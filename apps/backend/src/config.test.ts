@@ -104,6 +104,20 @@ describe('createConfig', () => {
       expect(createConfig({ TRUST_PROXY: '10.0.0.0/8' }).trust_proxy).toBe('10.0.0.0/8')
       expect(createConfig({ TRUST_PROXY: '127.0.0.1,10.0.0.1' }).trust_proxy).toBe('127.0.0.1,10.0.0.1')
     })
+
+    it('accepts the named presets proxy-addr understands', () => {
+      expect(createConfig({ TRUST_PROXY: 'loopback' }).trust_proxy).toBe('loopback')
+      expect(createConfig({ TRUST_PROXY: 'uniquelocal' }).trust_proxy).toBe('uniquelocal')
+    })
+
+    it('reports a malformed value here rather than letting Fastify throw later', () => {
+      // Without validating, `TRUE` reaches proxy-addr.compile() from inside
+      // Fastify() and surfaces as a bare `invalid IP address: TRUE`, not the
+      // configuration block this module and the README promise.
+      expect(() => createConfig({ TRUST_PROXY: 'TRUE' })).toThrow(/Invalid environment configuration/)
+      expect(() => createConfig({ TRUST_PROXY: 'TRUE' })).toThrow(/TRUST_PROXY/)
+      expect(() => createConfig({ TRUST_PROXY: '10.0.0.0/nonsense' })).toThrow(/TRUST_PROXY/)
+    })
   })
 
   describe('rejection', () => {

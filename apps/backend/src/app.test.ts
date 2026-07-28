@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -92,6 +92,8 @@ describe('with a web root', () => {
     webRoot = mkdtempSync(join(tmpdir(), 'sage-burner-web-'))
     writeFileSync(join(webRoot, 'index.html'), '<!doctype html><title>Sage Burner</title>')
     writeFileSync(join(webRoot, 'app.js'), 'console.info("hi")')
+    mkdirSync(join(webRoot, 'assets'))
+    writeFileSync(join(webRoot, 'assets', 'index-a1b2c3.js'), 'export const hashed = true')
   })
 
   afterEach(() => {
@@ -105,6 +107,19 @@ describe('with a web root', () => {
 
     expect(response.statusCode).toBe(200)
     expect(response.body).toContain('console.info')
+  })
+
+  it('serves a nested asset, which is the shape every Vite build emits', async () => {
+    // Non-obvious property of `wildcard: false`: @fastify/static globs `**/**`
+    // at registration and registers a route per file, so subdirectories work.
+    // Without this test a regression breaking nested serving entirely would
+    // leave the file green, since only the negative cases cover subpaths.
+    await build({ WEB_ROOT: webRoot })
+
+    const response = await app.inject({ method: 'GET', url: '/assets/index-a1b2c3.js' })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.body).toContain('hashed')
   })
 
   it('serves the shell at the root', async () => {
@@ -170,7 +185,8 @@ describe('with a web root', () => {
     // text/html", which is far worse to debug than a 404.
     await build({ WEB_ROOT: webRoot })
 
-    const response = await app.inject({ method: 'GET', url: '/assets/index-a1b2c3.js' })
+    // A hash from the *previous* build — the fixture only has index-a1b2c3.js.
+    const response = await app.inject({ method: 'GET', url: '/assets/index-0ldbu1.js' })
 
     expect(response.statusCode).toBe(404)
     expect(response.headers['content-type']).toContain('application/json')
@@ -202,5 +218,56 @@ describe('with a web root', () => {
 
     expect(response.statusCode).toBe(404)
     expect(response.json()).toEqual({ error: 'not_found' })
+  })
+
+  it('404s a percent-encoded API path rather than serving the shell', async () => {
+    // `/%61pi/nope` is `/api/nope`. Matching the raw path would hand back HTML
+    // and make the "an API path is never the SPA shell" rule not quite true.
+    await build({ WEB_ROOT: webRoot })
+
+    const response = await app.inject({ method: 'GET', url: '/%61pi/nope' })
+
+    expect(response.statusCode).toBe(404)
+    expect(response.json()).toEqual({ error: 'not_found' })
+  })
+})
+
+describe('a web root that cannot serve the app', () => {
+  // Setting WEB_ROOT states an intent to serve the frontend. Failing to do so
+  // must stop the boot: /api/version would keep answering, so the container
+  // healthcheck stays green while every page 404s — which is what a typo'd
+  // variable, an unmounted volume, or a missing web build all look like.
+  let dir: string
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'sage-burner-badroot-'))
+  })
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  const buildWith = async (webRoot: string) => {
+    handle = createDb({ url: ':memory:' })
+    runMigrations(handle)
+    return createApp({
+      db: handle.db,
+      config: createConfig({ LOG_LEVEL: 'silent', WEB_ROOT: webRoot }),
+    })
+  }
+
+  it('refuses to start when the directory does not exist', async () => {
+    await expect(buildWith(join(dir, 'nope'))).rejects.toThrow(/does not exist/i)
+  })
+
+  it('refuses to start when the path is a file', async () => {
+    const file = join(dir, 'a-file')
+    writeFileSync(file, 'not a directory')
+
+    await expect(buildWith(file)).rejects.toThrow(/not a directory/i)
+  })
+
+  it('refuses to start when there is no index.html to serve', async () => {
+    await expect(buildWith(dir)).rejects.toThrow(/index\.html/i)
   })
 })

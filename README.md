@@ -70,10 +70,14 @@ nothing.
 Invalid configuration fails at boot with every problem listed, rather than
 starting and behaving subtly wrong.
 
-`TRUST_PROXY` defaults to trusting nothing. Set it to `1` when the app sits
-behind a single reverse proxy — leaving it at `false` there means `request.ip`
-is the proxy's address, while setting it to `true` means any client can claim
-whatever address it likes via `X-Forwarded-For`.
+`TRUST_PROXY` defaults to trusting nothing. See the deployment notes below for
+what to set it to.
+
+Setting `WEB_ROOT` is a statement of intent to serve the frontend, so the app
+refuses to start if that directory is missing, is not a directory, or has no
+`index.html`. Without that check a typo'd variable or an unmounted volume would
+produce a container that starts, keeps answering the healthcheck, and 404s every
+page.
 
 ### Database
 
@@ -108,6 +112,43 @@ database ahead of time.
 >
 > There will be no open signup, so a fresh deployment also needs a way to seed
 > the first admin before anybody can be approved ([#10]).
+
+### Deployment shape
+
+Apache on the host holds the public IP for several domains and reverse-proxies
+to the container:
+
+```
+client ──https──▶ Apache (host) ──http──▶ 127.0.0.1:8081 ──▶ container :3000
+```
+
+Two things follow from that, both easy to get wrong:
+
+**Set `TRUST_PROXY=1`.** Apache is the only hop that appends to
+`X-Forwarded-For` — Docker's port mapping is NAT, not an HTTP proxy, so it adds
+nothing. Trusting exactly one hop makes `request.ip` the real client address,
+and it is spoof-resistant: a client can only _prepend_ to the header, while
+Apache appends the address it actually saw. `true` would trust the whole chain
+and let any client claim any address; the default `false` leaves every request
+looking like it came from the Docker bridge.
+
+**Publish the port on loopback only** — `127.0.0.1:8081:3000`, never
+`8081:3000`. Docker writes its own iptables rules ahead of ufw/firewalld, so a
+plainly-published port is reachable from the internet even with a host firewall
+that denies it, bypassing Apache and its TLS entirely.
+
+The vhost needs roughly:
+
+```apache
+ProxyPreserveHost On
+RequestHeader set X-Forwarded-Proto "https"
+ProxyPass        / http://127.0.0.1:8081/
+ProxyPassReverse / http://127.0.0.1:8081/
+```
+
+`X-Forwarded-Proto` is not cosmetic: Apache terminates TLS, so without it the
+app believes it is serving plain HTTP — which decides whether the session cookie
+gets its `Secure` flag.
 
 [#5]: https://github.com/fiddur/sage-burner/issues/5
 [#6]: https://github.com/fiddur/sage-burner/issues/6

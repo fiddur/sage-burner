@@ -1,3 +1,4 @@
+import proxyAddr from 'proxy-addr'
 import { z } from 'zod'
 
 /**
@@ -48,7 +49,12 @@ const parseTrustProxy = (value: string | undefined): boolean | number | string =
   if (value === 'true') return true
   if (value === 'false') return false
   if (/^\d+$/.test(value)) return Number(value)
-  // Anything else is an address or CIDR list, which Fastify accepts verbatim.
+
+  // Anything else is an address or CIDR list. Validated with the same compiler
+  // Fastify will use, so `TRUE`, `yes`, or a fat-fingered CIDR is reported here
+  // among the other configuration problems rather than surfacing later as a
+  // bare `invalid IP address: TRUE` thrown from inside Fastify().
+  proxyAddr.compile(value.split(',').map((entry) => entry.trim()))
   return value
 }
 
@@ -101,6 +107,14 @@ export const createConfig = (env: NodeJS.ProcessEnv = process.env): Config => {
 
   const value = parsed.data
 
+  let trust_proxy: boolean | number | string
+  try {
+    trust_proxy = parseTrustProxy(value.TRUST_PROXY)
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    throw new Error(`Invalid environment configuration:\n  TRUST_PROXY: ${detail}`)
+  }
+
   return {
     node_env: value.NODE_ENV,
     port: value.PORT,
@@ -108,7 +122,7 @@ export const createConfig = (env: NodeJS.ProcessEnv = process.env): Config => {
     database_url: value.DATABASE_URL,
     log_level: value.LOG_LEVEL,
     build_sha: value.BUILD_SHA,
-    trust_proxy: parseTrustProxy(value.TRUST_PROXY),
+    trust_proxy,
     ...(value.WEB_ROOT === undefined ? {} : { web_root: value.WEB_ROOT }),
   }
 }
