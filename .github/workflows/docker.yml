@@ -1,6 +1,13 @@
 name: Build and Push Docker Image
 
 on:
+  # No `paths:` filter here, deliberately. A path-filtered `pull_request`
+  # trigger reports *no check at all* on an unaffected PR rather than a passing
+  # one — which a required status check waits on forever.
+  pull_request:
+    branches:
+      - develop
+      - main
   push:
     branches:
       - develop
@@ -30,11 +37,13 @@ concurrency:
 # watchtower version pin.
 
 jobs:
-  # Publishing is gated on this. A merge to develop is live on the server within
-  # five minutes, watchtower has no rollback, and --cleanup removes the
-  # superseded image — so recovering from a bad deploy means hand-pinning a
-  # <sha> tag in the compose file. Cheap insurance against that.
+  # Runs on pull requests and on push. On push it gates publishing: a merge to
+  # develop is live on the server within five minutes, watchtower has no
+  # rollback, and --cleanup removes the superseded image — so recovering from a
+  # bad deploy means hand-pinning a <sha> tag in the compose file. On pull
+  # requests it is the check the merge gate in AGENTS.md refers to.
   check:
+    name: CI Gate
     runs-on: ubuntu-latest
     permissions:
       contents: read

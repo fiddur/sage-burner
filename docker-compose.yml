@@ -1,3 +1,14 @@
+# Pinned, because the volume's real name is derived from it. Left to default,
+# the project name is whatever directory this file happens to sit in — so
+# renaming or moving the deployment directory makes `docker compose up -d`
+# create a *fresh, empty* volume, migrate a new schema into it, and come up
+# healthy with no members and no error anywhere. The old volume survives, so it
+# is recoverable, but nothing signals that anything happened.
+#
+# A named volume protects against `docker compose down`. This protects against
+# the project name shifting underneath it.
+name: sage-burner
+
 # Deployment: Apache on the host holds the public IP for several domains and
 # reverse-proxies to this container.
 #

@@ -41,7 +41,10 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.json ./
 COPY packages/shared/package.json packages/shared/
 COPY apps/backend/package.json apps/backend/
 
-RUN pnpm install --frozen-lockfile --prod --ignore-scripts
+# The cache purge is part of the same layer, so corepack's downloaded pnpm
+# (~24MB) never lands in the image — which watchtower re-pulls on every deploy.
+RUN pnpm install --frozen-lockfile --prod --ignore-scripts \
+ && rm -rf /root/.cache
 
 # Node runs these as-is; there is no dist/ to copy.
 COPY packages/shared/src packages/shared/src

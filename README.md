@@ -193,7 +193,6 @@ Set it in the `:443` vhost, not in an include shared with a `:80` one. Hardcoded
 to `https` it would lie about a plain-HTTP request, and a cookie marked `Secure`
 on a connection that is not would simply never come back.
 
-[#6]: https://github.com/fiddur/sage-burner/issues/6
 [#10]: https://github.com/fiddur/sage-burner/issues/10
 
 ## Repository layout
