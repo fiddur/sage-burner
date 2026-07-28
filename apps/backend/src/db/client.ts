@@ -1,4 +1,6 @@
 import { drizzle } from 'drizzle-orm/node-sqlite'
+import { mkdirSync } from 'node:fs'
+import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
 import * as schema from './schema.ts'
@@ -27,6 +29,12 @@ export interface CreateDbOptions {
 const IN_MEMORY = ':memory:'
 
 export const createDb = ({ url }: CreateDbOptions): DbHandle => {
+  // SQLite will not create a missing parent directory — it just fails with
+  // `unable to open database file`. The default lives under a gitignored
+  // `data/`, so on a fresh checkout, and on a fresh Docker volume, that
+  // directory does not exist yet.
+  if (url !== IN_MEMORY) mkdirSync(path.dirname(url), { recursive: true })
+
   const client = new DatabaseSync(url)
 
   // SQLite ships with foreign key enforcement OFF, per connection. Without

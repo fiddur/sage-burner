@@ -1,3 +1,4 @@
+import type { Answers } from '@sage-burner/shared'
 import type { SQL } from 'drizzle-orm'
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core'
 
@@ -40,16 +41,26 @@ const oneOf = (column: SQLiteColumn, values: readonly string[]): SQL => {
  */
 
 /** A single burn. Never assume there is only one — the whole point is recurrence. */
-export const event = sqliteTable('event', {
-  id: text('id').primaryKey(),
-  name: text('name').notNull(),
-  slug: text('slug').notNull().unique(),
-  start_date: text('start_date').notNull(),
-  end_date: text('end_date').notNull(),
-  welcome_markdown: text('welcome_markdown').notNull().default(''),
-  member_cap: integer('member_cap').notNull(),
-  created_at: text('created_at').notNull(),
-})
+export const event = sqliteTable(
+  'event',
+  {
+    id: text('id').notNull(),
+    name: text('name').notNull(),
+    slug: text('slug').notNull().unique(),
+    start_date: text('start_date').notNull(),
+    end_date: text('end_date').notNull(),
+    welcome_markdown: text('welcome_markdown').notNull().default(''),
+    member_cap: integer('member_cap').notNull(),
+    created_at: text('created_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    // Mirrors `withEventDateOrder` in the shared schemas. Dates are fixed-width
+    // ISO, so a string comparison is chronological here.
+    check('event_date_order_check', sql`${table.end_date} >= ${table.start_date}`),
+    check('event_member_cap_check', sql`${table.member_cap} > 0`),
+  ],
+)
 
 /**
  * One question on an event's application form.
@@ -60,7 +71,7 @@ export const event = sqliteTable('event', {
 export const formQuestion = sqliteTable(
   'form_question',
   {
-    id: text('id').primaryKey(),
+    id: text('id').notNull(),
     event_id: text('event_id')
       .notNull()
       .references(() => event.id, { onDelete: 'cascade' }),
@@ -75,8 +86,12 @@ export const formQuestion = sqliteTable(
     options: text('options', { mode: 'json' }).$type<string[] | null>(),
   },
   (table) => [
+    primaryKey({ columns: [table.id] }),
     index('form_question_event_order_idx').on(table.event_id, table.order),
     check('form_question_type_check', oneOf(table.type, formQuestionTypes)),
+    check('form_question_order_check', sql`${table.order} >= 0`),
+    // SQLite has no boolean type, so without this the column accepts 7.
+    check('form_question_required_check', sql`${table.required} in (0, 1)`),
   ],
 )
 
@@ -84,12 +99,19 @@ export const formQuestion = sqliteTable(
 export const application = sqliteTable(
   'application',
   {
-    id: text('id').primaryKey(),
+    id: text('id').notNull(),
     event_id: text('event_id')
       .notNull()
       .references(() => event.id, { onDelete: 'cascade' }),
-    /** Answers keyed by `form_question.id`. */
-    answers: text('answers', { mode: 'json' }).$type<Record<string, string | boolean>>().notNull(),
+    /**
+     * Answers keyed by `form_question.id`.
+     *
+     * The type is imported, not restated: `Answers` is a *partial* record,
+     * because an unanswered optional question is absent at runtime. Writing
+     * `Record<string, string | boolean>` here would not be assignable from what
+     * the API layer validates, and the insert would need a cast to compile.
+     */
+    answers: text('answers', { mode: 'json' }).$type<Answers>().notNull(),
     status: text('status', { enum: applicationStatuses }).notNull().default('pending'),
     applicant_name: text('applicant_name').notNull(),
     applicant_contact: text('applicant_contact').notNull(),
@@ -97,26 +119,31 @@ export const application = sqliteTable(
     decided_at: text('decided_at'),
   },
   (table) => [
+    primaryKey({ columns: [table.id] }),
     index('application_event_status_idx').on(table.event_id, table.status),
     check('application_status_check', oneOf(table.status, applicationStatuses)),
   ],
 )
 
 /** A login identity. Password and passkeys both hang off this. */
-export const account = sqliteTable('account', {
-  id: text('id').primaryKey(),
-  /** Stored lowercased so lookups are unambiguous; uniqueness is enforced below. */
-  email: text('email').notNull().unique(),
-  /** Nullable: a passkey-only account is legitimate. */
-  password_hash: text('password_hash'),
-  created_at: text('created_at').notNull(),
-})
+export const account = sqliteTable(
+  'account',
+  {
+    id: text('id').notNull(),
+    /** Stored lowercased so lookups are unambiguous; uniqueness is enforced below. */
+    email: text('email').notNull().unique(),
+    /** Nullable: a passkey-only account is legitimate. */
+    password_hash: text('password_hash'),
+    created_at: text('created_at').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.id] })],
+)
 
 /** A registered WebAuthn credential. An account may have several, or none. */
 export const passkey = sqliteTable(
   'passkey',
   {
-    id: text('id').primaryKey(),
+    id: text('id').notNull(),
     account_id: text('account_id')
       .notNull()
       .references(() => account.id, { onDelete: 'cascade' }),
@@ -126,7 +153,11 @@ export const passkey = sqliteTable(
     counter: integer('counter').notNull().default(0),
     created_at: text('created_at').notNull(),
   },
-  (table) => [index('passkey_account_idx').on(table.account_id)],
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    index('passkey_account_idx').on(table.account_id),
+    check('passkey_counter_check', sql`${table.counter} >= 0`),
+  ],
 )
 
 /** Coarse access level. No fine-grained permissions in v1. */
@@ -153,7 +184,7 @@ export const accountRole = sqliteTable(
 export const inviteToken = sqliteTable(
   'invite_token',
   {
-    id: text('id').primaryKey(),
+    id: text('id').notNull(),
     /** CSPRNG-random and unguessable — never derived from the id or a timestamp. */
     token: text('token').notNull().unique(),
     event_id: text('event_id')
@@ -168,7 +199,7 @@ export const inviteToken = sqliteTable(
       .notNull()
       .references(() => account.id),
   },
-  (table) => [index('invite_token_event_idx').on(table.event_id)],
+  (table) => [primaryKey({ columns: [table.id] }), index('invite_token_event_idx').on(table.event_id)],
 )
 
 /**
@@ -180,7 +211,7 @@ export const inviteToken = sqliteTable(
 export const member = sqliteTable(
   'member',
   {
-    id: text('id').primaryKey(),
+    id: text('id').notNull(),
     event_id: text('event_id')
       .notNull()
       .references(() => event.id, { onDelete: 'cascade' }),
@@ -207,10 +238,23 @@ export const member = sqliteTable(
       .references(() => inviteToken.id),
   },
   (table) => [
-    // One membership per person per burn. This is also what makes concurrent
-    // redemptions of the same invite safe: the second insert loses.
+    primaryKey({ columns: [table.id] }),
+    // One membership per person per burn.
     uniqueIndex('member_event_account_idx').on(table.event_id, table.account_id),
-    index('member_event_idx').on(table.event_id),
+    // What actually makes an invite single-use. Stamping `used_at` in the
+    // application is a check-then-act race with nothing underneath it, and the
+    // index above only stops the *same* account joining twice — so without
+    // this, a forwarded invite link lets a second person redeem it and quietly
+    // breaks member_cap accounting, which is sized against invites issued.
+    uniqueIndex('member_invite_token_idx').on(table.invite_token_id),
+    // Mirrors `withMemberStayOrder` in the shared schemas.
+    check(
+      'member_stay_order_check',
+      sql`${table.arrival_date} is null or ${table.departure_date} is null
+          or ${table.departure_date} >= ${table.arrival_date}`,
+    ),
+    // No separate index on event_id alone: SQLite uses the leftmost prefix of
+    // member_event_account_idx for that, so one would only add write cost.
     check('member_payment_status_check', oneOf(table.payment_status, paymentStatuses)),
   ],
 )
@@ -227,7 +271,7 @@ export const member = sqliteTable(
 export const session = sqliteTable(
   'session',
   {
-    id: text('id').primaryKey(),
+    id: text('id').notNull(),
     event_id: text('event_id')
       .notNull()
       .references(() => event.id, { onDelete: 'cascade' }),
@@ -240,7 +284,19 @@ export const session = sqliteTable(
     time_slot_end: text('time_slot_end'),
     location: text('location'),
   },
-  (table) => [index('session_event_slot_idx').on(table.event_id, table.time_slot_start)],
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    index('session_event_slot_idx').on(table.event_id, table.time_slot_start),
+    // Mirrors `withValidTimeSlot`: a slot is both ends or neither. The
+    // ordering half of that rule is not expressible here — comparing ISO
+    // timestamps needs instant semantics, not SQLite string comparison — so it
+    // stays in the Zod schema. Noted so the asymmetry does not read as an
+    // oversight.
+    check(
+      'session_slot_whole_check',
+      sql`(${table.time_slot_start} is null) = (${table.time_slot_end} is null)`,
+    ),
+  ],
 )
 
 // Deliberately no relations() / defineRelations() block.

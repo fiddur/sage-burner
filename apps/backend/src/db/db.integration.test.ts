@@ -261,6 +261,32 @@ describe('uniqueness', () => {
   it('rejects a duplicate account email', () => {
     expect(() => seedAccount(ids.otherAccount, 'admin@example.org')).toThrow()
   })
+
+  it('makes an invite genuinely single-use, even by a different account', () => {
+    // The (event, account) index only stops the *same* person joining twice.
+    // Without a unique index on invite_token_id, a forwarded invite link lets
+    // a second person redeem it — and member_cap is sized against invites
+    // issued, so the cap silently overruns too.
+    seedAccount(ids.otherAccount, 'someone.else@example.org')
+    seedInvite(ids.invite)
+    seedMember(ids.member, ids.account, ids.invite)
+
+    expect(() => seedMember(ids.otherMember, ids.otherAccount, ids.invite)).toThrow()
+  })
+
+  it('rejects a NULL primary key, which SQLite would otherwise allow', () => {
+    // Outside INTEGER PRIMARY KEY, SQLite permits NULL in a primary key column
+    // unless it is also NOT NULL — and NULLs compare distinct, so it permits
+    // several. Drizzle's types require an id, but a raw statement does not.
+    expect(() =>
+      handle.client
+        .prepare(
+          `INSERT INTO event (id, name, slug, start_date, end_date, welcome_markdown, member_cap, created_at)
+           VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run('Nameless', 'nameless', '2026-10-02', '2026-10-04', '', 42, NOW),
+    ).toThrow()
+  })
 })
 
 describe('check constraints', () => {
@@ -295,6 +321,84 @@ describe('check constraints', () => {
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
         )
         .run('app2', ids.event, '{}', 'maybe', 'Someone', 'a@b.c', NOW),
+    ).toThrow()
+  })
+
+  it('rejects an event that ends before it starts', () => {
+    expect(() =>
+      handle.client
+        .prepare(
+          `INSERT INTO event (id, name, slug, start_date, end_date, welcome_markdown, member_cap, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run('e-bad', 'Backwards', 'backwards', '2026-10-04', '2026-10-02', '', 42, NOW),
+    ).toThrow()
+  })
+
+  it('rejects a non-positive member cap', () => {
+    expect(() =>
+      handle.client
+        .prepare(
+          `INSERT INTO event (id, name, slug, start_date, end_date, welcome_markdown, member_cap, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run('e-cap', 'Nobody', 'nobody', '2026-10-02', '2026-10-04', '', 0, NOW),
+    ).toThrow()
+  })
+
+  it('rejects a member departing before they arrive', () => {
+    seedInvite(ids.invite)
+    expect(() =>
+      handle.client
+        .prepare(
+          `INSERT INTO member (id, event_id, account_id, name, contact, arrival_date, departure_date,
+                               payment_status, invite_token_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          ids.member,
+          ids.event,
+          ids.account,
+          'Someone',
+          'a@b.c',
+          '2026-10-04',
+          '2026-10-02',
+          'unpaid',
+          ids.invite,
+        ),
+    ).toThrow()
+  })
+
+  it('rejects half a time slot', () => {
+    seedInvite(ids.invite)
+    seedMember(ids.member, ids.account, ids.invite)
+    expect(() =>
+      handle.client
+        .prepare(
+          `INSERT INTO session (id, event_id, title, host_member_id, description, time_slot_start, time_slot_end)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run('s-half', ids.event, 'Half a slot', ids.member, '', '2026-10-03T09:00:00Z', null),
+    ).toThrow()
+  })
+
+  it('rejects a negative question order', () => {
+    expect(() =>
+      handle.client
+        .prepare(
+          'INSERT INTO form_question (id, event_id, "order", type, label, required) VALUES (?, ?, ?, ?, ?, ?)',
+        )
+        .run('q-neg', ids.event, -1, 'text', 'Why?', 1),
+    ).toThrow()
+  })
+
+  it('rejects a non-boolean required flag, which SQLite would otherwise store', () => {
+    expect(() =>
+      handle.client
+        .prepare(
+          'INSERT INTO form_question (id, event_id, "order", type, label, required) VALUES (?, ?, ?, ?, ?, ?)',
+        )
+        .run('q-seven', ids.event, 0, 'text', 'Why?', 7),
     ).toThrow()
   })
 

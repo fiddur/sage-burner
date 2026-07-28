@@ -1,5 +1,5 @@
 CREATE TABLE `account` (
-	`id` text PRIMARY KEY,
+	`id` text PRIMARY KEY NOT NULL,
 	`email` text NOT NULL UNIQUE,
 	`password_hash` text,
 	`created_at` text NOT NULL
@@ -14,7 +14,7 @@ CREATE TABLE `account_role` (
 );
 --> statement-breakpoint
 CREATE TABLE `application` (
-	`id` text PRIMARY KEY,
+	`id` text PRIMARY KEY NOT NULL,
 	`event_id` text NOT NULL,
 	`answers` text NOT NULL,
 	`status` text DEFAULT 'pending' NOT NULL,
@@ -27,18 +27,20 @@ CREATE TABLE `application` (
 );
 --> statement-breakpoint
 CREATE TABLE `event` (
-	`id` text PRIMARY KEY,
+	`id` text PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
 	`slug` text NOT NULL UNIQUE,
 	`start_date` text NOT NULL,
 	`end_date` text NOT NULL,
 	`welcome_markdown` text DEFAULT '' NOT NULL,
 	`member_cap` integer NOT NULL,
-	`created_at` text NOT NULL
+	`created_at` text NOT NULL,
+	CONSTRAINT "event_date_order_check" CHECK("end_date" >= "start_date"),
+	CONSTRAINT "event_member_cap_check" CHECK("member_cap" > 0)
 );
 --> statement-breakpoint
 CREATE TABLE `form_question` (
-	`id` text PRIMARY KEY,
+	`id` text PRIMARY KEY NOT NULL,
 	`event_id` text NOT NULL,
 	`order` integer NOT NULL,
 	`type` text NOT NULL,
@@ -47,11 +49,13 @@ CREATE TABLE `form_question` (
 	`required` integer DEFAULT false NOT NULL,
 	`options` text,
 	CONSTRAINT `fk_form_question_event_id_event_id_fk` FOREIGN KEY (`event_id`) REFERENCES `event`(`id`) ON DELETE CASCADE,
-	CONSTRAINT "form_question_type_check" CHECK("type" in ('text', 'textarea', 'checkbox', 'agreement'))
+	CONSTRAINT "form_question_type_check" CHECK("type" in ('text', 'textarea', 'checkbox', 'agreement')),
+	CONSTRAINT "form_question_order_check" CHECK("order" >= 0),
+	CONSTRAINT "form_question_required_check" CHECK("required" in (0, 1))
 );
 --> statement-breakpoint
 CREATE TABLE `invite_token` (
-	`id` text PRIMARY KEY,
+	`id` text PRIMARY KEY NOT NULL,
 	`token` text NOT NULL UNIQUE,
 	`event_id` text NOT NULL,
 	`application_id` text,
@@ -64,7 +68,7 @@ CREATE TABLE `invite_token` (
 );
 --> statement-breakpoint
 CREATE TABLE `member` (
-	`id` text PRIMARY KEY,
+	`id` text PRIMARY KEY NOT NULL,
 	`event_id` text NOT NULL,
 	`account_id` text NOT NULL,
 	`name` text NOT NULL,
@@ -81,21 +85,24 @@ CREATE TABLE `member` (
 	CONSTRAINT `fk_member_event_id_event_id_fk` FOREIGN KEY (`event_id`) REFERENCES `event`(`id`) ON DELETE CASCADE,
 	CONSTRAINT `fk_member_account_id_account_id_fk` FOREIGN KEY (`account_id`) REFERENCES `account`(`id`),
 	CONSTRAINT `fk_member_invite_token_id_invite_token_id_fk` FOREIGN KEY (`invite_token_id`) REFERENCES `invite_token`(`id`),
+	CONSTRAINT "member_stay_order_check" CHECK("arrival_date" is null or "departure_date" is null
+          or "departure_date" >= "arrival_date"),
 	CONSTRAINT "member_payment_status_check" CHECK("payment_status" in ('unpaid', 'partial', 'paid'))
 );
 --> statement-breakpoint
 CREATE TABLE `passkey` (
-	`id` text PRIMARY KEY,
+	`id` text PRIMARY KEY NOT NULL,
 	`account_id` text NOT NULL,
 	`credential_id` text NOT NULL UNIQUE,
 	`public_key` text NOT NULL,
 	`counter` integer DEFAULT 0 NOT NULL,
 	`created_at` text NOT NULL,
-	CONSTRAINT `fk_passkey_account_id_account_id_fk` FOREIGN KEY (`account_id`) REFERENCES `account`(`id`) ON DELETE CASCADE
+	CONSTRAINT `fk_passkey_account_id_account_id_fk` FOREIGN KEY (`account_id`) REFERENCES `account`(`id`) ON DELETE CASCADE,
+	CONSTRAINT "passkey_counter_check" CHECK("counter" >= 0)
 );
 --> statement-breakpoint
 CREATE TABLE `session` (
-	`id` text PRIMARY KEY,
+	`id` text PRIMARY KEY NOT NULL,
 	`event_id` text NOT NULL,
 	`title` text NOT NULL,
 	`host_member_id` text NOT NULL,
@@ -104,13 +111,14 @@ CREATE TABLE `session` (
 	`time_slot_end` text,
 	`location` text,
 	CONSTRAINT `fk_session_event_id_event_id_fk` FOREIGN KEY (`event_id`) REFERENCES `event`(`id`) ON DELETE CASCADE,
-	CONSTRAINT `fk_session_host_member_id_member_id_fk` FOREIGN KEY (`host_member_id`) REFERENCES `member`(`id`) ON DELETE CASCADE
+	CONSTRAINT `fk_session_host_member_id_member_id_fk` FOREIGN KEY (`host_member_id`) REFERENCES `member`(`id`) ON DELETE CASCADE,
+	CONSTRAINT "session_slot_whole_check" CHECK(("time_slot_start" is null) = ("time_slot_end" is null))
 );
 --> statement-breakpoint
 CREATE INDEX `application_event_status_idx` ON `application` (`event_id`,`status`);--> statement-breakpoint
 CREATE INDEX `form_question_event_order_idx` ON `form_question` (`event_id`,`order`);--> statement-breakpoint
 CREATE INDEX `invite_token_event_idx` ON `invite_token` (`event_id`);--> statement-breakpoint
 CREATE UNIQUE INDEX `member_event_account_idx` ON `member` (`event_id`,`account_id`);--> statement-breakpoint
-CREATE INDEX `member_event_idx` ON `member` (`event_id`);--> statement-breakpoint
+CREATE UNIQUE INDEX `member_invite_token_idx` ON `member` (`invite_token_id`);--> statement-breakpoint
 CREATE INDEX `passkey_account_idx` ON `passkey` (`account_id`);--> statement-breakpoint
 CREATE INDEX `session_event_slot_idx` ON `session` (`event_id`,`time_slot_start`);

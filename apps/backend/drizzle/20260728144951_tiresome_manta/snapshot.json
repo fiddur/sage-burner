@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "c6fc8aed-6962-4635-8ca4-b8662903b584",
+  "id": "3d1f1cdd-5905-4f74-9fb9-ff554ce80050",
   "prevIds": ["00000000-0000-0000-0000-000000000000"],
   "ddl": [
     {
@@ -42,7 +42,7 @@
     },
     {
       "type": "text",
-      "notNull": false,
+      "notNull": true,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -102,7 +102,7 @@
     },
     {
       "type": "text",
-      "notNull": false,
+      "notNull": true,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -182,7 +182,7 @@
     },
     {
       "type": "text",
-      "notNull": false,
+      "notNull": true,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -262,7 +262,7 @@
     },
     {
       "type": "text",
-      "notNull": false,
+      "notNull": true,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -342,7 +342,7 @@
     },
     {
       "type": "text",
-      "notNull": false,
+      "notNull": true,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -412,7 +412,7 @@
     },
     {
       "type": "text",
-      "notNull": false,
+      "notNull": true,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -552,7 +552,7 @@
     },
     {
       "type": "text",
-      "notNull": false,
+      "notNull": true,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -612,7 +612,7 @@
     },
     {
       "type": "text",
-      "notNull": false,
+      "notNull": true,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -823,6 +823,13 @@
       "table": "session"
     },
     {
+      "columns": ["id"],
+      "nameExplicit": false,
+      "name": "account_pk",
+      "entityType": "pks",
+      "table": "account"
+    },
+    {
       "columns": ["account_id", "role"],
       "nameExplicit": false,
       "name": "account_role_pk",
@@ -832,58 +839,51 @@
     {
       "columns": ["id"],
       "nameExplicit": false,
-      "name": "account_pk",
-      "table": "account",
-      "entityType": "pks"
-    },
-    {
-      "columns": ["id"],
-      "nameExplicit": false,
       "name": "application_pk",
-      "table": "application",
-      "entityType": "pks"
+      "entityType": "pks",
+      "table": "application"
     },
     {
       "columns": ["id"],
       "nameExplicit": false,
       "name": "event_pk",
-      "table": "event",
-      "entityType": "pks"
+      "entityType": "pks",
+      "table": "event"
     },
     {
       "columns": ["id"],
       "nameExplicit": false,
       "name": "form_question_pk",
-      "table": "form_question",
-      "entityType": "pks"
+      "entityType": "pks",
+      "table": "form_question"
     },
     {
       "columns": ["id"],
       "nameExplicit": false,
       "name": "invite_token_pk",
-      "table": "invite_token",
-      "entityType": "pks"
+      "entityType": "pks",
+      "table": "invite_token"
     },
     {
       "columns": ["id"],
       "nameExplicit": false,
       "name": "member_pk",
-      "table": "member",
-      "entityType": "pks"
+      "entityType": "pks",
+      "table": "member"
     },
     {
       "columns": ["id"],
       "nameExplicit": false,
       "name": "passkey_pk",
-      "table": "passkey",
-      "entityType": "pks"
+      "entityType": "pks",
+      "table": "passkey"
     },
     {
       "columns": ["id"],
       "nameExplicit": false,
       "name": "session_pk",
-      "table": "session",
-      "entityType": "pks"
+      "entityType": "pks",
+      "table": "session"
     },
     {
       "columns": [
@@ -956,14 +956,14 @@
     {
       "columns": [
         {
-          "value": "event_id",
+          "value": "invite_token_id",
           "isExpression": false
         }
       ],
-      "isUnique": false,
+      "isUnique": true,
       "where": null,
       "origin": "manual",
-      "name": "member_event_idx",
+      "name": "member_invite_token_idx",
       "entityType": "indexes",
       "table": "member"
     },
@@ -1040,16 +1040,58 @@
       "table": "application"
     },
     {
+      "value": "\"end_date\" >= \"start_date\"",
+      "name": "event_date_order_check",
+      "entityType": "checks",
+      "table": "event"
+    },
+    {
+      "value": "\"member_cap\" > 0",
+      "name": "event_member_cap_check",
+      "entityType": "checks",
+      "table": "event"
+    },
+    {
       "value": "\"type\" in ('text', 'textarea', 'checkbox', 'agreement')",
       "name": "form_question_type_check",
       "entityType": "checks",
       "table": "form_question"
     },
     {
+      "value": "\"order\" >= 0",
+      "name": "form_question_order_check",
+      "entityType": "checks",
+      "table": "form_question"
+    },
+    {
+      "value": "\"required\" in (0, 1)",
+      "name": "form_question_required_check",
+      "entityType": "checks",
+      "table": "form_question"
+    },
+    {
+      "value": "\"arrival_date\" is null or \"departure_date\" is null\n          or \"departure_date\" >= \"arrival_date\"",
+      "name": "member_stay_order_check",
+      "entityType": "checks",
+      "table": "member"
+    },
+    {
       "value": "\"payment_status\" in ('unpaid', 'partial', 'paid')",
       "name": "member_payment_status_check",
       "entityType": "checks",
       "table": "member"
+    },
+    {
+      "value": "\"counter\" >= 0",
+      "name": "passkey_counter_check",
+      "entityType": "checks",
+      "table": "passkey"
+    },
+    {
+      "value": "(\"time_slot_start\" is null) = (\"time_slot_end\" is null)",
+      "name": "session_slot_whole_check",
+      "entityType": "checks",
+      "table": "session"
     }
   ],
   "renames": []
