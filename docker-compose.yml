@@ -95,7 +95,14 @@ services:
     # updates itself. Upstream has had no release since 1.7.1 and is largely
     # dormant; a maintained fork is worth considering for the thing that
     # auto-deploys production.
-    image: containrrr/watchtower:1.7.1
+    #
+    # Digest-pinned, not just tagged: a tag can be re-pushed, and the workflow
+    # next door declines exactly that bet for GitHub Actions. The Dockerfile's
+    # argument for a floating base tag — that pinning would freeze security
+    # patches — does not transfer, since this image is dormant upstream and
+    # never updates itself anyway. Dependabot's docker-compose entry keeps the
+    # digest current.
+    image: containrrr/watchtower:1.7.1@sha256:6dd50763bbd632a83cb154d5451700530d1e44200b268a4e9488fefdfcf2b038
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     labels:

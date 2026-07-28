@@ -151,16 +151,27 @@ jobs:
             --cap-drop ALL \
             --security-opt no-new-privileges:true \
             -p 127.0.0.1:3000:3000 "$IMAGE"
-          for _ in $(seq 30); do
-            if curl -fsS http://127.0.0.1:3000/api/version; then
+          # Waits on the image's own HEALTHCHECK rather than curling from the
+          # host. That subsumes the curl — the healthcheck hits /api/version
+          # too — and additionally exercises the instruction itself, so a base
+          # image dropping busybox wget, or ${PORT} ceasing to expand, fails
+          # here rather than leaving a permanently unhealthy container that CI
+          # called fine. The README positions the healthcheck as the signal to
+          # monitor, so a silently broken one is worse than none.
+          for _ in $(seq 45); do
+            STATUS=$(docker inspect -f '{{.State.Health.Status}}' smoke)
+            if [ "$STATUS" = healthy ]; then
+              echo "image starts, migrates, serves, and reports healthy"
+              curl -fsS http://127.0.0.1:3000/api/version
               echo
-              echo "image starts, migrates and serves"
               docker rm -f smoke > /dev/null
               exit 0
             fi
+            if [ "$STATUS" = unhealthy ]; then break; fi
             sleep 1
           done
-          echo "image did not become responsive:"
+          echo "image never became healthy (last status: ${STATUS:-unknown}):"
+          docker inspect -f '{{json .State.Health}}' smoke || true
           docker logs smoke
           exit 1
 

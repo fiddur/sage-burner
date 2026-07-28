@@ -59,6 +59,12 @@ COPY apps/backend/drizzle apps/backend/drizzle
 
 COPY --from=builder /app/apps/web/dist ./apps/web/dist
 
+# Publishing to Docker Hub is conveying, and this is AGPL. The Corresponding
+# Source ships almost incidentally — Node runs the TypeScript directly, so the
+# backend and shared sources are right there — but the terms have to travel
+# with it, and the image is the artifact strangers actually receive.
+COPY LICENSE ./
+
 # The volume mount point, and the only thing the app needs to write. /app stays
 # root-owned and world-readable: `node` can read its own code and dependencies
 # but cannot modify them, and a recursive chown here would rewrite every copied
