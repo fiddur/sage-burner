@@ -63,10 +63,13 @@ jobs:
       - run: pnpm check
       - run: pnpm test
 
+  # Runs on pull requests too, without pushing. Otherwise CI Gate could go green
+  # on a change that breaks the image — a Dockerfile edit, a lockfile change, or
+  # a new workspace package the runtime stage's hand-picked COPY list misses —
+  # and the failure would surface only in the publish run after merge, leaving
+  # develop unpublishable until someone noticed the red run.
   build:
     needs: check
-    # Also guards workflow_dispatch, which can be fired from any branch.
-    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     # Nothing here uses GITHUB_TOKEN — Hub auth is via secrets and the GHA cache
     # uses ACTIONS_RUNTIME_TOKEN — so the default grant would be unused
@@ -81,6 +84,9 @@ jobs:
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       - name: Log in to Docker Hub
+        # Nothing to authenticate for on a pull request, and this is the step
+        # holding push rights on the deployed image.
+        if: github.event_name != 'pull_request'
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -105,7 +111,10 @@ jobs:
         with:
           context: .
           file: Dockerfile
-          push: true
+          # Build always, publish only from the two release branches. The branch
+          # test also guards workflow_dispatch, which can be fired from any ref.
+          push: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/develop' ||
+            github.ref == 'refs/heads/main') }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           # Surfaced by /api/version, so a deployed container can be traced

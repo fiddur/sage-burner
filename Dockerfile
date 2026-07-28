@@ -87,7 +87,12 @@ EXPOSE 3000
 
 # Hits the app rather than the port, so a process that is up but not serving
 # still counts as unhealthy. `start-period` covers migrating a fresh volume.
+#
+# busybox wget rather than `node -e`: this runs every 30 seconds forever on a
+# small box that is also serving SQLite, and spawning a full Node runtime
+# (~50MB RSS) for a one-line HTTP GET is a poor trade. wget exits non-zero on a
+# non-2xx response, which is the property the check needs.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/api/version').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD wget -q -O /dev/null "http://127.0.0.1:${PORT}/api/version" || exit 1
 
 CMD ["node", "apps/backend/src/server.ts"]

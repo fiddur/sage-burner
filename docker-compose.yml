@@ -84,6 +84,15 @@ services:
       # Its own scope label, so a differently-scoped watchtower leaves it alone.
       - 'com.centurylinklabs.watchtower.scope=sage-burner'
     command: --label-enable --scope sage-burner --cleanup --interval 300
+    logging:
+      # Same reasoning as the app service: unrotated json-file grows until the
+      # disk does, and this one is on the same host and the same disk. It gets
+      # there far more slowly — a couple of lines per five-minute poll — but
+      # "slowly" on a box meant to run for months is still eventually.
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
     restart: unless-stopped
 
 volumes:
