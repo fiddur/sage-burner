@@ -30,10 +30,18 @@ services:
       # the vhost routing for every other domain on that IP.
       - '127.0.0.1:8081:3000'
     environment:
-      # Declared here, not in the image: this is the file that knows what is in
-      # front of the container. See README "Deployment shape" — `1` is correct
-      # for exactly one header-appending proxy, and is spoof-resistant there.
-      - TRUST_PROXY=${TRUST_PROXY:-1}
+      # Declared here rather than in the image, because this is the file that
+      # knows what is in front of the container. `.env.example` ships
+      # TRUST_PROXY=1, which is correct for the documented Apache setup and
+      # spoof-resistant there.
+      #
+      # The fallback is `false` on purpose: the Dockerfile declines to guess
+      # this precisely because guessing fails open, and defaulting to 1 here
+      # would guess on behalf of anyone running `docker compose up` without a
+      # header-appending proxy — handing them a request.ip the client controls.
+      # So copying .env is a required step for the Apache deployment, not an
+      # optional one.
+      - TRUST_PROXY=${TRUST_PROXY:-false}
       - LOG_LEVEL=${LOG_LEVEL:-info}
     volumes:
       # The database. A named volume rather than a bind mount so `docker
@@ -48,6 +56,10 @@ services:
       - 'com.centurylinklabs.watchtower.scope=sage-burner'
     # No healthcheck block: the image defines one that respects $PORT, and
     # repeating it here only creates two copies to keep in step.
+    security_opt:
+      # No setuid binary in the image can gain privileges. Close to free, and
+      # this container is reachable from the network and holds member records.
+      - no-new-privileges:true
     logging:
       # The daemon default is json-file with no rotation. Fastify writes a JSON
       # line per request, and this is meant to sit on a small box for months —

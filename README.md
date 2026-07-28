@@ -129,9 +129,14 @@ correct wherever you are standing.
 ## Running it for real
 
 ```sh
-cp .env.example .env    # optional — every variable has a working default
+cp .env.example .env
 docker compose up -d
 ```
+
+Copying `.env` is a required step, not a convenience: `TRUST_PROXY` defaults to
+`false` so that a compose file run without a reverse proxy in front cannot be
+handed a client-controlled `request.ip`. `.env.example` ships the `1` that the
+Apache deployment below wants.
 
 One service, one named volume holding the SQLite database, and a watchtower
 sidecar that polls Docker Hub every five minutes and redeploys when the tag

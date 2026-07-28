@@ -23,6 +23,15 @@ updates:
       interval: weekly
     commit-message:
       prefix: 'chore(deploy)'
+    ignore:
+      # Not major bumps of the base image. AGENTS.md records Node 24 LTS as a
+      # deliberate divergence — odd-numbered lines never become LTS — so a
+      # node:25 PR would arrive weekly and always be closed. It would fail
+      # loudly rather than dangerously (root `engines: ~24` makes pnpm refuse
+      # the install), but noise that is always wrong trains people to ignore
+      # the rule that is sometimes right.
+      - dependency-name: node
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: npm
     directory: /
