@@ -230,7 +230,7 @@ docker run --rm \
   alpine sh -c '
     rm -f /data/sage-burner.sqlite /data/sage-burner.sqlite-wal /data/sage-burner.sqlite-shm &&
     cp /backup/sage-burner-<stamp>.sqlite /data/sage-burner.sqlite &&
-    chown 1000:1000 /data/sage-burner.sqlite'
+    chown -R 1000:1000 /data'
 
 docker compose up -d
 ```
@@ -242,9 +242,15 @@ Three things that will bite otherwise:
   you just replaced. The backup is already a complete, checkpointed copy.
 - **Use the full volume name.** `-v sage_burner_data:/data` does not error — it
   creates a new empty volume, and you restore into nothing.
-- **`chown 1000:1000`.** The container runs as `node`, and a file copied in by
-  root is not writable by it. The app would start and then fail on the first
-  write.
+- **`chown -R`, not just the file.** The container runs as `node`. If the volume
+  no longer exists — lost host, `docker volume rm`, restoring onto a new machine,
+  which is exactly when this section is needed — this `docker run` is the first
+  to mount it, so Docker creates it root-owned from the `alpine` image. Chowning
+  only the file leaves the _directory_ unwritable, SQLite cannot create the
+  `-wal`/`-shm` sidecars, and the container exits immediately with
+  `ERR_SQLITE_ERROR: attempt to write a readonly database` — pointing at the file
+  you just fixed. `restart: unless-stopped` then crash-loops it, so read
+  `docker compose logs` rather than hunting through request logs.
 
 The watchtower here is **scoped** — it runs with `--scope sage-burner` and only
 touches containers carrying the matching label — so it coexists with any other

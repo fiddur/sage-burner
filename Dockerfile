@@ -62,14 +62,17 @@ COPY --from=builder /app/apps/web/dist ./apps/web/dist
 # Publishing to Docker Hub is conveying, and this is AGPL, so the terms have to
 # travel with the artifact strangers actually receive.
 #
-# What ships as source and what does not: the backend and `packages/shared` are
-# here as TypeScript, because Node runs them directly rather than a build
-# artifact. `apps/web` is not — only its built bundle is copied, and the
-# Corresponding Source for that (its `src`, Vite config and manifest) is not in
-# the image. Corresponding Source for the bundle is offered through the public
-# repository, which the served app links to in its footer; that link is also
-# what answers AGPL §13 for network users, so it is load-bearing rather than
-# decorative.
+# What ships as source: the backend and `packages/shared` are here as
+# TypeScript, because Node runs them directly rather than a build artifact. The
+# web app's sources travel too, less obviously — `vite.config.ts` sets
+# `build.sourcemap: true`, so the emitted `.js.map` carries `sourcesContent`
+# and is served alongside the bundle. That is deliberate: the repository is
+# public and AGPL, and a sourcemap makes a real bug report far more useful.
+#
+# The build configuration itself is not in the image, so Corresponding Source
+# is completed by the public repository, which the served app links to in its
+# footer. That link also answers AGPL §13 for network users, making it
+# load-bearing rather than decorative — do not tidy it away in a redesign.
 COPY LICENSE ./
 
 # The volume mount point, and the only thing the app needs to write. /app stays
