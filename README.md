@@ -167,6 +167,12 @@ is consistent against a live database:
 
 ```sh
 STAMP=$(date +%F-%H%M)
+# Sweep any leftovers first. The cleanup at the end only runs on the happy path,
+# so an interrupted copy — or watchtower recreating the container mid-backup —
+# leaves a full database-sized file on the same volume the live database is on.
+# Repeated failures accumulate one each, and filling that disk takes SQLite's
+# write path down with it.
+docker compose exec -T sage-burner sh -c 'rm -f /data/backup-*.sqlite'
 # VACUUM INTO refuses to overwrite, so write to a fresh name each time — a run
 # that dies before the cleanup below must not block the next one.
 docker compose exec -T sage-burner \

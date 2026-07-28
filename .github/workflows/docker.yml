@@ -67,18 +67,10 @@ jobs:
       - run: pnpm check
       - run: pnpm test
 
-  # Runs on pull requests too, without pushing, and then starts what it built.
-  #
-  # Building alone is not enough: a missed source COPY produces a perfectly
-  # clean image that exits at boot with ERR_MODULE_NOT_FOUND, so the failure
-  # mode most likely to be introduced here — the runtime stage's hand-picked
-  # COPY list falling behind a new workspace package — is exactly the one a
-  # build-only gate waves through. Since watchtower has no rollback and
-  # --cleanup removes the superseded image, that is worth catching before
-  # merge rather than after.
-  #
-  # Starting it also exercises migrating a fresh volume, which nothing else
-  # does before production does it.
+  # Build, start what was built, then publish — in that order, so nothing
+  # unstartable reaches Docker Hub. Watchtower has no rollback and --cleanup
+  # removes the superseded image, so the alternative to catching it here is
+  # hand-pinning a <sha> tag in the compose file on a live deployment.
   build:
     needs: check
     runs-on: ubuntu-latest
@@ -116,19 +108,18 @@ jobs:
             type=sha,prefix=
             type=raw,value=develop,enable=${{ github.ref == 'refs/heads/develop' }}
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-            type=raw,value=pr-smoke,enable=${{ github.event_name == 'pull_request' }}
 
-      - name: Build and push
+      # Built and loaded, never pushed. The push is a separate step *after* the
+      # smoke test, so a broken image is never published — running the smoke
+      # test after a push would only tell us the thing watchtower is already
+      # deploying is broken.
+      - name: Build
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
           file: Dockerfile
-          # Build always, publish only from the two release branches. The branch
-          # test also guards workflow_dispatch, which can be fired from any ref.
-          push: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/develop' ||
-            github.ref == 'refs/heads/main') }}
-          # Into the runner's daemon on pull requests, so the next step can run it.
-          load: ${{ github.event_name == 'pull_request' }}
+          push: false
+          load: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           # Surfaced by /api/version, so a deployed container can be traced
@@ -137,12 +128,21 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Proves the image actually starts, not merely that it builds.
+      # Proves the image starts, not merely that it builds. A missed source COPY
+      # produces a perfectly clean image that exits at boot with
+      # ERR_MODULE_NOT_FOUND — the failure most likely to be introduced by
+      # editing the runtime stage's hand-picked COPY list, and the one a
+      # build-only gate waves through.
+      #
+      # Also exercises migrating a fresh volume, which nothing else does before
+      # production does it.
       - name: Smoke-test the image
-        if: github.event_name == 'pull_request'
         run: |
           set -euo pipefail
-          docker run -d --name smoke -p 127.0.0.1:3000:3000 fiddur/sage-burner:pr-smoke
+          # The sha tag, which metadata-action emits on every build.
+          IMAGE=$(printf '%s\n' "${{ steps.meta.outputs.tags }}" | head -1)
+          echo "smoke-testing $IMAGE"
+          docker run -d --name smoke -p 127.0.0.1:3000:3000 "$IMAGE"
           for _ in $(seq 30); do
             if curl -fsS http://127.0.0.1:3000/api/version; then
               echo
@@ -155,3 +155,19 @@ jobs:
           echo "image did not become responsive:"
           docker logs smoke
           exit 1
+
+      # Cache hit on the build above, so this only uploads layers. Publishes
+      # only from the two release branches; the branch test also guards
+      # workflow_dispatch, which can be fired from any ref.
+      - name: Push
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/develop' || github.ref ==
+          'refs/heads/main')
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: BUILD_SHA=${{ github.sha }}
+          cache-from: type=gha
