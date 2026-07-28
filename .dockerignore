@@ -1,0 +1,42 @@
+# Dependencies
+node_modules
+**/node_modules
+
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Build artifacts
+dist
+build
+coverage
+*.log
+
+# Tests (not needed in the runtime image)
+**/*.test.ts
+**/*.test.tsx
+**/*.integration.test.ts
+
+# Local database
+data
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
+# Documentation
+*.md
+docs
+
+# Environment files (passed in as env vars instead)
+.env
+.env.*
+
+# OS files
+.DS_Store
+Thumbs.db

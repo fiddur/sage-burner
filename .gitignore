@@ -1,0 +1,18 @@
+.env
+.env.*
+!.env.example
+node_modules
+dist/
+coverage/
+
+# Local SQLite database and its WAL/SHM sidecars
+data/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
+# Editors
+.idea
+.vscode
+*.iml
+*.swp
