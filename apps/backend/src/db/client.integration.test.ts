@@ -15,6 +15,10 @@ import { event } from './schema.ts'
  * Every other test uses `:memory:`, which skips both the directory creation and
  * the WAL pragmas — i.e. exactly the half that runs in production, where a
  * regression would only surface against a fresh Docker volume.
+ *
+ * Note: the relative-path cases call `process.chdir`, which works under
+ * vitest's default `forks` pool but throws under `threads`. If a
+ * `vitest.config.ts` ever sets a pool, keep this file on `forks`.
  */
 
 let dir: string
@@ -28,6 +32,23 @@ beforeEach(() => {
 afterEach(() => {
   handle?.close()
   rmSync(dir, { recursive: true, force: true })
+})
+
+describe('createDb url validation', () => {
+  it('refuses an empty url rather than opening a throwaway database', () => {
+    // `new DatabaseSync('')` succeeds and opens a private temporary database,
+    // so without this guard everything appears to work and the data is gone at
+    // shutdown. The cheapest possible test for the most expensive regression:
+    // a refactor dropping the guard, or reverting migrate-cli to `??`, would
+    // otherwise reintroduce silent data loss with a fully green suite.
+    expect(() => createDb({ url: '' })).toThrow(/empty/i)
+    expect(() => createDb({ url: '   ' })).toThrow(/empty/i)
+  })
+
+  it('still accepts an explicit :memory:', () => {
+    const memory = createDb({ url: ':memory:' })
+    expect(() => memory.close()).not.toThrow()
+  })
 })
 
 describe('createDb against a file', () => {

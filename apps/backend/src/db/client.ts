@@ -47,8 +47,10 @@ export const createDb = ({ url }: CreateDbOptions): DbHandle => {
   // `unable to open database file`. The default lives under a gitignored
   // `data/`, so on a fresh checkout, and on a fresh Docker volume, that
   // directory does not exist yet.
-  // 0o700: the file holds contact details and allergies. Irrelevant inside a
-  // single-tenant container, free everywhere else.
+  // 0o700 on directories we create, because the file holds contact details and
+  // allergies. Not a guarantee about the deployed file: an existing `data/` —
+  // a bind mount, or a volume Docker made 0755 — keeps its own permissions,
+  // and SQLite creates the file itself at 0644 & ~umask regardless.
   if (url !== IN_MEMORY) mkdirSync(path.dirname(url), { recursive: true, mode: 0o700 })
 
   const client = new DatabaseSync(url)

@@ -17,19 +17,27 @@ export const migrationsFolder = path.join(import.meta.dirname, '..', '..', 'driz
  * only what's new. Drizzle tracks what has run in its own table, so this is
  * idempotent and safe to call on every boot.
  *
- * Foreign keys are disabled for the duration, then the result is checked before
- * they go back on. That is not paranoia about our own SQL — it is forced by how
- * SQLite alters tables. SQLite cannot change a column in place, so drizzle-kit
- * emits a rebuild: `CREATE __new_x`, copy, `DROP TABLE x`, rename. With foreign
- * keys on, that `DROP` cascade-deletes the children of a parent table — rebuild
- * `event` and its members, applications and sessions go with it, silently and
- * inside a transaction that commits successfully.
+ * Foreign keys are disabled for the duration. That is not paranoia about our own
+ * SQL — it is forced by how SQLite alters tables. SQLite cannot change a column
+ * in place, so drizzle-kit emits a rebuild: `CREATE __new_x`, copy,
+ * `DROP TABLE x`, rename. With foreign keys on, that `DROP` cascade-deletes the
+ * children of a parent table — rebuild `event` and its members, applications
+ * and sessions go with it, silently, inside a transaction that then commits
+ * successfully.
  *
- * `PRAGMA foreign_keys` is a no-op inside a transaction and drizzle wraps
- * migrations in one, so out here is the only place it can be toggled at all.
- * `foreign_key_check` afterwards turns what would be a silent data loss into a
- * failed boot, which is the difference between noticing on deploy and noticing
- * when an organiser opens an empty member list.
+ * **Turning them off is the whole protection.** The `foreign_key_check`
+ * afterwards does not catch that case and must not be mistaken for a net under
+ * it: a cascade leaves nothing dangling, so the check comes back empty while
+ * the rows are gone. What it does catch is the inverse — children left pointing
+ * at a parent that vanished, which is what the same rebuild produces once
+ * cascades are off. Both are worth having; only one of them is this function's
+ * reason for existing.
+ *
+ * Hence the read-back. `PRAGMA foreign_keys` is a no-op inside a transaction
+ * and drizzle wraps migrations in one, so out here is the only place it can be
+ * toggled at all — and a silently ineffective `OFF` would arm the very cascade
+ * this exists to prevent. Better to refuse to migrate than to find out
+ * afterwards.
  *
  * If that check ever does fire, the database will not heal itself: drizzle has
  * already committed and recorded the migration, so it will not re-run and every
@@ -42,6 +50,13 @@ export const runMigrations = (handle: DbHandle, folder: string = migrationsFolde
 
   client.exec('PRAGMA foreign_keys = OFF')
   try {
+    if (client.prepare('PRAGMA foreign_keys').get()?.foreign_keys !== 0) {
+      throw new Error(
+        'Could not disable foreign keys before migrating (already inside a transaction?) — ' +
+          'refusing to run a table rebuild with cascades armed.',
+      )
+    }
+
     migrate(db, { migrationsFolder: folder })
 
     const violations = client.prepare('PRAGMA foreign_key_check').all()
