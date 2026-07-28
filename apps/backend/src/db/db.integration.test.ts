@@ -262,6 +262,14 @@ describe('uniqueness', () => {
     expect(() => seedAccount(ids.otherAccount, 'admin@example.org')).toThrow()
   })
 
+  it('refuses a mixed-case email, so one human cannot become two accounts', () => {
+    // SQLite's UNIQUE on TEXT is BINARY, so without the lowercase CHECK the
+    // address below is simply a different account — with its own passkeys,
+    // roles and memberships, able to join the very same event.
+    expect(() => seedAccount(ids.otherAccount, 'Admin@Example.org')).toThrow()
+    expect(() => seedAccount(ids.otherAccount, 'someone.else@example.org')).not.toThrow()
+  })
+
   it('makes an invite genuinely single-use, even by a different account', () => {
     // The (event, account) index only stops the *same* person joining twice.
     // Without a unique index on invite_token_id, a forwarded invite link lets

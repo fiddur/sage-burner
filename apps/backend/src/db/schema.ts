@@ -130,13 +130,24 @@ export const account = sqliteTable(
   'account',
   {
     id: text('id').notNull(),
-    /** Stored lowercased so lookups are unambiguous; uniqueness is enforced below. */
+    /**
+     * Always lowercase — enforced by the CHECK below, not merely intended.
+     *
+     * SQLite's UNIQUE on TEXT uses BINARY collation, so on its own it would
+     * make `admin@example.org` and `Admin@Example.org` two different accounts
+     * for one human, each with its own passkeys, roles and memberships.
+     * Requiring the stored form to be lowercase also guarantees an exact-match
+     * lookup on a lowercased input can never miss a row.
+     */
     email: text('email').notNull().unique(),
     /** Nullable: a passkey-only account is legitimate. */
     password_hash: text('password_hash'),
     created_at: text('created_at').notNull(),
   },
-  (table) => [primaryKey({ columns: [table.id] })],
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    check('account_email_lowercase_check', sql`${table.email} = lower(${table.email})`),
+  ],
 )
 
 /** A registered WebAuthn credential. An account may have several, or none. */
@@ -193,7 +204,13 @@ export const inviteToken = sqliteTable(
     /** Null for an admin-created direct invite with no application behind it. */
     application_id: text('application_id').references(() => application.id, { onDelete: 'set null' }),
     expires_at: text('expires_at').notNull(),
-    /** Stamped on redemption. A token with this set can never be redeemed again. */
+    /**
+     * Stamped on redemption, for display and auditing.
+     *
+     * This is a record of redemption, not the thing preventing a second one —
+     * inserting a member against an already-stamped token is accepted here.
+     * `member_invite_token_idx` is what actually enforces single use.
+     */
     used_at: text('used_at'),
     created_by: text('created_by')
       .notNull()
@@ -233,6 +250,16 @@ export const member = sqliteTable(
     /** Admin-set only. Members can read their own status but never write it. */
     payment_status: text('payment_status', { enum: paymentStatuses }).notNull().default('unpaid'),
     payment_date: text('payment_date'),
+    /**
+     * The invite this membership was redeemed from.
+     *
+     * Deliberately **not** constrained to match `event_id`: nothing here stops
+     * an invite minted for the autumn burn being redeemed into the spring one.
+     * Doing that in the schema needs a unique index on `invite_token(event_id,
+     * id)` plus a composite foreign key, and unlike double redemption — which
+     * is a check-then-act race the application cannot win alone — this is
+     * ordinary application logic, so the redemption path (#17) owns it.
+     */
     invite_token_id: text('invite_token_id')
       .notNull()
       .references(() => inviteToken.id),

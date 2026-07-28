@@ -2,7 +2,8 @@ CREATE TABLE `account` (
 	`id` text PRIMARY KEY NOT NULL,
 	`email` text NOT NULL UNIQUE,
 	`password_hash` text,
-	`created_at` text NOT NULL
+	`created_at` text NOT NULL,
+	CONSTRAINT "account_email_lowercase_check" CHECK("email" = lower("email"))
 );
 --> statement-breakpoint
 CREATE TABLE `account_role` (

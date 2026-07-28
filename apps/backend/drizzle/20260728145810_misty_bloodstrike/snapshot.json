@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "3d1f1cdd-5905-4f74-9fb9-ff554ce80050",
+  "id": "05290d4c-48cc-409e-b527-04ad2ab5416e",
   "prevIds": ["00000000-0000-0000-0000-000000000000"],
   "ddl": [
     {
@@ -1026,6 +1026,12 @@
       "name": "passkey_credential_id_unique",
       "entityType": "uniques",
       "table": "passkey"
+    },
+    {
+      "value": "\"email\" = lower(\"email\")",
+      "name": "account_email_lowercase_check",
+      "entityType": "checks",
+      "table": "account"
     },
     {
       "value": "\"role\" in ('admin', 'member')",
