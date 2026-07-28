@@ -147,9 +147,18 @@ jobs:
           # not the one part of the runtime configuration nothing ever starts.
           # A dependency that quietly needs a capability should fail here, not
           # five minutes after a merge on a deployment with no rollback.
+          #
+          # --health-interval overrides only the cadence, not the command, so
+          # the image's own HEALTHCHECK is still what runs. Without it the
+          # image's 30s interval and 30s start-period put the first probe at
+          # t=30s and the second at t=60s — measured: healthy at t=31s with
+          # exactly one probe recorded — so the loop below would observe one
+          # probe and then time out. A single slow first probe on a loaded
+          # runner would fail an image that is fine.
           docker run -d --name smoke \
             --cap-drop ALL \
             --security-opt no-new-privileges:true \
+            --health-interval=2s \
             -p 127.0.0.1:3000:3000 "$IMAGE"
           # Waits on the image's own HEALTHCHECK rather than curling from the
           # host. That subsumes the curl — the healthcheck hits /api/version

@@ -59,10 +59,17 @@ COPY apps/backend/drizzle apps/backend/drizzle
 
 COPY --from=builder /app/apps/web/dist ./apps/web/dist
 
-# Publishing to Docker Hub is conveying, and this is AGPL. The Corresponding
-# Source ships almost incidentally — Node runs the TypeScript directly, so the
-# backend and shared sources are right there — but the terms have to travel
-# with it, and the image is the artifact strangers actually receive.
+# Publishing to Docker Hub is conveying, and this is AGPL, so the terms have to
+# travel with the artifact strangers actually receive.
+#
+# What ships as source and what does not: the backend and `packages/shared` are
+# here as TypeScript, because Node runs them directly rather than a build
+# artifact. `apps/web` is not — only its built bundle is copied, and the
+# Corresponding Source for that (its `src`, Vite config and manifest) is not in
+# the image. Corresponding Source for the bundle is offered through the public
+# repository, which the served app links to in its footer; that link is also
+# what answers AGPL §13 for network users, so it is load-bearing rather than
+# decorative.
 COPY LICENSE ./
 
 # The volume mount point, and the only thing the app needs to write. /app stays
