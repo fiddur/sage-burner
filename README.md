@@ -160,11 +160,14 @@ copying the file alone can miss recent commits — use SQLite's backup API, whic
 is consistent against a live database:
 
 ```sh
-docker compose exec sage-burner \
+STAMP=$(date +%F-%H%M)
+# VACUUM INTO refuses to overwrite, so write to a fresh name each time — a run
+# that dies before the cleanup below must not block the next one.
+docker compose exec -T sage-burner \
   node -e "const {DatabaseSync}=require('node:sqlite');
-           new DatabaseSync(process.env.DATABASE_URL).exec(\"VACUUM INTO '/data/backup.sqlite'\")"
-docker compose cp sage-burner:/data/backup.sqlite ./sage-burner-$(date +%F).sqlite
-docker compose exec sage-burner rm /data/backup.sqlite
+           new DatabaseSync(process.env.DATABASE_URL).exec(\"VACUUM INTO '/data/backup-$STAMP.sqlite'\")"
+docker compose cp "sage-burner:/data/backup-$STAMP.sqlite" "./sage-burner-$STAMP.sqlite"
+docker compose exec -T sage-burner rm -f "/data/backup-$STAMP.sqlite"
 ```
 
 Worth doing before any deploy that includes a migration, since a migration that

@@ -13,10 +13,10 @@ node_modules
 .gitignore
 
 # IDE
-.idea
-.vscode
-*.swp
-*.swo
+**/.idea
+**/.vscode
+**/*.swp
+**/*.swo
 
 # Build artifacts
 **/dist
@@ -48,5 +48,5 @@ docs
 **/.env.*
 
 # OS files
-.DS_Store
-Thumbs.db
+**/.DS_Store
+**/Thumbs.db

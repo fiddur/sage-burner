@@ -13,9 +13,14 @@ updates:
     commit-message:
       prefix: 'chore(ci)'
 
-  # Covers the base image and the watchtower pin. Watchtower in particular is
-  # worth watching: it holds the Docker socket read-write, and upstream is
-  # dormant enough that a move to a maintained fork may be the real answer.
+  # Covers the Dockerfile only. Dependabot's `docker` fetcher takes
+  # Dockerfiles plus YAML that looks like a Kubernetes resource (it requires
+  # both `apiVersion` and `kind`), so a compose file is dropped before parsing
+  # — see the separate `docker-compose` entry below.
+  #
+  # As written this entry has nothing to propose: the base image floats on a
+  # tag rather than a digest, and majors are ignored just below. It is here for
+  # the next image this repo pins.
   - package-ecosystem: docker
     directories:
       - /
@@ -32,6 +37,17 @@ updates:
       # the rule that is sometimes right.
       - dependency-name: node
         update-types: ['version-update:semver-major']
+
+  # The compose file, and specifically the watchtower pin — the update in this
+  # repo most worth seeing. That container holds the Docker socket read-write,
+  # which is root-equivalent on the host, and upstream is dormant enough that a
+  # move to a maintained fork may be the real answer.
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: 'chore(deploy)'
 
   - package-ecosystem: npm
     directory: /
