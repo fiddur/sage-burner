@@ -119,8 +119,12 @@ and point `WEB_ROOT` at the output:
 
 ```sh
 pnpm --filter sage-burner-web build
-WEB_ROOT=apps/web/dist pnpm dev:backend
+WEB_ROOT=$PWD/apps/web/dist pnpm dev:backend
 ```
+
+`WEB_ROOT` is resolved against the backend's working directory, which `pnpm
+dev:backend` sets to `apps/backend` — so an absolute path is the one that stays
+correct wherever you are standing.
 
 ## Running it for real
 

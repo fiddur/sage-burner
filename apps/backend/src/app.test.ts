@@ -135,6 +135,20 @@ describe('with a web root', () => {
     expect(shell.headers['cache-control']).toBe('no-cache')
   })
 
+  it('keeps the shell uncached on the SPA fallback path too', async () => {
+    // The path real navigations take. It reaches the shell through
+    // `reply.sendFile` rather than a registered route, so the header applying
+    // there is a non-obvious property of @fastify/static rather than something
+    // this code arranges — worth pinning, since caching the shell is what pins
+    // clients to a build that no longer exists.
+    await build({ WEB_ROOT: webRoot })
+
+    const response = await app.inject({ method: 'GET', url: '/schedule' })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.headers['cache-control']).toBe('no-cache')
+  })
+
   it('serves the shell at the root', async () => {
     await build({ WEB_ROOT: webRoot })
 

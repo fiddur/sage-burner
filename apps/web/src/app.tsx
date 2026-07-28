@@ -1,12 +1,14 @@
 import { LocationProvider, Route, Router } from 'preact-iso'
 
+import type { Viewer } from './viewer.tsx'
+
 import { Layout } from './components/Layout.tsx'
 import { Home } from './pages/Home.tsx'
 import { NotFound } from './pages/NotFound.tsx'
-import { SessionProvider } from './session.tsx'
+import { ViewerProvider } from './viewer.tsx'
 
 /**
- * Routes.
+ * The route table.
  *
  * Note the constraint the backend imposes: it tells a missing asset apart from
  * a client-side route by whether the last path segment has a file extension, so
@@ -14,15 +16,23 @@ import { SessionProvider } from './session.tsx'
  * path, and invite tokens must be dot-free. A path with an extension gets a 404
  * from the server and never reaches this router.
  */
-export const App = () => (
+export const Routes = () => (
+  <Router>
+    <Route path="/" component={Home} />
+    <Route default component={NotFound} />
+  </Router>
+)
+
+/**
+ * `viewer` is injectable so tests drive the real route table and the real
+ * layout rather than a copy that can silently fall out of step with this one.
+ */
+export const App = ({ viewer }: { viewer?: Viewer }) => (
   <LocationProvider>
-    <SessionProvider>
+    <ViewerProvider viewer={viewer}>
       <Layout>
-        <Router>
-          <Route path="/" component={Home} />
-          <Route default component={NotFound} />
-        </Router>
+        <Routes />
       </Layout>
-    </SessionProvider>
+    </ViewerProvider>
   </LocationProvider>
 )

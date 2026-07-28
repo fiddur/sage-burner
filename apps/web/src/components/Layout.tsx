@@ -1,6 +1,6 @@
 import type { ComponentChildren } from 'preact'
 
-import { isAdmin, isMember, useSession } from '../session.tsx'
+import { isAdmin, isMember, useViewer } from '../viewer.tsx'
 
 /**
  * The frame every page sits in.
@@ -11,7 +11,7 @@ import { isAdmin, isMember, useSession } from '../session.tsx'
  * guarded server-side as well.
  */
 export const Layout = ({ children }: { children: ComponentChildren }) => {
-  const session = useSession()
+  const viewer = useViewer()
 
   return (
     <div class="layout">
@@ -24,21 +24,21 @@ export const Layout = ({ children }: { children: ComponentChildren }) => {
         </a>
 
         <nav aria-label="Main">
-          {session.status === 'signed-out' && (
+          {viewer.status === 'signed-out' && (
             <>
               <a href="/apply">Apply</a>
               <a href="/login">Log in</a>
             </>
           )}
 
-          {isMember(session) && (
+          {isMember(viewer) && (
             <>
               <a href="/profile">My details</a>
               <a href="/schedule">Schedule</a>
             </>
           )}
 
-          {isAdmin(session) && <a href="/admin">Organise</a>}
+          {isAdmin(viewer) && <a href="/admin">Organise</a>}
         </nav>
       </header>
 

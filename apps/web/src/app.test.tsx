@@ -1,34 +1,20 @@
 import { cleanup, render, screen } from '@testing-library/preact'
-import { LocationProvider, Route, Router } from 'preact-iso'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import type { Session } from './session.tsx'
+import type { Viewer } from './viewer.tsx'
 
-import { Layout } from './components/Layout.tsx'
-import { Home } from './pages/Home.tsx'
-import { NotFound } from './pages/NotFound.tsx'
-import { SessionProvider } from './session.tsx'
+import { App } from './app.tsx'
 
 /**
- * Mounts the real routing and layout rather than asserting on props, so a
- * broken route or a nav that shows the wrong links actually fails.
+ * Mounts the real `App` — its route table, its layout, its providers — rather
+ * than a copy of them. A route added, removed or repointed in app.tsx must be
+ * able to fail here, which a re-declared table could not do.
  */
 
-const renderAt = (path: string, session?: Session) => {
+const renderAt = (path: string, viewer?: Viewer) => {
   window.history.replaceState(null, '', path)
 
-  return render(
-    <LocationProvider>
-      <SessionProvider session={session}>
-        <Layout>
-          <Router>
-            <Route path="/" component={Home} />
-            <Route default component={NotFound} />
-          </Router>
-        </Layout>
-      </SessionProvider>
-    </LocationProvider>,
-  )
+  return render(<App viewer={viewer} />)
 }
 
 afterEach(() => {

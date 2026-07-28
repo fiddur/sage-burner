@@ -113,6 +113,19 @@ describe('createApiClient', () => {
         await expect(createApiClient(doFetch).request('/things')).rejects.toThrow(contains)
       }
     })
+
+    it('never shows a member the backend machine code for an unmapped status', async () => {
+      // 400/409/422 all arrive once the application form lands. Surfacing
+      // `validation_failed` verbatim would be worse than saying nothing.
+      for (const status of [400, 409, 422]) {
+        const doFetch = respondWith({ error: 'validation_failed' }, { status })
+        const failure = createApiClient(doFetch).request('/applications')
+
+        await expect(failure).rejects.toThrow(`Request failed (${status}).`)
+        // The code is still available for a caller that knows what to do with it.
+        await expect(failure).rejects.toMatchObject({ code: 'validation_failed' })
+      }
+    })
   })
 
   it('passes an abort signal through so navigation can cancel in-flight requests', async () => {

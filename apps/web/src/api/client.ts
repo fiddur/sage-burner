@@ -31,12 +31,21 @@ interface ErrorBody {
   error?: unknown
 }
 
-const messageFor = (status: number, code: string) => {
-  if (status === 404) return 'Not found.'
+/**
+ * A message worth showing a member.
+ *
+ * Unmapped statuses fall back to a generic line rather than surfacing the
+ * backend's machine code — a member should never read `validation_failed`.
+ * The code is still on `error.code`, where a caller that knows what a
+ * particular failure means can map it deliberately; a form handling 422 will
+ * want to do exactly that.
+ */
+const messageFor = (status: number) => {
   if (status === 401) return 'You need to sign in.'
   if (status === 403) return 'You do not have access to that.'
+  if (status === 404) return 'Not found.'
   if (status >= 500) return 'Something went wrong at our end. Please try again.'
-  return code === 'unknown' ? `Request failed (${status}).` : code
+  return `Request failed (${status}).`
 }
 
 /**
@@ -84,7 +93,7 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
 
     if (!response.ok) {
       const code = await codeFrom(response)
-      throw apiError(response.status, code, messageFor(response.status, code))
+      throw apiError(response.status, code, messageFor(response.status))
     }
 
     if (response.status === 204) return undefined as T
