@@ -1,0 +1,34 @@
+{
+  "name": "sage-burner",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Membership, application, and scheduling platform for small burner-style mini-events",
+  "keywords": [
+    "burner",
+    "event",
+    "membership",
+    "self-hosted"
+  ],
+  "license": "AGPL-3.0-or-later",
+  "author": "Fredrik Liljegren <fredrik@liljegren.org>",
+  "type": "module",
+  "scripts": {
+    "dev:backend": "pnpm --filter sage-burner-backend dev",
+    "dev:web": "pnpm --filter sage-burner-web dev",
+    "build": "pnpm -r --if-present build",
+    "test": "pnpm -r --if-present test",
+    "check": "oxlint -c .oxlintrc.json && pnpm -r --if-present check",
+    "fix": "oxfmt . && oxlint -c .oxlintrc.json --fix"
+  },
+  "devDependencies": {
+    "@tsconfig/node24": "^24.0.4",
+    "@typescript/native-preview": "^7.0.0-0",
+    "oxfmt": "^0",
+    "oxlint": "^1",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": "~25"
+  },
+  "packageManager": "pnpm@10.33.4"
+}
