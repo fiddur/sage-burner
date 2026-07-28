@@ -31,16 +31,18 @@ services:
       - '127.0.0.1:8081:3000'
     environment:
       # Declared here rather than in the image, because this is the file that
-      # knows what is in front of the container. `.env.example` ships
-      # TRUST_PROXY=1, which is correct for the documented Apache setup and
-      # spoof-resistant there.
+      # knows what is in front of the container — but declared as a *fallback*,
+      # because this file does not know either.
       #
-      # The fallback is `false` on purpose: the Dockerfile declines to guess
-      # this precisely because guessing fails open, and defaulting to 1 here
-      # would guess on behalf of anyone running `docker compose up` without a
-      # header-appending proxy — handing them a request.ip the client controls.
-      # So copying .env is a required step for the Apache deployment, not an
-      # optional one.
+      # `false` at every layer that has to guess: the image, this fallback, and
+      # `.env.example`, which ships `TRUST_PROXY=false` with `TRUST_PROXY=1`
+      # commented out below it. Uncommenting that is what the documented Apache
+      # setup needs, and one trusted hop is spoof-resistant there since a client
+      # can only prepend to X-Forwarded-For.
+      #
+      # Do not "fix" this back to 1. Anyone running compose without a
+      # header-appending proxy would then get a request.ip the client controls,
+      # which is what decides the session cookie's Secure flag.
       - TRUST_PROXY=${TRUST_PROXY:-false}
       - LOG_LEVEL=${LOG_LEVEL:-info}
     volumes:
@@ -60,6 +62,10 @@ services:
       # No setuid binary in the image can gain privileges. Close to free, and
       # this container is reachable from the network and holds member records.
       - no-new-privileges:true
+    cap_drop:
+      # The process runs as uid 1000 and binds :3000, which is above the
+      # privileged range — so it needs none of the default capability set.
+      - ALL
     logging:
       # The daemon default is json-file with no rotation. Fastify writes a JSON
       # line per request, and this is meant to sit on a small box for months —
