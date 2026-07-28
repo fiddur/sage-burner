@@ -18,12 +18,39 @@ const DEFAULT_DATABASE_URL = './data/sage-burner.sqlite'
  * value would beat every default here — which for the database url means
  * opening a throwaway database and losing everything at shutdown.
  */
-const blankToUndefined = (value: unknown) =>
-  typeof value === 'string' && value.trim() === '' ? undefined : value
+const blankToUndefined = (value: unknown) => {
+  if (typeof value !== 'string') return value
+  // Trim every string value, not just to decide blankness: an env file can
+  // leave a trailing newline on any of them, and `HOST="127.0.0.1\n"` passes
+  // validation, reaches `dns.lookup`, and fails the boot with an ENOTFOUND
+  // naming a host that looks perfectly correct in the logs.
+  const trimmed = value.trim()
+  return trimmed === '' ? undefined : trimmed
+}
 
 const optional = <T extends z.ZodType>(schema: T) => z.preprocess(blankToUndefined, schema)
 
 const port = z.coerce.number().int().min(1).max(65_535)
+
+/**
+ * How much of `X-Forwarded-For` to believe.
+ *
+ * `true` trusts the entire chain from whoever connects, which makes
+ * `request.ip` and `request.protocol` client-controlled unless something in
+ * front always rewrites those headers — and nothing here guarantees that, since
+ * the container runs one process with no proxy inside it. Default is therefore
+ * to trust nothing; the operator states what is actually in front.
+ *
+ * `1` (a hop count) is the right answer behind a single reverse proxy.
+ */
+const parseTrustProxy = (value: string | undefined): boolean | number | string => {
+  if (value === undefined) return false
+  if (value === 'true') return true
+  if (value === 'false') return false
+  if (/^\d+$/.test(value)) return Number(value)
+  // Anything else is an address or CIDR list, which Fastify accepts verbatim.
+  return value
+}
 
 export const envSchema = z.object({
   NODE_ENV: optional(z.enum(['development', 'test', 'production']).default('development')),
@@ -41,9 +68,9 @@ export const envSchema = z.object({
    * `/api` here. Set in the container, where one Node process serves both.
    */
   WEB_ROOT: optional(z.string().min(1).optional()),
+  /** `false` (default), `true`, a hop count like `1`, or an address/CIDR list. */
+  TRUST_PROXY: optional(z.string().min(1).optional()),
 })
-
-export type Env = z.infer<typeof envSchema>
 
 export interface Config {
   node_env: 'development' | 'test' | 'production'
@@ -53,6 +80,7 @@ export interface Config {
   log_level: 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace' | 'silent'
   build_sha: string
   web_root?: string
+  trust_proxy: boolean | number | string
 }
 
 /**
@@ -77,12 +105,10 @@ export const createConfig = (env: NodeJS.ProcessEnv = process.env): Config => {
     node_env: value.NODE_ENV,
     port: value.PORT,
     host: value.HOST,
-    // Trimmed: `DATABASE_URL` sourced from an env file can carry a trailing
-    // newline, which would create the directory and then open a file whose
-    // name ends in one.
-    database_url: value.DATABASE_URL.trim(),
+    database_url: value.DATABASE_URL,
     log_level: value.LOG_LEVEL,
     build_sha: value.BUILD_SHA,
-    ...(value.WEB_ROOT === undefined ? {} : { web_root: value.WEB_ROOT.trim() }),
+    trust_proxy: parseTrustProxy(value.TRUST_PROXY),
+    ...(value.WEB_ROOT === undefined ? {} : { web_root: value.WEB_ROOT }),
   }
 }

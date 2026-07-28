@@ -65,9 +65,15 @@ nothing.
 | `LOG_LEVEL`    | `info`                      | `fatal` … `trace`, or `silent`                                     |
 | `BUILD_SHA`    | `unknown`                   | Commit the image was built from                                    |
 | `WEB_ROOT`     | _(unset)_                   | Directory of the built web app. Unset in dev, where Vite serves it |
+| `TRUST_PROXY`  | `false`                     | `false`, `true`, a hop count like `1`, or an address/CIDR list     |
 
 Invalid configuration fails at boot with every problem listed, rather than
 starting and behaving subtly wrong.
+
+`TRUST_PROXY` defaults to trusting nothing. Set it to `1` when the app sits
+behind a single reverse proxy — leaving it at `false` there means `request.ip`
+is the proxy's address, while setting it to `true` means any client can claim
+whatever address it likes via `X-Forwarded-For`.
 
 ### Database
 

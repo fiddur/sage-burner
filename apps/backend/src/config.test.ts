@@ -33,6 +33,7 @@ describe('createConfig', () => {
       log_level: 'warn',
       build_sha: 'abc123',
       web_root: '/usr/share/web',
+      trust_proxy: false,
     })
   })
 
@@ -59,12 +60,49 @@ describe('createConfig', () => {
   })
 
   describe('trimming', () => {
+    // Every string value, not just the ones that happened to get an ad-hoc
+    // .trim(): an env file can leave a trailing newline on any of them.
     it('trims a database url, which an env file can leave a newline on', () => {
       expect(createConfig({ DATABASE_URL: './data/burn.sqlite\n' }).database_url).toBe('./data/burn.sqlite')
     })
 
     it('trims the web root as well', () => {
       expect(createConfig({ WEB_ROOT: ' /usr/share/web \n' }).web_root).toBe('/usr/share/web')
+    })
+
+    it('trims the host, which would otherwise fail dns lookup at boot', () => {
+      // `z.string().min(1)` is perfectly happy with "127.0.0.1\n"; it reaches
+      // dns.lookup and the boot dies with an ENOTFOUND naming a host that
+      // looks entirely correct in the logs.
+      expect(createConfig({ HOST: '127.0.0.1\n' }).host).toBe('127.0.0.1')
+    })
+
+    it('trims the build sha', () => {
+      expect(createConfig({ BUILD_SHA: 'abc123\n' }).build_sha).toBe('abc123')
+    })
+  })
+
+  describe('trust_proxy', () => {
+    it('trusts nothing by default', () => {
+      // `true` would believe the whole X-Forwarded-For chain from whoever
+      // connects, making request.ip client-controlled. Nothing guarantees a
+      // header-stripping proxy is in front — the container runs one process.
+      expect(createConfig({}).trust_proxy).toBe(false)
+    })
+
+    it('accepts a hop count, the right answer behind one reverse proxy', () => {
+      expect(createConfig({ TRUST_PROXY: '1' }).trust_proxy).toBe(1)
+      expect(createConfig({ TRUST_PROXY: '2' }).trust_proxy).toBe(2)
+    })
+
+    it('accepts explicit booleans', () => {
+      expect(createConfig({ TRUST_PROXY: 'true' }).trust_proxy).toBe(true)
+      expect(createConfig({ TRUST_PROXY: 'false' }).trust_proxy).toBe(false)
+    })
+
+    it('passes an address or CIDR list through', () => {
+      expect(createConfig({ TRUST_PROXY: '10.0.0.0/8' }).trust_proxy).toBe('10.0.0.0/8')
+      expect(createConfig({ TRUST_PROXY: '127.0.0.1,10.0.0.1' }).trust_proxy).toBe('127.0.0.1,10.0.0.1')
     })
   })
 

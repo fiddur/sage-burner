@@ -69,6 +69,20 @@ describe('without a web root', () => {
 
     expect(response.statusCode).toBe(404)
   })
+
+  it('gives the API the same 404 body it gives when serving the web app', async () => {
+    // WEB_ROOT is unset in development and set in the container. If the body
+    // differed, frontend error handling written against one shape would meet
+    // the other in the environment it was never tested in — and Fastify's
+    // default also echoes the method and path back, which the terse body
+    // deliberately avoids.
+    await build()
+
+    const response = await app.inject({ method: 'GET', url: '/api/nope' })
+
+    expect(response.statusCode).toBe(404)
+    expect(response.json()).toEqual({ error: 'not_found' })
+  })
 })
 
 describe('with a web root', () => {
@@ -146,5 +160,47 @@ describe('with a web root', () => {
     const response = await app.inject({ method: 'POST', url: '/not/a/thing' })
 
     expect(response.statusCode).toBe(404)
+  })
+
+  it('404s a missing asset instead of handing back the HTML shell', async () => {
+    // Vite emits content-hashed chunks and Watchtower swaps the image under
+    // live clients, so a page on the previous build asks for a chunk that no
+    // longer exists. Answering with the shell and a 200 produces "Expected a
+    // JavaScript module script but the server responded with a MIME type of
+    // text/html", which is far worse to debug than a 404.
+    await build({ WEB_ROOT: webRoot })
+
+    const response = await app.inject({ method: 'GET', url: '/assets/index-a1b2c3.js' })
+
+    expect(response.statusCode).toBe(404)
+    expect(response.headers['content-type']).toContain('application/json')
+  })
+
+  it('404s any missing file with an extension, not just scripts', async () => {
+    await build({ WEB_ROOT: webRoot })
+
+    for (const url of ['/missing.css', '/favicon.ico', '/img/logo.svg']) {
+      expect((await app.inject({ method: 'GET', url })).statusCode).toBe(404)
+    }
+  })
+
+  it('serves the shell for a client route even with a query string', async () => {
+    await build({ WEB_ROOT: webRoot })
+
+    const response = await app.inject({ method: 'GET', url: '/invite/tok?from=discord' })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.body).toContain('Sage Burner')
+  })
+
+  it('404s an API path carrying a query string rather than serving the shell', async () => {
+    // request.url includes the query string, so matching on it raw would let
+    // `/api/nope?x=1` fall through to the SPA branch.
+    await build({ WEB_ROOT: webRoot })
+
+    const response = await app.inject({ method: 'GET', url: '/api/nope?x=1' })
+
+    expect(response.statusCode).toBe(404)
+    expect(response.json()).toEqual({ error: 'not_found' })
   })
 })
