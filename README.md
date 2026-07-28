@@ -45,37 +45,34 @@ pnpm check      # typecheck + lint
 pnpm test       # unit tests, non-watch
 ```
 
-Run the two halves in separate terminals:
-
-```sh
-pnpm dev:backend   # Fastify on :3000, against a local SQLite file
-pnpm dev:web       # Vite dev server with HMR, proxying /api to the backend
-```
+> **Not available yet.** There is no dev server to run — `apps/backend` and
+> `apps/web` don't exist. `pnpm dev:backend` and `pnpm dev:web` are wired up in
+> the root `package.json` but will fail until the Fastify backend ([#4]) and the
+> Preact frontend ([#5]) land.
 
 ## Running it for real
 
-```sh
-cp .env.example .env    # then edit it
-docker compose up -d
-```
+> **Not available yet.** Deployment needs the Dockerfile and compose file from
+> [#6]. Once those exist, deploying is `cp .env.example .env` followed by
+> `docker compose up -d` — one service, one named volume holding the SQLite
+> database, and a watchtower sidecar picking up new images automatically, with
+> `docker compose down && docker compose up` preserving your data.
+>
+> There will be no open signup, so a fresh deployment also needs a way to seed
+> the first admin before anybody can be approved ([#10]).
 
-That is the whole deployment. One service, one named volume holding the SQLite
-database, plus a watchtower sidecar that picks up new images automatically.
-`docker compose down && docker compose up` preserves your data.
-
-### First admin
-
-A fresh deployment has no accounts, and there is no open signup — accounts are
-only created by redeeming an invite. See `.env.example` for how to seed the
-first admin, which you need before you can approve anybody.
+[#4]: https://github.com/fiddur/sage-burner/issues/4
+[#5]: https://github.com/fiddur/sage-burner/issues/5
+[#6]: https://github.com/fiddur/sage-burner/issues/6
+[#10]: https://github.com/fiddur/sage-burner/issues/10
 
 ## Repository layout
 
 ```
-apps/backend      Fastify API, static serving, ICS feed
-apps/web          Preact + Vite single-page app
+apps/backend      Fastify API, static serving, ICS feed      (planned, #4)
+apps/web          Preact + Vite single-page app              (planned, #5)
 packages/shared   Zod schemas and types shared by both
-docs/             Longer-form documentation
+docs/             Longer-form documentation                  (planned)
 ```
 
 Conventions, code style, and the contribution workflow live in

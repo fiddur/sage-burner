@@ -21,5 +21,18 @@ export const slugSchema = z
 /** Required free text: trimmed, non-empty, and bounded so a field cannot be used as storage. */
 export const text = (max: number) => z.string().trim().min(1).max(max)
 
-/** Optional free text: trimmed and bounded, with an explicit `null` for "not set". */
-export const optionalText = (max: number) => z.string().trim().max(max).nullable()
+/**
+ * Optional free text: trimmed and bounded, with an explicit `null` for "not set".
+ *
+ * Empty and whitespace-only input collapses to `null` so "not set" has exactly
+ * one representation. Otherwise `''`, `'   '` and `null` all mean the same
+ * thing while comparing unequal, and the database, the API and the web app each
+ * have to remember to handle all three.
+ */
+export const optionalText = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .nullable()
+    .transform((value) => (value === '' ? null : value))

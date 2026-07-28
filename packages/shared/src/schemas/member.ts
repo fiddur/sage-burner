@@ -4,13 +4,10 @@ import { paymentStatuses } from '../enums.ts'
 import { dateSchema, idSchema, optionalText, text } from './common.ts'
 
 /**
- * A person's participation in one specific burn.
- *
- * Scoped to `(event, account)` on purpose: the same human attending three burns
- * has three member rows, each with its own payment state, allergies and arrival
- * dates. Collapsing that into one "person" record is a deliberate v2 refactor.
+ * The field list, unrefined — see `eventFields` for why this is exported
+ * separately from the refined schema.
  */
-export const memberSchema = z.object({
+export const memberFields = z.object({
   id: idSchema,
   event_id: idSchema,
   account_id: idSchema,
@@ -34,5 +31,23 @@ export const memberSchema = z.object({
   payment_date: dateSchema.nullable(),
   invite_token_id: idSchema,
 })
+
+/**
+ * A person's participation in one specific burn.
+ *
+ * Scoped to `(event, account)` on purpose: the same human attending three burns
+ * has three member rows, each with its own payment state, allergies and arrival
+ * dates. Collapsing that into one "person" record is a deliberate v2 refactor.
+ *
+ * String comparison is sound for the date range: `z.iso.date()` is fixed-width
+ * `YYYY-MM-DD`, so lexicographic order is chronological order.
+ */
+export const memberSchema = memberFields.refine(
+  (m) => m.arrival_date === null || m.departure_date === null || m.arrival_date <= m.departure_date,
+  {
+    message: 'departure_date must not be before arrival_date',
+    path: ['departure_date'],
+  },
+)
 
 export type Member = z.infer<typeof memberSchema>

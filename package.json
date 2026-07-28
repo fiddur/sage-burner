@@ -25,6 +25,7 @@
     "@typescript/native-preview": "^7.0.0-0",
     "oxfmt": "^0",
     "oxlint": "^1",
+    "oxlint-tsgolint": "^7.0.2001",
     "typescript": "^5.6.3"
   },
   "engines": {

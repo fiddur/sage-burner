@@ -42,6 +42,9 @@
     "unicorn/error-message": 2,
     "no-console": [2, { "allow": ["warn", "error", "info"] }],
     "typescript/no-explicit-any": 2,
+    // Type-aware rule: only evaluated under `oxlint --type-aware`, which needs
+    // the `oxlint-tsgolint` package. The per-package `check` scripts pass that
+    // flag — without it this rule silently never runs.
     "typescript/no-floating-promises": 2,
     "typescript/no-non-null-assertion": 1
   },

@@ -51,6 +51,9 @@ have no third client and no public API contract to publish.
 - Avoid global variables, module-level mutable state, and singletons.
 - Avoid casting. Use proper typing and type guards.
 - `pnpm fix` formats and auto-fixes lint. `pnpm check` type-checks and lints.
+- Per-package `check` runs `oxlint --type-aware`, which needs `oxlint-tsgolint`.
+  Type-aware rules — `no-floating-promises` in particular — are silently skipped
+  without that flag, so keep it on any new package's `check` script.
 
 ## Testing
 

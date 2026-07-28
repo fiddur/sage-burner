@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 
 import { applicationSchema } from './application.ts'
 import { slugSchema } from './common.ts'
-import { eventSchema } from './event.ts'
+import { eventFields, eventSchema } from './event.ts'
 import { formQuestionSchema } from './form-question.ts'
-import { memberSchema } from './member.ts'
-import { publicSessionSchema, sessionSchema } from './session.ts'
+import { memberFields, memberSchema } from './member.ts'
+import { publicSessionSchema, sessionFields, sessionSchema } from './session.ts'
 
 const ID = '0b8a1d4e-3f2c-4a6b-9c1d-5e7f8a9b0c1d'
 const OTHER_ID = '1c9b2e5f-4a3d-4b7c-8d2e-6f8a9b0c1d2e'
@@ -155,6 +155,57 @@ describe('memberSchema', () => {
   it('rejects a payment status outside the vocabulary', () => {
     expect(memberSchema.safeParse({ ...aMember, payment_status: 'refunded' }).success).toBe(false)
   })
+
+  it('rejects a departure before the arrival, so no one records a negative stay', () => {
+    const backwards = { ...aMember, arrival_date: '2026-10-04', departure_date: '2026-10-02' }
+    const parsed = memberSchema.safeParse(backwards)
+    expect(parsed.success).toBe(false)
+    expect(parsed.error?.issues[0]?.path).toEqual(['departure_date'])
+  })
+
+  it('accepts arriving and departing on the same day', () => {
+    const dayTrip = { ...aMember, arrival_date: '2026-10-03', departure_date: '2026-10-03' }
+    expect(memberSchema.safeParse(dayTrip).success).toBe(true)
+  })
+
+  it('does not compare dates when only one end is known', () => {
+    expect(memberSchema.safeParse({ ...aMember, departure_date: null }).success).toBe(true)
+    expect(memberSchema.safeParse({ ...aMember, arrival_date: null }).success).toBe(true)
+  })
+})
+
+describe('optionalText', () => {
+  const aMemberWith = (notes: unknown) => ({
+    id: ID,
+    event_id: OTHER_ID,
+    account_id: ID,
+    name: 'Someone',
+    contact: 'someone@example.org',
+    allergies_notes: null,
+    arrival_date: null,
+    departure_date: null,
+    lodging: null,
+    shift_preference: null,
+    notes,
+    payment_status: 'unpaid',
+    payment_date: null,
+    invite_token_id: OTHER_ID,
+  })
+
+  it('collapses empty and whitespace-only input to null, so "not set" has one representation', () => {
+    for (const blank of ['', '   ', '\t\n']) {
+      const parsed = memberSchema.parse(aMemberWith(blank))
+      expect(parsed.notes).toBeNull()
+    }
+  })
+
+  it('keeps real text, trimmed', () => {
+    expect(memberSchema.parse(aMemberWith('  bring a drum  ')).notes).toBe('bring a drum')
+  })
+
+  it('still accepts an explicit null', () => {
+    expect(memberSchema.parse(aMemberWith(null)).notes).toBeNull()
+  })
 })
 
 describe('sessionSchema', () => {
@@ -195,6 +246,44 @@ describe('sessionSchema', () => {
   it('rejects a zero-length slot', () => {
     const instant = { ...aSession, time_slot_end: aSession.time_slot_start }
     expect(sessionSchema.safeParse(instant).success).toBe(false)
+  })
+
+  it('rejects a backwards slot even when the two ends differ in precision', () => {
+    // Lexicographically '…T09:00:00.500Z' < '…T09:00:00Z' ('.' sorts before
+    // 'Z'), so a string comparison would wave this through despite the slot
+    // ending half a second before it starts.
+    const mixedPrecision = {
+      ...aSession,
+      time_slot_start: '2026-10-03T09:00:00.500Z',
+      time_slot_end: '2026-10-03T09:00:00Z',
+    }
+    expect(mixedPrecision.time_slot_start < mixedPrecision.time_slot_end).toBe(true)
+    expect(sessionSchema.safeParse(mixedPrecision).success).toBe(false)
+  })
+
+  it('accepts a forwards slot whose ends differ in precision', () => {
+    const mixedPrecision = {
+      ...aSession,
+      time_slot_start: '2026-10-03T09:00:00Z',
+      time_slot_end: '2026-10-03T09:00:00.500Z',
+    }
+    expect(sessionSchema.safeParse(mixedPrecision).success).toBe(true)
+  })
+})
+
+describe('deriving schemas', () => {
+  it('lets a create body drop server-owned fields without redeclaring the shape', () => {
+    const createEvent = eventFields.omit({ id: true, created_at: true })
+    expect(createEvent.safeParse({ ...anEvent, id: undefined, created_at: undefined }).success).toBe(true)
+  })
+
+  it('lets a patch body be partial', () => {
+    const patchMember = memberFields.partial()
+    expect(patchMember.safeParse({ notes: 'just this one field' }).success).toBe(true)
+  })
+
+  it('lets a session create body drop its id', () => {
+    expect(() => sessionFields.omit({ id: true })).not.toThrow()
   })
 })
 
