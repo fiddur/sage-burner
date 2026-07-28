@@ -247,7 +247,10 @@ describe('a web root that cannot serve the app', () => {
     rmSync(dir, { recursive: true, force: true })
   })
 
-  const buildWith = async (webRoot: string) => {
+  // `handle` is the shared one, so the outer afterEach closes the database.
+  // No Fastify instance needs closing: createApp throws before returning, so
+  // there is nothing constructed to leak — that is the property under test.
+  const buildWith = (webRoot: string) => {
     handle = createDb({ url: ':memory:' })
     runMigrations(handle)
     return createApp({

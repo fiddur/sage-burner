@@ -27,7 +27,7 @@ const API_PREFIX = '/api'
  * as-is rather than throwing; it will not match anything either way.
  */
 const pathnameOf = (url: string) => {
-  const raw = url.split('?')[0] ?? url
+  const [raw = url] = url.split('?')
   try {
     return decodeURIComponent(raw)
   } catch {
@@ -51,6 +51,11 @@ const isApiRequest = (pathname: string) => pathname === API_PREFIX || pathname.s
  * dot is treated as a file and 404s.** So client-side routes must not embed
  * one — no filenames, no email addresses in a path, and in particular invite
  * tokens must be dot-free for `/invite/:token` to resolve.
+ *
+ * One wrinkle: `path.extname('/.env')` is `''`, so a dotfile-shaped path gets
+ * the shell rather than a 404. Harmless — the static glob skips dotfiles, so
+ * there is nothing to serve either way — but the rule is "has an extension",
+ * not "contains a dot".
  */
 const looksLikeAsset = (pathname: string) => path.extname(pathname) !== ''
 

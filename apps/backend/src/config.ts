@@ -1,4 +1,4 @@
-import proxyAddr from 'proxy-addr'
+import proxyAddr from '@fastify/proxy-addr'
 import { z } from 'zod'
 
 /**
@@ -50,10 +50,20 @@ const parseTrustProxy = (value: string | undefined): boolean | number | string =
   if (value === 'false') return false
   if (/^\d+$/.test(value)) return Number(value)
 
-  // Anything else is an address or CIDR list. Validated with the same compiler
-  // Fastify will use, so `TRUE`, `yes`, or a fat-fingered CIDR is reported here
-  // among the other configuration problems rather than surfacing later as a
-  // bare `invalid IP address: TRUE` thrown from inside Fastify().
+  // Anything else is an address or CIDR list, validated here so `TRUE`, `yes`,
+  // or a fat-fingered CIDR is reported among the other configuration problems
+  // rather than surfacing later as a bare `invalid IP address: TRUE` thrown
+  // from inside Fastify().
+  //
+  // Imported from `@fastify/proxy-addr` specifically — Fastify 5 uses that
+  // fork, not the original `proxy-addr`. They agree today, but they are
+  // separately versioned, and this is the value that decides whether
+  // `request.ip` is client-controlled: what we validate and what Fastify
+  // enforces must be the same code, not merely two packages that currently
+  // behave alike.
+  //
+  // Fastify splits and trims the raw string itself before compiling, so the
+  // value passed through below is handled identically at runtime.
   proxyAddr.compile(value.split(',').map((entry) => entry.trim()))
   return value
 }
