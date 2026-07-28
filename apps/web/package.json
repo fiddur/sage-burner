@@ -1,0 +1,27 @@
+{
+  "name": "sage-burner-web",
+  "version": "0.1.0",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "check": "tsgo --noEmit && oxlint -c ../../.oxlintrc.json --type-aware",
+    "fix": "oxfmt . && oxlint -c ../../.oxlintrc.json --fix"
+  },
+  "dependencies": {
+    "@sage-burner/shared": "workspace:*",
+    "preact": "^10.29.7",
+    "preact-iso": "^2.12.1"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.10.6",
+    "@testing-library/preact": "^3.2.4",
+    "happy-dom": "^20.11.1",
+    "vite": "^8.1.5",
+    "vitest": "^4"
+  }
+}

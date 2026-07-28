@@ -122,6 +122,19 @@ describe('with a web root', () => {
     expect(response.body).toContain('hashed')
   })
 
+  it('caches hashed assets forever and the shell never', async () => {
+    // The shell points at the current hashes, so caching it is how a client
+    // gets pinned to a build that no longer exists — and Watchtower redeploys
+    // on its own schedule, so nobody is there to notice.
+    await build({ WEB_ROOT: webRoot })
+
+    const asset = await app.inject({ method: 'GET', url: '/assets/index-a1b2c3.js' })
+    expect(asset.headers['cache-control']).toBe('public, max-age=31536000, immutable')
+
+    const shell = await app.inject({ method: 'GET', url: '/index.html' })
+    expect(shell.headers['cache-control']).toBe('no-cache')
+  })
+
   it('serves the shell at the root', async () => {
     await build({ WEB_ROOT: webRoot })
 
