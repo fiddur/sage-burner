@@ -110,7 +110,8 @@ origin/develop`. Reset rather than pull — squash merges make local `develop`
 3. Implement, tests first where reasonable.
 4. `pnpm fix && pnpm check && pnpm test` all green locally.
 5. Open a **Draft** PR against `develop`, body containing `Closes #<issue>`.
-6. Watch CI. Red → fix and push. Green → `gh pr ready <n>`.
+6. Watch CI — all of it, not one named check. Red → fix and push. Green →
+   `gh pr ready <n>`.
 7. Wait for the review by tailing `/home/fiddur/src/codereview/events.log` for
    the line `<pr url> updated` — do not poll GitHub on a timer. (`review
 started` means it has only begun; keep waiting for `updated`.)
@@ -123,7 +124,10 @@ started` means it has only begun; keep waiting for `updated`.)
     - the latest review body starts with `✅Approved`, **and** it is on the
       current head commit (a `✅Approved` left on an older commit is stale),
     - every inline review thread is resolved,
-    - CI (`CI Gate`) is green,
+    - **every** check is green — not a named one. `CI Gate` runs the tests,
+      but `build` is what proves the image starts, and naming only the first
+      would let a red `build` through. Check the whole rollup:
+      `gh pr view <n> --json statusCheckRollup`.
     - `mergeStateStatus` is `CLEAN`.
       Then `gh pr merge <n> --merge`. Never `--admin`. Avoid `--auto` — a push
       clears it and the PR sits `BLOCKED`.
