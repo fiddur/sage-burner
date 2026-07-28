@@ -45,10 +45,29 @@ pnpm check      # typecheck + lint
 pnpm test       # unit tests, non-watch
 ```
 
-> **Not available yet.** There is no dev server to run — `apps/backend` and
-> `apps/web` don't exist. `pnpm dev:backend` and `pnpm dev:web` are wired up in
+### Database
+
+`apps/backend` holds the schema and migrations. The database is a single SQLite
+file; `DATABASE_URL` sets its path and defaults to `./data/sage-burner.sqlite`,
+whose parent directory is created for you.
+
+```sh
+pnpm --filter sage-burner-backend db:generate   # after editing src/db/schema.ts
+pnpm --filter sage-burner-backend db:migrate    # apply migrations to DATABASE_URL
+```
+
+`db:generate` writes SQL to `apps/backend/drizzle/` — commit it. Read the
+generated SQL before trusting it, particularly the first migration that alters
+rather than creates a column: SQLite implements that as a table rebuild, which
+interacts badly with foreign keys (see the note on `runMigrations`).
+
+The server will also migrate on boot, so `db:migrate` is only for preparing a
+database ahead of time.
+
+> **No dev server yet.** `pnpm dev:backend` and `pnpm dev:web` are wired up in
 > the root `package.json` but will fail until the Fastify backend ([#4]) and the
-> Preact frontend ([#5]) land.
+> Preact frontend ([#5]) land — `apps/backend` currently contains the database
+> layer only, and `apps/web` does not exist.
 
 ## Running it for real
 
@@ -69,10 +88,10 @@ pnpm test       # unit tests, non-watch
 ## Repository layout
 
 ```
-apps/backend      Fastify API, static serving, ICS feed      (planned, #4)
-apps/web          Preact + Vite single-page app              (planned, #5)
+apps/backend      Drizzle schema + migrations; Fastify API to follow (#4)
+apps/web          Preact + Vite single-page app                       (planned, #5)
 packages/shared   Zod schemas and types shared by both
-docs/             Longer-form documentation                  (planned)
+docs/             Longer-form documentation                           (planned)
 ```
 
 Conventions, code style, and the contribution workflow live in

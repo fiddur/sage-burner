@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "05290d4c-48cc-409e-b527-04ad2ab5416e",
+  "id": "00988195-aa0b-4f7b-872c-6bbf684eab52",
   "prevIds": ["00000000-0000-0000-0000-000000000000"],
   "ddl": [
     {
@@ -356,7 +356,7 @@
       "autoincrement": false,
       "default": null,
       "generated": null,
-      "name": "token",
+      "name": "token_hash",
       "entityType": "columns",
       "table": "invite_token"
     },
@@ -1014,9 +1014,9 @@
       "table": "event"
     },
     {
-      "columns": ["token"],
+      "columns": ["token_hash"],
       "nameExplicit": false,
-      "name": "invite_token_token_unique",
+      "name": "invite_token_token_hash_unique",
       "entityType": "uniques",
       "table": "invite_token"
     },

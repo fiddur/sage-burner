@@ -57,7 +57,7 @@ CREATE TABLE `form_question` (
 --> statement-breakpoint
 CREATE TABLE `invite_token` (
 	`id` text PRIMARY KEY NOT NULL,
-	`token` text NOT NULL UNIQUE,
+	`token_hash` text NOT NULL UNIQUE,
 	`event_id` text NOT NULL,
 	`application_id` text,
 	`expires_at` text NOT NULL,

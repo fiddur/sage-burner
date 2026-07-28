@@ -56,12 +56,30 @@ describe('createDb against a file', () => {
     expect(handle.client.prepare('PRAGMA foreign_keys').get()?.foreign_keys).toBe(1)
   })
 
-  it('handles a bare filename with no directory component', () => {
-    // `path.dirname('sage.sqlite')` is '.', which must not blow up.
-    const file = join(dir, 'bare.sqlite')
-    expect(() => {
-      handle = createDb({ url: file })
-    }).not.toThrow()
+  it('handles a relative url, which is what the default DATABASE_URL is', () => {
+    // `./data/sage-burner.sqlite` is the default, so relative paths are the
+    // normal case rather than an edge one. Needs the process cwd moved, since
+    // that is what "relative" resolves against — restored immediately so a
+    // stray database cannot land in the repo.
+    const cwd = process.cwd()
+    try {
+      process.chdir(dir)
+      handle = createDb({ url: './data/sage-burner.sqlite' })
+      expect(existsSync(join(dir, 'data', 'sage-burner.sqlite'))).toBe(true)
+    } finally {
+      process.chdir(cwd)
+    }
+  })
+
+  it('handles a bare filename, whose dirname is "."', () => {
+    const cwd = process.cwd()
+    try {
+      process.chdir(dir)
+      handle = createDb({ url: 'bare.sqlite' })
+      expect(existsSync(join(dir, 'bare.sqlite'))).toBe(true)
+    } finally {
+      process.chdir(cwd)
+    }
   })
 
   it('persists data across connections, which is the whole point of the volume', () => {

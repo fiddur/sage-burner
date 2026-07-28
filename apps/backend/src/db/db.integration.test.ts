@@ -58,7 +58,7 @@ const seedInvite = (id: string) =>
     .insert(inviteToken)
     .values({
       id,
-      token: `token-${id}`,
+      token_hash: `hash-of-token-${id}`,
       event_id: ids.event,
       application_id: null,
       expires_at: '2026-09-01T00:00:00Z',
@@ -219,7 +219,7 @@ describe('uniqueness', () => {
       .insert(inviteToken)
       .values({
         id: 'i0000000-0000-4000-8000-000000000003',
-        token: 'token-next',
+        token_hash: 'hash-of-token-next',
         event_id: 'e0000000-0000-4000-8000-000000000002',
         expires_at: '2026-12-01T00:00:00Z',
         created_by: ids.account,
@@ -242,14 +242,14 @@ describe('uniqueness', () => {
     ).not.toThrow()
   })
 
-  it('rejects a reused invite token string', () => {
+  it('rejects a reused invite token digest', () => {
     seedInvite(ids.invite)
     expect(() =>
       handle.db
         .insert(inviteToken)
         .values({
           id: ids.otherInvite,
-          token: `token-${ids.invite}`,
+          token_hash: `hash-of-token-${ids.invite}`,
           event_id: ids.event,
           expires_at: '2026-09-01T00:00:00Z',
           created_by: ids.account,

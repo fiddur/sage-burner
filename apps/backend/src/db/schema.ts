@@ -196,8 +196,19 @@ export const inviteToken = sqliteTable(
   'invite_token',
   {
     id: text('id').notNull(),
-    /** CSPRNG-random and unguessable — never derived from the id or a timestamp. */
-    token: text('token').notNull().unique(),
+    /**
+     * SHA-256 of the invite token, never the token itself.
+     *
+     * The token is CSPRNG-random and unguessable, shown once in the link the
+     * admin copies, and then only its digest is kept. Storing it in the clear
+     * would make the SQLite file the secret: a leaked backup, or a stray copy
+     * of the Docker volume, would hand out every unexpired invite verbatim.
+     *
+     * Lookup is by exact match on the digest, so this costs nothing
+     * structurally. A plain SHA-256 is sufficient and no KDF is needed —
+     * unguessable input means there is no dictionary to run.
+     */
+    token_hash: text('token_hash').notNull().unique(),
     event_id: text('event_id')
       .notNull()
       .references(() => event.id, { onDelete: 'cascade' }),
@@ -282,6 +293,10 @@ export const member = sqliteTable(
     ),
     // No separate index on event_id alone: SQLite uses the leftmost prefix of
     // member_event_account_idx for that, so one would only add write cost.
+    // Note this covers one direction only — "which burns is this person a
+    // member of?" filters on account_id and falls back to a scan. Left that
+    // way deliberately: at ~42 members across a handful of events the scan is
+    // free, and an index would cost a write on every member update.
     check('member_payment_status_check', oneOf(table.payment_status, paymentStatuses)),
   ],
 )
