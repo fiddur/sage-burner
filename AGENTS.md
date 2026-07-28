@@ -7,6 +7,17 @@ Discord workflow with a single self-hosted app.
 Conventions here deliberately track the sibling project `aurboda` so both repos
 feel the same to work in. Where this repo diverges, it says so and why.
 
+Two deliberate divergences from aurboda:
+
+- **Node 24 LTS, not 25.** Odd-numbered Node lines never become LTS and stop
+  receiving security patches roughly six months in; 25's window closed in
+  June 2026. This app holds contact details and allergies, so it runs on a
+  supported runtime. Type stripping is on by default in 24, so the
+  no-build-step decision is unaffected.
+- **No nginx in the container.** One Node process serves the API, the SPA and
+  the ICS feed. The app is small enough that a second process buys nothing but
+  moving parts.
+
 ## Repository structure
 
 - `apps/backend` — Fastify API. Also serves the built web app and the ICS feed.
@@ -14,9 +25,7 @@ feel the same to work in. Where this repo diverges, it says so and why.
 - `packages/shared` — Zod schemas and inferred types, shared by both.
 - `docs/` — longer-form documentation.
 
-One Node process serves everything in production. Unlike aurboda there is **no
-nginx in the container** — the app is small enough that a second process buys
-nothing but moving parts.
+One Node process serves everything in production.
 
 ## Shared schemas and types (`packages/shared`)
 

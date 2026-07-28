@@ -3,9 +3,30 @@ import { z } from 'zod'
 import { paymentStatuses } from '../enums.ts'
 import { dateSchema, idSchema, optionalText, text } from './common.ts'
 
+/** Tolerates missing keys so `.partial()` and `.omit()` derivations still typecheck. */
+type Stay = { arrival_date?: string | null; departure_date?: string | null }
+
+const staysInOrder = ({ arrival_date, departure_date }: Stay) =>
+  arrival_date == null || departure_date == null || arrival_date <= departure_date
+
+/**
+ * Re-applies the arrival/departure ordering check to a schema derived from
+ * `memberFields`.
+ *
+ * Wrap every derived create/update body in this — see `withEventDateOrder` for
+ * why deriving from the unrefined object otherwise drops the invariant. This
+ * one matters especially: the member profile page is a write path members use
+ * themselves.
+ */
+export const withMemberStayOrder = <T extends z.ZodType<Stay>>(schema: T) =>
+  schema.refine(staysInOrder, {
+    message: 'departure_date must not be before arrival_date',
+    path: ['departure_date'],
+  })
+
 /**
  * The field list, unrefined — see `eventFields` for why this is exported
- * separately from the refined schema.
+ * separately, and wrap derivations in `withMemberStayOrder`.
  */
 export const memberFields = z.object({
   id: idSchema,
@@ -42,12 +63,6 @@ export const memberFields = z.object({
  * String comparison is sound for the date range: `z.iso.date()` is fixed-width
  * `YYYY-MM-DD`, so lexicographic order is chronological order.
  */
-export const memberSchema = memberFields.refine(
-  (m) => m.arrival_date === null || m.departure_date === null || m.arrival_date <= m.departure_date,
-  {
-    message: 'departure_date must not be before arrival_date',
-    path: ['departure_date'],
-  },
-)
+export const memberSchema = withMemberStayOrder(memberFields)
 
 export type Member = z.infer<typeof memberSchema>

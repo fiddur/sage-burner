@@ -24,19 +24,19 @@ what ships first, and the `post-mvp` label for the longer roadmap.
 
 ## Stack
 
-| Layer    | Choice                                                        |
-| -------- | ------------------------------------------------------------- |
-| Frontend | Preact + Vite                                                 |
-| Backend  | Fastify (Node 25, TypeScript run directly via type stripping) |
-| Database | SQLite via Drizzle ORM — one file on a mounted volume         |
-| Auth     | Password **and** WebAuthn/passkey, coexisting per account     |
-| Calendar | Public read-only `.ics` subscription feed                     |
+| Layer    | Choice                                                            |
+| -------- | ----------------------------------------------------------------- |
+| Frontend | Preact + Vite                                                     |
+| Backend  | Fastify (Node 24 LTS, TypeScript run directly via type stripping) |
+| Database | SQLite via Drizzle ORM — one file on a mounted volume             |
+| Auth     | Password **and** WebAuthn/passkey, coexisting per account         |
+| Calendar | Public read-only `.ics` subscription feed                         |
 
 One Node process serves the API, the built web app, and the calendar feed.
 
 ## Local development
 
-Requires Node 25 (see `.nvmrc`) and pnpm 10.
+Requires Node 24 LTS (see `.nvmrc`) and pnpm 10.
 
 ```sh
 nvm use
