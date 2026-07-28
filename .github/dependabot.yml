@@ -1,0 +1,38 @@
+version: 2
+
+# The workflow pins actions to commit SHAs, which is the right call for a job
+# holding push rights on an auto-deployed image — but a pin only stays a
+# security measure if something keeps it current. Left alone it just rots, and
+# the first set shipped two majors stale, which is the argument for automating
+# rather than remembering.
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: 'chore(ci)'
+
+  # Covers the base image and the watchtower pin. Watchtower in particular is
+  # worth watching: it holds the Docker socket read-write, and upstream is
+  # dormant enough that a move to a maintained fork may be the real answer.
+  - package-ecosystem: docker
+    directories:
+      - /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: 'chore(deploy)'
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: 'chore(deps)'
+    # The workspace already refuses registry packages younger than 72 hours
+    # (pnpm-workspace.yaml, minimumReleaseAge). Grouping keeps that from
+    # becoming a stream of one-line PRs.
+    groups:
+      all-dependencies:
+        patterns: ['*']

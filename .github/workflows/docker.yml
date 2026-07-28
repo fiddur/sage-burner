@@ -35,6 +35,10 @@ concurrency:
 # without review — so `@v3` meaning "whatever that tag points at today" is the
 # same bet this repo declines elsewhere via pnpm's minimumReleaseAge and the
 # watchtower version pin.
+#
+# The trailing version comment is the only thing making a pin auditable, so it
+# has to be right: resolve it from the tag that points at the SHA, not from the
+# repository's latest release. Dependabot keeps both in step from here.
 
 jobs:
   # Runs on pull requests and on push. On push it gates publishing: a merge to
@@ -50,9 +54,9 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v6.0.9
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v7.0.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
           cache: pnpm

@@ -141,7 +141,30 @@ members with it.
 
 The image runs as an unprivileged user, migrates on boot, and reports healthy
 only once `/api/version` actually answers — so a process that is up but not
-serving still counts as down.
+serving is reported as unhealthy rather than fine.
+
+Nothing acts on that, though: `restart: unless-stopped` reacts to the process
+exiting, not to the health status, and watchtower does not roll back. An
+unhealthy container will sit there being unhealthy until someone looks. Treat
+the healthcheck as a signal to monitor, not as self-healing.
+
+### Backups
+
+The database is one file on the `sage_burner_data` volume. It is in WAL mode, so
+copying the file alone can miss recent commits — use SQLite's backup API, which
+is consistent against a live database:
+
+```sh
+docker compose exec sage-burner \
+  node -e "const {DatabaseSync}=require('node:sqlite');
+           new DatabaseSync(process.env.DATABASE_URL).exec(\"VACUUM INTO '/data/backup.sqlite'\")"
+docker compose cp sage-burner:/data/backup.sqlite ./sage-burner-$(date +%F).sqlite
+docker compose exec sage-burner rm /data/backup.sqlite
+```
+
+Worth doing before any deploy that includes a migration, since a migration that
+alters a column is a table rebuild and restoring the volume is the documented
+recovery path if one goes wrong.
 
 The watchtower here is **scoped** — it runs with `--scope sage-burner` and only
 touches containers carrying the matching label — so it coexists with any other

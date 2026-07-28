@@ -6,6 +6,12 @@
 # stripping, and the database is `node:sqlite` rather than a native binding. So
 # there is no build toolchain in either stage and no coupling to a Node ABI.
 
+# The base image floats on the 24-alpine tag while everything in the workflow
+# next door is pinned to a SHA. That asymmetry is deliberate: a pinned base
+# would freeze the Alpine and Node security patches this image is rebuilt to
+# pick up, and unlike a GitHub Action it does not run with credentials. The
+# major is pinned, which is the part that could break the build.
+
 # ---------------------------------------------------------------------------
 # Build stage — produces the web bundle only.
 # ---------------------------------------------------------------------------
