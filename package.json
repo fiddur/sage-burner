@@ -17,7 +17,7 @@
     "dev:web": "pnpm --filter sage-burner-web dev",
     "build": "pnpm -r --if-present build",
     "test": "pnpm -r --if-present test",
-    "check": "oxlint -c .oxlintrc.json && pnpm -r --if-present check",
+    "check": "oxfmt --check . && oxlint -c .oxlintrc.json && pnpm -r --if-present check",
     "fix": "oxfmt . && oxlint -c .oxlintrc.json --fix"
   },
   "devDependencies": {

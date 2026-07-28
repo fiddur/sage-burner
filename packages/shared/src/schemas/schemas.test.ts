@@ -327,11 +327,26 @@ describe('deriving schemas', () => {
 })
 
 describe('publicSessionSchema', () => {
-  it('carries no member identity, so the unauthenticated ICS feed cannot leak one', () => {
-    const leaky = new Set(['host_member_id', 'event_id', 'contact', 'allergies_notes', 'payment_status'])
-    for (const field of Object.keys(publicSessionFields.shape)) {
-      expect(leaky.has(field)).toBe(false)
-    }
+  it('exposes exactly these fields and nothing else', () => {
+    // An allowlist, deliberately, not a denylist of known-sensitive names.
+    // This schema is the guard rail for an unauthenticated endpoint, so adding
+    // a field must fail this test until someone consciously widens it — a
+    // denylist only catches leaks that were thought of in advance, and
+    // `host_name` is exactly the field most likely to get added here.
+    expect(Object.keys(publicSessionFields.shape).sort()).toEqual([
+      'description',
+      'id',
+      'location',
+      'time_slot_end',
+      'time_slot_start',
+      'title',
+    ])
+  })
+
+  it('inherits its constraints from sessionFields rather than redeclaring them', () => {
+    const toolong = 'x'.repeat(20_001)
+    expect(publicSessionFields.shape.description.safeParse(toolong).success).toBe(false)
+    expect(sessionFields.shape.description.safeParse(toolong).success).toBe(false)
   })
 
   it('rejects a backwards slot, so the feed cannot emit DTEND before DTSTART', () => {

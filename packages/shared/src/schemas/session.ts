@@ -74,14 +74,13 @@ export type Session = z.infer<typeof sessionSchema>
  * and the ordering check is re-applied so the feed cannot emit an event whose
  * `DTEND` precedes its `DTSTART`.
  */
-export const publicSessionFields = z.object({
-  id: idSchema,
-  title: text(200),
-  description: z.string().max(20_000),
-  time_slot_start: dateTimeSchema,
-  time_slot_end: dateTimeSchema,
-  location: optionalText(200),
-})
+export const publicSessionFields = sessionFields
+  .pick({ id: true, title: true, description: true, location: true })
+  .extend({
+    // Narrowed from nullable: only scheduled sessions belong in a calendar.
+    time_slot_start: dateTimeSchema,
+    time_slot_end: dateTimeSchema,
+  })
 
 export const publicSessionSchema = withValidTimeSlot(publicSessionFields)
 
