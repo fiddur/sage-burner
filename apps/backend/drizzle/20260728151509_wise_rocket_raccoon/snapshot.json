@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "00988195-aa0b-4f7b-872c-6bbf684eab52",
+  "id": "fc633e05-f096-4f8b-b608-88f60b21e87e",
   "prevIds": ["00000000-0000-0000-0000-000000000000"],
   "ddl": [
     {
@@ -932,6 +932,20 @@
       "where": null,
       "origin": "manual",
       "name": "invite_token_event_idx",
+      "entityType": "indexes",
+      "table": "invite_token"
+    },
+    {
+      "columns": [
+        {
+          "value": "application_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "\"invite_token\".\"application_id\" is not null",
+      "origin": "manual",
+      "name": "invite_token_application_idx",
       "entityType": "indexes",
       "table": "invite_token"
     },

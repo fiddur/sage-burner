@@ -119,6 +119,7 @@ CREATE TABLE `session` (
 CREATE INDEX `application_event_status_idx` ON `application` (`event_id`,`status`);--> statement-breakpoint
 CREATE INDEX `form_question_event_order_idx` ON `form_question` (`event_id`,`order`);--> statement-breakpoint
 CREATE INDEX `invite_token_event_idx` ON `invite_token` (`event_id`);--> statement-breakpoint
+CREATE UNIQUE INDEX `invite_token_application_idx` ON `invite_token` (`application_id`) WHERE "invite_token"."application_id" is not null;--> statement-breakpoint
 CREATE UNIQUE INDEX `member_event_account_idx` ON `member` (`event_id`,`account_id`);--> statement-breakpoint
 CREATE UNIQUE INDEX `member_invite_token_idx` ON `member` (`invite_token_id`);--> statement-breakpoint
 CREATE INDEX `passkey_account_idx` ON `passkey` (`account_id`);--> statement-breakpoint

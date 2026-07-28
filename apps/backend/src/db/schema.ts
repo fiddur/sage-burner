@@ -131,13 +131,19 @@ export const account = sqliteTable(
   {
     id: text('id').notNull(),
     /**
-     * Always lowercase — enforced by the CHECK below, not merely intended.
+     * Lowercase ASCII — enforced by the CHECK below, not merely intended.
      *
      * SQLite's UNIQUE on TEXT uses BINARY collation, so on its own it would
      * make `admin@example.org` and `Admin@Example.org` two different accounts
      * for one human, each with its own passkeys, roles and memberships.
-     * Requiring the stored form to be lowercase also guarantees an exact-match
-     * lookup on a lowercased input can never miss a row.
+     *
+     * The guarantee is ASCII-only, because SQLite's `lower()` is: `Å@x.org`
+     * satisfies the CHECK unchanged and can coexist with `å@x.org`. Narrow in
+     * practice — a non-ASCII local part needs SMTPUTF8, and domains arrive
+     * punycoded — but it is exactly the case this CHECK cannot backstop. So
+     * **the application must still normalise with JS `toLowerCase()` before
+     * writing or looking up**; do not read this constraint as making an
+     * exact-match lookup unconditionally safe.
      */
     email: text('email').notNull().unique(),
     /** Nullable: a passkey-only account is legitimate. */
@@ -214,6 +220,15 @@ export const inviteToken = sqliteTable(
       .references(() => event.id, { onDelete: 'cascade' }),
     /** Null for an admin-created direct invite with no application behind it. */
     application_id: text('application_id').references(() => application.id, { onDelete: 'set null' }),
+    /**
+     * The admin who minted this invite.
+     *
+     * No `onDelete`, so SQLite's default RESTRICT applies and an account that
+     * has issued invites cannot be deleted. Deliberate: erasing who let whom in
+     * would quietly rewrite the record of how the group formed. The same
+     * applies to `member.account_id`. It does mean "delete my account" has no
+     * answer yet — see #35, which owns that decision.
+     */
     expires_at: text('expires_at').notNull(),
     /**
      * Stamped on redemption, for display and auditing.
@@ -227,7 +242,27 @@ export const inviteToken = sqliteTable(
       .notNull()
       .references(() => account.id),
   },
-  (table) => [primaryKey({ columns: [table.id] }), index('invite_token_event_idx').on(table.event_id)],
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    index('invite_token_event_idx').on(table.event_id),
+    // One invite per application, so an approved application can only ever
+    // become one membership. Without this, a double-clicked Approve or a
+    // retried request mints two invites for the same application, and since
+    // single use is keyed on the token, each redeems into a separate account:
+    // one application, two humans.
+    //
+    // The application can win this race on its own — approving can `UPDATE ...
+    // WHERE status = 'pending'` and check the row count — but the same argument
+    // used for `member_invite_token_idx` applies: an invariant this
+    // load-bearing should not depend on every future caller getting a
+    // transaction right.
+    //
+    // Partial, because NULLs compare distinct in SQLite: direct admin invites
+    // carry no application and must stay unconstrained.
+    uniqueIndex('invite_token_application_idx')
+      .on(table.application_id)
+      .where(sql`${table.application_id} is not null`),
+  ],
 )
 
 /**

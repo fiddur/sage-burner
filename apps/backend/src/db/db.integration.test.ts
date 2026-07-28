@@ -262,6 +262,48 @@ describe('uniqueness', () => {
     expect(() => seedAccount(ids.otherAccount, 'admin@example.org')).toThrow()
   })
 
+  it('allows only one invite per application, so one approval is one membership', () => {
+    // Without the partial unique index a double-clicked Approve mints two
+    // invites for the same application, and single use is keyed on the token —
+    // so each redeems into a separate account. One application, two humans.
+    handle.db
+      .insert(application)
+      .values({
+        id: 'app-dup',
+        event_id: ids.event,
+        answers: {},
+        status: 'approved',
+        applicant_name: 'Someone',
+        applicant_contact: 'someone@example.org',
+        submitted_at: NOW,
+        decided_at: NOW,
+      })
+      .run()
+
+    const mint = (id: string) =>
+      handle.db
+        .insert(inviteToken)
+        .values({
+          id,
+          token_hash: `hash-of-${id}`,
+          event_id: ids.event,
+          application_id: 'app-dup',
+          expires_at: '2026-09-01T00:00:00Z',
+          created_by: ids.account,
+        })
+        .run()
+
+    expect(() => mint('inv-1')).not.toThrow()
+    expect(() => mint('inv-2')).toThrow()
+  })
+
+  it('still allows many direct admin invites, which carry no application', () => {
+    // The index must be partial: NULLs compare distinct in SQLite, but a
+    // non-partial unique index would still read as forbidding this.
+    expect(() => seedInvite(ids.invite)).not.toThrow()
+    expect(() => seedInvite(ids.otherInvite)).not.toThrow()
+  })
+
   it('refuses a mixed-case email, so one human cannot become two accounts', () => {
     // SQLite's UNIQUE on TEXT is BINARY, so without the lowercase CHECK the
     // address below is simply a different account — with its own passkeys,
