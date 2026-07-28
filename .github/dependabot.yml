@@ -55,9 +55,18 @@ updates:
       interval: weekly
     commit-message:
       prefix: 'chore(deps)'
-    # The workspace already refuses registry packages younger than 72 hours
-    # (pnpm-workspace.yaml, minimumReleaseAge). Grouping keeps that from
-    # becoming a stream of one-line PRs.
+    # Matches pnpm-workspace.yaml's minimumReleaseAge (4320 minutes = 72 hours).
+    #
+    # Grouping below bounds how *many* PRs arrive; this bounds *when*. Without
+    # it, a weekly run landing inside that window proposes a version pnpm's
+    # resolver refuses to consider, so `pnpm install --frozen-lockfile` fails
+    # with ERR_PNPM_NO_MATCHING_VERSION and CI Gate goes red on a dependency
+    # bump that was never installable. Same argument as the node-major ignore
+    # above: a check that fails for reasons unrelated to the change teaches
+    # people to skim past it.
+    cooldown:
+      default-days: 3
+    # Keeps the 72-hour policy from becoming a stream of one-line PRs.
     groups:
       all-dependencies:
         patterns: ['*']
