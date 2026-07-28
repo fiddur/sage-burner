@@ -133,10 +133,11 @@ cp .env.example .env
 docker compose up -d
 ```
 
-Copying `.env` is a required step, not a convenience: `TRUST_PROXY` defaults to
-`false` so that a compose file run without a reverse proxy in front cannot be
-handed a client-controlled `request.ip`. `.env.example` ships the `1` that the
-Apache deployment below wants.
+For the Apache deployment below, uncomment `TRUST_PROXY=1` in that `.env` —
+without it `request.ip` is the Docker bridge for every request. It ships
+commented out rather than set, because a trusted hop with nothing in front
+appending to `X-Forwarded-For` hands the client control of that value, and a
+default that is only safe if you edit the file is not a safe default.
 
 One service, one named volume holding the SQLite database, and a watchtower
 sidecar that polls Docker Hub every five minutes and redeploys when the tag

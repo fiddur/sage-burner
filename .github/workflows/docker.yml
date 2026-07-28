@@ -19,6 +19,7 @@ on:
       - 'pnpm-workspace.yaml'
       - 'package.json'
       - 'tsconfig.json'
+      - '.nvmrc'
       - 'Dockerfile'
       - '.dockerignore'
       - '.github/workflows/docker.yml'
