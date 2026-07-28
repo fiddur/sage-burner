@@ -29,20 +29,32 @@ services:
       # compose down` cannot take the members with it.
       - sage_burner_data:/data
     labels:
-      # Watchtower below runs with --label-enable, so it updates only what
-      # carries this. Without the label nothing would ever be updated; without
-      # --label-enable it would update every container on the host, including
-      # ones belonging to other projects.
+      # Watchtower below runs with --label-enable and --scope, so it updates
+      # only what carries both of these. Without the enable label nothing would
+      # be updated; without the scope, two watchtowers on one host would both
+      # act on the same containers.
       - 'com.centurylinklabs.watchtower.enable=true'
+      - 'com.centurylinklabs.watchtower.scope=sage-burner'
     # No healthcheck block: the image defines one that respects $PORT, and
     # repeating it here only creates two copies to keep in step.
+    logging:
+      # The daemon default is json-file with no rotation. Fastify writes a JSON
+      # line per request, and this is meant to sit on a small box for months —
+      # unrotated, the log grows until the disk is full, which takes SQLite's
+      # write path down with it.
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
     restart: unless-stopped
 
   # Polls Docker Hub every 5 minutes and redeploys when the tag moves.
   #
-  # If the host already runs a watchtower for another project, drop this
-  # service and add the label above to that one's scope instead — two
-  # instances on the same socket both act on the same containers.
+  # Scoped, so it coexists with any other watchtower on the same host: an
+  # instance started with --scope only touches containers carrying the matching
+  # `watchtower.scope` label, and ignores everything else. An *unscoped*
+  # watchtower elsewhere on the host would still grab these containers, so if
+  # one exists, give it a scope too.
   watchtower:
     # Pinned. This container holds the Docker socket read-write, which is
     # root-equivalent on the host — whatever image it resolves to can start
@@ -57,7 +69,10 @@ services:
     image: containrrr/watchtower:1.7.1
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    command: --label-enable --cleanup --interval 300
+    labels:
+      # Its own scope label, so a differently-scoped watchtower leaves it alone.
+      - 'com.centurylinklabs.watchtower.scope=sage-burner'
+    command: --label-enable --scope sage-burner --cleanup --interval 300
     restart: unless-stopped
 
 volumes:

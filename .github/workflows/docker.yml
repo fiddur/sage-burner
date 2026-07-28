@@ -23,8 +23,39 @@ concurrency:
   group: docker-${{ github.ref }}
   cancel-in-progress: true
 
+# Actions are pinned to commit SHAs rather than mutable major tags. The publish
+# job holds DOCKERHUB_TOKEN — push rights on the image watchtower auto-deploys
+# without review — so `@v3` meaning "whatever that tag points at today" is the
+# same bet this repo declines elsewhere via pnpm's minimumReleaseAge and the
+# watchtower version pin.
+
 jobs:
+  # Publishing is gated on this. A merge to develop is live on the server within
+  # five minutes, watchtower has no rollback, and --cleanup removes the
+  # superseded image — so recovering from a bad deploy means hand-pinning a
+  # <sha> tag in the compose file. Cheap insurance against that.
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v6.0.9
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # The same gate as local development: formatting, types, lint, tests.
+      - run: pnpm check
+      - run: pnpm test
+
   build:
+    needs: check
     # Also guards workflow_dispatch, which can be fired from any branch.
     if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -35,20 +66,20 @@ jobs:
       contents: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Extract metadata for Docker
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
         with:
           images: fiddur/sage-burner
           # `latest` is built from main rather than promoted from a sha-tagged
@@ -61,7 +92,7 @@ jobs:
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
       - name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
           file: Dockerfile

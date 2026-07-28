@@ -143,11 +143,11 @@ The image runs as an unprivileged user, migrates on boot, and reports healthy
 only once `/api/version` actually answers — so a process that is up but not
 serving still counts as down.
 
-If the host already runs a watchtower for another project, drop that service
-from the compose file and add the
-`com.centurylinklabs.watchtower.enable=true` label to the existing one's scope
-instead. Two watchtowers on the same Docker socket both act on the same
-containers.
+The watchtower here is **scoped** — it runs with `--scope sage-burner` and only
+touches containers carrying the matching label — so it coexists with any other
+watchtower on the host. The one thing to avoid is an _unscoped_ watchtower
+elsewhere on the same machine: that one grabs every container it can see,
+including these. If one exists, give it a scope too.
 
 > **No admin yet.** There is no open signup, so a fresh deployment currently has
 > nobody who can approve anything — seeding the first admin arrives with [#10].
