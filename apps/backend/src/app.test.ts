@@ -135,6 +135,28 @@ describe('with a web root', () => {
     expect(shell.headers['cache-control']).toBe('no-cache')
   })
 
+  it('does not cache the shell when an ancestor directory is named assets', async () => {
+    // A substring test against the absolute path would match here and hand the
+    // shell `immutable` — which no redeploy can bust, pinning every client
+    // that loaded it to a dead build for a year.
+    const outer = mkdtempSync(join(tmpdir(), 'sage-burner-outer-'))
+    const nested = join(outer, 'assets', 'app', 'dist')
+    mkdirSync(nested, { recursive: true })
+    writeFileSync(join(nested, 'index.html'), '<!doctype html><title>Sage Burner</title>')
+
+    try {
+      await build({ WEB_ROOT: nested })
+
+      const shell = await app.inject({ method: 'GET', url: '/index.html' })
+      expect(shell.headers['cache-control']).toBe('no-cache')
+
+      const fallback = await app.inject({ method: 'GET', url: '/schedule' })
+      expect(fallback.headers['cache-control']).toBe('no-cache')
+    } finally {
+      rmSync(outer, { recursive: true, force: true })
+    }
+  })
+
   it('keeps the shell uncached on the SPA fallback path too', async () => {
     // The path real navigations take. It reaches the shell through
     // `reply.sendFile` rather than a registered route, so the header applying

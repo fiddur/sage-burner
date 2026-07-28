@@ -7,10 +7,10 @@
 export const NotFound = () => (
   <article class="prose">
     <h1>Nothing here</h1>
-    <p>That page does not exist — or the link that brought you here has expired.</p>
+    <p>That page does not exist yet, or the link that brought you here has stopped working.</p>
     <p>
-      If you were following an invite, ask whoever sent it for a fresh one: invites are single-use and do run
-      out.
+      If you were following an invite, ask whoever sent it for a fresh one — invites are single-use and do
+      expire.
     </p>
     <p>
       <a class="button" href="/">

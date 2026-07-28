@@ -144,7 +144,11 @@ export const createApp = async ({ db, config }: AppDeps): Promise<FastifyInstanc
         // caching it is how clients get pinned to a build that no longer
         // exists. Watchtower redeploys on its own schedule, so this is the
         // difference between a new version arriving and never arriving.
-        const cacheable = filePath.includes(`${path.sep}assets${path.sep}`)
+        //
+        // Relative to the root, not a substring of the absolute path — which
+        // would also match when any ancestor directory happens to be called
+        // `assets`, handing the shell an `immutable` no redeploy can bust.
+        const cacheable = path.relative(root, filePath).startsWith(`assets${path.sep}`)
         response.header('cache-control', cacheable ? 'public, max-age=31536000, immutable' : 'no-cache')
       },
     })
