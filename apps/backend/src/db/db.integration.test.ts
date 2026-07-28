@@ -90,7 +90,7 @@ const seedMember = (id: string, account_id: string, invite_token_id: string) =>
 
 beforeEach(() => {
   handle = createDb({ url: ':memory:' })
-  runMigrations(handle.db)
+  runMigrations(handle)
   seedAccount(ids.account, 'admin@example.org')
   seedEvent()
 })
@@ -122,13 +122,41 @@ describe('migrations', () => {
   })
 
   it('is idempotent — running again on the same database is a no-op', () => {
-    expect(() => runMigrations(handle.db)).not.toThrow()
+    expect(() => runMigrations(handle)).not.toThrow()
     expect(handle.db.select().from(event).all()).toHaveLength(1)
+  })
+
+  it('restores foreign key enforcement afterwards', () => {
+    // It is switched off for the duration so a table-rebuild migration cannot
+    // cascade-delete children. Leaving it off would be far worse than never
+    // touching it.
+    expect(handle.client.prepare('PRAGMA foreign_keys').get()?.foreign_keys).toBe(1)
+  })
+
+  it('restores foreign key enforcement even when a migration throws', () => {
+    expect(() => runMigrations(handle, '/nonexistent/migrations')).toThrow()
+    expect(handle.client.prepare('PRAGMA foreign_keys').get()?.foreign_keys).toBe(1)
+  })
+
+  it('refuses to finish if a migration left a dangling reference', () => {
+    // Simulates what a table rebuild does with foreign keys off: the parent
+    // goes, the children stay and point at nothing. Without the
+    // foreign_key_check this commits silently and an organiser opens an empty
+    // member list; with it, the boot fails instead.
+    seedInvite(ids.invite)
+    seedMember(ids.member, ids.account, ids.invite)
+
+    handle.client.exec('PRAGMA foreign_keys = OFF')
+    handle.client.exec(`DELETE FROM event WHERE id = '${ids.event}'`)
+    handle.client.exec('PRAGMA foreign_keys = ON')
+
+    expect(() => runMigrations(handle)).toThrow(/foreign key violation/i)
+    expect(handle.client.prepare('PRAGMA foreign_keys').get()?.foreign_keys).toBe(1)
   })
 })
 
 describe('foreign keys', () => {
-  it('are actually enforced (SQLite defaults them off)', () => {
+  it('are on — pinned by createDb rather than inherited from the driver', () => {
     const enabled = handle.client.prepare('PRAGMA foreign_keys').get()
     expect(enabled?.foreign_keys).toBe(1)
   })
@@ -430,6 +458,24 @@ describe('check constraints', () => {
         )
         .run('s-half', ids.event, 'Half a slot', ids.member, '', '2026-10-03T09:00:00Z', null),
     ).toThrow()
+  })
+
+  it('rejects a malformed date, which the ordering checks depend on', () => {
+    // '2026-1-2' is not fixed width, so it sorts wrong — the ordering CHECKs
+    // compare these as strings and would silently accept a backwards range.
+    expect(() =>
+      handle.client
+        .prepare(
+          `INSERT INTO event (id, name, slug, start_date, end_date, welcome_markdown, member_cap, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run('e-loose', 'Loose', 'loose', '2026-1-2', '2026-10-04', '', 42, NOW),
+    ).toThrow()
+  })
+
+  it('still accepts a null date, since arrival and departure are optional', () => {
+    seedInvite(ids.invite)
+    expect(() => seedMember(ids.member, ids.account, ids.invite)).not.toThrow()
   })
 
   it('rejects a negative question order', () => {

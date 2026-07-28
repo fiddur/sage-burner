@@ -86,7 +86,7 @@ describe('createDb against a file', () => {
     const file = join(dir, 'sage-burner.sqlite')
 
     const first = createDb({ url: file })
-    runMigrations(first.db)
+    runMigrations(first)
     first.db
       .insert(event)
       .values({

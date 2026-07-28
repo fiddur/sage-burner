@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "fc633e05-f096-4f8b-b608-88f60b21e87e",
+  "id": "7f74a145-3c37-40aa-bbae-5615501c439b",
   "prevIds": ["00000000-0000-0000-0000-000000000000"],
   "ddl": [
     {
@@ -1060,6 +1060,18 @@
       "table": "application"
     },
     {
+      "value": "\"start_date\" is null or \"start_date\" glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'",
+      "name": "event_start_date_check",
+      "entityType": "checks",
+      "table": "event"
+    },
+    {
+      "value": "\"end_date\" is null or \"end_date\" glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'",
+      "name": "event_end_date_check",
+      "entityType": "checks",
+      "table": "event"
+    },
+    {
       "value": "\"end_date\" >= \"start_date\"",
       "name": "event_date_order_check",
       "entityType": "checks",
@@ -1088,6 +1100,24 @@
       "name": "form_question_required_check",
       "entityType": "checks",
       "table": "form_question"
+    },
+    {
+      "value": "\"arrival_date\" is null or \"arrival_date\" glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'",
+      "name": "member_arrival_date_check",
+      "entityType": "checks",
+      "table": "member"
+    },
+    {
+      "value": "\"departure_date\" is null or \"departure_date\" glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'",
+      "name": "member_departure_date_check",
+      "entityType": "checks",
+      "table": "member"
+    },
+    {
+      "value": "\"payment_date\" is null or \"payment_date\" glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'",
+      "name": "member_payment_date_check",
+      "entityType": "checks",
+      "table": "member"
     },
     {
       "value": "\"arrival_date\" is null or \"departure_date\" is null\n          or \"departure_date\" >= \"arrival_date\"",

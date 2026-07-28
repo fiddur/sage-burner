@@ -37,9 +37,9 @@ export const createDb = ({ url }: CreateDbOptions): DbHandle => {
 
   const client = new DatabaseSync(url)
 
-  // SQLite ships with foreign key enforcement OFF, per connection. Without
-  // this every `references()` in the schema is decorative and orphaned rows
-  // are accepted silently.
+  // Pinned rather than inherited: `node:sqlite` enables foreign keys by
+  // default today (unlike SQLite's own default, and unlike most drivers), and
+  // nothing here should depend on that staying true across Node versions.
   client.exec('PRAGMA foreign_keys = ON')
 
   // Wait rather than failing outright when another connection holds a write

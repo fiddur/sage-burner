@@ -36,6 +36,8 @@ CREATE TABLE `event` (
 	`welcome_markdown` text DEFAULT '' NOT NULL,
 	`member_cap` integer NOT NULL,
 	`created_at` text NOT NULL,
+	CONSTRAINT "event_start_date_check" CHECK("start_date" is null or "start_date" glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+	CONSTRAINT "event_end_date_check" CHECK("end_date" is null or "end_date" glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
 	CONSTRAINT "event_date_order_check" CHECK("end_date" >= "start_date"),
 	CONSTRAINT "event_member_cap_check" CHECK("member_cap" > 0)
 );
@@ -86,6 +88,9 @@ CREATE TABLE `member` (
 	CONSTRAINT `fk_member_event_id_event_id_fk` FOREIGN KEY (`event_id`) REFERENCES `event`(`id`) ON DELETE CASCADE,
 	CONSTRAINT `fk_member_account_id_account_id_fk` FOREIGN KEY (`account_id`) REFERENCES `account`(`id`),
 	CONSTRAINT `fk_member_invite_token_id_invite_token_id_fk` FOREIGN KEY (`invite_token_id`) REFERENCES `invite_token`(`id`),
+	CONSTRAINT "member_arrival_date_check" CHECK("arrival_date" is null or "arrival_date" glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+	CONSTRAINT "member_departure_date_check" CHECK("departure_date" is null or "departure_date" glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+	CONSTRAINT "member_payment_date_check" CHECK("payment_date" is null or "payment_date" glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
 	CONSTRAINT "member_stay_order_check" CHECK("arrival_date" is null or "departure_date" is null
           or "departure_date" >= "arrival_date"),
 	CONSTRAINT "member_payment_status_check" CHECK("payment_status" in ('unpaid', 'partial', 'paid'))

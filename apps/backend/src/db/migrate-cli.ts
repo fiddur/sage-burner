@@ -11,7 +11,7 @@ const url = process.env.DATABASE_URL ?? './data/sage-burner.sqlite'
 const handle = createDb({ url })
 
 try {
-  runMigrations(handle.db)
+  runMigrations(handle)
   console.info(`✅ Migrations applied to ${url}`)
 } finally {
   handle.close()

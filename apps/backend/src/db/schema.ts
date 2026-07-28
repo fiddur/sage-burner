@@ -15,6 +15,20 @@ import { check, index, integer, primaryKey, sqliteTable, text, uniqueIndex } fro
  * same constant the API validates against is what actually keeps the two from
  * drifting.
  */
+/**
+ * `column` is a fixed-width `YYYY-MM-DD` date, or null.
+ *
+ * The date-ordering CHECKs compare these as strings, which is only sound
+ * because the width is fixed — a raw insert of `'2026-1-2'` sorts wrong and
+ * would slip past them. Same reasoning as `oneOf`: the constraint exists for
+ * writes that do not come through the API, so it has to hold on its own.
+ *
+ * Shape only. It does not reject `2026-02-30`; `z.iso.date()` does that at the
+ * API boundary.
+ */
+const isIsoDate = (column: SQLiteColumn): SQL =>
+  sql`${column} is null or ${column} glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'`
+
 const oneOf = (column: SQLiteColumn, values: readonly string[]): SQL => {
   // Must be `sql.raw`, not interpolation: `sql`${value}`` produces a bound
   // parameter, and a `?` placeholder inside a CHECK constraint is meaningless
@@ -57,6 +71,8 @@ export const event = sqliteTable(
     primaryKey({ columns: [table.id] }),
     // Mirrors `withEventDateOrder` in the shared schemas. Dates are fixed-width
     // ISO, so a string comparison is chronological here.
+    check('event_start_date_check', isIsoDate(table.start_date)),
+    check('event_end_date_check', isIsoDate(table.end_date)),
     check('event_date_order_check', sql`${table.end_date} >= ${table.start_date}`),
     check('event_member_cap_check', sql`${table.member_cap} > 0`),
   ],
@@ -314,24 +330,35 @@ export const member = sqliteTable(
     primaryKey({ columns: [table.id] }),
     // One membership per person per burn.
     uniqueIndex('member_event_account_idx').on(table.event_id, table.account_id),
-    // What actually makes an invite single-use. Stamping `used_at` in the
-    // application is a check-then-act race with nothing underneath it, and the
-    // index above only stops the *same* account joining twice — so without
+    // What makes an invite single-use, for as long as the member row exists.
+    // Note the caveat: delete a member and this index stops objecting, so
+    // anyone still holding the original link could redeem it again. Redemption
+    // (#17) closes that by making the `used_at` stamp load-bearing too —
+    // `UPDATE invite_token SET used_at = ? WHERE id = ? AND used_at IS NULL`,
+    // requiring one affected row — so the two mechanisms cover each other.
+    //
+    // Stamping `used_at` alone is a check-then-act race with nothing
+    // underneath it, and the index above only stops the *same* account joining
+    // twice — so without
     // this, a forwarded invite link lets a second person redeem it and quietly
     // breaks member_cap accounting, which is sized against invites issued.
     uniqueIndex('member_invite_token_idx').on(table.invite_token_id),
+    // No separate index on event_id alone: SQLite uses the leftmost prefix of
+    // member_event_account_idx for that, so one would only add write cost.
+    // That covers one direction only — "which burns is this person a member
+    // of?" filters on account_id and falls back to a scan. Left that way
+    // deliberately: at ~42 members across a handful of events the scan is
+    // free, and an index would cost a write on every member update.
+    //
     // Mirrors `withMemberStayOrder` in the shared schemas.
+    check('member_arrival_date_check', isIsoDate(table.arrival_date)),
+    check('member_departure_date_check', isIsoDate(table.departure_date)),
+    check('member_payment_date_check', isIsoDate(table.payment_date)),
     check(
       'member_stay_order_check',
       sql`${table.arrival_date} is null or ${table.departure_date} is null
           or ${table.departure_date} >= ${table.arrival_date}`,
     ),
-    // No separate index on event_id alone: SQLite uses the leftmost prefix of
-    // member_event_account_idx for that, so one would only add write cost.
-    // Note this covers one direction only — "which burns is this person a
-    // member of?" filters on account_id and falls back to a scan. Left that
-    // way deliberately: at ~42 members across a handful of events the scan is
-    // free, and an index would cost a write on every member update.
     check('member_payment_status_check', oneOf(table.payment_status, paymentStatuses)),
   ],
 )
