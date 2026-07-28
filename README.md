@@ -155,7 +155,13 @@ the healthcheck as a signal to monitor, not as self-healing.
 
 ### Backups
 
-The database is one file on the `sage_burner_data` volume. It is in WAL mode, so
+The database is one file on the `sage_burner_data` volume — which Docker shows
+as **`sage-burner_sage_burner_data`**, since compose prefixes volume names with
+the project name. Use the full name with `docker volume` and `docker run -v`:
+naming the short form does not error, it silently creates a new empty volume,
+which during a restore means restoring into nothing.
+
+It is in WAL mode, so
 copying the file alone can miss recent commits — use SQLite's backup API, which
 is consistent against a live database:
 

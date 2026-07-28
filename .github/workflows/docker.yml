@@ -67,11 +67,18 @@ jobs:
       - run: pnpm check
       - run: pnpm test
 
-  # Runs on pull requests too, without pushing. Otherwise CI Gate could go green
-  # on a change that breaks the image — a Dockerfile edit, a lockfile change, or
-  # a new workspace package the runtime stage's hand-picked COPY list misses —
-  # and the failure would surface only in the publish run after merge, leaving
-  # develop unpublishable until someone noticed the red run.
+  # Runs on pull requests too, without pushing, and then starts what it built.
+  #
+  # Building alone is not enough: a missed source COPY produces a perfectly
+  # clean image that exits at boot with ERR_MODULE_NOT_FOUND, so the failure
+  # mode most likely to be introduced here — the runtime stage's hand-picked
+  # COPY list falling behind a new workspace package — is exactly the one a
+  # build-only gate waves through. Since watchtower has no rollback and
+  # --cleanup removes the superseded image, that is worth catching before
+  # merge rather than after.
+  #
+  # Starting it also exercises migrating a fresh volume, which nothing else
+  # does before production does it.
   build:
     needs: check
     runs-on: ubuntu-latest
@@ -109,6 +116,7 @@ jobs:
             type=sha,prefix=
             type=raw,value=develop,enable=${{ github.ref == 'refs/heads/develop' }}
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=pr-smoke,enable=${{ github.event_name == 'pull_request' }}
 
       - name: Build and push
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
@@ -119,6 +127,8 @@ jobs:
           # test also guards workflow_dispatch, which can be fired from any ref.
           push: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/develop' ||
             github.ref == 'refs/heads/main') }}
+          # Into the runner's daemon on pull requests, so the next step can run it.
+          load: ${{ github.event_name == 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           # Surfaced by /api/version, so a deployed container can be traced
@@ -126,3 +136,22 @@ jobs:
           build-args: BUILD_SHA=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Proves the image actually starts, not merely that it builds.
+      - name: Smoke-test the image
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          docker run -d --name smoke -p 127.0.0.1:3000:3000 fiddur/sage-burner:pr-smoke
+          for _ in $(seq 30); do
+            if curl -fsS http://127.0.0.1:3000/api/version; then
+              echo
+              echo "image starts, migrates and serves"
+              docker rm -f smoke > /dev/null
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "image did not become responsive:"
+          docker logs smoke
+          exit 1
