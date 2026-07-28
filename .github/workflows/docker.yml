@@ -90,20 +90,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
-      - name: Log in to Docker Hub
-        # Must match the `Push` step's condition exactly, not merely exclude
-        # pull requests: workflow_dispatch can fire from any ref, and a looser
-        # gate here would materialise DOCKERHUB_TOKEN into a runner that is
-        # about to execute four third-party actions and `docker run` freshly
-        # built, branch-controlled code — on a run that cannot publish anyway.
-        # Same argument as dropping GITHUB_TOKEN to contents: read.
-        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/develop' || github.ref ==
-          'refs/heads/main')
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
       - name: Extract metadata for Docker
         id: meta
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
@@ -148,8 +134,21 @@ jobs:
       - name: Smoke-test the image
         run: |
           set -euo pipefail
-          # The sha tag, which metadata-action emits on every build.
-          IMAGE=$(printf '%s\n' "${{ steps.meta.outputs.tags }}" | head -1)
+          # The sha tag specifically, not `head -1`. metadata-action sorts by
+          # priority descending and `type=raw` outranks `type=sha`, so the first
+          # line is `:develop` on a push to develop and `:latest` on main —
+          # tags that exist on Docker Hub. Combined with docker's pull fallback,
+          # a load that failed to apply a tag would silently smoke-test the
+          # *previously published* image and green-light it, which is exactly
+          # the tested-bytes-are-published-bytes property the Push step exists
+          # to guarantee. A sha tag cannot do that: it does not exist remotely
+          # for a new commit. `--pull=never` below closes it structurally.
+          IMAGE=$(printf '%s\n' "${{ steps.meta.outputs.tags }}" | grep -- ":${GITHUB_SHA:0:7}\$" || true)
+          if [ -z "$IMAGE" ]; then
+            echo "no sha tag among the built tags — metadata-action output changed shape:"
+            printf '%s\n' "${{ steps.meta.outputs.tags }}"
+            exit 1
+          fi
           echo "smoke-testing $IMAGE"
           # Same constraints docker-compose.yml applies, so the hardening is
           # not the one part of the runtime configuration nothing ever starts.
@@ -167,6 +166,7 @@ jobs:
             --cap-drop ALL \
             --security-opt no-new-privileges:true \
             --health-interval=2s \
+            --pull=never \
             -p 127.0.0.1:3000:3000 "$IMAGE"
           # Waits on the image's own HEALTHCHECK rather than curling from the
           # host. That subsumes the curl — the healthcheck hits /api/version
@@ -191,6 +191,21 @@ jobs:
           docker inspect -f '{{json .State.Health}}' smoke || true
           docker logs smoke
           exit 1
+
+      # Deliberately last before the push. Nothing above needs it — the build
+      # runs with `push: false` and the base image is public — so placing it
+      # earlier would leave DOCKERHUB_TOKEN in ~/.docker/config.json for the
+      # whole build and for `docker run` on freshly built, branch-controlled
+      # code. The condition must match the Push step exactly: workflow_dispatch
+      # can fire from any ref, and credentials should not materialise on a run
+      # that cannot publish.
+      - name: Log in to Docker Hub
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/develop' || github.ref ==
+          'refs/heads/main')
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       # Pushes the exact image the smoke test started, rather than rebuilding.
       #
