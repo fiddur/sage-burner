@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    // Explicit rather than relying on automatic @types discovery, which does
+    // not reach the workspace-local @types/node under pnpm's isolated layout.
+    "types": ["node"]
+  },
+  "include": ["src", "drizzle.config.ts"]
+}
