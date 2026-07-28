@@ -50,26 +50,32 @@ COPY apps/backend/drizzle apps/backend/drizzle
 
 COPY --from=builder /app/apps/web/dist ./apps/web/dist
 
-# The volume mount point. Created ahead of time and owned by `node` so the
-# unprivileged user can write the database into it.
-RUN mkdir -p /data && chown -R node:node /data /app
+# The volume mount point, and the only thing the app needs to write. /app stays
+# root-owned and world-readable: `node` can read its own code and dependencies
+# but cannot modify them, and a recursive chown here would rewrite every copied
+# file into a fresh layer — roughly doubling the image, which watchtower re-pulls
+# on every deploy.
+RUN mkdir -p /data && chown node:node /data
 
 # Everything below runs as a normal user. The container holds contact details
 # and allergies; there is no reason for it to be root, and an image that has
 # never run as root cannot be talked into it by a bad mount.
 USER node
 
+# These are properties of the image itself, and each fails safe: HOST must be
+# 0.0.0.0 to be reachable inside Docker at all, and the two paths point at what
+# this image actually contains.
+#
+# TRUST_PROXY is deliberately NOT set here. It describes the topology in front
+# of the container, which the image cannot know — and getting it wrong fails
+# open: with a hop count and no appending proxy, `request.ip` becomes whatever
+# the client claims. The default of trusting nothing stands, and whoever knows
+# what is in front declares it (see docker-compose.yml).
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
     PORT=3000 \
     DATABASE_URL=/data/sage-burner.sqlite \
     WEB_ROOT=/app/apps/web/dist
-
-# Apache is the only hop that appends to X-Forwarded-For; Docker's port mapping
-# is NAT, not an HTTP proxy, so it adds nothing. Trusting exactly one hop makes
-# request.ip the real client address, and a client can only prepend to the
-# header while Apache appends what it saw.
-ENV TRUST_PROXY=1
 
 ARG BUILD_SHA=unknown
 ENV BUILD_SHA=${BUILD_SHA}

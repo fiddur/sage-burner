@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - develop
+      - main
     paths:
       - 'apps/**'
       - 'packages/**'
@@ -25,8 +26,13 @@ concurrency:
 jobs:
   build:
     # Also guards workflow_dispatch, which can be fired from any branch.
-    if: github.ref == 'refs/heads/develop'
+    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    # Nothing here uses GITHUB_TOKEN — Hub auth is via secrets and the GHA cache
+    # uses ACTIONS_RUNTIME_TOKEN — so the default grant would be unused
+    # privilege handed to four third-party actions on every run.
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -45,9 +51,14 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: fiddur/sage-burner
+          # `latest` is built from main rather than promoted from a sha-tagged
+          # develop image: merging develop into main produces a new merge
+          # commit, whose sha was never built, so there would be nothing to
+          # retag. The GHA cache makes the rebuild cheap.
           tags: |
             type=sha,prefix=
-            type=raw,value=develop
+            type=raw,value=develop,enable=${{ github.ref == 'refs/heads/develop' }}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
       - name: Build and push
         uses: docker/build-push-action@v6

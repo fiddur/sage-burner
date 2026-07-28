@@ -5,7 +5,8 @@
 #
 # Images are tagged:
 #   develop  - built from the develop branch
-#   latest   - promoted from a release on main
+#   latest   - built from main
+#   <sha>    - every build, for pinning to an exact commit
 # Change the tag below to follow one or the other.
 
 services:
@@ -18,9 +19,10 @@ services:
       # the vhost routing for every other domain on that IP.
       - '127.0.0.1:8081:3000'
     environment:
-      # See README "Deployment shape". `1` is correct for exactly one
-      # header-appending proxy in front, and is spoof-resistant there.
-      - TRUST_PROXY=1
+      # Declared here, not in the image: this is the file that knows what is in
+      # front of the container. See README "Deployment shape" — `1` is correct
+      # for exactly one header-appending proxy, and is spoof-resistant there.
+      - TRUST_PROXY=${TRUST_PROXY:-1}
       - LOG_LEVEL=${LOG_LEVEL:-info}
     volumes:
       # The database. A named volume rather than a bind mount so `docker
@@ -32,18 +34,8 @@ services:
       # --label-enable it would update every container on the host, including
       # ones belonging to other projects.
       - 'com.centurylinklabs.watchtower.enable=true'
-    healthcheck:
-      test:
-        [
-          'CMD',
-          'node',
-          '-e',
-          "fetch('http://127.0.0.1:3000/api/version').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
-        ]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
+    # No healthcheck block: the image defines one that respects $PORT, and
+    # repeating it here only creates two copies to keep in step.
     restart: unless-stopped
 
   # Polls Docker Hub every 5 minutes and redeploys when the tag moves.
@@ -52,7 +44,17 @@ services:
   # service and add the label above to that one's scope instead — two
   # instances on the same socket both act on the same containers.
   watchtower:
-    image: containrrr/watchtower
+    # Pinned. This container holds the Docker socket read-write, which is
+    # root-equivalent on the host — whatever image it resolves to can start
+    # privileged containers, mount the host filesystem and read the member
+    # database. An implicit `:latest` there would sit oddly beside the supply
+    # chain care in pnpm-workspace.yaml (minimumReleaseAge, blockExoticSubdeps).
+    #
+    # Note it is also the one service --label-enable does not cover, so it never
+    # updates itself. Upstream has had no release since 1.7.1 and is largely
+    # dormant; a maintained fork is worth considering for the thing that
+    # auto-deploys production.
+    image: containrrr/watchtower:1.7.1
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     command: --label-enable --cleanup --interval 300
