@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 import { applicationStatuses } from '../enums.ts'
-import { dateTimeSchema, idSchema, text } from './common.ts'
+import { dateTimeSchema, idSchema, nonEmptyText } from './common.ts'
 
 /**
  * One answer to one question. Text questions yield a string; `checkbox` and
@@ -25,8 +25,8 @@ export const applicationSchema = z.object({
   event_id: idSchema,
   answers: answersSchema,
   status: z.enum(applicationStatuses),
-  applicant_name: text(200),
-  applicant_contact: text(500),
+  applicant_name: nonEmptyText(200),
+  applicant_contact: nonEmptyText(500),
   submitted_at: dateTimeSchema,
   /** Set when an admin approves or rejects; null while pending. */
   decided_at: dateTimeSchema.nullable(),

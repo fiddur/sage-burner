@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 import { paymentStatuses } from '../enums.ts'
-import { dateSchema, idSchema, optionalText, text } from './common.ts'
+import { dateSchema, idSchema, optionalText, nonEmptyText } from './common.ts'
 
 /** Tolerates missing keys so `.partial()` and `.omit()` derivations still typecheck. */
 type Stay = { arrival_date?: string | null; departure_date?: string | null }
@@ -32,8 +32,8 @@ export const memberFields = z.object({
   id: idSchema,
   event_id: idSchema,
   account_id: idSchema,
-  name: text(200),
-  contact: text(500),
+  name: nonEmptyText(200),
+  contact: nonEmptyText(500),
   /** Free text — "gluten", "sensitive to red lentils". Never a fixed list. */
   allergies_notes: optionalText(2000),
   arrival_date: dateSchema.nullable(),
