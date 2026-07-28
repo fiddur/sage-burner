@@ -57,13 +57,17 @@ updates:
       prefix: 'chore(deps)'
     # Matches pnpm-workspace.yaml's minimumReleaseAge (4320 minutes = 72 hours).
     #
-    # Grouping below bounds how *many* PRs arrive; this bounds *when*. Without
-    # it, a weekly run landing inside that window proposes a version pnpm's
-    # resolver refuses to consider, so `pnpm install --frozen-lockfile` fails
-    # with ERR_PNPM_NO_MATCHING_VERSION and CI Gate goes red on a dependency
-    # bump that was never installable. Same argument as the node-major ignore
-    # above: a check that fails for reasons unrelated to the change teaches
-    # people to skim past it.
+    # Grouping below bounds how *many* PRs arrive; this bounds *when*.
+    #
+    # minimumReleaseAge is a resolution-time policy, and a frozen-lockfile
+    # install does not resolve — so the failure is not in `pnpm install` here.
+    # It is one step earlier: Dependabot runs pnpm itself to regenerate the
+    # lockfile, that resolution is refused, and the update job errors — or it
+    # opens a PR whose package.json and lockfile disagree, and CI Gate goes red
+    # with ERR_PNPM_OUTDATED_LOCKFILE. That is the string to grep for.
+    #
+    # Same argument as the node-major ignore above: a check that fails for
+    # reasons unrelated to the change teaches people to skim past it.
     cooldown:
       default-days: 3
     # Keeps the 72-hour policy from becoming a stream of one-line PRs.

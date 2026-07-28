@@ -162,11 +162,16 @@ the project name. Use the full name with `docker volume` and `docker run -v`:
 naming the short form does not error, it silently creates a new empty volume,
 which during a restore means restoring into nothing.
 
-It is in WAL mode, so
-copying the file alone can miss recent commits — use SQLite's backup API, which
-is consistent against a live database:
+It is in WAL mode, so copying the file alone can miss recent commits — use
+SQLite's backup API, which is consistent against a live database:
 
 ```sh
+# Meant to run from cron, so failures must be loud: without `set -e` the final
+# `rm -f` always succeeds and the whole block exits 0 even when VACUUM INTO hit
+# a full disk or the copy out failed. Cron sees success, nobody looks, and the
+# gap surfaces on the day the restore below is needed.
+set -euo pipefail
+
 STAMP=$(date +%F-%H%M%S)
 # Sweep leftovers older than an hour. The cleanup at the end only runs on the
 # happy path, so an interrupted copy — or watchtower recreating the container
