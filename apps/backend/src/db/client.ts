@@ -29,11 +29,27 @@ export interface CreateDbOptions {
 const IN_MEMORY = ':memory:'
 
 export const createDb = ({ url }: CreateDbOptions): DbHandle => {
+  // `new DatabaseSync('')` does not fail — it opens a private temporary
+  // database that is discarded on close. Everything would appear to work:
+  // migrations apply, writes succeed, and the data is gone at shutdown. An
+  // empty value is easy to produce by accident, since `DATABASE_URL:
+  // ${DATABASE_URL}` in a compose file with the variable unset yields exactly
+  // `''`. Guarding here rather than at each call site so no future caller has
+  // to remember.
+  if (url.trim() === '') {
+    throw new Error(
+      'Database url is empty. SQLite would silently open a throwaway in-memory database and lose ' +
+        'everything on shutdown — set DATABASE_URL, or pass ":memory:" if that is genuinely wanted.',
+    )
+  }
+
   // SQLite will not create a missing parent directory — it just fails with
   // `unable to open database file`. The default lives under a gitignored
   // `data/`, so on a fresh checkout, and on a fresh Docker volume, that
   // directory does not exist yet.
-  if (url !== IN_MEMORY) mkdirSync(path.dirname(url), { recursive: true })
+  // 0o700: the file holds contact details and allergies. Irrelevant inside a
+  // single-tenant container, free everywhere else.
+  if (url !== IN_MEMORY) mkdirSync(path.dirname(url), { recursive: true, mode: 0o700 })
 
   const client = new DatabaseSync(url)
 

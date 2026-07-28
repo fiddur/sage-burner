@@ -30,6 +30,12 @@ export const migrationsFolder = path.join(import.meta.dirname, '..', '..', 'driz
  * `foreign_key_check` afterwards turns what would be a silent data loss into a
  * failed boot, which is the difference between noticing on deploy and noticing
  * when an organiser opens an empty member list.
+ *
+ * If that check ever does fire, the database will not heal itself: drizzle has
+ * already committed and recorded the migration, so it will not re-run and every
+ * subsequent boot fails the same way. That is deliberate — better a container
+ * that refuses to start than one serving a half-deleted event — but recovery is
+ * manual, and restoring the volume from backup is usually the fastest route.
  */
 export const runMigrations = (handle: DbHandle, folder: string = migrationsFolder): void => {
   const { db, client } = handle

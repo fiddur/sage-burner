@@ -7,15 +7,6 @@ import { sql } from 'drizzle-orm'
 import { check, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 /**
- * `column IN (...)`, built from a vocabulary in `@sage-burner/shared`.
- *
- * Drizzle's `{ enum: [...] }` only narrows the TypeScript type — it emits no
- * constraint, so without this a bad value reaching the database by any path
- * other than the API would be stored happily. Generating the CHECK from the
- * same constant the API validates against is what actually keeps the two from
- * drifting.
- */
-/**
  * `column` is a fixed-width `YYYY-MM-DD` date, or null.
  *
  * The date-ordering CHECKs compare these as strings, which is only sound
@@ -29,6 +20,15 @@ import { check, index, integer, primaryKey, sqliteTable, text, uniqueIndex } fro
 const isIsoDate = (column: SQLiteColumn): SQL =>
   sql`${column} is null or ${column} glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'`
 
+/**
+ * `column IN (...)`, built from a vocabulary in `@sage-burner/shared`.
+ *
+ * Drizzle's `{ enum: [...] }` only narrows the TypeScript type — it emits no
+ * constraint, so without this a bad value reaching the database by any path
+ * other than the API would be stored happily. Generating the CHECK from the
+ * same constant the API validates against is what actually keeps the two from
+ * drifting.
+ */
 const oneOf = (column: SQLiteColumn, values: readonly string[]): SQL => {
   // Must be `sql.raw`, not interpolation: `sql`${value}`` produces a bound
   // parameter, and a `?` placeholder inside a CHECK constraint is meaningless
@@ -236,15 +236,6 @@ export const inviteToken = sqliteTable(
       .references(() => event.id, { onDelete: 'cascade' }),
     /** Null for an admin-created direct invite with no application behind it. */
     application_id: text('application_id').references(() => application.id, { onDelete: 'set null' }),
-    /**
-     * The admin who minted this invite.
-     *
-     * No `onDelete`, so SQLite's default RESTRICT applies and an account that
-     * has issued invites cannot be deleted. Deliberate: erasing who let whom in
-     * would quietly rewrite the record of how the group formed. The same
-     * applies to `member.account_id`. It does mean "delete my account" has no
-     * answer yet — see #35, which owns that decision.
-     */
     expires_at: text('expires_at').notNull(),
     /**
      * Stamped on redemption, for display and auditing.
@@ -254,6 +245,20 @@ export const inviteToken = sqliteTable(
      * `member_invite_token_idx` is what actually enforces single use.
      */
     used_at: text('used_at'),
+    /**
+     * The admin who minted this invite.
+     *
+     * No `onDelete`, so SQLite's default NO ACTION applies and an account that
+     * has issued invites cannot be deleted. Deliberate: erasing who let whom in
+     * would quietly rewrite the record of how the group formed. The same
+     * applies to `member.account_id`. It does mean "delete my account" has no
+     * answer yet — see #35, which owns that decision.
+     *
+     * NO ACTION rather than RESTRICT matters here: it is checked at the end of
+     * the statement, not immediately, which is what lets an `event` delete
+     * cascade through invites and members in one go without tripping over this
+     * edge mid-cascade.
+     */
     created_by: text('created_by')
       .notNull()
       .references(() => account.id),
@@ -380,6 +385,12 @@ export const session = sqliteTable(
       .notNull()
       .references(() => event.id, { onDelete: 'cascade' }),
     title: text('title').notNull(),
+    /**
+     * Not constrained to match `event_id` — same gap, and same reasoning, as
+     * `member.invite_token_id`: a dream can currently name a host who is a
+     * member of a different burn. Ordinary application logic rather than a
+     * race, so the scheduling routes (#20) own it.
+     */
     host_member_id: text('host_member_id')
       .notNull()
       .references(() => member.id, { onDelete: 'cascade' }),

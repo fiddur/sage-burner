@@ -13,6 +13,7 @@ import {
   formQuestion,
   inviteToken,
   member,
+  passkey,
   session,
 } from './schema.ts'
 
@@ -506,6 +507,81 @@ describe('check constraints', () => {
         )
         .run('q2', ids.event, 0, 'select', 'Pick one', 1),
     ).toThrow()
+  })
+})
+
+describe('passkeys', () => {
+  const seedPasskey = (id: string, credential_id: string, counter = 0) =>
+    handle.db
+      .insert(passkey)
+      .values({
+        id,
+        account_id: ids.account,
+        credential_id,
+        public_key: 'cHVibGljLWtleQ==',
+        counter,
+        created_at: NOW,
+      })
+      .run()
+
+  it('lets one account register several', () => {
+    expect(() => seedPasskey('pk1', 'cred-1')).not.toThrow()
+    expect(() => seedPasskey('pk2', 'cred-2')).not.toThrow()
+  })
+
+  it('rejects a credential id already registered', () => {
+    seedPasskey('pk1', 'cred-1')
+    expect(() => seedPasskey('pk2', 'cred-1')).toThrow()
+  })
+
+  it('rejects a negative signature counter', () => {
+    expect(() =>
+      handle.client
+        .prepare(
+          `INSERT INTO passkey (id, account_id, credential_id, public_key, counter, created_at)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+        )
+        .run('pk-neg', ids.account, 'cred-neg', 'key', -1, NOW),
+    ).toThrow()
+  })
+
+  it('goes away with the account it belongs to', () => {
+    seedAccount(ids.otherAccount, 'someone.else@example.org')
+    handle.db
+      .insert(passkey)
+      .values({
+        id: 'pk1',
+        account_id: ids.otherAccount,
+        credential_id: 'cred-1',
+        public_key: 'cHVibGljLWtleQ==',
+        counter: 0,
+        created_at: NOW,
+      })
+      .run()
+
+    handle.db.delete(account).where(eq(account.id, ids.otherAccount)).run()
+
+    expect(handle.db.select().from(passkey).all()).toHaveLength(0)
+  })
+})
+
+describe('account deletion', () => {
+  it('is blocked for an account that has issued invites', () => {
+    seedInvite(ids.invite)
+    expect(() => handle.db.delete(account).where(eq(account.id, ids.account)).run()).toThrow()
+  })
+
+  it('is blocked for an account that is a member somewhere', () => {
+    seedAccount(ids.otherAccount, 'someone.else@example.org')
+    seedInvite(ids.invite)
+    seedMember(ids.member, ids.otherAccount, ids.invite)
+
+    expect(() => handle.db.delete(account).where(eq(account.id, ids.otherAccount)).run()).toThrow()
+  })
+
+  it('is allowed for an account with no history', () => {
+    seedAccount(ids.otherAccount, 'someone.else@example.org')
+    expect(() => handle.db.delete(account).where(eq(account.id, ids.otherAccount)).run()).not.toThrow()
   })
 })
 
