@@ -128,14 +128,29 @@ correct wherever you are standing.
 
 ## Running it for real
 
-> **Not available yet.** Deployment needs the Dockerfile and compose file from
-> [#6]. Once those exist, deploying is `cp .env.example .env` followed by
-> `docker compose up -d` — one service, one named volume holding the SQLite
-> database, and a watchtower sidecar picking up new images automatically, with
-> `docker compose down && docker compose up` preserving your data.
->
-> There will be no open signup, so a fresh deployment also needs a way to seed
-> the first admin before anybody can be approved ([#10]).
+```sh
+cp .env.example .env    # optional — every variable has a working default
+docker compose up -d
+```
+
+One service, one named volume holding the SQLite database, and a watchtower
+sidecar that polls Docker Hub every five minutes and redeploys when the tag
+moves. `docker compose down && docker compose up` preserves your data — the
+volume is named, not a bind mount, so removing the container does not take the
+members with it.
+
+The image runs as an unprivileged user, migrates on boot, and reports healthy
+only once `/api/version` actually answers — so a process that is up but not
+serving still counts as down.
+
+If the host already runs a watchtower for another project, drop that service
+from the compose file and add the
+`com.centurylinklabs.watchtower.enable=true` label to the existing one's scope
+instead. Two watchtowers on the same Docker socket both act on the same
+containers.
+
+> **No admin yet.** There is no open signup, so a fresh deployment currently has
+> nobody who can approve anything — seeding the first admin arrives with [#10].
 
 ### Deployment shape
 

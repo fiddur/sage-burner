@@ -1,0 +1,62 @@
+# Deployment: Apache on the host holds the public IP for several domains and
+# reverse-proxies to this container.
+#
+#   client ──https──▶ Apache (host) ──http──▶ 127.0.0.1:8081 ──▶ container :3000
+#
+# Images are tagged:
+#   develop  - built from the develop branch
+#   latest   - promoted from a release on main
+# Change the tag below to follow one or the other.
+
+services:
+  sage-burner:
+    image: fiddur/sage-burner:develop
+    ports:
+      # Loopback only, deliberately. Docker writes its own iptables rules ahead
+      # of ufw/firewalld, so `8081:3000` would be reachable from the internet
+      # even with a host firewall denying it — bypassing Apache, its TLS, and
+      # the vhost routing for every other domain on that IP.
+      - '127.0.0.1:8081:3000'
+    environment:
+      # See README "Deployment shape". `1` is correct for exactly one
+      # header-appending proxy in front, and is spoof-resistant there.
+      - TRUST_PROXY=1
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    volumes:
+      # The database. A named volume rather than a bind mount so `docker
+      # compose down` cannot take the members with it.
+      - sage_burner_data:/data
+    labels:
+      # Watchtower below runs with --label-enable, so it updates only what
+      # carries this. Without the label nothing would ever be updated; without
+      # --label-enable it would update every container on the host, including
+      # ones belonging to other projects.
+      - 'com.centurylinklabs.watchtower.enable=true'
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/api/version').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  # Polls Docker Hub every 5 minutes and redeploys when the tag moves.
+  #
+  # If the host already runs a watchtower for another project, drop this
+  # service and add the label above to that one's scope instead — two
+  # instances on the same socket both act on the same containers.
+  watchtower:
+    image: containrrr/watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --label-enable --cleanup --interval 300
+    restart: unless-stopped
+
+volumes:
+  sage_burner_data:
