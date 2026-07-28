@@ -9,8 +9,16 @@ import { dateTimeSchema, idSchema, text } from './common.ts'
  */
 export const answerSchema = z.union([z.string().max(10_000), z.boolean()])
 
-/** Answers keyed by `form_question.id`. */
-export const answersSchema = z.record(idSchema, answerSchema)
+/**
+ * Answers keyed by `form_question.id`.
+ *
+ * `partialRecord`, not `record`: a plain `z.record` infers a non-optional index
+ * signature, so `answers[question.id]` would type as `string | boolean` while
+ * being `undefined` at runtime for every unanswered optional question — and the
+ * dynamic form renderer and the admin review UI both index into exactly that.
+ * Runtime behaviour is identical; this just stops the type lying.
+ */
+export const answersSchema = z.partialRecord(idSchema, answerSchema)
 
 export const applicationSchema = z.object({
   id: idSchema,

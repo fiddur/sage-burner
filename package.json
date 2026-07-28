@@ -17,7 +17,7 @@
     "dev:web": "pnpm --filter sage-burner-web dev",
     "build": "pnpm -r --if-present build",
     "test": "pnpm -r --if-present test",
-    "check": "oxlint -c .oxlintrc.json && pnpm -r --if-present check",
+    "check": "oxfmt --check . && oxlint -c .oxlintrc.json && pnpm -r --if-present check",
     "fix": "oxfmt . && oxlint -c .oxlintrc.json --fix"
   },
   "devDependencies": {
@@ -25,10 +25,11 @@
     "@typescript/native-preview": "^7.0.0-0",
     "oxfmt": "^0",
     "oxlint": "^1",
+    "oxlint-tsgolint": "^7.0.2001",
     "typescript": "^5.6.3"
   },
   "engines": {
-    "node": "~25"
+    "node": "~24"
   },
   "packageManager": "pnpm@10.33.4"
 }

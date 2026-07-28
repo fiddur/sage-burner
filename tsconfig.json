@@ -6,6 +6,10 @@
     "erasableSyntaxOnly": true,
     "verbatimModuleSyntax": true,
     "rewriteRelativeImportExtensions": true,
-    "noEmit": true
+    "noEmit": true,
+    // `strict` alone lets `arr[0]` and `record[key]` type as present when they
+    // may not be. Both are everywhere here — answers keyed by question id,
+    // query results indexed by position — so the lookup should be honest.
+    "noUncheckedIndexedAccess": true
   }
 }
