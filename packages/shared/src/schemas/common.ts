@@ -18,8 +18,16 @@ export const slugSchema = z
   .max(64)
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'must be lowercase words separated by single hyphens')
 
-/** Required free text: trimmed, non-empty, and bounded so a field cannot be used as storage. */
-export const text = (max: number) => z.string().trim().min(1).max(max)
+/**
+ * Required free text: trimmed, non-empty, and bounded so a field cannot be used
+ * as storage.
+ *
+ * Named `nonEmptyText` rather than `text` because this package's exports land
+ * in the same namespace as everything else a file imports, and `text` collides
+ * with `drizzle-orm/sqlite-core`'s column builder — which every schema file in
+ * the backend imports.
+ */
+export const nonEmptyText = (max: number) => z.string().trim().min(1).max(max)
 
 /**
  * Optional free text: trimmed and bounded, with an explicit `null` for "not set".

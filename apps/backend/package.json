@@ -5,6 +5,8 @@
   "license": "AGPL-3.0-or-later",
   "type": "module",
   "scripts": {
+    "start": "node src/server.ts",
+    "dev": "node --watch src/server.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node src/db/migrate-cli.ts",
     "test": "vitest run",
@@ -12,8 +14,11 @@
     "fix": "oxfmt . && oxlint -c ../../.oxlintrc.json --fix"
   },
   "dependencies": {
+    "@fastify/static": "^10.1.2",
     "@sage-burner/shared": "workspace:*",
-    "drizzle-orm": "1.0.0-beta.22"
+    "drizzle-orm": "1.0.0-beta.22",
+    "fastify": "^5.10.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^24",

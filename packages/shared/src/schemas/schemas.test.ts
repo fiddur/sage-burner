@@ -153,7 +153,7 @@ describe('memberSchema', () => {
     expect(memberSchema.safeParse(sparse).success).toBe(true)
   })
 
-  it('takes lodging and shift preference as free text, so new options need no deploy', () => {
+  it('takes lodging and shift preference as free nonEmptyText, so new options need no deploy', () => {
     const novel = { ...aMember, lodging: 'Hammock in the barn', shift_preference: 'Sauna tending' }
     expect(memberSchema.safeParse(novel).success).toBe(true)
   })
@@ -205,7 +205,7 @@ describe('optionalText', () => {
     }
   })
 
-  it('keeps real text, trimmed', () => {
+  it('keeps real nonEmptyText, trimmed', () => {
     expect(memberSchema.parse(aMemberWith('  bring a drum  ')).notes).toBe('bring a drum')
   })
 

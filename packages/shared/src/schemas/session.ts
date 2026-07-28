@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { dateTimeSchema, idSchema, optionalText, text } from './common.ts'
+import { dateTimeSchema, idSchema, optionalText, nonEmptyText } from './common.ts'
 
 /** Tolerates missing keys so `.partial()` and `.omit()` derivations still typecheck. */
 type TimeSlot = { time_slot_start?: string | null; time_slot_end?: string | null }
@@ -43,7 +43,7 @@ export const withValidTimeSlot = <T extends z.ZodType<TimeSlot>>(schema: T) =>
 export const sessionFields = z.object({
   id: idSchema,
   event_id: idSchema,
-  title: text(200),
+  title: nonEmptyText(200),
   host_member_id: idSchema,
   description: z.string().max(20_000),
   time_slot_start: dateTimeSchema.nullable(),

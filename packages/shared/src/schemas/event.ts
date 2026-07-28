@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { dateSchema, dateTimeSchema, idSchema, slugSchema, text } from './common.ts'
+import { dateSchema, dateTimeSchema, idSchema, slugSchema, nonEmptyText } from './common.ts'
 
 /** Tolerates missing keys so `.partial()` and `.omit()` derivations still typecheck. */
 type DateRange = { start_date?: string; end_date?: string }
@@ -37,7 +37,7 @@ export const withEventDateOrder = <T extends z.ZodType<DateRange>>(schema: T) =>
  */
 export const eventFields = z.object({
   id: idSchema,
-  name: text(200),
+  name: nonEmptyText(200),
   slug: slugSchema,
   start_date: dateSchema,
   end_date: dateSchema,
