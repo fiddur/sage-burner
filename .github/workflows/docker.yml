@@ -143,7 +143,14 @@ jobs:
           # The sha tag, which metadata-action emits on every build.
           IMAGE=$(printf '%s\n' "${{ steps.meta.outputs.tags }}" | head -1)
           echo "smoke-testing $IMAGE"
-          docker run -d --name smoke -p 127.0.0.1:3000:3000 "$IMAGE"
+          # Same constraints docker-compose.yml applies, so the hardening is
+          # not the one part of the runtime configuration nothing ever starts.
+          # A dependency that quietly needs a capability should fail here, not
+          # five minutes after a merge on a deployment with no rollback.
+          docker run -d --name smoke \
+            --cap-drop ALL \
+            --security-opt no-new-privileges:true \
+            -p 127.0.0.1:3000:3000 "$IMAGE"
           for _ in $(seq 30); do
             if curl -fsS http://127.0.0.1:3000/api/version; then
               echo

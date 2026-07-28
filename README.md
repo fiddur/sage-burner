@@ -128,6 +128,29 @@ correct wherever you are standing.
 
 ## Running it for real
 
+### Before the first deploy
+
+`docker compose up -d` pulls `fiddur/sage-burner:develop`, and the workflow in
+`.github/workflows/docker.yml` is the only thing that publishes it. That
+workflow needs two **repository secrets**, and without them the `build` job
+fails at the login step on the first merge to `develop` — nothing is published,
+and the tag the compose file names does not exist:
+
+| Secret               | Value                                                          |
+| -------------------- | -------------------------------------------------------------- |
+| `DOCKERHUB_USERNAME` | The Docker Hub account that owns `fiddur/sage-burner`          |
+| `DOCKERHUB_TOKEN`    | A Docker Hub **access token**, scoped to write that repository |
+
+Use a scoped access token rather than the account password. Whoever can move
+the `:develop` tag effectively has root on the deployment host, since watchtower
+pulls it automatically and holds the Docker socket.
+
+Neither `CI Gate` nor `build` is a required status check, and `develop` has no
+branch protection — see the note in [`AGENTS.md`](./AGENTS.md). Configuring a
+ruleset is what turns the documented merge gate into an enforced one.
+
+### Deploying
+
 ```sh
 cp .env.example .env
 docker compose up -d
