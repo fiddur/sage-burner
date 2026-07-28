@@ -122,6 +122,55 @@ describe('with a web root', () => {
     expect(response.body).toContain('hashed')
   })
 
+  it('caches hashed assets forever and the shell never', async () => {
+    // The shell points at the current hashes, so caching it is how a client
+    // gets pinned to a build that no longer exists — and Watchtower redeploys
+    // on its own schedule, so nobody is there to notice.
+    await build({ WEB_ROOT: webRoot })
+
+    const asset = await app.inject({ method: 'GET', url: '/assets/index-a1b2c3.js' })
+    expect(asset.headers['cache-control']).toBe('public, max-age=31536000, immutable')
+
+    const shell = await app.inject({ method: 'GET', url: '/index.html' })
+    expect(shell.headers['cache-control']).toBe('no-cache')
+  })
+
+  it('does not cache the shell when an ancestor directory is named assets', async () => {
+    // A substring test against the absolute path would match here and hand the
+    // shell `immutable` — which no redeploy can bust, pinning every client
+    // that loaded it to a dead build for a year.
+    const outer = mkdtempSync(join(tmpdir(), 'sage-burner-outer-'))
+    const nested = join(outer, 'assets', 'app', 'dist')
+    mkdirSync(nested, { recursive: true })
+    writeFileSync(join(nested, 'index.html'), '<!doctype html><title>Sage Burner</title>')
+
+    try {
+      await build({ WEB_ROOT: nested })
+
+      const shell = await app.inject({ method: 'GET', url: '/index.html' })
+      expect(shell.headers['cache-control']).toBe('no-cache')
+
+      const fallback = await app.inject({ method: 'GET', url: '/schedule' })
+      expect(fallback.headers['cache-control']).toBe('no-cache')
+    } finally {
+      rmSync(outer, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps the shell uncached on the SPA fallback path too', async () => {
+    // The path real navigations take. It reaches the shell through
+    // `reply.sendFile` rather than a registered route, so the header applying
+    // there is a non-obvious property of @fastify/static rather than something
+    // this code arranges — worth pinning, since caching the shell is what pins
+    // clients to a build that no longer exists.
+    await build({ WEB_ROOT: webRoot })
+
+    const response = await app.inject({ method: 'GET', url: '/schedule' })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.headers['cache-control']).toBe('no-cache')
+  })
+
   it('serves the shell at the root', async () => {
     await build({ WEB_ROOT: webRoot })
 

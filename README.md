@@ -43,11 +43,27 @@ nvm use
 pnpm install
 pnpm check      # formatting, typecheck, lint — the same gate CI runs
 pnpm test       # tests, non-watch
-pnpm dev:backend   # Fastify on :3000, migrating on boot
 ```
+
+Run the two halves in separate terminals:
+
+```sh
+pnpm dev:backend   # Fastify on :3000, migrating on boot
+pnpm dev:web       # Vite on :5173 with HMR, proxying /api to the backend
+```
+
+The app always talks to a same-origin `/api` — the backend serves both halves
+in production, and Vite proxies to it in development — so there is no base URL
+to configure and no CORS anywhere.
 
 `GET /api/version` answers with the build SHA and doubles as the container
 healthcheck.
+
+**Client-side routes must not contain a dot.** The backend distinguishes a
+missing asset from a client-side route by whether the last path segment has a
+file extension, so anything with one gets a 404 and never reaches the router.
+That is what stops a stale page requesting a vanished content-hashed chunk from
+being handed the HTML shell. It also means invite tokens must be dot-free.
 
 ### Configuration
 
@@ -98,9 +114,17 @@ interacts badly with foreign keys (see the note on `runMigrations`).
 The server will also migrate on boot, so `db:migrate` is only for preparing a
 database ahead of time.
 
-> **No frontend yet.** `pnpm dev:web` will fail until the Preact app ([#5])
-> lands. Until then the backend serves the API only; set `WEB_ROOT` once there
-> is a build to point it at.
+To serve the built frontend from the backend the way production does, build it
+and point `WEB_ROOT` at the output:
+
+```sh
+pnpm --filter sage-burner-web build
+WEB_ROOT=$PWD/apps/web/dist pnpm dev:backend
+```
+
+`WEB_ROOT` is resolved against the backend's working directory, which `pnpm
+dev:backend` sets to `apps/backend` — so an absolute path is the one that stays
+correct wherever you are standing.
 
 ## Running it for real
 
@@ -150,7 +174,6 @@ ProxyPassReverse / http://127.0.0.1:8081/
 app believes it is serving plain HTTP — which decides whether the session cookie
 gets its `Secure` flag.
 
-[#5]: https://github.com/fiddur/sage-burner/issues/5
 [#6]: https://github.com/fiddur/sage-burner/issues/6
 [#10]: https://github.com/fiddur/sage-burner/issues/10
 
@@ -158,7 +181,7 @@ gets its `Secure` flag.
 
 ```
 apps/backend      Fastify API, static serving, Drizzle schema + migrations
-apps/web          Preact + Vite single-page app                       (planned, #5)
+apps/web          Preact + Vite single-page app
 packages/shared   Zod schemas and types shared by both
 docs/             Longer-form documentation                           (planned)
 ```
