@@ -117,8 +117,7 @@ started` means it has only begun; keep waiting for `updated`.)
 8. Read the review body **and every inline comment**. Fix genuine
    correctness/security findings; for trivial or subjective nits, resolve the
    thread with a brief rationale. Resolve every inline thread via the GraphQL
-   `resolveReviewThread` mutation — the `develop` ruleset blocks merge on any
-   open thread.
+   `resolveReviewThread` mutation.
 9. Any push starts a fresh review round. Repeat from step 7.
 10. **Merge without asking** once all four gates hold:
     - the latest review body starts with `✅Approved`, **and** it is on the
@@ -137,6 +136,13 @@ started` means it has only begun; keep waiting for `updated`.)
 The gate is not optional. "Merge on approval" removes the human confirmation
 step, not the review — never merge an unapproved PR, and never merge with open
 threads or red CI.
+
+**Nothing enforces it yet.** `develop` has no branch protection and the repo has
+no rulesets, so `CI Gate` is not a required status check and an unresolved
+thread does not block anything — GitHub would happily merge a red PR. The gate
+above is a discipline, not a mechanism, until those are configured in repository
+settings. Do not read the checks going green as the platform having stopped
+anything.
 
 ## Deployment
 

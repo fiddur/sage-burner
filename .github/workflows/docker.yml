@@ -156,18 +156,20 @@ jobs:
           docker logs smoke
           exit 1
 
-      # Cache hit on the build above, so this only uploads layers. Publishes
-      # only from the two release branches; the branch test also guards
-      # workflow_dispatch, which can be fired from any ref.
+      # Pushes the exact image the smoke test started, rather than rebuilding.
+      #
+      # A second build-push-action call would be a cache hit in practice, but
+      # only in practice: buildx re-resolves `FROM node:24-alpine` and imports
+      # the graph from the cache each time, so a moved base tag, a concurrent
+      # run touching the cache scope, or an eviction would silently publish a
+      # fresh image nothing had ever started. Every tag is already applied to
+      # the loaded image, so pushing it directly makes the guarantee structural.
+      #
+      # The trade: no buildx provenance/SBOM attestations, and this needs
+      # rethinking if the image ever goes multi-arch.
       - name: Push
         if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/develop' || github.ref ==
           'refs/heads/main')
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
-        with:
-          context: .
-          file: Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          build-args: BUILD_SHA=${{ github.sha }}
-          cache-from: type=gha
+        run: |
+          set -euo pipefail
+          printf '%s\n' "${{ steps.meta.outputs.tags }}" | xargs -rn1 docker push

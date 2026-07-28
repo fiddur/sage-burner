@@ -166,13 +166,17 @@ copying the file alone can miss recent commits — use SQLite's backup API, whic
 is consistent against a live database:
 
 ```sh
-STAMP=$(date +%F-%H%M)
-# Sweep any leftovers first. The cleanup at the end only runs on the happy path,
-# so an interrupted copy — or watchtower recreating the container mid-backup —
-# leaves a full database-sized file on the same volume the live database is on.
-# Repeated failures accumulate one each, and filling that disk takes SQLite's
-# write path down with it.
-docker compose exec -T sage-burner sh -c 'rm -f /data/backup-*.sqlite'
+STAMP=$(date +%F-%H%M%S)
+# Sweep leftovers older than an hour. The cleanup at the end only runs on the
+# happy path, so an interrupted copy — or watchtower recreating the container
+# mid-backup — leaves a full database-sized file on the same volume the live
+# database is on, and repeated failures accumulate one each until the disk is
+# full, which takes SQLite's write path with it.
+#
+# Age-based rather than a blanket delete: a nightly cron and a manual
+# pre-deploy backup can overlap, and removing everything would delete the other
+# run's in-flight target out from under it.
+docker compose exec -T sage-burner find /data -name 'backup-*.sqlite' -mmin +60 -delete
 # VACUUM INTO refuses to overwrite, so write to a fresh name each time — a run
 # that dies before the cleanup below must not block the next one.
 docker compose exec -T sage-burner \
@@ -183,8 +187,35 @@ docker compose exec -T sage-burner rm -f "/data/backup-$STAMP.sqlite"
 ```
 
 Worth doing before any deploy that includes a migration, since a migration that
-alters a column is a table rebuild and restoring the volume is the documented
-recovery path if one goes wrong.
+alters a column is a table rebuild, and the restore below is the recovery path
+if one goes wrong.
+
+### Restoring
+
+```sh
+docker compose down
+
+docker run --rm \
+  -v sage-burner_sage_burner_data:/data \
+  -v "$PWD:/backup" \
+  alpine sh -c '
+    rm -f /data/sage-burner.sqlite /data/sage-burner.sqlite-wal /data/sage-burner.sqlite-shm &&
+    cp /backup/sage-burner-<stamp>.sqlite /data/sage-burner.sqlite &&
+    chown 1000:1000 /data/sage-burner.sqlite'
+
+docker compose up -d
+```
+
+Three things that will bite otherwise:
+
+- **Delete the `-wal` and `-shm` sidecars.** Leaving a stale WAL beside a
+  restored database means SQLite replays transactions belonging to the database
+  you just replaced. The backup is already a complete, checkpointed copy.
+- **Use the full volume name.** `-v sage_burner_data:/data` does not error — it
+  creates a new empty volume, and you restore into nothing.
+- **`chown 1000:1000`.** The container runs as `node`, and a file copied in by
+  root is not writable by it. The app would start and then fail on the first
+  write.
 
 The watchtower here is **scoped** — it runs with `--scope sage-burner` and only
 touches containers carrying the matching label — so it coexists with any other
