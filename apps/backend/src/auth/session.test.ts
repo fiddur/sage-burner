@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 
 import { createSessions } from './session.ts'
@@ -93,10 +94,32 @@ describe('rejection', () => {
   it('rejects a token whose expiry is absent or unparseable', () => {
     // A signed token with a broken payload is ours, so it would be tempting to
     // trust it. It must still fail closed rather than become non-expiring.
+    //
+    // The signature is built here rather than through a `sign` method on
+    // `Sessions`: every route handler holds that object, and widening a
+    // signing primitive's surface for one assertion is the wrong trade on the
+    // one type where narrow matters most.
+    const signedWith = (payload: string) => {
+      const encoded = Buffer.from(payload, 'utf8').toString('base64url')
+      return `${encoded}.${createHmac('sha256', secret).update(encoded).digest('base64url')}`
+    }
+
     const auth = sessions()
     for (const payload of ['{}', '{"sub":"acct-1"}', '{"sub":"acct-1","exp":"soon"}', 'not json']) {
-      expect(auth.read(auth.sign(payload)), payload).toBeUndefined()
+      expect(auth.read(signedWith(payload)), payload).toBeUndefined()
     }
+  })
+
+  it('accepts a signature this test built itself, so the cases above are real', () => {
+    // Guards the helper: if `signedWith` produced a signature the reader
+    // rejected for the wrong reason, every case above would pass for that
+    // reason instead of for its payload.
+    const encoded = Buffer.from(JSON.stringify({ sub: 'acct-1', exp: 4102444800, jti: 'x' })).toString(
+      'base64url',
+    )
+    const token = `${encoded}.${createHmac('sha256', secret).update(encoded).digest('base64url')}`
+
+    expect(sessions().read(token)).toEqual({ account_id: 'acct-1' })
   })
 })
 

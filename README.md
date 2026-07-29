@@ -375,6 +375,14 @@ plain-HTTP origin — a LAN address, an internal hostname — the browser discar
 the cookie silently: login answers 200, the page says you are signed in, and the
 next load says you are not. Put TLS in front, as the Apache section below does.
 
+One deliberate hardening, with a cost worth knowing. If a request arrives with
+more than one session cookie, both are refused — a legitimate client only ever
+sends one, so a second is planted, and refusing beats signing the member into
+someone else's account. But logging in again does _not_ clear a planted cookie
+set at a different path, so the member stays locked out until it expires or they
+clear cookies by hand. Still the right trade against the alternative, and [#58]
+is what actually ends it.
+
 The consequence, stated plainly: **logout clears the cookie but does not
 invalidate the token**, which stays valid until it expires. That follows from
 sessions being signed rather than stored — there is no row to delete — and not
@@ -413,6 +421,7 @@ minutes after a merge.
 
 [#17]: https://github.com/fiddur/sage-burner/issues/17
 [#57]: https://github.com/fiddur/sage-burner/issues/57
+[#58]: https://github.com/fiddur/sage-burner/issues/58
 
 ## Security headers
 

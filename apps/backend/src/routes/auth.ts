@@ -72,9 +72,20 @@ const cookieHeader = (token: string, config: Config, maxAgeSeconds: number): str
  * So this refuses outright when the header carries more than one. A legitimate
  * client never sends two — the cookie is always `Path=/` with no `Domain`, so
  * there is only ever one to send — which makes a second one, by definition,
- * planted. Refusing both turns fixation into a sign-out: the member is bounced
- * to the login page instead of quietly editing their allergies into someone
- * else's record. A sign-out is a nuisance; the other is data disclosure.
+ * planted.
+ *
+ * Be precise about what that costs, because it is not a nuisance. Logging in
+ * again does **not** clear it: the login sets `Path=/`, and a cookie with a
+ * different path is a different cookie, so the planted one survives alongside
+ * it. Every subsequent request then carries two and is refused. The member is
+ * locked out until the planted cookie expires or they clear cookies by hand —
+ * and the SPA shows them signed in from the login response, then signed out on
+ * the next load, which is the confusing failure the `Secure` note above warns
+ * about.
+ *
+ * Still the right trade. A durable lockout beats a member typing their
+ * allergies and contact details into an attacker's record. But #58's `__Host-`
+ * prefix is what *ends* this, not merely a tidier spelling of it.
  *
  * `__Host-` remains the real fix and is not a drop-in, since it requires
  * `Secure` and that is set only when `NODE_ENV` is `production` — the name

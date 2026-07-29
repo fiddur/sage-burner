@@ -55,8 +55,6 @@ export interface Sessions {
   issue: (accountId: string) => string
   /** The payload, or undefined for anything forged, malformed or expired. */
   read: (token: string) => SessionPayload | undefined
-  /** Sign an arbitrary payload. Exported for tests that need a valid signature over invalid content. */
-  sign: (payload: string) => string
 }
 
 export const createSessions = ({ secret, now, ttlSeconds }: SessionDeps): Sessions => {
@@ -72,8 +70,6 @@ export const createSessions = ({ secret, now, ttlSeconds }: SessionDeps): Sessio
   }
 
   return {
-    sign,
-
     issue: (accountId) =>
       sign(
         JSON.stringify({
