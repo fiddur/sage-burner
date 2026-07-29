@@ -145,9 +145,16 @@ Use a scoped access token rather than the account password. Whoever can move
 the `:develop` tag effectively has root on the deployment host, since watchtower
 pulls it automatically and holds the Docker socket.
 
-Neither `CI Gate` nor `build` is a required status check, and `develop` has no
-branch protection — see the note in [`AGENTS.md`](./AGENTS.md). Configuring a
-ruleset is what turns the documented merge gate into an enforced one.
+What keeps a broken image off Docker Hub is the ordering inside the `build` job
+itself: it builds with `push: false`, smoke-tests the loaded sha tag, and pushes
+only if the container came up healthy. That holds with no ruleset at all — do
+not reorder it.
+
+Both `CI Gate` and `build` are _also_ required status checks on `develop`. What
+that adds is that the PR head was proven startable before merging — and since
+the policy is strict, so the branch must be up to date, that is the tree the
+merge commit gets. What is still not enforced is the review itself; see the note
+in [`AGENTS.md`](./AGENTS.md) for what a green rollup does and does not mean.
 
 ### Deploying
 
