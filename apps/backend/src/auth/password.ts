@@ -69,10 +69,21 @@ const SALT_LENGTH = 16
 /**
  * `maxmem` must be raised to match the parameters.
  *
- * Node's default is 32 MiB while scrypt needs `128 * N * r` — 64 MiB at the
- * settings above. Without this, hashing throws at the production cost while
- * passing every test at the cheap one, so the failure would first appear on
- * the first real login.
+ * Node's default is 32 MiB, and scrypt needs more than that at the settings
+ * above. Without this, hashing throws at the production cost while passing
+ * every test at the cheap one — the floor below covers those — so the failure
+ * would first appear on the first real login.
+ *
+ * **The doubling is headroom, not slack.** `128 * N * r` is the figure usually
+ * quoted and it is 4 KiB short: OpenSSL checks `p * 128 * r` for `B` *plus*
+ * `128 * r * (N + 2)` for `V`, which at N=2^16, r=8, p=2 needs 67,112,960
+ * bytes against `128 * N * r` = 67,108,864. Measured, not derived — passing
+ * exactly `128 * N * r` throws ERR_CRYPTO_INVALID_SCRYPT_PARAMS, and the exact
+ * OpenSSL figure passes.
+ *
+ * So do not "tidy" this to `128`. It would break every login in production
+ * while the suite stayed green, because the `Math.max` floor hides it at the
+ * cheap parameters the tests use.
  */
 const maxmemFor = ({ cost, blockSize }: ScryptParams) => Math.max(32 * 1024 * 1024, 256 * cost * blockSize)
 
