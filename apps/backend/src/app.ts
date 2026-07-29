@@ -9,7 +9,7 @@ import path from 'node:path'
 import type { Config } from './config.ts'
 import type { Database } from './db/index.ts'
 
-import { frameworkErrorHandler, registerErrorHandler } from './errors.ts'
+import { clientErrorHandler, frameworkErrorHandler, registerErrorHandler } from './errors.ts'
 import { registerVersionRoutes } from './routes/version.ts'
 
 export interface AppDeps {
@@ -119,6 +119,10 @@ export const createApp = async ({ db, config }: AppDeps): Promise<FastifyInstanc
     // rejects before that — a bad percent escape, an over-long path parameter —
     // which otherwise goes straight to the socket as Fastify's prose.
     frameworkErrors: frameworkErrorHandler,
+    // And the third: a request Node's HTTP parser rejects before Fastify sees
+    // one at all — an oversized header block, a client timeout. No reply object
+    // exists, so this writes the envelope to the socket itself.
+    clientErrorHandler,
   })
 
   app.decorate('db', db)

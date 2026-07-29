@@ -1,8 +1,12 @@
 import type { FastifyInstance } from 'fastify'
 
 import Fastify from 'fastify'
+import { connect } from 'node:net'
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { createApp } from './app.ts'
+import { createConfig } from './config.ts'
+import { createDb } from './db/index.ts'
 import { frameworkErrorHandler, registerErrorHandler } from './errors.ts'
 
 /**
@@ -88,15 +92,21 @@ describe('error logging', () => {
     // `frameworkErrors` bare, so an uncaught throw there leaves nothing on the
     // socket and takes the process down with an uncaughtException.
     //
-    // A failing log destination is the injectable version of that — the real
-    // one would be a future edit to `sendEnvelope`. The stream fails only on
-    // the 4xx line, so the handler's own error line still gets out.
+    // A failing log destination is the injectable version of that. It fails on
+    // every line this file writes — the 4xx line inside `sendEnvelope` and the
+    // fallback's own error line — so the containment cannot pass by falling
+    // back to a log that still works. It does not fail on Fastify's
+    // `incoming request`, which is written before `onBadUrl` calls the handler
+    // at all: failing that throws outside anything this file can catch, and
+    // would test a case no fallback could survive.
     const failing = Fastify({
       logger: {
         level: 'info',
         stream: {
           write: (chunk: string) => {
-            if (chunk.includes('request rejected')) throw new Error('log destination gone')
+            if (chunk.includes('rejected') || chunk.includes('handler failed')) {
+              throw new Error('log destination gone')
+            }
           },
         },
       },
@@ -111,6 +121,47 @@ describe('error logging', () => {
 
     expect(response.statusCode).toBe(500)
     expect(response.json()).toEqual({ error: 'internal_error' })
+
+    // What this pins is the ordering: logging before sending turns this into a
+    // 5s timeout and an unhandled rejection. The try/catch around the fallback's
+    // own log line is *not* pinned — that failure escapes as an
+    // uncaughtException after the response is already out, so the status cannot
+    // see it, and vitest installs its own uncaughtException handler ahead of any
+    // this test could add. Verified out-of-band instead: unguarded, the same
+    // scenario answers 500 and still raises one uncaughtException, which under
+    // Node's default takes the process down with the connection intact.
+  })
+
+  it('answers an oversized header block with the envelope, not Fastify prose', async () => {
+    // The third error path, and the only one that needs a real socket:
+    // `app.inject` skips Node's HTTP parser entirely, so nothing here is
+    // reachable through it. The default writes
+    // `{"error":"Request Header Fields Too Large",…}` — a sentence in the field
+    // the envelope promises is a slug. Reachable without malice on a
+    // cookie-session app once enough cookies accumulate on the domain.
+    const server = await createApp({
+      db: createDb({ url: ':memory:' }).db,
+      config: createConfig({ LOG_LEVEL: 'silent' }),
+    })
+    app = server
+    await server.listen({ port: 0, host: '127.0.0.1' })
+    const address = server.addresses()[0]
+    if (address === undefined) throw new Error('no address')
+
+    const raw = await new Promise<string>((resolve, reject) => {
+      const socket = connect(address.port, '127.0.0.1', () => {
+        socket.write(`GET /api/version HTTP/1.1\r\nHost: x\r\nCookie: ${'a'.repeat(24_000)}\r\n\r\n`)
+      })
+      let received = ''
+      socket.setEncoding('utf8')
+      socket.on('data', (chunk: string) => (received += chunk))
+      socket.on('close', () => resolve(received))
+      socket.on('error', reject)
+    })
+
+    expect(raw).toContain('431 Request Header Fields Too Large')
+    expect(raw).toContain('{"error":"bad_request"}')
+    expect(raw).not.toContain('"message"')
   })
 
   it('logs a 5xx with the stack, which is ours to explain', async () => {

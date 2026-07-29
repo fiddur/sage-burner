@@ -346,6 +346,12 @@ schema: { response: { 400: z.toJSONSchema(errorResponseSchema) } }
 Declaring only a success shape is safe — a `200` schema does not touch the
 error path, which is the case a route is actually likely to have.
 
+Three separate Fastify options are needed to make that hold, because a request
+can fail before it reaches a route: `setErrorHandler` for anything thrown,
+`frameworkErrors` for a URL the router rejects, and `clientErrorHandler` for a
+request Node's HTTP parser rejects — an oversized header block, a client
+timeout. Each default writes a sentence into `error` instead of a slug.
+
 "The app produces" is the limit of the promise. A reverse proxy in front can
 answer with its own error page — an Apache 502 while the container is
 restarting, for instance — and that will not be JSON at all. The web client

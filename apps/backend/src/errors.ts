@@ -1,13 +1,16 @@
 import type { ErrorCode, ErrorResponse } from '@sage-burner/shared'
 import type {
+  ConnectionError,
   FastifyError,
   FastifyInstance,
   FastifyReply,
   FastifyRequest,
   FastifyServerOptions,
 } from 'fastify'
+import type { Socket } from 'node:net'
 
 import { errorResponse } from '@sage-burner/shared'
+import { STATUS_CODES } from 'node:http'
 
 /**
  * Mapping anything thrown into the documented error envelope.
@@ -177,6 +180,44 @@ const sendEnvelope = (error: FastifyError, request: FastifyRequest, reply: Fasti
 }
 
 /**
+ * The third path, and the one with no `reply` to send through: a malformed or
+ * oversized request that Node's HTTP parser rejects before Fastify sees a
+ * request at all.
+ *
+ * Pass as `clientErrorHandler` when building the instance. The default writes
+ * `{"error":"Request Header Fields Too Large","message":…,"statusCode":431}`
+ * directly to the socket — prose in the field the envelope promises is a slug,
+ * which `createApiClient` would surface as
+ * `code: 'Request Header Fields Too Large'`. A cookie-session app can reach
+ * this without malice: enough accumulated cookies on the domain overflow the
+ * header buffer.
+ *
+ * Mirrors the default's socket handling exactly, because there is no framework
+ * left to do it — bail on a reset or destroyed socket, write only if writable,
+ * destroy after. Nothing is logged: the default logs at `trace`, i.e. off, and
+ * `this` is not typed on this callback.
+ */
+export const clientErrorHandler = (error: ConnectionError, socket: Socket) => {
+  // Both cases mean nobody is listening; the default returns here too.
+  if (error.code === 'ECONNRESET' || socket.destroyed) return
+
+  const status =
+    error.code === 'ERR_HTTP_REQUEST_TIMEOUT' ? 408 : error.code === 'HPE_HEADER_OVERFLOW' ? 431 : 400
+  const body = JSON.stringify(errorResponse(codeFor(status)))
+
+  if (socket.writable) {
+    socket.write(
+      `HTTP/1.1 ${status} ${STATUS_CODES[status] ?? 'Bad Request'}\r\n` +
+        `Content-Length: ${Buffer.byteLength(body)}\r\n` +
+        'Content-Type: application/json\r\n\r\n' +
+        body,
+    )
+  }
+
+  socket.destroy(error)
+}
+
+/**
  * The plainest thing that can still answer: a status and a constant body, no
  * derivation. If this throws too the connection drops, but there is nothing
  * left to fall back to.
@@ -187,8 +228,18 @@ const sendEnvelope = (error: FastifyError, request: FastifyRequest, reply: Fasti
  * site.
  */
 const sendLastResort = (request: FastifyRequest, reply: FastifyReply, failure: unknown) => {
-  request.log.error({ err: failure }, 'framework error handler failed')
+  // Response first, log second, and the log in its own catch. The failure this
+  // exists to survive is most plausibly a log destination that has gone away —
+  // in which case logging first would throw here too, and the caller would get
+  // the dropped connection this was written to prevent. A lost log line is the
+  // cheaper half.
   void reply.code(500).send(errorResponse('internal_error'))
+
+  try {
+    request.log.error({ err: failure }, 'framework error handler failed')
+  } catch {
+    // Nothing left to report it to.
+  }
 }
 
 /** Everything thrown by a route, a hook, or the not-found handler. */
