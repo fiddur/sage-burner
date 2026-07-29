@@ -304,6 +304,30 @@ on a connection that is not would simply never come back.
 
 [#10]: https://github.com/fiddur/sage-burner/issues/10
 
+## API errors
+
+Every non-2xx response from `/api` has the same body, and nothing else:
+
+```json
+{ "error": "not_found" }
+```
+
+`error` is a machine-readable slug, never a sentence — it is the thing a client
+branches on. The message a member reads is the frontend's to choose, because
+only the frontend knows what the member was trying to do. The real error goes to
+the server log, where a SQL fragment or a file path is useful rather than public.
+
+The vocabulary today is `bad_request`, `not_found` and `internal_error`, defined
+in [`packages/shared`](./packages/shared/src/schemas/error.ts). It grows with the
+routes that emit it — authentication codes arrive with accounts ([#8]), rather
+than being listed in advance and left unreachable.
+
+Clients should tolerate a slug they do not recognise: the schema accepts any
+string so an older frontend can still read a newer API's error instead of
+failing to parse the explanation of what went wrong.
+
+[#8]: https://github.com/fiddur/sage-burner/issues/8
+
 ## Repository layout
 
 ```

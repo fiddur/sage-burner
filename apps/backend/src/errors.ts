@@ -129,12 +129,17 @@ export const registerErrorHandler = (app: FastifyInstance) => {
     const chosen = declaredStatus(error) ?? fromReply ?? 500
     const status = chosen <= 599 ? chosen : 500
 
-    // 5xx is ours to explain; 4xx is the caller's mistake and would otherwise
-    // fill the log with noise anyone can generate.
+    // 5xx is ours to explain, so it gets the stack. 4xx is the caller's
+    // mistake and gets the facts without one: `info` is the default level, so
+    // this branch is on in production, and `{ err }` would hand pino a full
+    // stack per request — meaning anyone unauthenticated could fill the disk by
+    // posting `{ not json` in a loop. The code, status and message are what
+    // makes such a line useful anyway; the stack only says where Fastify's
+    // parser lives.
     if (status >= 500) {
       request.log.error({ err: error }, 'request failed')
     } else {
-      request.log.info({ err: error, status }, 'request rejected')
+      request.log.info({ code: error.code, status, reason: error.message }, 'request rejected')
     }
 
     // Fastify's default handler copies these across; replacing it drops them
