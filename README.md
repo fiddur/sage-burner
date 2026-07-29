@@ -344,13 +344,6 @@ There is **no open sign-up**. Accounts are created only by redeeming an invite
 - `GET /api/auth/me` — `{ viewer }` or `{ viewer: null }`. Always 200: an
   anonymous visitor on the public homepage is the expected case, not an error.
 
-One caveat on the equal-work property above: it holds while every stored hash
-uses the current parameters. Raising them would make an account still on the old
-ones verify _faster_ than the decoy, reopening the oracle in the other
-direction — and since the opportunistic upgrade only runs after a successful
-login, an account whose owner never signs in keeps the old parameters
-indefinitely. Raising the cost wants a plan for stale rows, not just next-login.
-
 **Passwords** are hashed with scrypt from `node:crypto` (N=2^16, r=8, p=2 — one
 of OWASP's listed configurations). #8 asked for argon2 or bcrypt; both are
 native modules, which means a build toolchain in an image whose whole point is
@@ -363,6 +356,14 @@ password — measured at 220ms versus 0ms before that was fixed. Differing is an
 account-enumeration oracle, and on a membership app the membership _is_ the
 private part. For the same reason a malformed request body answers 401 rather
 than 400.
+
+That equal-work property is conditional, and nothing enforces the condition: it
+holds while every stored hash uses the current parameters. Raising them would
+make an account still on the old ones verify _faster_ than the decoy, reopening
+the oracle in the other direction — and since the opportunistic upgrade runs
+only after a successful login, an account whose owner never signs in keeps the
+old parameters indefinitely. Raising the cost wants a plan for stale rows, not
+just next-login.
 
 **Sessions** are a signed value in an `HttpOnly`, `SameSite=Lax` cookie — not a
 database row.

@@ -59,8 +59,15 @@ const cookieHeader = (token: string, config: Config, maxAgeSeconds: number): str
  * cookies by descending path specificity, so one injected with `Path=/api`
  * shadows the real `Path=/` one. That needs an attacker who can already set
  * cookies for the domain — a sibling-subdomain XSS, or a plain-HTTP MITM
- * before HSTS is pinned — and it cannot forge a valid token, since the
- * signature still has to check out. The realistic damage is a forced sign-out.
+ * before HSTS is pinned.
+ *
+ * They cannot *forge* a token; the signature still has to check out. But they
+ * do not need to: they can log in as themselves and plant **their own valid**
+ * token. That is session fixation, and the damage is not a sign-out. The
+ * victim's browser fetches `/api/auth/me`, gets the attacker's account, renders
+ * a signed-in nav — and whatever the member then edits into their profile,
+ * contact details and allergies included, is written to a record the attacker
+ * can read back at leisure.
  *
  * `__Host-` is the standard fix and it is not a drop-in: it requires `Secure`,
  * which is set only when `NODE_ENV` is `production`, so the name would have to

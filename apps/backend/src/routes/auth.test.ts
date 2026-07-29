@@ -287,43 +287,62 @@ describe('concurrency', () => {
       Array.from({ length: count }, () => login(server, 'ada@example.org', 'a good long passphrase')),
     )
 
-  it('queues a third concurrent login rather than refusing it', async () => {
-    // The property that matters. A hard cap refused here, which turned two
-    // sustained anonymous requests into a permanent outage of the only way
-    // into the app — nothing to wait out, nothing to retry into.
-    const server = await build()
-    await slowAccount(server)
+  // 15s rather than vitest's 5s default. These deliberately use production
+  // scrypt parameters, so the slowest drives twelve hashes through two slots —
+  // ~1.6s here, and a shared CI runner doing 64 MiB scrypt on contended cores
+  // can plausibly eat a 3x margin. A red CI that says nothing about the code is
+  // worse than a slow test.
+  const SLOW_TEST_TIMEOUT_MS = 15_000
 
-    const statuses = (await attempts(server, 3)).map((response) => response.statusCode)
+  it(
+    'queues a third concurrent login rather than refusing it',
+    async () => {
+      // The property that matters. A hard cap refused here, which turned two
+      // sustained anonymous requests into a permanent outage of the only way
+      // into the app — nothing to wait out, nothing to retry into.
+      const server = await build()
+      await slowAccount(server)
 
-    expect(statuses).toEqual([200, 200, 200])
-  })
+      const statuses = (await attempts(server, 3)).map((response) => response.statusCode)
 
-  it('sheds only once the queue itself is full', async () => {
-    // Two running plus eight waiting; the eleventh has nowhere to go. The queue
-    // is bounded so it cannot become the exhaustion it exists to prevent.
-    const server = await build()
-    await slowAccount(server)
+      expect(statuses).toEqual([200, 200, 200])
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  )
 
-    const responses = await attempts(server, 11)
-    const shed = responses.filter((response) => response.statusCode === 429)
+  it(
+    'sheds only once the queue itself is full',
+    async () => {
+      // Two running plus eight waiting; the eleventh has nowhere to go. The queue
+      // is bounded so it cannot become the exhaustion it exists to prevent.
+      const server = await build()
+      await slowAccount(server)
 
-    expect(shed.length).toBeGreaterThanOrEqual(1)
-    expect(responses.filter((response) => response.statusCode === 200).length).toBeGreaterThanOrEqual(10)
-    expect(shed[0]?.json()).toEqual({ error: 'rate_limited' })
-    expect(shed[0]?.headers['retry-after']).toBe('1')
-  })
+      const responses = await attempts(server, 11)
+      const shed = responses.filter((response) => response.statusCode === 429)
 
-  it('releases every slot again, so a burst does not wedge login shut', async () => {
-    // The release is in a `finally`; without it a throw leaks a slot and login
-    // degrades permanently until a restart.
-    const server = await build()
-    await slowAccount(server)
+      expect(shed.length).toBeGreaterThanOrEqual(1)
+      expect(responses.filter((response) => response.statusCode === 200).length).toBeGreaterThanOrEqual(10)
+      expect(shed[0]?.json()).toEqual({ error: 'rate_limited' })
+      expect(shed[0]?.headers['retry-after']).toBe('1')
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  )
 
-    await attempts(server, 11)
+  it(
+    'releases every slot again, so a burst does not wedge login shut',
+    async () => {
+      // The release is in a `finally`; without it a throw leaks a slot and login
+      // degrades permanently until a restart.
+      const server = await build()
+      await slowAccount(server)
 
-    expect((await login(server, 'ada@example.org', 'a good long passphrase')).statusCode).toBe(200)
-  })
+      await attempts(server, 11)
+
+      expect((await login(server, 'ada@example.org', 'a good long passphrase')).statusCode).toBe(200)
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  )
 })
 
 describe('rehashing on login', () => {
