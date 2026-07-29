@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify'
 import Fastify from 'fastify'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { registerErrorHandler } from './errors.ts'
+import { frameworkErrorHandler, registerErrorHandler } from './errors.ts'
 
 /**
  * What the error handler writes to the log, as opposed to what it writes to the
@@ -80,6 +80,37 @@ describe('error logging', () => {
       code: 'FST_ERR_VALIDATION',
       reason: 'body must be object',
     })
+  })
+
+  it('answers rather than dropping the connection when the framework path fails', async () => {
+    // The two error paths do not share Fastify's safety net. `handleError`
+    // wraps `setErrorHandler` in a catch that re-sends; `onBadUrl` calls
+    // `frameworkErrors` bare, so an uncaught throw there leaves nothing on the
+    // socket and takes the process down with an uncaughtException.
+    //
+    // A failing log destination is the injectable version of that — the real
+    // one would be a future edit to `sendEnvelope`. The stream fails only on
+    // the 4xx line, so the handler's own error line still gets out.
+    const failing = Fastify({
+      logger: {
+        level: 'info',
+        stream: {
+          write: (chunk: string) => {
+            if (chunk.includes('request rejected')) throw new Error('log destination gone')
+          },
+        },
+      },
+      frameworkErrors: frameworkErrorHandler,
+    })
+    app = failing
+    // find-my-way short-circuits to 404 with an empty route tree, so onBadUrl
+    // never fires without at least one route to attempt a match against.
+    failing.get('/thing', async () => ({ ok: true }))
+
+    const response = await failing.inject({ method: 'GET', url: '/%zz' })
+
+    expect(response.statusCode).toBe(500)
+    expect(response.json()).toEqual({ error: 'internal_error' })
   })
 
   it('logs a 5xx with the stack, which is ours to explain', async () => {

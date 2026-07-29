@@ -176,6 +176,21 @@ const sendEnvelope = (error: FastifyError, request: FastifyRequest, reply: Fasti
   return reply.code(status).send(body)
 }
 
+/**
+ * The plainest thing that can still answer: a status and a constant body, no
+ * derivation. If this throws too the connection drops, but there is nothing
+ * left to fall back to.
+ *
+ * Takes plain `FastifyRequest`/`FastifyReply` rather than being written inline
+ * for the same reason `sendEnvelope` does — the generics on the
+ * `frameworkErrors` signature make `reply.code()` unassignable at the call
+ * site.
+ */
+const sendLastResort = (request: FastifyRequest, reply: FastifyReply, failure: unknown) => {
+  request.log.error({ err: failure }, 'framework error handler failed')
+  void reply.code(500).send(errorResponse('internal_error'))
+}
+
 /** Everything thrown by a route, a hook, or the not-found handler. */
 export const registerErrorHandler = (app: FastifyInstance) => {
   app.setErrorHandler<FastifyError>(sendEnvelope)
@@ -192,5 +207,28 @@ export const registerErrorHandler = (app: FastifyInstance) => {
  * caller can type, which `createApiClient` would hand back as
  * `code: 'Bad Request'`. `setErrorHandler` cannot cover it: the request never
  * reaches routing, so there is nothing to throw from.
+ *
+ * The two paths share the body but not Fastify's safety net, which is why this
+ * has its own. `handleError` wraps the `setErrorHandler` call in a `catch` that
+ * re-sends, so a throw there degrades to the prose envelope — ugly, but a
+ * response. `onBadUrl` calls this bare and returns its value, so a throw
+ * propagates out through find-my-way as an `uncaughtException` with nothing
+ * written to the socket: a dropped connection and, under the container's
+ * restart policy, a dead process. Verified, not assumed.
+ *
+ * Nothing reaches it today — `status` is clamped before `reply.code`, and none
+ * of the framework errors carries `headers`, so `reply.headers` is never even
+ * called here. It is containment for the version of this file that someone
+ * edits later.
  */
-export const frameworkErrorHandler: NonNullable<FastifyServerOptions['frameworkErrors']> = sendEnvelope
+export const frameworkErrorHandler: NonNullable<FastifyServerOptions['frameworkErrors']> = (
+  error,
+  request,
+  reply,
+) => {
+  try {
+    sendEnvelope(error, request, reply)
+  } catch (failure) {
+    sendLastResort(request, reply, failure)
+  }
+}
