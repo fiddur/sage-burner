@@ -63,6 +63,35 @@ const directives = (csp: string) =>
       }),
   )
 
+/**
+ * `<link>` tags that would fetch from another origin.
+ *
+ * Parsed rather than pattern-matched, because `rel` is a *token list* and the
+ * distinctions matter in both directions. `rel="shortcut icon"` and
+ * `rel="apple-touch-icon"` both fetch an image governed by `img-src`, so a
+ * favicon pasted from a generator would break in the built app — and a regex
+ * anchored at the start of the attribute value misses both. Meanwhile
+ * `dns-prefetch` only resolves a name and `preconnect` only opens a connection;
+ * neither fetches, so neither is CSP's business, and flagging them would fail a
+ * legitimate edit with a message about an unrelated policy.
+ */
+const fetchingRels = new Set(['stylesheet', 'modulepreload', 'icon', 'manifest', 'preload', 'prefetch'])
+
+const externallyFetchingLinks = (html: string): string[] =>
+  [...html.matchAll(/<link\b[^>]*>/gi)]
+    .map((match) => match[0])
+    .filter((tag) => {
+      const href = /\bhref\s*=\s*["']?([^"'\s>]+)/i.exec(tag)?.[1]
+      if (href === undefined || !/^(?:https?:)?\/\//i.test(href)) return false
+
+      const rel = /\brel\s*=\s*["']?([^"'>]*)/i.exec(tag)?.[1] ?? ''
+      return rel
+        .toLowerCase()
+        .split(/\s+/)
+        .filter(Boolean)
+        .some((token) => fetchingRels.has(token) || token.endsWith('-icon'))
+    })
+
 describe('security headers', () => {
   it('sends them on the API, the SPA shell, and a hashed asset alike', async () => {
     // Three different paths out of Fastify. A hook on the wrong one would leave
@@ -136,7 +165,12 @@ describe('security headers', () => {
   it('asks browsers to remember the TLS, which Apache terminates', async () => {
     expect(
       (await (await build()).inject({ method: 'GET', url: '/' })).headers['strict-transport-security'],
-    ).toContain('max-age=')
+      // The exact value, not merely its presence: the README's apex-domain
+      // warning is entirely about `includeSubDomains` and the one-year
+      // max-age, and both come from helmet's defaults rather than from
+      // `helmetOptions()`. A helmet upgrade shortening either would leave that
+      // warning silently wrong with every test still green.
+    ).toBe('max-age=31536000; includeSubDomains')
   })
 })
 
@@ -168,12 +202,7 @@ describe('the CSP against the actual page it protects', () => {
     // which a policy can block — failing a legitimate edit with a message
     // about a policy that had nothing to do with it.
     //
-    // The `rel` list is every value that fetches: stylesheet (style-src),
-    // modulepreload (script-src), icon (img-src), manifest (manifest-src),
-    // and preload/prefetch (whichever directive matches `as=`).
     expect(template).not.toMatch(/<(?:script|img)\b[^>]*\bsrc\s*=\s*["']?(?:https?:)?\/\//i)
-    expect(template).not.toMatch(
-      /<link\b(?=[^>]*\brel\s*=\s*["']?(?:stylesheet|modulepreload|icon|manifest|preload|prefetch)\b)(?=[^>]*\bhref\s*=\s*["']?(?:https?:)?\/\/)/i,
-    )
+    expect(externallyFetchingLinks(template)).toEqual([])
   })
 })
