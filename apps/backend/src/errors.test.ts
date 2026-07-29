@@ -137,6 +137,37 @@ describe('error logging', () => {
     // Node's default takes the process down with the connection intact.
   })
 
+  it('keeps the envelope on the thrown path when logging fails', async () => {
+    // The path with the actual traffic. `handleError` catches and re-sends, so
+    // an unguarded throw here does not drop the connection — it answers
+    // `{ statusCode, error: 'Internal Server Error', message: 'log destination
+    // gone' }`, which is the one response this file exists to prevent, and it
+    // would carry the failure's own message to the client.
+    const failing = Fastify({
+      logger: {
+        level: 'info',
+        stream: {
+          write: (chunk: string) => {
+            if (chunk.includes('rejected') || chunk.includes('handler failed')) {
+              throw new Error('log destination gone')
+            }
+          },
+        },
+      },
+    })
+    app = failing
+    registerErrorHandler(failing)
+    failing.get('/refused', async () => {
+      throw Object.assign(new Error('nope'), { statusCode: 403 })
+    })
+
+    const response = await failing.inject({ method: 'GET', url: '/refused' })
+
+    expect(response.statusCode).toBe(500)
+    expect(response.json()).toEqual({ error: 'internal_error' })
+    expect(response.body).not.toContain('log destination gone')
+  })
+
   it('answers an oversized header block with the envelope, not Fastify prose', async () => {
     // The third error path, and the only one that needs a real socket:
     // `app.inject` skips Node's HTTP parser entirely, so nothing here is

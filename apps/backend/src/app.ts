@@ -91,9 +91,10 @@ const assertServableWebRoot = (root: string): void => {
 /**
  * Logger configuration.
  *
- * Exported so the redaction can be tested against a captured stream — the paths
- * are a security control, and a typo in one is invisible until it is in a log
- * nobody meant to keep.
+ * Exported so the redaction can be tested against a captured stream rather than
+ * against a copy of it — `err.headers` is a real control, its failure mode is
+ * silence, and asserting a duplicated list would prove only that a string can
+ * be copied.
  *
  * Pretty output would need a dev-only dependency; JSON lines are what a
  * container's log driver wants anyway.
@@ -118,11 +119,17 @@ export const loggerOptions = (level: string) => ({
     // is the only form that cannot be defeated by casing. `sendEnvelope` logs
     // the header *names* separately, which is the part worth reading.
     //
-    // `res.headers["set-cookie"]` matches nothing today — Fastify's default
-    // `res` serializer emits `{ statusCode }` and no headers at all — and stays
-    // for the same reason the encodings are in `describesTheBody`: it costs
-    // nothing, and the day someone widens that serializer is not the day to be
-    // discovering it.
+    // Of the four, only `err.headers` matches anything today, and it is the
+    // only one with a test. Fastify's default serializers in
+    // `lib/logger-pino.js` emit `{ method, url, version, host, remoteAddress,
+    // remotePort }` for `req` and `{ statusCode }` for `res` — neither carries
+    // a `headers` key at all, so the other three can never fire.
+    //
+    // They stay for the same reason the encodings are in `describesTheBody`:
+    // they cost nothing, and the day someone passes a custom serializer is not
+    // the day to be discovering it. But they are a hedge, not a control — a
+    // typo in one of those three is *permanently* invisible, because nothing
+    // will ever reach it.
     paths: ['req.headers.cookie', 'req.headers.authorization', 'res.headers["set-cookie"]', 'err.headers'],
     remove: true,
   },

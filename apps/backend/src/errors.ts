@@ -273,9 +273,29 @@ const sendLastResort = (request: FastifyRequest, reply: FastifyReply, failure: u
   }
 }
 
+/**
+ * `sendEnvelope`, with the fallback around it.
+ *
+ * Both handlers use this rather than `sendEnvelope` directly. The framework
+ * path needs it because a throw there is an uncaughtException and a dropped
+ * connection. The thrown path needs it for a different reason: `handleError`
+ * catches and re-sends, so a throw degrades to Fastify's
+ * `{ statusCode, error, message }` — a response, but the one response this file
+ * exists to keep off the wire. And it is the path with the traffic. A log
+ * destination that has gone away hits `sendEnvelope` on every rejected request,
+ * not only on a bad URL.
+ */
+const sendEnvelopeGuarded = (error: FastifyError, request: FastifyRequest, reply: FastifyReply) => {
+  try {
+    sendEnvelope(error, request, reply)
+  } catch (failure) {
+    sendLastResort(request, reply, failure)
+  }
+}
+
 /** Everything thrown by a route, a hook, or the not-found handler. */
 export const registerErrorHandler = (app: FastifyInstance) => {
-  app.setErrorHandler<FastifyError>(sendEnvelope)
+  app.setErrorHandler<FastifyError>(sendEnvelopeGuarded)
 }
 
 /**
@@ -308,14 +328,4 @@ export const registerErrorHandler = (app: FastifyInstance) => {
  * called here. It is containment for the version of this file that someone
  * edits later.
  */
-export const frameworkErrorHandler: NonNullable<FastifyServerOptions['frameworkErrors']> = (
-  error,
-  request,
-  reply,
-) => {
-  try {
-    sendEnvelope(error, request, reply)
-  } catch (failure) {
-    sendLastResort(request, reply, failure)
-  }
-}
+export const frameworkErrorHandler: NonNullable<FastifyServerOptions['frameworkErrors']> = sendEnvelopeGuarded
