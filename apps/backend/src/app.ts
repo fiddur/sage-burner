@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 
 import fastifyStatic from '@fastify/static'
+import { errorResponse } from '@sage-burner/shared'
 import Fastify from 'fastify'
 import { existsSync, statSync } from 'node:fs'
 import path from 'node:path'
@@ -159,7 +160,7 @@ export const createApp = async ({ db, config }: AppDeps): Promise<FastifyInstanc
   // container (WEB_ROOT set). Frontend error handling written against one
   // would otherwise meet the other in the environment it was not tested in.
   app.setNotFoundHandler((request, reply) => {
-    const notFound = () => reply.code(404).send({ error: 'not_found' })
+    const notFound = () => reply.code(404).send(errorResponse('not_found'))
     const pathname = pathnameOf(request.url)
 
     // An unmatched API path is a real 404 — never the SPA shell. Serving HTML

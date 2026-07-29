@@ -139,6 +139,19 @@ describe('migrations', () => {
     expect(handle.client.prepare('PRAGMA foreign_keys').get()?.foreign_keys).toBe(1)
   })
 
+  it('refuses to migrate when foreign keys cannot be disabled', () => {
+    // The load-bearing branch: the docblock says turning foreign keys off *is*
+    // the whole protection against a table rebuild cascade-deleting children,
+    // and `PRAGMA foreign_keys` is a silent no-op inside a transaction. Drop
+    // the read-back and this file stays green while the cascade is re-armed.
+    handle.client.exec('BEGIN')
+    try {
+      expect(() => runMigrations(handle)).toThrow(/disable foreign keys/i)
+    } finally {
+      handle.client.exec('ROLLBACK')
+    }
+  })
+
   it('refuses to finish if a migration left a dangling reference', () => {
     // Simulates what a table rebuild does with foreign keys off: the parent
     // goes, the children stay and point at nothing. Without the

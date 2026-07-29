@@ -61,6 +61,45 @@ describe('GET /api/version', () => {
   })
 })
 
+describe('trustProxy', () => {
+  // Nothing else pins this: delete `trustProxy` from the Fastify options and
+  // every other test in this file still passes while the spoof-resistance the
+  // README argues for is silently gone. request.ip is what a rate limiter on
+  // invite redemption and an admin audit trail will key on.
+  //
+  // Verified by deleting the option: the `1` and `true` cases fail. The default
+  // case does *not*, because Fastify's own default is already `false` — so that
+  // one documents the intended behaviour rather than pinning our choice of it.
+  // Worth knowing before treating it as a guard.
+  const whoami = async (env: NodeJS.ProcessEnv) => {
+    await build(env)
+    app.get('/api/whoami', async (request) => ({ ip: request.ip }))
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/whoami',
+      // A client claiming 9.9.9.9, with Apache having appended what it saw.
+      headers: { 'x-forwarded-for': '9.9.9.9, 203.0.113.7' },
+      remoteAddress: '172.17.0.1',
+    })
+    return response.json()
+  }
+
+  it('trusts nothing by default, so a claimed address is ignored entirely', async () => {
+    // The more valuable half: an unconfigured deployment must not believe the
+    // header at all.
+    expect(await whoami({})).toEqual({ ip: '172.17.0.1' })
+  })
+
+  it('with one hop, takes what the proxy appended and ignores what the client prepended', async () => {
+    expect(await whoami({ TRUST_PROXY: '1' })).toEqual({ ip: '203.0.113.7' })
+  })
+
+  it('with `true`, believes the whole chain — which is why it is not the default', async () => {
+    expect(await whoami({ TRUST_PROXY: 'true' })).toEqual({ ip: '9.9.9.9' })
+  })
+})
+
 describe('without a web root', () => {
   it('404s an unknown path rather than pretending to be an SPA', async () => {
     await build()
