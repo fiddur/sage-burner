@@ -20,8 +20,20 @@ import { errorResponse } from '@sage-burner/shared'
 /** Header values Node's `setHeader` accepts, which is what `reply.headers` forwards to. */
 type HeaderValue = number | string | string[]
 
-/** Headers that belong to the body being replaced, never to the error carrying them. */
-const describesTheBody = new Set(['content-type', 'content-length'])
+/**
+ * Headers that belong to the body being replaced, never to the error carrying
+ * them. The encodings are here for the same reason as `content-type` rather
+ * than for a known trigger: an error declaring `gzip` would put that on a
+ * plaintext envelope, and the client would fail to gunzip a body that was never
+ * compressed.
+ *
+ * Three of the four are pinned by tests — removing them turns `app.test.ts`
+ * red. `content-length` cannot be: Fastify recomputes it in `onSendEnd`, so a
+ * stale one never reaches the wire and there is nothing to observe. It stays in
+ * the set because it describes the replaced body like the rest, not because it
+ * is load-bearing.
+ */
+const describesTheBody = new Set(['content-type', 'content-length', 'content-encoding', 'transfer-encoding'])
 
 /**
  * Headers an error asked to be sent with it.

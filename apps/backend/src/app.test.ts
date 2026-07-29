@@ -253,6 +253,32 @@ describe('the error envelope', () => {
     expect(response.headers['x-request-id']).toBe('abc')
   })
 
+  it('drops an encoding the envelope is not encoded with', async () => {
+    // Same class as the content-type case: the envelope is plaintext JSON, so
+    // an inherited `gzip` leaves the client trying to gunzip something that was
+    // never compressed. No trigger in the tree today — the set is exhaustive
+    // about the class rather than about what currently emits it.
+    await build()
+    app.get('/api/encoded', async () => {
+      throw Object.assign(new Error('nope'), {
+        statusCode: 502,
+        headers: {
+          'content-encoding': 'gzip',
+          'transfer-encoding': 'chunked',
+          'x-request-id': 'abc',
+        },
+      })
+    })
+
+    const response = await app.inject({ method: 'GET', url: '/api/encoded' })
+
+    expect(response.statusCode).toBe(502)
+    expect(response.json()).toEqual({ error: 'internal_error' })
+    expect(response.headers['content-encoding']).toBeUndefined()
+    expect(response.headers['transfer-encoding']).toBeUndefined()
+    expect(response.headers['x-request-id']).toBe('abc')
+  })
+
   it('maps a thrown 404 to not_found, not the generic 4xx code', async () => {
     // The unmatched-route 404 comes from setNotFoundHandler and never reaches
     // here, so nothing else exercises this branch — a route rejecting a missing
