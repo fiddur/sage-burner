@@ -142,10 +142,15 @@ describe('security headers', () => {
 
 describe('the CSP against the actual page it protects', () => {
   it('holds because the HTML entry point has nothing inline in it', async () => {
-    // This is the assumption the policy rests on, so it is pinned rather than
-    // trusted: Vite copies this file through, inline content and all. Adding an
-    // inline `<script>` or `<style>` here would leave the built app silently
-    // broken in production — the policy blocks it, and nothing else would fail.
+    // The assumption the policy rests on, pinned rather than trusted.
+    //
+    // Vite passes most of this file through untouched — checked, not assumed:
+    // an inline `<script type="module">` is extracted into the entry chunk and
+    // never reaches `dist/index.html`, but a classic inline `<script>`, a
+    // `<style>` block, `on*=` and `style=` all survive verbatim. Any of those
+    // would leave the built app silently broken in production: the policy
+    // blocks it, and nothing else would fail. The module case is caught too,
+    // which is stricter than necessary and the safe direction.
     const template = readFileSync(join(import.meta.dirname, '../../web/index.html'), 'utf8')
 
     expect(template).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i)
@@ -156,6 +161,15 @@ describe('the CSP against the actual page it protects', () => {
     // The same trap through the other door: `script-src 'self'` blocks a CDN
     // just as surely as an inline block, and with the identical symptom —
     // broken only in the built app, with nothing else failing.
-    expect(template).not.toMatch(/\b(?:src|href)\s*=\s*["']?(?:https?:)?\/\//i)
+    //
+    // Narrowed to the attributes that actually start a fetch CSP governs. A
+    // blanket `src|href` scan would also reject `<link rel="canonical">`,
+    // `rel="me"`, `rel="preconnect">` and any absolute `<a href>`, none of
+    // which a policy can block — failing a legitimate edit with a message
+    // about a policy that had nothing to do with it.
+    expect(template).not.toMatch(/<(?:script|img)\b[^>]*\bsrc\s*=\s*["']?(?:https?:)?\/\//i)
+    expect(template).not.toMatch(
+      /<link\b(?=[^>]*\brel\s*=\s*["']?(?:stylesheet|modulepreload)\b)(?=[^>]*\bhref\s*=\s*["']?(?:https?:)?\/\/)/i,
+    )
   })
 })

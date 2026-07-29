@@ -302,8 +302,9 @@ ProxyPassReverse / http://127.0.0.1:8081/
 ```
 
 Note there are no `Header set` lines for CSP, HSTS or the rest: the app sends
-those itself, and a second policy here could only further restrict it. See
-[Security headers](#security-headers).
+those itself. Do not add them here — `Header set` _replaces_ what the backend
+sent, so a policy written here shadows the app's rather than adding to it, and a
+weaker one silently wins. See [Security headers](#security-headers).
 
 `X-Forwarded-Proto` is not cosmetic: Apache terminates TLS, so without it the
 app believes it is serving plain HTTP — which decides whether the session cookie
@@ -368,18 +369,29 @@ Two things to know before deploying anywhere other than the documented setup:
   but reaching the container over plain HTTP at a LAN address or hostname
   upgrades every subresource to `https://` and yields a blank page.
 
-**Do not add these headers in the Apache vhost as well.** Browsers _intersect_
-multiple `Content-Security-Policy` headers rather than letting one win, so a
-second policy can only ever make the page more restricted — and debugging why a
-script is blocked when neither policy alone blocks it is miserable. The app is
-the single place this is configured.
+**Do not add these headers in the Apache vhost as well**, in either direction:
+
+- `Header set` **replaces** the app's header, so a policy written there is the
+  only one the browser sees — including a weaker one, and including a
+  `Strict-Transport-Security: max-age=300` that quietly undoes the year above.
+- `Header add`/`append` emits a second header, and browsers _intersect_ multiple
+  CSP headers rather than letting one win — so the page ends up more restricted
+  than either policy alone, and debugging why a script is blocked when neither
+  policy blocks it is miserable.
+
+The app is the single place this is configured.
 
 One assumption the policy rests on is pinned rather than trusted:
 `apps/web/index.html` must stay free of inline `<script>`, `<style>`, `on*=` and
-`style=`, **and of any absolute `src`/`href`** — a CDN link is blocked by
-`script-src 'self'` just as surely as an inline block. Vite copies that file
-through verbatim, so either would break the built app in production with nothing
-else failing. There is a test asserting it.
+`style=`, **and of any absolute `src`/`href` that CSP governs** — a CDN
+stylesheet is blocked by `style-src 'self'` just as surely as an inline block.
+
+Vite passes most of that file through untouched, so either would break the built
+app in production with nothing else failing. One exception, verified rather than
+assumed: an inline `<script type="module">` is extracted into the entry chunk and
+never reaches `dist/index.html`. A classic inline `<script>`, a `<style>` block,
+`on*=` and `style=` all survive verbatim. There is a test asserting all of it —
+stricter than strictly necessary, which is the safe direction.
 
 [#17]: https://github.com/fiddur/sage-burner/issues/17
 
