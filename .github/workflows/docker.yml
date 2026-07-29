@@ -223,4 +223,13 @@ jobs:
           'refs/heads/main')
         run: |
           set -euo pipefail
-          printf '%s\n' "${{ steps.meta.outputs.tags }}" | xargs -rn1 docker push
+          # Reversed, so the immutable sha tag lands before the one watchtower
+          # follows. metadata-action emits priority-descending and `type=raw`
+          # outranks `type=sha`, so the natural order pushes `:develop` first —
+          # and watchtower starts deploying it within five minutes. If the sha
+          # push then failed (a Hub blip, a rate limit, cancel-in-progress
+          # firing because a second merge landed), the deployable tag would have
+          # moved while the anchor did not exist, and "recover by hand-pinning a
+          # <sha> tag in the compose file" — which both job comments above rely
+          # on — would have nothing to pin to.
+          printf '%s\n' "${{ steps.meta.outputs.tags }}" | tac | xargs -rn1 docker push
