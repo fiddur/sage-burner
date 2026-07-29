@@ -77,7 +77,14 @@ export const Login = ({ api }: { api: Pick<ApiClient, 'login'> }) => {
     <section class="page">
       <h1>Log in</h1>
 
-      <form class="form" onSubmit={submit} noValidate>
+      {/*
+        No `noValidate`: it suppresses constraint validation on submit, which
+        makes the `required` attributes below inert — an empty form would POST
+        `{ email: '', password: '' }`, get a 401, and tell the member their
+        details did not match a form they never filled in. Letting the browser
+        handle it also catches a mistyped address before a round trip.
+      */}
+      <form class="form" onSubmit={submit}>
         {error !== undefined && (
           // `alert` so it is announced when it appears — a member using a
           // screen reader would otherwise resubmit a form that has already

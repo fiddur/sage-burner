@@ -24,13 +24,16 @@ export type ErrorResponse = z.infer<typeof errorResponseSchema>
  * Only what the app actually emits today. It grows alongside the routes that
  * emit it, rather than listing values first and leaving unreachable ones.
  *
- * `unauthenticated` and `forbidden` are the distinction a client cannot make
- * from the status alone once both exist: "sign in" and "you are signed in and
- * still may not" need different copy, and `messageFor` in the web client keys
- * on status, which gives 401 and 403 different messages but gives every other
- * 4xx the same one. `invalid_credentials` is deliberately one code for both a
- * wrong password and an unknown email — telling those apart is an account
- * enumeration oracle.
+ * `invalid_credentials` is deliberately one code for both a wrong password and
+ * an unknown email — telling those apart is an account enumeration oracle.
+ * `rate_limited` exists because 429 would otherwise be indistinguishable from a
+ * malformed body, and a client that cannot tell them apart cannot say "try
+ * again shortly".
+ *
+ * `unauthenticated` and `forbidden` are deliberately *absent* until #10's
+ * guards emit them. They are the distinction a client cannot make from status
+ * alone, and they will be wanted — but adding them now would be the thing the
+ * paragraph above forbids.
  *
  * `errorResponseSchema` deliberately accepts codes outside this list, so an
  * older client can still parse a newer API's response rather than failing to
@@ -40,9 +43,8 @@ export const errorCodes = [
   'bad_request',
   'not_found',
   'internal_error',
-  'unauthenticated',
-  'forbidden',
   'invalid_credentials',
+  'rate_limited',
 ] as const
 export type ErrorCode = (typeof errorCodes)[number]
 

@@ -263,6 +263,72 @@ describe('GET /api/auth/me', () => {
   })
 })
 
+describe('concurrency shedding', () => {
+  // Not a rate limiter (#57) — the availability guard. scrypt runs on libuv's
+  // four-slot threadpool, which @fastify/static reads files through, so a
+  // client holding concurrent logins stalls the whole app rather than just
+  // this route.
+  it('sheds a third concurrent login rather than queueing it', async () => {
+    const server = await build()
+    // Production parameters, so each verification is slow enough that three
+    // requests genuinely overlap. With `cheap` they would finish serially and
+    // the test would pass without the guard.
+    await givenAccount(server, {
+      email: 'ada@example.org',
+      password: 'a good long passphrase',
+      params: defaultScryptParams,
+    })
+
+    const attempts = [
+      login(server, 'ada@example.org', 'a good long passphrase'),
+      login(server, 'ada@example.org', 'a good long passphrase'),
+      login(server, 'ada@example.org', 'a good long passphrase'),
+    ]
+    const statuses = (await Promise.all(attempts)).map((response) => response.statusCode)
+
+    expect(statuses.filter((status) => status === 429)).toHaveLength(1)
+    expect(statuses.filter((status) => status === 200)).toHaveLength(2)
+  })
+
+  it('tells a shed caller when to come back, and in the documented vocabulary', async () => {
+    const server = await build()
+    await givenAccount(server, {
+      email: 'ada@example.org',
+      password: 'a good long passphrase',
+      params: defaultScryptParams,
+    })
+
+    const responses = await Promise.all([
+      login(server, 'ada@example.org', 'a good long passphrase'),
+      login(server, 'ada@example.org', 'a good long passphrase'),
+      login(server, 'ada@example.org', 'a good long passphrase'),
+    ])
+    const shed = responses.find((response) => response.statusCode === 429)
+
+    expect(shed?.json()).toEqual({ error: 'rate_limited' })
+    expect(shed?.headers['retry-after']).toBe('1')
+  })
+
+  it('releases the slot again, so a burst does not wedge login permanently', async () => {
+    // The counter is decremented in a `finally`; without it a throw would leak
+    // a slot and every later login would be refused until a restart.
+    const server = await build()
+    await givenAccount(server, {
+      email: 'ada@example.org',
+      password: 'a good long passphrase',
+      params: defaultScryptParams,
+    })
+
+    await Promise.all([
+      login(server, 'ada@example.org', 'a good long passphrase'),
+      login(server, 'ada@example.org', 'a good long passphrase'),
+      login(server, 'ada@example.org', 'a good long passphrase'),
+    ])
+
+    expect((await login(server, 'ada@example.org', 'a good long passphrase')).statusCode).toBe(200)
+  })
+})
+
 describe('rehashing on login', () => {
   // Every account in this file is created with `cheap` parameters, so every
   // successful login above already takes this branch. Nothing asserted what it

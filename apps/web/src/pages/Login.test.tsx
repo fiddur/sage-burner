@@ -126,6 +126,19 @@ describe('Login', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('did not say who')
   })
 
+  it('does not post an empty form, which would be answered as a wrong password', async () => {
+    // The form previously carried `noValidate`, which suppresses constraint
+    // validation on submit and made the `required` attributes inert: an empty
+    // submit POSTed `{ email: '', password: '' }`, got a 401, and told the
+    // member their details did not match a form they never filled in.
+    const login = vi.fn<AppApi['login']>(() => Promise.resolve({ viewer: null }))
+    renderLogin(login)
+
+    submit()
+
+    expect(login).not.toHaveBeenCalled()
+  })
+
   it('says why there is no sign-up or password reset', async () => {
     // Both are absent by design — accounts come from invites (#17) and there is
     // no mail service (#30). A dead link would be worse than saying so.

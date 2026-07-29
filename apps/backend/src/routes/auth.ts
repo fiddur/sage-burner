@@ -43,9 +43,19 @@ const cookieHeader = (token: string, config: Config, maxAgeSeconds: number): str
  * Read the session cookie without a cookie-parsing dependency.
  *
  * One header, one name, and the token alphabet is base64url plus a dot — so
- * `decodeURIComponent` is not needed and a full parser buys nothing. Splits on
- * `;` and takes the first match, which is what a browser sends; a duplicate
- * name is not something a browser produces for a single `Path=/` cookie.
+ * `decodeURIComponent` is not needed and a full parser buys nothing.
+ *
+ * It takes the *first* match, and duplicates are possible: RFC 6265 orders
+ * cookies by descending path specificity, so one injected with `Path=/api`
+ * shadows the real `Path=/` one. That needs an attacker who can already set
+ * cookies for the domain — a sibling-subdomain XSS, or a plain-HTTP MITM
+ * before HSTS is pinned — and it cannot forge a valid token, since the
+ * signature still has to check out. The realistic damage is a forced sign-out.
+ *
+ * `__Host-` is the standard fix and it is not available here: it requires
+ * `Secure`, which is production-only so that plain-HTTP `docker compose up`
+ * keeps working. A production-only cookie *name* would close it; #57 is not
+ * the place, but it is worth doing when the cookie is next touched.
  */
 export const readSessionCookie = (header: string | undefined): string | undefined => {
   if (header === undefined) return undefined
@@ -121,10 +131,39 @@ export interface AuthRouteDeps {
  */
 const noStore = (reply: FastifyReply) => reply.header('cache-control', 'no-store')
 
+/**
+ * How many password verifications may be in flight at once.
+ *
+ * Not a rate limiter — #57 is that, keyed per address. This is the narrower
+ * availability guard, and it is the one that has to exist before the route is
+ * reachable from the internet.
+ *
+ * `scrypt` runs on libuv's threadpool, four slots by default, and
+ * `@fastify/static` reads files through the same pool. So a single anonymous
+ * client holding a handful of concurrent POSTs here does not merely slow login
+ * down — it stalls the SPA and the ICS feed with it, indefinitely, at ~230ms
+ * per attempt. Two leaves half the pool for everything else.
+ *
+ * Two concurrent logins is not a constraint for 42 members; it is a constraint
+ * for someone trying to occupy the process.
+ */
+const MAX_CONCURRENT_VERIFICATIONS = 2
+
 export const registerAuthRoutes = (app: FastifyInstance, { db, config, sessions }: AuthRouteDeps) => {
+  // Per-registration rather than module-level, so two apps in one test process
+  // do not share a counter.
+  let verificationsInFlight = 0
   app.post('/api/auth/login', async (request, reply) => {
     const parsed = loginRequestSchema.safeParse(request.body)
     void noStore(reply)
+
+    if (verificationsInFlight >= MAX_CONCURRENT_VERIFICATIONS) {
+      // Shed rather than queue: queueing is what lets a client hold the
+      // threadpool. `Retry-After` is honest about how long the work takes.
+      void reply.header('retry-after', '1')
+      request.log.warn({ in_flight: verificationsInFlight }, 'login shed')
+      return reply.code(429).send(errorResponse('rate_limited'))
+    }
 
     if (!parsed.success) {
       // Deliberately not `bad_request`: a malformed body and a wrong password
@@ -145,7 +184,16 @@ export const registerAuthRoutes = (app: FastifyInstance, { db, config, sessions 
     // there, with the measurement that motivated it — this line only has to
     // avoid short-circuiting past it.
     const stored = row?.password_hash ?? null
-    const ok = await verifyPassword(parsed.data.password, stored)
+
+    verificationsInFlight += 1
+    let ok: boolean
+    try {
+      ok = await verifyPassword(parsed.data.password, stored)
+    } finally {
+      // `finally`, so a throw cannot leak a slot and wedge the counter at the
+      // cap — which would refuse every login until the process restarted.
+      verificationsInFlight -= 1
+    }
 
     if (!ok || row === undefined) {
       request.log.info({ status: 401 }, 'login rejected')
