@@ -126,10 +126,14 @@ describe('POST /api/auth/login', () => {
     expect(cookie).toContain('Path=/')
   })
 
-  it('omits Secure outside production, so plain-HTTP compose still works', async () => {
-    // The README promises `docker compose up` is enough to run it. An
-    // unconditional Secure flag would make login appear to succeed and then
-    // silently drop the cookie.
+  it('omits Secure outside production, which is `pnpm dev` and not compose', async () => {
+    // Named carefully: the image sets NODE_ENV=production, so a containerised
+    // deployment — including `docker compose up` — *does* get Secure. The
+    // environment this covers is local development against `pnpm dev`.
+    //
+    // The failure that makes it worth having: over plain HTTP the browser
+    // discards a Secure cookie silently, the login still answers 200, and the
+    // UI renders signed-in before the next load comes back signed out.
     const server = await build()
     await givenAccount(server, { email: 'ada@example.org', password: 'a good long passphrase' })
 

@@ -22,9 +22,18 @@ export const SESSION_COOKIE = 'sage_session'
  *   which is most of CSRF for free. Not `Strict`, which would drop the cookie
  *   when a member follows an invite link out of Discord and lands signed-out on
  *   a page they are signed in to.
- * - `Secure` in production only. Setting it unconditionally would make login
- *   silently fail on a plain-HTTP `docker compose up`, which the README
- *   promises works.
+ * - `Secure` whenever `NODE_ENV` is `production` — which the image sets, so
+ *   **every containerised deployment gets it**, including `docker compose up`.
+ *   The environment without it is `pnpm dev`.
+ *
+ *   Consequence worth knowing rather than working around: over plain HTTP on a
+ *   non-`localhost` origin, the browser silently discards the cookie. The login
+ *   still answers 200 and the UI renders signed-in from the response body, then
+ *   the next page load comes back signed out with nothing explaining why.
+ *   `localhost` escapes this only because browsers treat it as a trustworthy
+ *   origin — a different reason from the one this once claimed, and not one
+ *   applied uniformly. Plain HTTP therefore works on `localhost`; anything else
+ *   needs TLS in front.
  * - `Path=/` because the SPA and the API share an origin.
  */
 const cookieHeader = (token: string, config: Config, maxAgeSeconds: number): string => {
@@ -52,10 +61,10 @@ const cookieHeader = (token: string, config: Config, maxAgeSeconds: number): str
  * before HSTS is pinned — and it cannot forge a valid token, since the
  * signature still has to check out. The realistic damage is a forced sign-out.
  *
- * `__Host-` is the standard fix and it is not available here: it requires
- * `Secure`, which is production-only so that plain-HTTP `docker compose up`
- * keeps working. A production-only cookie *name* would close it; #57 is not
- * the place, but it is worth doing when the cookie is next touched.
+ * `__Host-` is the standard fix and it is not a drop-in: it requires `Secure`,
+ * which is set only when `NODE_ENV` is `production`, so the name would have to
+ * vary by environment or `pnpm dev` would have its cookie rejected outright.
+ * Tracked in #58, worth doing when the cookie is next touched.
  */
 export const readSessionCookie = (header: string | undefined): string | undefined => {
   if (header === undefined) return undefined
@@ -153,17 +162,8 @@ export const registerAuthRoutes = (app: FastifyInstance, { db, config, sessions 
   // Per-registration rather than module-level, so two apps in one test process
   // do not share a counter.
   let verificationsInFlight = 0
-  app.post('/api/auth/login', async (request, reply) => {
+  const handleLogin = async (request: FastifyRequest, reply: FastifyReply) => {
     const parsed = loginRequestSchema.safeParse(request.body)
-    void noStore(reply)
-
-    if (verificationsInFlight >= MAX_CONCURRENT_VERIFICATIONS) {
-      // Shed rather than queue: queueing is what lets a client hold the
-      // threadpool. `Retry-After` is honest about how long the work takes.
-      void reply.header('retry-after', '1')
-      request.log.warn({ in_flight: verificationsInFlight }, 'login shed')
-      return reply.code(429).send(errorResponse('rate_limited'))
-    }
 
     if (!parsed.success) {
       // Deliberately not `bad_request`: a malformed body and a wrong password
@@ -184,16 +184,7 @@ export const registerAuthRoutes = (app: FastifyInstance, { db, config, sessions 
     // there, with the measurement that motivated it — this line only has to
     // avoid short-circuiting past it.
     const stored = row?.password_hash ?? null
-
-    verificationsInFlight += 1
-    let ok: boolean
-    try {
-      ok = await verifyPassword(parsed.data.password, stored)
-    } finally {
-      // `finally`, so a throw cannot leak a slot and wedge the counter at the
-      // cap — which would refuse every login until the process restarted.
-      verificationsInFlight -= 1
-    }
+    const ok = await verifyPassword(parsed.data.password, stored)
 
     if (!ok || row === undefined) {
       request.log.info({ status: 401 }, 'login rejected')
@@ -216,6 +207,32 @@ export const registerAuthRoutes = (app: FastifyInstance, { db, config, sessions 
 
     const viewer: Viewer = { account_id: row.id, roles: await rolesFor(db, row.id) }
     return reply.code(200).send({ viewer } satisfies MeResponse)
+  }
+
+  app.post('/api/auth/login', async (request, reply) => {
+    void noStore(reply)
+
+    if (verificationsInFlight >= MAX_CONCURRENT_VERIFICATIONS) {
+      // Shed rather than queue: queueing is what lets a client hold the
+      // threadpool. `Retry-After` is honest about how long the work takes.
+      void reply.header('retry-after', '1')
+      request.log.warn({ in_flight: verificationsInFlight }, 'login shed')
+      return reply.code(429).send(errorResponse('rate_limited'))
+    }
+
+    // Claimed here, at the check, rather than just before the hashing below.
+    // There is an `await` between the two, and taking the slot after it makes
+    // the cap depend on the database driver resolving synchronously: with real
+    // I/O, several handlers could pass the check before any of them increments,
+    // and the guard would silently stop binding. `node:sqlite` happens to
+    // resolve as a microtask today, which is exactly the kind of accident that
+    // holds until it does not.
+    verificationsInFlight += 1
+    try {
+      return await handleLogin(request, reply)
+    } finally {
+      verificationsInFlight -= 1
+    }
   })
 
   app.post('/api/auth/logout', async (_request, reply: FastifyReply) => {
