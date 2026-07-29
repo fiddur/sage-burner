@@ -1,0 +1,264 @@
+name: Build and Push Docker Image
+
+on:
+  # No `paths:` filter here, deliberately. A path-filtered `pull_request`
+  # trigger reports *no check at all* on an unaffected PR rather than a passing
+  # one — which a required status check waits on forever.
+  pull_request:
+    branches:
+      - develop
+      - main
+  push:
+    branches:
+      - develop
+      - main
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'package.json'
+      - 'tsconfig.json'
+      - '.nvmrc'
+      - 'Dockerfile'
+      - '.dockerignore'
+      # An image input since the runtime stage copies it: a merge changing only
+      # the licence must republish, or :develop keeps conveying the old terms.
+      - 'LICENSE'
+      - '.github/workflows/docker.yml'
+  workflow_dispatch:
+
+# A second push while the first is still building would otherwise race to move
+# the `develop` tag, and the loser could win.
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+# Actions are pinned to commit SHAs rather than mutable major tags. The publish
+# job holds DOCKERHUB_TOKEN — push rights on the image watchtower auto-deploys
+# without review — so `@v3` meaning "whatever that tag points at today" is the
+# same bet this repo declines elsewhere via pnpm's minimumReleaseAge and the
+# watchtower version pin.
+#
+# The trailing version comment is the only thing making a pin auditable, so it
+# has to be right: resolve it from the tag that points at the SHA, not from the
+# repository's latest release. Dependabot keeps both in step from here.
+
+jobs:
+  # Runs on pull requests and on push. On push it gates publishing: a merge to
+  # develop is live on the server within five minutes, watchtower has no
+  # rollback, and --cleanup removes the superseded image — so recovering from a
+  # bad deploy means hand-pinning a <sha> tag in the compose file. On pull
+  # requests it is the check the merge gate in AGENTS.md refers to.
+  check:
+    name: CI Gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # The same gate as local development: formatting, types, lint, tests.
+      - run: pnpm check
+      - run: pnpm test
+
+      # The file that actually runs in production, and otherwise the only one
+      # here nothing checks: it is not an image input, so it is correctly absent
+      # from the push paths filter, and nothing else parses it. Without this the
+      # first thing to notice a typo or a bad key would be the server. The
+      # ${TRUST_PROXY:-false} / ${LOG_LEVEL:-info} defaults mean it resolves
+      # with no .env present.
+      - run: docker compose config -q
+
+  # Build, start what was built, then publish — in that order, so nothing
+  # unstartable reaches Docker Hub. Watchtower has no rollback and --cleanup
+  # removes the superseded image, so the alternative to catching it here is
+  # hand-pinning a <sha> tag in the compose file on a live deployment.
+  build:
+    needs: check
+    runs-on: ubuntu-latest
+    # Nothing here uses GITHUB_TOKEN — Hub auth is via secrets and the GHA cache
+    # uses ACTIONS_RUNTIME_TOKEN — so the default grant would be unused
+    # privilege handed to four third-party actions on every run.
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
+        with:
+          images: fiddur/sage-burner
+          # `latest` is built from main rather than promoted from a sha-tagged
+          # develop image: merging develop into main produces a new merge
+          # commit, whose sha was never built, so there would be nothing to
+          # retag. The GHA cache makes the rebuild cheap.
+          tags: |
+            type=sha,prefix=
+            type=raw,value=develop,enable=${{ github.ref == 'refs/heads/develop' }}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      # Built and loaded, never pushed. The push is a separate step *after* the
+      # smoke test, so a broken image is never published — running the smoke
+      # test after a push would only tell us the thing watchtower is already
+      # deploying is broken.
+      - name: Build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          file: Dockerfile
+          push: false
+          load: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Surfaced by /api/version, so a deployed container can be traced
+          # back to the commit it was built from.
+          build-args: BUILD_SHA=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Proves the image starts, not merely that it builds. A missed source COPY
+      # produces a perfectly clean image that exits at boot with
+      # ERR_MODULE_NOT_FOUND — the failure most likely to be introduced by
+      # editing the runtime stage's hand-picked COPY list, and the one a
+      # build-only gate waves through.
+      #
+      # Also exercises migrating a fresh volume, which nothing else does before
+      # production does it.
+      - name: Smoke-test the image
+        id: smoke
+        run: |
+          set -euo pipefail
+          # The sha tag specifically, not `head -1`. metadata-action sorts by
+          # priority descending and `type=raw` outranks `type=sha`, so the first
+          # line is `:develop` on a push to develop and `:latest` on main —
+          # tags that exist on Docker Hub. Combined with docker's pull fallback,
+          # a load that failed to apply a tag would silently smoke-test the
+          # *previously published* image and green-light it, which is exactly
+          # the tested-bytes-are-published-bytes property the Push step exists
+          # to guarantee. A sha tag cannot do that: it does not exist remotely
+          # for a new commit. `--pull=never` below closes it structurally.
+          IMAGE=$(printf '%s\n' "${{ steps.meta.outputs.tags }}" | grep -- ":${GITHUB_SHA:0:7}\$" || true)
+          if [ -z "$IMAGE" ]; then
+            echo "no sha tag among the built tags — metadata-action output changed shape:"
+            printf '%s\n' "${{ steps.meta.outputs.tags }}"
+            exit 1
+          fi
+          echo "smoke-testing $IMAGE"
+          # Exported so the push step can order by name rather than by
+          # deriving the sha tag's position from metadata-action's priorities.
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+          # Same constraints docker-compose.yml applies, so the hardening is
+          # not the one part of the runtime configuration nothing ever starts.
+          # A dependency that quietly needs a capability should fail here, not
+          # five minutes after a merge on a deployment with no rollback.
+          #
+          # --health-interval overrides only the cadence, not the command, so
+          # the image's own HEALTHCHECK is still what runs. Without it the
+          # image's 30s interval and 30s start-period put the first probe at
+          # t=30s and the second at t=60s — measured: healthy at t=31s with
+          # exactly one probe recorded — so the loop below would observe one
+          # probe and then time out. A single slow first probe on a loaded
+          # runner would fail an image that is fine.
+          docker run -d --name smoke \
+            --cap-drop ALL \
+            --security-opt no-new-privileges:true \
+            --health-interval=2s \
+            --pull=never \
+            -p 127.0.0.1:3000:3000 "$IMAGE"
+          # Waits on the image's own HEALTHCHECK rather than curling from the
+          # host. That subsumes the curl — the healthcheck hits /api/version
+          # too — and additionally exercises the instruction itself, so a base
+          # image dropping busybox wget, or ${PORT} ceasing to expand, fails
+          # here rather than leaving a permanently unhealthy container that CI
+          # called fine. The README positions the healthcheck as the signal to
+          # monitor, so a silently broken one is worse than none.
+          for _ in $(seq 45); do
+            STATUS=$(docker inspect -f '{{.State.Health.Status}}' smoke)
+            if [ "$STATUS" = healthy ]; then
+              echo "image starts, migrates, serves, and reports healthy"
+              curl -fsS http://127.0.0.1:3000/api/version
+              echo
+              docker rm -f smoke > /dev/null
+              exit 0
+            fi
+            if [ "$STATUS" = unhealthy ]; then break; fi
+            sleep 1
+          done
+          echo "image never became healthy (last status: ${STATUS:-unknown}):"
+          docker inspect -f '{{json .State.Health}}' smoke || true
+          docker logs smoke
+          exit 1
+
+      # Deliberately last before the push. Nothing above needs it — the build
+      # runs with `push: false` and the base image is public — so placing it
+      # earlier would leave DOCKERHUB_TOKEN in ~/.docker/config.json for the
+      # whole build and for `docker run` on freshly built, branch-controlled
+      # code. The condition must match the Push step exactly: workflow_dispatch
+      # can fire from any ref, and credentials should not materialise on a run
+      # that cannot publish.
+      - name: Log in to Docker Hub
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/develop' || github.ref ==
+          'refs/heads/main')
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Pushes the exact image the smoke test started, rather than rebuilding.
+      #
+      # A second build-push-action call would be a cache hit in practice, but
+      # only in practice: buildx re-resolves `FROM node:24-alpine` and imports
+      # the graph from the cache each time, so a moved base tag, a concurrent
+      # run touching the cache scope, or an eviction would silently publish a
+      # fresh image nothing had ever started. Every tag is already applied to
+      # the loaded image, so pushing it directly makes the guarantee structural.
+      #
+      # The trade: no buildx provenance/SBOM attestations, and this needs
+      # rethinking if the image ever goes multi-arch.
+      - name: Push
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/develop' || github.ref ==
+          'refs/heads/main')
+        run: |
+          set -euo pipefail
+          # The immutable sha tag first, by name — not by reversing
+          # metadata-action's output. Ordering matters because watchtower starts
+          # deploying `:develop` within five minutes of it moving: if the sha
+          # push failed afterwards (a Hub blip, a rate limit, cancel-in-progress
+          # firing because a second merge landed), the deployable tag would have
+          # moved with no anchor on Hub, and "recover by hand-pinning a <sha>
+          # tag in the compose file" — which both job comments above rely on —
+          # would have nothing to pin to.
+          #
+          # Derived ordering was the earlier shape and it was fragile: it
+          # assumed `type=raw` outranks `type=sha`, so a priority change or an
+          # explicit `priority=` on a tag line would have silently inverted it,
+          # with both pushes succeeding and nothing going red.
+          #
+          # The `|| exit 1` is load-bearing and must not be simplified away.
+          # `xargs` keeps going for exit statuses 1–125 and reports 123 at the
+          # end, by which point every tag has been pushed; `set -e` does not
+          # cover it either — measured, it does not abort this loop body — so
+          # stopping has to be explicit rather than inherited.
+          SHA_IMAGE='${{ steps.smoke.outputs.image }}'
+          docker push "$SHA_IMAGE" || exit 1
+
+          printf '%s\n' "${{ steps.meta.outputs.tags }}" | while read -r tag; do
+            if [ "$tag" != "$SHA_IMAGE" ]; then
+              docker push "$tag" || exit 1
+            fi
+          done

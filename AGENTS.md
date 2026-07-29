@@ -110,21 +110,24 @@ origin/develop`. Reset rather than pull — squash merges make local `develop`
 3. Implement, tests first where reasonable.
 4. `pnpm fix && pnpm check && pnpm test` all green locally.
 5. Open a **Draft** PR against `develop`, body containing `Closes #<issue>`.
-6. Watch CI. Red → fix and push. Green → `gh pr ready <n>`.
+6. Watch CI — all of it, not one named check. Red → fix and push. Green →
+   `gh pr ready <n>`.
 7. Wait for the review by tailing `/home/fiddur/src/codereview/events.log` for
    the line `<pr url> updated` — do not poll GitHub on a timer. (`review
 started` means it has only begun; keep waiting for `updated`.)
 8. Read the review body **and every inline comment**. Fix genuine
    correctness/security findings; for trivial or subjective nits, resolve the
    thread with a brief rationale. Resolve every inline thread via the GraphQL
-   `resolveReviewThread` mutation — the `develop` ruleset blocks merge on any
-   open thread.
+   `resolveReviewThread` mutation.
 9. Any push starts a fresh review round. Repeat from step 7.
 10. **Merge without asking** once all four gates hold:
     - the latest review body starts with `✅Approved`, **and** it is on the
       current head commit (a `✅Approved` left on an older commit is stale),
     - every inline review thread is resolved,
-    - CI (`CI Gate`) is green,
+    - **every** check is green — not a named one. `CI Gate` runs the tests,
+      but `build` is what proves the image starts, and naming only the first
+      would let a red `build` through. Check the whole rollup:
+      `gh pr view <n> --json statusCheckRollup`.
     - `mergeStateStatus` is `CLEAN`.
       Then `gh pr merge <n> --merge`. Never `--admin`. Avoid `--auto` — a push
       clears it and the PR sits `BLOCKED`.
@@ -137,6 +140,13 @@ started` means it has only begun; keep waiting for `updated`.)
 The gate is not optional. "Merge on approval" removes the human confirmation
 step, not the review — never merge an unapproved PR, and never merge with open
 threads or red CI.
+
+**Nothing enforces it yet.** `develop` has no branch protection and the repo has
+no rulesets, so `CI Gate` is not a required status check and an unresolved
+thread does not block anything — GitHub would happily merge a red PR. The gate
+above is a discipline, not a mechanism, until those are configured in repository
+settings. Do not read the checks going green as the platform having stopped
+anything.
 
 ## Deployment
 

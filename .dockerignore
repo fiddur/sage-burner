@@ -1,3 +1,9 @@
+# Patterns without a `**/` prefix are anchored at the context root, so `data`
+# alone matches `/data` and nothing else. The dev database actually lives at
+# `apps/backend/data/`, which is exactly the kind of thing that must never be
+# baked into a published image — hence `**/` on anything that could appear
+# under a workspace directory.
+
 # Dependencies
 node_modules
 **/node_modules
@@ -7,36 +13,40 @@ node_modules
 .gitignore
 
 # IDE
-.idea
-.vscode
-*.swp
-*.swo
+**/.idea
+**/.vscode
+**/*.swp
+**/*.swo
 
 # Build artifacts
-dist
-build
-coverage
-*.log
+**/dist
+**/build
+**/coverage
+**/*.log
 
 # Tests (not needed in the runtime image)
 **/*.test.ts
 **/*.test.tsx
 **/*.integration.test.ts
 
-# Local database
-data
-*.sqlite
-*.sqlite-wal
-*.sqlite-shm
+# Local databases. A developer's copy holds real member records — contact
+# details and allergies — so this is the one group where a missed pattern
+# publishes personal data to Docker Hub.
+**/data
+**/*.sqlite
+**/*.sqlite-wal
+**/*.sqlite-shm
 
 # Documentation
-*.md
+**/*.md
 docs
 
 # Environment files (passed in as env vars instead)
 .env
 .env.*
+**/.env
+**/.env.*
 
 # OS files
-.DS_Store
-Thumbs.db
+**/.DS_Store
+**/Thumbs.db

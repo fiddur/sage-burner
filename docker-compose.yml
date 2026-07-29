@@ -1,0 +1,126 @@
+# Pinned, because the volume's real name is derived from it. Left to default,
+# the project name is whatever directory this file happens to sit in — so
+# renaming or moving the deployment directory makes `docker compose up -d`
+# create a *fresh, empty* volume, migrate a new schema into it, and come up
+# healthy with no members and no error anywhere. The old volume survives, so it
+# is recoverable, but nothing signals that anything happened.
+#
+# A named volume protects against `docker compose down`. This protects against
+# the project name shifting underneath it.
+name: sage-burner
+
+# Deployment: Apache on the host holds the public IP for several domains and
+# reverse-proxies to this container.
+#
+#   client ──https──▶ Apache (host) ──http──▶ 127.0.0.1:8081 ──▶ container :3000
+#
+# Images are tagged:
+#   develop  - built from the develop branch
+#   latest   - built from main
+#   <sha>    - every build, for pinning to an exact commit
+# Change the tag below to follow one or the other.
+
+services:
+  sage-burner:
+    image: fiddur/sage-burner:develop
+    ports:
+      # Loopback only, deliberately. Docker writes its own iptables rules ahead
+      # of ufw/firewalld, so `8081:3000` would be reachable from the internet
+      # even with a host firewall denying it — bypassing Apache, its TLS, and
+      # the vhost routing for every other domain on that IP.
+      - '127.0.0.1:8081:3000'
+    environment:
+      # Declared here rather than in the image, because this is the file that
+      # knows what is in front of the container — but declared as a *fallback*,
+      # because this file does not know either.
+      #
+      # `false` at every layer that has to guess: the image, this fallback, and
+      # `.env.example`. Set it to 1 in your `.env` for the documented Apache
+      # setup — one trusted hop is spoof-resistant there, since a client can
+      # only prepend to X-Forwarded-For and Apache appends what it saw. See
+      # `.env.example` and the README for the full reasoning; this comment
+      # deliberately does not restate their contents, having twice gone stale
+      # by describing a version of that file which no longer existed.
+      #
+      # Do not "fix" this back to 1. Anyone running compose without a
+      # header-appending proxy would then get a request.ip the client controls,
+      # which is what decides the session cookie's Secure flag.
+      - TRUST_PROXY=${TRUST_PROXY:-false}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    volumes:
+      # The database. A named volume rather than a bind mount so `docker
+      # compose down` cannot take the members with it.
+      - sage_burner_data:/data
+    labels:
+      # Watchtower below runs with --label-enable and --scope, so it updates
+      # only what carries both of these. Without the enable label nothing would
+      # be updated; without the scope, two watchtowers on one host would both
+      # act on the same containers.
+      - 'com.centurylinklabs.watchtower.enable=true'
+      - 'com.centurylinklabs.watchtower.scope=sage-burner'
+    # No healthcheck block: the image defines one that respects $PORT, and
+    # repeating it here only creates two copies to keep in step.
+    security_opt:
+      # No setuid binary in the image can gain privileges. Close to free, and
+      # this container is reachable from the network and holds member records.
+      - no-new-privileges:true
+    cap_drop:
+      # The process runs as uid 1000 and binds :3000, which is above the
+      # privileged range — so it needs none of the default capability set.
+      - ALL
+    logging:
+      # The daemon default is json-file with no rotation. Fastify writes a JSON
+      # line per request, and this is meant to sit on a small box for months —
+      # unrotated, the log grows until the disk is full, which takes SQLite's
+      # write path down with it.
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+    restart: unless-stopped
+
+  # Polls Docker Hub every 5 minutes and redeploys when the tag moves.
+  #
+  # Scoped, so it coexists with any other watchtower on the same host: an
+  # instance started with --scope only touches containers carrying the matching
+  # `watchtower.scope` label, and ignores everything else. An *unscoped*
+  # watchtower elsewhere on the host would still grab these containers, so if
+  # one exists, give it a scope too.
+  watchtower:
+    # Pinned. This container holds the Docker socket read-write, which is
+    # root-equivalent on the host — whatever image it resolves to can start
+    # privileged containers, mount the host filesystem and read the member
+    # database. An implicit `:latest` there would sit oddly beside the supply
+    # chain care in pnpm-workspace.yaml (minimumReleaseAge, blockExoticSubdeps).
+    #
+    # Note it is also the one service --label-enable does not cover, so it never
+    # updates itself. Upstream has had no release since 1.7.1 and is largely
+    # dormant; a maintained fork is worth considering for the thing that
+    # auto-deploys production.
+    #
+    # Digest-pinned, not just tagged: a tag can be re-pushed, and the workflow
+    # next door declines exactly that bet for GitHub Actions. The Dockerfile's
+    # argument for a floating base tag — that pinning would freeze security
+    # patches — does not transfer, since this image is dormant upstream and
+    # never updates itself anyway. Dependabot's docker-compose entry keeps the
+    # digest current.
+    image: containrrr/watchtower:1.7.1@sha256:6dd50763bbd632a83cb154d5451700530d1e44200b268a4e9488fefdfcf2b038
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    labels:
+      # Its own scope label, so a differently-scoped watchtower leaves it alone.
+      - 'com.centurylinklabs.watchtower.scope=sage-burner'
+    command: --label-enable --scope sage-burner --cleanup --interval 300
+    logging:
+      # Same reasoning as the app service: unrotated json-file grows until the
+      # disk does, and this one is on the same host and the same disk. It gets
+      # there far more slowly — a couple of lines per five-minute poll — but
+      # "slowly" on a box meant to run for months is still eventually.
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+    restart: unless-stopped
+
+volumes:
+  sage_burner_data:
