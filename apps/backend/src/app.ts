@@ -1,3 +1,4 @@
+import type { FastifyHelmetOptions } from '@fastify/helmet'
 import type { FastifyInstance } from 'fastify'
 
 import helmet from '@fastify/helmet'
@@ -139,6 +140,13 @@ export const loggerOptions = (level: string) => ({
 /**
  * Security headers, as deviations from `@fastify/helmet`'s defaults.
  *
+ * Annotated rather than inferred. The object is built here and handed to
+ * `register()` as a call result, not as a fresh literal at the call site, so
+ * TypeScript's excess-property check never fires — `xFrameOption` for
+ * `xFrameOptions` compiled clean and silently reverted the header to
+ * SAMEORIGIN. The annotation is what catches the next misspelling; a test only
+ * covers the options something already asserts.
+ *
  * The defaults are close, but four need narrowing: three are looser than this
  * app needs, and `style-src`'s `'unsafe-inline'` is looser than it should be
  * anywhere. Everything not named here is
@@ -151,7 +159,7 @@ export const loggerOptions = (level: string) => ({
  * `X-XSS-Protection: 0`, which disables a legacy auditor that introduced
  * vulnerabilities of its own.
  */
-const helmetOptions = () => ({
+const helmetOptions = (): FastifyHelmetOptions => ({
   contentSecurityPolicy: {
     useDefaults: true,
     directives: {
@@ -176,7 +184,7 @@ const helmetOptions = () => ({
 
   // Overrides helmet's SAMEORIGIN. The belt to frame-ancestors' braces, for
   // browsers predating it.
-  xFrameOptions: { action: 'deny' as const },
+  xFrameOptions: { action: 'deny' },
 })
 
 /**
