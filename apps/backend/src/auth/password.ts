@@ -145,6 +145,20 @@ const DECOY_SALT = Buffer.alloc(SALT_LENGTH, 0x5a)
  *
  * `params` is used only for the decoy — a real hash carries its own. Exposed so
  * tests can burn a cheap hash rather than the production one.
+ *
+ * **The equal-work property is conditional, and the condition is not stated
+ * anywhere else.** The decoy derives at `params`; a real hash derives at
+ * whatever was stored. They match only while every row is at the current
+ * parameters. Raise the cost, and any account still holding the old ones
+ * verifies *faster* than the decoy — so probing that address with a wrong
+ * password is measurably quicker than probing one with no account, and the
+ * oracle reopens pointing the other way.
+ *
+ * That is not a transition window that closes on its own. The opportunistic
+ * upgrade in `routes/auth.ts` only runs after a *successful* login, so an
+ * account whose owner never signs in keeps its old parameters indefinitely.
+ * Raising the cost therefore needs a companion plan for stale rows — at minimum
+ * knowing how many there are — rather than relying on next-login alone.
  */
 export const verifyPassword = async (
   password: string,

@@ -344,6 +344,13 @@ There is **no open sign-up**. Accounts are created only by redeeming an invite
 - `GET /api/auth/me` — `{ viewer }` or `{ viewer: null }`. Always 200: an
   anonymous visitor on the public homepage is the expected case, not an error.
 
+One caveat on the equal-work property above: it holds while every stored hash
+uses the current parameters. Raising them would make an account still on the old
+ones verify _faster_ than the decoy, reopening the oracle in the other
+direction — and since the opportunistic upgrade only runs after a successful
+login, an account whose owner never signs in keeps the old parameters
+indefinitely. Raising the cost wants a plan for stale rows, not just next-login.
+
 **Passwords** are hashed with scrypt from `node:crypto` (N=2^16, r=8, p=2 — one
 of OWASP's listed configurations). #8 asked for argon2 or bcrypt; both are
 native modules, which means a build toolchain in an image whose whole point is
@@ -365,10 +372,13 @@ database row.
 `localhost` only, where browsers treat the origin as trustworthy. On any other
 plain-HTTP origin — a LAN address, an internal hostname — the browser discards
 the cookie silently: login answers 200, the page says you are signed in, and the
-next load says you are not. Put TLS in front, as the Apache section below does. The consequence, stated plainly: **logout clears the cookie
-but does not invalidate the token**, which stays valid until it expires. A
-compromised session can only be revoked by rotating `SESSION_SECRET`, which logs
-everyone out at once.
+next load says you are not. Put TLS in front, as the Apache section below does.
+
+The consequence, stated plainly: **logout clears the cookie but does not
+invalidate the token**, which stays valid until it expires. That follows from
+sessions being signed rather than stored — there is no row to delete — and not
+from anything above. A compromised session can only be revoked by rotating
+`SESSION_SECRET`, which logs everyone out at once.
 
 **Login is not rate-limited yet** ([#57]).
 
