@@ -149,3 +149,80 @@ a:hover {
   background: var(--ember-bright);
   color: var(--paper);
 }
+
+/* Forms --------------------------------------------------------------- */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 26rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.field > span {
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.field input {
+  padding: 0.55rem 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--sage) 40%, transparent);
+  border-radius: var(--radius);
+  background: var(--paper);
+  font: inherit;
+}
+
+.field input:focus-visible {
+  outline: 2px solid var(--ember);
+  outline-offset: 1px;
+}
+
+.form button[type='submit'] {
+  align-self: flex-start;
+  padding: 0.6rem 1.2rem;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--ember);
+  color: var(--paper);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.form button[type='submit']:disabled {
+  background: var(--muted);
+  cursor: progress;
+}
+
+/* Announced by role="alert", so it must not rely on colour alone. */
+.form-error {
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+  border-left: 3px solid var(--ember);
+  background: color-mix(in srgb, var(--ember) 10%, transparent);
+}
+
+.form-note {
+  max-width: 34rem;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+/* A control, not a link — it performs an action rather than navigating —
+   styled to sit with the nav links beside it. */
+.link-button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}

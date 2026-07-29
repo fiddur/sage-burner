@@ -316,6 +316,44 @@ on a connection that is not would simply never come back.
 
 [#10]: https://github.com/fiddur/sage-burner/issues/10
 
+## Accounts and sessions
+
+There is **no open sign-up**. Accounts are created only by redeeming an invite
+([#17]); `/login` says so rather than offering a dead link.
+
+- `POST /api/auth/login` — `{ email, password }`. 200 with `{ viewer }` and a
+  session cookie, or 401 `invalid_credentials`.
+- `POST /api/auth/logout` — clears the cookie.
+- `GET /api/auth/me` — `{ viewer }` or `{ viewer: null }`. Always 200: an
+  anonymous visitor on the public homepage is the expected case, not an error.
+
+**Passwords** are hashed with scrypt from `node:crypto` (N=2^16, r=8, p=2 — one
+of OWASP's listed configurations). #8 asked for argon2 or bcrypt; both are
+native modules, which means a build toolchain in an image whose whole point is
+that there is no build step, and the thing most likely to break a Node upgrade.
+The parameters are stored in each hash, so raising them later re-hashes on next
+login instead of invalidating every account.
+
+Login deliberately spends the same work on an unknown address as on a wrong
+password — measured at 220ms versus 0ms before that was fixed. Differing is an
+account-enumeration oracle, and on a membership app the membership _is_ the
+private part. For the same reason a malformed request body answers 401 rather
+than 400.
+
+**Sessions** are a signed value in an `HttpOnly`, `SameSite=Lax` cookie
+(`Secure` in production only, so plain-HTTP `docker compose up` still works) —
+not a database row. The consequence, stated plainly: **logout clears the cookie
+but does not invalidate the token**, which stays valid until it expires. A
+compromised session can only be revoked by rotating `SESSION_SECRET`, which logs
+everyone out at once.
+
+`SESSION_SECRET` is required in production and the app refuses to start without
+it. Generating one at boot instead would look like it works and log every member
+out on each deploy — with watchtower redeploying on a tag move, every few
+minutes after a merge.
+
+[#17]: https://github.com/fiddur/sage-burner/issues/17
+
 ## Security headers
 
 Every routed response carries a `Content-Security-Policy`,

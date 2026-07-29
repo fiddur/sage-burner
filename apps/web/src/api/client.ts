@@ -1,4 +1,4 @@
-import type { VersionResponse } from '@sage-burner/shared'
+import type { LoginRequest, MeResponse, VersionResponse } from '@sage-burner/shared'
 
 /**
  * The API client.
@@ -114,6 +114,14 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
   return {
     request,
     getVersion: () => request<VersionResponse>('/version'),
+
+    /** 200 with `{ viewer: null }` when signed out — not an error. */
+    getMe: (signal?: AbortSignal) => request<MeResponse>('/auth/me', { signal }),
+
+    /** Throws ApiError(401, 'invalid_credentials') on a bad email or password alike. */
+    login: (body: LoginRequest) => request<MeResponse>('/auth/login', { method: 'POST', body }),
+
+    logout: () => request<MeResponse>('/auth/logout', { method: 'POST' }),
   }
 }
 

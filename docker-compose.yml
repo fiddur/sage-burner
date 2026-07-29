@@ -47,6 +47,10 @@ services:
       # which is what decides the session cookie's Secure flag.
       - TRUST_PROXY=${TRUST_PROXY:-false}
       - LOG_LEVEL=${LOG_LEVEL:-info}
+      # No default: the app refuses to start in production without it, which is
+      # the intended failure. A default here would defeat that check.
+      - SESSION_SECRET=${SESSION_SECRET}
+      - SESSION_TTL_SECONDS=${SESSION_TTL_SECONDS:-1209600}
     volumes:
       # The database. A named volume rather than a bind mount so `docker
       # compose down` cannot take the members with it.

@@ -11,7 +11,9 @@ import path from 'node:path'
 import type { Config } from './config.ts'
 import type { Database } from './db/index.ts'
 
+import { createSessions } from './auth/session.ts'
 import { clientErrorHandler, frameworkErrorHandler, registerErrorHandler } from './errors.ts'
+import { registerAuthRoutes } from './routes/auth.ts'
 import { registerVersionRoutes } from './routes/version.ts'
 
 export interface AppDeps {
@@ -188,6 +190,18 @@ const helmetOptions = (): FastifyHelmetOptions => ({
 })
 
 /**
+ * Session signing, from config.
+ *
+ * The clock is `() => new Date()` here and injected in tests, which is the only
+ * way to assert expiry without a suite that waits two weeks.
+ */
+const sessionDeps = (config: Config) => ({
+  secret: config.session_secret,
+  now: () => new Date(),
+  ttlSeconds: config.session_ttl_seconds,
+})
+
+/**
  * Build the application.
  *
  * Takes its dependencies as arguments rather than constructing them, so tests
@@ -225,6 +239,7 @@ export const createApp = async ({ db, config }: AppDeps): Promise<FastifyInstanc
 
   registerErrorHandler(app)
   registerVersionRoutes(app, { config })
+  registerAuthRoutes(app, { db, config, sessions: createSessions(sessionDeps(config)) })
 
   const webRoot = config.web_root
   const servesWebApp = webRoot !== undefined

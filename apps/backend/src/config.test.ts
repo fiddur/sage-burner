@@ -23,6 +23,8 @@ describe('createConfig', () => {
       LOG_LEVEL: 'warn',
       BUILD_SHA: 'abc123',
       WEB_ROOT: '/usr/share/web',
+      SESSION_SECRET: 'x'.repeat(40),
+      SESSION_TTL_SECONDS: '3600',
     })
 
     expect(config).toEqual({
@@ -34,6 +36,44 @@ describe('createConfig', () => {
       build_sha: 'abc123',
       web_root: '/usr/share/web',
       trust_proxy: false,
+      session_secret: 'x'.repeat(40),
+      session_ttl_seconds: 3600,
+    })
+  })
+
+  describe('SESSION_SECRET', () => {
+    it('refuses to build a production config without one', () => {
+      // A random default generated at boot would look like it works and log
+      // every member out on each deploy — which, with watchtower redeploying on
+      // a tag move, is every few minutes after a merge.
+      expect(() => createConfig({ NODE_ENV: 'production' })).toThrow(/SESSION_SECRET/)
+    })
+
+    it('refuses a blank one in production, which is what .env.example ships', () => {
+      // `.env.example` has `SESSION_SECRET=` with no value, so a copied file
+      // sends an empty string rather than nothing at all. That must be the same
+      // refusal, or the documented first step produces a running app with a
+      // development key.
+      for (const value of ['', '   ']) {
+        expect(() => createConfig({ NODE_ENV: 'production', SESSION_SECRET: value }), value).toThrow(
+          /SESSION_SECRET/,
+        )
+      }
+    })
+
+    it('runs without one outside production', () => {
+      expect(createConfig({}).session_secret.length).toBeGreaterThanOrEqual(32)
+    })
+
+    it('rejects one too short to sign with, in any environment', () => {
+      // The schema bound, not the production guard: a 12-character secret set
+      // in development would otherwise be accepted here and rejected by
+      // createSessions at request time.
+      expect(() => createConfig({ SESSION_SECRET: 'too-short' })).toThrow(/SESSION_SECRET/)
+    })
+
+    it('defaults the session lifetime to two weeks', () => {
+      expect(createConfig({}).session_ttl_seconds).toBe(60 * 60 * 24 * 14)
     })
   })
 
