@@ -318,14 +318,53 @@ ProxyPass        / http://127.0.0.1:8081/
 ProxyPassReverse / http://127.0.0.1:8081/
 ```
 
+**Add throttling here too.** The app deliberately does not rate-limit login
+(see [Accounts and sessions](#accounts-and-sessions)), so this vhost is the only
+thing between an attacker and roughly 8–9 password guesses a second against one
+address. Nothing else will stop it.
+
+fail2ban suits slow grinding better than a burst limiter, since the app answers
+every failure with a plain `401`:
+
+```
+# /etc/fail2ban/filter.d/sage-burner-login.conf
+[Definition]
+failregex = ^<HOST> .* "POST /api/auth/login HTTP/[^"]*" 401
+ignoreregex =
+```
+
+```ini
+# /etc/fail2ban/jail.d/sage-burner.conf
+[sage-burner-login]
+enabled  = true
+port     = http,https
+filter   = sage-burner-login
+logpath  = /var/log/apache2/sage-access.log   # must match this vhost's CustomLog
+maxretry = 10
+findtime = 10m
+bantime  = 1h
+```
+
+Ten attempts in ten minutes is generous for a membership of 42 and leaves an
+attacker nowhere to go. `mod_qos` or `mod_evasive` can cap bursts as well, but
+they measure over seconds and a patient attacker simply goes slower.
+
+Untested on your host — the log path in particular has to match whatever
+`CustomLog` this vhost sets. Check `fail2ban-regex` against a real log line
+before trusting it.
+
 Note there are no `Header set` lines for CSP, HSTS or the rest: the app sends
 those itself. Do not add them here — `Header set` _replaces_ what the backend
 sent, so a policy written here shadows the app's rather than adding to it, and a
 weaker one silently wins. See [Security headers](#security-headers).
 
 `X-Forwarded-Proto` is not cosmetic: Apache terminates TLS, so without it the
-app believes it is serving plain HTTP — which decides whether the session cookie
-gets its `Secure` flag.
+app believes it is serving plain HTTP, and `request.protocol` is wrong for every
+request — which matters for logging, for redirects, and for anything later that
+keys on the scheme.
+
+It does _not_ decide the session cookie's `Secure` flag; that keys off
+`NODE_ENV`, which the image sets. See [Accounts and sessions](#accounts-and-sessions).
 
 Set it in the `:443` vhost, not in an include shared with a `:80` one. Hardcoded
 to `https` it would lie about a plain-HTTP request, and a cookie marked `Secure`
@@ -471,8 +510,6 @@ it: the table's `UNIQUE` is byte-exact, so `You@Example.org` and
 
 Nothing guards the `admin` role yet, so it grants nothing until [#10] lands. It
 is set now so the account is already right when it does.
-
-[#10]: https://github.com/fiddur/sage-burner/issues/10
 
 ## Security headers
 

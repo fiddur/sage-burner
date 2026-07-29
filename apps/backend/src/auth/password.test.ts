@@ -3,8 +3,12 @@ import { describe, expect, it } from 'vitest'
 import { hashPassword, needsRehash, verifyPassword } from './password.ts'
 
 /**
- * Hashing is slow on purpose, so these use the lowest cost the module allows
- * rather than the production one. `scryptParams` is exported for exactly that.
+ * Hashing is slow on purpose, so these run at a cost far below the production
+ * one — a suite hashing at ~230ms a time would be a suite nobody runs.
+ *
+ * A local literal rather than the module's `defaultScryptParams`: passing the
+ * cost in explicitly is what lets a test assert behaviour *across* parameter
+ * sets, which is most of what `needsRehash` is for.
  */
 const fast = { cost: 2 ** 12, blockSize: 8, parallelism: 1 }
 
