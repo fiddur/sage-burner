@@ -141,24 +141,38 @@ The gate is not optional. "Merge on approval" removes the human confirmation
 step, not the review — never merge an unapproved PR, and never merge with open
 threads or red CI.
 
-**Half of it is enforced.** The `CI and PR` ruleset is active on `develop` and
-requires the `CI Gate` check, strictly — so the branch must also be up to date
-with `develop` before it can merge. Force-pushing and deleting the branch are
-blocked outright.
+**Most of it is enforced now.** The `CI and PR` ruleset targets the repository's
+default branch — which is `develop` — and enforces, with no bypass actors:
 
-The other half is still discipline:
+- a pull request, merge-commit only (so step 10's `--merge` is the only method
+  the platform will accept),
+- the `CI Gate` check, strictly, so the branch must also be up to date with
+  `develop`,
+- resolution of every review thread,
+- no force-push, no branch deletion.
+
+Three gaps remain, and they are the ones worth knowing:
 
 - **`build` is not a required check.** `CI Gate` runs the tests; `build` is what
   proves the image actually starts. Only the first is enforced, so step 10's
   "check the whole rollup" still matters — a green `CI Gate` next to a red
   `build` would merge.
-- **No review is required.** GitHub cannot enforce the `✅Approved` gate on a
-  single-user repository, so nothing stops an unreviewed merge but this
-  document.
-- **Unresolved threads do not block.** Thread resolution is not in the ruleset.
+- **No approval is required** (`required_approving_review_count: 0`). GitHub will
+  not let an author approve their own pull request, and every commit and review
+  here is authored by the same account, so an approval requirement would deadlock
+  rather than protect. The `✅Approved` gate is therefore discipline, and this
+  document is the only thing enforcing it. The review agent's verdicts are
+  `COMMENTED`, not `APPROVED`, so they would not satisfy the setting even if it
+  could be turned on.
+- **`main` is unprotected.** The ruleset binds to `~DEFAULT_BRANCH`, so
+  `GET /repos/fiddur/sage-burner/rules/branches/main` returns nothing: no
+  required check, and force-push and deletion both allowed. The Deployment
+  section below promotes `main` to `:latest`, which makes the release branch the
+  unguarded one. The binding is also dynamic — changing the default branch would
+  silently move all of this off `develop`.
 
-So a green `CI Gate` means the tests passed. It does not mean the gate above was
-satisfied.
+So a green `CI Gate` means the tests passed and the threads are closed. It does
+not mean the image builds, and it does not mean anything reviewed the change.
 
 ## Deployment
 
