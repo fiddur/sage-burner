@@ -176,8 +176,12 @@ trust it:
 gh api repos/:owner/:repo/rules/branches/develop --jq '.[] | "\(.type): \(.parameters // {} | tojson)"'
 ```
 
-(Note that `// empty` in a jq object value deletes the whole object, so a query
-written that way silently drops every rule without the field you asked for.)
+(Beware `// empty` as a jq fallback: `empty` produces _no_ outputs, so any
+expression needing a value from it yields nothing and the whole surrounding
+output disappears — silently, and still exiting 0. Substituting
+`.parameters.required_status_checks // empty` into the interpolation above drops
+every rule that lacks the field, which reads as a ruleset that does not have
+them.)
 
 ## Deployment
 
