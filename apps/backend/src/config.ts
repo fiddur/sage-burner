@@ -91,9 +91,9 @@ export const envSchema = z.object({
    *
    * Optional here and required in production by the explicit check in
    * `createConfig` — not a Zod refinement, which could not tell the two
-   * environments apart from inside this schema. A
-   * development run should not need a secret to start, and a production one
-   * must not start without it. Generating a random default at boot instead
+   * environments apart from inside this schema. A development run should not
+   * need a secret to start, and a production one must not start without it.
+   * Generating a random default at boot instead
    * would look like it works and silently log every member out on each deploy —
    * which, with watchtower redeploying on a tag move, is every few minutes
    * after a merge.
@@ -161,9 +161,9 @@ export const createConfig = (env: NodeJS.ProcessEnv = process.env): Config => {
   // guessable — but that is incidental rather than designed, and it weakens the
   // moment a route returns another member's id, which the admin list will. Do
   // not read it as a second layer.
-  // The
-  // fixed value is the same for every dev run so a restart does not invalidate
-  // the session you were testing with.
+  //
+  // The fixed value is the same for every dev run, so a restart does not
+  // invalidate the session you were testing with.
   const session_secret = value.SESSION_SECRET ?? 'development-only-session-secret-not-for-production'
 
   if (value.NODE_ENV === 'production' && value.SESSION_SECRET === undefined) {

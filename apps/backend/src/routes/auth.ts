@@ -55,11 +55,11 @@ const cookieHeader = (token: string, config: Config, maxAgeSeconds: number): str
  * One header, one name, and the token alphabet is base64url plus a dot — so
  * `decodeURIComponent` is not needed and a full parser buys nothing.
  *
- * It takes the *first* match, and duplicates are possible: RFC 6265 orders
- * cookies by descending path specificity, so one injected with `Path=/api`
- * shadows the real `Path=/` one. That needs an attacker who can already set
- * cookies for the domain — a sibling-subdomain XSS, or a plain-HTTP MITM
- * before HSTS is pinned.
+ * Duplicates are possible: RFC 6265 orders cookies by descending path
+ * specificity, so one injected with `Path=/api` arrives ahead of the real
+ * `Path=/` one. That needs an attacker who can already set cookies for the
+ * domain — a sibling-subdomain XSS, or a plain-HTTP MITM before HSTS is
+ * pinned.
  *
  * They cannot *forge* a token; the signature still has to check out. But they
  * do not need to: they can log in as themselves and plant **their own valid**
