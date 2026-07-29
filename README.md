@@ -372,23 +372,28 @@ everyone out at once.
 
 **Login is not rate-limited yet** ([#57]).
 
-At most two password verifications run at once; a third is refused with `429`
-rather than queued, because queueing is what lets one client occupy the
-threadpool. That bounds the damage to login itself: two sustained anonymous
-requests will hold the cap and make every member's login answer `429` for as
-long as they keep them open. Denying login is a much smaller thing than stalling
-the whole process, but it is not nothing.
+There is a bound on concurrent _work_, which is a different thing. At most two
+password verifications run at once, and up to eight further callers wait in a
+FIFO queue; only an eleventh concurrent caller, or one still waiting after five
+seconds, gets a `429` with `Retry-After`.
 
-[#57] only removes that cliff if it bounds _per IP_, or queues with a short
-timeout — a limiter keyed on the email address alone would never fire against
-an attacker cycling addresses, and this cap would still refuse everyone.
-Every attempt costs ~230ms of CPU and
-64 MiB, including one for an address with no account, and `scrypt` runs on
-libuv's threadpool — four slots by default, shared with static file reads — so
-sustained login traffic degrades the whole app, not just that route. It is also
-the only bound on password guessing, since there is no lockout. Nothing can be
-guessed at today, because accounts exist only by direct database insert; this
-must land before [#17] turns on invite redemption.
+Queued rather than refused, deliberately. A hard cap would mean two sustained
+anonymous requests denied every member's login for as long as they held them,
+with nothing to wait out. Taking turns means a member arriving mid-flood is
+served, and a client holding connections open competes for places rather than
+owning them.
+
+Why any of this is needed: every attempt costs ~230ms of CPU and 64 MiB —
+including one for an address with no account, since the decoy derivation
+deliberately spends the same work — and `scrypt` runs on libuv's threadpool,
+four slots by default, shared with the reads that serve static files. Without a
+bound, sustained login traffic would degrade the whole app rather than just that
+route.
+
+What is still missing is the bound on _attempts_. There is no lockout and no
+backoff, so nothing slows an attacker working through passwords for one address.
+Nothing can be guessed at today — accounts exist only by direct database insert
+— but [#57] must land before [#17] turns on invite redemption.
 
 `SESSION_SECRET` is required in production and the app refuses to start without
 it. Generating one at boot instead would look like it works and log every member
@@ -494,10 +499,15 @@ branches on. The message a member reads is the frontend's to choose, because
 only the frontend knows what the member was trying to do. The real error goes to
 the server log, where a SQL fragment or a file path is useful rather than public.
 
-The vocabulary today is `bad_request`, `not_found` and `internal_error`, defined
-in [`packages/shared`](./packages/shared/src/schemas/error.ts). It grows with the
-routes that emit it — authentication codes arrive with accounts ([#8]), rather
-than being listed in advance and left unreachable.
+The vocabulary today is `bad_request`, `not_found`, `internal_error`,
+`invalid_credentials` and `rate_limited`, defined in
+[`packages/shared`](./packages/shared/src/schemas/error.ts). It grows with the
+routes that emit it, rather than being listed in advance and left unreachable —
+`unauthenticated` and `forbidden` are deliberately absent until the role guards
+emit them.
+
+`invalid_credentials` covers a wrong password and an unknown address alike:
+telling those apart is an account-enumeration oracle.
 
 Clients should tolerate a slug they do not recognise: the schema accepts any
 string so an older frontend can still read a newer API's error instead of
