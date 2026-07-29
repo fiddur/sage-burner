@@ -38,15 +38,27 @@ export interface GateOptions {
   setTimer?: (fn: () => void, ms: number) => { clear: () => void }
 }
 
+/**
+ * Why a caller did not get in.
+ *
+ * Distinguished because the two want different advice. `queue-full` means the
+ * work in flight should clear shortly. `timed-out` means the caller already
+ * waited the full timeout and the gate was saturated throughout — telling them
+ * to come straight back sends a well-behaved client honouring `Retry-After`
+ * into a hot loop against exactly the flood this exists to damp.
+ */
+export type Refusal = 'queue-full' | 'timed-out'
+
+export type Admission = { ok: true; release: () => void } | { ok: false; reason: Refusal }
+
 export interface Gate {
   /**
    * Take a slot, waiting if necessary.
    *
-   * Resolves to a release function, or `undefined` if the queue was full or the
-   * wait timed out. The caller **must** call the release function — do it in a
-   * `finally`, since a leaked slot wedges the gate until the process restarts.
+   * On success the caller **must** call `release` — do it in a `finally`, since
+   * a leaked slot wedges the gate until the process restarts.
    */
-  enter: () => Promise<(() => void) | undefined>
+  enter: () => Promise<Admission>
   /** For assertions and logging. */
   stats: () => { active: number; waiting: number }
 }
@@ -91,18 +103,18 @@ export const createGate = ({ slots, queue, timeoutMs, setTimer = realTimer }: Ga
     enter: async () => {
       if (active < slots) {
         active += 1
-        return releaseOnce()
+        return { ok: true, release: releaseOnce() }
       }
 
-      if (waiting.length >= queue) return undefined
+      if (waiting.length >= queue) return { ok: false, reason: 'queue-full' }
 
-      return new Promise<(() => void) | undefined>((resolve) => {
+      return new Promise<Admission>((resolve) => {
         const entry = {
-          admit: () => resolve(releaseOnce()),
+          admit: () => resolve({ ok: true, release: releaseOnce() }),
           timer: setTimer(() => {
             const index = waiting.indexOf(entry)
             if (index !== -1) waiting.splice(index, 1)
-            resolve(undefined)
+            resolve({ ok: false, reason: 'timed-out' })
           }, timeoutMs),
         }
 

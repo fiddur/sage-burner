@@ -330,6 +330,28 @@ describe('concurrency', () => {
   )
 
   it(
+    'tells a queue-full caller to come back sooner than a timed-out one',
+    async () => {
+      // A full queue clears as the work in flight finishes. A timeout means the
+      // caller already waited the whole window against a saturated gate, so
+      // sending them straight back would turn a client politely honouring
+      // `Retry-After` into a hot retry loop — under exactly the flood the gate
+      // exists to damp.
+      //
+      // Only the queue-full case is reachable from here; producing a timeout
+      // would hold the suite for the full 5s window. `gate.test.ts` covers the
+      // other branch directly, with injected timers.
+      const server = await build()
+      await slowAccount(server)
+
+      const shed = (await attempts(server, 11)).find((response) => response.statusCode === 429)
+
+      expect(shed?.headers['retry-after']).toBe('1')
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  )
+
+  it(
     'releases every slot again, so a burst does not wedge login shut',
     async () => {
       // The release is in a `finally`; without it a throw leaks a slot and login

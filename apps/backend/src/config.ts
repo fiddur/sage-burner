@@ -148,8 +148,20 @@ export const createConfig = (env: NodeJS.ProcessEnv = process.env): Config => {
     throw new Error(`Invalid environment configuration:\n  TRUST_PROXY: ${detail}`)
   }
 
-  // Absent outside production is a development convenience, not a fallback that
-  // reaches a deployment: the check immediately below rejects it there. The
+  // Absent outside production is a development convenience. The check below
+  // rejects it in production — but note what that check is shaped like: it asks
+  // `NODE_ENV === 'production'`, not "is this reachable by anyone". Any run that
+  // is not that — bare-metal `node`, a systemd unit, a compose file overriding
+  // NODE_ENV — signs sessions with the key three lines down, which is committed
+  // to a public repository, and serves the cookie without `Secure` at the same
+  // time. The image sets NODE_ENV=production, so the documented path is covered;
+  // this is about the undocumented ones.
+  //
+  // Forging a token also needs the target's `account.id`, a v4 UUID that is not
+  // guessable — but that is incidental rather than designed, and it weakens the
+  // moment a route returns another member's id, which the admin list will. Do
+  // not read it as a second layer.
+  // The
   // fixed value is the same for every dev run so a restart does not invalidate
   // the session you were testing with.
   const session_secret = value.SESSION_SECRET ?? 'development-only-session-secret-not-for-production'

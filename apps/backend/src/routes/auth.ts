@@ -249,20 +249,27 @@ export const registerAuthRoutes = (app: FastifyInstance, { db, config, sessions 
 
     // Taken before any work, so the bound cannot depend on what the database
     // driver does between a check and a claim.
-    const release = await gate.enter()
+    const admission = await gate.enter()
 
-    if (release === undefined) {
-      // The queue was full or the wait ran out. Only now is a 429 the honest
-      // answer — the caller has already waited their turn.
-      void reply.header('retry-after', '1')
-      request.log.warn(gate.stats(), 'login shed')
+    if (!admission.ok) {
+      // Only now is a 429 the honest answer — the caller has already waited
+      // their turn.
+      //
+      // The advice differs by reason. A full queue clears as the work in
+      // flight finishes, so a second is about right. A timeout means the
+      // caller already waited the full window against a gate that stayed
+      // saturated, and sending them straight back would turn a client politely
+      // honouring `Retry-After` into a hot retry loop — adding connection churn
+      // under exactly the flood this exists to damp.
+      void reply.header('retry-after', admission.reason === 'timed-out' ? '5' : '1')
+      request.log.warn({ ...gate.stats(), reason: admission.reason }, 'login shed')
       return reply.code(429).send(errorResponse('rate_limited'))
     }
 
     try {
       return await handleLogin(request, reply)
     } finally {
-      release()
+      admission.release()
     }
   })
 

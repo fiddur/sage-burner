@@ -34,8 +34,8 @@ describe('createGate', () => {
   it('admits up to the slot count immediately', async () => {
     const gate = gateWith()
 
-    expect(await gate.enter()).toBeTypeOf('function')
-    expect(await gate.enter()).toBeTypeOf('function')
+    expect((await gate.enter()).ok).toBe(true)
+    expect((await gate.enter()).ok).toBe(true)
     expect(gate.stats()).toEqual({ active: 2, waiting: 0 })
   })
 
@@ -49,8 +49,8 @@ describe('createGate', () => {
     const queued = gate.enter()
     expect(gate.stats()).toEqual({ active: 2, waiting: 1 })
 
-    first?.()
-    expect(await queued).toBeTypeOf('function')
+    if (first.ok) first.release()
+    expect((await queued).ok).toBe(true)
   })
 
   it('serves waiters first in, first out', async () => {
@@ -64,7 +64,7 @@ describe('createGate', () => {
     const a = gate.enter().then(() => order.push('a'))
     void gate.enter().then(() => order.push('b'))
 
-    held?.()
+    if (held.ok) held.release()
     await a
     expect(order).toEqual(['a'])
 
@@ -81,7 +81,9 @@ describe('createGate', () => {
     void gate.enter()
 
     expect(gate.stats()).toEqual({ active: 1, waiting: 2 })
-    expect(await gate.enter()).toBeUndefined()
+    // Named, not merely refused: a full queue clears shortly, so the caller is
+    // told to come back in a second rather than after the full window.
+    expect(await gate.enter()).toEqual({ ok: false, reason: 'queue-full' })
   })
 
   it('gives up on a caller that has waited too long', async () => {
@@ -92,7 +94,10 @@ describe('createGate', () => {
     const queued = gate.enter()
     timers.expireAll()
 
-    expect(await queued).toBeUndefined()
+    // Distinguished from queue-full: this caller already waited the whole
+    // window against a saturated gate, so sending them straight back would be
+    // a hot retry loop under exactly the flood the gate damps.
+    expect(await queued).toEqual({ ok: false, reason: 'timed-out' })
     expect(gate.stats().waiting).toBe(0)
   })
 
@@ -105,19 +110,20 @@ describe('createGate', () => {
 
     const abandoned = gate.enter()
     timers.expireAll()
-    expect(await abandoned).toBeUndefined()
+    expect((await abandoned).ok).toBe(false)
 
-    held?.()
+    if (held.ok) held.release()
     expect(gate.stats()).toEqual({ active: 0, waiting: 0 })
-    expect(await gate.enter()).toBeTypeOf('function')
+    expect((await gate.enter()).ok).toBe(true)
   })
 
   it('ignores a double release, which would otherwise raise the real limit', async () => {
     const gate = gateWith({ slots: 1 })
-    const release = await gate.enter()
+    const admission = await gate.enter()
+    if (!admission.ok) throw new Error('expected admission')
 
-    release?.()
-    release?.()
+    admission.release()
+    admission.release()
 
     expect(gate.stats().active).toBe(0)
   })
@@ -125,10 +131,10 @@ describe('createGate', () => {
   it('frees every slot again after a burst, so the gate cannot wedge shut', async () => {
     const gate = gateWith({ slots: 2, queue: 8 })
 
-    const releases = await Promise.all([gate.enter(), gate.enter()])
+    const admitted = await Promise.all([gate.enter(), gate.enter()])
     const queued = [gate.enter(), gate.enter()]
-    for (const release of releases) release?.()
-    for (const release of await Promise.all(queued)) release?.()
+    for (const entry of admitted) if (entry.ok) entry.release()
+    for (const entry of await Promise.all(queued)) if (entry.ok) entry.release()
 
     expect(gate.stats()).toEqual({ active: 0, waiting: 0 })
   })
