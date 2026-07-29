@@ -141,12 +141,24 @@ The gate is not optional. "Merge on approval" removes the human confirmation
 step, not the review — never merge an unapproved PR, and never merge with open
 threads or red CI.
 
-**Nothing enforces it yet.** `develop` has no branch protection and the repo has
-no rulesets, so `CI Gate` is not a required status check and an unresolved
-thread does not block anything — GitHub would happily merge a red PR. The gate
-above is a discipline, not a mechanism, until those are configured in repository
-settings. Do not read the checks going green as the platform having stopped
-anything.
+**Half of it is enforced.** The `CI and PR` ruleset is active on `develop` and
+requires the `CI Gate` check, strictly — so the branch must also be up to date
+with `develop` before it can merge. Force-pushing and deleting the branch are
+blocked outright.
+
+The other half is still discipline:
+
+- **`build` is not a required check.** `CI Gate` runs the tests; `build` is what
+  proves the image actually starts. Only the first is enforced, so step 10's
+  "check the whole rollup" still matters — a green `CI Gate` next to a red
+  `build` would merge.
+- **No review is required.** GitHub cannot enforce the `✅Approved` gate on a
+  single-user repository, so nothing stops an unreviewed merge but this
+  document.
+- **Unresolved threads do not block.** Thread resolution is not in the ruleset.
+
+So a green `CI Gate` means the tests passed. It does not mean the gate above was
+satisfied.
 
 ## Deployment
 
