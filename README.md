@@ -304,6 +304,62 @@ on a connection that is not would simply never come back.
 
 [#10]: https://github.com/fiddur/sage-burner/issues/10
 
+## API errors
+
+Every error response the app produces has the same body, and nothing else:
+
+```json
+{ "error": "not_found" }
+```
+
+`error` is a machine-readable slug, never a sentence — it is the thing a client
+branches on. The message a member reads is the frontend's to choose, because
+only the frontend knows what the member was trying to do. The real error goes to
+the server log, where a SQL fragment or a file path is useful rather than public.
+
+The vocabulary today is `bad_request`, `not_found` and `internal_error`, defined
+in [`packages/shared`](./packages/shared/src/schemas/error.ts). It grows with the
+routes that emit it — authentication codes arrive with accounts ([#8]), rather
+than being listed in advance and left unreachable.
+
+Clients should tolerate a slug they do not recognise: the schema accepts any
+string so an older frontend can still read a newer API's error instead of
+failing to parse the explanation of what went wrong.
+
+"Error response" rather than "non-2xx": a conditional request for an asset
+answers `304` with no body at all, which is a cache hit rather than a failure.
+
+One thing a route can do to break this promise, since the failure is silent in
+both directions — no test fails, and the response is a valid-looking `{}` that
+the client reads as an unknown code. A route that declares
+`schema.response` **for an error status** runs the envelope through that
+serializer, and anything the schema does not declare is stripped:
+
+```ts
+// Strips the envelope: answers 400 {}
+schema: { response: { 400: { type: 'object', properties: { detail: … } } } }
+
+// Keeps it
+schema: { response: { 400: z.toJSONSchema(errorResponseSchema) } }
+```
+
+Declaring only a success shape is safe — a `200` schema does not touch the
+error path, which is the case a route is actually likely to have.
+
+Three separate Fastify options are needed to make that hold, because a request
+can fail before it reaches a route: `setErrorHandler` for anything thrown,
+`frameworkErrors` for a URL the router rejects, and `clientErrorHandler` for a
+request Node's HTTP parser rejects — an oversized header block, a client
+timeout. Each default writes a sentence into `error` instead of a slug.
+
+"The app produces" is the limit of the promise. A reverse proxy in front can
+answer with its own error page — an Apache 502 while the container is
+restarting, for instance — and that will not be JSON at all. The web client
+handles this: a non-JSON error body yields `code: 'unknown'` rather than a
+parse error that hides the real status.
+
+[#8]: https://github.com/fiddur/sage-burner/issues/8
+
 ## Repository layout
 
 ```

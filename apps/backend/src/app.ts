@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 
 import fastifyStatic from '@fastify/static'
+import { errorResponse } from '@sage-burner/shared'
 import Fastify from 'fastify'
 import { existsSync, statSync } from 'node:fs'
 import path from 'node:path'
@@ -8,6 +9,7 @@ import path from 'node:path'
 import type { Config } from './config.ts'
 import type { Database } from './db/index.ts'
 
+import { clientErrorHandler, frameworkErrorHandler, registerErrorHandler } from './errors.ts'
 import { registerVersionRoutes } from './routes/version.ts'
 
 export interface AppDeps {
@@ -87,6 +89,53 @@ const assertServableWebRoot = (root: string): void => {
 }
 
 /**
+ * Logger configuration.
+ *
+ * Exported so the redaction can be tested against a captured stream rather than
+ * against a copy of it — `err.headers` is a real control, its failure mode is
+ * silence, and asserting a duplicated list would prove only that a string can
+ * be copied.
+ *
+ * Pretty output would need a dev-only dependency; JSON lines are what a
+ * container's log driver wants anyway.
+ */
+export const loggerOptions = (level: string) => ({
+  level,
+  redact: {
+    // These never belong in a log line, and the whole point of the app is that
+    // it holds them.
+    //
+    // `err.headers` goes wholesale rather than by name. `sendEnvelope`
+    // deliberately supports errors that carry headers — a 401 challenge, a rate
+    // limiter's Retry-After, a session-clearing set-cookie — and pino's error
+    // serializer copies an error's own enumerable properties into the log
+    // verbatim, so the supported shape is also the one that would write a live
+    // session value to disk.
+    //
+    // Naming them (`err.headers["set-cookie"]`) does not work: pino matches
+    // paths literally, and unlike `req.headers`, which Node lowercases, these
+    // keys are whatever the throwing code wrote. `Set-Cookie` is the
+    // conventional spelling and would sail straight past. Removing the object
+    // is the only form that cannot be defeated by casing. `sendEnvelope` logs
+    // the header *names* separately, which is the part worth reading.
+    //
+    // Of the four, only `err.headers` matches anything today, and it is the
+    // only one with a test. Fastify's default serializers in
+    // `lib/logger-pino.js` emit `{ method, url, version, host, remoteAddress,
+    // remotePort }` for `req` and `{ statusCode }` for `res` — neither carries
+    // a `headers` key at all, so the other three can never fire.
+    //
+    // They stay for the same reason the encodings are in `describesTheBody`:
+    // they cost nothing, and the day someone passes a custom serializer is not
+    // the day to be discovering it. But they are a hedge, not a control — a
+    // typo in one of those three is *permanently* invisible, because nothing
+    // will ever reach it.
+    paths: ['req.headers.cookie', 'req.headers.authorization', 'res.headers["set-cookie"]', 'err.headers'],
+    remove: true,
+  },
+})
+
+/**
  * Build the application.
  *
  * Takes its dependencies as arguments rather than constructing them, so tests
@@ -95,28 +144,28 @@ const assertServableWebRoot = (root: string): void => {
  */
 export const createApp = async ({ db, config }: AppDeps): Promise<FastifyInstance> => {
   const app = Fastify({
-    logger: {
-      level: config.log_level,
-      // Pretty output would need a dev-only dependency; JSON lines are what a
-      // container's log driver wants anyway.
-      redact: {
-        // These never belong in a log line, and the whole point of the app is
-        // that it holds them.
-        paths: ['req.headers.cookie', 'req.headers.authorization', 'res.headers["set-cookie"]'],
-        remove: true,
-      },
-    },
+    logger: loggerOptions(config.log_level),
     // Defaults to trusting nothing. `true` would believe the whole
     // X-Forwarded-For chain from whoever connects, making request.ip
     // client-controlled — which matters as soon as a rate limiter on invite
     // redemption or an admin audit trail keys on it. The operator declares
     // what is actually in front via TRUST_PROXY.
     trustProxy: config.trust_proxy,
+    // The other half of the error envelope. `setErrorHandler` covers anything
+    // thrown once a request reaches routing; this covers what find-my-way
+    // rejects before that — a bad percent escape, an over-long path parameter —
+    // which otherwise goes straight to the socket as Fastify's prose.
+    frameworkErrors: frameworkErrorHandler,
+    // And the third: a request Node's HTTP parser rejects before Fastify sees
+    // one at all — an oversized header block, a client timeout. No reply object
+    // exists, so this writes the envelope to the socket itself.
+    clientErrorHandler,
   })
 
   app.decorate('db', db)
   app.decorate('config', config)
 
+  registerErrorHandler(app)
   registerVersionRoutes(app, { config })
 
   const webRoot = config.web_root
@@ -159,7 +208,7 @@ export const createApp = async ({ db, config }: AppDeps): Promise<FastifyInstanc
   // container (WEB_ROOT set). Frontend error handling written against one
   // would otherwise meet the other in the environment it was not tested in.
   app.setNotFoundHandler((request, reply) => {
-    const notFound = () => reply.code(404).send({ error: 'not_found' })
+    const notFound = () => reply.code(404).send(errorResponse('not_found'))
     const pathname = pathnameOf(request.url)
 
     // An unmatched API path is a real 404 — never the SPA shell. Serving HTML
