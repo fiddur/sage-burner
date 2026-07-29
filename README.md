@@ -160,8 +160,21 @@ in [`AGENTS.md`](./AGENTS.md) for what a green rollup does and does not mean.
 
 ```sh
 cp .env.example .env
+sed -i "s|^SESSION_SECRET=$|SESSION_SECRET=$(openssl rand -base64 48)|" .env
 docker compose up -d
 ```
+
+The second line is not optional. `.env.example` ships `SESSION_SECRET=` with no
+value, the image sets `NODE_ENV=production`, and the app refuses to start
+without a secret — so `cp` followed straight by `up` crash-loops with
+`Invalid environment configuration: SESSION_SECRET`. That refusal is deliberate
+(see [Accounts and sessions](#accounts-and-sessions)); this is the step that
+satisfies it. Editing that line by hand does the same job.
+
+It fills the blank assignment rather than appending a second one. Compose's
+dotenv takes the last occurrence, so appending would also work — but the file
+would then read top-down as though no secret were set, which is the same trap
+`.env.example` warns about for `TRUST_PROXY`.
 
 For the Apache deployment below, change `TRUST_PROXY` to `1` in that `.env` —
 without it `request.ip` is the Docker bridge for every request. It ships as
@@ -347,12 +360,21 @@ but does not invalidate the token**, which stays valid until it expires. A
 compromised session can only be revoked by rotating `SESSION_SECRET`, which logs
 everyone out at once.
 
+**Login is not rate-limited yet** ([#57]). Every attempt costs ~230ms of CPU and
+64 MiB, including one for an address with no account, and `scrypt` runs on
+libuv's threadpool — four slots by default, shared with static file reads — so
+sustained login traffic degrades the whole app, not just that route. It is also
+the only bound on password guessing, since there is no lockout. Nothing can be
+guessed at today, because accounts exist only by direct database insert; this
+must land before [#17] turns on invite redemption.
+
 `SESSION_SECRET` is required in production and the app refuses to start without
 it. Generating one at boot instead would look like it works and log every member
 out on each deploy — with watchtower redeploying on a tag move, every few
 minutes after a merge.
 
 [#17]: https://github.com/fiddur/sage-burner/issues/17
+[#57]: https://github.com/fiddur/sage-burner/issues/57
 
 ## Security headers
 

@@ -63,17 +63,29 @@ export const Routes = ({ api }: { api: Pick<ApiClient, 'login'> }) => {
  * API. Two providers rather than a flag, because "fetch unless told otherwise"
  * is the kind of conditional that ends up fetching in a test suite.
  */
-export const App = ({ viewer, api = createApiClient() }: { viewer?: Viewer; api?: AppApi }) => {
+export const App = ({ viewer, api }: { viewer?: Viewer; api?: AppApi }) => {
+  // Not a default parameter. `api = createApiClient()` builds a fresh client on
+  // every render of `App`, and that identity is load-bearing twice over: it is
+  // the `useEffect` dependency in `FetchedViewerProvider`, so a new one aborts
+  // the in-flight `getMe` and refetches, and it is the `useMemo` dependency for
+  // `LoginRoute`, so a new one makes `Login` a different component type and
+  // remounts it with its state reset — defeating the memo that exists to
+  // prevent exactly that.
+  //
+  // Inert while `App` is the root and holds no state. The memo below it is
+  // written to survive that changing; this would have stopped it.
+  const client = useMemo(() => api ?? createApiClient(), [api])
+
   const content = (
-    <Layout api={api}>
-      <Routes api={api} />
+    <Layout api={client}>
+      <Routes api={client} />
     </Layout>
   )
 
   return (
     <LocationProvider>
       {viewer === undefined ? (
-        <FetchedViewerProvider api={api}>{content}</FetchedViewerProvider>
+        <FetchedViewerProvider api={client}>{content}</FetchedViewerProvider>
       ) : (
         <ViewerProvider viewer={viewer}>{content}</ViewerProvider>
       )}

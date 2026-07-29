@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { DbHandle } from '../db/index.ts'
 
 import { createApp } from '../app.ts'
-import { hashPassword } from '../auth/password.ts'
+import { defaultScryptParams, hashPassword, needsRehash, verifyPassword } from '../auth/password.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, accountRole } from '../db/schema.ts'
@@ -47,9 +47,34 @@ const build = async (env: NodeJS.ProcessEnv = {}) => {
   return app
 }
 
+/**
+ * Make every `update` on the live handle throw.
+ *
+ * Patched on the handle rather than mocked at the module boundary, so the route
+ * runs unchanged and the failure arrives from where a real one would — a full
+ * disk, a locked database.
+ */
+const breakUpdates = () => {
+  const db = handle?.db
+  if (db === undefined) throw new Error('build() first')
+  db.update = () => {
+    throw new Error('database is locked')
+  }
+}
+
 const givenAccount = async (
   server: FastifyInstance,
-  { email, password, roles = [] }: { email: string; password?: string; roles?: ('admin' | 'member')[] },
+  {
+    email,
+    password,
+    roles = [],
+    params = cheap,
+  }: {
+    email: string
+    password?: string
+    roles?: ('admin' | 'member')[]
+    params?: typeof cheap
+  },
 ) => {
   const id = randomUUID()
   const db = handle?.db
@@ -58,7 +83,7 @@ const givenAccount = async (
   await db.insert(account).values({
     id,
     email,
-    password_hash: password === undefined ? null : await hashPassword(password, cheap),
+    password_hash: password === undefined ? null : await hashPassword(password, params),
     created_at: new Date().toISOString(),
   })
   for (const role of roles) await db.insert(accountRole).values({ account_id: id, role })
@@ -235,6 +260,62 @@ describe('GET /api/auth/me', () => {
     })
 
     expect(response.json()).toEqual({ viewer: null })
+  })
+})
+
+describe('rehashing on login', () => {
+  // Every account in this file is created with `cheap` parameters, so every
+  // successful login above already takes this branch. Nothing asserted what it
+  // did — and it is the only path here that writes to member data.
+  const storedHashFor = async (id: string) => {
+    const db = handle?.db
+    if (db === undefined) throw new Error('build() first')
+    const [row] = await db.select({ hash: account.password_hash }).from(account).where(eq(account.id, id))
+    return row?.hash ?? null
+  }
+
+  it('upgrades a hash made with weaker parameters, and the password still works', async () => {
+    const server = await build()
+    const id = await givenAccount(server, { email: 'ada@example.org', password: 'a good long passphrase' })
+    const before = await storedHashFor(id)
+
+    expect((await login(server, 'ada@example.org', 'a good long passphrase')).statusCode).toBe(200)
+
+    const after = await storedHashFor(id)
+    expect(after).not.toBe(before)
+    expect(after).toContain(`n=${defaultScryptParams.cost}`)
+    expect(needsRehash(after ?? '')).toBe(false)
+    // The point of the upgrade is that it is transparent: same password, new
+    // hash. Writing a hash of the wrong thing would lock the member out on
+    // their *next* login, not this one.
+    await expect(verifyPassword('a good long passphrase', after)).resolves.toBe(true)
+  })
+
+  it('leaves an already-current hash alone', async () => {
+    const server = await build()
+    const id = await givenAccount(server, {
+      email: 'ada@example.org',
+      password: 'a good long passphrase',
+      params: defaultScryptParams,
+    })
+    const before = await storedHashFor(id)
+
+    await login(server, 'ada@example.org', 'a good long passphrase')
+
+    expect(await storedHashFor(id)).toBe(before)
+  })
+
+  it('still signs the member in when the upgrade write fails', async () => {
+    // The whole reason that write is wrapped: a full disk or a locked database
+    // must not turn a correct password into a failed login.
+    const server = await build()
+    await givenAccount(server, { email: 'ada@example.org', password: 'a good long passphrase' })
+    breakUpdates()
+
+    const response = await login(server, 'ada@example.org', 'a good long passphrase')
+
+    expect(response.statusCode).toBe(200)
+    expect(cookieFrom(response)).toContain(`${SESSION_COOKIE}=`)
   })
 })
 
