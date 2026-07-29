@@ -1,7 +1,15 @@
 import { LocationProvider, Route, Router } from 'preact-iso'
+import { useMemo } from 'preact/hooks'
 
 import type { ApiClient } from './api/client.ts'
 import type { Viewer } from './viewer.tsx'
+
+import { createApiClient } from './api/client.ts'
+import { Layout } from './components/Layout.tsx'
+import { Home } from './pages/Home.tsx'
+import { Login } from './pages/Login.tsx'
+import { NotFound } from './pages/NotFound.tsx'
+import { FetchedViewerProvider, ViewerProvider } from './viewer.tsx'
 
 /**
  * Only what the app reaches for, not the whole client.
@@ -10,13 +18,6 @@ import type { Viewer } from './viewer.tsx'
  * which is what lets it be a plain object rather than a cast.
  */
 export type AppApi = Pick<ApiClient, 'getMe' | 'login' | 'logout'>
-
-import { createApiClient } from './api/client.ts'
-import { Layout } from './components/Layout.tsx'
-import { Home } from './pages/Home.tsx'
-import { Login } from './pages/Login.tsx'
-import { NotFound } from './pages/NotFound.tsx'
-import { FetchedViewerProvider, ViewerProvider } from './viewer.tsx'
 
 /**
  * The route table.
@@ -27,13 +28,30 @@ import { FetchedViewerProvider, ViewerProvider } from './viewer.tsx'
  * path, and invite tokens must be dot-free. A path with an extension gets a 404
  * from the server and never reaches this router.
  */
-export const Routes = ({ api }: { api: Pick<ApiClient, 'login'> }) => (
-  <Router>
-    <Route path="/" component={Home} />
-    <Route path="/login" component={() => <Login api={api} />} />
-    <Route default component={NotFound} />
-  </Router>
-)
+export const Routes = ({ api }: { api: Pick<ApiClient, 'login'> }) => {
+  // Memoised because `component` is compared by identity: a fresh arrow each
+  // render is a *different component type*, so a re-rendered `Routes` would
+  // unmount and remount `Login` — and its `useState` — rather than diff it.
+  //
+  // Not a live bug today, which was measured rather than assumed. `Routes` does
+  // not re-render when the viewer resolves: `Layout` consumes the context and
+  // re-renders, but `children` is the same vnode reference it was handed, and
+  // Preact skips diffing an identical vnode. Typing into `/login` during the
+  // first `getMe` round-trip keeps the same DOM node and the same value.
+  //
+  // Kept anyway, at one line: it stops being true the moment anything makes
+  // `Routes` itself re-render — a prop from a consumer, a route-level context —
+  // and the symptom then is a member losing what they typed.
+  const LoginRoute = useMemo(() => () => <Login api={api} />, [api])
+
+  return (
+    <Router>
+      <Route path="/" component={Home} />
+      <Route path="/login" component={LoginRoute} />
+      <Route default component={NotFound} />
+    </Router>
+  )
+}
 
 /**
  * `viewer` and `api` are injectable so tests drive the real route table and the

@@ -89,7 +89,9 @@ export const envSchema = z.object({
   /**
    * HMAC key for session cookies.
    *
-   * Optional here and required in production by the refinement below: a
+   * Optional here and required in production by the explicit check in
+   * `createConfig` — not a Zod refinement, which could not tell the two
+   * environments apart from inside this schema. A
    * development run should not need a secret to start, and a production one
    * must not start without it. Generating a random default at boot instead
    * would look like it works and silently log every member out on each deploy —
@@ -147,7 +149,7 @@ export const createConfig = (env: NodeJS.ProcessEnv = process.env): Config => {
   }
 
   // Absent outside production is a development convenience, not a fallback that
-  // reaches a deployment: `assertProductionSecret` below rejects it there. The
+  // reaches a deployment: the check immediately below rejects it there. The
   // fixed value is the same for every dev run so a restart does not invalidate
   // the session you were testing with.
   const session_secret = value.SESSION_SECRET ?? 'development-only-session-secret-not-for-production'

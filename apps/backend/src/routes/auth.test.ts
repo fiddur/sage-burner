@@ -238,6 +238,30 @@ describe('GET /api/auth/me', () => {
   })
 })
 
+describe('caching', () => {
+  it('forbids storing any identity response', async () => {
+    // These carry per-identity data with no validators, which makes them
+    // heuristically cacheable — by the browser's own HTTP cache, which `fetch`
+    // uses by default, and by anything in front. The failure that matters is
+    // logout: the cookie is gone, but a reload answered from cache still shows
+    // the old viewer, and signed sessions give the server no second chance to
+    // notice.
+    const server = await build()
+    await givenAccount(server, { email: 'ada@example.org', password: 'a good long passphrase' })
+
+    const responses = [
+      await server.inject({ method: 'GET', url: '/api/auth/me' }),
+      await login(server, 'ada@example.org', 'a good long passphrase'),
+      await login(server, 'ada@example.org', 'wrong'),
+      await server.inject({ method: 'POST', url: '/api/auth/logout' }),
+    ]
+
+    for (const response of responses) {
+      expect(response.headers['cache-control'], String(response.statusCode)).toBe('no-store')
+    }
+  })
+})
+
 describe('POST /api/auth/logout', () => {
   it('tells the browser to drop the cookie', async () => {
     const server = await build()

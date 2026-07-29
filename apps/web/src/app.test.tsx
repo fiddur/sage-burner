@@ -1,16 +1,26 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { ApiClient } from './api/client.ts'
+import type { AppApi } from './app.tsx'
 import type { Viewer } from './viewer.tsx'
 
 import { App } from './app.tsx'
 
 /**
- * Only the methods the layout reaches for. Typed through `ApiClient` so a
- * rename there fails here rather than silently leaving this stub behind.
+ * A stub satisfying exactly what `App` declares it needs — a plain object, no
+ * cast.
+ *
+ * This was `as unknown as ApiClient`, which is the double cast the standards
+ * are aimed at: through `unknown` the object stops being checked against the
+ * type at all, so it would have survived `App` calling a method the stub does
+ * not have. The two unused entries reject rather than resolve, so a test that
+ * comes to depend on them fails loudly instead of quietly seeing a null viewer.
  */
-const clientWith = (logout: ApiClient['logout']) => ({ logout }) as unknown as ApiClient
+const clientWith = (logout: AppApi['logout']): AppApi => ({
+  logout,
+  getMe: () => Promise.reject(new Error('getMe is not stubbed in this file')),
+  login: () => Promise.reject(new Error('login is not stubbed in this file')),
+})
 
 /**
  * Mounts the real `App` — its route table, its layout, its providers — rather

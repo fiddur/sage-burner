@@ -105,9 +105,27 @@ export interface AuthRouteDeps {
   sessions: Sessions
 }
 
+/**
+ * Keep identity responses out of every cache.
+ *
+ * These are `GET`s and `POST`s carrying per-identity data with no
+ * `Cache-Control`, `ETag` or `Last-Modified`, which makes them *heuristically*
+ * cacheable — by the browser's own HTTP cache, which `fetch` uses by default,
+ * and by any shared cache in front. The concrete failure is logout: the cookie
+ * is gone, but a reload can still be answered from cache with the old
+ * `{ viewer: … }` — and since sessions are signed rather than stored, there is
+ * no server-side check to catch it.
+ *
+ * Helmet sets no cache headers, and the static handler's `no-cache` does not
+ * reach `/api`.
+ */
+const noStore = (reply: FastifyReply) => reply.header('cache-control', 'no-store')
+
 export const registerAuthRoutes = (app: FastifyInstance, { db, config, sessions }: AuthRouteDeps) => {
   app.post('/api/auth/login', async (request, reply) => {
     const parsed = loginRequestSchema.safeParse(request.body)
+    void noStore(reply)
+
     if (!parsed.success) {
       // Deliberately not `bad_request`: a malformed body and a wrong password
       // must be indistinguishable, or the shape of the error tells an attacker
@@ -153,6 +171,7 @@ export const registerAuthRoutes = (app: FastifyInstance, { db, config, sessions 
   })
 
   app.post('/api/auth/logout', async (_request, reply: FastifyReply) => {
+    void noStore(reply)
     // Max-Age=0 rather than omitting the cookie: the browser has to be told to
     // drop it. The token itself stays valid until it expires — sessions are
     // signed, not stored, so there is nothing server-side to revoke. That trade
@@ -162,6 +181,8 @@ export const registerAuthRoutes = (app: FastifyInstance, { db, config, sessions 
   })
 
   app.get('/api/auth/me', async (request, reply) => {
+    void noStore(reply)
+
     // 200 with a null viewer, not 401: an anonymous visitor loading the public
     // homepage is the expected case, and the client should not have to treat it
     // as a failure to render a signed-out page.
