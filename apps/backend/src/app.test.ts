@@ -230,6 +230,29 @@ describe('the error envelope', () => {
     expect(response.json()).toEqual({ error: 'internal_error' })
   })
 
+  it('drops a content-type from the error, which would break serialization', async () => {
+    // Fastify deletes content-type before calling a custom handler so
+    // serialization can be re-guessed. Copying the error's back makes
+    // `reply.send` skip serialization and hand `onSendEnd` an object, which
+    // fails into Fastify's prose envelope — the one thing this file exists to
+    // prevent — and loses the 400 along the way.
+    await build()
+    app.get('/api/mistyped', async () => {
+      throw Object.assign(new Error('nope'), {
+        statusCode: 400,
+        headers: { 'content-type': 'text/html', 'x-request-id': 'abc' },
+      })
+    })
+
+    const response = await app.inject({ method: 'GET', url: '/api/mistyped' })
+
+    expect(response.statusCode).toBe(400)
+    expect(response.json()).toEqual({ error: 'bad_request' })
+    expect(response.headers['content-type']).toMatch(/application\/json/)
+    // The rest of the error's headers still come through.
+    expect(response.headers['x-request-id']).toBe('abc')
+  })
+
   it('maps a thrown 404 to not_found, not the generic 4xx code', async () => {
     // The unmatched-route 404 comes from setNotFoundHandler and never reaches
     // here, so nothing else exercises this branch — a route rejecting a missing

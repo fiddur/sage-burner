@@ -20,6 +20,9 @@ import { errorResponse } from '@sage-burner/shared'
 /** Header values Node's `setHeader` accepts, which is what `reply.headers` forwards to. */
 type HeaderValue = number | string | string[]
 
+/** Headers that belong to the body being replaced, never to the error carrying them. */
+const describesTheBody = new Set(['content-type', 'content-length'])
+
 /**
  * Headers an error asked to be sent with it.
  *
@@ -37,6 +40,15 @@ const headersFrom = (error: unknown): Record<string, HeaderValue> | undefined =>
 
   const usable: Record<string, HeaderValue> = {}
   for (const [name, value] of Object.entries(headers)) {
+    // Both describe a body that is about to be replaced by the envelope.
+    // `content-type` is not merely stale: `handleError` deletes it before
+    // calling a custom handler so serialization can be re-guessed, and putting
+    // back a non-JSON one makes `reply.send` skip serialization and hand
+    // `onSendEnd` an object — which fails as FST_ERR_REP_INVALID_PAYLOAD_TYPE
+    // into Fastify's prose envelope, losing the status the error asked for.
+    // The default handler is immune because it always serializes to a string.
+    if (describesTheBody.has(name.toLowerCase())) continue
+
     if (typeof value === 'string' || typeof value === 'number') {
       usable[name] = value
     } else if (Array.isArray(value) && value.every((entry) => typeof entry === 'string')) {
