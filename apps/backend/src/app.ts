@@ -249,6 +249,14 @@ export const createApp = async ({ db, config }: AppDeps): Promise<FastifyInstanc
   // Nuisance rather than disclosure — nothing moves and the attacker learns
   // nothing — but no route here accepts plain text, so the parser is pure
   // attack surface.
+  //
+  // Note the scope: this is a property of the *instance*, not of the logout
+  // route, and it holds only while no registered parser accepts a form
+  // encoding. Registering `@fastify/formbody` later — for a webhook, an admin
+  // form post — would reopen it from a file with nothing to do with auth. The
+  // `cross-site reachability` block in `routes/auth.test.ts` is what keeps that
+  // honest: it asserts all three form encodings answer 415, so the regression
+  // fails CI rather than shipping.
   app.removeContentTypeParser('text/plain')
 
   app.decorate('db', db)

@@ -154,8 +154,18 @@ const DECOY_SALT = Buffer.alloc(SALT_LENGTH, 0x5a)
  * that is the whole secret. The decoy derivation costs one wasted hash per
  * failed login and closes it.
  *
- * `params` is used only for the decoy — a real hash carries its own. Exposed so
- * tests can burn a cheap hash rather than the production one.
+ * `options.params` is used only for the decoy — a real hash carries its own.
+ * Exposed so tests can burn a cheap hash rather than the production one.
+ *
+ * `options.onError` exists because the alternative is silence. A systemic
+ * failure here — bad parameters at the production cost, an allocation failure
+ * under memory pressure — presents as *every* login being rejected, with the
+ * same status, body and latency as a typo. Returning false is still right;
+ * throwing would answer 500 where a wrong password answers 401 and hand back
+ * the oracle above. But without this the operator has no way to tell "everyone
+ * is typing it wrong" from "hashing is broken", and the docblock on `maxmemFor`
+ * is explicit that the suite cannot catch that class either. Injected rather
+ * than imported, like the clock and the timers elsewhere here.
  *
  * **The equal-work property is conditional, and the condition is not stated
  * anywhere else.** The decoy derives at `params`; a real hash derives at
@@ -171,16 +181,31 @@ const DECOY_SALT = Buffer.alloc(SALT_LENGTH, 0x5a)
  * Raising the cost therefore needs a companion plan for stale rows — at minimum
  * knowing how many there are — rather than relying on next-login alone.
  */
+export interface VerifyOptions {
+  /** Cost for the decoy derivation only. A real hash carries its own. */
+  params?: ScryptParams
+  /** Called when the derivation itself fails, as opposed to failing to match. */
+  onError?: (error: unknown) => void
+}
+
 export const verifyPassword = async (
   password: string,
   stored: string | null,
-  params = defaultScryptParams,
+  { params = defaultScryptParams, onError }: VerifyOptions = {},
 ): Promise<boolean> => {
   const parsed = stored === null ? undefined : parseHash(stored)
 
   if (parsed === undefined) {
     // Not `return false` — see above.
-    await derive(password, DECOY_SALT, params).catch(() => undefined)
+    //
+    // The rejection is always swallowed, whether or not anyone is listening:
+    // `.catch(onError)` with no handler is `.catch(undefined)`, which does not
+    // swallow at all. That would throw out of here on the unknown-address path,
+    // answer 500 where a wrong password answers 401, and hand back the exact
+    // enumeration oracle the decoy exists to close.
+    await derive(password, DECOY_SALT, params).catch((error: unknown) => {
+      onError?.(error)
+    })
     return false
   }
 
@@ -189,7 +214,8 @@ export const verifyPassword = async (
     // Length-checked first: timingSafeEqual throws on a mismatch rather than
     // returning false, and a truncated key column would otherwise 500.
     return candidate.length === parsed.key.length && timingSafeEqual(candidate, parsed.key)
-  } catch {
+  } catch (error) {
+    onError?.(error)
     return false
   }
 }

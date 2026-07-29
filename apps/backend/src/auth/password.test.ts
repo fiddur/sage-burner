@@ -58,14 +58,14 @@ describe('verifyPassword', () => {
     // must fail the login — not 500 it, which would tell an attacker the
     // difference between a broken row and a wrong password.
     for (const stored of ['', 'not-a-hash', '$scrypt$', '$scrypt$n=1$abc', '$bcrypt$x$y']) {
-      await expect(verifyPassword('x', stored, fast), stored).resolves.toBe(false)
+      await expect(verifyPassword('x', stored, { params: fast }), stored).resolves.toBe(false)
     }
   })
 
   it('returns false for an account with no password set', async () => {
     // A passkey-only account has `password_hash: null`. Password login against
     // it must fail closed rather than treating absent as matching.
-    await expect(verifyPassword('x', null, fast)).resolves.toBe(false)
+    await expect(verifyPassword('x', null, { params: fast })).resolves.toBe(false)
   })
 
   it('spends the same work on an absent hash as on a wrong one', async () => {
@@ -80,9 +80,9 @@ describe('verifyPassword', () => {
     const real = await hashPassword('the right passphrase', fast)
 
     const average = async (stored: string | null) => {
-      await verifyPassword('wrong', stored, fast)
+      await verifyPassword('wrong', stored, { params: fast })
       const started = performance.now()
-      for (let i = 0; i < 5; i += 1) await verifyPassword('wrong', stored, fast)
+      for (let i = 0; i < 5; i += 1) await verifyPassword('wrong', stored, { params: fast })
       return (performance.now() - started) / 5
     }
 
@@ -90,6 +90,54 @@ describe('verifyPassword', () => {
     const withoutHash = await average(null)
 
     expect(withoutHash).toBeGreaterThan(withHash * 0.5)
+  })
+})
+
+describe('reporting a broken setup', () => {
+  // A systemic failure — bad parameters at the production cost, an allocation
+  // failure under pressure — presents as every login being rejected, with the
+  // same status, body and latency as a typo. Returning false stays right;
+  // saying nothing does not.
+  const brokenParams = { cost: 3, blockSize: 8, parallelism: 1 } // N must be a power of two
+
+  it('reports a failure while verifying a real hash, and still returns false', async () => {
+    const stored = await hashPassword('x', fast)
+    const seen: unknown[] = []
+
+    // A hash whose *stored* parameters are unusable: parseable, so it takes the
+    // real path, then fails inside scrypt.
+    const corrupted = stored.replace(`n=${fast.cost}`, 'n=3')
+    const result = await verifyPassword('x', corrupted, { onError: (error) => seen.push(error) })
+
+    expect(result).toBe(false)
+    expect(seen).toHaveLength(1)
+    expect(String(seen[0])).toContain('scrypt')
+  })
+
+  it('reports a failure on the decoy path too', async () => {
+    // The unknown-address path. Silence here would hide a broken setup for
+    // exactly the requests an attacker is generating.
+    const seen: unknown[] = []
+
+    const result = await verifyPassword('x', null, { params: brokenParams, onError: (e) => seen.push(e) })
+
+    expect(result).toBe(false)
+    expect(seen).toHaveLength(1)
+  })
+
+  it('is optional, so a caller that does not care is unaffected', async () => {
+    await expect(verifyPassword('x', null, { params: brokenParams })).resolves.toBe(false)
+  })
+
+  it('is not called when a password merely fails to match', async () => {
+    // Otherwise the log fills with one error per wrong password and the signal
+    // this exists for is buried.
+    const stored = await hashPassword('right', fast)
+    const seen: unknown[] = []
+
+    await verifyPassword('wrong', stored, { params: fast, onError: (error) => seen.push(error) })
+
+    expect(seen).toEqual([])
   })
 })
 

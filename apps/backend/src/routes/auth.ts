@@ -230,7 +230,13 @@ export const registerAuthRoutes = (app: FastifyInstance, { db, config, sessions 
     // there, with the measurement that motivated it — this line only has to
     // avoid short-circuiting past it.
     const stored = row?.password_hash ?? null
-    const ok = await verifyPassword(parsed.data.password, stored)
+    const ok = await verifyPassword(parsed.data.password, stored, {
+      // Without this a broken hashing setup is indistinguishable from every
+      // member mistyping at once: same 401, same body, same latency.
+      onError: (error) => {
+        request.log.error({ err: error }, 'password verification failed')
+      },
+    })
 
     if (!ok || row === undefined) {
       request.log.info({ status: 401 }, 'login rejected')
