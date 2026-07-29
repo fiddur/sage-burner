@@ -146,17 +146,13 @@ default branch — which is `develop` — and enforces, with no bypass actors:
 
 - a pull request, merge-commit only (so step 10's `--merge` is the only method
   the platform will accept),
-- the `CI Gate` check, strictly, so the branch must also be up to date with
-  `develop`,
+- both checks, `CI Gate` and `build`, strictly — so the branch must also be up
+  to date with `develop`,
 - resolution of every review thread,
 - no force-push, no branch deletion.
 
-Three gaps remain, and they are the ones worth knowing:
+That covers three of step 10's four gates. Two things remain unenforced:
 
-- **`build` is not a required check.** `CI Gate` runs the tests; `build` is what
-  proves the image actually starts. Only the first is enforced, so step 10's
-  "check the whole rollup" still matters — a green `CI Gate` next to a red
-  `build` would merge.
 - **No approval is required** (`required_approving_review_count: 0`). GitHub will
   not let an author approve their own pull request, and every commit and review
   here is authored by the same account, so an approval requirement would deadlock
@@ -164,15 +160,24 @@ Three gaps remain, and they are the ones worth knowing:
   document is the only thing enforcing it. The review agent's verdicts are
   `COMMENTED`, not `APPROVED`, so they would not satisfy the setting even if it
   could be turned on.
-- **`main` is unprotected.** The ruleset binds to `~DEFAULT_BRANCH`, so
-  `GET /repos/fiddur/sage-burner/rules/branches/main` returns nothing: no
-  required check, and force-push and deletion both allowed. The Deployment
-  section below promotes `main` to `:latest`, which makes the release branch the
-  unguarded one. The binding is also dynamic — changing the default branch would
-  silently move all of this off `develop`.
+- **`main` is unprotected**, deliberately for now — deployment runs from the
+  `:develop` tag, so `main` is unused. `GET /repos/fiddur/sage-burner/rules/branches/main`
+  returns nothing: no required check, force-push and deletion both allowed. Set
+  it up before the first promotion to `:latest`.
 
-So a green `CI Gate` means the tests passed and the threads are closed. It does
-not mean the image builds, and it does not mean anything reviewed the change.
+So a green rollup means the tests passed, the image starts, and the threads are
+closed. It does not mean anything reviewed the change.
+
+This paragraph caches an answer that actually lives in repository settings, and
+it has already gone stale several times while being written. Check rather than
+trust it:
+
+```sh
+gh api repos/:owner/:repo/rules/branches/develop --jq '.[] | "\(.type): \(.parameters // {} | tojson)"'
+```
+
+(Note that `// empty` in a jq object value deletes the whole object, so a query
+written that way silently drops every rule without the field you asked for.)
 
 ## Deployment
 

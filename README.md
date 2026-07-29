@@ -145,9 +145,10 @@ Use a scoped access token rather than the account password. Whoever can move
 the `:develop` tag effectively has root on the deployment host, since watchtower
 pulls it automatically and holds the Docker socket.
 
-Neither `CI Gate` nor `build` is a required status check, and `develop` has no
-branch protection — see the note in [`AGENTS.md`](./AGENTS.md). Configuring a
-ruleset is what turns the documented merge gate into an enforced one.
+Both `CI Gate` and `build` are required status checks on `develop`, so a merge
+cannot publish a `:develop` tag whose image fails to start — `build` is the job
+that proves it does. What is _not_ enforced is the review itself; see the note
+in [`AGENTS.md`](./AGENTS.md) for what a green rollup does and does not mean.
 
 ### Deploying
 
