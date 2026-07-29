@@ -263,14 +263,13 @@ export const registerAuthRoutes = (app: FastifyInstance, { db, config, sessions 
     const admission = await gate.enter()
 
     if (!admission.ok) {
-      // The advice differs by reason, and so does what happened. `queue-full`
-      // is refused synchronously — that caller waited for nothing — while
-      // `timed-out` means they held on for the whole window and got nowhere. A full queue clears as the work in
-      // flight finishes, so a second is about right. A timeout means the
-      // caller already waited the full window against a gate that stayed
-      // saturated, and sending them straight back would turn a client politely
-      // honouring `Retry-After` into a hot retry loop — adding connection churn
-      // under exactly the flood this exists to damp.
+      // The advice differs by reason, and so does what already happened.
+      // `queue-full` is refused synchronously and waited for nothing, and the
+      // work in flight clears shortly, so a second is about right. `timed-out`
+      // held on for the whole window against a gate that stayed saturated —
+      // sending that caller straight back turns a client politely honouring
+      // `Retry-After` into a hot retry loop, adding churn under exactly the
+      // flood this exists to damp.
       void reply.header('retry-after', admission.reason === 'timed-out' ? '5' : '1')
       request.log.warn({ ...gate.stats(), reason: admission.reason }, 'login shed')
       return reply.code(429).send(errorResponse('rate_limited'))

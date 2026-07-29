@@ -389,7 +389,10 @@ sessions being signed rather than stored — there is no row to delete — and n
 from anything above. A compromised session can only be revoked by rotating
 `SESSION_SECRET`, which logs everyone out at once.
 
-**Login is not rate-limited yet** ([#57]).
+**Login is not rate-limited in the app, deliberately.** Throttling repeated
+attempts is the reverse proxy's job for now — Apache sees every request first
+and can drop a flood before it costs a scrypt hash. [#57] tracks doing it in
+the app if that ever stops being enough.
 
 There is a bound on concurrent _work_, which is a different thing. At most two
 password verifications run at once, and up to eight further callers wait in a
@@ -409,16 +412,16 @@ four slots by default, shared with the reads that serve static files. Without a
 bound, sustained login traffic would degrade the whole app rather than just that
 route.
 
-What is still missing is the bound on _attempts_. There is no lockout and no
-backoff, so nothing slows an attacker working through passwords for one address
-— and the gate does not help, because it bounds concurrent work rather than
-attempts. Two slots at ~230ms is roughly 8–9 tries a second, about 750,000 a
-day, sustained indefinitely.
+What the app does **not** do is bound the number of _attempts_. There is no
+lockout and no backoff, and the gate does not provide one — it bounds concurrent
+work, which is a different thing. Two slots at ~230ms is roughly 8–9 tries a
+second, about 750,000 a day, sustained indefinitely against one address.
 
-That exposure opens with the **first account inserted**, not with [#17]. Since
-the point of this PR is that an operator inserts one so people can sign in,
-treat [#57] as due then; [#17] only widens who can create an account, it does
-not create the risk.
+**So configure the proxy.** Something that counts requests per client IP against
+`/api/auth/login` — `mod_evasive`, `mod_qos`, or fail2ban watching the access
+log — sized well below that figure. A few attempts a minute is generous for a
+membership of 42 and leaves an attacker nowhere to go. This matters from the
+moment the first account exists, which is the setup step below.
 
 `SESSION_SECRET` is required in production and the app refuses to start without
 it. Generating one at boot instead would look like it works and log every member
@@ -428,6 +431,48 @@ minutes after a merge.
 [#17]: https://github.com/fiddur/sage-burner/issues/17
 [#57]: https://github.com/fiddur/sage-burner/issues/57
 [#58]: https://github.com/fiddur/sage-burner/issues/58
+
+### Creating the first account
+
+There is no sign-up and no bootstrap command yet ([#10] adds one), so the first
+account is made by hand against the running container. Verified end to end
+against the built image:
+
+```sh
+docker compose exec \
+  -e ADMIN_EMAIL=you@example.org \
+  -e ADMIN_PASSWORD='choose something long' \
+  app node --input-type=module -e '
+import { randomUUID } from "node:crypto"
+import { createDb, runMigrations } from "/app/apps/backend/src/db/index.ts"
+import { account, accountRole } from "/app/apps/backend/src/db/schema.ts"
+import { hashPassword } from "/app/apps/backend/src/auth/password.ts"
+
+const handle = createDb({ url: process.env.DATABASE_URL })
+runMigrations(handle)
+const id = randomUUID()
+await handle.db.insert(account).values({
+  id,
+  email: process.env.ADMIN_EMAIL.trim().toLowerCase(),
+  password_hash: await hashPassword(process.env.ADMIN_PASSWORD),
+  created_at: new Date().toISOString(),
+})
+await handle.db.insert(accountRole).values({ account_id: id, role: "admin" })
+handle.close()
+console.log("created admin", process.env.ADMIN_EMAIL)
+'
+```
+
+It runs inside the container so the password is hashed by the same code that
+verifies it — a hash written any other way is a login that fails for reasons
+nothing explains. The email is lowercased for the same reason the schema does
+it: the table's `UNIQUE` is byte-exact, so `You@Example.org` and
+`you@example.org` would become two accounts for one person.
+
+Nothing guards the `admin` role yet, so it grants nothing until [#10] lands. It
+is set now so the account is already right when it does.
+
+[#10]: https://github.com/fiddur/sage-burner/issues/10
 
 ## Security headers
 
