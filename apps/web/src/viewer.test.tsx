@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { AppApi } from './app.tsx'
 
-import { FetchedViewerProvider, isAdmin, isMember, useViewer } from './viewer.tsx'
+import { FetchedViewerProvider, ViewerProvider, isAdmin, isMember, useViewer } from './viewer.tsx'
 
 /**
  * The provider the real app uses, against an injected client.
@@ -81,6 +81,34 @@ describe('FetchedViewerProvider', () => {
 
     expect(signals).toHaveLength(1)
     expect(signals[0]?.aborted).toBe(true)
+  })
+})
+
+describe('ViewerProvider', () => {
+  const StatusProbe = () => {
+    const viewer = useViewer()
+
+    return <output>{viewer.status}</output>
+  }
+
+  it('keeps the prop live rather than seeding it once', () => {
+    // `useState(viewer)` makes the prop an initial value only, which silently
+    // breaks the seam a test uses to say who is looking: re-rendering with a
+    // different viewer does nothing, and a test written that way passes against
+    // genuinely broken code. That happened during this PR.
+    const { rerender } = render(
+      <ViewerProvider viewer={{ status: 'loading' }}>
+        <StatusProbe />
+      </ViewerProvider>,
+    )
+    expect(screen.getByRole('status').textContent).toBe('loading')
+
+    rerender(
+      <ViewerProvider viewer={{ status: 'signed-out' }}>
+        <StatusProbe />
+      </ViewerProvider>,
+    )
+    expect(screen.getByRole('status').textContent).toBe('signed-out')
   })
 })
 

@@ -48,9 +48,25 @@ export const ViewerProvider = ({
   children: ComponentChildren
   viewer?: Viewer
 }) => {
-  const [current, setViewer] = useState(viewer)
+  // The prop stays live until something actually changes the viewer, rather
+  // than being seeded into `useState` and then ignored.
+  //
+  // That distinction bit me while writing this PR: a test re-rendered `App`
+  // with a different `viewer` to simulate the viewer resolving, nothing
+  // happened, and the test passed against code that was genuinely broken. With
+  // `useState(viewer)` the prop is an *initial value only* — a seam whose whole
+  // purpose is letting a test state who is looking, silently ignoring the
+  // second thing it is told.
+  //
+  // After a login or logout the override wins, because at that point the local
+  // answer is the newer one.
+  const [override, setOverride] = useState<Viewer | undefined>(undefined)
 
-  return <ViewerContext.Provider value={{ viewer: current, setViewer }}>{children}</ViewerContext.Provider>
+  return (
+    <ViewerContext.Provider value={{ viewer: override ?? viewer, setViewer: setOverride }}>
+      {children}
+    </ViewerContext.Provider>
+  )
 }
 
 /**

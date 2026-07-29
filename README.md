@@ -410,9 +410,15 @@ bound, sustained login traffic would degrade the whole app rather than just that
 route.
 
 What is still missing is the bound on _attempts_. There is no lockout and no
-backoff, so nothing slows an attacker working through passwords for one address.
-Nothing can be guessed at today — accounts exist only by direct database insert
-— but [#57] must land before [#17] turns on invite redemption.
+backoff, so nothing slows an attacker working through passwords for one address
+— and the gate does not help, because it bounds concurrent work rather than
+attempts. Two slots at ~230ms is roughly 8–9 tries a second, about 750,000 a
+day, sustained indefinitely.
+
+That exposure opens with the **first account inserted**, not with [#17]. Since
+the point of this PR is that an operator inserts one so people can sign in,
+treat [#57] as due then; [#17] only widens who can create an account, it does
+not create the risk.
 
 `SESSION_SECRET` is required in production and the app refuses to start without
 it. Generating one at boot instead would look like it works and log every member

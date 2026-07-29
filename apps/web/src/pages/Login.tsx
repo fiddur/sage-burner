@@ -5,14 +5,6 @@ import type { ApiClient } from '../api/client.ts'
 import { isApiError } from '../api/client.ts'
 import { useSetViewer, useViewer } from '../viewer.tsx'
 
-/**
- * Sign in.
- *
- * There is no "forgot password" and no sign-up link, deliberately: accounts are
- * created only by redeeming an invite (#17), and there is no mail service to
- * send a reset through (#30). An admin resets a password out of band until
- * either exists — saying so here is better than a dead link.
- */
 /** The three failures a login can produce, each wanting different behaviour. */
 const messageForFailure = (failure: unknown): string => {
   if (!isApiError(failure)) return 'Could not sign in just now. Please try again.'
@@ -22,6 +14,14 @@ const messageForFailure = (failure: unknown): string => {
   return 'Could not sign in just now. Please try again.'
 }
 
+/**
+ * Sign in.
+ *
+ * There is no "forgot password" and no sign-up link, deliberately: accounts are
+ * created only by redeeming an invite (#17), and there is no mail service to
+ * send a reset through (#30). An admin resets a password out of band until
+ * either exists — saying so here is better than a dead link.
+ */
 export const Login = ({ api }: { api: Pick<ApiClient, 'login'> }) => {
   const viewer = useViewer()
   const setViewer = useSetViewer()
