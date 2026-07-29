@@ -1,9 +1,11 @@
 import type { FastifyInstance } from 'fastify'
 
+import { errorResponseSchema } from '@sage-burner/shared'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { z } from 'zod'
 
 import type { DbHandle } from './db/index.ts'
 
@@ -304,6 +306,44 @@ describe('the error envelope', () => {
     const response = await app.inject({ method: 'GET', url: `/api/thing/${'x'.repeat(200)}` })
 
     expect(response.statusCode).toBe(414)
+    expect(response.json()).toEqual({ error: 'bad_request' })
+  })
+
+  it('survives a route that declares only a success schema', async () => {
+    // The realistic case, and the reason the serializer trap below is narrower
+    // than it first looks: a response schema for 200 alone does not touch the
+    // error path.
+    await build()
+    app.get(
+      '/api/typed',
+      { schema: { response: { 200: { type: 'object', properties: { ok: { type: 'boolean' } } } } } },
+      async () => {
+        throw Object.assign(new Error('nope'), { statusCode: 400 })
+      },
+    )
+
+    const response = await app.inject({ method: 'GET', url: '/api/typed' })
+
+    expect(response.json()).toEqual({ error: 'bad_request' })
+  })
+
+  it('survives a route that declares an error status, given the envelope schema', async () => {
+    // A schema for the error status itself runs the envelope through the route
+    // serializer, and anything it does not declare is stripped — a `{ detail }`
+    // 400 schema answers `400 {}` on the one path the handler exists to
+    // guarantee, with no test failing and a valid-looking body. This pins the
+    // remedy the docblock in errors.ts recommends, so the advice cannot rot.
+    await build()
+    app.get(
+      '/api/detailed',
+      { schema: { response: { 400: z.toJSONSchema(errorResponseSchema) } } },
+      async () => {
+        throw Object.assign(new Error('nope'), { statusCode: 400 })
+      },
+    )
+
+    const response = await app.inject({ method: 'GET', url: '/api/detailed' })
+
     expect(response.json()).toEqual({ error: 'bad_request' })
   })
 

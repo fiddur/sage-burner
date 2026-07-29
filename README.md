@@ -329,6 +329,23 @@ failing to parse the explanation of what went wrong.
 "Error response" rather than "non-2xx": a conditional request for an asset
 answers `304` with no body at all, which is a cache hit rather than a failure.
 
+One thing a route can do to break this promise, since the failure is silent in
+both directions — no test fails, and the response is a valid-looking `{}` that
+the client reads as an unknown code. A route that declares
+`schema.response` **for an error status** runs the envelope through that
+serializer, and anything the schema does not declare is stripped:
+
+```ts
+// Strips the envelope: answers 400 {}
+schema: { response: { 400: { type: 'object', properties: { detail: … } } } }
+
+// Keeps it
+schema: { response: { 400: z.toJSONSchema(errorResponseSchema) } }
+```
+
+Declaring only a success shape is safe — a `200` schema does not touch the
+error path, which is the case a route is actually likely to have.
+
 "The app produces" is the limit of the promise. A reverse proxy in front can
 answer with its own error page — an Apache 502 while the container is
 restarting, for instance — and that will not be JSON at all. The web client

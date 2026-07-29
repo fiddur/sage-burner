@@ -126,12 +126,16 @@ const codeFor = (status: number): ErrorCode => {
  * Fastify and only one of them is the obvious one.
  *
  * One trap this cannot close from here: the `send` below goes through the
- * route's response serializer, so a route declaring `schema.response[400]`
- * strips the envelope down to whatever that schema allows — a route with a
- * `{ detail }` 400 schema answers `400 {}`, not `{ error: 'bad_request' }`, on
- * exactly the path this exists to guarantee. No route declares response schemas
- * yet. The first one that does must add `errorResponseSchema` for its error
- * statuses.
+ * route's response serializer, so a route declaring a schema *for an error
+ * status* strips the envelope down to whatever that schema allows — a route
+ * with a `{ detail }` 400 schema answers `400 {}`, not `{ error:
+ * 'bad_request' }`, on exactly the path this exists to guarantee.
+ *
+ * Declaring only a success shape is safe: with a 200 schema and no 400 schema
+ * the envelope passes through untouched, which is the case a route is actually
+ * likely to have. The fix for the other case is to include
+ * `z.toJSONSchema(errorResponseSchema)` under each error status the route
+ * declares. Both halves are pinned in `app.test.ts`.
  */
 const sendEnvelope = (error: FastifyError, request: FastifyRequest, reply: FastifyReply) => {
   // Falls back to a status the route already set on the reply, which
