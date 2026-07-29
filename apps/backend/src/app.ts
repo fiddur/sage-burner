@@ -1,5 +1,7 @@
+import type { FastifyHelmetOptions } from '@fastify/helmet'
 import type { FastifyInstance } from 'fastify'
 
+import helmet from '@fastify/helmet'
 import fastifyStatic from '@fastify/static'
 import { errorResponse } from '@sage-burner/shared'
 import Fastify from 'fastify'
@@ -136,6 +138,56 @@ export const loggerOptions = (level: string) => ({
 })
 
 /**
+ * Security headers, as deviations from `@fastify/helmet`'s defaults.
+ *
+ * Annotated rather than inferred. The object is built here and handed to
+ * `register()` as a call result, not as a fresh literal at the call site, so
+ * TypeScript's excess-property check never fires — `xFrameOption` for
+ * `xFrameOptions` compiled clean and silently reverted the header to
+ * SAMEORIGIN. The annotation is what catches the next misspelling; a test only
+ * covers the options something already asserts.
+ *
+ * The defaults are close, but four need narrowing: three are looser than this
+ * app needs, and `style-src`'s `'unsafe-inline'` is looser than it should be
+ * anywhere. Everything not named here is
+ * helmet's default and is wanted: `nosniff`, `Referrer-Policy: no-referrer`
+ * (stricter than the `strict-origin-when-cross-origin` #41 asked for, and the
+ * right call while an invite token lives in a URL path), HSTS,
+ * `Cross-Origin-Opener-Policy` and `Cross-Origin-Resource-Policy` — but not
+ * `Cross-Origin-Embedder-Policy`, which helmet stopped defaulting on in v6
+ * because `require-corp` breaks every cross-origin subresource — and
+ * `X-XSS-Protection: 0`, which disables a legacy auditor that introduced
+ * vulnerabilities of its own.
+ */
+const helmetOptions = (): FastifyHelmetOptions => ({
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      // Helmet defaults to `'self'`, and pairs it with X-Frame-Options
+      // SAMEORIGIN. Nothing here frames anything, and approving an application
+      // is a one-click action, so the answer is no rather than same-origin.
+      'frame-ancestors': ["'none'"],
+
+      // Helmet's default is `'self' https: 'unsafe-inline'`. The inline
+      // allowance is the one that matters: with it, an injected `style=` can
+      // still be used to overlay or exfiltrate, and CSP stops being a real
+      // control. Checked against the build rather than assumed — the app has no
+      // inline styles and no `style=` attributes, and `styles.css` uses only
+      // system font stacks, so there is no `@font-face` or `url()` to allow.
+      'style-src': ["'self'"],
+      'font-src': ["'self'"],
+
+      // No <base> is ever emitted, so nothing needs to set one.
+      'base-uri': ["'none'"],
+    },
+  },
+
+  // Overrides helmet's SAMEORIGIN. The belt to frame-ancestors' braces, for
+  // browsers predating it.
+  xFrameOptions: { action: 'deny' },
+})
+
+/**
  * Build the application.
  *
  * Takes its dependencies as arguments rather than constructing them, so tests
@@ -161,6 +213,12 @@ export const createApp = async ({ db, config }: AppDeps): Promise<FastifyInstanc
     // exists, so this writes the envelope to the socket itself.
     clientErrorHandler,
   })
+
+  // Registered before anything that can answer, so the headers reach the SPA
+  // shell and static assets as well as the API — `@fastify/helmet` hooks
+  // `onRequest`, and a plugin registered after a route still covers it, but
+  // putting it first means there is no ordering to get wrong later.
+  await app.register(helmet, helmetOptions())
 
   app.decorate('db', db)
   app.decorate('config', config)

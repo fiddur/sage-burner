@@ -301,6 +301,11 @@ ProxyPass        / http://127.0.0.1:8081/
 ProxyPassReverse / http://127.0.0.1:8081/
 ```
 
+Note there are no `Header set` lines for CSP, HSTS or the rest: the app sends
+those itself. Do not add them here — `Header set` _replaces_ what the backend
+sent, so a policy written here shadows the app's rather than adding to it, and a
+weaker one silently wins. See [Security headers](#security-headers).
+
 `X-Forwarded-Proto` is not cosmetic: Apache terminates TLS, so without it the
 app believes it is serving plain HTTP — which decides whether the session cookie
 gets its `Secure` flag.
@@ -310,6 +315,89 @@ to `https` it would lie about a plain-HTTP request, and a cookie marked `Secure`
 on a connection that is not would simply never come back.
 
 [#10]: https://github.com/fiddur/sage-burner/issues/10
+
+## Security headers
+
+Every routed response carries a `Content-Security-Policy`,
+`Referrer-Policy: no-referrer`, `X-Content-Type-Options: nosniff`,
+`Strict-Transport-Security: max-age=31536000; includeSubDomains` and the rest,
+via `@fastify/helmet` registered before any route.
+
+"Routed" is the limit: helmet hooks `onRequest`, which runs after routing, so the
+two paths that answer outside it — `clientErrorHandler`, and `frameworkErrors`
+for a URL the router rejects — send their JSON error envelope bare. Both are
+error bodies rather than documents, so there is nothing there for a policy to
+protect.
+
+The policy is:
+
+```
+default-src 'self'; base-uri 'none'; font-src 'self'; form-action 'self';
+frame-ancestors 'none'; img-src 'self' data:; object-src 'none';
+script-src 'self'; script-src-attr 'none'; style-src 'self';
+upgrade-insecure-requests
+```
+
+Four deliberate departures from helmet's defaults, each pinned by a test in
+`apps/backend/src/security-headers.test.ts`:
+
+- **No `'unsafe-inline'` on `style-src`.** Helmet ships it by default, and it is
+  the allowance that makes a CSP mostly decorative. The app has no inline styles
+  and no `style=` attributes, and `styles.css` uses only system font stacks — no
+  `@font-face`, no `url()` — so it does not need one.
+- **`frame-ancestors 'none'` and `X-Frame-Options: DENY`**, rather than helmet's
+  `'self'`/`SAMEORIGIN`. Nothing here frames anything, and approving an
+  application is a single click.
+- **`font-src 'self'`**, not helmet's `'self' https: data:`, for the same reason
+  — there are no web fonts to fetch.
+- **`base-uri 'none'`**, since no `<base>` is ever emitted.
+
+`Referrer-Policy: no-referrer` is helmet's default and stricter than it needs to
+be for most pages — kept because an invite token travels in a URL path
+([#17]), and a member clicking any outbound link from `/invite/<token>` would
+otherwise hand the token to the destination.
+
+Two things to know before deploying anywhere other than the documented setup:
+
+- **HSTS is `max-age=31536000; includeSubDomains`** — one year, covering every
+  subdomain of whatever host serves the app. Fine on a dedicated subdomain like
+  `sage.example.org`. On an apex it would make every plain-HTTP sibling
+  subdomain unreachable for anyone who has visited, and shortening it only takes
+  effect for a visitor who returns.
+- **`upgrade-insecure-requests` assumes TLS terminates in front.** Browsers
+  exempt `localhost` and loopback, so `docker compose up` locally is unaffected —
+  but reaching the container over plain HTTP at a LAN address or hostname
+  upgrades every subresource to `https://` and yields a blank page.
+
+**Do not add these headers in the Apache vhost as well**, in either direction:
+
+- `Header set` **replaces** the app's header, so a policy written there is the
+  only one the browser sees — including a weaker one, and including a
+  `Strict-Transport-Security: max-age=300` that quietly undoes the year above.
+- `Header add`/`append` emits a second header, and browsers _intersect_ multiple
+  CSP headers rather than letting one win — so the page ends up more restricted
+  than either policy alone, and debugging why a script is blocked when neither
+  policy blocks it is miserable.
+
+The app is the single place this is configured.
+
+One assumption the policy rests on is pinned rather than trusted:
+`apps/web/index.html` must stay free of inline `<script>`, `<style>`, `on*=` and
+`style=`, **and of any absolute URL that starts a fetch** — a `src` on a script
+or image, or an `href` on a `<link>` that actually loads something
+(`stylesheet`, `modulepreload`, `icon`, `manifest`, `preload`, `prefetch`). A
+CDN stylesheet is blocked by `style-src 'self'` just as surely as an inline
+block. A `rel="canonical"` or `rel="preconnect"` is not checked, because no
+directive governs it.
+
+Vite passes most of that file through untouched, so either would break the built
+app in production with nothing else failing. One exception, verified rather than
+assumed: an inline `<script type="module">` is extracted into the entry chunk and
+never reaches `dist/index.html`. A classic inline `<script>`, a `<style>` block,
+`on*=` and `style=` all survive verbatim. There is a test asserting all of it —
+stricter than strictly necessary, which is the safe direction.
+
+[#17]: https://github.com/fiddur/sage-burner/issues/17
 
 ## API errors
 

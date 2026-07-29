@@ -14,6 +14,7 @@
     "fix": "oxfmt . && oxlint -c ../../.oxlintrc.json --fix"
   },
   "dependencies": {
+    "@fastify/helmet": "^13.1.0",
     "@fastify/proxy-addr": "^5.1.0",
     "@fastify/static": "^10.1.2",
     "@sage-burner/shared": "workspace:*",
