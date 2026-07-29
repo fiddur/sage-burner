@@ -442,7 +442,7 @@ against the built image:
 docker compose exec \
   -e ADMIN_EMAIL=you@example.org \
   -e ADMIN_PASSWORD='choose something long' \
-  app node --input-type=module -e '
+  sage-burner node --input-type=module -e '
 import { randomUUID } from "node:crypto"
 import { createDb, runMigrations } from "/app/apps/backend/src/db/index.ts"
 import { account, accountRole } from "/app/apps/backend/src/db/schema.ts"
