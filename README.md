@@ -156,11 +156,11 @@ cp .env.example .env
 docker compose up -d
 ```
 
-For the Apache deployment below, uncomment `TRUST_PROXY=1` in that `.env` —
-without it `request.ip` is the Docker bridge for every request. It ships
-commented out rather than set, because a trusted hop with nothing in front
-appending to `X-Forwarded-For` hands the client control of that value, and a
-default that is only safe if you edit the file is not a safe default.
+For the Apache deployment below, change `TRUST_PROXY` to `1` in that `.env` —
+without it `request.ip` is the Docker bridge for every request. It ships as
+`false` rather than `1` because a trusted hop with nothing in front appending to
+`X-Forwarded-For` hands the client control of that value, and a default that is
+only safe if you edit the file is not a safe default.
 
 One service, one named volume holding the SQLite database, and a watchtower
 sidecar that polls Docker Hub every five minutes and redeploys when the tag

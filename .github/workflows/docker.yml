@@ -71,6 +71,14 @@ jobs:
       - run: pnpm check
       - run: pnpm test
 
+      # The file that actually runs in production, and otherwise the only one
+      # here nothing checks: it is not an image input, so it is correctly absent
+      # from the push paths filter, and nothing else parses it. Without this the
+      # first thing to notice a typo or a bad key would be the server. The
+      # ${TRUST_PROXY:-false} / ${LOG_LEVEL:-info} defaults mean it resolves
+      # with no .env present.
+      - run: docker compose config -q
+
   # Build, start what was built, then publish — in that order, so nothing
   # unstartable reaches Docker Hub. Watchtower has no rollback and --cleanup
   # removes the superseded image, so the alternative to catching it here is
@@ -132,6 +140,7 @@ jobs:
       # Also exercises migrating a fresh volume, which nothing else does before
       # production does it.
       - name: Smoke-test the image
+        id: smoke
         run: |
           set -euo pipefail
           # The sha tag specifically, not `head -1`. metadata-action sorts by
@@ -150,6 +159,9 @@ jobs:
             exit 1
           fi
           echo "smoke-testing $IMAGE"
+          # Exported so the push step can order by name rather than by
+          # deriving the sha tag's position from metadata-action's priorities.
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
           # Same constraints docker-compose.yml applies, so the hardening is
           # not the one part of the runtime configuration nothing ever starts.
           # A dependency that quietly needs a capability should fail here, not
@@ -223,22 +235,30 @@ jobs:
           'refs/heads/main')
         run: |
           set -euo pipefail
-          # Reversed, so the immutable sha tag lands before the one watchtower
-          # follows. metadata-action emits priority-descending and `type=raw`
-          # outranks `type=sha`, so the natural order pushes `:develop` first —
-          # and watchtower starts deploying it within five minutes. If the sha
-          # push then failed (a Hub blip, a rate limit, cancel-in-progress
+          # The immutable sha tag first, by name — not by reversing
+          # metadata-action's output. Ordering matters because watchtower starts
+          # deploying `:develop` within five minutes of it moving: if the sha
+          # push failed afterwards (a Hub blip, a rate limit, cancel-in-progress
           # firing because a second merge landed), the deployable tag would have
-          # moved while the anchor did not exist, and "recover by hand-pinning a
-          # <sha> tag in the compose file" — which both job comments above rely
-          # on — would have nothing to pin to.
+          # moved with no anchor on Hub, and "recover by hand-pinning a <sha>
+          # tag in the compose file" — which both job comments above rely on —
+          # would have nothing to pin to.
+          #
+          # Derived ordering was the earlier shape and it was fragile: it
+          # assumed `type=raw` outranks `type=sha`, so a priority change or an
+          # explicit `priority=` on a tag line would have silently inverted it,
+          # with both pushes succeeding and nothing going red.
           #
           # The `|| exit 1` is load-bearing and must not be simplified away.
-          # Ordering only helps if the first failure actually stops the rest:
           # `xargs` keeps going for exit statuses 1–125 and reports 123 at the
-          # end, by which point every tag has been pushed. `set -e` does not
+          # end, by which point every tag has been pushed; `set -e` does not
           # cover it either — measured, it does not abort this loop body — so
-          # the check has to be explicit rather than inherited.
-          printf '%s\n' "${{ steps.meta.outputs.tags }}" | tac | while read -r tag; do
-            docker push "$tag" || exit 1
+          # stopping has to be explicit rather than inherited.
+          SHA_IMAGE='${{ steps.smoke.outputs.image }}'
+          docker push "$SHA_IMAGE" || exit 1
+
+          printf '%s\n' "${{ steps.meta.outputs.tags }}" | while read -r tag; do
+            if [ "$tag" != "$SHA_IMAGE" ]; then
+              docker push "$tag" || exit 1
+            fi
           done
