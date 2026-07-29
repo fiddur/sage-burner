@@ -67,21 +67,25 @@ being handed the HTML shell. It also means invite tokens must be dot-free.
 
 ### Configuration
 
-Every variable is optional; the defaults are what you get from a bare
-`docker run`. An empty value is treated as unset, since `FOO: ${FOO}` in a
+Every variable is optional except `SESSION_SECRET`, which is required whenever
+`NODE_ENV` is `production` — and the image sets that, so a bare `docker run` of
+the published image needs it. The other defaults are what you get without any
+configuration. An empty value is treated as unset, since `FOO: ${FOO}` in a
 compose file with `FOO` undefined expands to an empty string rather than to
 nothing.
 
-| Variable       | Default                     | Meaning                                                            |
-| -------------- | --------------------------- | ------------------------------------------------------------------ |
-| `NODE_ENV`     | `development`               | `development` \| `test` \| `production`                            |
-| `PORT`         | `3000`                      | Port to listen on                                                  |
-| `HOST`         | `0.0.0.0`                   | Bind address — `0.0.0.0` to be reachable in Docker                 |
-| `DATABASE_URL` | `./data/sage-burner.sqlite` | SQLite file; parent directory is created                           |
-| `LOG_LEVEL`    | `info`                      | `fatal` … `trace`, or `silent`                                     |
-| `BUILD_SHA`    | `unknown`                   | Commit the image was built from                                    |
-| `WEB_ROOT`     | _(unset)_                   | Directory of the built web app. Unset in dev, where Vite serves it |
-| `TRUST_PROXY`  | `false`                     | `false`, `true`, a hop count like `1`, or an address/CIDR list     |
+| Variable              | Default                     | Meaning                                                                                        |
+| --------------------- | --------------------------- | ---------------------------------------------------------------------------------------------- |
+| `NODE_ENV`            | `development`               | `development` \| `test` \| `production`                                                        |
+| `PORT`                | `3000`                      | Port to listen on                                                                              |
+| `HOST`                | `0.0.0.0`                   | Bind address — `0.0.0.0` to be reachable in Docker                                             |
+| `DATABASE_URL`        | `./data/sage-burner.sqlite` | SQLite file; parent directory is created                                                       |
+| `LOG_LEVEL`           | `info`                      | `fatal` … `trace`, or `silent`                                                                 |
+| `BUILD_SHA`           | `unknown`                   | Commit the image was built from                                                                |
+| `WEB_ROOT`            | _(unset)_                   | Directory of the built web app. Unset in dev, where Vite serves it                             |
+| `TRUST_PROXY`         | `false`                     | `false`, `true`, a hop count like `1`, or an address/CIDR list                                 |
+| `SESSION_SECRET`      | _(none)_                    | **Required in production.** HMAC key for session cookies, 32+ chars. `openssl rand -base64 48` |
+| `SESSION_TTL_SECONDS` | `1209600`                   | How long a session lasts. Two weeks                                                            |
 
 Invalid configuration fails at boot with every problem listed, rather than
 starting and behaving subtly wrong.

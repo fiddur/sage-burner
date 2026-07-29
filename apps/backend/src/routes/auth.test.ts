@@ -267,67 +267,60 @@ describe('GET /api/auth/me', () => {
   })
 })
 
-describe('concurrency shedding', () => {
+describe('concurrency', () => {
   // Not a rate limiter (#57) — the availability guard. scrypt runs on libuv's
   // four-slot threadpool, which @fastify/static reads files through, so a
-  // client holding concurrent logins stalls the whole app rather than just
-  // this route.
-  it('sheds a third concurrent login rather than queueing it', async () => {
-    const server = await build()
-    // Production parameters, so each verification is slow enough that three
-    // requests genuinely overlap. With `cheap` they would finish serially and
-    // the test would pass without the guard.
-    await givenAccount(server, {
+  // client holding concurrent logins would otherwise stall the whole app.
+  //
+  // These use production parameters deliberately: with `cheap` ones the
+  // requests finish serially and never overlap, so they would pass with no
+  // gate at all.
+  const slowAccount = (server: FastifyInstance) =>
+    givenAccount(server, {
       email: 'ada@example.org',
       password: 'a good long passphrase',
       params: defaultScryptParams,
     })
 
-    const attempts = [
-      login(server, 'ada@example.org', 'a good long passphrase'),
-      login(server, 'ada@example.org', 'a good long passphrase'),
-      login(server, 'ada@example.org', 'a good long passphrase'),
-    ]
-    const statuses = (await Promise.all(attempts)).map((response) => response.statusCode)
+  const attempts = (server: FastifyInstance, count: number) =>
+    Promise.all(
+      Array.from({ length: count }, () => login(server, 'ada@example.org', 'a good long passphrase')),
+    )
 
-    expect(statuses.filter((status) => status === 429)).toHaveLength(1)
-    expect(statuses.filter((status) => status === 200)).toHaveLength(2)
+  it('queues a third concurrent login rather than refusing it', async () => {
+    // The property that matters. A hard cap refused here, which turned two
+    // sustained anonymous requests into a permanent outage of the only way
+    // into the app — nothing to wait out, nothing to retry into.
+    const server = await build()
+    await slowAccount(server)
+
+    const statuses = (await attempts(server, 3)).map((response) => response.statusCode)
+
+    expect(statuses).toEqual([200, 200, 200])
   })
 
-  it('tells a shed caller when to come back, and in the documented vocabulary', async () => {
+  it('sheds only once the queue itself is full', async () => {
+    // Two running plus eight waiting; the eleventh has nowhere to go. The queue
+    // is bounded so it cannot become the exhaustion it exists to prevent.
     const server = await build()
-    await givenAccount(server, {
-      email: 'ada@example.org',
-      password: 'a good long passphrase',
-      params: defaultScryptParams,
-    })
+    await slowAccount(server)
 
-    const responses = await Promise.all([
-      login(server, 'ada@example.org', 'a good long passphrase'),
-      login(server, 'ada@example.org', 'a good long passphrase'),
-      login(server, 'ada@example.org', 'a good long passphrase'),
-    ])
-    const shed = responses.find((response) => response.statusCode === 429)
+    const responses = await attempts(server, 11)
+    const shed = responses.filter((response) => response.statusCode === 429)
 
-    expect(shed?.json()).toEqual({ error: 'rate_limited' })
-    expect(shed?.headers['retry-after']).toBe('1')
+    expect(shed.length).toBeGreaterThanOrEqual(1)
+    expect(responses.filter((response) => response.statusCode === 200).length).toBeGreaterThanOrEqual(10)
+    expect(shed[0]?.json()).toEqual({ error: 'rate_limited' })
+    expect(shed[0]?.headers['retry-after']).toBe('1')
   })
 
-  it('releases the slot again, so a burst does not wedge login permanently', async () => {
-    // The counter is decremented in a `finally`; without it a throw would leak
-    // a slot and every later login would be refused until a restart.
+  it('releases every slot again, so a burst does not wedge login shut', async () => {
+    // The release is in a `finally`; without it a throw leaks a slot and login
+    // degrades permanently until a restart.
     const server = await build()
-    await givenAccount(server, {
-      email: 'ada@example.org',
-      password: 'a good long passphrase',
-      params: defaultScryptParams,
-    })
+    await slowAccount(server)
 
-    await Promise.all([
-      login(server, 'ada@example.org', 'a good long passphrase'),
-      login(server, 'ada@example.org', 'a good long passphrase'),
-      login(server, 'ada@example.org', 'a good long passphrase'),
-    ])
+    await attempts(server, 11)
 
     expect((await login(server, 'ada@example.org', 'a good long passphrase')).statusCode).toBe(200)
   })

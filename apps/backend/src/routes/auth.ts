@@ -8,6 +8,7 @@ import type { Sessions } from '../auth/session.ts'
 import type { Config } from '../config.ts'
 import type { Database } from '../db/index.ts'
 
+import { createGate } from '../auth/gate.ts'
 import { hashPassword, needsRehash, verifyPassword } from '../auth/password.ts'
 import { account, accountRole } from '../db/schema.ts'
 
@@ -141,34 +142,31 @@ export interface AuthRouteDeps {
 const noStore = (reply: FastifyReply) => reply.header('cache-control', 'no-store')
 
 /**
- * How many password verifications may be in flight at once.
+ * Bounds on concurrent password verification.
  *
- * Not a rate limiter — #57 is that. This is the narrower availability guard,
- * and it is the one that has to exist before the route is reachable from the
- * internet.
+ * `scrypt` costs ~230ms and 64 MiB and runs on libuv's threadpool — four slots
+ * by default, shared with the file reads `@fastify/static` does. Two leaves
+ * half the pool for everything else.
  *
- * Note what #57 does *not* automatically fix, if it is scoped to per-address
- * buckets: an attacker cycling addresses never fills one, so two sustained
- * requests still hold this cap and every member's login answers 429. Removing
- * that cliff needs a per-IP bound ahead of the slot claim, or a bounded queue
- * with a short timeout so a member waits half a second instead of being
- * refused.
+ * Queued rather than shed, which matters more than the numbers. A hard cap
+ * means two sustained anonymous requests refuse every member's login for as
+ * long as they are held, with nothing to wait out — a permanent outage of the
+ * only way into the app, triggerable from a laptop. A FIFO queue keeps the same
+ * threadpool bound while letting a member arriving mid-flood take their turn.
  *
- * `scrypt` runs on libuv's threadpool, four slots by default, and
- * `@fastify/static` reads files through the same pool. So a single anonymous
- * client holding a handful of concurrent POSTs here does not merely slow login
- * down — it stalls the SPA and the ICS feed with it, indefinitely, at ~230ms
- * per attempt. Two leaves half the pool for everything else.
+ * The queue is bounded so it cannot become the exhaustion it prevents, and the
+ * wait is bounded so a caller is answered rather than held open. Eight deep at
+ * two at a time is ~920ms worst case, comfortably inside the timeout.
  *
- * Two concurrent logins is not a constraint for 42 members; it is a constraint
- * for someone trying to occupy the process.
+ * Still not a rate limiter: this bounds concurrent work, not attempts per
+ * caller. #57 is that, and it is what bounds guessing.
  */
-const MAX_CONCURRENT_VERIFICATIONS = 2
+const LOGIN_GATE = { slots: 2, queue: 8, timeoutMs: 2000 }
 
 export const registerAuthRoutes = (app: FastifyInstance, { db, config, sessions }: AuthRouteDeps) => {
   // Per-registration rather than module-level, so two apps in one test process
-  // do not share a counter.
-  let verificationsInFlight = 0
+  // do not share a gate.
+  const gate = createGate(LOGIN_GATE)
   const handleLogin = async (request: FastifyRequest, reply: FastifyReply) => {
     const parsed = loginRequestSchema.safeParse(request.body)
 
@@ -219,26 +217,22 @@ export const registerAuthRoutes = (app: FastifyInstance, { db, config, sessions 
   app.post('/api/auth/login', async (request, reply) => {
     void noStore(reply)
 
-    if (verificationsInFlight >= MAX_CONCURRENT_VERIFICATIONS) {
-      // Shed rather than queue: queueing is what lets a client hold the
-      // threadpool. `Retry-After` is honest about how long the work takes.
+    // Taken before any work, so the bound cannot depend on what the database
+    // driver does between a check and a claim.
+    const release = await gate.enter()
+
+    if (release === undefined) {
+      // The queue was full or the wait ran out. Only now is a 429 the honest
+      // answer — the caller has already waited their turn.
       void reply.header('retry-after', '1')
-      request.log.warn({ in_flight: verificationsInFlight }, 'login shed')
+      request.log.warn(gate.stats(), 'login shed')
       return reply.code(429).send(errorResponse('rate_limited'))
     }
 
-    // Claimed here, at the check, rather than just before the hashing below.
-    // There is an `await` between the two, and taking the slot after it makes
-    // the cap depend on the database driver resolving synchronously: with real
-    // I/O, several handlers could pass the check before any of them increments,
-    // and the guard would silently stop binding. `node:sqlite` happens to
-    // resolve as a microtask today, which is exactly the kind of accident that
-    // holds until it does not.
-    verificationsInFlight += 1
     try {
       return await handleLogin(request, reply)
     } finally {
-      verificationsInFlight -= 1
+      release()
     }
   })
 

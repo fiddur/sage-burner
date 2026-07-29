@@ -172,8 +172,13 @@ export const verifyPassword = async (
 /**
  * Whether a stored hash was made with weaker parameters than we now use.
  *
- * True for anything unparseable as well, so a row written by an older or
- * broken path is replaced the next time its owner logs in successfully.
+ * True for anything unparseable as well — failing toward re-hashing rather than
+ * toward leaving a bad row alone. Note that this does *not* rescue a broken row
+ * today: the login path only consults this after `verifyPassword` returned
+ * true, and that returns false for anything `parseHash` cannot read. So an
+ * unreadable hash fails login permanently rather than being replaced on the
+ * next one, and fixing that needs a password reset — there is nothing to
+ * verify a new hash against.
  */
 export const needsRehash = (stored: string, params = defaultScryptParams): boolean => {
   const parsed = parseHash(stored)
