@@ -8,7 +8,15 @@ import type { VersionResponse } from '@sage-burner/shared'
  * to configure, nothing to get wrong per environment, and no CORS anywhere.
  */
 
-/** Raised for anything that is not a 2xx. Carries enough to render a message. */
+/**
+ * Raised for anything that is not a 2xx. Carries enough to render a message.
+ *
+ * `code` holds the envelope's `error` slug, or the literal `'unknown'` when the
+ * body was not the documented envelope — a proxy's HTML, an empty body, a
+ * crash. Typed as `string` rather than the shared `ErrorCode` union on purpose:
+ * the API may return a code this build predates, and narrowing would collapse
+ * that to `'unknown'`, losing the one string worth putting in a bug report.
+ */
 export interface ApiError extends Error {
   status: number
   code: string
@@ -25,11 +33,6 @@ export const apiError = (status: number, code: string, message: string): ApiErro
 
 export const isApiError = (value: unknown): value is ApiError =>
   value instanceof Error && 'status' in value && 'code' in value
-
-/** The backend's error envelope. Kept narrow deliberately — see `not_found`. */
-interface ErrorBody {
-  error?: unknown
-}
 
 /**
  * A message worth showing a member.
@@ -58,8 +61,15 @@ const messageFor = (status: number) => {
 const codeFrom = async (response: Response): Promise<string> => {
   try {
     const body: unknown = await response.json()
-    const { error } = (body ?? {}) as ErrorBody
-    return typeof error === 'string' ? error : 'unknown'
+    // Narrowed rather than cast to `ErrorResponse`: the whole point of this
+    // function is that the body might not be that shape at all. Validating
+    // with `errorResponseSchema` would be the obvious alternative, but that
+    // would put Zod in the browser bundle — the web app imports types only.
+    if (typeof body === 'object' && body !== null && 'error' in body) {
+      const { error } = body
+      if (typeof error === 'string') return error
+    }
+    return 'unknown'
   } catch {
     return 'unknown'
   }

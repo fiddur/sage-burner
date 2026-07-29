@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { errorCodes, errorResponse, errorResponseSchema, isErrorCode } from './error.ts'
+import { errorCodes, errorResponse, errorResponseSchema } from './error.ts'
 
 /**
  * These pin the wire format itself.
@@ -42,17 +42,5 @@ describe('errorResponseSchema', () => {
 
   it('accepts a code outside the vocabulary, so an older client can still parse a newer API', () => {
     expect(errorResponseSchema.safeParse({ error: 'some_future_code' }).success).toBe(true)
-  })
-})
-
-describe('isErrorCode', () => {
-  it('accepts every declared code', () => {
-    for (const code of errorCodes) expect(isErrorCode(code)).toBe(true)
-  })
-
-  it('rejects unknown strings and non-strings', () => {
-    expect(isErrorCode('teapot')).toBe(false)
-    expect(isErrorCode('')).toBe(false)
-    for (const value of [null, undefined, 404, true, {}, []]) expect(isErrorCode(value)).toBe(false)
   })
 })
