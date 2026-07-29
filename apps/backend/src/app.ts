@@ -104,20 +104,26 @@ export const loggerOptions = (level: string) => ({
     // These never belong in a log line, and the whole point of the app is that
     // it holds them.
     //
-    // `err.headers` is here because `sendEnvelope` deliberately supports errors
-    // that carry headers — a 401 challenge, a rate limiter's Retry-After, a
-    // session-clearing set-cookie — and pino's error serializer copies an
-    // error's own enumerable properties into the log verbatim. So the supported
-    // shape is also the one that would write a session value to disk on the 5xx
-    // branch.
-    paths: [
-      'req.headers.cookie',
-      'req.headers.authorization',
-      'res.headers["set-cookie"]',
-      'err.headers["set-cookie"]',
-      'err.headers.cookie',
-      'err.headers.authorization',
-    ],
+    // `err.headers` goes wholesale rather than by name. `sendEnvelope`
+    // deliberately supports errors that carry headers — a 401 challenge, a rate
+    // limiter's Retry-After, a session-clearing set-cookie — and pino's error
+    // serializer copies an error's own enumerable properties into the log
+    // verbatim, so the supported shape is also the one that would write a live
+    // session value to disk.
+    //
+    // Naming them (`err.headers["set-cookie"]`) does not work: pino matches
+    // paths literally, and unlike `req.headers`, which Node lowercases, these
+    // keys are whatever the throwing code wrote. `Set-Cookie` is the
+    // conventional spelling and would sail straight past. Removing the object
+    // is the only form that cannot be defeated by casing. `sendEnvelope` logs
+    // the header *names* separately, which is the part worth reading.
+    //
+    // `res.headers["set-cookie"]` matches nothing today — Fastify's default
+    // `res` serializer emits `{ statusCode }` and no headers at all — and stays
+    // for the same reason the encodings are in `describesTheBody`: it costs
+    // nothing, and the day someone widens that serializer is not the day to be
+    // discovering it.
+    paths: ['req.headers.cookie', 'req.headers.authorization', 'res.headers["set-cookie"]', 'err.headers'],
     remove: true,
   },
 })

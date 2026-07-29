@@ -185,10 +185,15 @@ describe('error logging', () => {
       throw Object.assign(new Error('kaput'), {
         statusCode: 500,
         headers: {
-          'set-cookie': ['session=SECRETVALUE; Path=/'],
-          authorization: 'Bearer SECRETTOKEN',
-          cookie: 'session=SECRETCOOKIE',
-          'www-authenticate': 'Bearer',
+          // Canonically cased on purpose. Naming redact paths
+          // (`err.headers["set-cookie"]`) only matches the lowercase spelling,
+          // and `Set-Cookie` is the one most libraries actually emit — so the
+          // supported shape in its usual casing would sail past a by-name
+          // control. These keys are the test.
+          'Set-Cookie': ['session=SECRETVALUE; Path=/'],
+          Authorization: 'Bearer SECRETTOKEN',
+          Cookie: 'session=SECRETCOOKIE',
+          'WWW-Authenticate': 'Bearer',
         },
       })
     })
@@ -199,9 +204,29 @@ describe('error logging', () => {
     expect(logged).not.toContain('SECRETVALUE')
     expect(logged).not.toContain('SECRETTOKEN')
     expect(logged).not.toContain('SECRETCOOKIE')
-    // Redaction is targeted, not a blanket drop of err.headers — a challenge
-    // header is exactly what makes a 401 line worth reading.
-    expect(logged).toContain('www-authenticate')
+    // The names survive, which is the part worth reading — "a challenge was
+    // attached" without the value that must never be written down.
+    expect(logged).toContain('WWW-Authenticate')
+    expect(logged).toContain('sent_headers')
+  })
+
+  it('answers a non-object throw with the envelope, keeping the reply status', async () => {
+    // `throw null` is legal, and reaches the handler with a status already on
+    // the reply. Reading `error.code` off it threw, Fastify's catch re-sent
+    // that as its prose envelope, and the 409 was lost — the one throw this
+    // handler could not handle produced exactly what it exists to prevent.
+    const captured = withCapturedLog()
+    app = captured.app
+    captured.app.get('/nothing', async (_request, reply) => {
+      reply.code(409)
+      // eslint-disable-next-line no-throw-literal
+      throw null
+    })
+
+    const response = await captured.app.inject({ method: 'GET', url: '/nothing' })
+
+    expect(response.statusCode).toBe(409)
+    expect(response.json()).toEqual({ error: 'bad_request' })
   })
 
   it('logs a 5xx with the stack, which is ours to explain', async () => {

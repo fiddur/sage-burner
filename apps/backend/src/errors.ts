@@ -116,6 +116,27 @@ const declaredStatus = (error: unknown): number | undefined => {
   return fromStatus ?? ('statusCode' in error ? usable(error.statusCode) : undefined)
 }
 
+/**
+ * The `code` and `message` of the thrown thing, if it has them.
+ *
+ * `throw null` is legal and reaches here whenever the route already set a 4xx
+ * on the reply — reading `error.code` off it threw, and Fastify's `catch`
+ * re-sent that as its prose envelope with the original status lost. So the one
+ * throw this handler could not handle produced exactly the output it exists to
+ * prevent. Narrowed like `headersFrom` and `declaredStatus`, so "whatever was
+ * thrown" is literally true.
+ */
+const detailsOf = (error: unknown): { code?: string; reason?: string } => {
+  if (typeof error !== 'object' || error === null) {
+    return typeof error === 'string' ? { reason: error } : {}
+  }
+
+  const code = 'code' in error && typeof error.code === 'string' ? error.code : undefined
+  const reason = 'message' in error && typeof error.message === 'string' ? error.message : undefined
+
+  return { code, reason }
+}
+
 const codeFor = (status: number): ErrorCode => {
   if (status === 404) return 'not_found'
   if (status >= 400 && status < 500) return 'bad_request'
@@ -159,6 +180,12 @@ const sendEnvelope = (error: FastifyError, request: FastifyRequest, reply: Fasti
   const chosen = declaredStatus(error) ?? fromReply ?? 500
   const status = chosen <= 599 ? chosen : 500
 
+  // Fastify's default handler copies these across; replacing it drops them
+  // silently. The two plausible sources are both on the roadmap — a 401
+  // `WWW-Authenticate` challenge with #8, and `Retry-After` from the invite
+  // rate limiter — and a missing challenge header looks like a client bug.
+  const headers = headersFrom(error)
+
   // 5xx is ours to explain, so it gets the stack. 4xx is the caller's
   // mistake and gets the facts without one: `info` is the default level, so
   // this branch is on in production, and `{ err }` would hand pino a full
@@ -166,17 +193,17 @@ const sendEnvelope = (error: FastifyError, request: FastifyRequest, reply: Fasti
   // posting `{ not json` in a loop. The code, status and message are what
   // makes such a line useful anyway; the stack only says where Fastify's
   // parser lives.
+  //
+  // Names, never values: `loggerOptions` strips `err.headers` wholesale
+  // because pino cannot redact by name across casings, so this is what is left
+  // of them — and "a challenge was attached" is the readable part anyway.
+  // A value here would be the session cookie.
   if (status >= 500) {
-    request.log.error({ err: error }, 'request failed')
+    request.log.error({ err: error, sent_headers: headers && Object.keys(headers) }, 'request failed')
   } else {
-    request.log.info({ code: error.code, status, reason: error.message }, 'request rejected')
+    request.log.info({ ...detailsOf(error), status }, 'request rejected')
   }
 
-  // Fastify's default handler copies these across; replacing it drops them
-  // silently. The two plausible sources are both on the roadmap — a 401
-  // `WWW-Authenticate` challenge with #8, and `Retry-After` from the invite
-  // rate limiter — and a missing challenge header looks like a client bug.
-  const headers = headersFrom(error)
   if (headers !== undefined) void reply.headers(headers)
 
   const body: ErrorResponse = errorResponse(codeFor(status))
