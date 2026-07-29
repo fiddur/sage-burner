@@ -139,6 +139,21 @@ describe('Login', () => {
     expect(login).not.toHaveBeenCalled()
   })
 
+  it('shows no form while the viewer is still loading', async () => {
+    // A signed-in member opening /login directly would otherwise see the form
+    // flash before it swaps — the same flicker `loading` was introduced in
+    // viewer.tsx to avoid for the nav, reappearing where it is most likely to
+    // be typed into.
+    render(
+      <ViewerProvider viewer={{ status: 'loading' }}>
+        <Login api={{ login: vi.fn(() => Promise.resolve({ viewer: null })) }} />
+      </ViewerProvider>,
+    )
+
+    expect(screen.queryByLabelText('Email')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Log in' })).toBeNull()
+  })
+
   it('says why there is no sign-up or password reset', async () => {
     // Both are absent by design — accounts come from invites (#17) and there is
     // no mail service (#30). A dead link would be worse than saying so.

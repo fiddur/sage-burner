@@ -143,9 +143,16 @@ const noStore = (reply: FastifyReply) => reply.header('cache-control', 'no-store
 /**
  * How many password verifications may be in flight at once.
  *
- * Not a rate limiter — #57 is that, keyed per address. This is the narrower
- * availability guard, and it is the one that has to exist before the route is
- * reachable from the internet.
+ * Not a rate limiter — #57 is that. This is the narrower availability guard,
+ * and it is the one that has to exist before the route is reachable from the
+ * internet.
+ *
+ * Note what #57 does *not* automatically fix, if it is scoped to per-address
+ * buckets: an attacker cycling addresses never fills one, so two sustained
+ * requests still hold this cap and every member's login answers 429. Removing
+ * that cliff needs a per-IP bound ahead of the slot claim, or a bounded queue
+ * with a short timeout so a member waits half a second instead of being
+ * refused.
  *
  * `scrypt` runs on libuv's threadpool, four slots by default, and
  * `@fastify/static` reads files through the same pool. So a single anonymous

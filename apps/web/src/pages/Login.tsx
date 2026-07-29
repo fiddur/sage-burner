@@ -28,6 +28,20 @@ export const Login = ({ api }: { api: Pick<ApiClient, 'login'> }) => {
   // attempt costs the server a ~200ms scrypt hash.
   const inFlight = useRef(false)
 
+  if (viewer.status === 'loading') {
+    // Not the form. `viewer.tsx` introduced `loading` precisely so the nav does
+    // not render signed-out and then swap; rendering the form here would put
+    // the same flicker back on the page where it is most confusing — a member
+    // already signed in, opening /login directly, sees a login form for a
+    // moment and reasonably starts typing into it.
+    return (
+      <section class="page">
+        <h1>Log in</h1>
+        <p class="form-note">One moment…</p>
+      </section>
+    )
+  }
+
   if (viewer.status === 'signed-in') {
     return (
       <section class="page">

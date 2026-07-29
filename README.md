@@ -373,7 +373,11 @@ rather than queued, because queueing is what lets one client occupy the
 threadpool. That bounds the damage to login itself: two sustained anonymous
 requests will hold the cap and make every member's login answer `429` for as
 long as they keep them open. Denying login is a much smaller thing than stalling
-the whole process, but it is not nothing, and [#57] is what actually fixes it.
+the whole process, but it is not nothing.
+
+[#57] only removes that cliff if it bounds _per IP_, or queues with a short
+timeout — a limiter keyed on the email address alone would never fire against
+an attacker cycling addresses, and this cap would still refuse everyone.
 Every attempt costs ~230ms of CPU and
 64 MiB, including one for an address with no account, and `scrypt` runs on
 libuv's threadpool — four slots by default, shared with static file reads — so
