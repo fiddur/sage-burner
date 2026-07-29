@@ -54,6 +54,26 @@ describe('Login', () => {
     expect((await screen.findByRole('alert')).textContent).toBe('That email and password did not match.')
   })
 
+  it('tells a rate-limited member to wait, rather than to try again', async () => {
+    // The login gate sheds with 429 and `Retry-After`. "Please try again"
+    // invites exactly the immediate retry that header exists to prevent — and
+    // under a flood, that is the client behaviour that makes it worse. This is
+    // what `rate_limited` was added to the vocabulary for.
+    const login = vi.fn<AppApi['login']>(() =>
+      Promise.reject(apiError(429, 'rate_limited', 'Too many attempts just now.')),
+    )
+    renderLogin(login)
+
+    fillIn('ada@example.org', 'a good long passphrase')
+    submit()
+
+    const message = (await screen.findByRole('alert')).textContent
+    expect(message).toContain('Wait a few seconds')
+    // Specifically not the generic failure copy, which says only "Please try
+    // again" and so invites the immediate retry.
+    expect(message).not.toBe('Could not sign in just now. Please try again.')
+  })
+
   it('distinguishes a server failure from a rejected password', async () => {
     // "That email and password did not match" would send someone hunting for a
     // typo when the database is down.

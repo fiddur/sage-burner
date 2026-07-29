@@ -263,10 +263,9 @@ export const registerAuthRoutes = (app: FastifyInstance, { db, config, sessions 
     const admission = await gate.enter()
 
     if (!admission.ok) {
-      // Only now is a 429 the honest answer — the caller has already waited
-      // their turn.
-      //
-      // The advice differs by reason. A full queue clears as the work in
+      // The advice differs by reason, and so does what happened. `queue-full`
+      // is refused synchronously — that caller waited for nothing — while
+      // `timed-out` means they held on for the whole window and got nowhere. A full queue clears as the work in
       // flight finishes, so a second is about right. A timeout means the
       // caller already waited the full window against a gate that stayed
       // saturated, and sending them straight back would turn a client politely

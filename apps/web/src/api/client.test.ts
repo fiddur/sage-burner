@@ -118,6 +118,9 @@ describe('createApiClient', () => {
         { status: 401, contains: 'sign in' },
         { status: 403, contains: 'access' },
         { status: 404, contains: 'Not found' },
+        // Says how long, rather than inviting the immediate retry that the
+        // accompanying `Retry-After` exists to prevent.
+        { status: 429, contains: 'Wait a few seconds' },
         { status: 500, contains: 'our end' },
       ]
 

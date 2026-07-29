@@ -13,6 +13,15 @@ import { useSetViewer, useViewer } from '../viewer.tsx'
  * send a reset through (#30). An admin resets a password out of band until
  * either exists — saying so here is better than a dead link.
  */
+/** The three failures a login can produce, each wanting different behaviour. */
+const messageForFailure = (failure: unknown): string => {
+  if (!isApiError(failure)) return 'Could not sign in just now. Please try again.'
+  if (failure.status === 401) return 'That email and password did not match.'
+  if (failure.status === 429) return 'Too many sign-in attempts just now. Wait a few seconds and try again.'
+
+  return 'Could not sign in just now. Please try again.'
+}
+
 export const Login = ({ api }: { api: Pick<ApiClient, 'login'> }) => {
   const viewer = useViewer()
   const setViewer = useSetViewer()
@@ -73,14 +82,14 @@ export const Login = ({ api }: { api: Pick<ApiClient, 'login'> }) => {
 
       setViewer({ id: signedIn.account_id, roles: signedIn.roles })
     } catch (failure) {
-      // 401 is the only expected failure and covers a wrong password and an
-      // unknown address alike — the API refuses to distinguish them, so neither
-      // does this copy.
-      setError(
-        isApiError(failure) && failure.status === 401
-          ? 'That email and password did not match.'
-          : 'Could not sign in just now. Please try again.',
-      )
+      // Three cases, because they want different behaviour from the member.
+      //
+      // 401 covers a wrong password and an unknown address alike — the API
+      // refuses to distinguish them, so neither does this copy. 429 is the
+      // login gate shedding; saying "try again" there invites exactly the
+      // immediate retry `Retry-After` exists to prevent, which is why
+      // `rate_limited` was added to the vocabulary in the first place.
+      setError(messageForFailure(failure))
     } finally {
       inFlight.current = false
       setSubmitting(false)

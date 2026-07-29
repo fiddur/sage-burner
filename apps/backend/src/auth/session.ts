@@ -41,7 +41,15 @@ interface WireFormat {
   jti: string
 }
 
-const isWireFormat = (value: unknown): value is WireFormat =>
+/**
+ * Narrowed to what `read` actually uses.
+ *
+ * Not `value is WireFormat`: that interface also requires `jti`, which nothing
+ * here checks, so the guard would be claiming more than it verifies — the soft
+ * cast the typing rule is aimed at. `jti` exists to make two tokens issued in
+ * the same second differ; it is written, never read.
+ */
+const isWireFormat = (value: unknown): value is Pick<WireFormat, 'sub' | 'exp'> =>
   typeof value === 'object' &&
   value !== null &&
   'sub' in value &&
