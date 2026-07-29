@@ -4,6 +4,8 @@ import Fastify from 'fastify'
 import { connect } from 'node:net'
 import { afterEach, describe, expect, it } from 'vitest'
 
+import type { DbHandle } from './db/index.ts'
+
 import { createApp } from './app.ts'
 import { createConfig } from './config.ts'
 import { createDb } from './db/index.ts'
@@ -46,10 +48,13 @@ const withCapturedLog = () => {
 
 describe('error logging', () => {
   let app: FastifyInstance | undefined
+  let handle: DbHandle | undefined
 
   afterEach(async () => {
     await app?.close()
+    handle?.close()
     app = undefined
+    handle = undefined
   })
 
   const rejectionFor = async (thrown: unknown) => {
@@ -139,8 +144,9 @@ describe('error logging', () => {
     // `{"error":"Request Header Fields Too Large",…}` — a sentence in the field
     // the envelope promises is a slug. Reachable without malice on a
     // cookie-session app once enough cookies accumulate on the domain.
+    handle = createDb({ url: ':memory:' })
     const server = await createApp({
-      db: createDb({ url: ':memory:' }).db,
+      db: handle.db,
       config: createConfig({ LOG_LEVEL: 'silent' }),
     })
     app = server

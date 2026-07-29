@@ -139,6 +139,10 @@ const codeFor = (status: number): ErrorCode => {
  * likely to have. The fix for the other case is to include
  * `z.toJSONSchema(errorResponseSchema)` under each error status the route
  * declares. Both halves are pinned in `app.test.ts`.
+ *
+ * Documented rather than enforced, which is the weak form for a failure this
+ * quiet. #51 tracks the `onRoute` hook that would make it a boot failure
+ * instead, the way `assertServableWebRoot` does for a bad WEB_ROOT.
  */
 const sendEnvelope = (error: FastifyError, request: FastifyRequest, reply: FastifyReply) => {
   // Falls back to a status the route already set on the reply, which
@@ -249,8 +253,13 @@ export const registerErrorHandler = (app: FastifyInstance) => {
 
 /**
  * Everything find-my-way rejects before a route is ever reached: a bad percent
- * escape (`/api/%zz`, FST_ERR_BAD_URL) and an over-long path parameter
- * (FST_ERR_MAX_PARAM_LENGTH, a 414).
+ * escape (`/api/%zz`, FST_ERR_BAD_URL), an over-long path parameter
+ * (FST_ERR_MAX_PARAM_LENGTH, a 414), and an async constraint strategy that
+ * fails to resolve (FST_ERR_ASYNC_CONSTRAINT, a 500). The third has no test:
+ * nothing in the tree registers a constraint strategy, and one would have to
+ * exist purely to fail. It is also the site where the containment below matters
+ * most — that call is inside an async callback, so a throw escapes even further
+ * than on the other two.
  *
  * Pass as `frameworkErrors` when building the instance. Without it, `onBadUrl`
  * writes `{ error: 'Bad Request', code, message, statusCode }` straight to the
