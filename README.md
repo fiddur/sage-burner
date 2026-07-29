@@ -306,7 +306,7 @@ on a connection that is not would simply never come back.
 
 ## API errors
 
-Every non-2xx response from `/api` has the same body, and nothing else:
+Every non-2xx response the app produces has the same body, and nothing else:
 
 ```json
 { "error": "not_found" }
@@ -325,6 +325,12 @@ than being listed in advance and left unreachable.
 Clients should tolerate a slug they do not recognise: the schema accepts any
 string so an older frontend can still read a newer API's error instead of
 failing to parse the explanation of what went wrong.
+
+"The app produces" is the limit of the promise. A reverse proxy in front can
+answer with its own error page — an Apache 502 while the container is
+restarting, for instance — and that will not be JSON at all. The web client
+handles this: a non-JSON error body yields `code: 'unknown'` rather than a
+parse error that hides the real status.
 
 [#8]: https://github.com/fiddur/sage-burner/issues/8
 

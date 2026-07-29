@@ -279,6 +279,34 @@ describe('the error envelope', () => {
     expect(response.headers['x-request-id']).toBe('abc')
   })
 
+  it('covers a bad url, which never reaches a route to throw from', async () => {
+    // find-my-way rejects the percent escape before routing, so
+    // `setErrorHandler` cannot see it. Without `frameworkErrors`, Fastify's
+    // `onBadUrl` writes `{"error":"Bad Request","code":…,"message":…}` straight
+    // to the socket — prose in the field the envelope promises is a slug, on a
+    // URL any caller can type, which the web client would surface as
+    // `code: 'Bad Request'`.
+    await build()
+
+    const response = await app.inject({ method: 'GET', url: '/api/%zz' })
+
+    expect(response.statusCode).toBe(400)
+    expect(response.json()).toEqual({ error: 'bad_request' })
+  })
+
+  it('keeps the status a framework error asked for rather than flattening it', async () => {
+    // FST_ERR_MAX_PARAM_LENGTH is a 414, so the handler cannot hardcode the 400
+    // that the bad-url case suggests.
+    await build()
+    app.get('/api/thing/:id', async () => ({ ok: true }))
+    await app.ready()
+
+    const response = await app.inject({ method: 'GET', url: `/api/thing/${'x'.repeat(200)}` })
+
+    expect(response.statusCode).toBe(414)
+    expect(response.json()).toEqual({ error: 'bad_request' })
+  })
+
   it('maps a thrown 404 to not_found, not the generic 4xx code', async () => {
     // The unmatched-route 404 comes from setNotFoundHandler and never reaches
     // here, so nothing else exercises this branch — a route rejecting a missing

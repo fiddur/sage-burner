@@ -1,5 +1,11 @@
 import type { ErrorCode, ErrorResponse } from '@sage-burner/shared'
-import type { FastifyError, FastifyInstance } from 'fastify'
+import type {
+  FastifyError,
+  FastifyInstance,
+  FastifyReply,
+  FastifyRequest,
+  FastifyServerOptions,
+} from 'fastify'
 
 import { errorResponse } from '@sage-burner/shared'
 
@@ -113,43 +119,66 @@ const codeFor = (status: number): ErrorCode => {
   return 'internal_error'
 }
 
-export const registerErrorHandler = (app: FastifyInstance) => {
-  app.setErrorHandler<FastifyError>((error, request, reply) => {
-    // Falls back to a status the route already set on the reply, which
-    // Fastify's default handler preserves and this would otherwise discard.
-    //
-    // The upper clamp guards this handler, not Node: `reply.code()` rejects
-    // anything outside 100–599 with FST_ERR_BAD_STATUS_CODE, and `handleError`
-    // wraps the call to this function in a try/catch whose `catch` does
-    // `reply.send(err)`. So an unclamped 600 would throw here and be re-sent
-    // through the root handler as Fastify's `{ statusCode, error, message }`
-    // prose — the exact envelope this file exists to keep off the wire, leaking
-    // on the one path least likely to be exercised.
-    const fromReply = reply.statusCode >= 400 ? reply.statusCode : undefined
-    const chosen = declaredStatus(error) ?? fromReply ?? 500
-    const status = chosen <= 599 ? chosen : 500
+/**
+ * Answer with the envelope, whatever was thrown.
+ *
+ * Shared by the two paths that can fail, because they are separate options in
+ * Fastify and only one of them is the obvious one.
+ */
+const sendEnvelope = (error: FastifyError, request: FastifyRequest, reply: FastifyReply) => {
+  // Falls back to a status the route already set on the reply, which
+  // Fastify's default handler preserves and this would otherwise discard.
+  //
+  // The upper clamp guards this handler, not Node: `reply.code()` rejects
+  // anything outside 100–599 with FST_ERR_BAD_STATUS_CODE, and `handleError`
+  // wraps the call to this function in a try/catch whose `catch` does
+  // `reply.send(err)`. So an unclamped 600 would throw here and be re-sent
+  // through the root handler as Fastify's `{ statusCode, error, message }`
+  // prose — the exact envelope this file exists to keep off the wire, leaking
+  // on the one path least likely to be exercised.
+  const fromReply = reply.statusCode >= 400 ? reply.statusCode : undefined
+  const chosen = declaredStatus(error) ?? fromReply ?? 500
+  const status = chosen <= 599 ? chosen : 500
 
-    // 5xx is ours to explain, so it gets the stack. 4xx is the caller's
-    // mistake and gets the facts without one: `info` is the default level, so
-    // this branch is on in production, and `{ err }` would hand pino a full
-    // stack per request — meaning anyone unauthenticated could fill the disk by
-    // posting `{ not json` in a loop. The code, status and message are what
-    // makes such a line useful anyway; the stack only says where Fastify's
-    // parser lives.
-    if (status >= 500) {
-      request.log.error({ err: error }, 'request failed')
-    } else {
-      request.log.info({ code: error.code, status, reason: error.message }, 'request rejected')
-    }
+  // 5xx is ours to explain, so it gets the stack. 4xx is the caller's
+  // mistake and gets the facts without one: `info` is the default level, so
+  // this branch is on in production, and `{ err }` would hand pino a full
+  // stack per request — meaning anyone unauthenticated could fill the disk by
+  // posting `{ not json` in a loop. The code, status and message are what
+  // makes such a line useful anyway; the stack only says where Fastify's
+  // parser lives.
+  if (status >= 500) {
+    request.log.error({ err: error }, 'request failed')
+  } else {
+    request.log.info({ code: error.code, status, reason: error.message }, 'request rejected')
+  }
 
-    // Fastify's default handler copies these across; replacing it drops them
-    // silently. The two plausible sources are both on the roadmap — a 401
-    // `WWW-Authenticate` challenge with #8, and `Retry-After` from the invite
-    // rate limiter — and a missing challenge header looks like a client bug.
-    const headers = headersFrom(error)
-    if (headers !== undefined) void reply.headers(headers)
+  // Fastify's default handler copies these across; replacing it drops them
+  // silently. The two plausible sources are both on the roadmap — a 401
+  // `WWW-Authenticate` challenge with #8, and `Retry-After` from the invite
+  // rate limiter — and a missing challenge header looks like a client bug.
+  const headers = headersFrom(error)
+  if (headers !== undefined) void reply.headers(headers)
 
-    const body: ErrorResponse = errorResponse(codeFor(status))
-    return reply.code(status).send(body)
-  })
+  const body: ErrorResponse = errorResponse(codeFor(status))
+  return reply.code(status).send(body)
 }
+
+/** Everything thrown by a route, a hook, or the not-found handler. */
+export const registerErrorHandler = (app: FastifyInstance) => {
+  app.setErrorHandler<FastifyError>(sendEnvelope)
+}
+
+/**
+ * Everything find-my-way rejects before a route is ever reached: a bad percent
+ * escape (`/api/%zz`, FST_ERR_BAD_URL) and an over-long path parameter
+ * (FST_ERR_MAX_PARAM_LENGTH, a 414).
+ *
+ * Pass as `frameworkErrors` when building the instance. Without it, `onBadUrl`
+ * writes `{ error: 'Bad Request', code, message, statusCode }` straight to the
+ * socket — prose in the field the envelope promises is a slug, on a URL any
+ * caller can type, which `createApiClient` would hand back as
+ * `code: 'Bad Request'`. `setErrorHandler` cannot cover it: the request never
+ * reaches routing, so there is nothing to throw from.
+ */
+export const frameworkErrorHandler: NonNullable<FastifyServerOptions['frameworkErrors']> = sendEnvelope

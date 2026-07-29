@@ -9,7 +9,7 @@ import path from 'node:path'
 import type { Config } from './config.ts'
 import type { Database } from './db/index.ts'
 
-import { registerErrorHandler } from './errors.ts'
+import { frameworkErrorHandler, registerErrorHandler } from './errors.ts'
 import { registerVersionRoutes } from './routes/version.ts'
 
 export interface AppDeps {
@@ -114,6 +114,11 @@ export const createApp = async ({ db, config }: AppDeps): Promise<FastifyInstanc
     // redemption or an admin audit trail keys on it. The operator declares
     // what is actually in front via TRUST_PROXY.
     trustProxy: config.trust_proxy,
+    // The other half of the error envelope. `setErrorHandler` covers anything
+    // thrown once a request reaches routing; this covers what find-my-way
+    // rejects before that — a bad percent escape, an over-long path parameter —
+    // which otherwise goes straight to the socket as Fastify's prose.
+    frameworkErrors: frameworkErrorHandler,
   })
 
   app.decorate('db', db)
