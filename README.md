@@ -301,6 +301,10 @@ ProxyPass        / http://127.0.0.1:8081/
 ProxyPassReverse / http://127.0.0.1:8081/
 ```
 
+Note there are no `Header set` lines for CSP, HSTS or the rest: the app sends
+those itself, and a second policy here could only further restrict it. See
+[Security headers](#security-headers).
+
 `X-Forwarded-Proto` is not cosmetic: Apache terminates TLS, so without it the
 app believes it is serving plain HTTP — which decides whether the session cookie
 gets its `Secure` flag.

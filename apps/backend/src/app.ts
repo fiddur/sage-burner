@@ -139,8 +139,9 @@ export const loggerOptions = (level: string) => ({
 /**
  * Security headers, as deviations from `@fastify/helmet`'s defaults.
  *
- * The defaults are close, but two of them are looser than this app needs and
- * one is looser than it should be anywhere. Everything not named here is
+ * The defaults are close, but four need narrowing: three are looser than this
+ * app needs, and `style-src`'s `'unsafe-inline'` is looser than it should be
+ * anywhere. Everything not named here is
  * helmet's default and is wanted: `nosniff`, `Referrer-Policy: no-referrer`
  * (stricter than the `strict-origin-when-cross-origin` #41 asked for, and the
  * right call while an invite token lives in a URL path), HSTS,
@@ -173,7 +174,8 @@ const helmetOptions = () => ({
     },
   },
 
-  // Helmet's SAMEORIGIN, for browsers predating frame-ancestors.
+  // Overrides helmet's SAMEORIGIN. The belt to frame-ancestors' braces, for
+  // browsers predating it.
   xFrameOptions: { action: 'deny' as const },
 })
 
