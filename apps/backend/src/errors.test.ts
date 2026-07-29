@@ -13,7 +13,15 @@ import { registerErrorHandler } from './errors.ts'
  * be captured: `createApp` builds its logger from config and has no seam for one.
  */
 
-type LogLine = { level: number; msg: string; stack?: string; err?: { stack?: string } }
+type LogLine = { msg: string; err?: { stack?: unknown } }
+
+/**
+ * Narrowed rather than cast, for the same reason `headersFrom` is: `JSON.parse`
+ * returns `any`, so a cast here would assert a shape pino is merely expected to
+ * produce, and a line that did not match would be read as one that did.
+ */
+const isLogLine = (value: unknown): value is LogLine =>
+  typeof value === 'object' && value !== null && 'msg' in value && typeof value.msg === 'string'
 
 const withCapturedLog = () => {
   const lines: LogLine[] = []
@@ -23,7 +31,7 @@ const withCapturedLog = () => {
       stream: {
         write: (chunk: string) => {
           const parsed: unknown = JSON.parse(chunk)
-          if (typeof parsed === 'object' && parsed !== null) lines.push(parsed as LogLine)
+          if (isLogLine(parsed)) lines.push(parsed)
         },
       },
     },
