@@ -61,6 +61,49 @@ describe('GET /api/version', () => {
   })
 })
 
+describe('the error envelope', () => {
+  // Without a setErrorHandler, Fastify answers a throw with
+  // `{ statusCode, error: 'Internal Server Error', message }` — which satisfies
+  // errorResponseSchema, since `error` is a string, while putting a sentence
+  // where the envelope promises a slug. A client branching on `code` would be
+  // branching on prose, and `message` can carry internals.
+  it('maps a thrown error to the envelope, leaking nothing', async () => {
+    await build()
+    app.get('/api/boom', async () => {
+      throw new Error('database password is hunter2')
+    })
+
+    const response = await app.inject({ method: 'GET', url: '/api/boom' })
+
+    expect(response.statusCode).toBe(500)
+    expect(response.json()).toEqual({ error: 'internal_error' })
+    expect(response.body).not.toContain('hunter2')
+    expect(response.body).not.toContain('Internal Server Error')
+  })
+
+  it('maps a malformed JSON body to the envelope rather than Fastify prose', async () => {
+    await build()
+    app.post('/api/things', async () => ({ ok: true }))
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/things',
+      headers: { 'content-type': 'application/json' },
+      payload: '{ not json',
+    })
+
+    expect(response.statusCode).toBe(400)
+    expect(response.json()).toEqual({ error: 'bad_request' })
+  })
+
+  it('preserves the status a route chose', async () => {
+    await build()
+    app.get('/api/teapot', async (_request, reply) => reply.code(418).send({ ok: false }))
+
+    expect((await app.inject({ method: 'GET', url: '/api/teapot' })).statusCode).toBe(418)
+  })
+})
+
 describe('trustProxy', () => {
   // Nothing else pins this: delete `trustProxy` from the Fastify options and
   // every other test in this file still passes while the spoof-resistance the

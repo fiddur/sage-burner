@@ -21,16 +21,17 @@ export type ErrorResponse = z.infer<typeof errorResponseSchema>
 /**
  * Error codes the API can return.
  *
- * Only what routes actually emit today. It grows alongside the routes that
- * emit it — #8 adds the auth codes when there are auth routes to return them,
- * rather than listing them here first and leaving three unreachable values and
- * an argument about type safety that nothing yet exercises.
+ * Only what the app actually emits today: the 404 handler, and the error
+ * handler that maps everything else onto this envelope. It grows alongside the
+ * routes that emit it — #8 adds the auth codes when there are auth routes to
+ * return them, rather than listing them first and leaving unreachable values
+ * and an argument about type safety that nothing yet exercises.
  *
  * `errorResponseSchema` deliberately accepts codes outside this list, so an
  * older client can still parse a newer API's response rather than failing to
  * read the error explaining what went wrong.
  */
-export const errorCodes = ['not_found'] as const
+export const errorCodes = ['bad_request', 'not_found', 'internal_error'] as const
 export type ErrorCode = (typeof errorCodes)[number]
 
 /** Build the body for a given code. The single place the envelope is constructed. */

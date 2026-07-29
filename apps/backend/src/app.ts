@@ -9,6 +9,7 @@ import path from 'node:path'
 import type { Config } from './config.ts'
 import type { Database } from './db/index.ts'
 
+import { registerErrorHandler } from './errors.ts'
 import { registerVersionRoutes } from './routes/version.ts'
 
 export interface AppDeps {
@@ -118,6 +119,7 @@ export const createApp = async ({ db, config }: AppDeps): Promise<FastifyInstanc
   app.decorate('db', db)
   app.decorate('config', config)
 
+  registerErrorHandler(app)
   registerVersionRoutes(app, { config })
 
   const webRoot = config.web_root
