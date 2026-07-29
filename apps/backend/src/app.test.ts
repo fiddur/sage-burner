@@ -215,9 +215,10 @@ describe('the error envelope', () => {
     expect((await app.inject({ method: 'GET', url: '/api/mixed' })).statusCode).toBe(409)
   })
 
-  it('clamps a status Node would refuse to write', async () => {
-    // Fastify's default handler assigns this verbatim and lets `writeHead`
-    // throw, turning a handled error into a connection reset.
+  it('clamps a status reply.code would reject rather than throwing inside the handler', async () => {
+    // Unclamped, `reply.code(600)` throws FST_ERR_BAD_STATUS_CODE, Fastify
+    // catches it and re-sends through the root handler, and its prose envelope
+    // reaches the wire — so the body assertion is the real one here.
     await build()
     app.get('/api/absurd', async () => {
       throw Object.assign(new Error('nope'), { statusCode: 600 })
@@ -227,6 +228,21 @@ describe('the error envelope', () => {
 
     expect(response.statusCode).toBe(500)
     expect(response.json()).toEqual({ error: 'internal_error' })
+  })
+
+  it('maps a thrown 404 to not_found, not the generic 4xx code', async () => {
+    // The unmatched-route 404 comes from setNotFoundHandler and never reaches
+    // here, so nothing else exercises this branch — a route rejecting a missing
+    // record is what will.
+    await build()
+    app.get('/api/gone', async () => {
+      throw Object.assign(new Error('no such member'), { statusCode: 404 })
+    })
+
+    const response = await app.inject({ method: 'GET', url: '/api/gone' })
+
+    expect(response.statusCode).toBe(404)
+    expect(response.json()).toEqual({ error: 'not_found' })
   })
 })
 

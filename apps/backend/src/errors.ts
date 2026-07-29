@@ -50,13 +50,27 @@ const headersFrom = (error: unknown): Record<string, HeaderValue> | undefined =>
 /**
  * The status an error asked for, if it asked for a usable one.
  *
- * Mirrors Fastify's own `setErrorStatusCode`: `status` wins over `statusCode`,
- * and either is honoured only when it is already an error status. Some
+ * Either field is honoured only when it is already an error status. Some
  * middleware sets `status` alone; reading `statusCode` by itself would answer
  * 500 to an error that plainly said 403, and log it as ours rather than the
  * caller's. A declared 2xx is ignored rather than sent, because the envelope
  * with an ok status is the one shape it must never take — the web client
  * checks `response.ok` and would hand `{ error: … }` back as the payload.
+ *
+ * `status` wins over `statusCode`, which is one ordering where Fastify has
+ * two. `setErrorHeaders` reads `status` first; `setErrorStatusCode`, which
+ * runs immediately after it, reads `statusCode` first — and because the first
+ * writes `res.statusCode` directly rather than through `reply.code()`,
+ * `kReplyHasStatusCode` stays false and the second overwrites it. So the
+ * effective default is `status`-first when the route set a status of its own
+ * and `statusCode`-first when it did not. This picks `status` first
+ * throughout: it matches the default in the case that has a route behind it,
+ * and the divergence needs an error carrying both fields, both >= 400 and
+ * different, which nothing in the tree emits.
+ *
+ * Deliberately stricter than the default in one respect: Fastify compares
+ * loosely, so `status: '403'` passes `>= 400` there and becomes a 500 here.
+ * A status is a number.
  */
 const declaredStatus = (error: unknown): number | undefined => {
   if (typeof error !== 'object' || error === null) return undefined
@@ -79,10 +93,14 @@ export const registerErrorHandler = (app: FastifyInstance) => {
   app.setErrorHandler<FastifyError>((error, request, reply) => {
     // Falls back to a status the route already set on the reply, which
     // Fastify's default handler preserves and this would otherwise discard.
-    // Clamped at the top, which is the one place this deliberately does not
-    // follow the default: that writes `res.statusCode = 600` verbatim and
-    // lets Node throw at `writeHead`, turning a handled error into a
-    // connection reset.
+    //
+    // The upper clamp guards this handler, not Node: `reply.code()` rejects
+    // anything outside 100–599 with FST_ERR_BAD_STATUS_CODE, and `handleError`
+    // wraps the call to this function in a try/catch whose `catch` does
+    // `reply.send(err)`. So an unclamped 600 would throw here and be re-sent
+    // through the root handler as Fastify's `{ statusCode, error, message }`
+    // prose — the exact envelope this file exists to keep off the wire, leaking
+    // on the one path least likely to be exercised.
     const fromReply = reply.statusCode >= 400 ? reply.statusCode : undefined
     const chosen = declaredStatus(error) ?? fromReply ?? 500
     const status = chosen <= 599 ? chosen : 500
