@@ -383,8 +383,12 @@ The app is the single place this is configured.
 
 One assumption the policy rests on is pinned rather than trusted:
 `apps/web/index.html` must stay free of inline `<script>`, `<style>`, `on*=` and
-`style=`, **and of any absolute `src`/`href` that CSP governs** — a CDN
-stylesheet is blocked by `style-src 'self'` just as surely as an inline block.
+`style=`, **and of any absolute URL that starts a fetch** — a `src` on a script
+or image, or an `href` on a `<link>` that actually loads something
+(`stylesheet`, `modulepreload`, `icon`, `manifest`, `preload`, `prefetch`). A
+CDN stylesheet is blocked by `style-src 'self'` just as surely as an inline
+block. A `rel="canonical"` or `rel="preconnect"` is not checked, because no
+directive governs it.
 
 Vite passes most of that file through untouched, so either would break the built
 app in production with nothing else failing. One exception, verified rather than

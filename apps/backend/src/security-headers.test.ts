@@ -167,9 +167,13 @@ describe('the CSP against the actual page it protects', () => {
     // `rel="me"`, `rel="preconnect">` and any absolute `<a href>`, none of
     // which a policy can block — failing a legitimate edit with a message
     // about a policy that had nothing to do with it.
+    //
+    // The `rel` list is every value that fetches: stylesheet (style-src),
+    // modulepreload (script-src), icon (img-src), manifest (manifest-src),
+    // and preload/prefetch (whichever directive matches `as=`).
     expect(template).not.toMatch(/<(?:script|img)\b[^>]*\bsrc\s*=\s*["']?(?:https?:)?\/\//i)
     expect(template).not.toMatch(
-      /<link\b(?=[^>]*\brel\s*=\s*["']?(?:stylesheet|modulepreload)\b)(?=[^>]*\bhref\s*=\s*["']?(?:https?:)?\/\/)/i,
+      /<link\b(?=[^>]*\brel\s*=\s*["']?(?:stylesheet|modulepreload|icon|manifest|preload|prefetch)\b)(?=[^>]*\bhref\s*=\s*["']?(?:https?:)?\/\/)/i,
     )
   })
 })
