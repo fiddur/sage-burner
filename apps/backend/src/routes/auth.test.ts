@@ -448,6 +448,21 @@ describe('readSessionCookie', () => {
     expect(readSessionCookie(`${SESSION_COOKIE}=`)).toBeUndefined()
   })
 
+  it('refuses a shadowed session rather than picking one', () => {
+    // RFC 6265 orders by descending path specificity, so an attacker who can
+    // set cookies for the domain plants a valid token of their own at
+    // `Path=/api` and it arrives first. Taking it would sign the member into
+    // the attacker's account, where their contact details and allergies would
+    // then be typed. Refusing both signs them out instead.
+    expect(
+      readSessionCookie(`${SESSION_COOKIE}=attacker.token; ${SESSION_COOKIE}=real.token`),
+    ).toBeUndefined()
+  })
+
+  it('refuses a duplicate even when the planted one is empty', () => {
+    expect(readSessionCookie(`${SESSION_COOKIE}=; ${SESSION_COOKIE}=real.token`)).toBeUndefined()
+  })
+
   it('does not match a cookie whose name merely ends with ours', () => {
     // `not_sage_session=…` must not be read as the session.
     expect(readSessionCookie(`not_${SESSION_COOKIE}=abc.def`)).toBeUndefined()

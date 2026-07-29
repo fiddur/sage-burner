@@ -69,23 +69,33 @@ const cookieHeader = (token: string, config: Config, maxAgeSeconds: number): str
  * contact details and allergies included, is written to a record the attacker
  * can read back at leisure.
  *
- * `__Host-` is the standard fix and it is not a drop-in: it requires `Secure`,
- * which is set only when `NODE_ENV` is `production`, so the name would have to
- * vary by environment or `pnpm dev` would have its cookie rejected outright.
- * Tracked in #58, worth doing when the cookie is next touched.
+ * So this refuses outright when the header carries more than one. A legitimate
+ * client never sends two — the cookie is always `Path=/` with no `Domain`, so
+ * there is only ever one to send — which makes a second one, by definition,
+ * planted. Refusing both turns fixation into a sign-out: the member is bounced
+ * to the login page instead of quietly editing their allergies into someone
+ * else's record. A sign-out is a nuisance; the other is data disclosure.
+ *
+ * `__Host-` remains the real fix and is not a drop-in, since it requires
+ * `Secure` and that is set only when `NODE_ENV` is `production` — the name
+ * would have to vary by environment or `pnpm dev` would have its cookie
+ * rejected outright. Tracked in #58. This does not wait for it.
  */
 export const readSessionCookie = (header: string | undefined): string | undefined => {
   if (header === undefined) return undefined
 
-  for (const part of header.split(';')) {
-    const trimmed = part.trim()
-    if (!trimmed.startsWith(`${SESSION_COOKIE}=`)) continue
+  const present = header
+    .split(';')
+    .map((part) => part.trim())
+    .filter((part) => part.startsWith(`${SESSION_COOKIE}=`))
 
-    const value = trimmed.slice(SESSION_COOKIE.length + 1)
-    return value === '' ? undefined : value
-  }
+  // Counted, not first-wins. Duplicates are refused whether or not the extra
+  // one has a value: an empty planted cookie cannot fixate a session, but
+  // distinguishing the cases buys nothing and costs a branch to get wrong.
+  if (present.length !== 1) return undefined
 
-  return undefined
+  const value = present[0]?.slice(SESSION_COOKIE.length + 1)
+  return value === undefined || value === '' ? undefined : value
 }
 
 const rolesFor = async (db: Database, accountId: string) => {
