@@ -47,6 +47,28 @@ const headersFrom = (error: unknown): Record<string, HeaderValue> | undefined =>
   return Object.keys(usable).length > 0 ? usable : undefined
 }
 
+/**
+ * The status an error asked for, if it asked for a usable one.
+ *
+ * Mirrors Fastify's own `setErrorStatusCode`: `status` wins over `statusCode`,
+ * and either is honoured only when it is already an error status. Some
+ * middleware sets `status` alone; reading `statusCode` by itself would answer
+ * 500 to an error that plainly said 403, and log it as ours rather than the
+ * caller's. A declared 2xx is ignored rather than sent, because the envelope
+ * with an ok status is the one shape it must never take — the web client
+ * checks `response.ok` and would hand `{ error: … }` back as the payload.
+ */
+const declaredStatus = (error: unknown): number | undefined => {
+  if (typeof error !== 'object' || error === null) return undefined
+
+  // Spelled out rather than looped over: `in` narrows on a literal key, not on
+  // a union of them, and a loop would need a cast to read the field back.
+  const usable = (value: unknown) => (typeof value === 'number' && value >= 400 ? value : undefined)
+  const fromStatus = 'status' in error ? usable(error.status) : undefined
+
+  return fromStatus ?? ('statusCode' in error ? usable(error.statusCode) : undefined)
+}
+
 const codeFor = (status: number): ErrorCode => {
   if (status === 404) return 'not_found'
   if (status >= 400 && status < 500) return 'bad_request'
@@ -55,16 +77,15 @@ const codeFor = (status: number): ErrorCode => {
 
 export const registerErrorHandler = (app: FastifyInstance) => {
   app.setErrorHandler<FastifyError>((error, request, reply) => {
-    // Clamped, not taken verbatim. An error carrying a 2xx statusCode would
-    // otherwise answer `200 {"error":"internal_error"}` — the one shape the
-    // envelope must never take, because the web client checks `response.ok`
-    // and would hand that object back to the caller as the payload rather
-    // than throwing. Falls back to a status the route already set on the
-    // reply, which Fastify's default handler preserves and this would
-    // otherwise discard.
+    // Falls back to a status the route already set on the reply, which
+    // Fastify's default handler preserves and this would otherwise discard.
+    // Clamped at the top, which is the one place this deliberately does not
+    // follow the default: that writes `res.statusCode = 600` verbatim and
+    // lets Node throw at `writeHead`, turning a handled error into a
+    // connection reset.
     const fromReply = reply.statusCode >= 400 ? reply.statusCode : undefined
-    const chosen = error.statusCode ?? fromReply
-    const status = chosen !== undefined && chosen >= 400 && chosen <= 599 ? chosen : 500
+    const chosen = declaredStatus(error) ?? fromReply ?? 500
+    const status = chosen <= 599 ? chosen : 500
 
     // 5xx is ours to explain; 4xx is the caller's mistake and would otherwise
     // fill the log with noise anyone can generate.

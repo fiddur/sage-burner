@@ -168,6 +168,66 @@ describe('the error envelope', () => {
     // present at all, which a string-only filter would not have managed.
     expect(response.headers['retry-after']).toBe('30')
   })
+
+  it('carries an array of set-cookie headers without collapsing them', async () => {
+    // The realistic producer of the array shape: `reply.header` accumulates
+    // set-cookie rather than overwriting. Dropping the array would log a
+    // member out on the way to being told why the request failed.
+    await build()
+    app.get('/api/stale-session', async () => {
+      throw Object.assign(new Error('session expired'), {
+        statusCode: 401,
+        headers: { 'set-cookie': ['session=; Max-Age=0', 'csrf=; Max-Age=0'] },
+      })
+    })
+
+    const response = await app.inject({ method: 'GET', url: '/api/stale-session' })
+
+    expect(response.statusCode).toBe(401)
+    expect(response.headers['set-cookie']).toEqual(['session=; Max-Age=0', 'csrf=; Max-Age=0'])
+  })
+
+  it('honours an error that declares `status` rather than `statusCode`', async () => {
+    // Fastify's own handler reads `status` first and some middleware sets only
+    // that; reading `statusCode` alone would answer 500 to an error that
+    // plainly said 403 — and log it as ours rather than the caller's.
+    await build()
+    app.get('/api/status-only', async () => {
+      throw Object.assign(new Error('nope'), { status: 403 })
+    })
+
+    const response = await app.inject({ method: 'GET', url: '/api/status-only' })
+
+    expect(response.statusCode).toBe(403)
+    expect(response.json()).toEqual({ error: 'bad_request' })
+  })
+
+  it('ignores a declared status below 400 in favour of one the reply already set', async () => {
+    // `status: 200` is not a request to answer 200 with an error body. Fastify
+    // ignores sub-400 values on the error for the same reason, so the 409 the
+    // route set stands.
+    await build()
+    app.get('/api/mixed', async (_request, reply) => {
+      reply.code(409)
+      throw Object.assign(new Error('nope'), { status: 200, statusCode: 204 })
+    })
+
+    expect((await app.inject({ method: 'GET', url: '/api/mixed' })).statusCode).toBe(409)
+  })
+
+  it('clamps a status Node would refuse to write', async () => {
+    // Fastify's default handler assigns this verbatim and lets `writeHead`
+    // throw, turning a handled error into a connection reset.
+    await build()
+    app.get('/api/absurd', async () => {
+      throw Object.assign(new Error('nope'), { statusCode: 600 })
+    })
+
+    const response = await app.inject({ method: 'GET', url: '/api/absurd' })
+
+    expect(response.statusCode).toBe(500)
+    expect(response.json()).toEqual({ error: 'internal_error' })
+  })
 })
 
 describe('trustProxy', () => {
