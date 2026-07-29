@@ -232,4 +232,13 @@ jobs:
           # moved while the anchor did not exist, and "recover by hand-pinning a
           # <sha> tag in the compose file" — which both job comments above rely
           # on — would have nothing to pin to.
-          printf '%s\n' "${{ steps.meta.outputs.tags }}" | tac | xargs -rn1 docker push
+          #
+          # The `|| exit 1` is load-bearing and must not be simplified away.
+          # Ordering only helps if the first failure actually stops the rest:
+          # `xargs` keeps going for exit statuses 1–125 and reports 123 at the
+          # end, by which point every tag has been pushed. `set -e` does not
+          # cover it either — measured, it does not abort this loop body — so
+          # the check has to be explicit rather than inherited.
+          printf '%s\n' "${{ steps.meta.outputs.tags }}" | tac | while read -r tag; do
+            docker push "$tag" || exit 1
+          done
