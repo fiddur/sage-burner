@@ -187,7 +187,10 @@ describe('the CSP against the actual page it protects', () => {
     // which is stricter than necessary and the safe direction.
     const template = readFileSync(join(import.meta.dirname, '../../web/index.html'), 'utf8')
 
-    expect(template).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i)
+    // `src\s*=`, not `src=`, matching the sibling assertions: `<script src =
+    // "…">` is valid HTML, and reporting it as an *inline* script would be the
+    // same misleading failure the `fetchingRels` comment below avoids.
+    expect(template).not.toMatch(/<script(?![^>]*\bsrc\s*=)[^>]*>/i)
     expect(template).not.toMatch(/<style[\s>]/i)
     expect(template).not.toMatch(/\son[a-z]+\s*=/i)
     expect(template).not.toMatch(/\sstyle\s*=/i)
