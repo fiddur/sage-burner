@@ -306,7 +306,7 @@ on a connection that is not would simply never come back.
 
 ## API errors
 
-Every non-2xx response the app produces has the same body, and nothing else:
+Every error response the app produces has the same body, and nothing else:
 
 ```json
 { "error": "not_found" }
@@ -325,6 +325,9 @@ than being listed in advance and left unreachable.
 Clients should tolerate a slug they do not recognise: the schema accepts any
 string so an older frontend can still read a newer API's error instead of
 failing to parse the explanation of what went wrong.
+
+"Error response" rather than "non-2xx": a conditional request for an asset
+answers `304` with no body at all, which is a cache hit rather than a failure.
 
 "The app produces" is the limit of the promise. A reverse proxy in front can
 answer with its own error page — an Apache 502 while the container is

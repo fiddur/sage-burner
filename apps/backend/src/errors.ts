@@ -124,6 +124,14 @@ const codeFor = (status: number): ErrorCode => {
  *
  * Shared by the two paths that can fail, because they are separate options in
  * Fastify and only one of them is the obvious one.
+ *
+ * One trap this cannot close from here: the `send` below goes through the
+ * route's response serializer, so a route declaring `schema.response[400]`
+ * strips the envelope down to whatever that schema allows — a route with a
+ * `{ detail }` 400 schema answers `400 {}`, not `{ error: 'bad_request' }`, on
+ * exactly the path this exists to guarantee. No route declares response schemas
+ * yet. The first one that does must add `errorResponseSchema` for its error
+ * statuses.
  */
 const sendEnvelope = (error: FastifyError, request: FastifyRequest, reply: FastifyReply) => {
   // Falls back to a status the route already set on the reply, which
