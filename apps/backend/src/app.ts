@@ -234,6 +234,23 @@ export const createApp = async ({ db, config }: AppDeps): Promise<FastifyInstanc
   // putting it first means there is no ordering to get wrong later.
   await app.register(helmet, helmetOptions())
 
+  // Fastify parses `text/plain` by default, and that is the one body type a
+  // cross-site HTML form can send — `enctype="text/plain"` is reachable from
+  // any page, while urlencoded and multipart 415 out here.
+  //
+  // It matters because `SameSite=Lax` protects less than it looks like it does.
+  // Lax stops the cookie being *sent* cross-site, which covers every route that
+  // needs a session — but logout does not need one. It ignores the body and
+  // answers with `Set-Cookie: …; Max-Age=0`, and a Set-Cookie on a top-level
+  // cross-site navigation is honoured. So `evil.com` could auto-submit a form
+  // and sign a member out. Verified: text/plain answered 200 with the clearing
+  // cookie, the other two form encodings answered 415.
+  //
+  // Nuisance rather than disclosure — nothing moves and the attacker learns
+  // nothing — but no route here accepts plain text, so the parser is pure
+  // attack surface.
+  app.removeContentTypeParser('text/plain')
+
   app.decorate('db', db)
   app.decorate('config', config)
 

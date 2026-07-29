@@ -423,6 +423,47 @@ describe('rehashing on login', () => {
   })
 })
 
+describe('cross-site reachability', () => {
+  // `SameSite=Lax` protects less than it appears to. It stops the cookie being
+  // *sent* cross-site, which covers every route that needs a session — but
+  // logout does not need one: it ignores the body and answers with a clearing
+  // `Set-Cookie`, and a Set-Cookie on a top-level cross-site navigation is
+  // honoured. The only body type an HTML form can send that Fastify would parse
+  // is `text/plain`, so that parser is removed.
+  const formEncodings = ['text/plain', 'application/x-www-form-urlencoded', 'multipart/form-data; boundary=x']
+
+  it('refuses every body type a cross-site form could submit', async () => {
+    const server = await build()
+
+    for (const contentType of formEncodings) {
+      const response = await server.inject({
+        method: 'POST',
+        url: '/api/auth/logout',
+        headers: { 'content-type': contentType },
+        payload: 'anything',
+      })
+
+      expect(response.statusCode, contentType).toBe(415)
+      expect(response.headers['set-cookie'], contentType).toBeUndefined()
+    }
+  })
+
+  it('still accepts the JSON the app itself sends', async () => {
+    // The guard must not cost the real client anything.
+    const server = await build()
+
+    const response = await server.inject({
+      method: 'POST',
+      url: '/api/auth/logout',
+      headers: { 'content-type': 'application/json' },
+      payload: {},
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(cookieFrom(response)).toContain('Max-Age=0')
+  })
+})
+
 describe('caching', () => {
   it('forbids storing any identity response', async () => {
     // These carry per-identity data with no validators, which makes them

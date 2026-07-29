@@ -478,9 +478,12 @@ account is made by hand against the running container. Verified end to end
 against the built image:
 
 ```sh
+read -rs -p 'Password: ' ADMIN_PASSWORD; echo
+export ADMIN_PASSWORD
+
 docker compose exec \
   -e ADMIN_EMAIL=you@example.org \
-  -e ADMIN_PASSWORD='choose something long' \
+  -e ADMIN_PASSWORD \
   sage-burner node --input-type=module -e '
 import { randomUUID } from "node:crypto"
 import { createDb, runMigrations } from "/app/apps/backend/src/db/index.ts"
@@ -502,9 +505,17 @@ console.log("created admin", process.env.ADMIN_EMAIL)
 '
 ```
 
-It runs inside the container so the password is hashed by the same code that
-verifies it — a hash written any other way is a login that fails for reasons
-nothing explains. The email is lowercased for the same reason the schema does
+`read -rs` and a bare `-e ADMIN_PASSWORD` keep the password out of two places
+it would otherwise sit in plain text: the shell history, and the host's process
+arguments, where any local user can read it off `ps` for the life of the
+command. `-e VAR` with no `=` forwards the value from the caller's environment
+rather than restating it — verified: the container receives it and it appears
+nowhere in docker's argv. This is the one password on the system at the moment
+it is created, so it is worth the extra line.
+
+The command runs inside the container so the password is hashed by the same
+code that verifies it — a hash written any other way is a login that fails for
+reasons nothing explains. The email is lowercased for the same reason the schema does
 it: the table's `UNIQUE` is byte-exact, so `You@Example.org` and
 `you@example.org` would become two accounts for one person.
 
