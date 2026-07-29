@@ -96,11 +96,57 @@ describe('the error envelope', () => {
     expect(response.json()).toEqual({ error: 'bad_request' })
   })
 
-  it('preserves the status a route chose', async () => {
+  it('preserves the status the error chose, and maps 4xx to bad_request', async () => {
     await build()
-    app.get('/api/teapot', async (_request, reply) => reply.code(418).send({ ok: false }))
+    app.get('/api/forbidden', async () => {
+      throw Object.assign(new Error('nope'), { statusCode: 403 })
+    })
 
-    expect((await app.inject({ method: 'GET', url: '/api/teapot' })).statusCode).toBe(418)
+    const response = await app.inject({ method: 'GET', url: '/api/forbidden' })
+
+    expect(response.statusCode).toBe(403)
+    expect(response.json()).toEqual({ error: 'bad_request' })
+  })
+
+  it('refuses to answer 2xx with an error body', async () => {
+    // The one shape the envelope must never take: createApiClient checks
+    // `response.ok`, so a 200 carrying { error: … } skips the error path
+    // entirely and is handed to the caller as the payload.
+    await build()
+    app.get('/api/sneaky', async () => {
+      throw Object.assign(new Error('nope'), { statusCode: 200 })
+    })
+
+    const response = await app.inject({ method: 'GET', url: '/api/sneaky' })
+
+    expect(response.statusCode).toBe(500)
+    expect(response.json()).toEqual({ error: 'internal_error' })
+  })
+
+  it('keeps a status the route set on the reply before throwing', async () => {
+    // Fastify's default handler preserves this; replacing it would discard it.
+    await build()
+    app.get('/api/conflict', async (_request, reply) => {
+      reply.code(409)
+      throw new Error('already exists')
+    })
+
+    expect((await app.inject({ method: 'GET', url: '/api/conflict' })).statusCode).toBe(409)
+  })
+
+  it('carries error headers through, which a 401 challenge will need', async () => {
+    await build()
+    app.get('/api/challenge', async () => {
+      throw Object.assign(new Error('nope'), {
+        statusCode: 401,
+        headers: { 'www-authenticate': 'Bearer' },
+      })
+    })
+
+    const response = await app.inject({ method: 'GET', url: '/api/challenge' })
+
+    expect(response.statusCode).toBe(401)
+    expect(response.headers['www-authenticate']).toBe('Bearer')
   })
 })
 
