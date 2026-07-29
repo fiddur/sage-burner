@@ -35,10 +35,12 @@ services:
       # because this file does not know either.
       #
       # `false` at every layer that has to guess: the image, this fallback, and
-      # `.env.example`, which ships `TRUST_PROXY=false` with `TRUST_PROXY=1`
-      # commented out below it. Uncommenting that is what the documented Apache
-      # setup needs, and one trusted hop is spoof-resistant there since a client
-      # can only prepend to X-Forwarded-For.
+      # `.env.example`. Set it to 1 in your `.env` for the documented Apache
+      # setup — one trusted hop is spoof-resistant there, since a client can
+      # only prepend to X-Forwarded-For and Apache appends what it saw. See
+      # `.env.example` and the README for the full reasoning; this comment
+      # deliberately does not restate their contents, having twice gone stale
+      # by describing a version of that file which no longer existed.
       #
       # Do not "fix" this back to 1. Anyone running compose without a
       # header-appending proxy would then get a request.ip the client controls,
