@@ -311,6 +311,49 @@ on a connection that is not would simply never come back.
 
 [#10]: https://github.com/fiddur/sage-burner/issues/10
 
+## Security headers
+
+Every response carries a `Content-Security-Policy`, `Referrer-Policy: no-referrer`,
+`X-Content-Type-Options: nosniff`, HSTS and the rest, via `@fastify/helmet`
+registered before any route. The policy is:
+
+```
+default-src 'self'; base-uri 'none'; font-src 'self'; form-action 'self';
+frame-ancestors 'none'; img-src 'self' data:; object-src 'none';
+script-src 'self'; script-src-attr 'none'; style-src 'self';
+upgrade-insecure-requests
+```
+
+Three deliberate departures from helmet's defaults, each pinned by a test in
+`apps/backend/src/security-headers.test.ts`:
+
+- **No `'unsafe-inline'` on `style-src`.** Helmet ships it by default, and it is
+  the allowance that makes a CSP mostly decorative. The app has no inline styles
+  and no `style=` attributes, and `styles.css` uses only system font stacks — no
+  `@font-face`, no `url()` — so it does not need one.
+- **`frame-ancestors 'none'` and `X-Frame-Options: DENY`**, rather than helmet's
+  `'self'`/`SAMEORIGIN`. Nothing here frames anything, and approving an
+  application is a single click.
+- **`base-uri 'none'`**, since no `<base>` is ever emitted.
+
+`Referrer-Policy: no-referrer` is helmet's default and stricter than it needs to
+be for most pages — kept because an invite token travels in a URL path
+([#17]), and a member clicking any outbound link from `/invite/<token>` would
+otherwise hand the token to the destination.
+
+**Do not add these headers in the Apache vhost as well.** Browsers _intersect_
+multiple `Content-Security-Policy` headers rather than letting one win, so a
+second policy can only ever make the page more restricted — and debugging why a
+script is blocked when neither policy alone blocks it is miserable. The app is
+the single place this is configured.
+
+One assumption the policy rests on is pinned rather than trusted: `apps/web/index.html`
+must stay free of inline `<script>`, `<style>`, `on*=` and `style=`, because Vite
+copies that file through verbatim. Adding one would break the built app in
+production and nothing else would fail. There is a test asserting it.
+
+[#17]: https://github.com/fiddur/sage-burner/issues/17
+
 ## API errors
 
 Every error response the app produces has the same body, and nothing else:

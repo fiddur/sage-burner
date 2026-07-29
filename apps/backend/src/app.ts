@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 
+import helmet from '@fastify/helmet'
 import fastifyStatic from '@fastify/static'
 import { errorResponse } from '@sage-burner/shared'
 import Fastify from 'fastify'
@@ -136,6 +137,44 @@ export const loggerOptions = (level: string) => ({
 })
 
 /**
+ * Security headers, as deviations from `@fastify/helmet`'s defaults.
+ *
+ * The defaults are close, but two of them are looser than this app needs and
+ * one is looser than it should be anywhere. Everything not named here is
+ * helmet's default and is wanted: `nosniff`, `Referrer-Policy: no-referrer`
+ * (stricter than the `strict-origin-when-cross-origin` #41 asked for, and the
+ * right call while an invite token lives in a URL path), HSTS, the
+ * Cross-Origin-* trio, and `X-XSS-Protection: 0`, which disables a legacy
+ * auditor that introduced vulnerabilities of its own.
+ */
+const helmetOptions = () => ({
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      // Helmet defaults to `'self'`, and pairs it with X-Frame-Options
+      // SAMEORIGIN. Nothing here frames anything, and approving an application
+      // is a one-click action, so the answer is no rather than same-origin.
+      'frame-ancestors': ["'none'"],
+
+      // Helmet's default is `'self' https: 'unsafe-inline'`. The inline
+      // allowance is the one that matters: with it, an injected `style=` can
+      // still be used to overlay or exfiltrate, and CSP stops being a real
+      // control. Checked against the build rather than assumed — the app has no
+      // inline styles and no `style=` attributes, and `styles.css` uses only
+      // system font stacks, so there is no `@font-face` or `url()` to allow.
+      'style-src': ["'self'"],
+      'font-src': ["'self'"],
+
+      // No <base> is ever emitted, so nothing needs to set one.
+      'base-uri': ["'none'"],
+    },
+  },
+
+  // Helmet's SAMEORIGIN, for browsers predating frame-ancestors.
+  xFrameOptions: { action: 'deny' as const },
+})
+
+/**
  * Build the application.
  *
  * Takes its dependencies as arguments rather than constructing them, so tests
@@ -161,6 +200,12 @@ export const createApp = async ({ db, config }: AppDeps): Promise<FastifyInstanc
     // exists, so this writes the envelope to the socket itself.
     clientErrorHandler,
   })
+
+  // Registered before anything that can answer, so the headers reach the SPA
+  // shell and static assets as well as the API — `@fastify/helmet` hooks
+  // `onRequest`, and a plugin registered after a route still covers it, but
+  // putting it first means there is no ordering to get wrong later.
+  await app.register(helmet, helmetOptions())
 
   app.decorate('db', db)
   app.decorate('config', config)
