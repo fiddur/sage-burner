@@ -89,6 +89,40 @@ const assertServableWebRoot = (root: string): void => {
 }
 
 /**
+ * Logger configuration.
+ *
+ * Exported so the redaction can be tested against a captured stream — the paths
+ * are a security control, and a typo in one is invisible until it is in a log
+ * nobody meant to keep.
+ *
+ * Pretty output would need a dev-only dependency; JSON lines are what a
+ * container's log driver wants anyway.
+ */
+export const loggerOptions = (level: string) => ({
+  level,
+  redact: {
+    // These never belong in a log line, and the whole point of the app is that
+    // it holds them.
+    //
+    // `err.headers` is here because `sendEnvelope` deliberately supports errors
+    // that carry headers — a 401 challenge, a rate limiter's Retry-After, a
+    // session-clearing set-cookie — and pino's error serializer copies an
+    // error's own enumerable properties into the log verbatim. So the supported
+    // shape is also the one that would write a session value to disk on the 5xx
+    // branch.
+    paths: [
+      'req.headers.cookie',
+      'req.headers.authorization',
+      'res.headers["set-cookie"]',
+      'err.headers["set-cookie"]',
+      'err.headers.cookie',
+      'err.headers.authorization',
+    ],
+    remove: true,
+  },
+})
+
+/**
  * Build the application.
  *
  * Takes its dependencies as arguments rather than constructing them, so tests
@@ -97,17 +131,7 @@ const assertServableWebRoot = (root: string): void => {
  */
 export const createApp = async ({ db, config }: AppDeps): Promise<FastifyInstance> => {
   const app = Fastify({
-    logger: {
-      level: config.log_level,
-      // Pretty output would need a dev-only dependency; JSON lines are what a
-      // container's log driver wants anyway.
-      redact: {
-        // These never belong in a log line, and the whole point of the app is
-        // that it holds them.
-        paths: ['req.headers.cookie', 'req.headers.authorization', 'res.headers["set-cookie"]'],
-        remove: true,
-      },
-    },
+    logger: loggerOptions(config.log_level),
     // Defaults to trusting nothing. `true` would believe the whole
     // X-Forwarded-For chain from whoever connects, making request.ip
     // client-controlled — which matters as soon as a rate limiter on invite

@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import type { DbHandle } from './db/index.ts'
 
-import { createApp } from './app.ts'
+import { createApp, loggerOptions } from './app.ts'
 import { createConfig } from './config.ts'
 import { createDb } from './db/index.ts'
 import { frameworkErrorHandler, registerErrorHandler } from './errors.ts'
@@ -168,6 +168,40 @@ describe('error logging', () => {
     expect(raw).toContain('431 Request Header Fields Too Large')
     expect(raw).toContain('{"error":"bad_request"}')
     expect(raw).not.toContain('"message"')
+  })
+
+  it('redacts credentials an error carried in its headers', async () => {
+    // The 5xx branch logs `{ err }`, and pino's error serializer copies an
+    // error's own enumerable properties — so the error-carried headers this
+    // file deliberately supports (a session-clearing set-cookie, a challenge)
+    // are also the shape that would write a live session value to disk.
+    const lines: string[] = []
+    const capturing = Fastify({
+      logger: { ...loggerOptions('info'), stream: { write: (chunk: string) => void lines.push(chunk) } },
+    })
+    app = capturing
+    registerErrorHandler(capturing)
+    capturing.get('/boom', async () => {
+      throw Object.assign(new Error('kaput'), {
+        statusCode: 500,
+        headers: {
+          'set-cookie': ['session=SECRETVALUE; Path=/'],
+          authorization: 'Bearer SECRETTOKEN',
+          cookie: 'session=SECRETCOOKIE',
+          'www-authenticate': 'Bearer',
+        },
+      })
+    })
+
+    await capturing.inject({ method: 'GET', url: '/boom' })
+
+    const logged = lines.join('')
+    expect(logged).not.toContain('SECRETVALUE')
+    expect(logged).not.toContain('SECRETTOKEN')
+    expect(logged).not.toContain('SECRETCOOKIE')
+    // Redaction is targeted, not a blanket drop of err.headers — a challenge
+    // header is exactly what makes a 401 line worth reading.
+    expect(logged).toContain('www-authenticate')
   })
 
   it('logs a 5xx with the stack, which is ours to explain', async () => {
