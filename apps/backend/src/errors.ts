@@ -4,7 +4,7 @@ import type { FastifyError, FastifyInstance } from 'fastify'
 import { errorResponse } from '@sage-burner/shared'
 
 /**
- * Map anything thrown into the documented error envelope.
+ * Mapping anything thrown into the documented error envelope.
  *
  * Without this, Fastify's built-in serializer answers with
  * `{ statusCode, error: 'Internal Server Error', message }` — which satisfies
@@ -16,22 +16,32 @@ import { errorResponse } from '@sage-burner/shared'
  * So the response carries the code and nothing else, and the real error goes to
  * the log where it is useful and not public.
  */
+
+/** Header values Node's `setHeader` accepts, which is what `reply.headers` forwards to. */
+type HeaderValue = number | string | string[]
+
 /**
  * Headers an error asked to be sent with it.
  *
  * `FastifyError` does not declare `headers`, but Fastify's own default handler
- * reads it — so this narrows rather than casting, and keeps only string values,
- * which is what `reply.headers` can carry.
+ * passes it to `reply.headers` untouched — so this narrows rather than casting,
+ * and accepts everything that call can carry. Filtering to strings would drop
+ * the numeric `Retry-After` a rate limiter emits, silently, which is precisely
+ * one of the cases this function exists for.
  */
-const headersFrom = (error: unknown): Record<string, string> | undefined => {
+const headersFrom = (error: unknown): Record<string, HeaderValue> | undefined => {
   if (typeof error !== 'object' || error === null || !('headers' in error)) return undefined
 
   const { headers } = error
   if (typeof headers !== 'object' || headers === null) return undefined
 
-  const usable: Record<string, string> = {}
+  const usable: Record<string, HeaderValue> = {}
   for (const [name, value] of Object.entries(headers)) {
-    if (typeof value === 'string') usable[name] = value
+    if (typeof value === 'string' || typeof value === 'number') {
+      usable[name] = value
+    } else if (Array.isArray(value) && value.every((entry) => typeof entry === 'string')) {
+      usable[name] = value
+    }
   }
 
   return Object.keys(usable).length > 0 ? usable : undefined

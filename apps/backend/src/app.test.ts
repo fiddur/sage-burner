@@ -148,6 +148,26 @@ describe('the error envelope', () => {
     expect(response.statusCode).toBe(401)
     expect(response.headers['www-authenticate']).toBe('Bearer')
   })
+
+  it('carries a numeric Retry-After, which is how rate limiters emit it', async () => {
+    // Filtering headers to strings would drop this silently, telling a client
+    // to back off without saying for how long — and @fastify/rate-limit
+    // computes Retry-After as a number.
+    await build()
+    app.get('/api/limited', async () => {
+      throw Object.assign(new Error('slow down'), {
+        statusCode: 429,
+        headers: { 'retry-after': 30 },
+      })
+    })
+
+    const response = await app.inject({ method: 'GET', url: '/api/limited' })
+
+    expect(response.statusCode).toBe(429)
+    // Serialised on the wire, as all headers are — the point is that it is
+    // present at all, which a string-only filter would not have managed.
+    expect(response.headers['retry-after']).toBe('30')
+  })
 })
 
 describe('trustProxy', () => {
