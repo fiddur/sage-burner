@@ -313,9 +313,18 @@ on a connection that is not would simply never come back.
 
 ## Security headers
 
-Every response carries a `Content-Security-Policy`, `Referrer-Policy: no-referrer`,
-`X-Content-Type-Options: nosniff`, HSTS and the rest, via `@fastify/helmet`
-registered before any route. The policy is:
+Every routed response carries a `Content-Security-Policy`,
+`Referrer-Policy: no-referrer`, `X-Content-Type-Options: nosniff`,
+`Strict-Transport-Security: max-age=31536000; includeSubDomains` and the rest,
+via `@fastify/helmet` registered before any route.
+
+"Routed" is the limit: helmet hooks `onRequest`, which runs after routing, so the
+two paths that answer outside it — `clientErrorHandler`, and `frameworkErrors`
+for a URL the router rejects — send their JSON error envelope bare. Both are
+error bodies rather than documents, so there is nothing there for a policy to
+protect.
+
+The policy is:
 
 ```
 default-src 'self'; base-uri 'none'; font-src 'self'; form-action 'self';
@@ -324,7 +333,7 @@ script-src 'self'; script-src-attr 'none'; style-src 'self';
 upgrade-insecure-requests
 ```
 
-Three deliberate departures from helmet's defaults, each pinned by a test in
+Four deliberate departures from helmet's defaults, each pinned by a test in
 `apps/backend/src/security-headers.test.ts`:
 
 - **No `'unsafe-inline'` on `style-src`.** Helmet ships it by default, and it is
@@ -334,6 +343,8 @@ Three deliberate departures from helmet's defaults, each pinned by a test in
 - **`frame-ancestors 'none'` and `X-Frame-Options: DENY`**, rather than helmet's
   `'self'`/`SAMEORIGIN`. Nothing here frames anything, and approving an
   application is a single click.
+- **`font-src 'self'`**, not helmet's `'self' https: data:`, for the same reason
+  — there are no web fonts to fetch.
 - **`base-uri 'none'`**, since no `<base>` is ever emitted.
 
 `Referrer-Policy: no-referrer` is helmet's default and stricter than it needs to
@@ -341,16 +352,30 @@ be for most pages — kept because an invite token travels in a URL path
 ([#17]), and a member clicking any outbound link from `/invite/<token>` would
 otherwise hand the token to the destination.
 
+Two things to know before deploying anywhere other than the documented setup:
+
+- **HSTS is `max-age=31536000; includeSubDomains`** — one year, covering every
+  subdomain of whatever host serves the app. Fine on a dedicated subdomain like
+  `sage.example.org`. On an apex it would make every plain-HTTP sibling
+  subdomain unreachable for anyone who has visited, and shortening it only takes
+  effect for a visitor who returns.
+- **`upgrade-insecure-requests` assumes TLS terminates in front.** Browsers
+  exempt `localhost` and loopback, so `docker compose up` locally is unaffected —
+  but reaching the container over plain HTTP at a LAN address or hostname
+  upgrades every subresource to `https://` and yields a blank page.
+
 **Do not add these headers in the Apache vhost as well.** Browsers _intersect_
 multiple `Content-Security-Policy` headers rather than letting one win, so a
 second policy can only ever make the page more restricted — and debugging why a
 script is blocked when neither policy alone blocks it is miserable. The app is
 the single place this is configured.
 
-One assumption the policy rests on is pinned rather than trusted: `apps/web/index.html`
-must stay free of inline `<script>`, `<style>`, `on*=` and `style=`, because Vite
-copies that file through verbatim. Adding one would break the built app in
-production and nothing else would fail. There is a test asserting it.
+One assumption the policy rests on is pinned rather than trusted:
+`apps/web/index.html` must stay free of inline `<script>`, `<style>`, `on*=` and
+`style=`, **and of any absolute `src`/`href`** — a CDN link is blocked by
+`script-src 'self'` just as surely as an inline block. Vite copies that file
+through verbatim, so either would break the built app in production with nothing
+else failing. There is a test asserting it.
 
 [#17]: https://github.com/fiddur/sage-burner/issues/17
 

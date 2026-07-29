@@ -143,9 +143,12 @@ export const loggerOptions = (level: string) => ({
  * one is looser than it should be anywhere. Everything not named here is
  * helmet's default and is wanted: `nosniff`, `Referrer-Policy: no-referrer`
  * (stricter than the `strict-origin-when-cross-origin` #41 asked for, and the
- * right call while an invite token lives in a URL path), HSTS, the
- * Cross-Origin-* trio, and `X-XSS-Protection: 0`, which disables a legacy
- * auditor that introduced vulnerabilities of its own.
+ * right call while an invite token lives in a URL path), HSTS,
+ * `Cross-Origin-Opener-Policy` and `Cross-Origin-Resource-Policy` — but not
+ * `Cross-Origin-Embedder-Policy`, which helmet stopped defaulting on in v6
+ * because `require-corp` breaks every cross-origin subresource — and
+ * `X-XSS-Protection: 0`, which disables a legacy auditor that introduced
+ * vulnerabilities of its own.
  */
 const helmetOptions = () => ({
   contentSecurityPolicy: {

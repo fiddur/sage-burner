@@ -126,6 +126,11 @@ describe('security headers', () => {
     expect(found.get('script-src')).toEqual(["'self'"])
     expect(found.get('style-src')).toEqual(["'self'"])
     expect(found.get('object-src')).toEqual(["'none'"])
+    // Both are overrides too — helmet ships `'self' https: data:` for font-src
+    // and `'self'` for base-uri — and without these two lines they were the
+    // only ones nothing would notice losing.
+    expect(found.get('font-src')).toEqual(["'self'"])
+    expect(found.get('base-uri')).toEqual(["'none'"])
   })
 
   it('asks browsers to remember the TLS, which Apache terminates', async () => {
@@ -147,5 +152,10 @@ describe('the CSP against the actual page it protects', () => {
     expect(template).not.toMatch(/<style[\s>]/i)
     expect(template).not.toMatch(/\son[a-z]+\s*=/i)
     expect(template).not.toMatch(/\sstyle\s*=/i)
+
+    // The same trap through the other door: `script-src 'self'` blocks a CDN
+    // just as surely as an inline block, and with the identical symptom —
+    // broken only in the built app, with nothing else failing.
+    expect(template).not.toMatch(/\b(?:src|href)\s*=\s*["']?(?:https?:)?\/\//i)
   })
 })
