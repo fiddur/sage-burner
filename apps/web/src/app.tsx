@@ -21,7 +21,18 @@ import { FetchedViewerProvider, ViewerProvider } from './viewer.tsx'
  */
 export type AppApi = Pick<
   ApiClient,
-  'createEvent' | 'getAdminAccounts' | 'getEvents' | 'getMe' | 'login' | 'logout' | 'updateEvent'
+  | 'createEvent'
+  | 'getAdminAccounts'
+  | 'getEvents'
+  | 'getMe'
+  | 'login'
+  | 'logout'
+  | 'updateEvent'
+  | 'addQuestion'
+  | 'deleteQuestion'
+  | 'getQuestions'
+  | 'reorderQuestions'
+  | 'updateQuestion'
 >
 
 /**
@@ -36,7 +47,19 @@ export type AppApi = Pick<
 export const Routes = ({
   api,
 }: {
-  api: Pick<ApiClient, 'createEvent' | 'getAdminAccounts' | 'getEvents' | 'login' | 'updateEvent'>
+  api: Pick<
+    ApiClient,
+    | 'createEvent'
+    | 'getAdminAccounts'
+    | 'getEvents'
+    | 'login'
+    | 'updateEvent'
+    | 'addQuestion'
+    | 'deleteQuestion'
+    | 'getQuestions'
+    | 'reorderQuestions'
+    | 'updateQuestion'
+  >
 }) => {
   // Memoised because `component` is compared by identity: a fresh arrow each
   // render is a *different component type*, so a re-rendered `Routes` would

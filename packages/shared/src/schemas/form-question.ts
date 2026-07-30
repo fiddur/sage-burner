@@ -28,3 +28,38 @@ export const formQuestionSchema = z.object({
 })
 
 export type FormQuestion = z.infer<typeof formQuestionSchema>
+
+/**
+ * Creating a question. `id` and `event_id` come from the route, not the body.
+ *
+ * `order` is assigned by the server — a new question goes last. Letting a client
+ * pick would make two organisers adding questions at once produce a collision
+ * over something neither of them chose.
+ */
+export const formQuestionCreateSchema = formQuestionSchema.omit({
+  id: true,
+  event_id: true,
+  order: true,
+})
+export type FormQuestionCreate = z.infer<typeof formQuestionCreateSchema>
+
+/** Editing one. `order` is changed by the reorder endpoint, not here. */
+export const formQuestionUpdateSchema = formQuestionCreateSchema.partial()
+export type FormQuestionUpdate = z.infer<typeof formQuestionUpdateSchema>
+
+/**
+ * Reordering: the complete list of question ids, in the order wanted.
+ *
+ * The whole list rather than a move-this-one instruction, because the order is
+ * what the organiser sees and dragging one question renumbers several. Sending
+ * all of them makes the request describe the end state, so a lost or reordered
+ * request cannot leave the form half-renumbered.
+ */
+export const formQuestionOrderSchema = z.object({ ids: z.array(idSchema) })
+export type FormQuestionOrder = z.infer<typeof formQuestionOrderSchema>
+
+export const formQuestionsResponseSchema = z.object({ questions: z.array(formQuestionSchema) })
+export type FormQuestionsResponse = z.infer<typeof formQuestionsResponseSchema>
+
+export const formQuestionResponseSchema = z.object({ question: formQuestionSchema })
+export type FormQuestionResponse = z.infer<typeof formQuestionResponseSchema>

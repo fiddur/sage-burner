@@ -629,6 +629,39 @@ the same renderer that page will.
 A slug collision answers **409** rather than a generic failure — the slug appears
 in URLs, so it is something the organiser fixes by choosing another.
 
+### The application form's questions
+
+`form_question` rows, never code. Organisers retune the questions between every
+burn, so adding, editing, reordering or removing one must never need a redeploy
+— and the web app renders whatever it is handed rather than knowing the
+questions.
+
+Organise → **Events and welcome text** → edit an event → **Application
+questions**. Types in v1: short text, long text, checkbox, and _agreement_ — a
+checkbox that must be ticked to submit.
+
+Two rules that are the server's, not the browser's:
+
+- **`order` is assigned by the server.** A new question goes last; a client
+  cannot pick a position. Two organisers adding at once would otherwise collide
+  over a number neither of them chose.
+- **Reordering sends the complete list of ids**, in the order wanted, and a
+  partial list is rejected with 400. Moving one question renumbers several, so a
+  request that names only some of them would leave the rest on stale positions —
+  an order nobody chose. The renumbering runs in a transaction for the same
+  reason. An id belonging to another event is refused too, since it would
+  silently move a question off a form it belongs to.
+
+`GET /api/events/:id/questions` is public — the application form is public, so
+its questions are — and `no-cache`, so a question added a moment ago is not
+hidden behind a stale response. Every write is admin-only.
+
+`options` exists as a JSON column for future select/radio types and is not yet
+consumed by any type. `required` is enforced server-side on submission, which is
+[#14]'s half of the work.
+
+[#14]: https://github.com/fiddur/sage-burner/issues/14
+
 ### Markdown is escaped, not filtered
 
 `welcome_markdown` is admin-authored and will be rendered to every public
