@@ -153,7 +153,7 @@ export const registerEventRoutes = (
       // carrying both dates in the wrong order, so `safeParse` above answers 400
       // and this handler never sees one — a guard for it would be unreachable,
       // which is the same dead-code shape as the `requireSignedIn` this branch
-      // removes. `reject a patch with both dates in the wrong order` covers that
+      // removes. `rejects a patch with both dates in the wrong order` covers that
       // path at the schema, where it actually lives.
       //
       // One date given: the condition goes in the `where`, so it is evaluated
@@ -181,13 +181,16 @@ export const registerEventRoutes = (
       // fire if it ever arrived as a bigint, and a rejected one-sided date move
       // would fall through to the 200 below with a body reporting a date that was
       // never written. Silent success, which is the failure this comment
-      // previously had inverted. `rejects a one-sided date move in either
-      // direction` is the test that notices, since it asserts 400.
+      // previously had inverted. The test that notices asserts 400:
+      // `rejects a one-sided date move in either direction, and stores nothing`
       //
       // Reading zero as "no row matched" also relies on SQLite counting a row
       // whose SET values are identical; MySQL returns 0 there, which would turn
-      // every no-op save into a 400. `answers 200 when the welcome text is
-      // re-saved unchanged` covers that half.
+      // every no-op save into a 400. Covered by:
+      // `answers 200 when the welcome text is re-saved unchanged`
+      //
+      // Both names are on one line each on purpose — a name wrapped across two
+      // comment lines cannot be grepped, which is the only reason to quote it.
       if (Number(result.changes) === 0) return reply.code(400).send(errorResponse('bad_request'))
 
       return { event: merged } satisfies EventResponse

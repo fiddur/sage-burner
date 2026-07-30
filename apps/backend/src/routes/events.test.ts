@@ -377,7 +377,8 @@ describe('admin event routes', () => {
     // - `.returning()` on that statement makes `result` an array, so
     //   `result.changes` is `undefined` and `Number(undefined)` is `NaN` — the
     //   guard silently stops firing and a bad one-sided date move returns 200.
-    //   `rejects a one-sided date move in either direction` fails then, not this.
+    //   What fails then is, on one line so it greps:
+    //   `rejects a one-sided date move in either direction, and stores nothing`
     // - `setReadBigInts` is absorbed by the `Number(...)` in the handler
     //   (`Number(0n) === 0`), and a no-op save reports `1n` rather than `0n`
     //   anyway, so it is not a failure in either direction.

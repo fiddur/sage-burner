@@ -152,8 +152,13 @@ describe('reporting a broken setup', () => {
  * production figure and 128 MiB, twice, in a suite that otherwise deliberately
  * keeps to cheap parameters.
  *
- * The substitution is asserted rather than assumed: a silent no-op here would
- * leave both tests comparing `fast` against `fast` and passing for nothing.
+ * The substitution is asserted rather than assumed — but for the error message,
+ * not to turn a pass into a failure. A silent no-op leaves `stored` recording
+ * `fast`, and `needsRehash(stored, defaultScryptParams)` is *true* there (nothing
+ * stronger on any axis, cost and parallelism both lower) while both call sites
+ * assert false — so it already fails loudly. Checked: removing this line fails
+ * both tests. What the check buys is one clear error naming the format instead of
+ * two puzzling assertion failures.
  */
 const recordedAt = async (params: ScryptParams) => {
   const stored = await hashPassword('x', fast)

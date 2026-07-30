@@ -114,7 +114,7 @@ export type EventCreateInput = z.input<typeof eventCreateSchema>
  * rejects it, so `safeParse` answers 400 — which is why the handler carries no
  * check for it. Relaxing this refine would therefore not merely loosen
  * validation, it would let an out-of-order pair through to the database CHECK;
- * `reject a patch with both dates in the wrong order` in `events.test.ts` is what
+ * `rejects a patch with both dates in the wrong order` in `events.test.ts` is what
  * notices.
  */
 export const eventUpdateSchema = withEventDateOrder(
