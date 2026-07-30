@@ -621,20 +621,18 @@ markdown with a live preview. Saving takes effect immediately in the API: the
 public response is `Cache-Control: no-cache`, so a browser may store it but must
 revalidate, and a correction cannot sit invisible in a cache.
 
-**The public homepage does not render this yet** — `Home.tsx` is still a
-placeholder and [#13] is what puts the welcome text on the page. Today the text
-is stored and served by `GET /api/events/active`; the preview in the editor uses
-the same renderer that page will.
+The public homepage renders it: name, dates and the welcome markdown, with
+"Apply to join" and "Log in" for a signed-out visitor. The editor's preview uses
+the same renderer, so what it shows is what a visitor gets.
 
 A slug collision answers **409** rather than a generic failure — the slug appears
 in URLs, so it is something the organiser fixes by choosing another.
 
 ### Markdown is escaped, not filtered
 
-`welcome_markdown` is admin-authored and will be rendered to every public
-visitor once [#13] lands, so it is treated as untrusted: an admin account is one
-phished password away from belonging to someone else. The renderer is already in
-use by the editor's preview.
+`welcome_markdown` is admin-authored and rendered to every public visitor, so it
+is treated as untrusted: an admin account is one phished password away from
+belonging to someone else.
 
 **Raw HTML in the welcome text is escaped and shows as visible text.** The usual
 build is `marked` + DOMPurify, and that was the first attempt — but DOMPurify
@@ -658,7 +656,31 @@ would have to know about `data:text/html`, `vbscript:` and friends individually.
 The cost is that a literal `<br>` renders as text. Markdown already has emphasis,
 headings, lists and links, which is the whole vocabulary this field needs.
 
-[#13]: https://github.com/fiddur/sage-burner/issues/13
+Content headings are shifted down one level: a `#` renders as `<h2>`, clamped at
+`<h6>`. The page owns `<h1>` (the site name) and `<h2>` (the event name), so an
+unshifted `#` would put a second `<h1>` underneath an `<h2>` and break the outline
+screen readers navigate by.
+
+Site-relative links must be genuinely site-relative: `//evil.com` and
+`/\evil.com` are rejected, since both navigate off-site while reading as local
+in the markdown source. Control characters are stripped before the check —
+`marked`'s angle-bracket destination form accepts tabs, and the browser discards
+them while parsing a URL, so `</\t/evil.com>` would otherwise arrive as
+`//evil.com`. No privilege is gained either way — whoever writes this
+field could link `https://evil.com` outright — but the allowlist should mean what
+it says.
+
+**Remote images are allowed, and that is a deliberate trade.** `img-src` is
+`'self' data: https:` rather than helmet's default `'self' data:`, because the
+URL allowlist admits `https://` image sources and the two disagreeing meant an
+image was rendered into the page and then blocked by the browser — which reads as
+a bug rather than a policy. Images therefore have a _stricter_ allowlist than
+links: `https://` or site-relative only, since a plain `http://` image would hit
+that same mismatch. Links still accept `http://` — `img-src` does not govern
+navigation. There is no upload feature, so the alternative is
+that images do not work at all. The cost: an image host an organiser links to
+sees the IP of every homepage visitor, and this is the only external request the
+app can produce. Narrow it back to `'self' data:` if uploads ever land.
 
 ## Security headers
 
@@ -757,11 +779,16 @@ only the frontend knows what the member was trying to do. The real error goes to
 the server log, where a SQL fragment or a file path is useful rather than public.
 
 The vocabulary today is `bad_request`, `not_found`, `internal_error`,
-`invalid_credentials` and `rate_limited`, defined in
+`invalid_credentials`, `unauthenticated`, `forbidden`, `conflict` and
+`rate_limited`, defined in
 [`packages/shared`](./packages/shared/src/schemas/error.ts). It grows with the
-routes that emit it, rather than being listed in advance and left unreachable —
-`unauthenticated` and `forbidden` are deliberately absent until the role guards
-emit them.
+routes that emit it, rather than being listed in advance and left unreachable.
+
+`unauthenticated` and `forbidden` are separate because 401 and 403 are the one
+distinction a client cannot safely collapse — signing in fixes the first and
+does nothing for the second. `conflict` exists because a duplicate event slug is
+something an organiser fixes by choosing another, which a generic `bad_request`
+would not convey.
 
 `invalid_credentials` covers a wrong password and an unknown address alike:
 telling those apart is an account-enumeration oracle.

@@ -131,7 +131,9 @@ describe('AdminEvents', () => {
     fill('Welcome text (markdown)', '# Bring water')
 
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Bring water', level: 1 })).toBeTruthy()
+      // Level 2, matching what the public page renders — the preview is only
+      // useful if it shows the same thing.
+      expect(screen.getByRole('heading', { name: 'Bring water', level: 2 })).toBeTruthy()
     })
   })
 
@@ -160,11 +162,13 @@ describe('AdminEvents', () => {
     await waitFor(() => {
       expect(updateEvent).toHaveBeenCalledWith('e-1', { welcome_markdown: '# New words' })
     })
-    // Deliberately does not promise the homepage renders it — `Home.tsx` is
-    // still the #13 placeholder, and an organiser told otherwise would go look.
+    // The homepage renders the welcome text as of #13, so this promise is now
+    // true. It was deliberately hedged while `Home.tsx` was a placeholder — and
+    // the hedge had to come out with the placeholder, or the message would have
+    // gone on pointing an organiser at an issue that was already closed.
     const status = (await screen.findByRole('status')).textContent
     expect(status).toContain('Saved')
-    expect(status).toContain('#13')
+    expect(status).not.toContain('#13')
   })
 
   it('surfaces a failed save rather than claiming success', async () => {
