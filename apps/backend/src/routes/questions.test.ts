@@ -1,6 +1,7 @@
 import type { FormQuestion } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
+import { formQuestionTypes, tickBoxRequired } from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -533,6 +534,64 @@ describe('editing a question', () => {
       .from(formQuestion)
       .where(eq(formQuestion.id, id))
     expect(row).toMatchObject({ type: 'checkbox', required: false })
+  })
+
+  it('applies the tick-box rule to every type the vocabulary defines', async () => {
+    // Driven by `formQuestionTypes` rather than naming the two types, so a third
+    // one is covered the day it is added instead of needing a new test.
+    //
+    // Honest about its limits: this cannot discriminate the hardcoded version of
+    // `tickBoxCondition`'s `required`-only branch, because hardcoding "true
+    // conflicts with checkbox, false with agreement" *is* correct while those are
+    // the only two tick-box types. Deriving from `tickBoxRequired` is future-proofing,
+    // and no test today can prove it — this covers the surface it applies to.
+    const server = await build()
+    const cookie = await givenAdmin()
+    const eventId = await givenEvent()
+
+    for (const type of formQuestionTypes) {
+      const must = tickBoxRequired(type)
+      if (must === undefined) continue
+
+      // create with the wrong value for the type
+      const created = await add(server, cookie, eventId, {
+        ...question,
+        type,
+        required: !must,
+        label: `bad ${type}`,
+      })
+      expect(created.statusCode, `create ${type} required=${String(!must)}`).toBe(400)
+
+      // PATCH the type onto a row whose `required` is wrong for it
+      const seed = await add(server, cookie, eventId, {
+        ...question,
+        type: 'text',
+        required: !must,
+        label: `seed ${type}`,
+      })
+      const retyped = await server.inject({
+        method: 'PATCH',
+        url: `/api/admin/questions/${seed.json().question.id}`,
+        headers: { cookie },
+        payload: { type },
+      })
+      expect(retyped.statusCode, `patch type to ${type}`).toBe(400)
+
+      // PATCH `required` to the wrong value on a row already of that type
+      const typed = await add(server, cookie, eventId, {
+        ...question,
+        type,
+        required: must,
+        label: `typed ${type}`,
+      })
+      const flipped = await server.inject({
+        method: 'PATCH',
+        url: `/api/admin/questions/${typed.json().question.id}`,
+        headers: { cookie },
+        payload: { required: !must },
+      })
+      expect(flipped.statusCode, `patch required on ${type}`).toBe(400)
+    }
   })
 
   it('refuses an anonymous patch', async () => {

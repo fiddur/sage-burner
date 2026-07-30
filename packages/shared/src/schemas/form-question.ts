@@ -62,9 +62,14 @@ export const tickBoxRequired = (type: string): boolean | undefined => {
 /**
  * Whether a `type`/`required` pair contradicts the rule.
  *
- * Absent keys pass, because a pair is only decidable when both are known and a
- * PATCH body may legitimately carry one. That is why the handler applies this to
- * the *merged* row rather than to the body — see `PATCH /api/admin/questions/:id`.
+ * Absent keys pass, because a pair is only decidable when both are known and the
+ * partial update schema below is built from this — a PATCH body may legitimately
+ * carry one of the two keys, and rejecting that would refuse every single-field
+ * edit.
+ *
+ * It is therefore *not* the whole rule for an update. The PATCH handler decides a
+ * lone key inside its `UPDATE` statement instead of re-checking a merged row here,
+ * because a merged-row check either side of an `await` is a race.
  */
 export const violatesTickBoxRules = (value: { type?: string; required?: boolean }): boolean => {
   if (value.type === undefined || value.required === undefined) return false

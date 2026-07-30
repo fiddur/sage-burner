@@ -5,10 +5,11 @@ import {
   errorResponse,
   formQuestionCreateSchema,
   formQuestionOrderSchema,
+  formQuestionTypes,
   formQuestionUpdateSchema,
   tickBoxRequired,
 } from '@sage-burner/shared'
-import { and, asc, desc, eq, ne } from 'drizzle-orm'
+import { and, asc, desc, eq, notInArray } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -22,13 +23,17 @@ import { noStore } from '../http.ts'
  * The tick-box rule as SQL, for a PATCH carrying only one of the two keys — or
  * `undefined` when the body cannot break it.
  *
- * The same shape as `dateOrderCondition` in `routes/events.ts`, and for the same
- * reason: a merged-row check either side of an `await` is check-then-act. Two
- * PATCHes arriving in one event-loop turn — `{ type: 'checkbox' }` and
- * `{ required: true }` against `(text, false)` — each read before either writes,
- * so both pass their own check, both write, and the row lands on
- * `(checkbox, required=1)`. The database CHECK then rejects the second UPDATE and
- * the caller gets a 500. Deciding it inside the statement makes it atomic.
+ * A merged-row check either side of an `await` is check-then-act. Two PATCHes
+ * arriving in one event-loop turn — `{ type: 'checkbox' }` and `{ required: true }`
+ * against `(text, false)` — each read before either writes, so both pass their own
+ * check, both write, and the row lands on `(checkbox, required=1)`. The database
+ * CHECK then rejects the second UPDATE and the caller gets a 500. Deciding it
+ * inside the statement makes it atomic.
+ *
+ * No cross-reference to `routes/events.ts`: its date-order check is a plain JS
+ * comparison on the merged row and carries the same race. A branch in flight turns
+ * it into a statement-level condition, but naming a symbol that does not exist here
+ * is worse than saying nothing.
  *
  * With **both** keys present the body settles it alone and the schema refine has
  * already rejected a contradictory pair, so there is nothing to evaluate here.
@@ -41,9 +46,20 @@ const tickBoxCondition = ({ type, required }: { type?: string; required?: boolea
     return must === undefined ? undefined : eq(formQuestion.required, must)
   }
 
-  // `required: true` is wrong only for a checkbox, `required: false` only for an
-  // agreement — so the condition is on the type the row must *not* have.
-  if (required !== undefined) return ne(formQuestion.type, required ? 'checkbox' : 'agreement')
+  // Derived from the vocabulary and the rule, not restated. Hardcoding "true
+  // conflicts with checkbox, false with agreement" is correct only while there are
+  // exactly two tick-box types — add a third and create would reject it (the refine
+  // reads `tickBoxRequired`) while this branch let a PATCH through to the CHECK,
+  // which is the drift this design exists to prevent.
+  if (required !== undefined) {
+    const conflicting = formQuestionTypes.filter((candidate) => {
+      const must = tickBoxRequired(candidate)
+
+      return must !== undefined && must !== required
+    })
+
+    return conflicting.length === 0 ? undefined : notInArray(formQuestion.type, conflicting)
+  }
 
   return undefined
 }
@@ -159,9 +175,8 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db, sessions }: G
       // No merged-row check in JS. A PATCH can break the tick-box rule with a
       // single field from either direction, and the schema cannot decide a lone key
       // — but a read-then-check here is a race (see `tickBoxCondition`), and a JS
-      // fail-fast would also pre-empt the statement in every non-racing case, which
-      // is how the equivalent guard in `routes/events.ts` ended up unreachable from
-      // any test.
+      // fail-fast would also pre-empt the statement in every non-racing case, so
+      // nothing would exercise the condition that does the real work.
       const merged = { ...existing, ...parsed.data }
       const rule = tickBoxCondition(parsed.data)
       const where =
