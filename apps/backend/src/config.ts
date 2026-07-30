@@ -80,14 +80,28 @@ const isLoopbackHost = (host: string): boolean =>
   host === 'localhost' || host === '::1' || host === '[::1]' || /^127\.\d+\.\d+\.\d+$/.test(host)
 
 /**
- * Whether it is safe to fall back to the published development signing key.
+ * Whether a browser other than the developer's own could reach this process.
  *
- * Both conditions, because either alone is a deployment nobody meant to make:
- * production on loopback is still production, and development on `0.0.0.0` is
- * a forgeable session on the LAN.
+ * One predicate, used by both the `SESSION_SECRET` requirement and the `Secure`
+ * flag, so the two cannot drift apart — they answer the same question.
+ *
+ * Three signals, because the first two together still miss the deployment this
+ * repository documents. `NODE_ENV` cannot answer it alone: it defaults to
+ * `development` when unset. Nor can `HOST`, because **a reverse proxy in front
+ * means the app binds loopback** — `pnpm start` or a systemd unit on
+ * `127.0.0.1:3000` behind the README's Apache vhost satisfies "not production"
+ * and "loopback" both, and would have booted quietly on the development key
+ * that is committed to this repository, serving a non-`Secure` cookie over
+ * Apache's TLS.
+ *
+ * `WEB_ROOT` closes it. Setting it says "serve the built frontend", which is a
+ * deployment by definition — Vite serves the frontend in development, so a dev
+ * run never sets it. The one case that pays for this is building the frontend
+ * and pointing a local backend at it, which the README notes now needs a secret;
+ * that run is serving the built app, so being treated as a deployment is right.
  */
-const allowsDevelopmentSecret = (nodeEnv: string, host: string): boolean =>
-  nodeEnv !== 'production' && isLoopbackHost(host)
+const looksLikeDeployment = (nodeEnv: string, host: string, webRoot: string | undefined): boolean =>
+  nodeEnv === 'production' || !isLoopbackHost(host) || webRoot !== undefined
 
 export const envSchema = z.object({
   NODE_ENV: optional(z.enum(['development', 'test', 'production']).default('development')),
@@ -153,8 +167,8 @@ export interface Config {
    * Decided here rather than at the cookie, so the policy has one home and the
    * cookie does not re-derive it from `NODE_ENV` — which is the mistake this
    * file spends a paragraph explaining, since `NODE_ENV` defaults to
-   * `development` when unset. Same predicate as the `SESSION_SECRET` guard:
-   * production, or reachable beyond loopback.
+   * `development` when unset. Exactly the same predicate as the
+   * `SESSION_SECRET` requirement, `looksLikeDeployment`, so the two cannot drift.
    */
   secure_cookies: boolean
   port: number
@@ -218,9 +232,9 @@ export const createConfig = (env: NodeJS.ProcessEnv = process.env): Config => {
   // invalidate the session you were testing with.
   const session_secret = value.SESSION_SECRET ?? 'development-only-session-secret-not-for-production'
 
-  if (value.SESSION_SECRET === undefined && !allowsDevelopmentSecret(value.NODE_ENV, value.HOST)) {
+  if (value.SESSION_SECRET === undefined && looksLikeDeployment(value.NODE_ENV, value.HOST, value.WEB_ROOT)) {
     throw new Error(
-      `Invalid environment configuration:\n  SESSION_SECRET: required unless the app is outside production *and* bound to loopback (got NODE_ENV=${value.NODE_ENV}, HOST=${value.HOST}). 32+ characters; generate with \`openssl rand -base64 48\``,
+      `Invalid environment configuration:\n  SESSION_SECRET: required for anything a browser other than yours can reach — production, a non-loopback HOST, or a set WEB_ROOT (got NODE_ENV=${value.NODE_ENV}, HOST=${value.HOST}, WEB_ROOT=${value.WEB_ROOT ?? '(unset)'}). 32+ characters; generate with \`openssl rand -base64 48\``,
     )
   }
 
@@ -228,7 +242,7 @@ export const createConfig = (env: NodeJS.ProcessEnv = process.env): Config => {
     node_env: value.NODE_ENV,
     session_secret,
     session_ttl_seconds: value.SESSION_TTL_SECONDS,
-    secure_cookies: value.NODE_ENV === 'production' || !isLoopbackHost(value.HOST),
+    secure_cookies: looksLikeDeployment(value.NODE_ENV, value.HOST, value.WEB_ROOT),
     port: value.PORT,
     host: value.HOST,
     database_url: value.DATABASE_URL,

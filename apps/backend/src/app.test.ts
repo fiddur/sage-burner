@@ -24,7 +24,13 @@ let app: FastifyInstance
 const build = async (env: NodeJS.ProcessEnv = {}) => {
   handle = createDb({ url: ':memory:' })
   runMigrations(handle)
-  app = await createApp({ db: handle.db, config: createConfig({ LOG_LEVEL: 'silent', ...env }) })
+  app = await createApp({
+    db: handle.db,
+    // A secret because a test may set WEB_ROOT, which `looksLikeDeployment`
+    // counts as reachable — so the published development key is refused. Passed
+    // unconditionally rather than per-test so the reason lives in one place.
+    config: createConfig({ LOG_LEVEL: 'silent', SESSION_SECRET: 't'.repeat(40), ...env }),
+  })
   return app
 }
 
@@ -645,7 +651,7 @@ describe('a web root that cannot serve the app', () => {
     runMigrations(handle)
     return createApp({
       db: handle.db,
-      config: createConfig({ LOG_LEVEL: 'silent', WEB_ROOT: webRoot }),
+      config: createConfig({ LOG_LEVEL: 'silent', SESSION_SECRET: 't'.repeat(40), WEB_ROOT: webRoot }),
     })
   }
 

@@ -82,8 +82,22 @@ const cookieHeader = (token: string, config: Config, maxAgeSeconds: number): str
  * there is only ever one to send — which makes a second one, by definition,
  * planted.
  *
- * Be precise about what that costs, because it is not a nuisance. Logging in
- * again does **not** clear it: the login sets `Path=/`, and a cookie with a
+ * Be precise about what this buys, because it is half of the threat above, not
+ * all of it. The refusal only fires when *two* cookies arrive, which needs the
+ * victim to already hold one. A victim who is **signed out** holds none, so a
+ * single planted `sage_session=<attacker token>; Domain=example.org` is the only
+ * cookie present, `present.length === 1`, and it is accepted — `/api/auth/me`
+ * answers with the attacker's account and the member fills in their details
+ * there. So: a victim who already holds a session cannot be swapped onto another
+ * account. A signed-out one still can.
+ *
+ * That is why #58 is the fix rather than a tidier spelling of this. `__Host-`
+ * forbids `Domain`, so a sibling subdomain's cookie is host-only to that
+ * subdomain and never reaches this origin at all — which the duplicate check
+ * cannot reach by construction.
+ *
+ * And be precise about the cost, because it is not a nuisance and it is paid in
+ * both cases. Logging in again does **not** clear a planted cookie: the login sets `Path=/`, and a cookie with a
  * different path is a different cookie, so the planted one survives alongside
  * it. Every subsequent request then carries two and is refused. The member is
  * locked out until the planted cookie expires or they clear cookies by hand —

@@ -376,6 +376,14 @@ It does _not_ decide the session cookie's `Secure` flag. That is decided in
 `config.ts` from `NODE_ENV` and `HOST` — set whenever `NODE_ENV` is `production` **or** `HOST` is not loopback. See
 [Accounts and sessions](#accounts-and-sessions).
 
+**Running without Docker?** Set `NODE_ENV=production` explicitly. A proxy in
+front means the app binds loopback, so "not production" and "loopback" are both
+true of a `pnpm start` or systemd unit behind this vhost — and neither says
+"deployment". Serving the built frontend (`WEB_ROOT`) is what the app uses to
+notice, and it will refuse to start without a `SESSION_SECRET` on that basis; but
+`NODE_ENV=production` is what you actually mean, and it does not rely on that
+inference.
+
 Set it in the `:443` vhost, not in an include shared with a `:80` one. Hardcoded
 to `https` it would lie about a plain-HTTP request, and a cookie marked `Secure`
 on a connection that is not would simply never come back.

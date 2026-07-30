@@ -106,6 +106,28 @@ describe('createConfig', () => {
       expect(() => createConfig({ HOST: '0.0.0.0' })).toThrow(/NODE_ENV=development.*HOST=0\.0\.0\.0/s)
     })
 
+    it('requires a secret when WEB_ROOT is set, even on loopback outside production', () => {
+      // The hole the first two signals left, and it is the deployment this repo
+      // documents: a reverse proxy in front means the app binds *loopback*. So
+      // `pnpm start` behind the README's Apache vhost with NODE_ENV unset
+      // satisfied both "not production" and "loopback", and would have booted on
+      // the development key that is committed to this repository — serving a
+      // non-Secure cookie over Apache's TLS.
+      //
+      // Setting WEB_ROOT says "serve the built frontend", which is a deployment
+      // by definition: Vite serves it in development, so a dev run never sets it.
+      expect(() => createConfig({ WEB_ROOT: '/usr/share/web' })).toThrow(/SESSION_SECRET/)
+      expect(() => createConfig({ WEB_ROOT: '/usr/share/web', HOST: '127.0.0.1' })).toThrow(/SESSION_SECRET/)
+    })
+
+    it('marks cookies Secure when WEB_ROOT is set, on the same predicate', () => {
+      // One predicate for both, so the flag and the secret requirement cannot
+      // drift: the cookie would otherwise lack Secure on exactly the run above.
+      const config = createConfig({ SESSION_SECRET: 's'.repeat(40), WEB_ROOT: '/usr/share/web' })
+
+      expect(config.secure_cookies).toBe(true)
+    })
+
     it('marks cookies Secure whenever the app is reachable beyond loopback', () => {
       // Keyed off the same predicate as the secret guard, not off NODE_ENV.
       // Before that, `SESSION_SECRET=… HOST=0.0.0.0 node src/server.ts` bound
@@ -161,7 +183,11 @@ describe('createConfig', () => {
     })
 
     it('trims the web root as well', () => {
-      expect(createConfig({ WEB_ROOT: ' /usr/share/web \n' }).web_root).toBe('/usr/share/web')
+      // A secret because a set WEB_ROOT is deployment-shaped, which is what the
+      // `looksLikeDeployment` cases below cover.
+      expect(createConfig({ SESSION_SECRET: 's'.repeat(40), WEB_ROOT: ' /usr/share/web \n' }).web_root).toBe(
+        '/usr/share/web',
+      )
     })
 
     it('trims the host, which would otherwise fail dns lookup at boot', () => {
