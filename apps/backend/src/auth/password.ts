@@ -223,6 +223,18 @@ export const verifyPassword = async (
 /**
  * Whether a stored hash was made with weaker parameters than we now use.
  *
+ * **Never downgrades.** A per-field `<` is not a work comparison: a hash at
+ * OWASP's other listed rung — N=2^17, r=8, p=1, the one `defaultScryptParams`
+ * was measured against — has `parallelism` 1 against our 2, so a field-wise
+ * check called it stale and the login path would have rewritten it to N=2^16.
+ * Half the memory-hardness, silently, on a successful login.
+ *
+ * So: if the stored hash is stronger in *any* dimension, leave it alone. That is
+ * deliberately conservative — a hash stronger on one axis and weaker on another
+ * is left as it is rather than guessed about — and this function is the
+ * documented seam for the next parameter change, which is precisely when a
+ * mixed-parameter estate exists.
+ *
  * True for anything unparseable as well — failing toward re-hashing rather than
  * toward leaving a bad row alone. Note that this does *not* rescue a broken row
  * today: the login path only consults this after `verifyPassword` returned
@@ -235,9 +247,15 @@ export const needsRehash = (stored: string, params = defaultScryptParams): boole
   const parsed = parseHash(stored)
   if (parsed === undefined) return true
 
-  return (
-    parsed.params.cost < params.cost ||
-    parsed.params.blockSize < params.blockSize ||
-    parsed.params.parallelism < params.parallelism
-  )
+  const axes = [
+    [parsed.params.cost, params.cost],
+    [parsed.params.blockSize, params.blockSize],
+    [parsed.params.parallelism, params.parallelism],
+  ] as const
+
+  // Stronger anywhere wins: leave it. Checked before the weaker test, so a hash
+  // that is higher on one axis and lower on another is never rewritten.
+  if (axes.some(([storedValue, current]) => storedValue > current)) return false
+
+  return axes.some(([storedValue, current]) => storedValue < current)
 }

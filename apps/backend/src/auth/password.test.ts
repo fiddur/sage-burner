@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { hashPassword, needsRehash, verifyPassword } from './password.ts'
+import { defaultScryptParams, hashPassword, needsRehash, verifyPassword } from './password.ts'
 
 /**
  * Hashing is slow on purpose, so these run at a cost far below the production
@@ -152,6 +152,33 @@ describe('needsRehash', () => {
     const stored = await hashPassword('x', fast)
 
     expect(needsRehash(stored, { ...fast, cost: fast.cost * 2 })).toBe(true)
+  })
+
+  it('never downgrades a hash that is stronger on any axis', async () => {
+    // The concrete case: OWASP's other listed rung, and the one
+    // `defaultScryptParams` was measured against. It has p=1 against our p=2, so
+    // a field-wise `<` called it stale — and the login path would have rewritten
+    // N=2^17 down to N=2^16, halving memory-hardness on a *successful* login.
+    const strongerRung = { cost: 2 ** 17, blockSize: 8, parallelism: 1 }
+    const stored = await hashPassword('x', strongerRung)
+
+    expect(needsRehash(stored, defaultScryptParams)).toBe(false)
+  })
+
+  it('leaves a hash alone when one axis is higher and another lower', async () => {
+    // Deliberately conservative rather than clever: a mixed comparison is not a
+    // work comparison, so it is left as it is instead of guessed about.
+    const mixed = { cost: 2 ** 17, blockSize: 4, parallelism: 2 }
+    const stored = await hashPassword('x', mixed)
+
+    expect(needsRehash(stored, defaultScryptParams)).toBe(false)
+  })
+
+  it('still upgrades a hash weaker on every axis', async () => {
+    // The guard must not have turned into "never rehash".
+    const stored = await hashPassword('x', fast)
+
+    expect(needsRehash(stored, defaultScryptParams)).toBe(true)
   })
 
   it('is true for anything unparseable, so a bad row gets replaced on next login', () => {

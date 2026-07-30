@@ -34,12 +34,22 @@ describe('issue and read', () => {
     expect(auth.issue('acct-1')).not.toBe(auth.issue('acct-1'))
   })
 
-  it('carries no readable account id, so a log line does not leak one', () => {
-    // The payload is signed, not encrypted, so anything in it is public. The
-    // id is inside the signed blob rather than in a separate readable field.
+  it('keeps the account id inside the signed payload', () => {
+    // Narrower than it looks, and worth being exact about: the payload is
+    // base64url JSON, so a token in a log line *does* leak the id —
+    // `Buffer.from(part, 'base64url')` is the whole attack. What this pins is
+    // only that the id lives inside the signed blob rather than in a separate
+    // plaintext field beside it, where an unrelated log line could pick it up
+    // without the token.
+    //
+    // The thing that keeps tokens out of logs is the `redact` list in `app.ts`,
+    // tested there.
     const token = sessions().issue('acct-secret-1234')
 
     expect(token).not.toContain('acct-secret-1234')
+    // Stated rather than implied: it decodes.
+    const [payload = ''] = token.split('.')
+    expect(Buffer.from(payload, 'base64url').toString('utf8')).toContain('acct-secret-1234')
   })
 })
 
