@@ -13,6 +13,7 @@ import type { Database } from './db/index.ts'
 
 import { createSessions } from './auth/session.ts'
 import { clientErrorHandler, frameworkErrorHandler, registerErrorHandler } from './errors.ts'
+import { registerAdminRoutes } from './routes/admin.ts'
 import { registerAuthRoutes } from './routes/auth.ts'
 import { registerVersionRoutes } from './routes/version.ts'
 
@@ -264,7 +265,11 @@ export const createApp = async ({ db, config }: AppDeps): Promise<FastifyInstanc
 
   registerErrorHandler(app)
   registerVersionRoutes(app, { config })
-  registerAuthRoutes(app, { db, config, sessions: createSessions(sessionDeps(config)) })
+
+  // One `Sessions` for both, so the guards verify what the login route signed.
+  const sessions = createSessions(sessionDeps(config))
+  registerAuthRoutes(app, { db, config, sessions })
+  registerAdminRoutes(app, { db, sessions })
 
   const webRoot = config.web_root
   const servesWebApp = webRoot !== undefined

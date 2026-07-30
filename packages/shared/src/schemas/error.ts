@@ -44,6 +44,8 @@ export const errorCodes = [
   'not_found',
   'internal_error',
   'invalid_credentials',
+  'unauthenticated',
+  'forbidden',
   'rate_limited',
 ] as const
 export type ErrorCode = (typeof errorCodes)[number]

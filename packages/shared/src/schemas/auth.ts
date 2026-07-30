@@ -31,6 +31,16 @@ export const emailSchema = z.string().trim().toLowerCase().pipe(z.email().max(25
  */
 export const loginPasswordSchema = z.string().min(1).max(1024)
 
+/**
+ * A password being *set*, where a strength floor is fair game.
+ *
+ * Separate from `loginPasswordSchema` on purpose: a rule added here must never
+ * be applied at login, or raising it locks out everyone whose existing password
+ * no longer passes. Length only — composition rules push people toward
+ * `Passw0rd!` and NIST dropped them.
+ */
+export const newPasswordSchema = z.string().min(12).max(1024)
+
 export const loginRequestSchema = z.object({
   email: emailSchema,
   password: loginPasswordSchema,

@@ -6,6 +6,7 @@ import type { Viewer } from './viewer.tsx'
 
 import { createApiClient } from './api/client.ts'
 import { Layout } from './components/Layout.tsx'
+import { Admin } from './pages/Admin.tsx'
 import { Home } from './pages/Home.tsx'
 import { Login } from './pages/Login.tsx'
 import { NotFound } from './pages/NotFound.tsx'
@@ -17,7 +18,7 @@ import { FetchedViewerProvider, ViewerProvider } from './viewer.tsx'
  * Narrow on purpose: a test supplying a stub then has to satisfy exactly these,
  * which is what lets it be a plain object rather than a cast.
  */
-export type AppApi = Pick<ApiClient, 'getMe' | 'login' | 'logout'>
+export type AppApi = Pick<ApiClient, 'getAdminAccounts' | 'getMe' | 'login' | 'logout'>
 
 /**
  * The route table.
@@ -28,7 +29,7 @@ export type AppApi = Pick<ApiClient, 'getMe' | 'login' | 'logout'>
  * path, and invite tokens must be dot-free. A path with an extension gets a 404
  * from the server and never reaches this router.
  */
-export const Routes = ({ api }: { api: Pick<ApiClient, 'login'> }) => {
+export const Routes = ({ api }: { api: Pick<ApiClient, 'getAdminAccounts' | 'login'> }) => {
   // Memoised because `component` is compared by identity: a fresh arrow each
   // render is a *different component type*, so a re-rendered `Routes` would
   // unmount and remount `Login` — and its `useState` — rather than diff it.
@@ -43,11 +44,13 @@ export const Routes = ({ api }: { api: Pick<ApiClient, 'login'> }) => {
   // `Routes` itself re-render — a prop from a consumer, a route-level context —
   // and the symptom then is a member losing what they typed.
   const LoginRoute = useMemo(() => () => <Login api={api} />, [api])
+  const AdminRoute = useMemo(() => () => <Admin api={api} />, [api])
 
   return (
     <Router>
       <Route path="/" component={Home} />
       <Route path="/login" component={LoginRoute} />
+      <Route path="/admin" component={AdminRoute} />
       <Route default component={NotFound} />
     </Router>
   )

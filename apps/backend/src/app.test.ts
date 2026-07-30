@@ -104,16 +104,26 @@ describe('the error envelope', () => {
     expect(response.json()).toEqual({ error: 'bad_request' })
   })
 
-  it('preserves the status the error chose, and maps 4xx to bad_request', async () => {
+  it('preserves the status the error chose, and names the codes a client acts on', async () => {
+    // 401 and 403 get their own codes rather than the generic `bad_request`,
+    // because the client behaves differently: 401 sends the visitor to the
+    // login page, 403 must not — logging in again would change nothing. Other
+    // 4xx statuses stay `bad_request`; several tests below cover that.
     await build()
     app.get('/api/forbidden', async () => {
       throw Object.assign(new Error('nope'), { statusCode: 403 })
     })
+    app.get('/api/unauthenticated', async () => {
+      throw Object.assign(new Error('nope'), { statusCode: 401 })
+    })
 
-    const response = await app.inject({ method: 'GET', url: '/api/forbidden' })
+    const forbidden = await app.inject({ method: 'GET', url: '/api/forbidden' })
+    const unauthenticated = await app.inject({ method: 'GET', url: '/api/unauthenticated' })
 
-    expect(response.statusCode).toBe(403)
-    expect(response.json()).toEqual({ error: 'bad_request' })
+    expect(forbidden.statusCode).toBe(403)
+    expect(forbidden.json()).toEqual({ error: 'forbidden' })
+    expect(unauthenticated.statusCode).toBe(401)
+    expect(unauthenticated.json()).toEqual({ error: 'unauthenticated' })
   })
 
   it('refuses to answer 2xx with an error body', async () => {
@@ -207,7 +217,7 @@ describe('the error envelope', () => {
     const response = await app.inject({ method: 'GET', url: '/api/status-only' })
 
     expect(response.statusCode).toBe(403)
-    expect(response.json()).toEqual({ error: 'bad_request' })
+    expect(response.json()).toEqual({ error: 'forbidden' })
   })
 
   it('ignores a declared status below 400 in favour of one the reply already set', async () => {

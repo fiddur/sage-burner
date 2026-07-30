@@ -11,7 +11,8 @@
     "db:migrate": "node src/db/migrate-cli.ts",
     "test": "vitest run",
     "check": "tsgo --noEmit && oxlint -c ../../.oxlintrc.json --type-aware",
-    "fix": "oxfmt . && oxlint -c ../../.oxlintrc.json --fix"
+    "fix": "oxfmt . && oxlint -c ../../.oxlintrc.json --fix",
+    "admin:create": "node src/cli/create-admin.ts"
   },
   "dependencies": {
     "@fastify/helmet": "^13.1.0",
