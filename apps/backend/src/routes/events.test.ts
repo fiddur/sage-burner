@@ -363,28 +363,16 @@ describe('admin event routes', () => {
   })
 
   it('answers 200 when the welcome text is re-saved unchanged', async () => {
-    // The zero-rows branch reads `changes` as "rows matched". SQLite counts a row
-    // whose SET values are identical, so this passes — and it is the realistic
-    // path: an organiser opens the editor, changes nothing, clicks Save.
+    // The realistic path: an organiser opens the editor, changes nothing, clicks
+    // Save. What it pins is that a write which changes no values is still a
+    // success — not an error, and not "no such event".
     //
-    // What this test uniquely catches is a **driver swap** to one that reports 0
-    // for an update whose values are unchanged (MySQL does). The row is still
-    // there, so the re-read finds it and the handler answers **400
-    // `bad_request`** — "check the dates and lengths" for a save that changed
-    // nothing. Nothing else in the suite notices, because every other PATCH test
-    // writes a genuinely new value; this one fails loudly because 400 is not 200.
-    //
-    // Two things it does *not* catch, listed because an earlier version of this
-    // comment claimed it did:
-    //
-    // - `.returning()` on that statement makes `result` an array, so
-    //   `result.changes` is `undefined` and `Number(undefined)` is `NaN` — the
-    //   guard silently stops firing and a bad one-sided date move returns 200.
-    //   What fails then is, on one line so it greps:
-    //   `rejects a one-sided date move in either direction, and stores nothing`
-    // - `setReadBigInts` is absorbed by the `Number(...)` in the handler
-    //   (`Number(0n) === 0`), and a no-op save reports `1n` rather than `0n`
-    //   anyway, so it is not a failure in either direction.
+    // It used to guard something narrower and more fragile: the handler read
+    // `changes`, which meant it depended on SQLite counting a row whose SET values
+    // are identical, where MySQL reports 0. `.returning()` removed that — `RETURNING`
+    // emits a row per row the `WHERE` matched, whether or not the values differ —
+    // so this no longer defends a driver-specific coupling, because there is not
+    // one. It defends the contract instead, which is the part a member would feel.
     const server = await build()
     const cookie = await givenAdmin()
     const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
@@ -562,10 +550,13 @@ describe('admin event routes', () => {
   it("answers 409 when a patch takes another event's slug", async () => {
     // The 409 was only covered on POST, and it matters more here: this branch
     // changed the mechanism from a try/catch around the await to an `undefined`
-    // sentinel out of `.catch()`, and nothing pinned that `result === undefined`
-    // means "slug conflict" rather than "the driver returned nothing". A
-    // `.returning()` added to that statement would make `result` an array and
-    // quietly change what both that check and the `changes` check mean.
+    // sentinel out of `.catch()`, and nothing pinned that `undefined` means "slug
+    // conflict" rather than "the driver returned nothing".
+    //
+    // That distinction carries more weight since `.returning()` landed, because the
+    // handler now reads two different empty-ish results from the same statement:
+    // `undefined` from the `.catch()` is a conflict (409), and `[]` is "no row
+    // matched" (400 or 404). Collapsing them would answer the wrong one.
     const server = await build()
     const cookie = await givenAdmin()
     await givenEvent({ slug: 'winter-2026', start_date: '2026-12-01', end_date: '2026-12-05' })
