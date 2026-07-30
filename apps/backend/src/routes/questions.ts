@@ -176,6 +176,19 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db, sessions }: G
       const parsed = formQuestionOrderSchema.safeParse(request.body)
       if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
 
+      // The same probe `POST` does, and for the same reason: without it an unknown
+      // event id reads an empty question list, satisfies `sameSet` vacuously, and
+      // answers 200 with `{ questions: [] }` — reporting a successful reorder of a
+      // form that does not exist. A typo'd or stale id in an admin tool would look
+      // like it worked, and the two routes under this prefix would disagree about
+      // the same input.
+      const [found] = await db
+        .select({ id: event.id })
+        .from(event)
+        .where(eq(event.id, request.params.eventId))
+        .limit(1)
+      if (found === undefined) return reply.code(404).send(errorResponse('not_found'))
+
       const existing = await questionsFor(db, request.params.eventId)
       const wanted = parsed.data.ids
 

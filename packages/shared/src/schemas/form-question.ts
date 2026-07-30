@@ -38,30 +38,21 @@ export type FormQuestion = z.infer<typeof formQuestionSchema>
  * - **`checkbox` must not be required.** A checkbox always has an answer — `false`
  *   is one — so "must be present" is vacuous, and the only other reading of a
  *   required checkbox is "must be ticked", which is what `agreement` *is*. Two
- *   spellings of one rule is the ambiguity, so this rejects the second spelling
- *   rather than leaving a consumer to pick a meaning.
+ *   spellings of one rule is the ambiguity, so the second is rejected rather than
+ *   left for a consumer to interpret.
  *
  * Both were storable, leaving #14 to decide what such a row means. Settled at the
  * boundary while there are no rows to migrate, and mirrored by CHECK constraints
  * in `db/schema.ts` for writes that never touch this schema.
  *
- * A wrapper rather than a `.refine()` on `formQuestionSchema`, for the same
- * reason `withEventDateOrder` is one: a top-level refine produces a schema that
- * `.omit()` and `.partial()` refuse to operate on. It tolerates a partial body —
- * only a `type`/`required` pair that is present *and* contradictory is rejected —
- * so a PATCH carrying one of the two is settled by the handler against the
- * merged row.
+ * The three functions below are one rule with three shapes: what `required` must
+ * be, whether a given pair breaks it, and the schema wrapper. It was written out
+ * separately in each place first, and the copies drifted within the hour — the
+ * PATCH handler covered `agreement` and not `checkbox`, so a request producing a
+ * required checkbox reached the database CHECK and answered 500 instead of 400.
  */
-/**
- * What `required` must be for a type, or `undefined` when it is the organiser's
- * choice.
- *
- * The single statement of the rule. It had been written out three times — the two
- * refines below, the merged-row check in the PATCH handler, and the editor's
- * control state — and the halves drifted immediately: the handler covered
- * `agreement` and not `checkbox`, so a PATCH producing a required checkbox reached
- * the database CHECK and answered 500 instead of 400. One function, three callers.
- */
+
+/** What `required` must be for a type, or `undefined` when it is the organiser's choice. */
 export const tickBoxRequired = (type: string): boolean | undefined => {
   if (type === 'agreement') return true
   if (type === 'checkbox') return false
@@ -71,9 +62,9 @@ export const tickBoxRequired = (type: string): boolean | undefined => {
 /**
  * Whether a `type`/`required` pair contradicts the rule.
  *
- * Absent keys pass: a PATCH body may carry one of the two, and the pair is only
- * decidable when both are known. The handler therefore has to apply this to the
- * *merged* row, not to the body — see `PATCH /api/admin/questions/:id`.
+ * Absent keys pass, because a pair is only decidable when both are known and a
+ * PATCH body may legitimately carry one. That is why the handler applies this to
+ * the *merged* row rather than to the body — see `PATCH /api/admin/questions/:id`.
  */
 export const violatesTickBoxRules = (value: { type?: string; required?: boolean }): boolean => {
   if (value.type === undefined || value.required === undefined) return false
@@ -82,6 +73,15 @@ export const violatesTickBoxRules = (value: { type?: string; required?: boolean 
   return must !== undefined && value.required !== must
 }
 
+/**
+ * The rule as a schema wrapper.
+ *
+ * A wrapper rather than a `.refine()` on `formQuestionSchema`, for the same reason
+ * `withEventDateOrder` is one: a top-level refine produces a schema that `.omit()`
+ * and `.partial()` refuse to operate on. It tolerates a partial body, since
+ * `violatesTickBoxRules` passes an undecidable pair — so a PATCH carrying one of
+ * the two keys is settled by the handler, not here.
+ */
 export const withTickBoxRules = <T extends z.ZodType<{ type?: string; required?: boolean }>>(schema: T) =>
   schema.refine((value) => !violatesTickBoxRules(value), {
     message: 'an agreement question must be required, and a checkbox question must not be',

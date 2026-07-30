@@ -602,6 +602,19 @@ describe('reordering questions', () => {
     expect(c ?? '').toBeTruthy()
   })
 
+  it('answers 404 for an event that does not exist', async () => {
+    // An empty id list satisfies set-equality against an empty read, so without an
+    // existence probe this answered 200 — a successful reorder of a form that is
+    // not there. `POST` under the same prefix already 404s for the same input.
+    const server = await build()
+    const cookie = await givenAdmin()
+
+    const response = await reorder(server, cookie, randomUUID(), [])
+
+    expect(response.statusCode).toBe(404)
+    expect(response.json()).toEqual({ error: 'not_found' })
+  })
+
   it('refuses an anonymous caller', async () => {
     const server = await build()
     const cookie = await givenAdmin()
