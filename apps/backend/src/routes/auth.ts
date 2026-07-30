@@ -23,9 +23,15 @@ export const SESSION_COOKIE = 'sage_session'
  *   which is most of CSRF for free. Not `Strict`, which would drop the cookie
  *   when a member follows an invite link out of Discord and lands signed-out on
  *   a page they are signed in to.
- * - `Secure` whenever `config.secure_cookies` — production, *or* bound beyond
- *   loopback. The image is both, so every containerised deployment gets it; the
- *   environment without it is `pnpm dev` on loopback.
+ * - `Secure` whenever `config.secure_cookies` — production, a non-loopback
+ *   `HOST`, or a set `WEB_ROOT`. The image is all three, so every containerised
+ *   deployment gets it; the environment without it is `pnpm dev`, which is none
+ *   of them.
+ *
+ *   The third signal is the one that matters most and is easiest to overlook: a
+ *   `pnpm start` behind a proxy is neither production nor non-loopback — the
+ *   proxy is *why* it binds loopback — and serving the built frontend is the
+ *   only thing marking its cookie `Secure`.
  *
  *   Keyed off the same predicate as the `SESSION_SECRET` guard rather than off
  *   `NODE_ENV`, because `NODE_ENV` cannot answer "is this reachable" — it
@@ -279,10 +285,19 @@ export const registerAuthRoutes = (app: FastifyInstance, { db, config, sessions 
       }
     }
 
+    // Roles first, then the cookie. The other order reads more naturally and is
+    // wrong: `reply.header` sticks to the reply, so a database failure in
+    // `rolesFor` answers 500 with a valid session cookie already attached — the
+    // member is told the login failed while being signed in, and the next
+    // request succeeds for no reason they can see. Nothing is issued until
+    // every query that can fail has succeeded.
+    const roles = await rolesFor(db, row.id)
+
     void reply.header('set-cookie', cookieHeader(sessions.issue(row.id), config, config.session_ttl_seconds))
 
-    const viewer: Viewer = { account_id: row.id, roles: await rolesFor(db, row.id) }
-    return reply.code(200).send({ viewer } satisfies MeResponse)
+    return reply
+      .code(200)
+      .send({ viewer: { account_id: row.id, roles } satisfies Viewer } satisfies MeResponse)
   }
 
   app.post('/api/auth/login', async (request, reply) => {

@@ -48,6 +48,46 @@ const build = async (env: NodeJS.ProcessEnv = {}) => {
 }
 
 /**
+ * Let the first `n` selects through, then throw.
+ *
+ * Enough to fail one specific query in a handler that runs several, which is
+ * what it takes to pin the order they run in.
+ */
+const breakSelectsAfter = (n: number) => {
+  const db = handle?.db
+  if (db === undefined) throw new Error('build() first')
+
+  const original = db.select.bind(db)
+  let seen = 0
+  db.select = ((...args: Parameters<typeof original>) => {
+    seen += 1
+    if (seen > n) throw new Error('select failed')
+    return original(...args)
+  }) as typeof db.select
+}
+
+/**
+ * Count `select` calls on the live handle.
+ *
+ * The only way to observe "rejected before touching the database": the response
+ * is an identical 401 either way, so an assertion on it cannot tell the schema
+ * guard from a full lookup that failed to match.
+ */
+const countSelects = () => {
+  const db = handle?.db
+  if (db === undefined) throw new Error('build() first')
+
+  const original = db.select.bind(db)
+  const calls = { count: 0 }
+  db.select = ((...args: Parameters<typeof original>) => {
+    calls.count += 1
+    return original(...args)
+  }) as typeof db.select
+
+  return calls
+}
+
+/**
  * Make every `update` on the live handle throw.
  *
  * Patched on the handle rather than mocked at the module boundary, so the route
@@ -211,8 +251,57 @@ describe('POST /api/auth/login', () => {
     const server = await build()
     await givenAccount(server, { email: 'ada@example.org' })
 
-    expect((await login(server, 'ada@example.org', '')).statusCode).toBe(401)
+    // Only this line reaches the null-hash path. An empty password used to be
+    // asserted here too, and could not: `loginPasswordSchema` is `.min(1)`, so
+    // it fails `safeParse` and returns 401 from the guard at the top of
+    // `handleLogin`, before the account is looked up at all — the same 401 it
+    // would give for an address that does not exist, and the same one it would
+    // give if `verifyPassword` returned true for a null hash.
     expect((await login(server, 'ada@example.org', 'anything')).statusCode).toBe(401)
+  })
+
+  it('rejects an empty password before touching the database', async () => {
+    // What the misplaced assertion above was actually testing — and it needs to
+    // be checked this way, because the response is an identical 401 whether the
+    // schema rejected it or a lookup ran and failed to match. Counting reads is
+    // the only thing that distinguishes them.
+    const server = await build()
+    await givenAccount(server, { email: 'ada@example.org', password: 'a good long passphrase' })
+    const selects = countSelects()
+
+    const response = await login(server, 'ada@example.org', '')
+
+    expect(response.statusCode).toBe(401)
+    expect(response.json()).toEqual({ error: 'invalid_credentials' })
+    expect(selects.count).toBe(0)
+  })
+
+  it('does read the database for a password that could have been right', async () => {
+    // The other half: without it, the assertion above would pass against a
+    // handler that never queried at all.
+    const server = await build()
+    await givenAccount(server, { email: 'ada@example.org', password: 'a good long passphrase' })
+    const selects = countSelects()
+
+    await login(server, 'ada@example.org', 'wrong but well-formed')
+
+    expect(selects.count).toBeGreaterThan(0)
+  })
+
+  it('issues no cookie when the roles lookup fails', async () => {
+    // The cookie is set after every query that can fail, not before. `reply
+    // .header` sticks to the reply, so the natural order — issue, then look up
+    // roles — answers 500 with a valid session attached: the member is told the
+    // login failed while being signed in, and their next request works for no
+    // reason they can see.
+    const server = await build()
+    await givenAccount(server, { email: 'ada@example.org', password: 'a good long passphrase' })
+    breakSelectsAfter(1) // the account lookup succeeds; the roles lookup does not
+
+    const response = await login(server, 'ada@example.org', 'a good long passphrase')
+
+    expect(response.statusCode).toBe(500)
+    expect(response.headers['set-cookie']).toBeUndefined()
   })
 
   it('sets no cookie when the login fails', async () => {

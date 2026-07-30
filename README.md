@@ -67,10 +67,11 @@ being handed the HTML shell. It also means invite tokens must be dot-free.
 
 ### Configuration
 
-Every variable is optional except `SESSION_SECRET`, which is required unless the
-app is **both** outside production **and** bound to loopback. The image sets
-`NODE_ENV=production` and `HOST=0.0.0.0`, so any container needs one; `pnpm dev`
-needs nothing, because `HOST` defaults to loopback.
+Every variable is optional except `SESSION_SECRET`, which is required for
+anything a browser other than yours could reach. Three signals, any one of which
+is enough: `NODE_ENV=production`, a non-loopback `HOST`, or a set `WEB_ROOT`. The
+image sets all three, so any container needs a secret; `pnpm dev` needs nothing,
+because it is none of them.
 
 Two conditions rather than one because `NODE_ENV` cannot answer the question that
 matters. It defaults to `development` when unset, so a bare `node
@@ -83,18 +84,18 @@ The other defaults are what you get without any configuration. An empty value is
 treated as unset, since `FOO: ${FOO}` in a compose file with `FOO` undefined
 expands to an empty string rather than to nothing.
 
-| Variable              | Default                     | Meaning                                                                                                                    |
-| --------------------- | --------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `NODE_ENV`            | `development`               | `development` \| `test` \| `production`                                                                                    |
-| `PORT`                | `3000`                      | Port to listen on                                                                                                          |
-| `HOST`                | `127.0.0.1`                 | Bind address. Loopback by default; the image sets `0.0.0.0`. Binding anywhere else requires `SESSION_SECRET`               |
-| `DATABASE_URL`        | `./data/sage-burner.sqlite` | SQLite file; parent directory is created                                                                                   |
-| `LOG_LEVEL`           | `info`                      | `fatal` … `trace`, or `silent`                                                                                             |
-| `BUILD_SHA`           | `unknown`                   | Commit the image was built from                                                                                            |
-| `WEB_ROOT`            | _(unset)_                   | Directory of the built web app. Unset in dev, where Vite serves it                                                         |
-| `TRUST_PROXY`         | `false`                     | `false`, `true`, a hop count like `1`, or an address/CIDR list                                                             |
-| `SESSION_SECRET`      | _(none)_                    | **Required unless outside production and on loopback.** HMAC key for session cookies, 32+ chars. `openssl rand -base64 48` |
-| `SESSION_TTL_SECONDS` | `1209600`                   | How long a session lasts. Two weeks                                                                                        |
+| Variable              | Default                     | Meaning                                                                                                                                                 |
+| --------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`            | `development`               | `development` \| `test` \| `production`                                                                                                                 |
+| `PORT`                | `3000`                      | Port to listen on                                                                                                                                       |
+| `HOST`                | `127.0.0.1`                 | Bind address. Loopback by default; the image sets `0.0.0.0`. Binding anywhere else requires `SESSION_SECRET`                                            |
+| `DATABASE_URL`        | `./data/sage-burner.sqlite` | SQLite file; parent directory is created                                                                                                                |
+| `LOG_LEVEL`           | `info`                      | `fatal` … `trace`, or `silent`                                                                                                                          |
+| `BUILD_SHA`           | `unknown`                   | Commit the image was built from                                                                                                                         |
+| `WEB_ROOT`            | _(unset)_                   | Directory of the built web app. Unset in dev, where Vite serves it                                                                                      |
+| `TRUST_PROXY`         | `false`                     | `false`, `true`, a hop count like `1`, or an address/CIDR list                                                                                          |
+| `SESSION_SECRET`      | _(none)_                    | **Required if `NODE_ENV=production`, `HOST` is not loopback, or `WEB_ROOT` is set.** HMAC key for session cookies, 32+ chars. `openssl rand -base64 48` |
+| `SESSION_TTL_SECONDS` | `1209600`                   | How long a session lasts. Two weeks                                                                                                                     |
 
 Invalid configuration fails at boot with every problem listed, rather than
 starting and behaving subtly wrong.
@@ -132,8 +133,14 @@ and point `WEB_ROOT` at the output:
 
 ```sh
 pnpm --filter sage-burner-web build
-WEB_ROOT=$PWD/apps/web/dist pnpm dev:backend
+SESSION_SECRET=$(openssl rand -base64 48) WEB_ROOT=$PWD/apps/web/dist pnpm dev:backend
 ```
+
+The secret is needed because a set `WEB_ROOT` means "serve the built frontend",
+which the app counts as a deployment — see [Configuration](#configuration). This
+run also gets `Secure` cookies, which is fine over `http://localhost` in Chrome
+and Firefox because they treat it as a trustworthy origin, but is not universal;
+if login does not stick in some other browser, that is why.
 
 `WEB_ROOT` is resolved against the backend's working directory, which `pnpm
 dev:backend` sets to `apps/backend` — so an absolute path is the one that stays
@@ -342,6 +349,14 @@ failregex = ^<HOST> .* "POST /api/auth/login HTTP/[^"]*" 401
 ignoreregex =
 ```
 
+That uniformity is deliberate — a malformed body answers `401` too, so the shape
+of the error cannot be used to probe which addresses parse as accounts — and it
+is the one drawback of this filter: the pattern above cannot tell a password
+guess from a client sending a body the schema rejects. A frontend bug would ban
+the member rather than surface itself. Nothing in the access log distinguishes
+them, so if you hit that, look at the app log (`login rejected` is logged only
+for a real credential failure) before assuming an attack.
+
 ```ini
 # /etc/fail2ban/jail.d/sage-burner.conf
 [sage-burner-login]
@@ -373,7 +388,8 @@ request — which matters for logging, for redirects, and for anything later tha
 keys on the scheme.
 
 It does _not_ decide the session cookie's `Secure` flag. That is decided in
-`config.ts` from `NODE_ENV` and `HOST` — set whenever `NODE_ENV` is `production` **or** `HOST` is not loopback. See
+`config.ts`, on the same three signals as the secret requirement: `production`, a
+non-loopback `HOST`, or a set `WEB_ROOT`. See
 [Accounts and sessions](#accounts-and-sessions).
 
 **Running without Docker?** Set `NODE_ENV=production` explicitly. A proxy in
@@ -425,11 +441,12 @@ just next-login.
 **Sessions** are a signed value in an `HttpOnly`, `SameSite=Lax` cookie — not a
 database row.
 
-`Secure` is set whenever `NODE_ENV` is `production` **or** `HOST` is not loopback — decided once in `config.ts` as
-`secure_cookies`, on the same predicate as the `SESSION_SECRET` requirement. The
-image sets both, so **every containerised deployment gets it**, and so does any
-hand-rolled run that binds beyond loopback. Plain HTTP therefore works on
-`localhost` only, where browsers treat the origin as trustworthy — and that is
+`Secure` is decided once in `config.ts` as `secure_cookies`, on exactly the same
+predicate as the `SESSION_SECRET` requirement: `production`, a non-loopback
+`HOST`, or a set `WEB_ROOT`. The image is all three, so **every containerised
+deployment gets it** — and so does a hand-rolled `pnpm start` behind a proxy,
+which is neither production nor non-loopback but does serve the built
+frontend. Plain HTTP therefore works on `localhost` only, where browsers treat the origin as trustworthy — and that is
 now true by construction rather than by coincidence of the Dockerfile. On any other
 plain-HTTP origin — a LAN address, an internal hostname — the browser discards
 the cookie silently: login answers 200, the page says you are signed in, and the

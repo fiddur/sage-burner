@@ -97,8 +97,9 @@ const isLoopbackHost = (host: string): boolean =>
  * `WEB_ROOT` closes it. Setting it says "serve the built frontend", which is a
  * deployment by definition — Vite serves the frontend in development, so a dev
  * run never sets it. The one case that pays for this is building the frontend
- * and pointing a local backend at it, which the README notes now needs a secret;
- * that run is serving the built app, so being treated as a deployment is right.
+ * and pointing a local backend at it; the README's recipe for that passes a
+ * secret, and that run *is* serving the built app, so being treated as a
+ * deployment is right.
  */
 const looksLikeDeployment = (nodeEnv: string, host: string, webRoot: string | undefined): boolean =>
   nodeEnv === 'production' || !isLoopbackHost(host) || webRoot !== undefined
