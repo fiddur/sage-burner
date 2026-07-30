@@ -44,7 +44,9 @@ describe('Home', () => {
     // page, with no deploy in between.
     renderHome(summer)
 
-    expect(await screen.findByRole('heading', { name: 'Bring water', level: 1 })).toBeTruthy()
+    // Level 2: the page's own `h1` is the site name, so content headings shift
+    // down one rather than producing a second `h1` under an `h2`.
+    expect(await screen.findByRole('heading', { name: 'Bring water', level: 2 })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'map' }).getAttribute('href')).toBe('/map')
   })
 
@@ -56,6 +58,15 @@ describe('Home', () => {
     await screen.findByRole('heading', { name: 'Summer Burn 2026', level: 2 })
     expect(document.querySelector('.welcome script')).toBeNull()
     expect(screen.getByText(/<script>alert\(1\)<\/script>/)).toBeTruthy()
+  })
+
+  it('does not flash "Apply to join" at a member while the viewer loads', async () => {
+    // `isMember` is false during `loading`, so without the gate a member sees an
+    // invitation to apply to something they are already in, then watches it
+    // vanish — a layout shift on the first paint of the public page.
+    renderHome(summer, { status: 'loading' })
+
+    expect(screen.queryByRole('link', { name: 'Apply to join' })).toBeNull()
   })
 
   it('says there is no burn rather than showing nothing', async () => {

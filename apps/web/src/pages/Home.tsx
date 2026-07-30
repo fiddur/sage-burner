@@ -87,10 +87,16 @@ export const Home = ({ api }: { api: HomeApi }) => {
       <p class="home-actions">
         {/*
           Applying is the point of the page, so the link does not wait for the
-          event to load — someone who arrived to apply should not sit through a
-          round trip first. Members already have their own pages in the nav.
+          *event* to load — someone who arrived to apply should not sit through
+          that round trip first. It does wait for the viewer, which is a
+          different request and already in flight before this mounts: `isMember`
+          is false while the viewer is `loading`, so without this gate a member
+          would be shown "Apply to join" for the length of `getMe` and then watch
+          it vanish — a layout shift, and an invitation to apply to something
+          they are already in. `Layout` gates its public entry points the same
+          way, for the same reason.
         */}
-        {!isMember(viewer) && (
+        {viewer.status !== 'loading' && !isMember(viewer) && (
           <a class="button" href="/apply">
             Apply to join
           </a>

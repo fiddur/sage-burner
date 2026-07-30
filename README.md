@@ -656,9 +656,17 @@ would have to know about `data:text/html`, `vbscript:` and friends individually.
 The cost is that a literal `<br>` renders as text. Markdown already has emphasis,
 headings, lists and links, which is the whole vocabulary this field needs.
 
+Content headings are shifted down one level: a `#` renders as `<h2>`, clamped at
+`<h6>`. The page owns `<h1>` (the site name) and `<h2>` (the event name), so an
+unshifted `#` would put a second `<h1>` underneath an `<h2>` and break the outline
+screen readers navigate by.
+
 Site-relative links must be genuinely site-relative: `//evil.com` and
 `/\evil.com` are rejected, since both navigate off-site while reading as local
-in the markdown source. No privilege is gained either way — whoever writes this
+in the markdown source. Control characters are stripped before the check —
+`marked`'s angle-bracket destination form accepts tabs, and the browser discards
+them while parsing a URL, so `</\t/evil.com>` would otherwise arrive as
+`//evil.com`. No privilege is gained either way — whoever writes this
 field could link `https://evil.com` outright — but the allowlist should mean what
 it says.
 
@@ -666,7 +674,10 @@ it says.
 `'self' data: https:` rather than helmet's default `'self' data:`, because the
 URL allowlist admits `https://` image sources and the two disagreeing meant an
 image was rendered into the page and then blocked by the browser — which reads as
-a bug rather than a policy. There is no upload feature, so the alternative is
+a bug rather than a policy. Images therefore have a *stricter* allowlist than
+links: `https://` or site-relative only, since a plain `http://` image would hit
+that same mismatch. Links still accept `http://` — `img-src` does not govern
+navigation. There is no upload feature, so the alternative is
 that images do not work at all. The cost: an image host an organiser links to
 sees the IP of every homepage visitor, and this is the only external request the
 app can produce. Narrow it back to `'self' data:` if uploads ever land.
