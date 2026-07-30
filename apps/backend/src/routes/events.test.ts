@@ -276,20 +276,6 @@ describe('admin event routes', () => {
     expect(row).toMatchObject({ slug: 'summer-2026', start_date: '2026-08-01', member_cap: 42 })
   })
 
-  it('reject a patch that moves one date past the other', async () => {
-    // The schema cannot catch this: it has to tolerate a partial range, since a
-    // PATCH may legitimately carry only one date. Without the merged-range
-    // check this reaches the database CHECK and answers 500.
-    const server = await build()
-    const cookie = await givenAdmin()
-    const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
-
-    const response = await patch(server, cookie, id, { start_date: '2026-09-01' })
-
-    expect(response.statusCode).toBe(400)
-    expect(response.json()).toEqual({ error: 'bad_request' })
-  })
-
   it('treats an empty patch as a no-op rather than a 500', async () => {
     // `set({})` is not valid SQL, so drizzle refuses it outright — this used to
     // answer `internal_error` with a stack in the log. A no-op PATCH is
@@ -335,10 +321,18 @@ describe('admin event routes', () => {
     expect(row).toMatchObject({ start_date: '2026-08-01', end_date: '2026-08-05' })
   })
 
-  it('still rejects a one-sided date move, now decided inside the statement', async () => {
-    // The condition rides in the UPDATE's `where`, so a concurrent change to the
-    // other date cannot slip between a read and a write and turn this into a 500
-    // from the database CHECK.
+  it('rejects a one-sided date move in either direction, and stores nothing', async () => {
+    // The schema cannot catch this: it tolerates a partial range, since a PATCH
+    // may legitimately carry one date. The handler puts the condition in the
+    // UPDATE's `where` so it is evaluated against the row at write time.
+    //
+    // What these assertions distinguish is that a one-sided move is refused and
+    // the row is untouched — **not** that the decision happens inside the
+    // statement. A read-then-check implementation passes this identically. The
+    // in-statement property is real (it is what stops a concurrent move to the
+    // other date reaching `event_date_order_check` as a 500) but it is not
+    // observable from two sequential requests, so nothing here defends it; the
+    // reachability of `dateOrderCondition` is what this covers.
     const server = await build()
     const cookie = await givenAdmin()
     const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
@@ -347,9 +341,28 @@ describe('admin event routes', () => {
     const movedEnd = await patch(server, cookie, id, { end_date: '2026-07-01' })
 
     expect(movedStart.statusCode).toBe(400)
+    expect(movedStart.json()).toEqual({ error: 'bad_request' })
     expect(movedEnd.statusCode).toBe(400)
     const [row] = await db().select().from(event)
     expect(row).toMatchObject({ start_date: '2026-08-01', end_date: '2026-08-05' })
+  })
+
+  it('answers 200 when the welcome text is re-saved unchanged', async () => {
+    // The 400 on zero rows reads `changes` as "rows matched". SQLite counts a row
+    // whose SET values are identical, so this passes — and it is the realistic
+    // path: an organiser opens the editor, changes nothing, clicks Save. A driver
+    // swap, a `.returning()` added to that statement, or `setReadBigInts` making
+    // this `0n` would turn every no-op save into `bad_request`, and nothing else
+    // in the suite would notice: every other PATCH test writes a new value.
+    const server = await build()
+    const cookie = await givenAdmin()
+    const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
+    await patch(server, cookie, id, { welcome_markdown: '# Bring water' })
+
+    const response = await patch(server, cookie, id, { welcome_markdown: '# Bring water' })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().event).toMatchObject({ welcome_markdown: '# Bring water' })
   })
 
   it('allows a one-sided date move that keeps the order', async () => {
