@@ -5,7 +5,16 @@ import type { ApiClient } from '../api/client.ts'
 import { isApiError } from '../api/client.ts'
 import { useSetViewer, useViewer } from '../viewer.tsx'
 
-/** The three failures a login can produce, each wanting different behaviour. */
+/**
+ * The three failures a login can produce, each wanting different behaviour.
+ *
+ * Deliberately not `failure.message`, which `messageFor` in the API client
+ * already produces: this page can be more specific than a generic API error
+ * ("sign-in attempts" rather than "attempts"), and a login form is where that
+ * specificity is worth most. The near-duplicate 429 copy in the two places is
+ * intentional rather than drift — if one is edited, decide about the other
+ * rather than assuming they must match.
+ */
 const messageForFailure = (failure: unknown): string => {
   if (!isApiError(failure)) return 'Could not sign in just now. Please try again.'
   if (failure.status === 401) return 'That email and password did not match.'

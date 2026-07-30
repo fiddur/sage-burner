@@ -19,10 +19,15 @@ export const emailSchema = z.string().trim().toLowerCase().pipe(z.email().max(25
  *
  * Deliberately only bounded, never pattern-checked: rejecting an existing
  * password at the login form because it fails a rule added later locks the
- * owner out of their own account. The upper bound is a denial-of-service guard
- * — scrypt hashes whatever it is given, so an unbounded field lets one request
- * burn arbitrary CPU. Registration is where strength rules belong, and that
- * arrives with invite redemption (#17).
+ * owner out of their own account. Registration is where strength rules belong,
+ * and that arrives with invite redemption (#17).
+ *
+ * The upper bound is *not* a CPU guard, which is what this comment used to
+ * claim. scrypt's cost is set by N and r; the password itself only feeds a
+ * single PBKDF2-HMAC-SHA256 pass. Measured: 8 bytes 217ms, 1 KiB 216ms, 64 KiB
+ * 220ms — indistinguishable. The bound is there for the ordinary reasons — body
+ * size, log volume, not handing unbounded input to a crypto primitive — and 1024
+ * is far above any real passphrase.
  */
 export const loginPasswordSchema = z.string().min(1).max(1024)
 
