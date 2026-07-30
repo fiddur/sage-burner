@@ -581,6 +581,77 @@ redirecting.
 The web app hides what a viewer cannot use, but that is presentation. Every
 admin route refuses server-side regardless of what the nav rendered.
 
+## Events
+
+There is never "the" event. `event` rows exist from day one and the app is built
+around recurrence — up to four burns a year, each with its own applications,
+members and payments.
+
+### Which event is active
+
+The public homepage and application form need one event, so the rule is written
+down rather than inferred per call site:
+
+> The **active event** is the soonest-ending event whose end date has not passed.
+> Ties break on start date, then slug.
+
+Consequences worth knowing:
+
+- An event **running today is still active** — mid-burn is when the homepage
+  matters most, and a rule keyed on the start date would drop it the moment it
+  began.
+- An event **ending today is still active**, until UTC midnight. The comparison
+  is in UTC rather than a configured timezone: the only thing it decides is when
+  an event stops being the active one, and a few hours either way on the closing
+  day is not something an organiser would notice. A timezone setting would be a
+  config knob, a migration and a test matrix bought for that.
+- Once **every** event has ended there is no active event, and the homepage says
+  so. It deliberately does not fall back to the most recent past event, which
+  would leave last year's welcome text up as though it were an invitation.
+  Creating the next event is what fills the gap.
+
+`GET /api/events/active` is public and answers `{ "event": null }` rather than a
+404 before the first event exists — that is the ordinary state of a fresh
+deployment, not an error.
+
+### Editing an event
+
+Organise → **Events and welcome text**. Create events there, and edit the welcome
+markdown with a live preview. Saving takes effect immediately: the public
+response is `Cache-Control: no-cache`, so a browser may store it but must
+revalidate, and a correction cannot sit invisible in a cache.
+
+A slug collision answers **409** rather than a generic failure — the slug appears
+in URLs, so it is something the organiser fixes by choosing another.
+
+### Markdown is escaped, not filtered
+
+`welcome_markdown` is admin-authored and rendered to every public visitor, so it
+is treated as untrusted: an admin account is one phished password away from
+belonging to someone else.
+
+**Raw HTML in the welcome text is escaped and shows as visible text.** The usual
+build is `marked` + DOMPurify, and that was the first attempt — but DOMPurify
+needs a real DOM, and under happy-dom (the test environment) it reports
+`isSupported: true` while doing nothing useful:
+`sanitize('<h1>a</h1><script>b</script>')` returns `a<script>b</script>`,
+dropping the safe tag and keeping the dangerous one. A sanitiser the suite cannot
+exercise is a security control held on trust, and that one was actively wrong
+where the tests run.
+
+Escaping needs no DOM, so it behaves identically in Node, in tests and in the
+browser — and the tests prove it rather than assuming it. It is also the stricter
+rule: no allowlist to get wrong, and no gap between how a sanitiser parses the
+input and how the browser does.
+
+Link and image URLs are checked separately against a scheme allowlist
+(`https:`, `http:`, `mailto:`, site-relative and anchors), because escaping does
+nothing about `[click](javascript:…)` — that is markdown, not HTML. A denylist
+would have to know about `data:text/html`, `vbscript:` and friends individually.
+
+The cost is that a literal `<br>` renders as text. Markdown already has emphasis,
+headings, lists and links, which is the whole vocabulary this field needs.
+
 ## Security headers
 
 Every routed response carries a `Content-Security-Policy`,

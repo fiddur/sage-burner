@@ -55,3 +55,48 @@ export const eventFields = z.object({
 export const eventSchema = withEventDateOrder(eventFields)
 
 export type Event = z.infer<typeof eventSchema>
+
+/**
+ * Creating an event. `id` and `created_at` are the server's to assign.
+ *
+ * `welcome_markdown` defaults to empty so the create form is short: an
+ * organiser naming a date and a cap should not also have to write the welcome
+ * text before the event can exist.
+ */
+export const eventCreateSchema = withEventDateOrder(
+  eventFields.omit({ id: true, created_at: true }).extend({
+    welcome_markdown: eventFields.shape.welcome_markdown.default(''),
+  }),
+)
+export type EventCreate = z.infer<typeof eventCreateSchema>
+
+/**
+ * Editing one. Every field optional — the welcome text is edited far more often
+ * than the dates, and a PATCH that had to restate the whole event would make
+ * two organisers editing different fields overwrite each other.
+ *
+ * Still wrapped in `withEventDateOrder`, which tolerates a partial range: it
+ * only rejects when both dates are present and out of order. A PATCH moving
+ * *one* date past the other therefore passes here and is caught by the database
+ * CHECK — see `updateEvent`, which re-reads the row and validates the merged
+ * range rather than relying on that.
+ */
+export const eventUpdateSchema = withEventDateOrder(
+  eventFields.omit({ id: true, created_at: true }).partial(),
+)
+export type EventUpdate = z.infer<typeof eventUpdateSchema>
+
+export const eventResponseSchema = z.object({ event: eventFields })
+export type EventResponse = z.infer<typeof eventResponseSchema>
+
+export const eventsResponseSchema = z.object({ events: z.array(eventFields) })
+export type EventsResponse = z.infer<typeof eventsResponseSchema>
+
+/**
+ * The public homepage's event, or `null` before the first one is created.
+ *
+ * Nullable rather than 404: "no event yet" is the state a fresh deployment is
+ * in, and the homepage should render an explanation rather than an error.
+ */
+export const activeEventResponseSchema = z.object({ event: eventFields.nullable() })
+export type ActiveEventResponse = z.infer<typeof activeEventResponseSchema>
