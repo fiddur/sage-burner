@@ -364,10 +364,23 @@ describe('admin event routes', () => {
   it('answers 200 when the welcome text is re-saved unchanged', async () => {
     // The 400 on zero rows reads `changes` as "rows matched". SQLite counts a row
     // whose SET values are identical, so this passes — and it is the realistic
-    // path: an organiser opens the editor, changes nothing, clicks Save. A driver
-    // swap, a `.returning()` added to that statement, or `setReadBigInts` making
-    // this `0n` would turn every no-op save into `bad_request`, and nothing else
-    // in the suite would notice: every other PATCH test writes a new value.
+    // path: an organiser opens the editor, changes nothing, clicks Save.
+    //
+    // What this test uniquely catches is a **driver swap** to one that reports 0
+    // for an update whose values are unchanged (MySQL does), which would turn
+    // every no-op save into `bad_request`. Nothing else in the suite notices,
+    // because every other PATCH test writes a genuinely new value.
+    //
+    // Two things it does *not* catch, listed because an earlier version of this
+    // comment claimed it did:
+    //
+    // - `.returning()` on that statement makes `result` an array, so
+    //   `result.changes` is `undefined` and `Number(undefined)` is `NaN` — the
+    //   guard silently stops firing and a bad one-sided date move returns 200.
+    //   `rejects a one-sided date move in either direction` fails then, not this.
+    // - `setReadBigInts` is absorbed by the `Number(...)` in the handler
+    //   (`Number(0n) === 0`), and a no-op save reports `1n` rather than `0n`
+    //   anyway, so it is not a failure in either direction.
     const server = await build()
     const cookie = await givenAdmin()
     const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
@@ -390,6 +403,24 @@ describe('admin event routes', () => {
     expect(response.statusCode).toBe(200)
     const [row] = await db().select().from(event)
     expect(row).toMatchObject({ start_date: '2026-08-01', end_date: '2026-08-09' })
+  })
+
+  it("answers 409 when a patch takes another event's slug", async () => {
+    // The 409 was only covered on POST, and it matters more here: this branch
+    // changed the mechanism from a try/catch around the await to an `undefined`
+    // sentinel out of `.catch()`, and nothing pinned that `result === undefined`
+    // means "slug conflict" rather than "the driver returned nothing". A
+    // `.returning()` added to that statement would make `result` an array and
+    // quietly change what both that check and the `changes` check mean.
+    const server = await build()
+    const cookie = await givenAdmin()
+    await givenEvent({ slug: 'winter-2026', start_date: '2026-12-01', end_date: '2026-12-05' })
+    const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
+
+    const response = await patch(server, cookie, id, { slug: 'winter-2026' })
+
+    expect(response.statusCode).toBe(409)
+    expect(response.json()).toEqual({ error: 'conflict' })
   })
 
   it('answer 404 for an event that does not exist', async () => {
