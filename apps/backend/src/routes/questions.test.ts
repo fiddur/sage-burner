@@ -208,6 +208,42 @@ describe('adding a question', () => {
     expect((await add(server, cookie, eventId, { ...question, label: '' })).statusCode).toBe(400)
   })
 
+  it('accepts a create body that omits help_text and options', async () => {
+    // `.nullable()` does not make a key optional, so omitting either was a bare
+    // `bad_request` naming no field — and `options` is a column nothing consumes
+    // yet.
+    const server = await build()
+    const cookie = await givenAdmin()
+    const eventId = await givenEvent()
+
+    const response = await add(server, cookie, eventId, {
+      type: 'text',
+      label: 'Your name',
+      required: true,
+    })
+
+    expect(response.statusCode).toBe(201)
+    expect(response.json().question).toMatchObject({ help_text: null, options: null })
+  })
+
+  it('refuses an agreement question that is not required', async () => {
+    // The type exists because submission is blocked when it is unticked, so
+    // `{ type: 'agreement', required: false }` contradicts itself. Rejected while
+    // there are no rows, rather than leaving #14 to pick a half to believe.
+    const server = await build()
+    const cookie = await givenAdmin()
+    const eventId = await givenEvent()
+
+    const response = await add(server, cookie, eventId, {
+      ...question,
+      type: 'agreement',
+      required: false,
+    })
+
+    expect(response.statusCode).toBe(400)
+    expect(labelsOf(await publicList(server, eventId))).toEqual([])
+  })
+
   it('rejects an unknown question type', async () => {
     const server = await build()
     const cookie = await givenAdmin()
@@ -275,6 +311,58 @@ describe('editing a question', () => {
 
       expect(response.statusCode, JSON.stringify(payload)).toBe(200)
     }
+  })
+
+  it('refuses a patch that would make an agreement optional', async () => {
+    // One field is enough to break the rule, and the schema only sees the body —
+    // so the merged row is what has to hold. Both directions.
+    const server = await build()
+    const cookie = await givenAdmin()
+    const eventId = await givenEvent()
+    const agreement = await add(server, cookie, eventId, {
+      ...question,
+      type: 'agreement',
+      label: 'I agree',
+    })
+    const optional = await add(server, cookie, eventId, {
+      ...question,
+      type: 'text',
+      label: 'Optional',
+      required: false,
+    })
+
+    const unrequire = await server.inject({
+      method: 'PATCH',
+      url: `/api/admin/questions/${agreement.json().question.id}`,
+      headers: { cookie },
+      payload: { required: false },
+    })
+    const retype = await server.inject({
+      method: 'PATCH',
+      url: `/api/admin/questions/${optional.json().question.id}`,
+      headers: { cookie },
+      payload: { type: 'agreement' },
+    })
+
+    expect(unrequire.statusCode).toBe(400)
+    expect(retype.statusCode).toBe(400)
+  })
+
+  it('refuses an anonymous patch', async () => {
+    // POST, DELETE and the reorder each had one; PATCH was the odd one out.
+    const server = await build()
+    const cookie = await givenAdmin()
+    const eventId = await givenEvent()
+    const created = await add(server, cookie, eventId, question)
+
+    const response = await server.inject({
+      method: 'PATCH',
+      url: `/api/admin/questions/${created.json().question.id}`,
+      payload: { label: 'hijacked' },
+    })
+
+    expect(response.statusCode).toBe(401)
+    expect(labelsOf(await publicList(server, eventId))).toEqual(['Why do you want to come?'])
   })
 
   it('answers 404 for a question that does not exist', async () => {

@@ -89,7 +89,14 @@ export const QuestionEditor = ({ api, eventId }: { api: QuestionsApi; eventId: s
     setError(undefined)
     try {
       await work()
-      await refresh()
+      // Outside the `catch` below, and with its own message. Inside the `try`
+      // this reported `fallback` — "Could not add the question." — for a question
+      // that was already in the database, with the draft cleared. The exact
+      // inverse of the failure this component is otherwise careful about:
+      // pretending the change *didn't* take.
+      await refresh().catch(() => {
+        setError('Saved, but the list could not be reloaded.')
+      })
     } catch (failure) {
       setError(messageFor(failure, fallback))
       // Re-read on failure too, or the one error the API deliberately produces
@@ -112,8 +119,7 @@ export const QuestionEditor = ({ api, eventId }: { api: QuestionsApi; eventId: s
         // The column is nullable and "not set" has exactly one representation,
         // so an empty box is null rather than an empty string.
         help_text: draft.help_text.trim() === '' ? null : draft.help_text,
-        required: draft.required,
-        options: null,
+        required: draft.type === 'agreement' ? true : draft.required,
       })
       setDraft(BLANK)
     }, 'Could not add the question.')
@@ -252,13 +258,20 @@ export const QuestionEditor = ({ api, eventId }: { api: QuestionsApi; eventId: s
           />
         </label>
 
+        {/*
+          Disabled for `agreement`, not merely defaulted: that type exists because
+          submission is blocked when it is unticked, so an optional agreement is a
+          contradiction. The API refuses it too — this makes the rule visible
+          instead of turning a tick into a 400.
+        */}
         <label class="field-inline">
           <input
             type="checkbox"
-            checked={draft.required}
+            checked={draft.type === 'agreement' || draft.required}
+            disabled={draft.type === 'agreement'}
             onChange={(changeEvent) => setDraft({ ...draft, required: changeEvent.currentTarget.checked })}
           />
-          <span>Required</span>
+          <span>Required{draft.type === 'agreement' ? ' (always, for an agreement)' : ''}</span>
         </label>
 
         <button type="submit" disabled={busy}>
@@ -335,16 +348,24 @@ const QuestionFields = ({
       <label class="field-inline">
         <input
           type="checkbox"
-          checked={required}
+          checked={type === 'agreement' || required}
+          disabled={type === 'agreement'}
           onChange={(changeEvent) => setRequired(changeEvent.currentTarget.checked)}
         />
-        <span>Required</span>
+        <span>Required{type === 'agreement' ? ' (always, for an agreement)' : ''}</span>
       </label>
 
       <button
         type="button"
         disabled={busy || label.trim() === ''}
-        onClick={() => onSave({ label, type, help_text: helpText.trim() === '' ? null : helpText, required })}
+        onClick={() =>
+          onSave({
+            label,
+            type,
+            help_text: helpText.trim() === '' ? null : helpText,
+            required: type === 'agreement' ? true : required,
+          })
+        }
       >
         Save question
       </button>

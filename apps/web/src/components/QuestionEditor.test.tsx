@@ -70,12 +70,15 @@ describe('QuestionEditor', () => {
     screen.getByRole('button', { name: 'Add question' }).click()
 
     await waitFor(() => {
+      // No `options` key: it is optional in the request shape now. Sending an
+      // explicit `null` for a column no question type consumes was ceremony, and
+      // the update path never sent it — so the two halves of this editor
+      // disagreed about whether it is a field you send.
       expect(addQuestion).toHaveBeenCalledWith(EVENT, {
         label: 'New one',
         type: 'textarea',
         help_text: null,
         required: true,
-        options: null,
       })
     })
   })
@@ -92,6 +95,39 @@ describe('QuestionEditor', () => {
     await waitFor(() => {
       expect(addQuestion).toHaveBeenCalledWith(EVENT, expect.objectContaining({ type: 'agreement' }))
     })
+  })
+
+  it('reports a saved question whose list reload failed as saved', async () => {
+    // The inverse of the failure this component otherwise guards: the write
+    // succeeded, so "Could not add the question." would send an organiser to add
+    // it a second time.
+    let calls = 0
+    const getQuestions = vi.fn(() => {
+      calls += 1
+      return calls === 1
+        ? Promise.resolve({ questions: [] })
+        : Promise.reject(apiError(500, 'internal_error', 'boom'))
+    })
+    renderEditor(stub({ getQuestions, addQuestion: () => Promise.resolve({ question: q('n', 'New', 0) }) }))
+    await screen.findByText(/No questions yet/)
+
+    fireEvent.input(screen.getByLabelText('New question'), { target: { value: 'New' } })
+    screen.getByRole('button', { name: 'Add question' }).click()
+
+    expect((await screen.findByRole('alert')).textContent).toBe('Saved, but the list could not be reloaded.')
+  })
+
+  it('will not let an agreement be optional', async () => {
+    // The API refuses the combination; this makes the rule visible rather than
+    // turning a tick into a 400.
+    renderEditor(stub())
+    await screen.findByText(/No questions yet/)
+
+    fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'agreement' } })
+
+    const required = screen.getByLabelText(/^Required/)
+    expect(required.hasAttribute('disabled')).toBe(true)
+    expect((required as HTMLInputElement).checked).toBe(true)
   })
 
   it('re-reads after a change rather than patching local state', async () => {

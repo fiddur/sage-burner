@@ -30,21 +30,52 @@ export const formQuestionSchema = z.object({
 export type FormQuestion = z.infer<typeof formQuestionSchema>
 
 /**
+ * `agreement` implies `required`.
+ *
+ * The type exists precisely because submission is blocked when it is unticked,
+ * so `{ type: 'agreement', required: false }` is self-contradictory — and it was
+ * storable, leaving #14 to decide which half of the row to believe. Rejected at
+ * the boundary instead, while there are no rows to migrate.
+ *
+ * A wrapper rather than a `.refine()` on `formQuestionSchema`, for the same
+ * reason `withEventDateOrder` is one: a top-level refine produces a schema that
+ * `.omit()` and `.partial()` refuse to operate on. It tolerates a partial body —
+ * only a `type`/`required` pair that is present *and* contradictory is rejected —
+ * so a PATCH carrying one of the two is settled by the handler against the
+ * merged row.
+ */
+export const withAgreementRequired = <T extends z.ZodType<{ type?: string; required?: boolean }>>(
+  schema: T,
+) =>
+  schema.refine((value) => value.type !== 'agreement' || value.required !== false, {
+    message: 'an agreement question must be required',
+    path: ['required'],
+  })
+
+/**
  * Creating a question. `id` and `event_id` come from the route, not the body.
  *
  * `order` is assigned by the server — a new question goes last. Letting a client
  * pick would make two organisers adding questions at once produce a collision
  * over something neither of them chose.
  */
-export const formQuestionCreateSchema = formQuestionSchema.omit({
-  id: true,
-  event_id: true,
-  order: true,
+export const formQuestionFields = formQuestionSchema.omit({ id: true, event_id: true, order: true }).extend({
+  // `.nullable()` does not make a key optional, so omitting these was a bare
+  // `bad_request` naming no field — and `options` is a column no question type
+  // consumes yet, so every caller was sending an explicit `null` for something
+  // inert. The update path already omitted them, so the two halves of the editor
+  // disagreed about whether they are fields you send.
+  help_text: formQuestionSchema.shape.help_text.nullish().default(null),
+  options: formQuestionSchema.shape.options.nullish().default(null),
 })
+
+export const formQuestionCreateSchema = withAgreementRequired(formQuestionFields)
 export type FormQuestionCreate = z.infer<typeof formQuestionCreateSchema>
+/** What a client may send: `help_text` and `options` are optional here. */
+export type FormQuestionCreateInput = z.input<typeof formQuestionCreateSchema>
 
 /** Editing one. `order` is changed by the reorder endpoint, not here. */
-export const formQuestionUpdateSchema = formQuestionCreateSchema.partial()
+export const formQuestionUpdateSchema = withAgreementRequired(formQuestionFields.partial())
 export type FormQuestionUpdate = z.infer<typeof formQuestionUpdateSchema>
 
 /**

@@ -118,9 +118,19 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db, sessions }: G
         return { question: existing } satisfies FormQuestionResponse
       }
 
+      // `agreement` implies `required`, and a PATCH can break that with one field
+      // — `{ required: false }` on an existing agreement question, or
+      // `{ type: 'agreement' }` on one that is optional. The schema only sees the
+      // body, so it catches a contradictory *pair*; the merged row is what
+      // actually has to hold.
+      const merged = { ...existing, ...parsed.data }
+      if (merged.type === 'agreement' && !merged.required) {
+        return reply.code(400).send(errorResponse('bad_request'))
+      }
+
       await db.update(formQuestion).set(parsed.data).where(eq(formQuestion.id, request.params.id))
 
-      return { question: { ...existing, ...parsed.data } } satisfies FormQuestionResponse
+      return { question: merged } satisfies FormQuestionResponse
     },
   )
 

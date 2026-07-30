@@ -655,9 +655,18 @@ Two rules that are the server's, not the browser's:
 its questions are — and `no-cache`, so a question added a moment ago is not
 hidden behind a stale response. Every write is admin-only.
 
+**An `agreement` question is always required.** The type exists because
+submission is blocked when it is unticked, so `{ type: 'agreement', required:
+false }` contradicts itself — the API refuses it, on create and on any PATCH that
+would produce it, and the editor disables the checkbox rather than letting a tick
+become a 400. Settled now, while there are no rows: whichever half of such a row
+you believed later would be a guess.
+
 `options` exists as a JSON column for future select/radio types and is not yet
-consumed by any type. `required` is enforced server-side on submission, which is
-[#14]'s half of the work.
+consumed by any type. Both it and `help_text` are optional in a create body —
+`.nullable()` does not make a key optional, so omitting them used to be a bare
+`bad_request` naming no field. `required` is enforced server-side on submission,
+which is [#14]'s half of the work.
 
 [#14]: https://github.com/fiddur/sage-burner/issues/14
 

@@ -5,7 +5,7 @@ import type {
   EventResponse,
   EventUpdate,
   EventsResponse,
-  FormQuestionCreate,
+  FormQuestionCreateInput,
   FormQuestionResponse,
   FormQuestionUpdate,
   FormQuestionsResponse,
@@ -167,7 +167,7 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
       request<FormQuestionsResponse>(`/events/${encodeURIComponent(eventId)}/questions`, { signal }),
 
     /** Admin only. New questions go last; `order` is the server's to assign. */
-    addQuestion: (eventId: string, body: FormQuestionCreate) =>
+    addQuestion: (eventId: string, body: FormQuestionCreateInput) =>
       request<FormQuestionResponse>(`/admin/events/${encodeURIComponent(eventId)}/questions`, {
         method: 'POST',
         body,
