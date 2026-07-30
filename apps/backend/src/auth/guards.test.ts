@@ -184,6 +184,15 @@ describe('GET /api/admin/accounts', () => {
     const { accounts } = response.json()
     expect(accounts).toHaveLength(2)
     expect(accounts.map((row: { id: string }) => row.id).sort()).toEqual([admin, member].sort())
+
+    // Which role landed on which account, not merely that both appear. Grouping
+    // on the wrong key — `entry.account_id === row.email` — gives every account
+    // `roles: []`, and every other assertion in this file still passes: the
+    // guard tests read roles through `rolesFor`, not through this route's
+    // grouping. The organiser would see a roster where nobody is an admin.
+    const find = (id: string) => accounts.find((row: { id: string }) => row.id === id)
+    expect(find(admin)).toMatchObject({ roles: ['admin'] })
+    expect(find(member)).toMatchObject({ roles: ['member'] })
   })
 
   it('never includes the password hash', async () => {

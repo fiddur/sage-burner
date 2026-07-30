@@ -84,6 +84,12 @@ export type EventCreateInput = z.input<typeof eventCreateSchema>
  * than the dates, and a PATCH that had to restate the whole event would make
  * two organisers editing different fields overwrite each other.
  *
+ * `.strict()`, so an unrecognised key is a 400 rather than a silent success. A
+ * partial schema strips unknown keys, so `{"welcome": "…"}` — a plausible typo
+ * for `welcome_markdown` — parsed to `{}` and the handler answered 200 with the
+ * row unchanged, which the editor rendered as "Saved." while nothing had been
+ * written. `{}` itself stays a legitimate no-op.
+ *
  * Still wrapped in `withEventDateOrder`, which tolerates a partial range: it
  * only rejects when both dates are present and out of order. A PATCH moving
  * *one* date past the other therefore passes here, so the handler has to catch
@@ -92,7 +98,7 @@ export type EventCreateInput = z.input<typeof eventCreateSchema>
  * reach the database CHECK and surface as a 500 rather than a 400.
  */
 export const eventUpdateSchema = withEventDateOrder(
-  eventFields.omit({ id: true, created_at: true }).partial(),
+  eventFields.omit({ id: true, created_at: true }).partial().strict(),
 )
 export type EventUpdate = z.infer<typeof eventUpdateSchema>
 

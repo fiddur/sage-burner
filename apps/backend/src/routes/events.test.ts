@@ -171,10 +171,23 @@ describe('admin event routes', () => {
     // where the guard itself is exercised; duplicating it here would test the
     // same preHandler twice.
     const server = await build()
+    const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
 
     expect((await server.inject({ method: 'GET', url: '/api/admin/events' })).statusCode).toBe(401)
     expect(
       (await server.inject({ method: 'POST', url: '/api/admin/events', payload: valid })).statusCode,
+    ).toBe(401)
+    // PATCH was missing while the name claimed the whole route group. It shares
+    // the preHandler, so the risk was low — but a test's name should not be
+    // broader than its assertions.
+    expect(
+      (
+        await server.inject({
+          method: 'PATCH',
+          url: `/api/admin/events/${id}`,
+          payload: { welcome_markdown: 'x' },
+        })
+      ).statusCode,
     ).toBe(401)
   })
 
@@ -277,21 +290,63 @@ describe('admin event routes', () => {
     expect(response.json()).toEqual({ error: 'bad_request' })
   })
 
-  it('treat a patch with no recognised keys as a no-op rather than a 500', async () => {
-    // Reachable two ways: literally `{}`, and — more likely — a typo like
-    // `welcome` for `welcome_markdown`, which Zod strips. Both used to reach
-    // `set({})`, which drizzle refuses outright, so a typo answered
-    // `internal_error` with a stack in the log.
+  it('treats an empty patch as a no-op rather than a 500', async () => {
+    // `set({})` is not valid SQL, so drizzle refuses it outright — this used to
+    // answer `internal_error` with a stack in the log. A no-op PATCH is
+    // idempotent, so the row comes back unchanged.
     const server = await build()
     const cookie = await givenAdmin()
     const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
 
-    for (const body of [{}, { welcome: 'typo' }]) {
-      const response = await patch(server, cookie, id, body)
+    const response = await patch(server, cookie, id, {})
 
-      expect(response.statusCode, JSON.stringify(body)).toBe(200)
-      expect(response.json().event).toMatchObject({ slug: 'summer-2026', welcome_markdown: '' })
-    }
+    expect(response.statusCode).toBe(200)
+    expect(response.json().event).toMatchObject({ slug: 'summer-2026', welcome_markdown: '' })
+  })
+
+  it('rejects an unrecognised key instead of answering "saved"', async () => {
+    // `welcome` for `welcome_markdown` is a plausible typo against a partial
+    // endpoint. A non-strict schema stripped it, the body became `{}`, and the
+    // no-op path above answered 200 — which the editor renders as "Saved."
+    // while nothing was written. Silent success is worse to diagnose than a 500.
+    const server = await build()
+    const cookie = await givenAdmin()
+    const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
+
+    const response = await patch(server, cookie, id, { welcome: 'typo' })
+
+    expect(response.statusCode).toBe(400)
+    expect(response.json()).toEqual({ error: 'bad_request' })
+  })
+
+  it('still rejects a one-sided date move, now decided inside the statement', async () => {
+    // The condition rides in the UPDATE's `where`, so a concurrent change to the
+    // other date cannot slip between a read and a write and turn this into a 500
+    // from the database CHECK.
+    const server = await build()
+    const cookie = await givenAdmin()
+    const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
+
+    const movedStart = await patch(server, cookie, id, { start_date: '2026-09-01' })
+    const movedEnd = await patch(server, cookie, id, { end_date: '2026-07-01' })
+
+    expect(movedStart.statusCode).toBe(400)
+    expect(movedEnd.statusCode).toBe(400)
+    const [row] = await db().select().from(event)
+    expect(row).toMatchObject({ start_date: '2026-08-01', end_date: '2026-08-05' })
+  })
+
+  it('allows a one-sided date move that keeps the order', async () => {
+    // The guard must not have become "no single-date patches".
+    const server = await build()
+    const cookie = await givenAdmin()
+    const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
+
+    const response = await patch(server, cookie, id, { end_date: '2026-08-09' })
+
+    expect(response.statusCode).toBe(200)
+    const [row] = await db().select().from(event)
+    expect(row).toMatchObject({ start_date: '2026-08-01', end_date: '2026-08-09' })
   })
 
   it('answer 404 for an event that does not exist', async () => {

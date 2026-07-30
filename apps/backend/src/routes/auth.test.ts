@@ -102,20 +102,21 @@ const breakUpdates = () => {
   }
 }
 
-const givenAccount = async (
-  server: FastifyInstance,
-  {
-    email,
-    password,
-    roles = [],
-    params = cheap,
-  }: {
-    email: string
-    password?: string
-    roles?: ('admin' | 'member')[]
-    params?: typeof cheap
-  },
-) => {
+/**
+ * No `server` argument: it took one and never used it, reading the module-level
+ * `handle` instead — which read as though the helper were scoped to that server.
+ */
+const givenAccount = async ({
+  email,
+  password,
+  roles = [],
+  params = cheap,
+}: {
+  email: string
+  password?: string
+  roles?: ('admin' | 'member')[]
+  params?: typeof cheap
+}) => {
   const id = randomUUID()
   const db = handle?.db
   if (db === undefined) throw new Error('build() first')
@@ -142,7 +143,7 @@ const cookieFrom = (response: { headers: Record<string, unknown> }) => {
 describe('POST /api/auth/login', () => {
   it('signs in a known account and returns its roles', async () => {
     const server = await build()
-    await givenAccount(server, {
+    await givenAccount({
       email: 'ada@example.org',
       password: 'a good long passphrase',
       roles: ['admin'],
@@ -156,7 +157,7 @@ describe('POST /api/auth/login', () => {
 
   it('sets an HttpOnly, SameSite=Lax session cookie', async () => {
     const server = await build()
-    await givenAccount(server, { email: 'ada@example.org', password: 'a good long passphrase' })
+    await givenAccount({ email: 'ada@example.org', password: 'a good long passphrase' })
 
     const cookie = cookieFrom(await login(server, 'ada@example.org', 'a good long passphrase'))
 
@@ -175,7 +176,7 @@ describe('POST /api/auth/login', () => {
     // The member-visible symptom would be signing in and being signed out on the
     // next page load.
     const server = await build({ SESSION_TTL_SECONDS: '3600' })
-    await givenAccount(server, { email: 'ada@example.org', password: 'a good long passphrase' })
+    await givenAccount({ email: 'ada@example.org', password: 'a good long passphrase' })
 
     const cookie = cookieFrom(await login(server, 'ada@example.org', 'a good long passphrase'))
 
@@ -191,7 +192,7 @@ describe('POST /api/auth/login', () => {
     // discards a Secure cookie silently, the login still answers 200, and the
     // UI renders signed-in before the next load comes back signed out.
     const server = await build()
-    await givenAccount(server, { email: 'ada@example.org', password: 'a good long passphrase' })
+    await givenAccount({ email: 'ada@example.org', password: 'a good long passphrase' })
 
     expect(cookieFrom(await login(server, 'ada@example.org', 'a good long passphrase'))).not.toContain(
       'Secure',
@@ -200,7 +201,7 @@ describe('POST /api/auth/login', () => {
 
   it('sets Secure in production', async () => {
     const server = await build({ NODE_ENV: 'production', SESSION_SECRET: 'p'.repeat(40) })
-    await givenAccount(server, { email: 'ada@example.org', password: 'a good long passphrase' })
+    await givenAccount({ email: 'ada@example.org', password: 'a good long passphrase' })
 
     expect(cookieFrom(await login(server, 'ada@example.org', 'a good long passphrase'))).toContain('Secure')
   })
@@ -210,7 +211,7 @@ describe('POST /api/auth/login', () => {
     // fails to find an account that plainly exists. Typing `Ada@Example.org`
     // into a login form is the ordinary case, not an edge one.
     const server = await build()
-    await givenAccount(server, { email: 'ada@example.org', password: 'a good long passphrase' })
+    await givenAccount({ email: 'ada@example.org', password: 'a good long passphrase' })
 
     expect((await login(server, '  Ada@Example.ORG  ', 'a good long passphrase')).statusCode).toBe(200)
   })
@@ -220,7 +221,7 @@ describe('POST /api/auth/login', () => {
     // which addresses belong to members, which is the private part of a
     // membership app.
     const server = await build()
-    await givenAccount(server, { email: 'ada@example.org', password: 'a good long passphrase' })
+    await givenAccount({ email: 'ada@example.org', password: 'a good long passphrase' })
 
     const wrongPassword = await login(server, 'ada@example.org', 'not the passphrase')
     const noSuchAccount = await login(server, 'nobody@example.org', 'a good long passphrase')
@@ -249,7 +250,7 @@ describe('POST /api/auth/login', () => {
   it('refuses a passkey-only account with no password set', async () => {
     // `password_hash` is null for those. Absent must not read as matching.
     const server = await build()
-    await givenAccount(server, { email: 'ada@example.org' })
+    await givenAccount({ email: 'ada@example.org' })
 
     // Only this line reaches the null-hash path. An empty password used to be
     // asserted here too, and could not: `loginPasswordSchema` is `.min(1)`, so
@@ -266,7 +267,7 @@ describe('POST /api/auth/login', () => {
     // schema rejected it or a lookup ran and failed to match. Counting reads is
     // the only thing that distinguishes them.
     const server = await build()
-    await givenAccount(server, { email: 'ada@example.org', password: 'a good long passphrase' })
+    await givenAccount({ email: 'ada@example.org', password: 'a good long passphrase' })
     const selects = countSelects()
 
     const response = await login(server, 'ada@example.org', '')
@@ -280,7 +281,7 @@ describe('POST /api/auth/login', () => {
     // The other half: without it, the assertion above would pass against a
     // handler that never queried at all.
     const server = await build()
-    await givenAccount(server, { email: 'ada@example.org', password: 'a good long passphrase' })
+    await givenAccount({ email: 'ada@example.org', password: 'a good long passphrase' })
     const selects = countSelects()
 
     await login(server, 'ada@example.org', 'wrong but well-formed')
@@ -295,7 +296,7 @@ describe('POST /api/auth/login', () => {
     // login failed while being signed in, and their next request works for no
     // reason they can see.
     const server = await build()
-    await givenAccount(server, { email: 'ada@example.org', password: 'a good long passphrase' })
+    await givenAccount({ email: 'ada@example.org', password: 'a good long passphrase' })
     breakSelectsAfter(1) // the account lookup succeeds; the roles lookup does not
 
     const response = await login(server, 'ada@example.org', 'a good long passphrase')
@@ -323,9 +324,45 @@ describe('GET /api/auth/me', () => {
     expect(response.json()).toEqual({ viewer: null })
   })
 
+  it('resolves the viewer in one query, not two', async () => {
+    // `viewerFor` runs on every guarded request. It used to check the account
+    // exists and then fetch roles separately; a left join answers both, and the
+    // join has to be *left* so an account with no roles still resolves.
+    const server = await build()
+    await givenAccount({ email: 'ada@example.org', password: 'a good long passphrase', roles: ['admin'] })
+    const cookie = cookieFrom(await login(server, 'ada@example.org', 'a good long passphrase'))
+    const selects = countSelects()
+
+    const response = await server.inject({
+      method: 'GET',
+      url: '/api/auth/me',
+      headers: { cookie: cookie ?? '' },
+    })
+
+    expect(response.json()).toMatchObject({ viewer: { roles: ['admin'] } })
+    expect(selects.count).toBe(1)
+  })
+
+  it('resolves an account with no roles at all', async () => {
+    // The left join's reason for being left: an applicant checking on their
+    // application is signed in with no role, and an inner join would 401 them.
+    const server = await build()
+    await givenAccount({ email: 'ada@example.org', password: 'a good long passphrase' })
+    const cookie = cookieFrom(await login(server, 'ada@example.org', 'a good long passphrase'))
+
+    const response = await server.inject({
+      method: 'GET',
+      url: '/api/auth/me',
+      headers: { cookie: cookie ?? '' },
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toMatchObject({ viewer: { roles: [] } })
+  })
+
   it('recognises the cookie from a login', async () => {
     const server = await build()
-    const id = await givenAccount(server, {
+    const id = await givenAccount({
       email: 'ada@example.org',
       password: 'a good long passphrase',
       roles: ['member'],
@@ -343,7 +380,7 @@ describe('GET /api/auth/me', () => {
 
   it('ignores a tampered cookie rather than trusting it', async () => {
     const server = await build()
-    await givenAccount(server, { email: 'ada@example.org', password: 'a good long passphrase' })
+    await givenAccount({ email: 'ada@example.org', password: 'a good long passphrase' })
 
     const response = await server.inject({
       method: 'GET',
@@ -358,7 +395,7 @@ describe('GET /api/auth/me', () => {
     // The signature proves the token was ours, not that the row still exists.
     // #35 will delete accounts; this is the path that must not resurrect one.
     const server = await build()
-    const id = await givenAccount(server, { email: 'ada@example.org', password: 'a good long passphrase' })
+    const id = await givenAccount({ email: 'ada@example.org', password: 'a good long passphrase' })
     const cookie = cookieFrom(await login(server, 'ada@example.org', 'a good long passphrase'))
     await handle?.db.delete(account).where(eq(account.id, id))
 
@@ -380,8 +417,8 @@ describe('concurrency', () => {
   // These use production parameters deliberately: with `cheap` ones the
   // requests finish serially and never overlap, so they would pass with no
   // gate at all.
-  const slowAccount = (server: FastifyInstance) =>
-    givenAccount(server, {
+  const slowAccount = () =>
+    givenAccount({
       email: 'ada@example.org',
       password: 'a good long passphrase',
       params: defaultScryptParams,
@@ -406,7 +443,7 @@ describe('concurrency', () => {
       // sustained anonymous requests into a permanent outage of the only way
       // into the app — nothing to wait out, nothing to retry into.
       const server = await build()
-      await slowAccount(server)
+      await slowAccount()
 
       const statuses = (await attempts(server, 3)).map((response) => response.statusCode)
 
@@ -421,7 +458,7 @@ describe('concurrency', () => {
       // Two running plus eight waiting; the eleventh has nowhere to go. The queue
       // is bounded so it cannot become the exhaustion it exists to prevent.
       const server = await build()
-      await slowAccount(server)
+      await slowAccount()
 
       const responses = await attempts(server, 11)
       const shed = responses.filter((response) => response.statusCode === 429)
@@ -444,7 +481,7 @@ describe('concurrency', () => {
       // The release is in a `finally`; without it a throw leaks a slot and login
       // degrades permanently until a restart.
       const server = await build()
-      await slowAccount(server)
+      await slowAccount()
 
       await attempts(server, 11)
 
@@ -467,7 +504,7 @@ describe('rehashing on login', () => {
 
   it('upgrades a hash made with weaker parameters, and the password still works', async () => {
     const server = await build()
-    const id = await givenAccount(server, { email: 'ada@example.org', password: 'a good long passphrase' })
+    const id = await givenAccount({ email: 'ada@example.org', password: 'a good long passphrase' })
     const before = await storedHashFor(id)
 
     expect((await login(server, 'ada@example.org', 'a good long passphrase')).statusCode).toBe(200)
@@ -484,7 +521,7 @@ describe('rehashing on login', () => {
 
   it('leaves an already-current hash alone', async () => {
     const server = await build()
-    const id = await givenAccount(server, {
+    const id = await givenAccount({
       email: 'ada@example.org',
       password: 'a good long passphrase',
       params: defaultScryptParams,
@@ -500,7 +537,7 @@ describe('rehashing on login', () => {
     // The whole reason that write is wrapped: a full disk or a locked database
     // must not turn a correct password into a failed login.
     const server = await build()
-    await givenAccount(server, { email: 'ada@example.org', password: 'a good long passphrase' })
+    await givenAccount({ email: 'ada@example.org', password: 'a good long passphrase' })
     breakUpdates()
 
     const response = await login(server, 'ada@example.org', 'a good long passphrase')
@@ -560,7 +597,7 @@ describe('caching', () => {
     // the old viewer, and signed sessions give the server no second chance to
     // notice.
     const server = await build()
-    await givenAccount(server, { email: 'ada@example.org', password: 'a good long passphrase' })
+    await givenAccount({ email: 'ada@example.org', password: 'a good long passphrase' })
 
     const responses = [
       await server.inject({ method: 'GET', url: '/api/auth/me' }),
