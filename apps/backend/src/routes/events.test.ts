@@ -415,6 +415,27 @@ describe('admin event routes', () => {
     expect(row).toMatchObject({ start_date: '2026-08-03', end_date: '2026-08-09' })
   })
 
+  it('allows moving the whole range forward, with both dates in one patch', async () => {
+    // The `return undefined` in `dateOrderCondition`'s both-dates branch. Nothing
+    // exercised it: every other both-dates PATCH here is out of order, so
+    // `withEventDateOrder` rejects it at `safeParse` and the handler never calls the
+    // function with both set.
+    //
+    // Deleting that line is not harmless — the next branch would then compare the
+    // *new* start against the *old* end column (`2026-09-01 <= 2026-08-05`), match
+    // no rows, and refuse a perfectly ordinary "the burn moved to September".
+    const server = await build()
+    const cookie = await givenAdmin()
+    const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
+
+    const response = await patch(server, cookie, id, { start_date: '2026-09-01', end_date: '2026-09-05' })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().event).toMatchObject({ start_date: '2026-09-01', end_date: '2026-09-05' })
+    const [row] = await db().select().from(event)
+    expect(row).toMatchObject({ start_date: '2026-09-01', end_date: '2026-09-05' })
+  })
+
   it('allows a one-day event, where the range collapses to a single date', async () => {
     // The boundary neither branch covered. `event_date_order_check` is
     // `end_date >= start_date`, so a one-day event is legal — but a strict `<`
