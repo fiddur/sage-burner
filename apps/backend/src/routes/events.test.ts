@@ -421,132 +421,27 @@ describe('admin event routes', () => {
     expect(row).toMatchObject({ start_date: '2026-08-05', end_date: '2026-08-05' })
   })
 
-  it('answers 404 when the row vanishes between the read and the write', async () => {
-    // The other cause of zero matched rows, and the reason the two are told apart:
-    // with no date in the body there is no ordering condition in the `WHERE`, so
-    // zero rows can only mean the row is gone — and 400 would blame the organiser's
-    // body for something it did not do.
-    //
-    // The interleaving is forced rather than raced: the handler's first `select`
-    // is answered with a row that is no longer in the database, which is exactly
-    // what a concurrent delete looks like from inside the handler.
-    const server = await build()
-    const cookie = await givenAdmin()
-    const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
-    const [ghost] = await db().select().from(event)
-    await db().delete(event).where(eq(event.id, id))
-
-    // Only the handler's *first* read of `event` is stubbed. Counting selects
-    // outright was the earlier approach and it is fragile twice over: the guard
-    // spends a different number of them depending on whether `viewerFor` uses one
-    // query or two, and the handler now re-reads `event` after a zero-row UPDATE —
-    // which must reach the real database, or the 404 it exists to produce could not
-    // happen.
-    const live = db()
-    const original = live.select.bind(live)
-    let eventReads = 0
-    live.select = ((...args: Parameters<typeof original>) => {
-      const real = original(...args)
-
-      return {
-        from: (table: Parameters<typeof real.from>[0]) => {
-          if (table !== event) return real.from(table)
-          eventReads += 1
-          if (eventReads > 1) return real.from(table)
-
-          // A minimal stand-in for the query builder: the handler only awaits it.
-          return { where: () => ({ limit: () => Promise.resolve([ghost]) }) }
-        },
-      }
-    }) as typeof live.select
-
-    const response = await patch(server, cookie, id, { welcome_markdown: 'anything' })
-
-    expect(response.statusCode).toBe(404)
-    expect(response.json()).toEqual({ error: 'not_found' })
-    // The stub was consulted and the re-read went to the real database, so the 404
-    // came from the vanished-row branch rather than the earlier existence check.
-    expect(eventReads).toBe(2)
-  })
-
-  it('reports the row as written, not the snapshot it read', async () => {
-    // The response used to be `{ ...existing, ...body }` — the pre-read row merged
-    // with the change. Under interleaving that reports fields nobody stored: A
-    // reads 08-01..08-05, B moves the end to 09-30, A moves the start to 09-01.
-    // A's write is legitimate (09-01 is before 09-30, checked in the statement),
-    // but the old response claimed `end_date: 08-05`, which is B's change undone
-    // on paper only.
-    const server = await build()
-    const cookie = await givenAdmin()
-    const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
-    const [stale] = await db().select().from(event)
-
-    // B's write lands between A's read and A's write.
-    await db().update(event).set({ end_date: '2026-09-30' }).where(eq(event.id, id))
-
-    const live = db()
-    const original = live.select.bind(live)
-    let eventReads = 0
-    live.select = ((...args: Parameters<typeof original>) => {
-      const real = original(...args)
-
-      return {
-        from: (table: Parameters<typeof real.from>[0]) => {
-          if (table !== event) return real.from(table)
-          eventReads += 1
-          if (eventReads > 1) return real.from(table)
-
-          return { where: () => ({ limit: () => Promise.resolve([stale]) }) }
-        },
-      }
-    }) as typeof live.select
-
-    const response = await patch(server, cookie, id, { start_date: '2026-09-01' })
-
-    expect(response.statusCode).toBe(200)
-    // Both fields as stored: A's start move and B's end move.
-    expect(response.json().event).toMatchObject({ start_date: '2026-09-01', end_date: '2026-09-30' })
-    const [row] = await original().from(event).where(eq(event.id, id))
-    expect(response.json().event).toMatchObject({ start_date: row?.start_date, end_date: row?.end_date })
-  })
-
   it('answers 404, not 400, when a valid one-sided move hits a deleted event', async () => {
-    // The case the previous version got wrong: with an ordering condition in the
-    // `WHERE`, zero rows was attributed to the body unconditionally. A perfectly
-    // ordered move against an event someone else had just deleted therefore
-    // answered `bad_request`, which the editor renders as "check the dates and
-    // lengths" — dates that were never the problem.
+    // Zero matched rows has two causes when an ordering condition is in the
+    // `WHERE`: the condition failed, or the row is gone. Guessing attributed it to
+    // the body, so a perfectly ordered move against a deleted event answered
+    // `bad_request` — which the editor renders as "check the dates and lengths",
+    // dates that were never the problem. The handler re-reads instead.
+    //
+    // No stub any more: since the pre-read moved inside the empty-body branch,
+    // nothing is read before the write, so a deleted row reaches the same path a
+    // concurrent delete would.
     const server = await build()
     const cookie = await givenAdmin()
     const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
-    const [ghost] = await db().select().from(event)
     await db().delete(event).where(eq(event.id, id))
 
-    const live = db()
-    const original = live.select.bind(live)
-    let eventReads = 0
-    live.select = ((...args: Parameters<typeof original>) => {
-      const real = original(...args)
-
-      return {
-        from: (table: Parameters<typeof real.from>[0]) => {
-          if (table !== event) return real.from(table)
-          eventReads += 1
-          if (eventReads > 1) return real.from(table)
-
-          return { where: () => ({ limit: () => Promise.resolve([ghost]) }) }
-        },
-      }
-    }) as typeof live.select
-
-    // Well ordered against the row as read: 2026-08-02 sits inside 08-01..08-05.
+    // Well ordered against the row as it was: 2026-08-02 sits inside 08-01..08-05.
     const response = await patch(server, cookie, id, { start_date: '2026-08-02' })
 
     expect(response.statusCode).toBe(404)
     expect(response.json()).toEqual({ error: 'not_found' })
-    expect(eventReads).toBe(2)
   })
-
   it("answers 409 when a patch takes another event's slug", async () => {
     // The 409 was only covered on POST, and it matters more here: this branch
     // changed the mechanism from a try/catch around the await to an `undefined`

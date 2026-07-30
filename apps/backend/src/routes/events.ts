@@ -138,14 +138,26 @@ export const registerEventRoutes = (
       const parsed = eventUpdateSchema.safeParse(request.body)
       if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
 
-      const [existing] = await db.select().from(event).where(eq(event.id, id)).limit(1)
-      if (existing === undefined) return reply.code(404).send(errorResponse('not_found'))
+      // The only body that never reaches the `UPDATE`. A body of only unrecognised
+      // keys is a 400 from the schema now, so `{}` is the one case left that
+      // changes nothing — and `set({})` is not valid SQL, so it has to be answered
+      // before the statement. A no-op PATCH is idempotent; returning the row
+      // unchanged is the honest answer.
+      //
+      // The read lives inside this branch rather than above it. It used to be
+      // unconditional, and once `.returning()` landed that bought nothing for any
+      // other body: the row comes back from the write, and a vanished row is
+      // answered by the re-read below. All the pre-read did was spend a third
+      // query to produce a 404 the write path produces anyway — and it left the
+      // handler holding a pre-write snapshot, which is what the response was
+      // wrongly built from two commits ago.
+      if (Object.keys(parsed.data).length === 0) {
+        const [existing] = await db.select().from(event).where(eq(event.id, id)).limit(1)
 
-      // A body of only unrecognised keys is a 400 from the schema now, so `{}`
-      // is the one case left that changes nothing — and `set({})` is not valid
-      // SQL, so it has to be answered before the UPDATE. A no-op PATCH is
-      // idempotent; returning the row unchanged is the honest answer.
-      if (Object.keys(parsed.data).length === 0) return { event: existing } satisfies EventResponse
+        return existing === undefined
+          ? reply.code(404).send(errorResponse('not_found'))
+          : ({ event: existing } satisfies EventResponse)
+      }
 
       // No both-dates check here. `withEventDateOrder` already rejects a body
       // carrying both dates in the wrong order, so `safeParse` above answers 400
