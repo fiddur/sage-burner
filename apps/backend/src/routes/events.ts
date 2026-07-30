@@ -172,16 +172,15 @@ export const registerEventRoutes = (
 
       if (result === undefined) return reply.code(409).send(errorResponse('conflict'))
 
-      // Zero rows has two causes, and they get different answers.
+      // Zero rows has two causes: the ordering condition failed, or the row was
+      // deleted between the SELECT above and this UPDATE. They are told apart by
+      // asking, not guessed at from whether a condition was present.
       //
-      // With `ordered` set, the ordering condition is in the `WHERE`, so it is
-      // overwhelmingly the one that failed: 400.
-      //
-      // With `ordered === undefined` — no dates in the body, or both — there is no
-      // condition beyond the id, so zero rows can *only* mean the row was deleted
-      // between the SELECT and the UPDATE. 400 would tell an organiser their body
-      // was wrong when it was not, and would contradict the 404 this same handler
-      // returns three lines up for a row that was already gone.
+      // Guessing was the previous version, and it was wrong in a way an organiser
+      // would feel: a perfectly ordered `{ start_date: … }` move against an event
+      // someone else had just deleted answered `bad_request`, which the editor
+      // renders as "check the dates and lengths" — sending them to re-check dates
+      // that were never the problem. One extra query, only ever on an error path.
       //
       // `Number(...)` because `node:sqlite` types `changes` as `number | bigint`,
       // and `0n === 0` is false — so a strict comparison would silently never
@@ -201,7 +200,9 @@ export const registerEventRoutes = (
       // Both names are on one line each on purpose — a name wrapped across two
       // comment lines cannot be grepped, which is the only reason to quote it.
       if (Number(result.changes) === 0) {
-        return ordered === undefined
+        const [stillThere] = await db.select({ id: event.id }).from(event).where(eq(event.id, id)).limit(1)
+
+        return stillThere === undefined
           ? reply.code(404).send(errorResponse('not_found'))
           : reply.code(400).send(errorResponse('bad_request'))
       }

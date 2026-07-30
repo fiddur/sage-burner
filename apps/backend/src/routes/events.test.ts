@@ -448,27 +448,74 @@ describe('admin event routes', () => {
     const [ghost] = await db().select().from(event)
     await db().delete(event).where(eq(event.id, id))
 
-    // The *second* select, not the first: `requireAdmin` runs before the handler
-    // and `viewerFor` spends one on the account/roles join. If that ever changes,
-    // this stub lands on the guard's query instead and the request 500s — a loud
-    // failure rather than a test quietly passing for the wrong reason.
+    // Only the handler's *first* read of `event` is stubbed. Counting selects
+    // outright was the earlier approach and it is fragile twice over: the guard
+    // spends a different number of them depending on whether `viewerFor` uses one
+    // query or two, and the handler now re-reads `event` after a zero-row UPDATE —
+    // which must reach the real database, or the 404 it exists to produce could not
+    // happen.
     const live = db()
     const original = live.select.bind(live)
-    let calls = 0
+    let eventReads = 0
     live.select = ((...args: Parameters<typeof original>) => {
-      calls += 1
-      if (calls !== 2) return original(...args)
-      // A minimal stand-in for the query builder: the handler only awaits it.
-      return { from: () => ({ where: () => ({ limit: () => Promise.resolve([ghost]) }) }) }
+      const real = original(...args)
+
+      return {
+        from: (table: Parameters<typeof real.from>[0]) => {
+          if (table !== event) return real.from(table)
+          eventReads += 1
+          if (eventReads > 1) return real.from(table)
+
+          // A minimal stand-in for the query builder: the handler only awaits it.
+          return { where: () => ({ limit: () => Promise.resolve([ghost]) }) }
+        },
+      }
     }) as typeof live.select
 
     const response = await patch(server, cookie, id, { welcome_markdown: 'anything' })
 
     expect(response.statusCode).toBe(404)
     expect(response.json()).toEqual({ error: 'not_found' })
-    // The stub was consulted, so the 404 came from the vanished-row branch rather
-    // than from the earlier existence check.
-    expect(calls).toBeGreaterThanOrEqual(2)
+    // The stub was consulted and the re-read went to the real database, so the 404
+    // came from the vanished-row branch rather than the earlier existence check.
+    expect(eventReads).toBe(2)
+  })
+
+  it('answers 404, not 400, when a valid one-sided move hits a deleted event', async () => {
+    // The case the previous version got wrong: with an ordering condition in the
+    // `WHERE`, zero rows was attributed to the body unconditionally. A perfectly
+    // ordered move against an event someone else had just deleted therefore
+    // answered `bad_request`, which the editor renders as "check the dates and
+    // lengths" — dates that were never the problem.
+    const server = await build()
+    const cookie = await givenAdmin()
+    const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
+    const [ghost] = await db().select().from(event)
+    await db().delete(event).where(eq(event.id, id))
+
+    const live = db()
+    const original = live.select.bind(live)
+    let eventReads = 0
+    live.select = ((...args: Parameters<typeof original>) => {
+      const real = original(...args)
+
+      return {
+        from: (table: Parameters<typeof real.from>[0]) => {
+          if (table !== event) return real.from(table)
+          eventReads += 1
+          if (eventReads > 1) return real.from(table)
+
+          return { where: () => ({ limit: () => Promise.resolve([ghost]) }) }
+        },
+      }
+    }) as typeof live.select
+
+    // Well ordered against the row as read: 2026-08-02 sits inside 08-01..08-05.
+    const response = await patch(server, cookie, id, { start_date: '2026-08-02' })
+
+    expect(response.statusCode).toBe(404)
+    expect(response.json()).toEqual({ error: 'not_found' })
+    expect(eventReads).toBe(2)
   })
 
   it("answers 409 when a patch takes another event's slug", async () => {

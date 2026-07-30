@@ -635,6 +635,9 @@ Three more things the write routes do, for anyone writing a second client:
   is refused rather than silently dropped, which on create would have produced an
   event whose welcome text was quietly empty and on update a "saved" that saved
   nothing.
+- **An empty PATCH body (`{}`) is a 200**, returning the event unchanged. It is a
+  no-op rather than an error, and it never reaches the `UPDATE` — which matters for
+  the 404 below.
 - **A PATCH names only what it changes.** Reading an event, editing the object and
   sending the whole thing back is therefore a 400 on `id` and `created_at`.
 - **A date move that would invert the range answers 400**, not a 500 from the
@@ -642,16 +645,14 @@ Three more things the write routes do, for anyone writing a second client:
   a one-sided move rides in the `UPDATE` itself, so a second organiser moving the
   other date concurrently cannot slip between a read and a write.
 
-A row that disappears between the read and the write answers **404** when the body
-carries no date, or both — the same as one that was already gone, because the body
-was not the problem. With exactly one date it answers **400** instead: the ordering
-condition is in the `UPDATE`, so a zero-row result has two possible causes and the
-handler names the far likelier one.
+A row that disappears between the read and the write answers **404**, the same as
+one that was already gone — the body was not the problem, whatever it contained. The
+two causes of a failed write are told apart by re-reading the row rather than
+inferred from the request, so a well-ordered date move against an event someone else
+has just deleted does not come back as "check the dates".
 
-One exception, since `{}` is documented above as a legitimate no-op: a body with no
-recognised keys never reaches the `UPDATE` at all, so against a vanished row it
-still answers **200** with the row as it was read. The 404 rule needs at least one
-key that changes something.
+The one exception is the empty body above: `{}` never reaches the `UPDATE`, so
+against a vanished row it still answers **200** with the event as it was read.
 
 ### Markdown is escaped, not filtered
 
