@@ -35,7 +35,8 @@ const build = async (): Promise<FastifyInstance> => {
   runMigrations(handle)
   app = await createApp({
     db: handle.db,
-    config: createConfig({ LOG_LEVEL: 'silent', WEB_ROOT: webRoot }),
+    // WEB_ROOT makes this deployment-shaped, so a secret is required.
+    config: createConfig({ LOG_LEVEL: 'silent', SESSION_SECRET: 't'.repeat(40), WEB_ROOT: webRoot }),
   })
   return app
 }

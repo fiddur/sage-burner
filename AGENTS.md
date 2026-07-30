@@ -191,7 +191,13 @@ them.)
 - The app is served at a **domain root** — there is no sub-path/`BASE_PATH`
   handling, deliberately.
 - No external services are required to run it: no SMTP, no payment gateway, no
-  external database. `docker compose up` must be sufficient.
+  external database.
+- `docker compose up` must be sufficient — with one current exception: the app
+  refuses to start without `SESSION_SECRET`, so a bare clone needs it generated
+  first (the README's Deploying section is one `sed` line). Failing loudly beats
+  minting an in-memory secret that logs every member out on each redeploy;
+  minting one into the data volume would restore the invariant, and #59 tracks
+  that decision. Do not read this as licence for a second exception.
 
 ## Documentation
 

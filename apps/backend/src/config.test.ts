@@ -3,12 +3,16 @@ import { describe, expect, it } from 'vitest'
 import { createConfig } from './config.ts'
 
 describe('createConfig', () => {
-  it('runs on an empty environment, so a bare `docker run` works', () => {
+  it('runs on an empty environment, bound to loopback', () => {
     const config = createConfig({})
 
     expect(config.node_env).toBe('development')
     expect(config.port).toBe(3000)
-    expect(config.host).toBe('0.0.0.0')
+    // Loopback, not `0.0.0.0`. A bare `docker run` is unaffected — the image
+    // sets HOST itself — so the only runs this default reaches are the ones
+    // nobody documented, and those should not be on the LAN with the published
+    // development signing key.
+    expect(config.host).toBe('127.0.0.1')
     expect(config.database_url).toBe('./data/sage-burner.sqlite')
     expect(config.build_sha).toBe('unknown')
     expect(config.web_root).toBeUndefined()
@@ -23,6 +27,8 @@ describe('createConfig', () => {
       LOG_LEVEL: 'warn',
       BUILD_SHA: 'abc123',
       WEB_ROOT: '/usr/share/web',
+      SESSION_SECRET: 'x'.repeat(40),
+      SESSION_TTL_SECONDS: '3600',
     })
 
     expect(config).toEqual({
@@ -34,6 +40,116 @@ describe('createConfig', () => {
       build_sha: 'abc123',
       web_root: '/usr/share/web',
       trust_proxy: false,
+      session_secret: 'x'.repeat(40),
+      session_ttl_seconds: 3600,
+      secure_cookies: true,
+    })
+  })
+
+  describe('SESSION_SECRET', () => {
+    it('refuses to build a production config without one', () => {
+      // A random default generated at boot would look like it works and log
+      // every member out on each deploy — which, with watchtower redeploying on
+      // a tag move, is every few minutes after a merge.
+      expect(() => createConfig({ NODE_ENV: 'production' })).toThrow(/SESSION_SECRET/)
+    })
+
+    it('refuses a blank one in production, which is what .env.example ships', () => {
+      // `.env.example` has `SESSION_SECRET=` with no value, so a copied file
+      // sends an empty string rather than nothing at all. That must be the same
+      // refusal, or the documented first step produces a running app with a
+      // development key.
+      for (const value of ['', '   ']) {
+        expect(() => createConfig({ NODE_ENV: 'production', SESSION_SECRET: value }), value).toThrow(
+          /SESSION_SECRET/,
+        )
+      }
+    })
+
+    it('runs without one outside production', () => {
+      expect(createConfig({}).session_secret.length).toBeGreaterThanOrEqual(32)
+    })
+
+    it('rejects one too short to sign with, in any environment', () => {
+      // The schema bound, not the production guard: a 12-character secret set
+      // in development would otherwise be accepted here and rejected by
+      // createSessions at request time.
+      expect(() => createConfig({ SESSION_SECRET: 'too-short' })).toThrow(/SESSION_SECRET/)
+    })
+
+    it('refuses the development key on anything reachable, not just in production', () => {
+      // `NODE_ENV` cannot answer "is this reachable by anyone": it defaults to
+      // `development` when unset, so a bare `node src/server.ts`, a systemd
+      // unit, or a compose file that drops the image's environment would sign
+      // sessions with a key committed to a public repository — and omit
+      // `Secure` at the same time. `HOST` is the value that knows.
+      expect(() => createConfig({ HOST: '0.0.0.0' })).toThrow(/SESSION_SECRET/)
+      expect(() => createConfig({ HOST: '192.168.1.10' })).toThrow(/SESSION_SECRET/)
+      expect(() => createConfig({ HOST: '::' })).toThrow(/SESSION_SECRET/)
+    })
+
+    it('allows it on loopback outside production, which is what `pnpm dev` is', () => {
+      for (const host of ['127.0.0.1', '127.0.0.2', 'localhost', '::1']) {
+        expect(createConfig({ HOST: host }).session_secret.length, host).toBeGreaterThanOrEqual(32)
+      }
+    })
+
+    it('refuses it in production even on loopback', () => {
+      // Production on loopback is still production — behind a proxy on the same
+      // host, which is exactly the documented deployment.
+      expect(() => createConfig({ NODE_ENV: 'production', HOST: '127.0.0.1' })).toThrow(/SESSION_SECRET/)
+    })
+
+    it('names both values in the message, so the refusal is diagnosable', () => {
+      // Two conditions decide this, and an operator who reads only "required in
+      // production" while running development will not look at HOST.
+      expect(() => createConfig({ HOST: '0.0.0.0' })).toThrow(/NODE_ENV=development.*HOST=0\.0\.0\.0/s)
+    })
+
+    it('requires a secret when WEB_ROOT is set, even on loopback outside production', () => {
+      // The hole the first two signals left, and it is the deployment this repo
+      // documents: a reverse proxy in front means the app binds *loopback*. So
+      // `pnpm start` behind the README's Apache vhost with NODE_ENV unset
+      // satisfied both "not production" and "loopback", and would have booted on
+      // the development key that is committed to this repository — serving a
+      // non-Secure cookie over Apache's TLS.
+      //
+      // Setting WEB_ROOT says "serve the built frontend", which is a deployment
+      // by definition: Vite serves it in development, so a dev run never sets it.
+      expect(() => createConfig({ WEB_ROOT: '/usr/share/web' })).toThrow(/SESSION_SECRET/)
+      expect(() => createConfig({ WEB_ROOT: '/usr/share/web', HOST: '127.0.0.1' })).toThrow(/SESSION_SECRET/)
+    })
+
+    it('marks cookies Secure when WEB_ROOT is set, on the same predicate', () => {
+      // One predicate for both, so the flag and the secret requirement cannot
+      // drift: the cookie would otherwise lack Secure on exactly the run above.
+      const config = createConfig({ SESSION_SECRET: 's'.repeat(40), WEB_ROOT: '/usr/share/web' })
+
+      expect(config.secure_cookies).toBe(true)
+    })
+
+    it('marks cookies Secure whenever the app is reachable beyond loopback', () => {
+      // Keyed off the same predicate as the secret guard, not off NODE_ENV.
+      // Before that, `SESSION_SECRET=… HOST=0.0.0.0 node src/server.ts` bound
+      // every interface and issued the cookie without Secure — and behind a
+      // proxy that also answers on :80 the browser sends it in cleartext.
+      const secret = { SESSION_SECRET: 's'.repeat(40) }
+
+      expect(createConfig({ ...secret, HOST: '0.0.0.0' }).secure_cookies).toBe(true)
+      expect(createConfig({ ...secret, HOST: '192.168.1.10' }).secure_cookies).toBe(true)
+      expect(createConfig({ NODE_ENV: 'production', ...secret, HOST: '127.0.0.1' }).secure_cookies).toBe(true)
+    })
+
+    it('leaves cookies unmarked only on loopback outside production', () => {
+      // Otherwise login silently fails on plain-HTTP `pnpm dev`: the browser
+      // discards a Secure cookie, the 200 says signed in, the next load says not.
+      for (const host of ['127.0.0.1', 'localhost', '::1']) {
+        expect(createConfig({ HOST: host }).secure_cookies, host).toBe(false)
+      }
+    })
+
+    it('defaults the session lifetime to two weeks', () => {
+      expect(createConfig({}).session_ttl_seconds).toBe(60 * 60 * 24 * 14)
     })
   })
 
@@ -46,7 +162,7 @@ describe('createConfig', () => {
 
       expect(config.database_url).toBe('./data/sage-burner.sqlite')
       expect(config.port).toBe(3000)
-      expect(config.host).toBe('0.0.0.0')
+      expect(config.host).toBe('127.0.0.1')
       expect(config.build_sha).toBe('unknown')
     })
 
@@ -67,7 +183,11 @@ describe('createConfig', () => {
     })
 
     it('trims the web root as well', () => {
-      expect(createConfig({ WEB_ROOT: ' /usr/share/web \n' }).web_root).toBe('/usr/share/web')
+      // A secret because a set WEB_ROOT is deployment-shaped, which is what the
+      // `looksLikeDeployment` cases below cover.
+      expect(createConfig({ SESSION_SECRET: 's'.repeat(40), WEB_ROOT: ' /usr/share/web \n' }).web_root).toBe(
+        '/usr/share/web',
+      )
     })
 
     it('trims the host, which would otherwise fail dns lookup at boot', () => {

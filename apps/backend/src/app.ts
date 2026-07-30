@@ -11,7 +11,9 @@ import path from 'node:path'
 import type { Config } from './config.ts'
 import type { Database } from './db/index.ts'
 
+import { createSessions } from './auth/session.ts'
 import { clientErrorHandler, frameworkErrorHandler, registerErrorHandler } from './errors.ts'
+import { registerAuthRoutes } from './routes/auth.ts'
 import { registerVersionRoutes } from './routes/version.ts'
 
 export interface AppDeps {
@@ -188,6 +190,18 @@ const helmetOptions = (): FastifyHelmetOptions => ({
 })
 
 /**
+ * Session signing, from config.
+ *
+ * The clock is `() => new Date()` here and injected in tests, which is the only
+ * way to assert expiry without a suite that waits two weeks.
+ */
+const sessionDeps = (config: Config) => ({
+  secret: config.session_secret,
+  now: () => new Date(),
+  ttlSeconds: config.session_ttl_seconds,
+})
+
+/**
  * Build the application.
  *
  * Takes its dependencies as arguments rather than constructing them, so tests
@@ -220,11 +234,37 @@ export const createApp = async ({ db, config }: AppDeps): Promise<FastifyInstanc
   // putting it first means there is no ordering to get wrong later.
   await app.register(helmet, helmetOptions())
 
+  // Fastify parses `text/plain` by default, and that is the one body type a
+  // cross-site HTML form can send — `enctype="text/plain"` is reachable from
+  // any page, while urlencoded and multipart 415 out here.
+  //
+  // It matters because `SameSite=Lax` protects less than it looks like it does.
+  // Lax stops the cookie being *sent* cross-site, which covers every route that
+  // needs a session — but logout does not need one. It ignores the body and
+  // answers with `Set-Cookie: …; Max-Age=0`, and a Set-Cookie on a top-level
+  // cross-site navigation is honoured. So `evil.com` could auto-submit a form
+  // and sign a member out. Verified: text/plain answered 200 with the clearing
+  // cookie, the other two form encodings answered 415.
+  //
+  // Nuisance rather than disclosure — nothing moves and the attacker learns
+  // nothing — but no route here accepts plain text, so the parser is pure
+  // attack surface.
+  //
+  // Note the scope: this is a property of the *instance*, not of the logout
+  // route, and it holds only while no registered parser accepts a form
+  // encoding. Registering `@fastify/formbody` later — for a webhook, an admin
+  // form post — would reopen it from a file with nothing to do with auth. The
+  // `cross-site reachability` block in `routes/auth.test.ts` is what keeps that
+  // honest: it asserts all three form encodings answer 415, so the regression
+  // fails CI rather than shipping.
+  app.removeContentTypeParser('text/plain')
+
   app.decorate('db', db)
   app.decorate('config', config)
 
   registerErrorHandler(app)
   registerVersionRoutes(app, { config })
+  registerAuthRoutes(app, { db, config, sessions: createSessions(sessionDeps(config)) })
 
   const webRoot = config.web_root
   const servesWebApp = webRoot !== undefined

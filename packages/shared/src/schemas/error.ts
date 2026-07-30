@@ -21,17 +21,31 @@ export type ErrorResponse = z.infer<typeof errorResponseSchema>
 /**
  * Error codes the API can return.
  *
- * Only what the app actually emits today: the 404 handler, and the error
- * handler that maps everything else onto this envelope. It grows alongside the
- * routes that emit it — #8 adds the auth codes when there are auth routes to
- * return them, rather than listing them first and leaving unreachable values
- * and an argument about type safety that nothing yet exercises.
+ * Only what the app actually emits today. It grows alongside the routes that
+ * emit it, rather than listing values first and leaving unreachable ones.
+ *
+ * `invalid_credentials` is deliberately one code for both a wrong password and
+ * an unknown email — telling those apart is an account enumeration oracle.
+ * `rate_limited` exists because 429 would otherwise be indistinguishable from a
+ * malformed body, and a client that cannot tell them apart cannot say "try
+ * again shortly".
+ *
+ * `unauthenticated` and `forbidden` are deliberately *absent* until #10's
+ * guards emit them. They are the distinction a client cannot make from status
+ * alone, and they will be wanted — but adding them now would be the thing the
+ * paragraph above forbids.
  *
  * `errorResponseSchema` deliberately accepts codes outside this list, so an
  * older client can still parse a newer API's response rather than failing to
  * read the error explaining what went wrong.
  */
-export const errorCodes = ['bad_request', 'not_found', 'internal_error'] as const
+export const errorCodes = [
+  'bad_request',
+  'not_found',
+  'internal_error',
+  'invalid_credentials',
+  'rate_limited',
+] as const
 export type ErrorCode = (typeof errorCodes)[number]
 
 /** Build the body for a given code. The single place the envelope is constructed. */

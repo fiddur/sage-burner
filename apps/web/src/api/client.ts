@@ -1,4 +1,4 @@
-import type { VersionResponse } from '@sage-burner/shared'
+import type { LoginRequest, MeResponse, VersionResponse } from '@sage-burner/shared'
 
 /**
  * The API client.
@@ -46,6 +46,10 @@ export const isApiError = (value: unknown): value is ApiError =>
 const messageFor = (status: number) => {
   if (status === 401) return 'You need to sign in.'
   if (status === 403) return 'You do not have access to that.'
+  // Deliberately says how long. Without it the copy invites the immediate retry
+  // the `Retry-After` header exists to prevent — and under a flood, that is the
+  // client behaviour that makes it worse.
+  if (status === 429) return 'Too many attempts just now. Wait a few seconds and try again.'
   if (status === 404) return 'Not found.'
   if (status >= 500) return 'Something went wrong at our end. Please try again.'
   return `Request failed (${status}).`
@@ -114,6 +118,14 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
   return {
     request,
     getVersion: () => request<VersionResponse>('/version'),
+
+    /** 200 with `{ viewer: null }` when signed out — not an error. */
+    getMe: (signal?: AbortSignal) => request<MeResponse>('/auth/me', { signal }),
+
+    /** Throws ApiError(401, 'invalid_credentials') on a bad email or password alike. */
+    login: (body: LoginRequest) => request<MeResponse>('/auth/login', { method: 'POST', body }),
+
+    logout: () => request<MeResponse>('/auth/logout', { method: 'POST' }),
   }
 }
 

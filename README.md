@@ -67,21 +67,35 @@ being handed the HTML shell. It also means invite tokens must be dot-free.
 
 ### Configuration
 
-Every variable is optional; the defaults are what you get from a bare
-`docker run`. An empty value is treated as unset, since `FOO: ${FOO}` in a
-compose file with `FOO` undefined expands to an empty string rather than to
-nothing.
+Every variable is optional except `SESSION_SECRET`, which is required for
+anything a browser other than yours could reach. Three signals, any one of which
+is enough: `NODE_ENV=production`, a non-loopback `HOST`, or a set `WEB_ROOT`. The
+image sets all three, so any container needs a secret; `pnpm dev` needs nothing,
+because it is none of them.
 
-| Variable       | Default                     | Meaning                                                            |
-| -------------- | --------------------------- | ------------------------------------------------------------------ |
-| `NODE_ENV`     | `development`               | `development` \| `test` \| `production`                            |
-| `PORT`         | `3000`                      | Port to listen on                                                  |
-| `HOST`         | `0.0.0.0`                   | Bind address — `0.0.0.0` to be reachable in Docker                 |
-| `DATABASE_URL` | `./data/sage-burner.sqlite` | SQLite file; parent directory is created                           |
-| `LOG_LEVEL`    | `info`                      | `fatal` … `trace`, or `silent`                                     |
-| `BUILD_SHA`    | `unknown`                   | Commit the image was built from                                    |
-| `WEB_ROOT`     | _(unset)_                   | Directory of the built web app. Unset in dev, where Vite serves it |
-| `TRUST_PROXY`  | `false`                     | `false`, `true`, a hop count like `1`, or an address/CIDR list     |
+Two conditions rather than one because `NODE_ENV` cannot answer the question that
+matters. It defaults to `development` when unset, so a bare `node
+apps/backend/src/server.ts` — a systemd unit, a hand-rolled deploy, a compose
+file that drops the image's environment — would otherwise bind every interface
+and sign sessions with the development key that is committed to this
+repository.
+
+The other defaults are what you get without any configuration. An empty value is
+treated as unset, since `FOO: ${FOO}` in a compose file with `FOO` undefined
+expands to an empty string rather than to nothing.
+
+| Variable              | Default                     | Meaning                                                                                                                                                 |
+| --------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`            | `development`               | `development` \| `test` \| `production`                                                                                                                 |
+| `PORT`                | `3000`                      | Port to listen on                                                                                                                                       |
+| `HOST`                | `127.0.0.1`                 | Bind address. Loopback by default; the image sets `0.0.0.0`. Binding anywhere else requires `SESSION_SECRET`                                            |
+| `DATABASE_URL`        | `./data/sage-burner.sqlite` | SQLite file; parent directory is created                                                                                                                |
+| `LOG_LEVEL`           | `info`                      | `fatal` … `trace`, or `silent`                                                                                                                          |
+| `BUILD_SHA`           | `unknown`                   | Commit the image was built from                                                                                                                         |
+| `WEB_ROOT`            | _(unset)_                   | Directory of the built web app. Unset in dev, where Vite serves it                                                                                      |
+| `TRUST_PROXY`         | `false`                     | `false`, `true`, a hop count like `1`, or an address/CIDR list                                                                                          |
+| `SESSION_SECRET`      | _(none)_                    | **Required if `NODE_ENV=production`, `HOST` is not loopback, or `WEB_ROOT` is set.** HMAC key for session cookies, 32+ chars. `openssl rand -base64 48` |
+| `SESSION_TTL_SECONDS` | `1209600`                   | How long a session lasts. Two weeks                                                                                                                     |
 
 Invalid configuration fails at boot with every problem listed, rather than
 starting and behaving subtly wrong.
@@ -119,8 +133,14 @@ and point `WEB_ROOT` at the output:
 
 ```sh
 pnpm --filter sage-burner-web build
-WEB_ROOT=$PWD/apps/web/dist pnpm dev:backend
+SESSION_SECRET=$(openssl rand -base64 48) WEB_ROOT=$PWD/apps/web/dist pnpm dev:backend
 ```
+
+The secret is needed because a set `WEB_ROOT` means "serve the built frontend",
+which the app counts as a deployment — see [Configuration](#configuration). This
+run also gets `Secure` cookies, which is fine over `http://localhost` in Chrome
+and Firefox because they treat it as a trustworthy origin, but is not universal;
+if login does not stick in some other browser, that is why.
 
 `WEB_ROOT` is resolved against the backend's working directory, which `pnpm
 dev:backend` sets to `apps/backend` — so an absolute path is the one that stays
@@ -160,8 +180,21 @@ in [`AGENTS.md`](./AGENTS.md) for what a green rollup does and does not mean.
 
 ```sh
 cp .env.example .env
+sed -i "s|^SESSION_SECRET=$|SESSION_SECRET=$(openssl rand -base64 48)|" .env
 docker compose up -d
 ```
+
+The second line is not optional. `.env.example` ships `SESSION_SECRET=` with no
+value, the image sets `NODE_ENV=production`, and the app refuses to start
+without a secret — so `cp` followed straight by `up` crash-loops with
+`Invalid environment configuration: SESSION_SECRET`. That refusal is deliberate
+(see [Accounts and sessions](#accounts-and-sessions)); this is the step that
+satisfies it. Editing that line by hand does the same job.
+
+It fills the blank assignment rather than appending a second one. Compose's
+dotenv takes the last occurrence, so appending would also work — but the file
+would then read top-down as though no secret were set, which is the same trap
+`.env.example` warns about for `TRUST_PROXY`.
 
 For the Apache deployment below, change `TRUST_PROXY` to `1` in that `.env` —
 without it `request.ip` is the Docker bridge for every request. It ships as
@@ -301,20 +334,231 @@ ProxyPass        / http://127.0.0.1:8081/
 ProxyPassReverse / http://127.0.0.1:8081/
 ```
 
+**Add throttling here too.** The app deliberately does not rate-limit login
+(see [Accounts and sessions](#accounts-and-sessions)), so this vhost is the only
+thing between an attacker and roughly 8–9 password guesses a second against one
+address. Nothing else will stop it.
+
+fail2ban suits slow grinding better than a burst limiter, since the app answers
+every failure with a plain `401`:
+
+```
+# /etc/fail2ban/filter.d/sage-burner-login.conf
+[Definition]
+failregex = ^<HOST> .* "POST /api/auth/login HTTP/[^"]*" 401
+ignoreregex =
+```
+
+That uniformity is deliberate — a malformed body answers `401` too, so the shape
+of the error cannot be used to probe which addresses parse as accounts — and it
+is the one drawback of this filter: the pattern above cannot tell a password
+guess from a client sending a body the schema rejects. A frontend bug would ban
+the member rather than surface itself. Nothing in the access log distinguishes
+them, so if you hit that, look at the app log (`login rejected` is logged only
+for a real credential failure) before assuming an attack.
+
+```ini
+# /etc/fail2ban/jail.d/sage-burner.conf
+[sage-burner-login]
+enabled  = true
+port     = http,https
+filter   = sage-burner-login
+logpath  = /var/log/apache2/sage-access.log   # must match this vhost's CustomLog
+maxretry = 10
+findtime = 10m
+bantime  = 1h
+```
+
+Ten attempts in ten minutes is generous for a membership of 42 and leaves an
+attacker nowhere to go. `mod_qos` or `mod_evasive` can cap bursts as well, but
+they measure over seconds and a patient attacker simply goes slower.
+
+Untested on your host — the log path in particular has to match whatever
+`CustomLog` this vhost sets. Check `fail2ban-regex` against a real log line
+before trusting it.
+
 Note there are no `Header set` lines for CSP, HSTS or the rest: the app sends
 those itself. Do not add them here — `Header set` _replaces_ what the backend
 sent, so a policy written here shadows the app's rather than adding to it, and a
 weaker one silently wins. See [Security headers](#security-headers).
 
 `X-Forwarded-Proto` is not cosmetic: Apache terminates TLS, so without it the
-app believes it is serving plain HTTP — which decides whether the session cookie
-gets its `Secure` flag.
+app believes it is serving plain HTTP, and `request.protocol` is wrong for every
+request — which matters for logging, for redirects, and for anything later that
+keys on the scheme.
+
+It does _not_ decide the session cookie's `Secure` flag. That is decided in
+`config.ts`, on the same three signals as the secret requirement: `production`, a
+non-loopback `HOST`, or a set `WEB_ROOT`. See
+[Accounts and sessions](#accounts-and-sessions).
+
+**Running without Docker?** Set `NODE_ENV=production` explicitly. A proxy in
+front means the app binds loopback, so "not production" and "loopback" are both
+true of a `pnpm start` or systemd unit behind this vhost — and neither says
+"deployment". Serving the built frontend (`WEB_ROOT`) is what the app uses to
+notice, and it will refuse to start without a `SESSION_SECRET` on that basis; but
+`NODE_ENV=production` is what you actually mean, and it does not rely on that
+inference.
 
 Set it in the `:443` vhost, not in an include shared with a `:80` one. Hardcoded
 to `https` it would lie about a plain-HTTP request, and a cookie marked `Secure`
 on a connection that is not would simply never come back.
 
 [#10]: https://github.com/fiddur/sage-burner/issues/10
+
+## Accounts and sessions
+
+There is **no open sign-up**. Accounts are created only by redeeming an invite
+([#17]); `/login` says so rather than offering a dead link.
+
+- `POST /api/auth/login` — `{ email, password }`. 200 with `{ viewer }` and a
+  session cookie, or 401 `invalid_credentials`.
+- `POST /api/auth/logout` — clears the cookie.
+- `GET /api/auth/me` — `{ viewer }` or `{ viewer: null }`. Always 200: an
+  anonymous visitor on the public homepage is the expected case, not an error.
+
+**Passwords** are hashed with scrypt from `node:crypto` (N=2^16, r=8, p=2 — one
+of OWASP's listed configurations). #8 asked for argon2 or bcrypt; both are
+native modules, which means a build toolchain in an image whose whole point is
+that there is no build step, and the thing most likely to break a Node upgrade.
+The parameters are stored in each hash, so raising them later re-hashes on next
+login instead of invalidating every account.
+
+Login deliberately spends the same work on an unknown address as on a wrong
+password — measured at 220ms versus 0ms before that was fixed. Differing is an
+account-enumeration oracle, and on a membership app the membership _is_ the
+private part. For the same reason a malformed request body answers 401 rather
+than 400.
+
+That equal-work property is conditional, and nothing enforces the condition: it
+holds while every stored hash uses the current parameters. Raising them would
+make an account still on the old ones verify _faster_ than the decoy, reopening
+the oracle in the other direction — and since the opportunistic upgrade runs
+only after a successful login, an account whose owner never signs in keeps the
+old parameters indefinitely. Raising the cost wants a plan for stale rows, not
+just next-login.
+
+**Sessions** are a signed value in an `HttpOnly`, `SameSite=Lax` cookie — not a
+database row.
+
+`Secure` is decided once in `config.ts` as `secure_cookies`, on exactly the same
+predicate as the `SESSION_SECRET` requirement: `production`, a non-loopback
+`HOST`, or a set `WEB_ROOT`. The image is all three, so **every containerised
+deployment gets it** — and so does a hand-rolled `pnpm start` behind a proxy,
+which is neither production nor non-loopback but does serve the built
+frontend. Plain HTTP therefore works on `localhost` only, where browsers treat the origin as trustworthy — and that is
+now true by construction rather than by coincidence of the Dockerfile. On any other
+plain-HTTP origin — a LAN address, an internal hostname — the browser discards
+the cookie silently: login answers 200, the page says you are signed in, and the
+next load says you are not. Put TLS in front, as the Apache section below does.
+
+One deliberate hardening, with a cost worth knowing. If a request arrives with
+more than one session cookie, both are refused — a legitimate client only ever
+sends one, so a second is planted, and refusing beats signing the member into
+someone else's account. But logging in again does _not_ clear a planted cookie
+set at a different path, so the member stays locked out until it expires or they
+clear cookies by hand. Still the right trade against the alternative, and [#58]
+is what actually ends it.
+
+The consequence, stated plainly: **logout clears the cookie but does not
+invalidate the token**, which stays valid until it expires. That follows from
+sessions being signed rather than stored — there is no row to delete — and not
+from anything above. A compromised session can only be revoked by rotating
+`SESSION_SECRET`, which logs everyone out at once.
+
+**Login is not rate-limited in the app, deliberately.** Throttling repeated
+attempts is the reverse proxy's job for now — Apache sees every request first
+and can drop a flood before it costs a scrypt hash. [#57] tracks doing it in
+the app if that ever stops being enough.
+
+There is a bound on concurrent _work_, which is a different thing. At most two
+password verifications run at once, and up to eight further callers wait in a
+FIFO queue; only an eleventh concurrent caller, or one still waiting after five
+seconds, gets a `429` with `Retry-After`.
+
+Queued rather than refused, deliberately. A hard cap would mean two sustained
+anonymous requests denied every member's login for as long as they held them,
+with nothing to wait out. Taking turns means a member arriving mid-flood is
+served, and a client holding connections open competes for places rather than
+owning them.
+
+Why any of this is needed: every attempt costs ~230ms of CPU and 64 MiB —
+including one for an address with no account, since the decoy derivation
+deliberately spends the same work — and `scrypt` runs on libuv's threadpool,
+four slots by default, shared with the reads that serve static files. Without a
+bound, sustained login traffic would degrade the whole app rather than just that
+route.
+
+What the app does **not** do is bound the number of _attempts_. There is no
+lockout and no backoff, and the gate does not provide one — it bounds concurrent
+work, which is a different thing. Two slots at ~230ms is roughly 8–9 tries a
+second, about 750,000 a day, sustained indefinitely against one address.
+
+**So configure the proxy.** Something that counts requests per client IP against
+`/api/auth/login` — `mod_evasive`, `mod_qos`, or fail2ban watching the access
+log — sized well below that figure. A few attempts a minute is generous for a
+membership of 42 and leaves an attacker nowhere to go. This matters from the
+moment the first account exists, which is the setup step below.
+
+`SESSION_SECRET` is required in production and the app refuses to start without
+it. Generating one at boot instead would look like it works and log every member
+out on each deploy — with watchtower redeploying on a tag move, every few
+minutes after a merge.
+
+[#17]: https://github.com/fiddur/sage-burner/issues/17
+[#57]: https://github.com/fiddur/sage-burner/issues/57
+[#58]: https://github.com/fiddur/sage-burner/issues/58
+
+### Creating the first account
+
+There is no sign-up and no bootstrap command yet ([#10] adds one), so the first
+account is made by hand against the running container. Verified end to end
+against the built image:
+
+```sh
+read -rs -p 'Password: ' ADMIN_PASSWORD; echo
+export ADMIN_PASSWORD
+
+docker compose exec \
+  -e ADMIN_EMAIL=you@example.org \
+  -e ADMIN_PASSWORD \
+  sage-burner node --input-type=module -e '
+import { randomUUID } from "node:crypto"
+import { createDb, runMigrations } from "/app/apps/backend/src/db/index.ts"
+import { account, accountRole } from "/app/apps/backend/src/db/schema.ts"
+import { hashPassword } from "/app/apps/backend/src/auth/password.ts"
+
+const handle = createDb({ url: process.env.DATABASE_URL })
+runMigrations(handle)
+const id = randomUUID()
+await handle.db.insert(account).values({
+  id,
+  email: process.env.ADMIN_EMAIL.trim().toLowerCase(),
+  password_hash: await hashPassword(process.env.ADMIN_PASSWORD),
+  created_at: new Date().toISOString(),
+})
+await handle.db.insert(accountRole).values({ account_id: id, role: "admin" })
+handle.close()
+console.log("created admin", process.env.ADMIN_EMAIL)
+'
+```
+
+`read -rs` and a bare `-e ADMIN_PASSWORD` keep the password out of two places
+it would otherwise sit in plain text: the shell history, and the host's process
+arguments, where any local user can read it off `ps` for the life of the
+command. `-e VAR` with no `=` forwards the value from the caller's environment
+rather than restating it — verified: the container receives it and it appears
+nowhere in docker's argv. This is the one password on the system at the moment
+it is created, so it is worth the extra line.
+
+The command runs inside the container so the password is hashed by the same
+code that verifies it — a hash written any other way is a login that fails for
+reasons nothing explains. The email is lowercased for the same reason the schema does
+it: the table's `UNIQUE` is byte-exact, so `You@Example.org` and
+`you@example.org` would become two accounts for one person.
+
+Nothing guards the `admin` role yet, so it grants nothing until [#10] lands. It
+is set now so the account is already right when it does.
 
 ## Security headers
 
@@ -412,10 +656,15 @@ branches on. The message a member reads is the frontend's to choose, because
 only the frontend knows what the member was trying to do. The real error goes to
 the server log, where a SQL fragment or a file path is useful rather than public.
 
-The vocabulary today is `bad_request`, `not_found` and `internal_error`, defined
-in [`packages/shared`](./packages/shared/src/schemas/error.ts). It grows with the
-routes that emit it — authentication codes arrive with accounts ([#8]), rather
-than being listed in advance and left unreachable.
+The vocabulary today is `bad_request`, `not_found`, `internal_error`,
+`invalid_credentials` and `rate_limited`, defined in
+[`packages/shared`](./packages/shared/src/schemas/error.ts). It grows with the
+routes that emit it, rather than being listed in advance and left unreachable —
+`unauthenticated` and `forbidden` are deliberately absent until the role guards
+emit them.
+
+`invalid_credentials` covers a wrong password and an unknown address alike:
+telling those apart is an account-enumeration oracle.
 
 Clients should tolerate a slug they do not recognise: the schema accepts any
 string so an older frontend can still read a newer API's error instead of
