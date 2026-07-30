@@ -360,17 +360,24 @@ describe('GET /api/auth/me', () => {
     expect(response.json()).toMatchObject({ viewer: { roles: [] } })
   })
 
-  it('agrees with the login response about who the viewer is', async () => {
-    // `Viewer.roles` is derived twice: `viewerFor` uses a left join, the login
-    // handler uses `rolesFor`. Both routes return a `Viewer`, and only `/me` was
-    // covered — so nothing noticed if the two derivations drifted.
-    //
-    // Three shapes, because the interesting disagreements are at the edges: two
-    // roles, one role, and none at all (where a left join and an inner join differ).
-    for (const roles of [['admin', 'member'], ['member'], []] as ('admin' | 'member')[][]) {
+  // `Viewer.roles` is derived twice: `viewerFor` uses a left join, the login handler
+  // uses `rolesFor`. Both routes return a `Viewer`, and only `/me` was covered — so
+  // nothing would notice if the two drifted.
+  //
+  // `it.each` rather than a loop inside one `it`: `build()` overwrites the
+  // module-level `handle` and `app`, and `afterEach` closes only whatever was
+  // assigned last, so looping dropped two Fastify instances and two database
+  // handles on the floor each run.
+  //
+  // Three shapes, because the interesting disagreements are at the edges: two roles,
+  // one role, and none at all — the last being where a left join and an inner join
+  // differ.
+  it.each([[['admin', 'member']], [['member']], [[]]] as const)(
+    'agrees with the login response about who the viewer is: %j',
+    async (roles) => {
       const server = await build()
       const email = `ada-${roles.length}@example.org`
-      await givenAccount({ email, password: 'a good long passphrase', roles })
+      await givenAccount({ email, password: 'a good long passphrase', roles: [...roles] })
 
       const loggedIn = await login(server, email, 'a good long passphrase')
       const cookie = cookieFrom(loggedIn)
@@ -382,10 +389,10 @@ describe('GET /api/auth/me', () => {
 
       const fromLogin = loggedIn.json().viewer
       const fromMe = me.json().viewer
-      expect(fromMe, JSON.stringify(roles)).toEqual(fromLogin)
-      expect([...fromMe.roles].sort(), JSON.stringify(roles)).toEqual([...roles].sort())
-    }
-  })
+      expect(fromMe).toEqual(fromLogin)
+      expect([...fromMe.roles].sort()).toEqual([...roles].sort())
+    },
+  )
 
   it('recognises the cookie from a login', async () => {
     const server = await build()
