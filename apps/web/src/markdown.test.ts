@@ -76,6 +76,26 @@ describe('renderMarkdown', () => {
     expect(renderMarkdown('[**bold** link](/x)')).toContain('<strong>bold</strong>')
   })
 
+  it('rejects a protocol-relative link that reads as site-relative', () => {
+    // `//evil.com` and `/\evil.com` both navigate off-site — browsers normalise
+    // the second to the first — while looking site-relative in the source.
+    for (const href of ['//evil.com', String.raw`/\evil.com`]) {
+      expect(renderMarkdown(`[x](${href})`), href).not.toContain('href=')
+    }
+  })
+
+  it('still allows a genuine site-relative link', () => {
+    expect(renderMarkdown('[x](/apply)')).toContain('href="/apply"')
+  })
+
+  it('allows an https image, which the CSP also permits', () => {
+    // The allowlist and `img-src` have to agree: rendering an image the browser
+    // then blocks looks like a bug rather than a policy.
+    expect(renderMarkdown('![a photo](https://example.org/burn.jpg)')).toContain(
+      'src="https://example.org/burn.jpg"',
+    )
+  })
+
   it('rejects an image with an unsafe source', () => {
     const html = renderMarkdown('![alt](javascript:alert(1))')
 

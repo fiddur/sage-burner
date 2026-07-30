@@ -1,24 +1,102 @@
+import type { Event } from '@sage-burner/shared'
+
+import { useEffect, useState } from 'preact/hooks'
+
+import type { ApiClient } from '../api/client.ts'
+
+import { renderMarkdown } from '../markdown.ts'
+import { isMember, useViewer } from '../viewer.tsx'
+
+type Active = { status: 'loading' } | { status: 'ready'; event: Event | null } | { status: 'failed' }
+
+export type HomeApi = Pick<ApiClient, 'getActiveEvent'>
+
 /**
- * Public landing page.
+ * The public landing page.
  *
- * A placeholder until #13, which renders the active event's admin-authored
- * welcome markdown here. Deliberately not inventing copy that an organiser will
- * only have to delete.
+ * Almost nothing here is written by us. Everything below the title comes from
+ * `welcome_markdown` on the active event, because copy that lives in this file
+ * is copy an organiser cannot change without a deploy — which is the whole
+ * point of #11 and this page.
+ *
+ * Reachable signed out; `getActiveEvent` needs no session.
  */
-export const Home = () => (
-  <article class="prose">
-    <h1>Sage Burner</h1>
-    <p>
-      Membership, applications and the shared programme for a small co-created gathering — the things that
-      used to live in a spreadsheet.
-    </p>
-    <p class="notice">
-      This is the skeleton. The welcome text an organiser writes for each burn will appear here.
-    </p>
-    <p>
-      <a class="button" href="/apply">
-        Apply to join
-      </a>
-    </p>
-  </article>
-)
+export const Home = ({ api }: { api: HomeApi }) => {
+  const viewer = useViewer()
+  const [active, setActive] = useState<Active>({ status: 'loading' })
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    api
+      .getActiveEvent(controller.signal)
+      .then((response) => {
+        if (!controller.signal.aborted) setActive({ status: 'ready', event: response.event })
+      })
+      .catch(() => {
+        // No code, no detail. A visitor who cannot reach the API can do nothing
+        // with the reason, and this is also what an offline first paint looks
+        // like — an error banner would be worse than "come back later".
+        if (!controller.signal.aborted) setActive({ status: 'failed' })
+      })
+
+    return () => {
+      controller.abort()
+    }
+  }, [api])
+
+  return (
+    <article class="prose">
+      <h1>Sage Burner</h1>
+
+      {active.status === 'loading' && <p class="form-note">One moment…</p>}
+
+      {active.status === 'failed' && (
+        <p class="notice">Could not load the current burn just now. Please try again shortly.</p>
+      )}
+
+      {active.status === 'ready' &&
+        active.event === null && (
+          // Before the first event exists, and again once the last has ended.
+          // Says so rather than showing a stale welcome text — see the
+          // active-event rule in the README.
+          <p class="notice">There is no burn scheduled at the moment. Check back later.</p>
+        )}
+
+      {active.status === 'ready' && active.event !== null && (
+        <>
+          <h2>{active.event.name}</h2>
+          <p class="event-dates">
+            <time dateTime={active.event.start_date}>{active.event.start_date}</time> –{' '}
+            <time dateTime={active.event.end_date}>{active.event.end_date}</time>
+          </p>
+
+          {/*
+            Admin-authored and rendered to everyone. `renderMarkdown` escapes
+            raw HTML rather than filtering it, and checks link and image URLs
+            against a scheme allowlist — `markdown.ts` says why escaping is the
+            safer of the two.
+          */}
+          <div
+            class="welcome"
+            dangerouslySetInnerHTML={{ __html: renderMarkdown(active.event.welcome_markdown) }}
+          />
+        </>
+      )}
+
+      <p class="home-actions">
+        {/*
+          Applying is the point of the page, so the link does not wait for the
+          event to load — someone who arrived to apply should not sit through a
+          round trip first. Members already have their own pages in the nav.
+        */}
+        {!isMember(viewer) && (
+          <a class="button" href="/apply">
+            Apply to join
+          </a>
+        )}
+        {viewer.status === 'signed-out' && <a href="/login">Log in</a>}
+      </p>
+    </article>
+  )
+}

@@ -40,8 +40,14 @@ const escapeHtml = (value: string) =>
  * `vbscript:` and a tab-separated `java\tscript:` all execute too, and a
  * denylist has to know about each. Site-relative and anchor links are the
  * common case in a welcome text and pass through.
+ *
+ * The `/` branch excludes `//` and `/\`: both are protocol-relative rather than
+ * site-relative, and browsers normalise `/\evil.com` to `//evil.com`, so a link
+ * that reads as site-relative in the markdown source would navigate off-site.
+ * No privilege is gained — whoever writes this field can put `https://evil.com`
+ * in it outright — but "site-relative" should mean what it says.
  */
-const isSafeUrl = (href: string) => /^(?:https?:\/\/|mailto:|\/|#)/i.test(href.trim())
+const isSafeUrl = (href: string) => /^(?:https?:\/\/|mailto:|#|\/(?![/\\]))/i.test(href.trim())
 
 /** `null` and `undefined` both mean "no title"; marked uses both. */
 const titleAttribute = (title: string | null | undefined) =>

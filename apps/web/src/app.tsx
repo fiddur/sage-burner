@@ -21,7 +21,14 @@ import { FetchedViewerProvider, ViewerProvider } from './viewer.tsx'
  */
 export type AppApi = Pick<
   ApiClient,
-  'createEvent' | 'getAdminAccounts' | 'getEvents' | 'getMe' | 'login' | 'logout' | 'updateEvent'
+  | 'createEvent'
+  | 'getActiveEvent'
+  | 'getAdminAccounts'
+  | 'getEvents'
+  | 'getMe'
+  | 'login'
+  | 'logout'
+  | 'updateEvent'
 >
 
 /**
@@ -36,7 +43,10 @@ export type AppApi = Pick<
 export const Routes = ({
   api,
 }: {
-  api: Pick<ApiClient, 'createEvent' | 'getAdminAccounts' | 'getEvents' | 'login' | 'updateEvent'>
+  api: Pick<
+    ApiClient,
+    'createEvent' | 'getActiveEvent' | 'getAdminAccounts' | 'getEvents' | 'login' | 'updateEvent'
+  >
 }) => {
   // Memoised because `component` is compared by identity: a fresh arrow each
   // render is a *different component type*, so a re-rendered `Routes` would
@@ -54,10 +64,11 @@ export const Routes = ({
   const LoginRoute = useMemo(() => () => <Login api={api} />, [api])
   const AdminRoute = useMemo(() => () => <Admin api={api} />, [api])
   const AdminEventsRoute = useMemo(() => () => <AdminEvents api={api} />, [api])
+  const HomeRoute = useMemo(() => () => <Home api={api} />, [api])
 
   return (
     <Router>
-      <Route path="/" component={Home} />
+      <Route path="/" component={HomeRoute} />
       <Route path="/login" component={LoginRoute} />
       <Route path="/admin" component={AdminRoute} />
       <Route path="/admin/events" component={AdminEventsRoute} />
