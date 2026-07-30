@@ -30,12 +30,20 @@ export const formQuestionSchema = z.object({
 export type FormQuestion = z.infer<typeof formQuestionSchema>
 
 /**
- * `agreement` implies `required`.
+ * `required` is not a free choice for the two tick-box types.
  *
- * The type exists precisely because submission is blocked when it is unticked,
- * so `{ type: 'agreement', required: false }` is self-contradictory — and it was
- * storable, leaving #14 to decide which half of the row to believe. Rejected at
- * the boundary instead, while there are no rows to migrate.
+ * - **`agreement` must be required.** The type exists precisely because
+ *   submission is blocked when it is unticked, so
+ *   `{ type: 'agreement', required: false }` is self-contradictory.
+ * - **`checkbox` must not be required.** A checkbox always has an answer — `false`
+ *   is one — so "must be present" is vacuous, and the only other reading of a
+ *   required checkbox is "must be ticked", which is what `agreement` *is*. Two
+ *   spellings of one rule is the ambiguity, so this rejects the second spelling
+ *   rather than leaving a consumer to pick a meaning.
+ *
+ * Both were storable, leaving #14 to decide what such a row means. Settled at the
+ * boundary while there are no rows to migrate, and mirrored by CHECK constraints
+ * in `db/schema.ts` for writes that never touch this schema.
  *
  * A wrapper rather than a `.refine()` on `formQuestionSchema`, for the same
  * reason `withEventDateOrder` is one: a top-level refine produces a schema that
@@ -44,13 +52,16 @@ export type FormQuestion = z.infer<typeof formQuestionSchema>
  * so a PATCH carrying one of the two is settled by the handler against the
  * merged row.
  */
-export const withAgreementRequired = <T extends z.ZodType<{ type?: string; required?: boolean }>>(
-  schema: T,
-) =>
-  schema.refine((value) => value.type !== 'agreement' || value.required !== false, {
-    message: 'an agreement question must be required',
-    path: ['required'],
-  })
+export const withTickBoxRules = <T extends z.ZodType<{ type?: string; required?: boolean }>>(schema: T) =>
+  schema
+    .refine((value) => value.type !== 'agreement' || value.required !== false, {
+      message: 'an agreement question must be required',
+      path: ['required'],
+    })
+    .refine((value) => value.type !== 'checkbox' || value.required !== true, {
+      message: 'a checkbox question cannot be required — use an agreement question for that',
+      path: ['required'],
+    })
 
 /**
  * Creating a question. `id` and `event_id` come from the route, not the body.
@@ -69,7 +80,7 @@ export const formQuestionFields = formQuestionSchema.omit({ id: true, event_id: 
   options: formQuestionSchema.shape.options.nullish().default(null),
 })
 
-export const formQuestionCreateSchema = withAgreementRequired(formQuestionFields)
+export const formQuestionCreateSchema = withTickBoxRules(formQuestionFields)
 export type FormQuestionCreate = z.infer<typeof formQuestionCreateSchema>
 /** What a client may send: `help_text` and `options` are optional here. */
 export type FormQuestionCreateInput = z.input<typeof formQuestionCreateSchema>
@@ -87,7 +98,7 @@ export type FormQuestionCreateInput = z.input<typeof formQuestionCreateSchema>
  * Defaults belong on create, where "absent" genuinely means "use this". On a
  * PATCH, absent means "leave it alone", which is the opposite.
  */
-export const formQuestionUpdateSchema = withAgreementRequired(
+export const formQuestionUpdateSchema = withTickBoxRules(
   formQuestionSchema.omit({ id: true, event_id: true, order: true }).partial(),
 )
 export type FormQuestionUpdate = z.infer<typeof formQuestionUpdateSchema>

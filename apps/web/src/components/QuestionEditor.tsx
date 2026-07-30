@@ -34,6 +34,24 @@ const TYPES = formQuestionTypes.map((value) => ({ value, label: TYPE_LABELS[valu
 
 const BLANK = { label: '', type: 'textarea' as FormQuestionType, help_text: '', required: true }
 
+/**
+ * `required` is decided by the type for the two tick-box types, not by the
+ * organiser: an `agreement` is always required, a `checkbox` never is. The API
+ * and the database both refuse the other combinations, so offering the choice
+ * would only turn a tick into a 400.
+ */
+const requiredFor = (type: FormQuestionType, chosen: boolean) => {
+  if (type === 'agreement') return true
+  if (type === 'checkbox') return false
+  return chosen
+}
+
+const requiredNote = (type: FormQuestionType) => {
+  if (type === 'agreement') return ' (always, for an agreement)'
+  if (type === 'checkbox') return ' (not applicable to a checkbox)'
+  return ''
+}
+
 const messageFor = (failure: unknown, fallback: string) => (isApiError(failure) ? failure.message : fallback)
 
 /**
@@ -127,7 +145,7 @@ export const QuestionEditor = ({ api, eventId }: { api: QuestionsApi; eventId: s
         // The column is nullable and "not set" has exactly one representation,
         // so an empty box is null rather than an empty string.
         help_text: draft.help_text.trim() === '' ? null : draft.help_text,
-        required: draft.type === 'agreement' ? true : draft.required,
+        required: requiredFor(draft.type, draft.required),
       })
       setDraft(BLANK)
     }, 'Could not add the question.')
@@ -275,11 +293,11 @@ export const QuestionEditor = ({ api, eventId }: { api: QuestionsApi; eventId: s
         <label class="field-inline">
           <input
             type="checkbox"
-            checked={draft.type === 'agreement' || draft.required}
-            disabled={draft.type === 'agreement'}
+            checked={requiredFor(draft.type, draft.required)}
+            disabled={draft.type === 'agreement' || draft.type === 'checkbox'}
             onChange={(changeEvent) => setDraft({ ...draft, required: changeEvent.currentTarget.checked })}
           />
-          <span>Required{draft.type === 'agreement' ? ' (always, for an agreement)' : ''}</span>
+          <span>Required{requiredNote(draft.type)}</span>
         </label>
 
         {/*
@@ -363,11 +381,11 @@ const QuestionFields = ({
       <label class="field-inline">
         <input
           type="checkbox"
-          checked={type === 'agreement' || required}
-          disabled={type === 'agreement'}
+          checked={requiredFor(type, required)}
+          disabled={type === 'agreement' || type === 'checkbox'}
           onChange={(changeEvent) => setRequired(changeEvent.currentTarget.checked)}
         />
-        <span>Required{type === 'agreement' ? ' (always, for an agreement)' : ''}</span>
+        <span>Required{requiredNote(type)}</span>
       </label>
 
       <button
@@ -378,7 +396,7 @@ const QuestionFields = ({
             label,
             type,
             help_text: helpText.trim() === '' ? null : helpText,
-            required: type === 'agreement' ? true : required,
+            required: requiredFor(type, required),
           })
         }
       >

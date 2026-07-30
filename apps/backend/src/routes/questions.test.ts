@@ -244,6 +244,24 @@ describe('adding a question', () => {
     expect(labelsOf(await publicList(server, eventId))).toEqual([])
   })
 
+  it('refuses a required checkbox, which is an agreement by another name', async () => {
+    // A checkbox always has an answer, so "must be present" is vacuous and "must
+    // be ticked" is what `agreement` means. Refusing the second spelling is what
+    // stops #14 having to pick a reading.
+    const server = await build()
+    const cookie = await givenAdmin()
+    const eventId = await givenEvent()
+
+    const response = await add(server, cookie, eventId, {
+      ...question,
+      type: 'checkbox',
+      required: true,
+    })
+
+    expect(response.statusCode).toBe(400)
+    expect(labelsOf(await publicList(server, eventId))).toEqual([])
+  })
+
   it('rejects an unknown question type', async () => {
     const server = await build()
     const cookie = await givenAdmin()

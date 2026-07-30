@@ -44,10 +44,16 @@ describe('QuestionEditor', () => {
 
   it('lists the questions in the order the API returned', async () => {
     // Server order, not a local sort — `order` is the server's to assign.
+    //
+    // The array deliberately disagrees with the `order` values: `First` carries
+    // order 2 and arrives first. A component sorting locally by `order` would
+    // render `Second` first and fail. With a pre-sorted fixture (0, 1, 2) a local
+    // sort passed identically, so the comment claimed something the test could
+    // not see.
     renderEditor(
       stub({
         getQuestions: () =>
-          Promise.resolve({ questions: [q('a', 'First', 0), q('b', 'Second', 1), q('c', 'Third', 2)] }),
+          Promise.resolve({ questions: [q('a', 'First', 2), q('b', 'Second', 0), q('c', 'Third', 1)] }),
       }),
     )
 
@@ -125,9 +131,9 @@ describe('QuestionEditor', () => {
 
     fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'agreement' } })
 
-    const required = screen.getByLabelText(/^Required/)
+    const required = screen.getByLabelText<HTMLInputElement>(/^Required/)
     expect(required.hasAttribute('disabled')).toBe(true)
-    expect((required as HTMLInputElement).checked).toBe(true)
+    expect(required.checked).toBe(true)
   })
 
   it('will not add a question whose label is only whitespace', async () => {
@@ -142,6 +148,21 @@ describe('QuestionEditor', () => {
 
     expect(screen.getByRole('button', { name: 'Add question' }).hasAttribute('disabled')).toBe(true)
     expect(addQuestion).not.toHaveBeenCalled()
+  })
+
+  it('will not let a checkbox be required', async () => {
+    // The other half of the same rule: a checkbox always has an answer, so
+    // "required" can only mean "must be ticked" — which is what `agreement` is.
+    // The API and the database both refuse it, so the control says so rather than
+    // turning a tick into a 400.
+    renderEditor(stub())
+    await screen.findByText(/No questions yet/)
+
+    fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'checkbox' } })
+
+    const required = screen.getByLabelText<HTMLInputElement>(/^Required/)
+    expect(required.hasAttribute('disabled')).toBe(true)
+    expect(required.checked).toBe(false)
   })
 
   it('re-reads after a change rather than patching local state', async () => {

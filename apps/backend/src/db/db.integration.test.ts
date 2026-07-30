@@ -532,6 +532,27 @@ describe('check constraints', () => {
     ).toThrow()
   })
 
+  it('rejects a required checkbox question', () => {
+    // The other half of the tick-box rule, and the API cannot see a direct insert.
+    expect(() =>
+      handle.client
+        .prepare(
+          'INSERT INTO form_question (id, event_id, "order", type, label, required) VALUES (?, ?, ?, ?, ?, ?)',
+        )
+        .run('q-required-checkbox', ids.event, 3, 'checkbox', 'Tick if vegan', 1),
+    ).toThrow()
+  })
+
+  it('still accepts an optional checkbox question', () => {
+    expect(() =>
+      handle.client
+        .prepare(
+          'INSERT INTO form_question (id, event_id, "order", type, label, required) VALUES (?, ?, ?, ?, ?, ?)',
+        )
+        .run('q-good-checkbox', ids.event, 4, 'checkbox', 'Tick if vegan', 0),
+    ).not.toThrow()
+  })
+
   it('still accepts a required agreement question', () => {
     // So the constraint is "agreement implies required" rather than
     // "no agreements".

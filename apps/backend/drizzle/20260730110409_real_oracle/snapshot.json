@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "361848af-7360-49a1-8f63-50a7829752d3",
+  "id": "c9e490ac-ba76-4a8c-aafb-0c5af31a63e1",
   "prevIds": ["ce8fec22-888e-4430-a086-e43900d240dd"],
   "ddl": [
     {
@@ -1104,6 +1104,12 @@
     {
       "value": "\"type\" <> 'agreement' or \"required\" = 1",
       "name": "form_question_agreement_required_check",
+      "entityType": "checks",
+      "table": "form_question"
+    },
+    {
+      "value": "\"type\" <> 'checkbox' or \"required\" = 0",
+      "name": "form_question_checkbox_optional_check",
       "entityType": "checks",
       "table": "form_question"
     },

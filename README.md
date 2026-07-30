@@ -655,12 +655,22 @@ Two rules that are the server's, not the browser's:
 its questions are — and `no-cache`, so a question added a moment ago is not
 hidden behind a stale response. Every write is admin-only.
 
-**An `agreement` question is always required.** The type exists because
-submission is blocked when it is unticked, so `{ type: 'agreement', required:
-false }` contradicts itself — the API refuses it, on create and on any PATCH that
-would produce it, and the editor disables the checkbox rather than letting a tick
-become a 400. Settled now, while there are no rows: whichever half of such a row
-you believed later would be a guess.
+**`required` is decided by the type for the two tick-box kinds, not chosen.**
+
+- An **`agreement`** is always required. The type exists because submission is
+  blocked when it is unticked, so `{ type: 'agreement', required: false }`
+  contradicts itself.
+- A **`checkbox`** is never required. It always has an answer — `false` is one —
+  so "must be present" is vacuous, and the only other reading of a required
+  checkbox is "must be ticked", which is what `agreement` already means. Two
+  spellings of one rule is the ambiguity, so the second is refused.
+
+The API rejects both combinations, on create and on any PATCH that would produce
+one; `db/schema.ts` carries a CHECK for each, because `required` has
+`.default(false)` and an insert that omits it never touches a Zod schema; and the
+editor disables the control with a note rather than letting a tick become a 400.
+Settled now, while there are no rows: whichever half of such a row you believed
+later would be a guess.
 
 `options` exists as a JSON column for future select/radio types and is not yet
 consumed by any type. Both it and `help_text` are optional in a create body —
