@@ -674,7 +674,7 @@ it says.
 `'self' data: https:` rather than helmet's default `'self' data:`, because the
 URL allowlist admits `https://` image sources and the two disagreeing meant an
 image was rendered into the page and then blocked by the browser — which reads as
-a bug rather than a policy. Images therefore have a *stricter* allowlist than
+a bug rather than a policy. Images therefore have a _stricter_ allowlist than
 links: `https://` or site-relative only, since a plain `http://` image would hit
 that same mismatch. Links still accept `http://` — `img-src` does not govern
 navigation. There is no upload feature, so the alternative is
