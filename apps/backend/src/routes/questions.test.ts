@@ -132,17 +132,28 @@ describe('adding a question', () => {
     expect(response.statusCode).toBe(401)
   })
 
-  it('appends to the end rather than trusting a client-supplied order', async () => {
+  it('appends to the end', async () => {
     const server = await build()
     const cookie = await givenAdmin()
 
     await add(server, cookie, { ...question, label: 'First' })
     await add(server, cookie, { ...question, label: 'Second' })
-    // `order` is not part of the create schema, so this key is stripped — the
-    // point being that a client cannot jump the queue.
-    await add(server, cookie, { ...question, label: 'Third', order: 0 })
+    await add(server, cookie, { ...question, label: 'Third' })
 
     expect(labelsOf(await publicList(server))).toEqual(['First', 'Second', 'Third'])
+  })
+
+  it('refuses a client-supplied order rather than silently dropping it', async () => {
+    // `order` is the server's to assign. It used to be stripped, which answered
+    // 201 for a request that did not do what it asked — the same silent success
+    // `.strict()` was added to the event schemas to kill.
+    const server = await build()
+    const cookie = await givenAdmin()
+
+    const response = await add(server, cookie, { ...question, label: 'Queue jumper', order: 0 })
+
+    expect(response.statusCode).toBe(400)
+    expect(labelsOf(await publicList(server))).toEqual([])
   })
 
   it('rejects a question with no label', async () => {
@@ -314,19 +325,26 @@ describe('editing a question', () => {
     })
     const id = created.json().question.id
 
-    for (const payload of [{}, { lable: 'typo' }]) {
-      const response = await server.inject({
-        method: 'PATCH',
-        url: `/api/admin/questions/${id}`,
-        headers: { cookie },
-        payload,
-      })
+    const noOp = await server.inject({
+      method: 'PATCH',
+      url: `/api/admin/questions/${id}`,
+      headers: { cookie },
+      payload: {},
+    })
+    expect(noOp.statusCode).toBe(200)
 
-      expect(response.statusCode, JSON.stringify(payload)).toBe(200)
+    // A typo is a 400 now, not a 200 that wrote nothing — `.strict()`, same as the
+    // event schemas. Silent success is worse to diagnose than a refusal.
+    const typo = await server.inject({
+      method: 'PATCH',
+      url: `/api/admin/questions/${id}`,
+      headers: { cookie },
+      payload: { lable: 'typo' },
+    })
+    expect(typo.statusCode).toBe(400)
 
-      const [row] = await db().select().from(formQuestion).where(eq(formQuestion.id, id))
-      expect(row, JSON.stringify(payload)).toMatchObject({ label: 'Question', help_text: 'kept' })
-    }
+    const [row] = await db().select().from(formQuestion).where(eq(formQuestion.id, id))
+    expect(row).toMatchObject({ label: 'Question', help_text: 'kept' })
   })
 
   it('refuses a patch that would make an agreement optional', async () => {
@@ -456,9 +474,10 @@ describe('editing a question', () => {
 
     expect(response.statusCode).toBe(400)
     expect(response.json()).toEqual({ error: 'bad_request' })
-    // The stub fired, so the 400 came from the stale-read path rather than from
-    // the existence check above it.
-    expect(intercepted).toBe(1)
+    // The stub fired for both reads the handler makes on this path: the pre-read,
+    // and the re-read that tells "condition failed" from "row is gone". Both see
+    // the stale row, so the answer is 400 rather than 404.
+    expect(intercepted).toBe(2)
 
     // And nothing was stored: the row is still a valid, optional checkbox.
     const [row] = await original({ type: formQuestion.type, required: formQuestion.required })

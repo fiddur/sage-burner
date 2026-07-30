@@ -138,8 +138,10 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db, sessions }: G
         .limit(1)
       if (existing === undefined) return reply.code(404).send(errorResponse('not_found'))
 
-      // Same trap as the event PATCH: a body of only unrecognised keys parses to
-      // `{}` and `set({})` is not valid SQL, so it would answer 500 to a typo.
+      // `{}` is the only body that changes nothing now — an unrecognised key is a
+      // 400 from `.strict()` above — and `set({})` is not valid SQL, so it has to
+      // be answered before the statement. A no-op PATCH is idempotent; returning
+      // the row unchanged is the honest answer.
       if (Object.keys(parsed.data).length === 0) {
         return { question: existing } satisfies FormQuestionResponse
       }
@@ -162,8 +164,18 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db, sessions }: G
       // `WHERE` it is overwhelmingly the rule that failed, so 400. Without one, only
       // the id was matched, so the row was deleted between the read and the write —
       // 404, the same answer as a row that was already gone.
+      // Zero rows has two causes: the tick-box condition failed, or the row was
+      // deleted between the read above and this write. Told apart by asking, not
+      // guessed at from whether a condition was present — guessing answered
+      // "Request failed (400)" for a question that no longer exists.
       if (Number(result.changes) === 0) {
-        return rule === undefined
+        const [stillThere] = await db
+          .select({ id: formQuestion.id })
+          .from(formQuestion)
+          .where(eq(formQuestion.id, request.params.id))
+          .limit(1)
+
+        return stillThere === undefined
           ? reply.code(404).send(errorResponse('not_found'))
           : reply.code(400).send(errorResponse('bad_request'))
       }

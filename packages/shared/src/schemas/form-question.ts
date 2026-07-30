@@ -101,6 +101,17 @@ export const withTickBoxRules = <T extends z.ZodType<{ type?: string; required?:
  * pick would make two organisers adding questions at once produce a collision
  * over something neither of them chose.
  */
+/**
+ * `.strict()` on both derivations below, for the reason `eventCreateSchema` and
+ * `eventUpdateSchema` give: an unrecognised key is a 400 rather than a silent
+ * success. A stripped typo parses to `{}`, the handler answers 200 with the row
+ * unchanged, and the editor renders "Saved." over a write that never happened —
+ * and on create, `POST { …, order: 0 }` would 201 with the key quietly dropped.
+ *
+ * It narrows the contract as well as catching typos: a client that reads a
+ * question, edits the object and sends the whole thing back gets a 400 on `id`
+ * and `order`. That is intended — a PATCH should name what it changes.
+ */
 export const formQuestionFields = formQuestionSchema.omit({ id: true, order: true }).extend({
   // `.nullable()` does not make a key optional, so omitting these was a bare
   // `bad_request` naming no field — and `options` is a column no question type
@@ -111,7 +122,7 @@ export const formQuestionFields = formQuestionSchema.omit({ id: true, order: tru
   options: formQuestionSchema.shape.options.nullish().default(null),
 })
 
-export const formQuestionCreateSchema = withTickBoxRules(formQuestionFields)
+export const formQuestionCreateSchema = withTickBoxRules(formQuestionFields.strict())
 export type FormQuestionCreate = z.infer<typeof formQuestionCreateSchema>
 /** What a client may send: `help_text` and `options` are optional here. */
 export type FormQuestionCreateInput = z.input<typeof formQuestionCreateSchema>
@@ -130,7 +141,7 @@ export type FormQuestionCreateInput = z.input<typeof formQuestionCreateSchema>
  * PATCH, absent means "leave it alone", which is the opposite.
  */
 export const formQuestionUpdateSchema = withTickBoxRules(
-  formQuestionSchema.omit({ id: true, order: true }).partial(),
+  formQuestionSchema.omit({ id: true, order: true }).partial().strict(),
 )
 export type FormQuestionUpdate = z.infer<typeof formQuestionUpdateSchema>
 

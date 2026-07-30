@@ -79,13 +79,10 @@ export const event = sqliteTable(
 )
 
 /**
- * One question on an event's application form.
+ * The application form's questions — **one central set**, not one per event.
  *
  * Rows, not code: organisers retune these between burns, so adding, editing or
  * reordering a question must never require a redeploy.
- */
-/**
- * The application form's questions — **one central set**, not one per event.
  *
  * Someone applies to join the community once, the way they would be admitted to a
  * Discord server; coming to a particular burn is a separate act afterwards. An

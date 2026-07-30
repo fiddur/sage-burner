@@ -693,8 +693,11 @@ stale response. Every write is admin-only.
   spellings of one rule is the ambiguity, so the second is refused.
 
 The API rejects both combinations, on create and on any PATCH that would produce
-one — including a PATCH naming only `type` or only `required`, which the schema
-alone cannot decide, so the rule rides in the `UPDATE` statement itself.
+one — including a PATCH naming only `type` or only `required`. The schema cannot
+decide a lone key, so that case is settled **inside the `UPDATE` statement**
+rather than by re-reading the row and checking in JavaScript: a check either side
+of an `await` is check-then-act, and two concurrent patches could each pass their
+own before either wrote.
 `db/schema.ts` carries a CHECK for each, because `required` has `.default(false)`
 and an insert that omits it never touches a Zod schema. The editor disables the
 control with a note rather than letting a tick become a 400.

@@ -566,7 +566,7 @@ describe('check constraints', () => {
     expect(() =>
       handle.client
         .prepare('INSERT INTO form_question (id, "order", type, label, required) VALUES (?, ?, ?, ?, ?)')
-        .run('q2', ids.event, 0, 'select', 'Pick one', 1),
+        .run('q2', 0, 'select', 'Pick one', 1),
     ).toThrow()
   })
 })
