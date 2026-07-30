@@ -456,23 +456,37 @@ describe('admin event routes', () => {
     expect(row).toMatchObject({ start_date: '2026-09-01', end_date: '2026-09-05' })
   })
 
-  it('allows a one-day event, where the range collapses to a single date', async () => {
-    // The boundary neither branch covered. `event_date_order_check` is
-    // `end_date >= start_date`, so a one-day event is legal — but a strict `<`
-    // slipped into `dateOrderCondition` in place of `<=` would 400 both of these
-    // and no test would have noticed.
+  // A one-day event is legal — `event_date_order_check` is `end_date >= start_date`
+  // — so both branches of `dateOrderCondition` must use `<=`, not `<`.
+  //
+  // One case each, on its own fixture. They were a single test with two sequential
+  // patches, and that only exercised the second boundary *because the first
+  // succeeded*: under a strict `<` the start move is refused, the row stays
+  // `08-01..08-05`, and the end move then evaluates `08-01 < 08-05` and passes. The
+  // mutation was still caught, but by one assertion rather than the two the comment
+  // claimed.
+  it('allows a start date landing exactly on the end date', async () => {
     const server = await build()
     const cookie = await givenAdmin()
     const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
 
-    const startOntoEnd = await patch(server, cookie, id, { start_date: '2026-08-05' })
-    expect(startOntoEnd.statusCode).toBe(200)
+    const response = await patch(server, cookie, id, { start_date: '2026-08-05' })
 
-    const endOntoStart = await patch(server, cookie, id, { end_date: '2026-08-05' })
-    expect(endOntoStart.statusCode).toBe(200)
-
+    expect(response.statusCode).toBe(200)
     const [row] = await db().select().from(event)
     expect(row).toMatchObject({ start_date: '2026-08-05', end_date: '2026-08-05' })
+  })
+
+  it('allows an end date landing exactly on the start date', async () => {
+    const server = await build()
+    const cookie = await givenAdmin()
+    const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
+
+    const response = await patch(server, cookie, id, { end_date: '2026-08-01' })
+
+    expect(response.statusCode).toBe(200)
+    const [row] = await db().select().from(event)
+    expect(row).toMatchObject({ start_date: '2026-08-01', end_date: '2026-08-01' })
   })
 
   it('answers 404, not 400, when a valid one-sided move hits a deleted event', async () => {
