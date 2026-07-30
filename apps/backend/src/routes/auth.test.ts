@@ -389,7 +389,15 @@ describe('GET /api/auth/me', () => {
 
       const fromLogin = loggedIn.json().viewer
       const fromMe = me.json().viewer
-      expect(fromMe).toEqual(fromLogin)
+
+      // Compared as a set, not a sequence. Neither query orders: `rolesFor` does a
+      // bare `SELECT role FROM account_role WHERE account_id = ?` and `viewerFor`
+      // reads them out of a left join, so the two agreeing on *order* is incidental
+      // — both plans happen to walk the same `(account_id, role)` composite-PK
+      // index. `toEqual` on the whole viewer would have pinned that accident as
+      // though it were the contract, and role order is not part of the contract.
+      expect(fromMe.account_id).toEqual(fromLogin.account_id)
+      expect([...fromMe.roles].sort()).toEqual([...fromLogin.roles].sort())
       expect([...fromMe.roles].sort()).toEqual([...roles].sort())
     },
   )
