@@ -130,6 +130,20 @@ describe('QuestionEditor', () => {
     expect((required as HTMLInputElement).checked).toBe(true)
   })
 
+  it('will not add a question whose label is only whitespace', async () => {
+    // `required` passes `'   '`, so without the disabled guard the form submits
+    // and `nonEmptyText(500)` trims it to `''` server-side — an unmapped 400 for
+    // input the browser could have refused.
+    const addQuestion = vi.fn(() => Promise.resolve({ question: q('n', 'x', 0) }))
+    renderEditor(stub({ addQuestion }))
+    await screen.findByText(/No questions yet/)
+
+    fireEvent.input(screen.getByLabelText('New question'), { target: { value: '   ' } })
+
+    expect(screen.getByRole('button', { name: 'Add question' }).hasAttribute('disabled')).toBe(true)
+    expect(addQuestion).not.toHaveBeenCalled()
+  })
+
   it('re-reads after a change rather than patching local state', async () => {
     // What is on screen has to be what the public form will render, including
     // the `order` the server assigned.
@@ -240,7 +254,9 @@ describe('QuestionEditor', () => {
     // `QuestionFields` is a div, not a form, and Save is type="button", so there
     // is no constraint validation — without this the request goes out, the shared
     // schema rejects it, and the organiser reads an unmapped "Request failed
-    // (400)". The add form below blocks the same input in the browser.
+    // (400)". The add form is disabled on the same input, which is what makes the
+    // two halves behave alike; `required` alone would not, since `'   '` passes
+    // browser validation.
     const updateQuestion = vi.fn(() => Promise.resolve({ question: q('a', 'x', 0) }))
     renderEditor(
       stub({ getQuestions: () => Promise.resolve({ questions: [q('a', 'Original', 0)] }), updateQuestion }),

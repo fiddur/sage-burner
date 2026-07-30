@@ -512,6 +512,38 @@ describe('check constraints', () => {
     ).toThrow()
   })
 
+  it('rejects an agreement question that is not required', () => {
+    // The API refuses this too, but the constraint exists for writes that do not
+    // come through it — and `required` has `.default(false)`, so an insert that
+    // simply omits the column produces exactly the contradictory row. Both forms
+    // here, since the second is the one the API cannot see.
+    expect(() =>
+      handle.client
+        .prepare(
+          'INSERT INTO form_question (id, event_id, "order", type, label, required) VALUES (?, ?, ?, ?, ?, ?)',
+        )
+        .run('q-optional-agreement', ids.event, 0, 'agreement', 'I agree', 0),
+    ).toThrow()
+
+    expect(() =>
+      handle.client
+        .prepare('INSERT INTO form_question (id, event_id, "order", type, label) VALUES (?, ?, ?, ?, ?)')
+        .run('q-defaulted-agreement', ids.event, 1, 'agreement', 'I agree'),
+    ).toThrow()
+  })
+
+  it('still accepts a required agreement question', () => {
+    // So the constraint is "agreement implies required" rather than
+    // "no agreements".
+    expect(() =>
+      handle.client
+        .prepare(
+          'INSERT INTO form_question (id, event_id, "order", type, label, required) VALUES (?, ?, ?, ?, ?, ?)',
+        )
+        .run('q-good-agreement', ids.event, 2, 'agreement', 'I agree', 1),
+    ).not.toThrow()
+  })
+
   it('rejects a question type the form cannot render', () => {
     expect(() =>
       handle.client

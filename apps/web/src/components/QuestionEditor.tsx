@@ -282,7 +282,14 @@ export const QuestionEditor = ({ api, eventId }: { api: QuestionsApi; eventId: s
           <span>Required{draft.type === 'agreement' ? ' (always, for an agreement)' : ''}</span>
         </label>
 
-        <button type="submit" disabled={busy}>
+        {/*
+          Also disabled on a whitespace-only label. `required` does not catch
+          `'   '` — it satisfies HTML constraint validation, the form submits, and
+          `nonEmptyText(500)` trims it to `''` server-side, so the organiser reads
+          the unmapped "Request failed (400)". This is what makes the parity with
+          the edit form below real rather than only true for a genuinely empty box.
+        */}
+        <button type="submit" disabled={busy || draft.label.trim() === ''}>
           Add question
         </button>
       </form>
