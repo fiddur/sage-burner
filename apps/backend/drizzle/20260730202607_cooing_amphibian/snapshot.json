@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "c9e490ac-ba76-4a8c-aafb-0c5af31a63e1",
+  "id": "df9620de-4204-4f81-bd18-7f1454eb21d2",
   "prevIds": ["ce8fec22-888e-4430-a086-e43900d240dd"],
   "ddl": [
     {
@@ -267,16 +267,6 @@
       "default": null,
       "generated": null,
       "name": "id",
-      "entityType": "columns",
-      "table": "form_question"
-    },
-    {
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "name": "event_id",
       "entityType": "columns",
       "table": "form_question"
     },
@@ -719,17 +709,6 @@
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "nameExplicit": false,
-      "name": "fk_form_question_event_id_event_id_fk",
-      "entityType": "fks",
-      "table": "form_question"
-    },
-    {
-      "columns": ["event_id"],
-      "tableTo": "event",
-      "columnsTo": ["id"],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "nameExplicit": false,
       "name": "fk_invite_token_event_id_event_id_fk",
       "entityType": "fks",
       "table": "invite_token"
@@ -906,10 +885,6 @@
     {
       "columns": [
         {
-          "value": "event_id",
-          "isExpression": false
-        },
-        {
           "value": "order",
           "isExpression": false
         }
@@ -917,7 +892,7 @@
       "isUnique": false,
       "where": null,
       "origin": "manual",
-      "name": "form_question_event_order_idx",
+      "name": "form_question_order_idx",
       "entityType": "indexes",
       "table": "form_question"
     },

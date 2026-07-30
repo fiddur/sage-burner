@@ -84,13 +84,18 @@ export const event = sqliteTable(
  * Rows, not code: organisers retune these between burns, so adding, editing or
  * reordering a question must never require a redeploy.
  */
+/**
+ * The application form's questions — **one central set**, not one per event.
+ *
+ * Someone applies to join the community once, the way they would be admitted to a
+ * Discord server; coming to a particular burn is a separate act afterwards. An
+ * `event_id` here would have made the same person answer the same questions again
+ * for every burn, and made "the questions" ambiguous the moment two events existed.
+ */
 export const formQuestion = sqliteTable(
   'form_question',
   {
     id: text('id').notNull(),
-    event_id: text('event_id')
-      .notNull()
-      .references(() => event.id, { onDelete: 'cascade' }),
     // Not unique: reordering swaps positions, and a transient collision
     // mid-swap must not be rejected by the database.
     order: integer('order').notNull(),
@@ -103,7 +108,7 @@ export const formQuestion = sqliteTable(
   },
   (table) => [
     primaryKey({ columns: [table.id] }),
-    index('form_question_event_order_idx').on(table.event_id, table.order),
+    index('form_question_order_idx').on(table.order),
     check('form_question_type_check', oneOf(table.type, formQuestionTypes)),
     check('form_question_order_check', sql`${table.order} >= 0`),
     // SQLite has no boolean type, so without this the column accepts 7.

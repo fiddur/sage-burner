@@ -28,13 +28,6 @@ const stub = (over: Partial<EventsApi> = {}): EventsApi => ({
   getEvents: () => Promise.resolve({ events: [summer] }),
   createEvent: () => Promise.reject(new Error('createEvent is not stubbed here')),
   updateEvent: () => Promise.reject(new Error('updateEvent is not stubbed here')),
-  // The question editor renders inside the event editor, so these must exist
-  // even for tests about the event itself. `QuestionEditor.test.tsx` covers them.
-  getQuestions: () => Promise.resolve({ questions: [] }),
-  addQuestion: () => Promise.reject(new Error('addQuestion is not stubbed here')),
-  updateQuestion: () => Promise.reject(new Error('updateQuestion is not stubbed here')),
-  deleteQuestion: () => Promise.reject(new Error('deleteQuestion is not stubbed here')),
-  reorderQuestions: () => Promise.reject(new Error('reorderQuestions is not stubbed here')),
   ...over,
 })
 

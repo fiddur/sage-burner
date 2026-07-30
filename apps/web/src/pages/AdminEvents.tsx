@@ -3,10 +3,8 @@ import type { Event } from '@sage-burner/shared'
 import { useEffect, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
-import type { QuestionsApi } from '../components/QuestionEditor.tsx'
 
 import { isApiError } from '../api/client.ts'
-import { QuestionEditor } from '../components/QuestionEditor.tsx'
 import { renderMarkdown } from '../markdown.ts'
 import { isAdmin, useViewer } from '../viewer.tsx'
 
@@ -15,7 +13,7 @@ type Events =
   | { status: 'ready'; events: readonly Event[] }
   | { status: 'failed'; message: string }
 
-export type EventsApi = Pick<ApiClient, 'createEvent' | 'getEvents' | 'updateEvent'> & QuestionsApi
+export type EventsApi = Pick<ApiClient, 'createEvent' | 'getEvents' | 'updateEvent'>
 
 const BLANK = { name: '', slug: '', start_date: '', end_date: '', member_cap: '42' }
 
@@ -225,8 +223,6 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
                   <button type="button" class="link-button" onClick={() => setEditing(undefined)}>
                     Done
                   </button>
-
-                  <QuestionEditor api={api} eventId={row.id} />
                 </>
               ) : (
                 <button type="button" onClick={() => startEditing(row)}>

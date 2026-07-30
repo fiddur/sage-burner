@@ -10,11 +10,8 @@ import { QuestionEditor } from './QuestionEditor.tsx'
 
 afterEach(cleanup)
 
-const EVENT = 'e-1'
-
 const q = (id: string, label: string, order: number, over: Partial<FormQuestion> = {}): FormQuestion => ({
   id,
-  event_id: EVENT,
   order,
   type: 'textarea',
   label,
@@ -33,7 +30,7 @@ const stub = (over: Partial<QuestionsApi> = {}): QuestionsApi => ({
   ...over,
 })
 
-const renderEditor = (api: QuestionsApi) => render(<QuestionEditor api={api} eventId={EVENT} />)
+const renderEditor = (api: QuestionsApi) => render(<QuestionEditor api={api} />)
 
 describe('QuestionEditor', () => {
   it('says the form will be empty when there are no questions', async () => {
@@ -80,7 +77,7 @@ describe('QuestionEditor', () => {
       // explicit `null` for a column no question type consumes was ceremony, and
       // the update path never sent it — so the two halves of this editor
       // disagreed about whether it is a field you send.
-      expect(addQuestion).toHaveBeenCalledWith(EVENT, {
+      expect(addQuestion).toHaveBeenCalledWith({
         label: 'New one',
         type: 'textarea',
         help_text: null,
@@ -99,7 +96,7 @@ describe('QuestionEditor', () => {
     screen.getByRole('button', { name: 'Add question' }).click()
 
     await waitFor(() => {
-      expect(addQuestion).toHaveBeenCalledWith(EVENT, expect.objectContaining({ type: 'agreement' }))
+      expect(addQuestion).toHaveBeenCalledWith(expect.objectContaining({ type: 'agreement' }))
     })
   })
 
@@ -195,7 +192,7 @@ describe('QuestionEditor', () => {
     screen.getByRole('button', { name: 'Move "First" down' }).click()
 
     await waitFor(() => {
-      expect(reorderQuestions).toHaveBeenCalledWith(EVENT, ['b', 'a', 'c'])
+      expect(reorderQuestions).toHaveBeenCalledWith(['b', 'a', 'c'])
     })
   })
 
@@ -213,7 +210,7 @@ describe('QuestionEditor', () => {
     screen.getByRole('button', { name: 'Move "Third" up' }).click()
 
     await waitFor(() => {
-      expect(reorderQuestions).toHaveBeenCalledWith(EVENT, ['a', 'c', 'b'])
+      expect(reorderQuestions).toHaveBeenCalledWith(['a', 'c', 'b'])
     })
   })
 

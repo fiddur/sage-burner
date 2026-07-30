@@ -63,7 +63,7 @@ const toQuestionType = (value: string, fallback: FormQuestionType) =>
   isFormQuestionType(value) ? value : fallback
 
 /**
- * The application form's questions, for one event.
+ * The application form's questions — one central set, not one per burn.
  *
  * These are rows rather than code precisely so an organiser can retune them
  * between burns without a deploy — so everything here writes through the API
@@ -74,7 +74,7 @@ const toQuestionType = (value: string, fallback: FormQuestionType) =>
  * moving one question renumbers several, and a half-applied reorder is an order
  * nobody chose.
  */
-export const QuestionEditor = ({ api, eventId }: { api: QuestionsApi; eventId: string }) => {
+export const QuestionEditor = ({ api }: { api: QuestionsApi }) => {
   const [loaded, setLoaded] = useState<Loaded>({ status: 'loading' })
   const [draft, setDraft] = useState(BLANK)
   const [busy, setBusy] = useState(false)
@@ -85,7 +85,7 @@ export const QuestionEditor = ({ api, eventId }: { api: QuestionsApi; eventId: s
     const controller = new AbortController()
 
     api
-      .getQuestions(eventId, controller.signal)
+      .getQuestions(controller.signal)
       .then((response) => {
         if (!controller.signal.aborted) setLoaded({ status: 'ready', questions: response.questions })
       })
@@ -97,13 +97,13 @@ export const QuestionEditor = ({ api, eventId }: { api: QuestionsApi; eventId: s
     return () => {
       controller.abort()
     }
-  }, [api, eventId])
+  }, [api])
 
   // Every mutation re-reads rather than patching local state. One extra request
   // per change, and in exchange what is on screen is what the public form will
   // render — including the `order` values the server assigned.
   const refresh = async () => {
-    const response = await api.getQuestions(eventId)
+    const response = await api.getQuestions()
     setLoaded({ status: 'ready', questions: response.questions })
   }
 
@@ -137,7 +137,7 @@ export const QuestionEditor = ({ api, eventId }: { api: QuestionsApi; eventId: s
   const addQuestion = (submitEvent: SubmitEvent) => {
     submitEvent.preventDefault()
     void run(async () => {
-      await api.addQuestion(eventId, {
+      await api.addQuestion({
         label: draft.label,
         type: draft.type,
         // The column is nullable and "not set" has exactly one representation,
@@ -160,7 +160,7 @@ export const QuestionEditor = ({ api, eventId }: { api: QuestionsApi; eventId: s
     ids[index] = displaced
     ids[target] = moved
 
-    void run(() => api.reorderQuestions(eventId, ids).then(() => undefined), 'Could not reorder.')
+    void run(() => api.reorderQuestions(ids).then(() => undefined), 'Could not reorder.')
   }
 
   if (loaded.status === 'loading') return <p class="form-note">Loading questions…</p>

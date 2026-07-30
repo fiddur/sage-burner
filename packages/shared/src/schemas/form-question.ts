@@ -4,15 +4,16 @@ import { formQuestionTypes } from '../enums.ts'
 import { idSchema, optionalText, nonEmptyText } from './common.ts'
 
 /**
- * One question on an event's application form.
+ * One question on the application form.
  *
- * These are rows, not code. Organisers retune the questions between every burn,
- * so adding, editing or reordering one must never require a redeploy — and the
- * web app must render whatever it is given rather than knowing the questions.
+ * These are rows, not code, and there is **one set** rather than one per event:
+ * an application is to the community, not to a burn. Organisers retune the
+ * questions between burns, so adding, editing or reordering one must never
+ * require a redeploy — and the web app must render whatever it is given rather
+ * than knowing the questions.
  */
 export const formQuestionSchema = z.object({
   id: idSchema,
-  event_id: idSchema,
   /** Display position, ascending. */
   order: z.int().nonnegative(),
   type: z.enum(formQuestionTypes),
@@ -94,13 +95,13 @@ export const withTickBoxRules = <T extends z.ZodType<{ type?: string; required?:
   })
 
 /**
- * Creating a question. `id` and `event_id` come from the route, not the body.
+ * Creating a question. `id` and `order` are the server's, not the body's.
  *
  * `order` is assigned by the server — a new question goes last. Letting a client
  * pick would make two organisers adding questions at once produce a collision
  * over something neither of them chose.
  */
-export const formQuestionFields = formQuestionSchema.omit({ id: true, event_id: true, order: true }).extend({
+export const formQuestionFields = formQuestionSchema.omit({ id: true, order: true }).extend({
   // `.nullable()` does not make a key optional, so omitting these was a bare
   // `bad_request` naming no field — and `options` is a column no question type
   // consumes yet, so every caller was sending an explicit `null` for something
@@ -129,7 +130,7 @@ export type FormQuestionCreateInput = z.input<typeof formQuestionCreateSchema>
  * PATCH, absent means "leave it alone", which is the opposite.
  */
 export const formQuestionUpdateSchema = withTickBoxRules(
-  formQuestionSchema.omit({ id: true, event_id: true, order: true }).partial(),
+  formQuestionSchema.omit({ id: true, order: true }).partial(),
 )
 export type FormQuestionUpdate = z.infer<typeof formQuestionUpdateSchema>
 

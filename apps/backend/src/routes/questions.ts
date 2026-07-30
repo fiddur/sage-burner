@@ -16,7 +16,7 @@ import type { GuardDeps } from '../auth/guards.ts'
 import type { Database } from '../db/index.ts'
 
 import { createGuards } from '../auth/guards.ts'
-import { event, formQuestion } from '../db/schema.ts'
+import { formQuestion } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 
 /**
@@ -65,90 +65,62 @@ const tickBoxCondition = ({ type, required }: { type?: string; required?: boolea
 }
 
 /**
- * The application form's questions.
+ * The application form's questions — one central set, not one per event.
  *
- * Rows, not code — organisers retune them between every burn, so adding,
- * editing or reordering one must never need a redeploy, and the web app renders
- * whatever it is handed rather than knowing the questions.
+ * Rows, not code: organisers retune them between burns, so adding, editing or
+ * reordering one must never need a redeploy, and the web app renders whatever it
+ * is handed rather than knowing the questions.
  *
- * Reads are public: the application form is public, so its questions are too.
- * Every write is admin-only.
+ * Reads are public, because the application form is. Every write is admin-only.
  */
-export const questionsFor = (db: Database, eventId: string): Promise<FormQuestion[]> =>
-  db
-    .select()
-    .from(formQuestion)
-    .where(eq(formQuestion.event_id, eventId))
-    .orderBy(asc(formQuestion.order), asc(formQuestion.id))
+export const questionsFor = (db: Database): Promise<FormQuestion[]> =>
+  db.select().from(formQuestion).orderBy(asc(formQuestion.order), asc(formQuestion.id))
 
 export const registerQuestionRoutes = (app: FastifyInstance, { db, sessions }: GuardDeps) => {
   const { requireAdmin } = createGuards({ db, sessions })
 
-  app.get<{ Params: { eventId: string } }>('/api/events/:eventId/questions', async (request, reply) => {
+  app.get('/api/questions', async (_request, reply) => {
     // Same reasoning as the active event: public, but an edit has to show up
     // without waiting out a heuristic freshness window.
     void reply.header('cache-control', 'no-cache')
 
-    return { questions: await questionsFor(db, request.params.eventId) } satisfies FormQuestionsResponse
+    return { questions: await questionsFor(db) } satisfies FormQuestionsResponse
   })
 
-  app.post<{ Params: { eventId: string } }>(
-    '/api/admin/events/:eventId/questions',
-    { preHandler: requireAdmin },
-    async (request, reply) => {
-      void noStore(reply)
+  app.post('/api/admin/questions', { preHandler: requireAdmin }, async (request, reply) => {
+    void noStore(reply)
 
-      const parsed = formQuestionCreateSchema.safeParse(request.body)
-      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+    const parsed = formQuestionCreateSchema.safeParse(request.body)
+    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
 
-      const [found] = await db
-        .select({ id: event.id })
-        .from(event)
-        .where(eq(event.id, request.params.eventId))
+    const id = randomUUID()
+
+    // Read and insert in one transaction, because otherwise "the server assigns
+    // `order`" is not true: two requests can observe the same last row between
+    // separate awaits and insert the same position. The order is returned rather
+    // than assigned into a row from inside the callback — that worked only because
+    // `drizzle-orm/node-sqlite` is synchronous, and on an async driver the insert
+    // would still be right while the 201 body reported `order: 0`.
+    const order = db.transaction((tx) => {
+      const [last] = tx
+        .select({ order: formQuestion.order })
+        .from(formQuestion)
+        .orderBy(desc(formQuestion.order))
         .limit(1)
-      // Checked rather than left to the foreign key: the FK would raise a
-      // constraint error and answer 500, where "no such event" is a 404.
-      if (found === undefined) return reply.code(404).send(errorResponse('not_found'))
+        .all()
 
-      // New questions go last, and `order` is the server's to assign.
-      //
-      // Read and insert in one transaction, because otherwise the claim is not
-      // true: two requests can observe the same `last` between separate awaits
-      // and insert the same `order`. The list stays deterministic either way —
-      // `orderBy(asc(order), asc(id))` breaks the tie, and any later reorder
-      // renumbers to 0..n-1 — so the symptom is mild. But the comment claimed a
-      // guarantee, and a guarantee is cheaper to provide here than to explain
-      // away.
-      const id = randomUUID()
+      const next = last === undefined ? 0 : last.order + 1
+      tx.insert(formQuestion)
+        .values({ ...parsed.data, id, order: next })
+        .run()
 
-      // Returns the order rather than assigning into a row from inside the
-      // callback. That worked only because `drizzle-orm/node-sqlite` is the
-      // synchronous driver — `db.transaction` returns `T`, not a promise, so the
-      // mutation landed before the reply was built. Nothing said so, and on an
-      // async driver the compiler would not object: the insert would still get the
-      // right order and the 201 body would report `order: 0`.
-      const order = db.transaction((tx) => {
-        const [last] = tx
-          .select({ order: formQuestion.order })
-          .from(formQuestion)
-          .where(eq(formQuestion.event_id, request.params.eventId))
-          .orderBy(desc(formQuestion.order))
-          .limit(1)
-          .all()
+      return next
+    })
 
-        const next = last === undefined ? 0 : last.order + 1
-        tx.insert(formQuestion)
-          .values({ ...parsed.data, id, event_id: request.params.eventId, order: next })
-          .run()
+    const row: FormQuestion = { ...parsed.data, id, order }
 
-        return next
-      })
-
-      const row: FormQuestion = { ...parsed.data, id, event_id: request.params.eventId, order }
-
-      return reply.code(201).send({ question: row } satisfies FormQuestionResponse)
-    },
-  )
+    return reply.code(201).send({ question: row } satisfies FormQuestionResponse)
+  })
 
   app.patch<{ Params: { id: string } }>(
     '/api/admin/questions/:id',
@@ -222,51 +194,33 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db, sessions }: G
     },
   )
 
-  app.put<{ Params: { eventId: string } }>(
-    '/api/admin/events/:eventId/questions/order',
-    { preHandler: requireAdmin },
-    async (request, reply) => {
-      void noStore(reply)
+  app.put('/api/admin/questions/order', { preHandler: requireAdmin }, async (request, reply) => {
+    void noStore(reply)
 
-      const parsed = formQuestionOrderSchema.safeParse(request.body)
-      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+    const parsed = formQuestionOrderSchema.safeParse(request.body)
+    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
 
-      // The same probe `POST` does, and for the same reason: without it an unknown
-      // event id reads an empty question list, satisfies `sameSet` vacuously, and
-      // answers 200 with `{ questions: [] }` — reporting a successful reorder of a
-      // form that does not exist. A typo'd or stale id in an admin tool would look
-      // like it worked, and the two routes under this prefix would disagree about
-      // the same input.
-      const [found] = await db
-        .select({ id: event.id })
-        .from(event)
-        .where(eq(event.id, request.params.eventId))
-        .limit(1)
-      if (found === undefined) return reply.code(404).send(errorResponse('not_found'))
+    const existing = await questionsFor(db)
+    const wanted = parsed.data.ids
 
-      const existing = await questionsFor(db, request.params.eventId)
-      const wanted = parsed.data.ids
+    // The request must name exactly the questions that exist, no more and no
+    // fewer. A partial list would renumber some rows and leave others on stale
+    // positions, producing an order nobody asked for.
+    const sameSet =
+      wanted.length === existing.length &&
+      new Set(wanted).size === wanted.length &&
+      existing.every((row) => wanted.includes(row.id))
+    if (!sameSet) return reply.code(400).send(errorResponse('bad_request'))
 
-      // The request must name exactly this event's questions, no more and no
-      // fewer. A partial list would renumber some rows and leave others on
-      // stale positions, producing an order nobody asked for; an id from
-      // another event would silently move a question off a form it belongs to.
-      const sameSet =
-        wanted.length === existing.length &&
-        new Set(wanted).size === wanted.length &&
-        existing.every((row) => wanted.includes(row.id))
-      if (!sameSet) return reply.code(400).send(errorResponse('bad_request'))
-
-      // One statement per question, but inside a transaction: a half-applied
-      // reorder is an order the organiser never chose, and this is the one
-      // write here that touches several rows at once.
-      db.transaction((tx) => {
-        wanted.forEach((id, index) => {
-          tx.update(formQuestion).set({ order: index }).where(eq(formQuestion.id, id)).run()
-        })
+    // One statement per question, but inside a transaction: a half-applied
+    // reorder is an order the organiser never chose, and this is the one write
+    // here that touches several rows at once.
+    db.transaction((tx) => {
+      wanted.forEach((id, index) => {
+        tx.update(formQuestion).set({ order: index }).where(eq(formQuestion.id, id)).run()
       })
+    })
 
-      return { questions: await questionsFor(db, request.params.eventId) } satisfies FormQuestionsResponse
-    },
-  )
+    return { questions: await questionsFor(db) } satisfies FormQuestionsResponse
+  })
 }

@@ -162,16 +162,12 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
     updateEvent: (id: string, body: EventUpdate) =>
       request<EventResponse>(`/admin/events/${encodeURIComponent(id)}`, { method: 'PATCH', body }),
 
-    /** Public. The application form's questions, in display order. */
-    getQuestions: (eventId: string, signal?: AbortSignal) =>
-      request<FormQuestionsResponse>(`/events/${encodeURIComponent(eventId)}/questions`, { signal }),
+    /** Public. The application form's questions, in display order. One central set. */
+    getQuestions: (signal?: AbortSignal) => request<FormQuestionsResponse>('/questions', { signal }),
 
     /** Admin only. New questions go last; `order` is the server's to assign. */
-    addQuestion: (eventId: string, body: FormQuestionCreateInput) =>
-      request<FormQuestionResponse>(`/admin/events/${encodeURIComponent(eventId)}/questions`, {
-        method: 'POST',
-        body,
-      }),
+    addQuestion: (body: FormQuestionCreateInput) =>
+      request<FormQuestionResponse>('/admin/questions', { method: 'POST', body }),
 
     /** Admin only. Partial — omitted fields are left as they are. */
     updateQuestion: (id: string, body: FormQuestionUpdate) =>
@@ -188,11 +184,8 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
      * Admin only. The *complete* list of ids in the order wanted — a partial
      * list is rejected, since it would renumber some rows and leave others.
      */
-    reorderQuestions: (eventId: string, ids: string[]) =>
-      request<FormQuestionsResponse>(`/admin/events/${encodeURIComponent(eventId)}/questions/order`, {
-        method: 'PUT',
-        body: { ids },
-      }),
+    reorderQuestions: (ids: string[]) =>
+      request<FormQuestionsResponse>('/admin/questions/order', { method: 'PUT', body: { ids } }),
   }
 }
 

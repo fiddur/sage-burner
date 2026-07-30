@@ -197,10 +197,6 @@ describe('foreign keys', () => {
     seedInvite(ids.invite)
     seedMember(ids.member, ids.account, ids.invite)
     handle.db
-      .insert(formQuestion)
-      .values({ id: 'q1', event_id: ids.event, order: 0, type: 'text', label: 'Why?', required: true })
-      .run()
-    handle.db
       .insert(application)
       .values({
         id: 'app1',
@@ -225,10 +221,23 @@ describe('foreign keys', () => {
 
     handle.db.delete(event).where(eq(event.id, ids.event)).run()
 
-    expect(handle.db.select().from(formQuestion).all()).toHaveLength(0)
     expect(handle.db.select().from(application).all()).toHaveLength(0)
     expect(handle.db.select().from(member).all()).toHaveLength(0)
     expect(handle.db.select().from(session).all()).toHaveLength(0)
+  })
+
+  it('leaves the application questions alone, since they are not scoped to an event', () => {
+    // The inverse of the cascade above, and the reason `form_question` lost its
+    // `event_id`: an application is to the community, so the questions outlive any
+    // single burn. Deleting last year's event must not empty the form.
+    handle.db
+      .insert(formQuestion)
+      .values({ id: 'q1', order: 0, type: 'text', label: 'Why do you want to join?', required: true })
+      .run()
+
+    handle.db.delete(event).where(eq(event.id, ids.event)).run()
+
+    expect(handle.db.select().from(formQuestion).all()).toHaveLength(1)
   })
 })
 
@@ -495,20 +504,16 @@ describe('check constraints', () => {
   it('rejects a negative question order', () => {
     expect(() =>
       handle.client
-        .prepare(
-          'INSERT INTO form_question (id, event_id, "order", type, label, required) VALUES (?, ?, ?, ?, ?, ?)',
-        )
-        .run('q-neg', ids.event, -1, 'text', 'Why?', 1),
+        .prepare('INSERT INTO form_question (id, "order", type, label, required) VALUES (?, ?, ?, ?, ?)')
+        .run('q-neg', -1, 'text', 'Why?', 1),
     ).toThrow()
   })
 
   it('rejects a non-boolean required flag, which SQLite would otherwise store', () => {
     expect(() =>
       handle.client
-        .prepare(
-          'INSERT INTO form_question (id, event_id, "order", type, label, required) VALUES (?, ?, ?, ?, ?, ?)',
-        )
-        .run('q-seven', ids.event, 0, 'text', 'Why?', 7),
+        .prepare('INSERT INTO form_question (id, "order", type, label, required) VALUES (?, ?, ?, ?, ?)')
+        .run('q-seven', 0, 'text', 'Why?', 7),
     ).toThrow()
   })
 
@@ -519,16 +524,14 @@ describe('check constraints', () => {
     // here, since the second is the one the API cannot see.
     expect(() =>
       handle.client
-        .prepare(
-          'INSERT INTO form_question (id, event_id, "order", type, label, required) VALUES (?, ?, ?, ?, ?, ?)',
-        )
-        .run('q-optional-agreement', ids.event, 0, 'agreement', 'I agree', 0),
+        .prepare('INSERT INTO form_question (id, "order", type, label, required) VALUES (?, ?, ?, ?, ?)')
+        .run('q-optional-agreement', 0, 'agreement', 'I agree', 0),
     ).toThrow()
 
     expect(() =>
       handle.client
-        .prepare('INSERT INTO form_question (id, event_id, "order", type, label) VALUES (?, ?, ?, ?, ?)')
-        .run('q-defaulted-agreement', ids.event, 1, 'agreement', 'I agree'),
+        .prepare('INSERT INTO form_question (id, "order", type, label) VALUES (?, ?, ?, ?)')
+        .run('q-defaulted-agreement', 1, 'agreement', 'I agree'),
     ).toThrow()
   })
 
@@ -536,20 +539,16 @@ describe('check constraints', () => {
     // The other half of the tick-box rule, and the API cannot see a direct insert.
     expect(() =>
       handle.client
-        .prepare(
-          'INSERT INTO form_question (id, event_id, "order", type, label, required) VALUES (?, ?, ?, ?, ?, ?)',
-        )
-        .run('q-required-checkbox', ids.event, 3, 'checkbox', 'Tick if vegan', 1),
+        .prepare('INSERT INTO form_question (id, "order", type, label, required) VALUES (?, ?, ?, ?, ?)')
+        .run('q-required-checkbox', 3, 'checkbox', 'Tick if vegan', 1),
     ).toThrow()
   })
 
   it('still accepts an optional checkbox question', () => {
     expect(() =>
       handle.client
-        .prepare(
-          'INSERT INTO form_question (id, event_id, "order", type, label, required) VALUES (?, ?, ?, ?, ?, ?)',
-        )
-        .run('q-good-checkbox', ids.event, 4, 'checkbox', 'Tick if vegan', 0),
+        .prepare('INSERT INTO form_question (id, "order", type, label, required) VALUES (?, ?, ?, ?, ?)')
+        .run('q-good-checkbox', 4, 'checkbox', 'Tick if vegan', 0),
     ).not.toThrow()
   })
 
@@ -558,19 +557,15 @@ describe('check constraints', () => {
     // "no agreements".
     expect(() =>
       handle.client
-        .prepare(
-          'INSERT INTO form_question (id, event_id, "order", type, label, required) VALUES (?, ?, ?, ?, ?, ?)',
-        )
-        .run('q-good-agreement', ids.event, 2, 'agreement', 'I agree', 1),
+        .prepare('INSERT INTO form_question (id, "order", type, label, required) VALUES (?, ?, ?, ?, ?)')
+        .run('q-good-agreement', 2, 'agreement', 'I agree', 1),
     ).not.toThrow()
   })
 
   it('rejects a question type the form cannot render', () => {
     expect(() =>
       handle.client
-        .prepare(
-          'INSERT INTO form_question (id, event_id, "order", type, label, required) VALUES (?, ?, ?, ?, ?, ?)',
-        )
+        .prepare('INSERT INTO form_question (id, "order", type, label, required) VALUES (?, ?, ?, ?, ?)')
         .run('q2', ids.event, 0, 'select', 'Pick one', 1),
     ).toThrow()
   })

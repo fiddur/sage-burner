@@ -12,7 +12,7 @@ import { createApp } from '../app.ts'
 import { createSessions } from '../auth/session.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, event, formQuestion } from '../db/schema.ts'
+import { account, accountRole, formQuestion } from '../db/schema.ts'
 import { SESSION_COOKIE } from './auth.ts'
 
 /**
@@ -67,21 +67,6 @@ const givenAdmin = async () => {
   return `${SESSION_COOKIE}=${sessions.issue(id)}`
 }
 
-const givenEvent = async (slug = 'summer-2026') => {
-  const id = randomUUID()
-  await db().insert(event).values({
-    id,
-    name: slug,
-    slug,
-    start_date: '2099-08-01',
-    end_date: '2099-08-05',
-    welcome_markdown: '',
-    member_cap: 42,
-    created_at: '2026-01-01T00:00:00.000Z',
-  })
-  return id
-}
-
 const question = {
   type: 'textarea' as const,
   label: 'Why do you want to come?',
@@ -90,24 +75,13 @@ const question = {
   options: null,
 }
 
-const add = (server: FastifyInstance, cookie: string, eventId: string, body: Record<string, unknown>) =>
-  server.inject({
-    method: 'POST',
-    url: `/api/admin/events/${eventId}/questions`,
-    headers: { cookie },
-    payload: body,
-  })
+const add = (server: FastifyInstance, cookie: string, body: Record<string, unknown>) =>
+  server.inject({ method: 'POST', url: '/api/admin/questions', headers: { cookie }, payload: body })
 
-const publicList = (server: FastifyInstance, eventId: string) =>
-  server.inject({ method: 'GET', url: `/api/events/${eventId}/questions` })
+const publicList = (server: FastifyInstance) => server.inject({ method: 'GET', url: '/api/questions' })
 
-const reorder = (server: FastifyInstance, cookie: string, eventId: string, ids: string[]) =>
-  server.inject({
-    method: 'PUT',
-    url: `/api/admin/events/${eventId}/questions/order`,
-    headers: { cookie },
-    payload: { ids },
-  })
+const reorder = (server: FastifyInstance, cookie: string, ids: string[]) =>
+  server.inject({ method: 'PUT', url: '/api/admin/questions/order', headers: { cookie }, payload: { ids } })
 
 const labelsOf = (response: { json: () => { questions: FormQuestion[] } }) =>
   response.json().questions.map((row) => row.label)
@@ -117,63 +91,43 @@ describe('the public question list', () => {
     // The application form is public, so its questions are.
     const server = await build()
     const cookie = await givenAdmin()
-    const eventId = await givenEvent()
-    await add(server, cookie, eventId, question)
+    await add(server, cookie, question)
 
-    const response = await publicList(server, eventId)
+    const response = await publicList(server)
 
     expect(response.statusCode).toBe(200)
     expect(labelsOf(response)).toEqual(['Why do you want to come?'])
   })
 
-  it('is empty for an event with no questions rather than a 404', async () => {
+  it('is empty before any question exists, rather than a 404', async () => {
     const server = await build()
-    const eventId = await givenEvent()
 
-    expect((await publicList(server, eventId)).json()).toEqual({ questions: [] })
+    expect((await publicList(server)).json()).toEqual({ questions: [] })
   })
 
   it('shows a question added through the admin API, with no deploy', async () => {
     // #12's acceptance, stated as a test: questions are rows, not code.
     const server = await build()
     const cookie = await givenAdmin()
-    const eventId = await givenEvent()
 
-    expect(labelsOf(await publicList(server, eventId))).toEqual([])
-    await add(server, cookie, eventId, { ...question, label: 'Added later' })
+    expect(labelsOf(await publicList(server))).toEqual([])
+    await add(server, cookie, { ...question, label: 'Added later' })
 
-    expect(labelsOf(await publicList(server, eventId))).toEqual(['Added later'])
-  })
-
-  it('only lists the questions of the event asked for', async () => {
-    const server = await build()
-    const cookie = await givenAdmin()
-    const summer = await givenEvent('summer-2026')
-    const winter = await givenEvent('winter-2026')
-    await add(server, cookie, summer, { ...question, label: 'Summer question' })
-    await add(server, cookie, winter, { ...question, label: 'Winter question' })
-
-    expect(labelsOf(await publicList(server, summer))).toEqual(['Summer question'])
+    expect(labelsOf(await publicList(server))).toEqual(['Added later'])
   })
 
   it('is marked no-cache so a new question is not hidden by a stale response', async () => {
     const server = await build()
-    const eventId = await givenEvent()
 
-    expect((await publicList(server, eventId)).headers['cache-control']).toBe('no-cache')
+    expect((await publicList(server)).headers['cache-control']).toBe('no-cache')
   })
 })
 
 describe('adding a question', () => {
   it('refuses an anonymous caller', async () => {
     const server = await build()
-    const eventId = await givenEvent()
 
-    const response = await server.inject({
-      method: 'POST',
-      url: `/api/admin/events/${eventId}/questions`,
-      payload: question,
-    })
+    const response = await server.inject({ method: 'POST', url: '/api/admin/questions', payload: question })
 
     expect(response.statusCode).toBe(401)
   })
@@ -181,32 +135,21 @@ describe('adding a question', () => {
   it('appends to the end rather than trusting a client-supplied order', async () => {
     const server = await build()
     const cookie = await givenAdmin()
-    const eventId = await givenEvent()
 
-    await add(server, cookie, eventId, { ...question, label: 'First' })
-    await add(server, cookie, eventId, { ...question, label: 'Second' })
+    await add(server, cookie, { ...question, label: 'First' })
+    await add(server, cookie, { ...question, label: 'Second' })
     // `order` is not part of the create schema, so this key is stripped — the
     // point being that a client cannot jump the queue.
-    await add(server, cookie, eventId, { ...question, label: 'Third', order: 0 })
+    await add(server, cookie, { ...question, label: 'Third', order: 0 })
 
-    expect(labelsOf(await publicList(server, eventId))).toEqual(['First', 'Second', 'Third'])
-  })
-
-  it('answers 404 for an event that does not exist', async () => {
-    // The foreign key would raise a constraint error and answer 500; "no such
-    // event" is a 404.
-    const server = await build()
-    const cookie = await givenAdmin()
-
-    expect((await add(server, cookie, randomUUID(), question)).statusCode).toBe(404)
+    expect(labelsOf(await publicList(server))).toEqual(['First', 'Second', 'Third'])
   })
 
   it('rejects a question with no label', async () => {
     const server = await build()
     const cookie = await givenAdmin()
-    const eventId = await givenEvent()
 
-    expect((await add(server, cookie, eventId, { ...question, label: '' })).statusCode).toBe(400)
+    expect((await add(server, cookie, { ...question, label: '' })).statusCode).toBe(400)
   })
 
   it('accepts a create body that omits help_text and options', async () => {
@@ -215,9 +158,8 @@ describe('adding a question', () => {
     // yet.
     const server = await build()
     const cookie = await givenAdmin()
-    const eventId = await givenEvent()
 
-    const response = await add(server, cookie, eventId, {
+    const response = await add(server, cookie, {
       type: 'text',
       label: 'Your name',
       required: true,
@@ -233,16 +175,15 @@ describe('adding a question', () => {
     // there are no rows, rather than leaving #14 to pick a half to believe.
     const server = await build()
     const cookie = await givenAdmin()
-    const eventId = await givenEvent()
 
-    const response = await add(server, cookie, eventId, {
+    const response = await add(server, cookie, {
       ...question,
       type: 'agreement',
       required: false,
     })
 
     expect(response.statusCode).toBe(400)
-    expect(labelsOf(await publicList(server, eventId))).toEqual([])
+    expect(labelsOf(await publicList(server))).toEqual([])
   })
 
   it('refuses a required checkbox, which is an agreement by another name', async () => {
@@ -251,38 +192,35 @@ describe('adding a question', () => {
     // stops #14 having to pick a reading.
     const server = await build()
     const cookie = await givenAdmin()
-    const eventId = await givenEvent()
 
-    const response = await add(server, cookie, eventId, {
+    const response = await add(server, cookie, {
       ...question,
       type: 'checkbox',
       required: true,
     })
 
     expect(response.statusCode).toBe(400)
-    expect(labelsOf(await publicList(server, eventId))).toEqual([])
+    expect(labelsOf(await publicList(server))).toEqual([])
   })
 
   it('rejects an unknown question type', async () => {
     const server = await build()
     const cookie = await givenAdmin()
-    const eventId = await givenEvent()
 
-    expect((await add(server, cookie, eventId, { ...question, type: 'signature' })).statusCode).toBe(400)
+    expect((await add(server, cookie, { ...question, type: 'signature' })).statusCode).toBe(400)
   })
 })
 
 describe('editing a question', () => {
-  const idOf = async (server: FastifyInstance, cookie: string, eventId: string, label: string) => {
-    const created = await add(server, cookie, eventId, { ...question, label })
+  const idOf = async (server: FastifyInstance, cookie: string, label: string) => {
+    const created = await add(server, cookie, { ...question, label })
     return created.json().question.id
   }
 
   it('changes the label without restating the question', async () => {
     const server = await build()
     const cookie = await givenAdmin()
-    const eventId = await givenEvent()
-    const id = await idOf(server, cookie, eventId, 'Old wording')
+    const id = await idOf(server, cookie, 'Old wording')
 
     const response = await server.inject({
       method: 'PATCH',
@@ -292,14 +230,13 @@ describe('editing a question', () => {
     })
 
     expect(response.statusCode).toBe(200)
-    expect(labelsOf(await publicList(server, eventId))).toEqual(['New wording'])
+    expect(labelsOf(await publicList(server))).toEqual(['New wording'])
   })
 
   it('leaves untouched fields alone', async () => {
     const server = await build()
     const cookie = await givenAdmin()
-    const eventId = await givenEvent()
-    const id = await idOf(server, cookie, eventId, 'Question')
+    const id = await idOf(server, cookie, 'Question')
 
     await server.inject({
       method: 'PATCH',
@@ -321,8 +258,7 @@ describe('editing a question', () => {
     // defaults now: on a PATCH, absent means "leave it alone".
     const server = await build()
     const cookie = await givenAdmin()
-    const eventId = await givenEvent()
-    const created = await add(server, cookie, eventId, {
+    const created = await add(server, cookie, {
       ...question,
       label: 'Old',
       help_text: 'A few sentences is plenty.',
@@ -345,8 +281,7 @@ describe('editing a question', () => {
     // clear it".
     const server = await build()
     const cookie = await givenAdmin()
-    const eventId = await givenEvent()
-    const created = await add(server, cookie, eventId, { ...question, help_text: 'remove me' })
+    const created = await add(server, cookie, { ...question, help_text: 'remove me' })
     const id = created.json().question.id
 
     await server.inject({
@@ -372,8 +307,7 @@ describe('editing a question', () => {
     // still 200, and every PATCH silently wipes the help text.
     const server = await build()
     const cookie = await givenAdmin()
-    const eventId = await givenEvent()
-    const created = await add(server, cookie, eventId, {
+    const created = await add(server, cookie, {
       ...question,
       label: 'Question',
       help_text: 'kept',
@@ -400,13 +334,12 @@ describe('editing a question', () => {
     // so the merged row is what has to hold. Both directions.
     const server = await build()
     const cookie = await givenAdmin()
-    const eventId = await givenEvent()
-    const agreement = await add(server, cookie, eventId, {
+    const agreement = await add(server, cookie, {
       ...question,
       type: 'agreement',
       label: 'I agree',
     })
-    const optional = await add(server, cookie, eventId, {
+    const optional = await add(server, cookie, {
       ...question,
       type: 'text',
       label: 'Optional',
@@ -437,14 +370,13 @@ describe('editing a question', () => {
     // not decidable on its own.
     const server = await build()
     const cookie = await givenAdmin()
-    const eventId = await givenEvent()
-    const requiredText = await add(server, cookie, eventId, {
+    const requiredText = await add(server, cookie, {
       ...question,
       type: 'text',
       label: 'Required text',
       required: true,
     })
-    const checkbox = await add(server, cookie, eventId, {
+    const checkbox = await add(server, cookie, {
       ...question,
       type: 'checkbox',
       label: 'Tick if vegan',
@@ -482,8 +414,7 @@ describe('editing a question', () => {
     // before a concurrent change, which is exactly what the loser of the race sees.
     const server = await build()
     const cookie = await givenAdmin()
-    const eventId = await givenEvent()
-    const created = await add(server, cookie, eventId, {
+    const created = await add(server, cookie, {
       ...question,
       type: 'text',
       label: 'Either way',
@@ -547,14 +478,13 @@ describe('editing a question', () => {
     // and no test today can prove it — this covers the surface it applies to.
     const server = await build()
     const cookie = await givenAdmin()
-    const eventId = await givenEvent()
 
     for (const type of formQuestionTypes) {
       const must = tickBoxRequired(type)
       if (must === undefined) continue
 
       // create with the wrong value for the type
-      const created = await add(server, cookie, eventId, {
+      const created = await add(server, cookie, {
         ...question,
         type,
         required: !must,
@@ -563,7 +493,7 @@ describe('editing a question', () => {
       expect(created.statusCode, `create ${type} required=${String(!must)}`).toBe(400)
 
       // PATCH the type onto a row whose `required` is wrong for it
-      const seed = await add(server, cookie, eventId, {
+      const seed = await add(server, cookie, {
         ...question,
         type: 'text',
         required: !must,
@@ -578,7 +508,7 @@ describe('editing a question', () => {
       expect(retyped.statusCode, `patch type to ${type}`).toBe(400)
 
       // PATCH `required` to the wrong value on a row already of that type
-      const typed = await add(server, cookie, eventId, {
+      const typed = await add(server, cookie, {
         ...question,
         type,
         required: must,
@@ -598,8 +528,7 @@ describe('editing a question', () => {
     // POST, DELETE and the reorder each had one; PATCH was the odd one out.
     const server = await build()
     const cookie = await givenAdmin()
-    const eventId = await givenEvent()
-    const created = await add(server, cookie, eventId, question)
+    const created = await add(server, cookie, question)
 
     const response = await server.inject({
       method: 'PATCH',
@@ -608,7 +537,7 @@ describe('editing a question', () => {
     })
 
     expect(response.statusCode).toBe(401)
-    expect(labelsOf(await publicList(server, eventId))).toEqual(['Why do you want to come?'])
+    expect(labelsOf(await publicList(server))).toEqual(['Why do you want to come?'])
   })
 
   it('answers 404 for a question that does not exist', async () => {
@@ -630,9 +559,8 @@ describe('deleting a question', () => {
   it('removes it from the public form', async () => {
     const server = await build()
     const cookie = await givenAdmin()
-    const eventId = await givenEvent()
-    const keep = await add(server, cookie, eventId, { ...question, label: 'Keep' })
-    const drop = await add(server, cookie, eventId, { ...question, label: 'Drop' })
+    const keep = await add(server, cookie, { ...question, label: 'Keep' })
+    const drop = await add(server, cookie, { ...question, label: 'Drop' })
 
     const response = await server.inject({
       method: 'DELETE',
@@ -641,15 +569,14 @@ describe('deleting a question', () => {
     })
 
     expect(response.statusCode).toBe(204)
-    expect(labelsOf(await publicList(server, eventId))).toEqual(['Keep'])
+    expect(labelsOf(await publicList(server))).toEqual(['Keep'])
     expect(keep.json().question.id).toBeTruthy()
   })
 
   it('refuses an anonymous caller', async () => {
     const server = await build()
     const cookie = await givenAdmin()
-    const eventId = await givenEvent()
-    const created = await add(server, cookie, eventId, question)
+    const created = await add(server, cookie, question)
 
     const response = await server.inject({
       method: 'DELETE',
@@ -661,10 +588,10 @@ describe('deleting a question', () => {
 })
 
 describe('reordering questions', () => {
-  const threeQuestions = async (server: FastifyInstance, cookie: string, eventId: string) => {
+  const threeQuestions = async (server: FastifyInstance, cookie: string) => {
     const ids: string[] = []
     for (const label of ['A', 'B', 'C']) {
-      ids.push((await add(server, cookie, eventId, { ...question, label })).json().question.id)
+      ids.push((await add(server, cookie, { ...question, label })).json().question.id)
     }
     return ids
   }
@@ -673,13 +600,12 @@ describe('reordering questions', () => {
     // #12's other acceptance criterion, end to end.
     const server = await build()
     const cookie = await givenAdmin()
-    const eventId = await givenEvent()
-    const [a, b, c] = await threeQuestions(server, cookie, eventId)
+    const [a, b, c] = await threeQuestions(server, cookie)
 
-    const response = await reorder(server, cookie, eventId, [c ?? '', a ?? '', b ?? ''])
+    const response = await reorder(server, cookie, [c ?? '', a ?? '', b ?? ''])
 
     expect(response.statusCode).toBe(200)
-    expect(labelsOf(await publicList(server, eventId))).toEqual(['C', 'A', 'B'])
+    expect(labelsOf(await publicList(server))).toEqual(['C', 'A', 'B'])
   })
 
   it('rejects a partial list rather than renumbering some rows', async () => {
@@ -687,72 +613,34 @@ describe('reordering questions', () => {
     // keep stale positions.
     const server = await build()
     const cookie = await givenAdmin()
-    const eventId = await givenEvent()
-    const [a, b] = await threeQuestions(server, cookie, eventId)
+    const [a, b] = await threeQuestions(server, cookie)
 
-    const response = await reorder(server, cookie, eventId, [b ?? '', a ?? ''])
+    const response = await reorder(server, cookie, [b ?? '', a ?? ''])
 
     expect(response.statusCode).toBe(400)
-    expect(labelsOf(await publicList(server, eventId))).toEqual(['A', 'B', 'C'])
+    expect(labelsOf(await publicList(server))).toEqual(['A', 'B', 'C'])
   })
 
   it('rejects a duplicate id', async () => {
     const server = await build()
     const cookie = await givenAdmin()
-    const eventId = await givenEvent()
-    const [a] = await threeQuestions(server, cookie, eventId)
+    const [a] = await threeQuestions(server, cookie)
 
-    expect((await reorder(server, cookie, eventId, [a ?? '', a ?? '', a ?? ''])).statusCode).toBe(400)
-  })
-
-  it('rejects a question belonging to another event', async () => {
-    // Otherwise a reorder silently moves a question off a form it belongs to.
-    const server = await build()
-    const cookie = await givenAdmin()
-    const summer = await givenEvent('summer-2026')
-    const winter = await givenEvent('winter-2026')
-    const [a, b, c] = await threeQuestions(server, cookie, summer)
-    const foreign = await add(server, cookie, winter, { ...question, label: 'Winter' })
-
-    // Substituted for one of summer's own ids, not appended: with four ids
-    // against three questions the length check answers first and the ownership
-    // condition is never reached — deleting it from the route would leave this
-    // test green.
-    const response = await reorder(server, cookie, summer, [foreign.json().question.id, a ?? '', b ?? ''])
-
-    expect(response.statusCode).toBe(400)
-    expect(labelsOf(await publicList(server, winter))).toEqual(['Winter'])
-    // And summer's own order is untouched, so the refusal was total.
-    expect(labelsOf(await publicList(server, summer))).toEqual(['A', 'B', 'C'])
-    expect(c ?? '').toBeTruthy()
-  })
-
-  it('answers 404 for an event that does not exist', async () => {
-    // An empty id list satisfies set-equality against an empty read, so without an
-    // existence probe this answered 200 — a successful reorder of a form that is
-    // not there. `POST` under the same prefix already 404s for the same input.
-    const server = await build()
-    const cookie = await givenAdmin()
-
-    const response = await reorder(server, cookie, randomUUID(), [])
-
-    expect(response.statusCode).toBe(404)
-    expect(response.json()).toEqual({ error: 'not_found' })
+    expect((await reorder(server, cookie, [a ?? '', a ?? '', a ?? ''])).statusCode).toBe(400)
   })
 
   it('refuses an anonymous caller', async () => {
     const server = await build()
     const cookie = await givenAdmin()
-    const eventId = await givenEvent()
-    const [a, b, c] = await threeQuestions(server, cookie, eventId)
+    const [a, b, c] = await threeQuestions(server, cookie)
 
     const response = await server.inject({
       method: 'PUT',
-      url: `/api/admin/events/${eventId}/questions/order`,
+      url: '/api/admin/questions/order',
       payload: { ids: [c ?? '', b ?? '', a ?? ''] },
     })
 
     expect(response.statusCode).toBe(401)
-    expect(labelsOf(await publicList(server, eventId))).toEqual(['A', 'B', 'C'])
+    expect(labelsOf(await publicList(server))).toEqual(['A', 'B', 'C'])
   })
 })
