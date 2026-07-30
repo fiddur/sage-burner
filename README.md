@@ -642,8 +642,11 @@ Three more things the write routes do, for anyone writing a second client:
   a one-sided move rides in the `UPDATE` itself, so a second organiser moving the
   other date concurrently cannot slip between a read and a write.
 
-A row that disappears between the read and the write answers **404**, the same as
-one that was already gone — the body was not the problem.
+A row that disappears between the read and the write answers **404** when the body
+carries no date, or both — the same as one that was already gone, because the body
+was not the problem. With exactly one date it answers **400** instead: the ordering
+condition is in the `UPDATE`, so a zero-row result has two possible causes and the
+handler names the far likelier one.
 
 ### Markdown is escaped, not filtered
 

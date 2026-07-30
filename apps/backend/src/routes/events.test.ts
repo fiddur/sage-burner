@@ -363,14 +363,16 @@ describe('admin event routes', () => {
   })
 
   it('answers 200 when the welcome text is re-saved unchanged', async () => {
-    // The 400 on zero rows reads `changes` as "rows matched". SQLite counts a row
+    // The zero-rows branch reads `changes` as "rows matched". SQLite counts a row
     // whose SET values are identical, so this passes — and it is the realistic
     // path: an organiser opens the editor, changes nothing, clicks Save.
     //
     // What this test uniquely catches is a **driver swap** to one that reports 0
-    // for an update whose values are unchanged (MySQL does), which would turn
-    // every no-op save into `bad_request`. Nothing else in the suite notices,
-    // because every other PATCH test writes a genuinely new value.
+    // for an update whose values are unchanged (MySQL does). This body carries no
+    // date, so `ordered` is undefined and the handler would answer **404
+    // `not_found`** — the event you are editing does not exist, for a save that
+    // changed nothing. Nothing else in the suite notices, because every other
+    // PATCH test writes a genuinely new value.
     //
     // Two things it does *not* catch, listed because an earlier version of this
     // comment claimed it did:
