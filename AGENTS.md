@@ -141,12 +141,47 @@ The gate is not optional. "Merge on approval" removes the human confirmation
 step, not the review — never merge an unapproved PR, and never merge with open
 threads or red CI.
 
-**Nothing enforces it yet.** `develop` has no branch protection and the repo has
-no rulesets, so `CI Gate` is not a required status check and an unresolved
-thread does not block anything — GitHub would happily merge a red PR. The gate
-above is a discipline, not a mechanism, until those are configured in repository
-settings. Do not read the checks going green as the platform having stopped
-anything.
+**Most of it is enforced now.** The `CI and PR` ruleset targets the repository's
+default branch — which is `develop` — and enforces, with no bypass actors:
+
+- a pull request, merge-commit only (so step 10's `--merge` is the only method
+  the platform will accept),
+- both checks, `CI Gate` and `build`, strictly — so the branch must also be up
+  to date with `develop`,
+- resolution of every review thread,
+- no force-push, no branch deletion.
+
+That covers three of step 10's four gates. Two things remain unenforced:
+
+- **No approval is required** (`required_approving_review_count: 0`). GitHub will
+  not let an author approve their own pull request, and every commit and review
+  here is authored by the same account, so an approval requirement would deadlock
+  rather than protect. The `✅Approved` gate is therefore discipline, and this
+  document is the only thing enforcing it. The review agent's verdicts are
+  `COMMENTED`, not `APPROVED`, so they would not satisfy the setting even if it
+  could be turned on.
+- **`main` is unprotected**, deliberately for now — deployment runs from the
+  `:develop` tag, so `main` is unused. `GET /repos/fiddur/sage-burner/rules/branches/main`
+  returns nothing: no required check, force-push and deletion both allowed. Set
+  it up before the first promotion to `:latest`.
+
+So a green rollup means the tests passed, the image starts, and the threads are
+closed. It does not mean anything reviewed the change.
+
+This paragraph caches an answer that actually lives in repository settings, and
+it has already gone stale several times while being written. Check rather than
+trust it:
+
+```sh
+gh api repos/:owner/:repo/rules/branches/develop --jq '.[] | "\(.type): \(.parameters // {} | tojson)"'
+```
+
+(Beware `// empty` as a jq fallback: `empty` produces _no_ outputs, so any
+expression needing a value from it yields nothing and the whole surrounding
+output disappears — silently, and still exiting 0. Substituting
+`.parameters.required_status_checks // empty` into the interpolation above drops
+every rule that lacks the field, which reads as a ruleset that does not have
+them.)
 
 ## Deployment
 
@@ -156,7 +191,13 @@ anything.
 - The app is served at a **domain root** — there is no sub-path/`BASE_PATH`
   handling, deliberately.
 - No external services are required to run it: no SMTP, no payment gateway, no
-  external database. `docker compose up` must be sufficient.
+  external database.
+- `docker compose up` must be sufficient — with one current exception: the app
+  refuses to start without `SESSION_SECRET`, so a bare clone needs it generated
+  first (the README's Deploying section is one `sed` line). Failing loudly beats
+  minting an in-memory secret that logs every member out on each redeploy;
+  minting one into the data volume would restore the invariant, and #59 tracks
+  that decision. Do not read this as licence for a second exception.
 
 ## Documentation
 

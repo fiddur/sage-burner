@@ -117,7 +117,7 @@ jobs:
       # test after a push would only tell us the thing watchtower is already
       # deploying is broken.
       - name: Build
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
           file: Dockerfile
@@ -174,11 +174,19 @@ jobs:
           # exactly one probe recorded — so the loop below would observe one
           # probe and then time out. A single slow first probe on a loaded
           # runner would fail an image that is fine.
+          #
+          # SESSION_SECRET is required because the image runs NODE_ENV=production
+          # and the app refuses to boot without one. That refusal is the point —
+          # a deployment that forgets it must fail loudly rather than issue
+          # forgeable sessions — so the smoke test supplies a throwaway rather
+          # than the app relaxing the rule. This value never signs anything real:
+          # the container is killed at the end of this step.
           docker run -d --name smoke \
             --cap-drop ALL \
             --security-opt no-new-privileges:true \
             --health-interval=2s \
             --pull=never \
+            -e SESSION_SECRET=smoke-test-only-secret-not-used-for-anything-real \
             -p 127.0.0.1:3000:3000 "$IMAGE"
           # Waits on the image's own HEALTHCHECK rather than curling from the
           # host. That subsumes the curl — the healthcheck hits /api/version

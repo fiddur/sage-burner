@@ -44,9 +44,18 @@ services:
       #
       # Do not "fix" this back to 1. Anyone running compose without a
       # header-appending proxy would then get a request.ip the client controls,
-      # which is what decides the session cookie's Secure flag.
+      # which is what an invite rate limiter and any admin audit trail key on.
+      #
+      # Not the session cookie's Secure flag: that is `secure_cookies` in
+      # config.ts, set whenever NODE_ENV is production, HOST is not loopback, or
+      # WEB_ROOT is set. The image sets all three, so it is on in every
+      # deployment of this image regardless of this value.
       - TRUST_PROXY=${TRUST_PROXY:-false}
       - LOG_LEVEL=${LOG_LEVEL:-info}
+      # No default: the app refuses to start in production without it, which is
+      # the intended failure. A default here would defeat that check.
+      - SESSION_SECRET=${SESSION_SECRET}
+      - SESSION_TTL_SECONDS=${SESSION_TTL_SECONDS:-1209600}
     volumes:
       # The database. A named volume rather than a bind mount so `docker
       # compose down` cannot take the members with it.
