@@ -293,13 +293,73 @@ describe('editing a question', () => {
     expect(row).toMatchObject({ label: 'Question', required: true, type: 'textarea' })
   })
 
-  it('treats a body with no recognised keys as a no-op rather than a 500', async () => {
-    // Same trap as the event PATCH: `set({})` is not valid SQL, so a typo'd
-    // field name would answer `internal_error`.
+  it('does not wipe the help text when only the label is edited', async () => {
+    // This was live, not hypothetical. `formQuestionFields` gives `help_text` and
+    // `options` a `.default(null)`, and `.partial()` does *not* suppress a default
+    // in Zod 4 — so `{ label: 'New' }` parsed to
+    // `{ label: 'New', help_text: null, options: null }` and every label edit
+    // silently cleared the help text. The update schema is derived without the
+    // defaults now: on a PATCH, absent means "leave it alone".
     const server = await build()
     const cookie = await givenAdmin()
     const eventId = await givenEvent()
-    const id = await idOf(server, cookie, eventId, 'Question')
+    const created = await add(server, cookie, eventId, {
+      ...question,
+      label: 'Old',
+      help_text: 'A few sentences is plenty.',
+    })
+    const id = created.json().question.id
+
+    await server.inject({
+      method: 'PATCH',
+      url: `/api/admin/questions/${id}`,
+      headers: { cookie },
+      payload: { label: 'New' },
+    })
+
+    const [row] = await db().select().from(formQuestion).where(eq(formQuestion.id, id))
+    expect(row).toMatchObject({ label: 'New', help_text: 'A few sentences is plenty.' })
+  })
+
+  it('still clears the help text when null is sent deliberately', async () => {
+    // The other half: "absent means leave alone" must not become "you can never
+    // clear it".
+    const server = await build()
+    const cookie = await givenAdmin()
+    const eventId = await givenEvent()
+    const created = await add(server, cookie, eventId, { ...question, help_text: 'remove me' })
+    const id = created.json().question.id
+
+    await server.inject({
+      method: 'PATCH',
+      url: `/api/admin/questions/${id}`,
+      headers: { cookie },
+      payload: { help_text: null },
+    })
+
+    const [row] = await db().select().from(formQuestion).where(eq(formQuestion.id, id))
+    expect(row).toMatchObject({ help_text: null })
+  })
+
+  it('treats a body with no recognised keys as a no-op rather than a 500', async () => {
+    // Same trap as the event PATCH: `set({})` is not valid SQL, so a typo'd
+    // field name would answer `internal_error`.
+    //
+    // The row is read back, because the status alone does not test the "no-op"
+    // half of the name. `formQuestionFields` gives `help_text` and `options` a
+    // `.default(null)`, suppressed by `.partial()` — if that ever stopped holding,
+    // `parsed.data` would be `{ help_text: null, options: null }` for a `{}` body:
+    // non-empty, so this guard is skipped, `set()` is valid SQL, the response is
+    // still 200, and every PATCH silently wipes the help text.
+    const server = await build()
+    const cookie = await givenAdmin()
+    const eventId = await givenEvent()
+    const created = await add(server, cookie, eventId, {
+      ...question,
+      label: 'Question',
+      help_text: 'kept',
+    })
+    const id = created.json().question.id
 
     for (const payload of [{}, { lable: 'typo' }]) {
       const response = await server.inject({
@@ -310,6 +370,9 @@ describe('editing a question', () => {
       })
 
       expect(response.statusCode, JSON.stringify(payload)).toBe(200)
+
+      const [row] = await db().select().from(formQuestion).where(eq(formQuestion.id, id))
+      expect(row, JSON.stringify(payload)).toMatchObject({ label: 'Question', help_text: 'kept' })
     }
   })
 

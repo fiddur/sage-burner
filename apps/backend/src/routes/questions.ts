@@ -7,7 +7,7 @@ import {
   formQuestionOrderSchema,
   formQuestionUpdateSchema,
 } from '@sage-burner/shared'
-import { asc, eq } from 'drizzle-orm'
+import { asc, desc, eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -73,24 +73,31 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db, sessions }: G
       // guarantee, and a guarantee is cheaper to provide here than to explain
       // away.
       const id = randomUUID()
-      const row: FormQuestion = {
-        ...parsed.data,
-        id,
-        event_id: request.params.eventId,
-        order: 0,
-      }
 
-      db.transaction((tx) => {
-        const rows = tx
+      // Returns the order rather than assigning into a row from inside the
+      // callback. That worked only because `drizzle-orm/node-sqlite` is the
+      // synchronous driver — `db.transaction` returns `T`, not a promise, so the
+      // mutation landed before the reply was built. Nothing said so, and on an
+      // async driver the compiler would not object: the insert would still get the
+      // right order and the 201 body would report `order: 0`.
+      const order = db.transaction((tx) => {
+        const [last] = tx
           .select({ order: formQuestion.order })
           .from(formQuestion)
           .where(eq(formQuestion.event_id, request.params.eventId))
-          .orderBy(asc(formQuestion.order))
+          .orderBy(desc(formQuestion.order))
+          .limit(1)
           .all()
 
-        row.order = rows.at(-1)?.order === undefined ? 0 : (rows.at(-1)?.order ?? 0) + 1
-        tx.insert(formQuestion).values(row).run()
+        const next = last === undefined ? 0 : last.order + 1
+        tx.insert(formQuestion)
+          .values({ ...parsed.data, id, event_id: request.params.eventId, order: next })
+          .run()
+
+        return next
       })
+
+      const row: FormQuestion = { ...parsed.data, id, event_id: request.params.eventId, order }
 
       return reply.code(201).send({ question: row } satisfies FormQuestionResponse)
     },

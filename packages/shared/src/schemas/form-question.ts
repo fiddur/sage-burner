@@ -74,8 +74,22 @@ export type FormQuestionCreate = z.infer<typeof formQuestionCreateSchema>
 /** What a client may send: `help_text` and `options` are optional here. */
 export type FormQuestionCreateInput = z.input<typeof formQuestionCreateSchema>
 
-/** Editing one. `order` is changed by the reorder endpoint, not here. */
-export const formQuestionUpdateSchema = withAgreementRequired(formQuestionFields.partial())
+/**
+ * Editing one. `order` is changed by the reorder endpoint, not here.
+ *
+ * Derived from the plain field list, **not** from `formQuestionFields` — that one
+ * carries `.default(null)` on `help_text` and `options`, and `.partial()` does not
+ * suppress a default in Zod 4. Built from it, `safeParse({ label: 'New' })`
+ * returned `{ label: 'New', help_text: null, options: null }`, so editing a label
+ * silently wiped the help text, and an empty body parsed to a non-empty object
+ * that slipped past the no-op guard and wiped it too.
+ *
+ * Defaults belong on create, where "absent" genuinely means "use this". On a
+ * PATCH, absent means "leave it alone", which is the opposite.
+ */
+export const formQuestionUpdateSchema = withAgreementRequired(
+  formQuestionSchema.omit({ id: true, event_id: true, order: true }).partial(),
+)
 export type FormQuestionUpdate = z.infer<typeof formQuestionUpdateSchema>
 
 /**

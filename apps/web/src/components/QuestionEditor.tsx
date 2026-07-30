@@ -1,6 +1,6 @@
 import type { FormQuestion, FormQuestionType } from '@sage-burner/shared'
 
-import { isFormQuestionType } from '@sage-burner/shared'
+import { formQuestionTypes, isFormQuestionType } from '@sage-burner/shared'
 import { useEffect, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -17,12 +17,20 @@ type Loaded =
   | { status: 'ready'; questions: readonly FormQuestion[] }
   | { status: 'failed'; message: string }
 
-const TYPES: { value: FormQuestionType; label: string }[] = [
-  { value: 'text', label: 'Short text' },
-  { value: 'textarea', label: 'Long text' },
-  { value: 'checkbox', label: 'Checkbox' },
-  { value: 'agreement', label: 'Agreement (must be ticked)' },
-]
+/**
+ * Built from `formQuestionTypes` through a total `Record`, so adding a fifth type
+ * to the vocabulary is a type error here rather than a silent omission from both
+ * selects — which is what made the "`formQuestionTypes` is where a fifth type
+ * will be added" note below true rather than aspirational.
+ */
+const TYPE_LABELS: Record<FormQuestionType, string> = {
+  text: 'Short text',
+  textarea: 'Long text',
+  checkbox: 'Checkbox',
+  agreement: 'Agreement (must be ticked)',
+}
+
+const TYPES = formQuestionTypes.map((value) => ({ value, label: TYPE_LABELS[value] }))
 
 const BLANK = { label: '', type: 'textarea' as FormQuestionType, help_text: '', required: true }
 
@@ -182,7 +190,7 @@ export const QuestionEditor = ({ api, eventId }: { api: QuestionsApi; eventId: s
               <>
                 <span class="question-label">{row.label}</span>{' '}
                 <span class="form-note">
-                  {TYPES.find((entry) => entry.value === row.type)?.label ?? row.type}
+                  {TYPE_LABELS[row.type]}
                   {row.required ? ' · required' : ''}
                 </span>
                 <button

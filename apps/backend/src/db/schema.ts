@@ -108,6 +108,16 @@ export const formQuestion = sqliteTable(
     check('form_question_order_check', sql`${table.order} >= 0`),
     // SQLite has no boolean type, so without this the column accepts 7.
     check('form_question_required_check', sql`${table.required} in (0, 1)`),
+    // An `agreement` question is required by definition — the type exists because
+    // submission is blocked when it is unticked. The API refuses the combination,
+    // but `required` also has `.default(false)`, so an insert that simply omits it
+    // — a migration, a manual fix, a backfill — would produce exactly the row the
+    // API exists to prevent. Same argument as `oneOf` above: the constraint is for
+    // writes that do not come through the API, so it has to hold on its own.
+    check(
+      'form_question_agreement_required_check',
+      sql`${table.type} <> 'agreement' or ${table.required} = 1`,
+    ),
   ],
 )
 
