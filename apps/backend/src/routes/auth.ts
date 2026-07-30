@@ -23,9 +23,17 @@ export const SESSION_COOKIE = 'sage_session'
  *   which is most of CSRF for free. Not `Strict`, which would drop the cookie
  *   when a member follows an invite link out of Discord and lands signed-out on
  *   a page they are signed in to.
- * - `Secure` whenever `NODE_ENV` is `production` — which the image sets, so
- *   **every containerised deployment gets it**, including `docker compose up`.
- *   The environment without it is `pnpm dev`.
+ * - `Secure` whenever `config.secure_cookies` — production, *or* bound beyond
+ *   loopback. The image is both, so every containerised deployment gets it; the
+ *   environment without it is `pnpm dev` on loopback.
+ *
+ *   Keyed off the same predicate as the `SESSION_SECRET` guard rather than off
+ *   `NODE_ENV`, because `NODE_ENV` cannot answer "is this reachable" — it
+ *   defaults to `development` when unset. Before that, a hand-rolled
+ *   `SESSION_SECRET=… HOST=0.0.0.0 node src/server.ts` bound every interface and
+ *   issued the cookie *without* `Secure`; behind a proxy that also answers on
+ *   `:80` the browser then sends it in cleartext, and the token is the session
+ *   with no server-side revocation.
  *
  *   Consequence worth knowing rather than working around: over plain HTTP on a
  *   non-`localhost` origin, the browser silently discards the cookie. The login
@@ -45,7 +53,7 @@ const cookieHeader = (token: string, config: Config, maxAgeSeconds: number): str
     'Path=/',
     `Max-Age=${maxAgeSeconds}`,
   ]
-  if (config.node_env === 'production') parts.push('Secure')
+  if (config.secure_cookies) parts.push('Secure')
   return parts.join('; ')
 }
 

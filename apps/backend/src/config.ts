@@ -147,6 +147,16 @@ export interface Config {
   node_env: 'development' | 'test' | 'production'
   session_secret: string
   session_ttl_seconds: number
+  /**
+   * Whether the session cookie gets `Secure`.
+   *
+   * Decided here rather than at the cookie, so the policy has one home and the
+   * cookie does not re-derive it from `NODE_ENV` — which is the mistake this
+   * file spends a paragraph explaining, since `NODE_ENV` defaults to
+   * `development` when unset. Same predicate as the `SESSION_SECRET` guard:
+   * production, or reachable beyond loopback.
+   */
+  secure_cookies: boolean
   port: number
   host: string
   database_url: string
@@ -218,6 +228,7 @@ export const createConfig = (env: NodeJS.ProcessEnv = process.env): Config => {
     node_env: value.NODE_ENV,
     session_secret,
     session_ttl_seconds: value.SESSION_TTL_SECONDS,
+    secure_cookies: value.NODE_ENV === 'production' || !isLoopbackHost(value.HOST),
     port: value.PORT,
     host: value.HOST,
     database_url: value.DATABASE_URL,

@@ -42,6 +42,7 @@ describe('createConfig', () => {
       trust_proxy: false,
       session_secret: 'x'.repeat(40),
       session_ttl_seconds: 3600,
+      secure_cookies: true,
     })
   })
 
@@ -103,6 +104,26 @@ describe('createConfig', () => {
       // Two conditions decide this, and an operator who reads only "required in
       // production" while running development will not look at HOST.
       expect(() => createConfig({ HOST: '0.0.0.0' })).toThrow(/NODE_ENV=development.*HOST=0\.0\.0\.0/s)
+    })
+
+    it('marks cookies Secure whenever the app is reachable beyond loopback', () => {
+      // Keyed off the same predicate as the secret guard, not off NODE_ENV.
+      // Before that, `SESSION_SECRET=… HOST=0.0.0.0 node src/server.ts` bound
+      // every interface and issued the cookie without Secure — and behind a
+      // proxy that also answers on :80 the browser sends it in cleartext.
+      const secret = { SESSION_SECRET: 's'.repeat(40) }
+
+      expect(createConfig({ ...secret, HOST: '0.0.0.0' }).secure_cookies).toBe(true)
+      expect(createConfig({ ...secret, HOST: '192.168.1.10' }).secure_cookies).toBe(true)
+      expect(createConfig({ NODE_ENV: 'production', ...secret, HOST: '127.0.0.1' }).secure_cookies).toBe(true)
+    })
+
+    it('leaves cookies unmarked only on loopback outside production', () => {
+      // Otherwise login silently fails on plain-HTTP `pnpm dev`: the browser
+      // discards a Secure cookie, the 200 says signed in, the next load says not.
+      for (const host of ['127.0.0.1', 'localhost', '::1']) {
+        expect(createConfig({ HOST: host }).secure_cookies, host).toBe(false)
+      }
     })
 
     it('defaults the session lifetime to two weeks', () => {

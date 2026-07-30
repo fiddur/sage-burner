@@ -126,6 +126,22 @@ describe('POST /api/auth/login', () => {
     expect(cookie).toContain('Path=/')
   })
 
+  it('gives the cookie the configured lifetime', async () => {
+    // `SESSION_TTL_SECONDS` reaches a browser here and nowhere else, and nothing
+    // asserted it: changing the login path to `cookieHeader(…, 0)` passed the
+    // whole file, because the two round-trip tests re-inject the header by hand
+    // and the only Max-Age assertion was logout's, which pins 0.
+    //
+    // The member-visible symptom would be signing in and being signed out on the
+    // next page load.
+    const server = await build({ SESSION_TTL_SECONDS: '3600' })
+    await givenAccount(server, { email: 'ada@example.org', password: 'a good long passphrase' })
+
+    const cookie = cookieFrom(await login(server, 'ada@example.org', 'a good long passphrase'))
+
+    expect(cookie).toContain('Max-Age=3600')
+  })
+
   it('omits Secure outside production, which is `pnpm dev` and not compose', async () => {
     // Named carefully: the image sets NODE_ENV=production, so a containerised
     // deployment — including `docker compose up` — *does* get Secure. The
