@@ -105,8 +105,12 @@ export type EventCreateInput = z.input<typeof eventCreateSchema>
  * the 400. A read-then-check would leave a window where two organisers each
  * moving one date both validate against the pre-update row, and the second write
  * reaches `event_date_order_check` as a 500 — the outcome the check exists to
- * avoid. The both-dates case is settled here and in the handler directly, since
- * the body determines the ordering with nothing to race against.
+ * avoid. The both-dates case never reaches the handler at all: the refine below
+ * rejects it, so `safeParse` answers 400 — which is why the handler carries no
+ * check for it. Relaxing this refine would therefore not merely loosen
+ * validation, it would let an out-of-order pair through to the database CHECK;
+ * `reject a patch with both dates in the wrong order` in `events.test.ts` is what
+ * notices.
  */
 export const eventUpdateSchema = withEventDateOrder(
   eventFields.omit({ id: true, created_at: true }).partial().strict(),

@@ -148,23 +148,13 @@ export const registerEventRoutes = (
 
       const merged = { ...existing, ...parsed.data }
 
-      // Only when *both* dates are given. The body settles the ordering on its
-      // own then, so there is nothing to race with and no reason to involve the
-      // statement.
+      // No both-dates check here. `withEventDateOrder` already rejects a body
+      // carrying both dates in the wrong order, so `safeParse` above answers 400
+      // and this handler never sees one — a guard for it would be unreachable,
+      // which is the same dead-code shape as the `requireSignedIn` this branch
+      // removes. `reject a patch with both dates in the wrong order` covers that
+      // path at the schema, where it actually lives.
       //
-      // Deliberately not `merged.end_date < merged.start_date`, which is what
-      // this was: that runs for a one-sided patch too, comparing the submitted
-      // date against the row as it was *read* — the read-then-check the block
-      // below exists to replace. It answered correctly in every non-racing case,
-      // which is worse than being wrong: it pre-empted the statement-level
-      // decision so completely that replacing `dateOrderCondition` with
-      // `() => undefined` passed the whole suite. The race fix was unreachable
-      // from a test.
-      const { start_date, end_date } = parsed.data
-      if (start_date !== undefined && end_date !== undefined && end_date < start_date) {
-        return reply.code(400).send(errorResponse('bad_request'))
-      }
-
       // One date given: the condition goes in the `where`, so it is evaluated
       // against the row as it is at write time. See `dateOrderCondition`.
       const ordered = dateOrderCondition(parsed.data)

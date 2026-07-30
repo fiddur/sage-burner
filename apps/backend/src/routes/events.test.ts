@@ -319,6 +319,22 @@ describe('admin event routes', () => {
     expect(response.json()).toEqual({ error: 'bad_request' })
   })
 
+  it('rejects a patch with both dates in the wrong order', async () => {
+    // Rejected by `withEventDateOrder` before the handler sees it, which is why
+    // the handler carries no both-dates check. Nothing covered this on the update
+    // path before — only on POST — so relaxing that refine would have gone
+    // unnoticed until an out-of-order pair reached the database CHECK.
+    const server = await build()
+    const cookie = await givenAdmin()
+    const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
+
+    const response = await patch(server, cookie, id, { start_date: '2026-09-01', end_date: '2026-08-20' })
+
+    expect(response.statusCode).toBe(400)
+    const [row] = await db().select().from(event)
+    expect(row).toMatchObject({ start_date: '2026-08-01', end_date: '2026-08-05' })
+  })
+
   it('still rejects a one-sided date move, now decided inside the statement', async () => {
     // The condition rides in the UPDATE's `where`, so a concurrent change to the
     // other date cannot slip between a read and a write and turn this into a 500
