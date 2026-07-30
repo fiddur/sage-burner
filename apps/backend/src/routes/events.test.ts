@@ -318,6 +318,26 @@ describe('admin event routes', () => {
     expect(response.json()).toEqual({ error: 'not_found' })
   })
 
+  it('rejects a whole event object patched back, the round-trip the README warns about', async () => {
+    // The documented contract — "reading an event, editing the object and sending
+    // the whole thing back is a 400 on `id` and `created_at`" — rests on two
+    // independent facts: `.strict()`, and `id`/`created_at` being omitted from the
+    // update schema. Either one changing alone breaks the promise, and the
+    // `welcome` test covers `.strict()` for a different key for a different reason.
+    const server = await build()
+    const cookie = await givenAdmin()
+    const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
+    const [whole] = await db().select().from(event)
+    if (whole === undefined) throw new Error('fixture missing')
+
+    const response = await patch(server, cookie, id, { ...whole, name: 'Renamed' })
+
+    expect(response.statusCode).toBe(400)
+    expect(response.json()).toEqual({ error: 'bad_request' })
+    const [row] = await db().select().from(event)
+    expect(row).toMatchObject({ name: 'summer-2026' })
+  })
+
   it('rejects an unrecognised key instead of answering "saved"', async () => {
     // `welcome` for `welcome_markdown` is a plausible typo against a partial
     // endpoint. A non-strict schema stripped it, the body became `{}`, and the
