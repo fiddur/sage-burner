@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 
+import { eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it } from 'vitest'
 
@@ -404,6 +405,44 @@ describe('admin event routes', () => {
     expect(response.statusCode).toBe(200)
     const [row] = await db().select().from(event)
     expect(row).toMatchObject({ start_date: '2026-08-01', end_date: '2026-08-09' })
+  })
+
+  it('answers 404 when the row vanishes between the read and the write', async () => {
+    // The other cause of zero matched rows, and the reason the two are told apart:
+    // with no date in the body there is no ordering condition in the `WHERE`, so
+    // zero rows can only mean the row is gone — and 400 would blame the organiser's
+    // body for something it did not do.
+    //
+    // The interleaving is forced rather than raced: the handler's first `select`
+    // is answered with a row that is no longer in the database, which is exactly
+    // what a concurrent delete looks like from inside the handler.
+    const server = await build()
+    const cookie = await givenAdmin()
+    const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
+    const [ghost] = await db().select().from(event)
+    await db().delete(event).where(eq(event.id, id))
+
+    // The *second* select, not the first: `requireAdmin` runs before the handler
+    // and `viewerFor` spends one on the account/roles join. If that ever changes,
+    // this stub lands on the guard's query instead and the request 500s — a loud
+    // failure rather than a test quietly passing for the wrong reason.
+    const live = db()
+    const original = live.select.bind(live)
+    let calls = 0
+    live.select = ((...args: Parameters<typeof original>) => {
+      calls += 1
+      if (calls !== 2) return original(...args)
+      // A minimal stand-in for the query builder: the handler only awaits it.
+      return { from: () => ({ where: () => ({ limit: () => Promise.resolve([ghost]) }) }) }
+    }) as typeof live.select
+
+    const response = await patch(server, cookie, id, { welcome_markdown: 'anything' })
+
+    expect(response.statusCode).toBe(404)
+    expect(response.json()).toEqual({ error: 'not_found' })
+    // The stub was consulted, so the 404 came from the vanished-row branch rather
+    // than from the earlier existence check.
+    expect(calls).toBeGreaterThanOrEqual(2)
   })
 
   it("answers 409 when a patch takes another event's slug", async () => {

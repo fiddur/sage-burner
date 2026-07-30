@@ -628,6 +628,23 @@ the same renderer, so what it shows is what a visitor gets.
 A slug collision answers **409** rather than a generic failure — the slug appears
 in URLs, so it is something the organiser fixes by choosing another.
 
+Three more things the write routes do, for anyone writing a second client:
+
+- **An unrecognised key is a 400**, on create and update alike. A body is not
+  filtered down to what the schema knows: `welcome` instead of `welcome_markdown`
+  is refused rather than silently dropped, which on create would have produced an
+  event whose welcome text was quietly empty and on update a "saved" that saved
+  nothing.
+- **A PATCH names only what it changes.** Reading an event, editing the object and
+  sending the whole thing back is therefore a 400 on `id` and `created_at`.
+- **A date move that would invert the range answers 400**, not a 500 from the
+  database. That holds for a body carrying one date as well as two — the check for
+  a one-sided move rides in the `UPDATE` itself, so a second organiser moving the
+  other date concurrently cannot slip between a read and a write.
+
+A row that disappears between the read and the write answers **404**, the same as
+one that was already gone — the body was not the problem.
+
 ### Markdown is escaped, not filtered
 
 `welcome_markdown` is admin-authored and rendered to every public visitor, so it

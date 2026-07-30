@@ -172,9 +172,16 @@ export const registerEventRoutes = (
 
       if (result === undefined) return reply.code(409).send(errorResponse('conflict'))
 
-      // Zero rows means the ordering condition failed: the id matched, since the
-      // row was read a moment ago. The only other way here is the row being
-      // deleted concurrently, and 400 is a defensible answer to that too.
+      // Zero rows has two causes, and they get different answers.
+      //
+      // With `ordered` set, the ordering condition is in the `WHERE`, so it is
+      // overwhelmingly the one that failed: 400.
+      //
+      // With `ordered === undefined` — no dates in the body, or both — there is no
+      // condition beyond the id, so zero rows can *only* mean the row was deleted
+      // between the SELECT and the UPDATE. 400 would tell an organiser their body
+      // was wrong when it was not, and would contradict the 404 this same handler
+      // returns three lines up for a row that was already gone.
       //
       // `Number(...)` because `node:sqlite` types `changes` as `number | bigint`,
       // and `0n === 0` is false — so a strict comparison would silently never
@@ -191,7 +198,11 @@ export const registerEventRoutes = (
       //
       // Both names are on one line each on purpose — a name wrapped across two
       // comment lines cannot be grepped, which is the only reason to quote it.
-      if (Number(result.changes) === 0) return reply.code(400).send(errorResponse('bad_request'))
+      if (Number(result.changes) === 0) {
+        return ordered === undefined
+          ? reply.code(404).send(errorResponse('not_found'))
+          : reply.code(400).send(errorResponse('bad_request'))
+      }
 
       return { event: merged } satisfies EventResponse
     },
