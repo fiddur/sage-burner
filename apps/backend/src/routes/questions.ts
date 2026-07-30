@@ -63,19 +63,34 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db, sessions }: G
       // constraint error and answer 500, where "no such event" is a 404.
       if (found === undefined) return reply.code(404).send(errorResponse('not_found'))
 
-      // New questions go last. `order` is the server's to assign — two
-      // organisers adding at once would otherwise collide over a number neither
-      // of them chose.
-      const existing = await questionsFor(db, request.params.eventId)
-      const last = existing.at(-1)
-
+      // New questions go last, and `order` is the server's to assign.
+      //
+      // Read and insert in one transaction, because otherwise the claim is not
+      // true: two requests can observe the same `last` between separate awaits
+      // and insert the same `order`. The list stays deterministic either way —
+      // `orderBy(asc(order), asc(id))` breaks the tie, and any later reorder
+      // renumbers to 0..n-1 — so the symptom is mild. But the comment claimed a
+      // guarantee, and a guarantee is cheaper to provide here than to explain
+      // away.
+      const id = randomUUID()
       const row: FormQuestion = {
         ...parsed.data,
-        id: randomUUID(),
+        id,
         event_id: request.params.eventId,
-        order: last === undefined ? 0 : last.order + 1,
+        order: 0,
       }
-      await db.insert(formQuestion).values(row)
+
+      db.transaction((tx) => {
+        const rows = tx
+          .select({ order: formQuestion.order })
+          .from(formQuestion)
+          .where(eq(formQuestion.event_id, request.params.eventId))
+          .orderBy(asc(formQuestion.order))
+          .all()
+
+        row.order = rows.at(-1)?.order === undefined ? 0 : (rows.at(-1)?.order ?? 0) + 1
+        tx.insert(formQuestion).values(row).run()
+      })
 
       return reply.code(201).send({ question: row } satisfies FormQuestionResponse)
     },

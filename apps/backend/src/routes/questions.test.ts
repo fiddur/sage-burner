@@ -380,15 +380,17 @@ describe('reordering questions', () => {
     const [a, b, c] = await threeQuestions(server, cookie, summer)
     const foreign = await add(server, cookie, winter, { ...question, label: 'Winter' })
 
-    const response = await reorder(server, cookie, summer, [
-      foreign.json().question.id,
-      a ?? '',
-      b ?? '',
-      c ?? '',
-    ])
+    // Substituted for one of summer's own ids, not appended: with four ids
+    // against three questions the length check answers first and the ownership
+    // condition is never reached — deleting it from the route would leave this
+    // test green.
+    const response = await reorder(server, cookie, summer, [foreign.json().question.id, a ?? '', b ?? ''])
 
     expect(response.statusCode).toBe(400)
     expect(labelsOf(await publicList(server, winter))).toEqual(['Winter'])
+    // And summer's own order is untouched, so the refusal was total.
+    expect(labelsOf(await publicList(server, summer))).toEqual(['A', 'B', 'C'])
+    expect(c ?? '').toBeTruthy()
   })
 
   it('refuses an anonymous caller', async () => {

@@ -178,6 +178,46 @@ describe('QuestionEditor', () => {
     })
   })
 
+  it('re-reads after a failure so the editor can recover', async () => {
+    // The dead end this closes: another organiser adds a question, this list is
+    // stale, every reorder rebuilds the same short id list and the API answers
+    // 400 forever. Without a re-read the only way out was reloading the page,
+    // and the message did not say so.
+    const getQuestions = vi.fn(() => Promise.resolve({ questions: [q('a', 'Only', 0), q('b', 'Two', 1)] }))
+    renderEditor(
+      stub({
+        getQuestions,
+        reorderQuestions: () => Promise.reject(apiError(400, 'bad_request', 'Request failed (400).')),
+      }),
+    )
+    await screen.findByText('Only')
+
+    screen.getByRole('button', { name: 'Move "Only" down' }).click()
+
+    await waitFor(() => {
+      expect(getQuestions).toHaveBeenCalledTimes(2)
+    })
+    expect(screen.getByRole('alert')).toBeTruthy()
+  })
+
+  it('will not save a question with an empty label', async () => {
+    // `QuestionFields` is a div, not a form, and Save is type="button", so there
+    // is no constraint validation — without this the request goes out, the shared
+    // schema rejects it, and the organiser reads an unmapped "Request failed
+    // (400)". The add form below blocks the same input in the browser.
+    const updateQuestion = vi.fn(() => Promise.resolve({ question: q('a', 'x', 0) }))
+    renderEditor(
+      stub({ getQuestions: () => Promise.resolve({ questions: [q('a', 'Original', 0)] }), updateQuestion }),
+    )
+    await screen.findByText('Original')
+
+    screen.getByRole('button', { name: 'Edit' }).click()
+    fireEvent.input(await screen.findByLabelText('Label'), { target: { value: '   ' } })
+
+    expect(screen.getByRole('button', { name: 'Save question' }).hasAttribute('disabled')).toBe(true)
+    expect(updateQuestion).not.toHaveBeenCalled()
+  })
+
   it('surfaces a failure instead of pretending the change took', async () => {
     renderEditor(
       stub({

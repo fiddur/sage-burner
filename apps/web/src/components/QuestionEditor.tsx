@@ -92,6 +92,12 @@ export const QuestionEditor = ({ api, eventId }: { api: QuestionsApi; eventId: s
       await refresh()
     } catch (failure) {
       setError(messageFor(failure, fallback))
+      // Re-read on failure too, or the one error the API deliberately produces
+      // becomes a dead end: another organiser adds a question, this list is now
+      // stale, every ↑/↓ rebuilds the same short id list, and `sameSet` answers
+      // 400 forever. Reloading the page was the only way out, and the message
+      // did not say so. One request on an error path buys recovery.
+      await refresh().catch(() => undefined)
     } finally {
       setBusy(false)
     }
@@ -289,8 +295,14 @@ const QuestionFields = ({
     <div class="question-edit">
       <label class="field">
         <span>Label</span>
+        {/*
+          No `required`: this is a `<div>`, not a `<form>`, and Save is a
+          `type="button"`, so there is no constraint validation to run — the
+          attribute would look like a guard while doing nothing. The disabled
+          button below is the actual guard, and it makes this path behave like
+          the add form, which is a real form and blocks the same input.
+        */}
         <input
-          required
           maxLength={500}
           value={label}
           onInput={(inputEvent) => setLabel(inputEvent.currentTarget.value)}
@@ -331,7 +343,7 @@ const QuestionFields = ({
 
       <button
         type="button"
-        disabled={busy}
+        disabled={busy || label.trim() === ''}
         onClick={() => onSave({ label, type, help_text: helpText.trim() === '' ? null : helpText, required })}
       >
         Save question
