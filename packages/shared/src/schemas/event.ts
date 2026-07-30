@@ -64,9 +64,14 @@ export type Event = z.infer<typeof eventSchema>
  * text before the event can exist.
  */
 export const eventCreateSchema = withEventDateOrder(
-  eventFields.omit({ id: true, created_at: true }).extend({
-    welcome_markdown: eventFields.shape.welcome_markdown.default(''),
-  }),
+  eventFields
+    .omit({ id: true, created_at: true })
+    .extend({ welcome_markdown: eventFields.shape.welcome_markdown.default('') })
+    // `.strict()` for the same reason as the update schema, and so the two do not
+    // differ for no stated reason: a stripped `welcome` for `welcome_markdown`
+    // would otherwise 201 an event whose welcome text is silently the `.default('')`
+    // rather than what was typed.
+    .strict(),
 )
 export type EventCreate = z.infer<typeof eventCreateSchema>
 
@@ -84,15 +89,38 @@ export type EventCreateInput = z.input<typeof eventCreateSchema>
  * than the dates, and a PATCH that had to restate the whole event would make
  * two organisers editing different fields overwrite each other.
  *
+ * `.strict()` narrows the contract as well as catching typos: a client that
+ * reads an event, edits the object and PATCHes the whole thing back now gets a
+ * 400 on `id` and `created_at`. That is intended — a PATCH body should name what
+ * it changes — and no client does it today, but it is a request-shape change and
+ * not only a typo guard.
+ *
+ * So an unrecognised key is a 400 rather than a silent success. A
+ * partial schema strips unknown keys, so `{"welcome": "…"}` — a plausible typo
+ * for `welcome_markdown` — parsed to `{}` and the handler answered 200 with the
+ * row unchanged, which the editor rendered as "Saved." while nothing had been
+ * written. `{}` itself stays a legitimate no-op.
+ *
  * Still wrapped in `withEventDateOrder`, which tolerates a partial range: it
  * only rejects when both dates are present and out of order. A PATCH moving
  * *one* date past the other therefore passes here, so the handler has to catch
- * it — `PATCH /api/admin/events/:id` in `apps/backend/src/routes/events.ts`
- * re-reads the row and validates the *merged* range. Without that it would
- * reach the database CHECK and surface as a 500 rather than a 400.
+ * it — and it does so **inside the UPDATE**, not by re-reading first:
+ * `PATCH /api/admin/events/:id` in `apps/backend/src/routes/events.ts` puts the
+ * ordering condition in the statement's `where`, so it is evaluated against the
+ * row at write time. Zero matched rows is then resolved by re-reading: **404** if
+ * the row is gone, 400 only if it is still there and the condition is what failed.
+ * A read-then-check would leave a window where two organisers each
+ * moving one date both validate against the pre-update row, and the second write
+ * reaches `event_date_order_check` as a 500 — the outcome the check exists to
+ * avoid. The both-dates case never reaches the handler at all: the refine below
+ * rejects it, so `safeParse` answers 400 — which is why the handler carries no
+ * check for it. Relaxing this refine would therefore not merely loosen
+ * validation, it would let an out-of-order pair through to the database CHECK;
+ * `rejects a patch with both dates in the wrong order` in `events.test.ts` is what
+ * notices.
  */
 export const eventUpdateSchema = withEventDateOrder(
-  eventFields.omit({ id: true, created_at: true }).partial(),
+  eventFields.omit({ id: true, created_at: true }).partial().strict(),
 )
 export type EventUpdate = z.infer<typeof eventUpdateSchema>
 

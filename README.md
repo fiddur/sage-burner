@@ -628,32 +628,59 @@ the same renderer, so what it shows is what a visitor gets.
 A slug collision answers **409** rather than a generic failure — the slug appears
 in URLs, so it is something the organiser fixes by choosing another.
 
+Four more things the write routes do, for anyone writing a second client:
+
+- **An unrecognised key is a 400**, on create and update alike. A body is not
+  filtered down to what the schema knows: `welcome` instead of `welcome_markdown`
+  is refused rather than silently dropped, which on create would have produced an
+  event whose welcome text was quietly empty and on update a "saved" that saved
+  nothing.
+- **An empty PATCH body (`{}`) is a 200** for an event that exists, returning it
+  unchanged, and a **404** for one that does not. It is a no-op rather than an
+  error, and it is the only body that reads instead of writing.
+- **A PATCH names only what it changes.** Reading an event, editing the object and
+  sending the whole thing back is therefore a 400 on `id` and `created_at`.
+- **A date move that would invert the range answers 400**, not a 500 from the
+  database. That holds for a body carrying one date as well as two — the check for
+  a one-sided move rides in the `UPDATE` itself, so a second organiser moving the
+  other date concurrently cannot slip between a read and a write.
+
+A PATCH responds with the event **as written**, not with the body merged onto what
+was read a moment earlier — so if another organiser's change landed in between, the
+response reflects it rather than reporting a value nobody stored.
+
+A row that disappears before the `UPDATE` reaches it answers **404**, the same as
+one that was already gone — the body was not the problem, whatever it contained. The
+two causes of a failed write are told apart by re-reading the row afterwards rather
+than inferred from the request, so a well-ordered date move against an event someone
+else has just deleted does not come back as "check the dates".
+
 ### The application form's questions
 
-`form_question` rows, never code. Organisers retune the questions between every
-burn, so adding, editing, reordering or removing one must never need a redeploy
-— and the web app renders whatever it is handed rather than knowing the
-questions.
+`form_question` rows, never code — and **one central set**, not one per burn.
+Someone applies to join the community once, the way they would be let into the
+Discord server; attending a particular burn is a separate act afterwards (#76).
+Organisers retune the questions between burns, so adding, editing, reordering or
+removing one must never need a redeploy, and the web app renders whatever it is
+handed rather than knowing the questions.
 
-Organise → **Events and welcome text** → edit an event → **Application
-questions**. Types in v1: short text, long text, checkbox, and _agreement_ — a
-checkbox that must be ticked to submit.
+Organise → **Application questions**. Types in v1: short text, long text,
+checkbox, and _agreement_ — a checkbox that must be ticked to submit.
 
 Two rules that are the server's, not the browser's:
 
 - **`order` is assigned by the server.** A new question goes last; a client
   cannot pick a position. Two organisers adding at once would otherwise collide
-  over a number neither of them chose.
+  over a number neither of them chose, so the read and the insert run in one
+  transaction.
 - **Reordering sends the complete list of ids**, in the order wanted, and a
   partial list is rejected with 400. Moving one question renumbers several, so a
-  request that names only some of them would leave the rest on stale positions —
-  an order nobody chose. The renumbering runs in a transaction for the same
-  reason. An id belonging to another event is refused too, since it would
-  silently move a question off a form it belongs to.
+  request naming only some of them would leave the rest on stale positions — an
+  order nobody chose. The renumbering runs in a transaction for the same reason.
 
-`GET /api/events/:id/questions` is public — the application form is public, so
-its questions are — and `no-cache`, so a question added a moment ago is not
-hidden behind a stale response. Every write is admin-only.
+`GET /api/questions` is public — the application form is public, so its questions
+are — and `no-cache`, so a question added a moment ago is not hidden behind a
+stale response. Every write is admin-only.
 
 **`required` is decided by the type for the two tick-box kinds, not chosen.**
 
@@ -667,17 +694,15 @@ hidden behind a stale response. Every write is admin-only.
 
 The API rejects both combinations, on create and on any PATCH that would produce
 one — including a PATCH naming only `type` or only `required`, which the schema
-alone cannot decide, so the handler applies the rule to the merged row.
+alone cannot decide, so the rule rides in the `UPDATE` statement itself.
 `db/schema.ts` carries a CHECK for each, because `required` has `.default(false)`
 and an insert that omits it never touches a Zod schema. The editor disables the
 control with a note rather than letting a tick become a 400.
 
 All four places read the rule from one function, `tickBoxRequired`, rather than
 restating it: written out separately, the handler covered `agreement` and not
-`checkbox` within an hour, and the gap surfaced as a 500 from the CHECK instead of
-a 400.
-Settled now, while there are no rows: whichever half of such a row you believed
-later would be a guess.
+`checkbox` within an hour, and the gap surfaced as a 500 from the CHECK instead
+of a 400.
 
 `options` exists as a JSON column for future select/radio types and is not yet
 consumed by any type. Both it and `help_text` are optional in a create body —

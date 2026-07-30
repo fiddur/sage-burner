@@ -73,6 +73,39 @@ have no third client and no public API contract to publish.
 - The backend should be well covered.
 - Always run tests non-watch (`pnpm test`, `pnpm check`) so no process hangs.
 
+### Claims must be executed, not reasoned about
+
+Roughly seventy review threads across #73 and #74 were one failure repeating:
+**behaviour changes, and its description somewhere else goes one step stale.**
+These are the habits that would have caught nearly all of them.
+
+- **Never write a claim you have not run.** Any "this catches X", "without this,
+  Y", or "the failure mode is Z" gets the mutation applied and the suite run
+  _before_ the sentence is written. This caught a test that passed against the
+  very implementation it existed to reject, and stopped an overstated claim about
+  what a boundary test covers. A failure mode described from memory has been
+  wrong more often than right here — including twice in the same direction.
+- **A rejecting test needs a passing sibling.** Two real defects hid behind this:
+  the `start_date` branch and the both-dates branch of `dateOrderCondition` each
+  had a test proving refusal and none proving success. Refusal cases are easier
+  to think of, so the success path is where the gap lands.
+- **After changing behaviour, grep for its own vocabulary** — the function names,
+  status codes and terms the old design used. Prose at a distance does not fail
+  to compile, and a comment naming the wrong thing is worse than none because the
+  next reader trusts it. This turned up a second stale reference twice.
+- **Prefer deleting the thing that needs syncing over syncing it.** Every durable
+  fix in those PRs was this shape: one `tickBoxRequired` replacing the same rule
+  written out in four places; `.returning()` removing the `changes` coupling and
+  the three comments describing it; scoping a pre-read removing a stub duplicated
+  across three tests. If a comment has to keep being corrected, the code is
+  telling you something.
+- **Comments must not reference branch state.** "this branch", "two commits ago",
+  or a symbol the PR deletes all dangle after the squash merge. Write what is true
+  of the merged tree.
+- **Gate the push on `pnpm check`, not on an `echo` beside it.** Two commits went
+  out red from exactly that shell mistake:
+  `if pnpm check >/dev/null 2>&1; then git push …; else echo "refusing"; fi`.
+
 ## Security expectations
 
 These are member records, so treat them as such:

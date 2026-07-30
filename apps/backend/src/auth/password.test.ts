@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
+import type { ScryptParams } from './password.ts'
+
 import { defaultScryptParams, hashPassword, needsRehash, verifyPassword } from './password.ts'
 
 /**
@@ -141,6 +143,32 @@ describe('reporting a broken setup', () => {
   })
 })
 
+/**
+ * A hash string whose *recorded* parameters are `params`, without doing the work.
+ *
+ * `needsRehash` only reads the parameters out of the string — the salt and key
+ * are irrelevant to it — so the cases below do not need a real hash at those
+ * settings. They used to call `hashPassword` at N=2^17, which is ~2x the 230ms
+ * production figure and 128 MiB, twice, in a suite that otherwise deliberately
+ * keeps to cheap parameters.
+ *
+ * The substitution is asserted rather than assumed — but for the error message,
+ * not to turn a pass into a failure. A silent no-op leaves `stored` recording
+ * `fast`, and `needsRehash(stored, defaultScryptParams)` is *true* there (nothing
+ * stronger on any axis, cost and parallelism both lower) while both call sites
+ * assert false — so it already fails loudly. Checked: removing this line fails
+ * both tests. What the check buys is one clear error naming the format instead of
+ * two puzzling assertion failures.
+ */
+const recordedAt = async (params: ScryptParams) => {
+  const stored = await hashPassword('x', fast)
+  const from = `n=${fast.cost},r=${fast.blockSize},p=${fast.parallelism}`
+  const to = `n=${params.cost},r=${params.blockSize},p=${params.parallelism}`
+  if (!stored.includes(from)) throw new Error(`hash format changed: ${stored}`)
+
+  return stored.replace(from, to)
+}
+
 describe('needsRehash', () => {
   it('is false for a hash made with the current parameters', async () => {
     const stored = await hashPassword('x', fast)
@@ -159,8 +187,7 @@ describe('needsRehash', () => {
     // `defaultScryptParams` was measured against. It has p=1 against our p=2, so
     // a field-wise `<` called it stale — and the login path would have rewritten
     // N=2^17 down to N=2^16, halving memory-hardness on a *successful* login.
-    const strongerRung = { cost: 2 ** 17, blockSize: 8, parallelism: 1 }
-    const stored = await hashPassword('x', strongerRung)
+    const stored = await recordedAt({ cost: 2 ** 17, blockSize: 8, parallelism: 1 })
 
     expect(needsRehash(stored, defaultScryptParams)).toBe(false)
   })
@@ -168,8 +195,7 @@ describe('needsRehash', () => {
   it('leaves a hash alone when one axis is higher and another lower', async () => {
     // Deliberately conservative rather than clever: a mixed comparison is not a
     // work comparison, so it is left as it is instead of guessed about.
-    const mixed = { cost: 2 ** 17, blockSize: 4, parallelism: 2 }
-    const stored = await hashPassword('x', mixed)
+    const stored = await recordedAt({ cost: 2 ** 17, blockSize: 4, parallelism: 2 })
 
     expect(needsRehash(stored, defaultScryptParams)).toBe(false)
   })
