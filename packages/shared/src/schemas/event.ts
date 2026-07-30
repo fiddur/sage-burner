@@ -64,9 +64,14 @@ export type Event = z.infer<typeof eventSchema>
  * text before the event can exist.
  */
 export const eventCreateSchema = withEventDateOrder(
-  eventFields.omit({ id: true, created_at: true }).extend({
-    welcome_markdown: eventFields.shape.welcome_markdown.default(''),
-  }),
+  eventFields
+    .omit({ id: true, created_at: true })
+    .extend({ welcome_markdown: eventFields.shape.welcome_markdown.default('') })
+    // `.strict()` for the same reason as the update schema, and so the two do not
+    // differ for no stated reason: a stripped `welcome` for `welcome_markdown`
+    // would otherwise 201 an event whose welcome text is silently the `.default('')`
+    // rather than what was typed.
+    .strict(),
 )
 export type EventCreate = z.infer<typeof eventCreateSchema>
 

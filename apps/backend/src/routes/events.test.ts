@@ -290,6 +290,20 @@ describe('admin event routes', () => {
     expect(response.json().event).toMatchObject({ slug: 'summer-2026', welcome_markdown: '' })
   })
 
+  it('rejects an unrecognised key on create too, not only on update', async () => {
+    // Otherwise `welcome` for `welcome_markdown` is stripped and the event is
+    // created with the `.default('')`, so an organiser gets a 201 for an event
+    // whose welcome text is silently empty. Same argument as the update path; the
+    // two schemas should not differ for no stated reason.
+    const server = await build()
+    const cookie = await givenAdmin()
+
+    const response = await create(server, cookie, { ...valid, welcome: 'typo' })
+
+    expect(response.statusCode).toBe(400)
+    expect(await db().select().from(event)).toHaveLength(0)
+  })
+
   it('rejects an unrecognised key instead of answering "saved"', async () => {
     // `welcome` for `welcome_markdown` is a plausible typo against a partial
     // endpoint. A non-strict schema stripped it, the body became `{}`, and the

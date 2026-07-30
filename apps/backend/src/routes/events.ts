@@ -63,8 +63,9 @@ export const activeEvent = async (db: Database, today: string): Promise<Event | 
  * row, and the second UPDATE then trips `event_date_order_check` and answers 500
  * — the outcome the check exists to avoid.
  *
- * When it carries **both**, there is nothing to race with: the ordering is
- * decided entirely by the body, so the caller checks it directly.
+ * When it carries **both**, `withEventDateOrder`'s refine has already rejected an
+ * out-of-order pair and `safeParse` answered 400, so the handler never sees one —
+ * which is why returning `undefined` here is safe rather than a gap.
  */
 const dateOrderCondition = ({ start_date, end_date }: { start_date?: string; end_date?: string }) => {
   if (start_date !== undefined && end_date !== undefined) return undefined
@@ -175,12 +176,19 @@ export const registerEventRoutes = (
       // row was read a moment ago. The only other way here is the row being
       // deleted concurrently, and 400 is a defensible answer to that too.
       //
-      // This reads `changes` as "rows matched", which is true on SQLite: it
-      // counts a row whose SET values are identical to what was already there.
-      // MySQL returns 0 for that, so the same code there would turn every
-      // re-save of unchanged welcome text into a 400. An unstated coupling to
-      // `node:sqlite` otherwise.
-      if (result.changes === 0) return reply.code(400).send(errorResponse('bad_request'))
+      // `Number(...)` because `node:sqlite` types `changes` as `number | bigint`,
+      // and `0n === 0` is false — so a strict comparison would silently never
+      // fire if it ever arrived as a bigint, and a rejected one-sided date move
+      // would fall through to the 200 below with a body reporting a date that was
+      // never written. Silent success, which is the failure this comment
+      // previously had inverted. `rejects a one-sided date move in either
+      // direction` is the test that notices, since it asserts 400.
+      //
+      // Reading zero as "no row matched" also relies on SQLite counting a row
+      // whose SET values are identical; MySQL returns 0 there, which would turn
+      // every no-op save into a 400. `answers 200 when the welcome text is
+      // re-saved unchanged` covers that half.
+      if (Number(result.changes) === 0) return reply.code(400).send(errorResponse('bad_request'))
 
       return { event: merged } satisfies EventResponse
     },
