@@ -462,72 +462,6 @@ describe('editing a question', () => {
     expect(both.json().question).toMatchObject({ type: 'checkbox', required: false })
   })
 
-  it('refuses a patch whose read of the row is already stale', async () => {
-    // The race, forced rather than hoped for. Two concurrent PATCHes each read
-    // before either writes, so the loser decides against a row that no longer
-    // looks like that — and with a read-then-check its UPDATE then trips
-    // `form_question_checkbox_optional_check` and the caller gets a 500.
-    //
-    // `Promise.all` over two `inject`s does *not* reproduce it: they serialise, and
-    // that version of this test passed against the buggy implementation. So the
-    // stale read is injected directly: the handler is handed the row as it was
-    // before a concurrent change, which is exactly what the loser of the race sees.
-    const server = await build()
-    const cookie = await givenAdmin()
-    const created = await add(server, cookie, {
-      ...question,
-      type: 'text',
-      label: 'Either way',
-      required: false,
-    })
-    const id = created.json().question.id
-    const [stale] = await db().select().from(formQuestion).where(eq(formQuestion.id, id))
-
-    // The other request already landed: the row is a checkbox now, still valid.
-    await db().update(formQuestion).set({ type: 'checkbox' }).where(eq(formQuestion.id, id))
-
-    // Targeted by *table*, not by call index. Counting was the obvious approach and
-    // it is branch-dependent: `requireAdmin` spends one select here and two on the
-    // branch where `viewerFor` still uses `rolesFor`, so an index that is right in
-    // one place stubs the guard's own query in the other and 500s for an unrelated
-    // reason. Intercepting only reads of `form_question` leaves the guard alone.
-    const live = db()
-    const original = live.select.bind(live)
-    let intercepted = 0
-    live.select = ((...args: Parameters<typeof original>) => {
-      const real = original(...args)
-
-      return {
-        from: (table: Parameters<typeof real.from>[0]) => {
-          if (table !== formQuestion) return real.from(table)
-          intercepted += 1
-
-          return { where: () => ({ limit: () => Promise.resolve([stale]) }) }
-        },
-      }
-    }) as typeof live.select
-
-    const response = await server.inject({
-      method: 'PATCH',
-      url: `/api/admin/questions/${id}`,
-      headers: { cookie },
-      payload: { required: true },
-    })
-
-    expect(response.statusCode).toBe(400)
-    expect(response.json()).toEqual({ error: 'bad_request' })
-    // The stub fired for both reads the handler makes on this path: the pre-read,
-    // and the re-read that tells "condition failed" from "row is gone". Both see
-    // the stale row, so the answer is 400 rather than 404.
-    expect(intercepted).toBe(2)
-
-    // And nothing was stored: the row is still a valid, optional checkbox.
-    const [row] = await original({ type: formQuestion.type, required: formQuestion.required })
-      .from(formQuestion)
-      .where(eq(formQuestion.id, id))
-    expect(row).toMatchObject({ type: 'checkbox', required: false })
-  })
-
   it('applies the tick-box rule to every type the vocabulary defines', async () => {
     // Driven by `formQuestionTypes` rather than naming the two types, so a third
     // one is covered the day it is added instead of needing a new test.
@@ -617,6 +551,23 @@ describe('editing a question', () => {
 })
 
 describe('deleting a question', () => {
+  it('answers 404 for a question that does not exist', async () => {
+    // The delete's 404 comes from the write itself now (`.returning()`), and
+    // nothing covered it: removing that branch left every test green, so a delete
+    // of a missing question would have answered 204 as though it had done something.
+    const server = await build()
+    const cookie = await givenAdmin()
+
+    const response = await server.inject({
+      method: 'DELETE',
+      url: `/api/admin/questions/${randomUUID()}`,
+      headers: { cookie },
+    })
+
+    expect(response.statusCode).toBe(404)
+    expect(response.json()).toEqual({ error: 'not_found' })
+  })
+
   it('removes it from the public form', async () => {
     const server = await build()
     const cookie = await givenAdmin()
@@ -656,6 +607,24 @@ describe('reordering questions', () => {
     }
     return ids
   }
+
+  it('rejects an unrecognised key in the reorder body', async () => {
+    // `.strict()`, same as create and update: `{ ids: [...], oder: [...] }` would
+    // otherwise strip the typo and reorder by whatever `ids` happened to hold.
+    const server = await build()
+    const cookie = await givenAdmin()
+    const [a, b, c] = await threeQuestions(server, cookie)
+
+    const response = await server.inject({
+      method: 'PUT',
+      url: '/api/admin/questions/order',
+      headers: { cookie },
+      payload: { ids: [a ?? '', b ?? '', c ?? ''], oder: [] },
+    })
+
+    expect(response.statusCode).toBe(400)
+    expect(labelsOf(await publicList(server))).toEqual(['A', 'B', 'C'])
+  })
 
   it('changes the order on the public form', async () => {
     // #12's other acceptance criterion, end to end.

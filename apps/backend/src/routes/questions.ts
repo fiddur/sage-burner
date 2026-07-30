@@ -130,19 +130,27 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db, sessions }: G
       const parsed = formQuestionUpdateSchema.safeParse(request.body)
       if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
 
-      const [existing] = await db
-        .select()
-        .from(formQuestion)
-        .where(eq(formQuestion.id, request.params.id))
-        .limit(1)
-      if (existing === undefined) return reply.code(404).send(errorResponse('not_found'))
-
-      // `{}` is the only body that changes nothing now — an unrecognised key is a
-      // 400 from `.strict()` above — and `set({})` is not valid SQL, so it has to
-      // be answered before the statement. A no-op PATCH is idempotent; returning
-      // the row unchanged is the honest answer.
+      // The only body that never reaches the `UPDATE`, and so the only one that
+      // needs a read of its own. An unrecognised key is a 400 from `.strict()`
+      // above, so `{}` is all that is left that changes nothing — and `set({})` is
+      // not valid SQL. A no-op PATCH is idempotent; returning the row unchanged is
+      // the honest answer.
+      //
+      // The read lives inside this branch rather than above it, for the reason
+      // `events.ts` gives: once `.returning()` supplies the response row and the
+      // re-read below answers a vanished one, an unconditional pre-read only spends
+      // a third query to produce a 404 the write path produces anyway — and leaves
+      // the handler holding a pre-write snapshot to be tempted by.
       if (Object.keys(parsed.data).length === 0) {
-        return { question: existing } satisfies FormQuestionResponse
+        const [existing] = await db
+          .select()
+          .from(formQuestion)
+          .where(eq(formQuestion.id, request.params.id))
+          .limit(1)
+
+        return existing === undefined
+          ? reply.code(404).send(errorResponse('not_found'))
+          : ({ question: existing } satisfies FormQuestionResponse)
       }
 
       // No merged-row check in JS. A PATCH can break the tick-box rule with a
@@ -188,14 +196,14 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db, sessions }: G
     async (request, reply) => {
       void noStore(reply)
 
-      const [existing] = await db
-        .select({ id: formQuestion.id })
-        .from(formQuestion)
+      // One statement: `.returning()` gives the 404 from the write itself, and
+      // closes the window where the row disappears between a read and the delete.
+      const deleted = await db
+        .delete(formQuestion)
         .where(eq(formQuestion.id, request.params.id))
-        .limit(1)
-      if (existing === undefined) return reply.code(404).send(errorResponse('not_found'))
+        .returning({ id: formQuestion.id })
 
-      await db.delete(formQuestion).where(eq(formQuestion.id, request.params.id))
+      if (deleted.length === 0) return reply.code(404).send(errorResponse('not_found'))
 
       // Deliberately does not renumber the survivors. `order` only has to sort,
       // not be contiguous, and renumbering here would fight a concurrent

@@ -152,7 +152,7 @@ export type FormQuestionUpdate = z.infer<typeof formQuestionUpdateSchema>
  * all of them makes the request describe the end state, so a lost or reordered
  * request cannot leave the form half-renumbered.
  */
-export const formQuestionOrderSchema = z.object({ ids: z.array(idSchema) })
+export const formQuestionOrderSchema = z.object({ ids: z.array(idSchema) }).strict()
 export type FormQuestionOrder = z.infer<typeof formQuestionOrderSchema>
 
 export const formQuestionsResponseSchema = z.object({ questions: z.array(formQuestionSchema) })
