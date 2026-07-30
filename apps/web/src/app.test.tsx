@@ -29,6 +29,7 @@ const clientWith = (logout: AppApi['logout']): AppApi => ({
   getEvents: () => Promise.reject(new Error('getEvents is not stubbed in this file')),
   createEvent: () => Promise.reject(new Error('createEvent is not stubbed in this file')),
   updateEvent: () => Promise.reject(new Error('updateEvent is not stubbed in this file')),
+  getActiveEvent: () => Promise.resolve({ event: null }),
 })
 
 /**

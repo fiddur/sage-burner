@@ -189,6 +189,24 @@ const helmetOptions = (): FastifyHelmetOptions => ({
 
       // No <base> is ever emitted, so nothing needs to set one.
       'base-uri': ["'none'"],
+
+      // Helmet's default is `'self' data:`, which contradicted the welcome
+      // text's own URL allowlist: `markdown.ts` admits `https://` image
+      // sources, so a remote image was rendered into the DOM and then blocked
+      // by the browser — the documented behaviour looked like a bug.
+      //
+      // Widened rather than narrowed because there is no upload feature, so the
+      // alternative is that images do not work at all. `https:` only, so an
+      // image cannot downgrade the page, and images cannot execute — `script-src`
+      // stays `'self'`.
+      //
+      // The honest cost: an image host an organiser links to sees the IP of
+      // every visitor to the homepage. That is the organiser's choice to make in
+      // a field only they can write, and it is the only external request this
+      // app can produce. An upload feature would remove the need for it, and
+      // narrowing this back to `'self' data:` is the change to make if one
+      // arrives.
+      'img-src': ["'self'", 'data:', 'https:'],
     },
   },
 

@@ -215,7 +215,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
                   )}
                   {saved && (
                     <p class="form-note" role="status">
-                      Saved. It appears on the homepage once that page is built (#13).
+                      Saved. The homepage shows it now.
                     </p>
                   )}
 
