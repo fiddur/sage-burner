@@ -68,11 +68,60 @@ const parseTrustProxy = (value: string | undefined): boolean | number | string =
   return value
 }
 
+/**
+ * Addresses that mean "only this machine can reach it".
+ *
+ * The whole 127.0.0.0/8 block, not just 127.0.0.1 — `127.0.0.2` is equally
+ * local and someone will eventually use it. An empty or unset HOST is not
+ * loopback: Node then binds every interface, which is the case this exists to
+ * catch.
+ */
+const isLoopbackHost = (host: string): boolean =>
+  host === 'localhost' || host === '::1' || host === '[::1]' || /^127\.\d+\.\d+\.\d+$/.test(host)
+
+/**
+ * Whether a browser other than the developer's own could reach this process.
+ *
+ * One predicate, used by both the `SESSION_SECRET` requirement and the `Secure`
+ * flag, so the two cannot drift apart — they answer the same question.
+ *
+ * Three signals, because the first two together still miss the deployment this
+ * repository documents. `NODE_ENV` cannot answer it alone: it defaults to
+ * `development` when unset. Nor can `HOST`, because **a reverse proxy in front
+ * means the app binds loopback** — `pnpm start` or a systemd unit on
+ * `127.0.0.1:3000` behind the README's Apache vhost satisfies "not production"
+ * and "loopback" both, and would have booted quietly on the development key
+ * that is committed to this repository, serving a non-`Secure` cookie over
+ * Apache's TLS.
+ *
+ * `WEB_ROOT` closes it. Setting it says "serve the built frontend", which is a
+ * deployment by definition — Vite serves the frontend in development, so a dev
+ * run never sets it. The one case that pays for this is building the frontend
+ * and pointing a local backend at it; the README's recipe for that passes a
+ * secret, and that run *is* serving the built app, so being treated as a
+ * deployment is right.
+ */
+const looksLikeDeployment = (nodeEnv: string, host: string, webRoot: string | undefined): boolean =>
+  nodeEnv === 'production' || !isLoopbackHost(host) || webRoot !== undefined
+
 export const envSchema = z.object({
   NODE_ENV: optional(z.enum(['development', 'test', 'production']).default('development')),
   PORT: optional(port.default(3000)),
-  /** 0.0.0.0 so the container is reachable from outside it. */
-  HOST: optional(z.string().min(1).default('0.0.0.0')),
+  /**
+   * Loopback by default; the image sets `0.0.0.0` explicitly.
+   *
+   * The default used to be `0.0.0.0` "so the container is reachable", which the
+   * container never needed — the Dockerfile has always set it. So the permissive
+   * default only ever applied to the runs nobody documented: a bare
+   * `node src/server.ts`, a systemd unit, a compose file that drops the image's
+   * environment. Those bound every interface *and* fell back to the published
+   * development signing key, which is the pairing the check in `createConfig`
+   * exists to refuse.
+   *
+   * Binding every interface is now something a deployment has to say out loud,
+   * and saying it means bringing your own `SESSION_SECRET`.
+   */
+  HOST: optional(z.string().min(1).default('127.0.0.1')),
   DATABASE_URL: optional(z.string().min(1).default(DEFAULT_DATABASE_URL)),
   LOG_LEVEL: optional(z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info')),
   /** Commit the image was built from. Surfaced by `/api/version`. */
@@ -86,10 +135,43 @@ export const envSchema = z.object({
   WEB_ROOT: optional(z.string().min(1).optional()),
   /** `false` (default), `true`, a hop count like `1`, or an address/CIDR list. */
   TRUST_PROXY: optional(z.string().min(1).optional()),
+  /**
+   * HMAC key for session cookies.
+   *
+   * Optional here and required in production by the explicit check in
+   * `createConfig` — not a Zod refinement, which could not tell the two
+   * environments apart from inside this schema. A development run should not
+   * need a secret to start, and a production one must not start without it.
+   * Generating a random default at boot instead
+   * would look like it works and silently log every member out on each deploy —
+   * which, with watchtower redeploying on a tag move, is every few minutes
+   * after a merge.
+   */
+  SESSION_SECRET: optional(z.string().min(32).optional()),
+  /** How long a session lasts. Two weeks by default. */
+  SESSION_TTL_SECONDS: optional(
+    z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(60 * 60 * 24 * 14),
+  ),
 })
 
 export interface Config {
   node_env: 'development' | 'test' | 'production'
+  session_secret: string
+  session_ttl_seconds: number
+  /**
+   * Whether the session cookie gets `Secure`.
+   *
+   * Decided here rather than at the cookie, so the policy has one home and the
+   * cookie does not re-derive it from `NODE_ENV` — which is the mistake this
+   * file spends a paragraph explaining, since `NODE_ENV` defaults to
+   * `development` when unset. Exactly the same predicate as the
+   * `SESSION_SECRET` requirement, `looksLikeDeployment`, so the two cannot drift.
+   */
+  secure_cookies: boolean
   port: number
   host: string
   database_url: string
@@ -125,8 +207,43 @@ export const createConfig = (env: NodeJS.ProcessEnv = process.env): Config => {
     throw new Error(`Invalid environment configuration:\n  TRUST_PROXY: ${detail}`)
   }
 
+  // Absent is a development convenience, and the check below decides when that
+  // convenience is safe by asking the question that actually matters: **is this
+  // reachable by anyone?**
+  //
+  // `NODE_ENV` alone could not answer it. It defaults to `development` when
+  // unset, so a bare `node apps/backend/src/server.ts` — a systemd unit, a
+  // hand-rolled deploy, a compose file that drops the image's NODE_ENV — would
+  // bind `0.0.0.0` and sign sessions with the key below, which is committed to
+  // a public repository, while also omitting `Secure`. `HOST` is the value that
+  // knows whether anyone else can reach the process, so it is the one that
+  // decides.
+  //
+  // The fallback therefore requires *both*: not production, and bound to
+  // loopback. `HOST` defaults to loopback for the same reason, so the safe case
+  // is the one you get by doing nothing and reaching the LAN is what you have to
+  // ask for — at which point you bring your own secret.
+  //
+  // Forging a token also needs the target's `account.id`, a v4 UUID that is not
+  // guessable — but that is incidental rather than designed, and it weakens the
+  // moment a route returns another member's id, which the admin list will. Do
+  // not read it as a second layer.
+  //
+  // The fixed value is the same for every dev run, so a restart does not
+  // invalidate the session you were testing with.
+  const session_secret = value.SESSION_SECRET ?? 'development-only-session-secret-not-for-production'
+
+  if (value.SESSION_SECRET === undefined && looksLikeDeployment(value.NODE_ENV, value.HOST, value.WEB_ROOT)) {
+    throw new Error(
+      `Invalid environment configuration:\n  SESSION_SECRET: required for anything a browser other than yours can reach — production, a non-loopback HOST, or a set WEB_ROOT (got NODE_ENV=${value.NODE_ENV}, HOST=${value.HOST}, WEB_ROOT=${value.WEB_ROOT ?? '(unset)'}). 32+ characters; generate with \`openssl rand -base64 48\``,
+    )
+  }
+
   return {
     node_env: value.NODE_ENV,
+    session_secret,
+    session_ttl_seconds: value.SESSION_TTL_SECONDS,
+    secure_cookies: looksLikeDeployment(value.NODE_ENV, value.HOST, value.WEB_ROOT),
     port: value.PORT,
     host: value.HOST,
     database_url: value.DATABASE_URL,

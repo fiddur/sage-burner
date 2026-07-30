@@ -1,4 +1,14 @@
-import type { VersionResponse } from '@sage-burner/shared'
+import type {
+  ActiveEventResponse,
+  AdminAccountsResponse,
+  EventCreateInput,
+  EventResponse,
+  EventUpdate,
+  EventsResponse,
+  LoginRequest,
+  MeResponse,
+  VersionResponse,
+} from '@sage-burner/shared'
 
 /**
  * The API client.
@@ -8,7 +18,15 @@ import type { VersionResponse } from '@sage-burner/shared'
  * to configure, nothing to get wrong per environment, and no CORS anywhere.
  */
 
-/** Raised for anything that is not a 2xx. Carries enough to render a message. */
+/**
+ * Raised for anything that is not a 2xx. Carries enough to render a message.
+ *
+ * `code` holds the envelope's `error` slug, or the literal `'unknown'` when the
+ * body was not the documented envelope — a proxy's HTML, an empty body, a
+ * crash. Typed as `string` rather than the shared `ErrorCode` union on purpose:
+ * the API may return a code this build predates, and narrowing would collapse
+ * that to `'unknown'`, losing the one string worth putting in a bug report.
+ */
 export interface ApiError extends Error {
   status: number
   code: string
@@ -26,11 +44,6 @@ export const apiError = (status: number, code: string, message: string): ApiErro
 export const isApiError = (value: unknown): value is ApiError =>
   value instanceof Error && 'status' in value && 'code' in value
 
-/** The backend's error envelope. Kept narrow deliberately — see `not_found`. */
-interface ErrorBody {
-  error?: unknown
-}
-
 /**
  * A message worth showing a member.
  *
@@ -43,6 +56,10 @@ interface ErrorBody {
 const messageFor = (status: number) => {
   if (status === 401) return 'You need to sign in.'
   if (status === 403) return 'You do not have access to that.'
+  // Deliberately says how long. Without it the copy invites the immediate retry
+  // the `Retry-After` header exists to prevent — and under a flood, that is the
+  // client behaviour that makes it worse.
+  if (status === 429) return 'Too many attempts just now. Wait a few seconds and try again.'
   if (status === 404) return 'Not found.'
   if (status >= 500) return 'Something went wrong at our end. Please try again.'
   return `Request failed (${status}).`
@@ -58,8 +75,15 @@ const messageFor = (status: number) => {
 const codeFrom = async (response: Response): Promise<string> => {
   try {
     const body: unknown = await response.json()
-    const { error } = (body ?? {}) as ErrorBody
-    return typeof error === 'string' ? error : 'unknown'
+    // Narrowed rather than cast to `ErrorResponse`: the whole point of this
+    // function is that the body might not be that shape at all. Validating
+    // with `errorResponseSchema` would be the obvious alternative, but that
+    // would put Zod in the browser bundle — the web app imports types only.
+    if (typeof body === 'object' && body !== null && 'error' in body) {
+      const { error } = body
+      if (typeof error === 'string') return error
+    }
+    return 'unknown'
   } catch {
     return 'unknown'
   }
@@ -104,6 +128,35 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
   return {
     request,
     getVersion: () => request<VersionResponse>('/version'),
+
+    /** 200 with `{ viewer: null }` when signed out — not an error. */
+    getMe: (signal?: AbortSignal) => request<MeResponse>('/auth/me', { signal }),
+
+    /** Throws ApiError(401, 'invalid_credentials') on a bad email or password alike. */
+    login: (body: LoginRequest) => request<MeResponse>('/auth/login', { method: 'POST', body }),
+
+    logout: () => request<MeResponse>('/auth/logout', { method: 'POST' }),
+
+    /**
+     * Admin only. Throws ApiError(401) signed out, ApiError(403) without the
+     * role — a caller may treat 401 as a cue to send the visitor to login, but
+     * must not do that for 403, where signing in again changes nothing.
+     */
+    getAdminAccounts: (signal?: AbortSignal) => request<AdminAccountsResponse>('/admin/accounts', { signal }),
+
+    /** Public. `{ event: null }` before the first event exists — not an error. */
+    getActiveEvent: (signal?: AbortSignal) => request<ActiveEventResponse>('/events/active', { signal }),
+
+    /** Admin only. */
+    getEvents: (signal?: AbortSignal) => request<EventsResponse>('/admin/events', { signal }),
+
+    /** Admin only. Throws ApiError(409, 'conflict') when the slug is taken. */
+    createEvent: (body: EventCreateInput) =>
+      request<EventResponse>('/admin/events', { method: 'POST', body }),
+
+    /** Admin only. Partial — omitted fields are left as they are. */
+    updateEvent: (id: string, body: EventUpdate) =>
+      request<EventResponse>(`/admin/events/${encodeURIComponent(id)}`, { method: 'PATCH', body }),
   }
 }
 

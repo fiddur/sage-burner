@@ -91,6 +91,19 @@ describe('createApiClient', () => {
       await expect(failure).rejects.toMatchObject({ status: 502, code: 'unknown' })
     })
 
+    it('falls back to unknown when the code is present but not a string', async () => {
+      // What a serialised Error leaking through a future handler looks like.
+      // `errorResponseSchema` rejects this shape, but the client deliberately
+      // does not use it — no runtime Zod in the browser — so that coverage
+      // does not reach this branch.
+      const doFetch = respondWith({ error: { message: 'nope' } }, { status: 500 })
+
+      await expect(createApiClient(doFetch).request('/things')).rejects.toMatchObject({
+        status: 500,
+        code: 'unknown',
+      })
+    })
+
     it('survives an entirely empty error body', async () => {
       const doFetch = vi.fn<typeof fetch>(() => Promise.resolve(new Response(null, { status: 500 })))
 
@@ -105,6 +118,9 @@ describe('createApiClient', () => {
         { status: 401, contains: 'sign in' },
         { status: 403, contains: 'access' },
         { status: 404, contains: 'Not found' },
+        // Says how long, rather than inviting the immediate retry that the
+        // accompanying `Retry-After` exists to prevent.
+        { status: 429, contains: 'Wait a few seconds' },
         { status: 500, contains: 'our end' },
       ]
 

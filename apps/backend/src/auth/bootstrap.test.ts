@@ -1,0 +1,166 @@
+import { eq } from 'drizzle-orm'
+import { afterEach, describe, expect, it } from 'vitest'
+
+import type { DbHandle } from '../db/index.ts'
+
+import { createDb, runMigrations } from '../db/index.ts'
+import { account, accountRole } from '../db/schema.ts'
+import { ensureAdmin } from './bootstrap.ts'
+import { verifyPassword } from './password.ts'
+
+const cheap = { cost: 2 ** 12, blockSize: 8, parallelism: 1 }
+
+let handle: DbHandle | undefined
+
+afterEach(() => {
+  handle?.close()
+  handle = undefined
+})
+
+const database = () => {
+  handle = createDb({ url: ':memory:' })
+  runMigrations(handle)
+  return handle.db
+}
+
+const rolesOf = async (db: ReturnType<typeof database>, accountId: string) => {
+  const rows = await db.select().from(accountRole).where(eq(accountRole.account_id, accountId))
+  return rows.map((row) => row.role)
+}
+
+describe('ensureAdmin', () => {
+  it('creates an admin with a usable password', async () => {
+    const db = database()
+
+    const result = await ensureAdmin({
+      db,
+      email: 'ada@example.org',
+      password: 'a good long passphrase',
+      params: cheap,
+    })
+
+    expect(result.created).toBe(true)
+    expect(await rolesOf(db, result.account_id)).toEqual(['admin'])
+
+    const [row] = await db.select().from(account).where(eq(account.id, result.account_id))
+    await expect(verifyPassword('a good long passphrase', row?.password_hash ?? null)).resolves.toBe(true)
+  })
+
+  it('is safe to run twice', async () => {
+    // A deploy script or a confused operator will do this. The second run must
+    // not fail on the primary key, and must not create a second account.
+    const db = database()
+    const first = await ensureAdmin({
+      db,
+      email: 'ada@example.org',
+      password: 'a good long passphrase',
+      params: cheap,
+    })
+
+    const second = await ensureAdmin({
+      db,
+      email: 'ada@example.org',
+      password: 'a good long passphrase',
+      params: cheap,
+    })
+
+    expect(second).toEqual({ account_id: first.account_id, created: false })
+    expect(await rolesOf(db, first.account_id)).toEqual(['admin'])
+    expect(await db.select().from(account)).toHaveLength(1)
+  })
+
+  it('grants the role to an account that already exists', async () => {
+    const db = database()
+    await db.insert(account).values({
+      id: 'existing',
+      email: 'ada@example.org',
+      password_hash: null,
+      created_at: '2026-01-01T00:00:00.000Z',
+    })
+
+    const result = await ensureAdmin({
+      db,
+      email: 'ada@example.org',
+      password: 'a good long passphrase',
+      params: cheap,
+    })
+
+    expect(result).toEqual({ account_id: 'existing', created: false })
+    expect(await rolesOf(db, 'existing')).toEqual(['admin'])
+  })
+
+  it('never changes an existing password', async () => {
+    // Otherwise the bootstrap command is an offline password reset for any
+    // account, and anyone who can run it can take over the organiser's login.
+    const db = database()
+    const first = await ensureAdmin({
+      db,
+      email: 'ada@example.org',
+      password: 'the original one',
+      params: cheap,
+    })
+
+    await ensureAdmin({ db, email: 'ada@example.org', password: 'an attacker choice', params: cheap })
+
+    const [row] = await db.select().from(account).where(eq(account.id, first.account_id))
+    await expect(verifyPassword('the original one', row?.password_hash ?? null)).resolves.toBe(true)
+    await expect(verifyPassword('an attacker choice', row?.password_hash ?? null)).resolves.toBe(false)
+  })
+
+  it('matches an existing account case-insensitively', async () => {
+    // The account table's UNIQUE is BINARY, so without normalising here the
+    // organiser gets a second account rather than the role they asked for.
+    const db = database()
+    const first = await ensureAdmin({
+      db,
+      email: 'ada@example.org',
+      password: 'a good long passphrase',
+      params: cheap,
+    })
+
+    const second = await ensureAdmin({
+      db,
+      email: '  Ada@Example.ORG ',
+      password: 'a good long passphrase',
+      params: cheap,
+    })
+
+    expect(second.account_id).toBe(first.account_id)
+    expect(await db.select().from(account)).toHaveLength(1)
+  })
+
+  it('rejects a password too short to be worth having', async () => {
+    const db = database()
+
+    await expect(
+      ensureAdmin({ db, email: 'ada@example.org', password: 'short', params: cheap }),
+    ).rejects.toThrow(/12 characters/)
+    expect(await db.select().from(account)).toHaveLength(0)
+  })
+
+  it('rejects an address that is not one', async () => {
+    const db = database()
+
+    await expect(
+      ensureAdmin({ db, email: 'not-an-email', password: 'a good long passphrase', params: cheap }),
+    ).rejects.toThrow(/valid email/)
+  })
+
+  it('still grants the role when the password would be too short', async () => {
+    // The length rule guards a password being *set*. Refusing to grant a role
+    // over it would fail for a reason that has nothing to do with the request.
+    const db = database()
+    const first = await ensureAdmin({
+      db,
+      email: 'ada@example.org',
+      password: 'a good long passphrase',
+      params: cheap,
+    })
+    await db.delete(accountRole).where(eq(accountRole.account_id, first.account_id))
+
+    const second = await ensureAdmin({ db, email: 'ada@example.org', password: 'x', params: cheap })
+
+    expect(second.created).toBe(false)
+    expect(await rolesOf(db, first.account_id)).toEqual(['admin'])
+  })
+})
