@@ -635,9 +635,9 @@ Four more things the write routes do, for anyone writing a second client:
   is refused rather than silently dropped, which on create would have produced an
   event whose welcome text was quietly empty and on update a "saved" that saved
   nothing.
-- **An empty PATCH body (`{}`) is a 200**, returning the event unchanged. It is a
-  no-op rather than an error, and it never reaches the `UPDATE` — which matters for
-  the 404 below.
+- **An empty PATCH body (`{}`) is a 200** for an event that exists, returning it
+  unchanged, and a **404** for one that does not. It is a no-op rather than an
+  error, and it is the only body that reads instead of writing.
 - **A PATCH names only what it changes.** Reading an event, editing the object and
   sending the whole thing back is therefore a 400 on `id` and `created_at`.
 - **A date move that would invert the range answers 400**, not a 500 from the
@@ -649,14 +649,11 @@ A PATCH responds with the event **as written**, not with the body merged onto wh
 was read a moment earlier — so if another organiser's change landed in between, the
 response reflects it rather than reporting a value nobody stored.
 
-A row that disappears between the read and the write answers **404**, the same as
+A row that disappears before the `UPDATE` reaches it answers **404**, the same as
 one that was already gone — the body was not the problem, whatever it contained. The
-two causes of a failed write are told apart by re-reading the row rather than
-inferred from the request, so a well-ordered date move against an event someone else
-has just deleted does not come back as "check the dates".
-
-The empty body is the one path that reads before writing, and it answers **404**
-for an event that is not there — `DELETE` then `PATCH {}` gives `not_found`, not a 200. The 200 in the bullet above is for an event that exists.
+two causes of a failed write are told apart by re-reading the row afterwards rather
+than inferred from the request, so a well-ordered date move against an event someone
+else has just deleted does not come back as "check the dates".
 
 ### Markdown is escaped, not filtered
 

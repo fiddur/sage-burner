@@ -106,8 +106,10 @@ export type EventCreateInput = z.input<typeof eventCreateSchema>
  * *one* date past the other therefore passes here, so the handler has to catch
  * it — and it does so **inside the UPDATE**, not by re-reading first:
  * `PATCH /api/admin/events/:id` in `apps/backend/src/routes/events.ts` puts the
- * ordering condition in the statement's `where` and treats zero matched rows as
- * the 400. A read-then-check would leave a window where two organisers each
+ * ordering condition in the statement's `where`, so it is evaluated against the
+ * row at write time. Zero matched rows is then resolved by re-reading: **404** if
+ * the row is gone, 400 only if it is still there and the condition is what failed.
+ * A read-then-check would leave a window where two organisers each
  * moving one date both validate against the pre-update row, and the second write
  * reaches `event_date_order_check` as a 500 — the outcome the check exists to
  * avoid. The both-dates case never reaches the handler at all: the refine below
