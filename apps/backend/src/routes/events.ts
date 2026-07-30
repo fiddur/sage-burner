@@ -161,10 +161,9 @@ export const registerEventRoutes = (
 
       // No both-dates check here. `withEventDateOrder` already rejects a body
       // carrying both dates in the wrong order, so `safeParse` above answers 400
-      // and this handler never sees one — a guard for it would be unreachable,
-      // which is the same dead-code shape as the `requireSignedIn` this branch
-      // removes. `rejects a patch with both dates in the wrong order` covers that
-      // path at the schema, where it actually lives.
+      // and this handler never sees one — a guard for it would be unreachable.
+      // `rejects a patch with both dates in the wrong order` covers that path at
+      // the schema, where it actually lives.
       //
       // One date given: the condition goes in the `where`, so it is evaluated
       // against the row as it is at write time. See `dateOrderCondition`.

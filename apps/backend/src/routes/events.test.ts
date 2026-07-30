@@ -511,9 +511,9 @@ describe('admin event routes', () => {
     expect(response.json()).toEqual({ error: 'not_found' })
   })
   it("answers 409 when a patch takes another event's slug", async () => {
-    // The 409 was only covered on POST, and it matters more here: this branch
-    // changed the mechanism from a try/catch around the await to an `undefined`
-    // sentinel out of `.catch()`, and nothing pinned that `undefined` means "slug
+    // The 409 was only covered on POST, and it matters more here because the
+    // handler signals a conflict with an `undefined` sentinel out of `.catch()`
+    // rather than by throwing — nothing else pins that `undefined` means "slug
     // conflict" rather than "the driver returned nothing".
     //
     // That distinction carries more weight since `.returning()` landed, because the
