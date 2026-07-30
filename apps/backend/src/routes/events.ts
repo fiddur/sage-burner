@@ -147,8 +147,6 @@ export const registerEventRoutes = (
       // idempotent; returning the row unchanged is the honest answer.
       if (Object.keys(parsed.data).length === 0) return { event: existing } satisfies EventResponse
 
-      const merged = { ...existing, ...parsed.data }
-
       // No both-dates check here. `withEventDateOrder` already rejects a body
       // carrying both dates in the wrong order, so `safeParse` above answers 400
       // and this handler never sees one — a guard for it would be unreachable,
@@ -161,46 +159,30 @@ export const registerEventRoutes = (
       const ordered = dateOrderCondition(parsed.data)
       const where = ordered === undefined ? eq(event.id, id) : and(eq(event.id, id), ordered)
 
-      const result = await db
+      // `.returning()` rather than reading `changes`, for two reasons that turn out
+      // to be the same one: the row it hands back is the row as written, so the
+      // response cannot report a field from the pre-read snapshot that another
+      // write has since changed — and an empty array means "no row matched" without
+      // depending on SQLite counting a row whose SET values are identical, which
+      // MySQL does not.
+      const updated = await db
         .update(event)
         .set(parsed.data)
         .where(where)
+        .returning()
         .catch((error: unknown) => {
           if (isSlugConflict(error)) return undefined
           throw error
         })
 
-      if (result === undefined) return reply.code(409).send(errorResponse('conflict'))
+      if (updated === undefined) return reply.code(409).send(errorResponse('conflict'))
 
-      // Zero rows has two causes: the ordering condition failed, or the row was
-      // deleted between the SELECT above and this UPDATE. They are told apart by
-      // asking, not guessed at from whether a condition was present.
-      //
-      // Guessing was the previous version, and it was wrong in a way an organiser
-      // would feel: a perfectly ordered `{ start_date: … }` move against an event
-      // someone else had just deleted answered `bad_request`, which the editor
-      // renders as "check the dates and lengths" — sending them to re-check dates
-      // that were never the problem. One extra query, only ever on an error path.
-      //
-      // `Number(...)` because `node:sqlite` types `changes` as `number | bigint`,
-      // and `0n === 0` is false — so a strict comparison would silently never
-      // fire if it ever arrived as a bigint, and a rejected one-sided date move
-      // would fall through to the 200 below with a body reporting a date that was
-      // never written. Silent success, which is the failure this comment
-      // previously had inverted. The test that notices asserts 400:
-      // `rejects a one-sided date move in either direction, and stores nothing`
-      //
-      // Reading zero as "no row matched" also relies on SQLite counting a row
-      // whose SET values are identical; MySQL returns 0 there. The row is still
-      // present in that case, so the re-read below finds it and the answer is a
-      // **400** — "check the dates and lengths" for a save that changed nothing,
-      // which is exactly the misdirection the re-read was added to stop happening
-      // for a deleted row. Covered by:
-      // `answers 200 when the welcome text is re-saved unchanged`
-      //
-      // Both names are on one line each on purpose — a name wrapped across two
-      // comment lines cannot be grepped, which is the only reason to quote it.
-      if (Number(result.changes) === 0) {
+      const [row] = updated
+      if (row === undefined) {
+        // Two causes: the ordering condition failed, or the row was deleted between
+        // the SELECT above and this UPDATE. Told apart by asking, not guessed at —
+        // guessing answered "check the dates and lengths" for a perfectly ordered
+        // move against an event someone else had just deleted.
         const [stillThere] = await db.select({ id: event.id }).from(event).where(eq(event.id, id)).limit(1)
 
         return stillThere === undefined
@@ -208,7 +190,7 @@ export const registerEventRoutes = (
           : reply.code(400).send(errorResponse('bad_request'))
       }
 
-      return { event: merged } satisfies EventResponse
+      return { event: row } satisfies EventResponse
     },
   )
 }

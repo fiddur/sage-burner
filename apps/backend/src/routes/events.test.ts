@@ -481,6 +481,47 @@ describe('admin event routes', () => {
     expect(eventReads).toBe(2)
   })
 
+  it('reports the row as written, not the snapshot it read', async () => {
+    // The response used to be `{ ...existing, ...body }` — the pre-read row merged
+    // with the change. Under interleaving that reports fields nobody stored: A
+    // reads 08-01..08-05, B moves the end to 09-30, A moves the start to 09-01.
+    // A's write is legitimate (09-01 is before 09-30, checked in the statement),
+    // but the old response claimed `end_date: 08-05`, which is B's change undone
+    // on paper only.
+    const server = await build()
+    const cookie = await givenAdmin()
+    const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
+    const [stale] = await db().select().from(event)
+
+    // B's write lands between A's read and A's write.
+    await db().update(event).set({ end_date: '2026-09-30' }).where(eq(event.id, id))
+
+    const live = db()
+    const original = live.select.bind(live)
+    let eventReads = 0
+    live.select = ((...args: Parameters<typeof original>) => {
+      const real = original(...args)
+
+      return {
+        from: (table: Parameters<typeof real.from>[0]) => {
+          if (table !== event) return real.from(table)
+          eventReads += 1
+          if (eventReads > 1) return real.from(table)
+
+          return { where: () => ({ limit: () => Promise.resolve([stale]) }) }
+        },
+      }
+    }) as typeof live.select
+
+    const response = await patch(server, cookie, id, { start_date: '2026-09-01' })
+
+    expect(response.statusCode).toBe(200)
+    // Both fields as stored: A's start move and B's end move.
+    expect(response.json().event).toMatchObject({ start_date: '2026-09-01', end_date: '2026-09-30' })
+    const [row] = await original().from(event).where(eq(event.id, id))
+    expect(response.json().event).toMatchObject({ start_date: row?.start_date, end_date: row?.end_date })
+  })
+
   it('answers 404, not 400, when a valid one-sided move hits a deleted event', async () => {
     // The case the previous version got wrong: with an ordering condition in the
     // `WHERE`, zero rows was attributed to the body unconditionally. A perfectly

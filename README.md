@@ -645,6 +645,10 @@ Four more things the write routes do, for anyone writing a second client:
   a one-sided move rides in the `UPDATE` itself, so a second organiser moving the
   other date concurrently cannot slip between a read and a write.
 
+A PATCH responds with the event **as written**, not with the body merged onto what
+was read a moment earlier — so if another organiser's change landed in between, the
+response reflects it rather than reporting a value nobody stored.
+
 A row that disappears between the read and the write answers **404**, the same as
 one that was already gone — the body was not the problem, whatever it contained. The
 two causes of a failed write are told apart by re-reading the row rather than
