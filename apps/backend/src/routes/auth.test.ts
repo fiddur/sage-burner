@@ -360,6 +360,33 @@ describe('GET /api/auth/me', () => {
     expect(response.json()).toMatchObject({ viewer: { roles: [] } })
   })
 
+  it('agrees with the login response about who the viewer is', async () => {
+    // `Viewer.roles` is derived twice: `viewerFor` uses a left join, the login
+    // handler uses `rolesFor`. Both routes return a `Viewer`, and only `/me` was
+    // covered — so nothing noticed if the two derivations drifted.
+    //
+    // Three shapes, because the interesting disagreements are at the edges: two
+    // roles, one role, and none at all (where a left join and an inner join differ).
+    for (const roles of [['admin', 'member'], ['member'], []] as ('admin' | 'member')[][]) {
+      const server = await build()
+      const email = `ada-${roles.length}@example.org`
+      await givenAccount({ email, password: 'a good long passphrase', roles })
+
+      const loggedIn = await login(server, email, 'a good long passphrase')
+      const cookie = cookieFrom(loggedIn)
+      const me = await server.inject({
+        method: 'GET',
+        url: '/api/auth/me',
+        headers: { cookie: cookie ?? '' },
+      })
+
+      const fromLogin = loggedIn.json().viewer
+      const fromMe = me.json().viewer
+      expect(fromMe, JSON.stringify(roles)).toEqual(fromLogin)
+      expect([...fromMe.roles].sort(), JSON.stringify(roles)).toEqual([...roles].sort())
+    }
+  })
+
   it('recognises the cookie from a login', async () => {
     const server = await build()
     const id = await givenAccount({
