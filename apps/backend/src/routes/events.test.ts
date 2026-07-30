@@ -166,7 +166,10 @@ describe('GET /api/events/active', () => {
 })
 
 describe('admin event routes', () => {
-  it('refuse anyone who is not an admin', async () => {
+  it('refuse an anonymous caller', async () => {
+    // The signed-in-but-not-admin case lives in `auth/guards.test.ts`, which is
+    // where the guard itself is exercised; duplicating it here would test the
+    // same preHandler twice.
     const server = await build()
 
     expect((await server.inject({ method: 'GET', url: '/api/admin/events' })).statusCode).toBe(401)
@@ -272,6 +275,23 @@ describe('admin event routes', () => {
 
     expect(response.statusCode).toBe(400)
     expect(response.json()).toEqual({ error: 'bad_request' })
+  })
+
+  it('treat a patch with no recognised keys as a no-op rather than a 500', async () => {
+    // Reachable two ways: literally `{}`, and — more likely — a typo like
+    // `welcome` for `welcome_markdown`, which Zod strips. Both used to reach
+    // `set({})`, which drizzle refuses outright, so a typo answered
+    // `internal_error` with a stack in the log.
+    const server = await build()
+    const cookie = await givenAdmin()
+    const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
+
+    for (const body of [{}, { welcome: 'typo' }]) {
+      const response = await patch(server, cookie, id, body)
+
+      expect(response.statusCode, JSON.stringify(body)).toBe(200)
+      expect(response.json().event).toMatchObject({ slug: 'summer-2026', welcome_markdown: '' })
+    }
   })
 
   it('answer 404 for an event that does not exist', async () => {

@@ -20,7 +20,12 @@ const BLANK = { name: '', slug: '', start_date: '', end_date: '', member_cap: '4
 const messageFor = (failure: unknown, fallback: string) => {
   if (!isApiError(failure)) return fallback
   if (failure.status === 409) return 'That slug is already taken — pick another.'
-  if (failure.status === 400) return 'Check the dates: the end cannot be before the start.'
+  // Not "check the dates". A 400 is also a name over 200 characters or a slug
+  // over 64, and the error envelope carries no field detail, so anything more
+  // specific than this is a guess that will sometimes point at the wrong field.
+  // The `maxlength` attributes below stop the browser sending those at all,
+  // which is the fix that actually helps.
+  if (failure.status === 400) return 'Something in that form was rejected — check the dates and lengths.'
   return failure.message
 }
 
@@ -99,9 +104,17 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
         welcome_markdown: '',
         member_cap: Number(draft.member_cap),
       })
+      // Inserted in start-date order rather than appended, because that is how
+      // `GET /api/admin/events` returns them — appending shows a winter event
+      // above a summer one until the next reload.
       setEvents((current) =>
         current.status === 'ready'
-          ? { status: 'ready', events: [...current.events, created.event] }
+          ? {
+              status: 'ready',
+              events: [...current.events, created.event].sort((a, b) =>
+                a.start_date.localeCompare(b.start_date),
+              ),
+            }
           : current,
       )
       setDraft(BLANK)
@@ -200,7 +213,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
                   )}
                   {saved && (
                     <p class="form-note" role="status">
-                      Saved. The homepage shows it now.
+                      Saved. It appears on the homepage once that page is built (#13).
                     </p>
                   )}
 
@@ -233,6 +246,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
           <span>Name</span>
           <input
             required
+            maxLength={200}
             value={draft.name}
             onInput={(inputEvent) => setDraft({ ...draft, name: inputEvent.currentTarget.value })}
           />
@@ -242,6 +256,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
           <span>Slug</span>
           <input
             required
+            maxLength={64}
             pattern="[a-z0-9]+(-[a-z0-9]+)*"
             value={draft.slug}
             onInput={(inputEvent) => setDraft({ ...draft, slug: inputEvent.currentTarget.value })}

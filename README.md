@@ -605,10 +605,10 @@ Consequences worth knowing:
   an event stops being the active one, and a few hours either way on the closing
   day is not something an organiser would notice. A timezone setting would be a
   config knob, a migration and a test matrix bought for that.
-- Once **every** event has ended there is no active event, and the homepage says
-  so. It deliberately does not fall back to the most recent past event, which
-  would leave last year's welcome text up as though it were an invitation.
-  Creating the next event is what fills the gap.
+- Once **every** event has ended there is no active event. The endpoint answers
+  `{ "event": null }`, and it deliberately does not fall back to the most recent
+  past event — that would leave last year's welcome text served as though it
+  were an invitation. Creating the next event is what fills the gap.
 
 `GET /api/events/active` is public and answers `{ "event": null }` rather than a
 404 before the first event exists — that is the ordinary state of a fresh
@@ -617,18 +617,24 @@ deployment, not an error.
 ### Editing an event
 
 Organise → **Events and welcome text**. Create events there, and edit the welcome
-markdown with a live preview. Saving takes effect immediately: the public
-response is `Cache-Control: no-cache`, so a browser may store it but must
+markdown with a live preview. Saving takes effect immediately in the API: the
+public response is `Cache-Control: no-cache`, so a browser may store it but must
 revalidate, and a correction cannot sit invisible in a cache.
+
+**The public homepage does not render this yet** — `Home.tsx` is still a
+placeholder and [#13] is what puts the welcome text on the page. Today the text
+is stored and served by `GET /api/events/active`; the preview in the editor uses
+the same renderer that page will.
 
 A slug collision answers **409** rather than a generic failure — the slug appears
 in URLs, so it is something the organiser fixes by choosing another.
 
 ### Markdown is escaped, not filtered
 
-`welcome_markdown` is admin-authored and rendered to every public visitor, so it
-is treated as untrusted: an admin account is one phished password away from
-belonging to someone else.
+`welcome_markdown` is admin-authored and will be rendered to every public
+visitor once [#13] lands, so it is treated as untrusted: an admin account is one
+phished password away from belonging to someone else. The renderer is already in
+use by the editor's preview.
 
 **Raw HTML in the welcome text is escaped and shows as visible text.** The usual
 build is `marked` + DOMPurify, and that was the first attempt — but DOMPurify
@@ -651,6 +657,8 @@ would have to know about `data:text/html`, `vbscript:` and friends individually.
 
 The cost is that a literal `<br>` renders as text. Markdown already has emphasis,
 headings, lists and links, which is the whole vocabulary this field needs.
+
+[#13]: https://github.com/fiddur/sage-burner/issues/13
 
 ## Security headers
 

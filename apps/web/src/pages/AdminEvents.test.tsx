@@ -96,6 +96,31 @@ describe('AdminEvents', () => {
     expect((await screen.findByRole('alert')).textContent).toBe('That slug is already taken — pick another.')
   })
 
+  it('keeps a newly created event in start-date order', async () => {
+    // The list comes back ordered by start date; appending would show a winter
+    // event above a summer one until the next reload.
+    const winter: Event = {
+      ...summer,
+      id: 'e-0',
+      name: 'Winter Burn',
+      slug: 'winter-2025',
+      start_date: '2025-12-01',
+      end_date: '2025-12-05',
+    }
+    renderPage(stub({ createEvent: () => Promise.resolve({ event: winter }) }))
+    await screen.findByText('Summer Burn 2026')
+
+    fill('Name', 'Winter Burn')
+    fill('Slug', 'winter-2025')
+    fill('Starts', '2025-12-01')
+    fill('Ends', '2025-12-05')
+    screen.getByRole('button', { name: 'Create event' }).click()
+
+    await screen.findByText('Winter Burn')
+    const names = screen.getAllByRole('heading', { level: 2 })
+    expect(names.map((node) => node.textContent)).toEqual(['Winter Burn', 'Summer Burn 2026', 'New event'])
+  })
+
   it('previews the welcome markdown as it is typed', async () => {
     // The reason the preview exists: otherwise the way to see a heading render
     // is to publish it to the public homepage.
@@ -135,7 +160,11 @@ describe('AdminEvents', () => {
     await waitFor(() => {
       expect(updateEvent).toHaveBeenCalledWith('e-1', { welcome_markdown: '# New words' })
     })
-    expect((await screen.findByRole('status')).textContent).toContain('Saved')
+    // Deliberately does not promise the homepage renders it — `Home.tsx` is
+    // still the #13 placeholder, and an organiser told otherwise would go look.
+    const status = (await screen.findByRole('status')).textContent
+    expect(status).toContain('Saved')
+    expect(status).toContain('#13')
   })
 
   it('surfaces a failed save rather than claiming success', async () => {

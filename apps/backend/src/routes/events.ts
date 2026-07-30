@@ -127,6 +127,13 @@ export const registerEventRoutes = (
       const merged = { ...existing, ...parsed.data }
       if (merged.end_date < merged.start_date) return reply.code(400).send(errorResponse('bad_request'))
 
+      // A body with no recognised keys — `{}`, or a typo like `welcome` for
+      // `welcome_markdown`, which Zod strips — parses to `{}` and reaches
+      // `set({})`, which drizzle refuses outright. Answering 500 to a typo is
+      // the same shape of gap as the range check above. A no-op PATCH is
+      // idempotent, so returning the row unchanged is the honest answer.
+      if (Object.keys(parsed.data).length === 0) return { event: existing } satisfies EventResponse
+
       try {
         await db.update(event).set(parsed.data).where(eq(event.id, id))
       } catch (error) {

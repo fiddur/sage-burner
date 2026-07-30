@@ -1,7 +1,7 @@
 import type {
   ActiveEventResponse,
   AdminAccountsResponse,
-  EventCreate,
+  EventCreateInput,
   EventResponse,
   EventUpdate,
   EventsResponse,
@@ -151,11 +151,12 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
     getEvents: (signal?: AbortSignal) => request<EventsResponse>('/admin/events', { signal }),
 
     /** Admin only. Throws ApiError(409, 'conflict') when the slug is taken. */
-    createEvent: (body: EventCreate) => request<EventResponse>('/admin/events', { method: 'POST', body }),
+    createEvent: (body: EventCreateInput) =>
+      request<EventResponse>('/admin/events', { method: 'POST', body }),
 
     /** Admin only. Partial — omitted fields are left as they are. */
     updateEvent: (id: string, body: EventUpdate) =>
-      request<EventResponse>(`/admin/events/${id}`, { method: 'PATCH', body }),
+      request<EventResponse>(`/admin/events/${encodeURIComponent(id)}`, { method: 'PATCH', body }),
   }
 }
 

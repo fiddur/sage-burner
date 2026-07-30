@@ -71,15 +71,25 @@ export const eventCreateSchema = withEventDateOrder(
 export type EventCreate = z.infer<typeof eventCreateSchema>
 
 /**
+ * What a *client* may send, as opposed to what the parsed result contains.
+ *
+ * `EventCreate` is the output type, so `welcome_markdown` is required there
+ * despite the `.default('')` — which makes the default useless to a caller
+ * typed against it. This is the request shape.
+ */
+export type EventCreateInput = z.input<typeof eventCreateSchema>
+
+/**
  * Editing one. Every field optional — the welcome text is edited far more often
  * than the dates, and a PATCH that had to restate the whole event would make
  * two organisers editing different fields overwrite each other.
  *
  * Still wrapped in `withEventDateOrder`, which tolerates a partial range: it
  * only rejects when both dates are present and out of order. A PATCH moving
- * *one* date past the other therefore passes here and is caught by the database
- * CHECK — see `updateEvent`, which re-reads the row and validates the merged
- * range rather than relying on that.
+ * *one* date past the other therefore passes here, so the handler has to catch
+ * it — `PATCH /api/admin/events/:id` in `apps/backend/src/routes/events.ts`
+ * re-reads the row and validates the *merged* range. Without that it would
+ * reach the database CHECK and surface as a 500 rather than a 400.
  */
 export const eventUpdateSchema = withEventDateOrder(
   eventFields.omit({ id: true, created_at: true }).partial(),
