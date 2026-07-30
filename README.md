@@ -655,8 +655,8 @@ two causes of a failed write are told apart by re-reading the row rather than
 inferred from the request, so a well-ordered date move against an event someone else
 has just deleted does not come back as "check the dates".
 
-The one exception is the empty body above: `{}` never reaches the `UPDATE`, so
-against a vanished row it still answers **200** with the event as it was read.
+The empty body is the one path that reads before writing, and it answers **404**
+for an event that is not there — `DELETE` then `PATCH {}` gives `not_found`, not a 200. The 200 in the bullet above is for an event that exists.
 
 ### Markdown is escaped, not filtered
 

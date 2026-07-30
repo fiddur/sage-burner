@@ -191,10 +191,15 @@ export const registerEventRoutes = (
 
       const [row] = updated
       if (row === undefined) {
-        // Two causes: the ordering condition failed, or the row was deleted between
-        // the SELECT above and this UPDATE. Told apart by asking, not guessed at —
-        // guessing answered "check the dates and lengths" for a perfectly ordered
-        // move against an event someone else had just deleted.
+        // Two causes: the ordering condition failed, or the row does not exist —
+        // whether it never did or was deleted a moment ago, which are the same thing
+        // from here. There is no read above on this path any more, so there is no
+        // read-then-write window to reason about; the `UPDATE` is the first and only
+        // look at the row.
+        //
+        // Told apart by asking, not guessed at — guessing answered "check the dates
+        // and lengths" for a perfectly ordered move against an event someone else
+        // had just deleted.
         const [stillThere] = await db.select({ id: event.id }).from(event).where(eq(event.id, id)).limit(1)
 
         return stillThere === undefined

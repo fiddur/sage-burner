@@ -305,6 +305,19 @@ describe('admin event routes', () => {
     expect(await db().select().from(event)).toHaveLength(0)
   })
 
+  it('answers 404 for an empty patch against an event that does not exist', async () => {
+    // The one branch that decides what `{}` means when there is no row. It is the
+    // only path that still reads before writing, so it is also the only place a
+    // missing event is detected without the `UPDATE` doing it.
+    const server = await build()
+    const cookie = await givenAdmin()
+
+    const response = await patch(server, cookie, randomUUID(), {})
+
+    expect(response.statusCode).toBe(404)
+    expect(response.json()).toEqual({ error: 'not_found' })
+  })
+
   it('rejects an unrecognised key instead of answering "saved"', async () => {
     // `welcome` for `welcome_markdown` is a plausible typo against a partial
     // endpoint. A non-strict schema stripped it, the body became `{}`, and the
