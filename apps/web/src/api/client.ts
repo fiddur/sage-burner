@@ -1,4 +1,4 @@
-import type { LoginRequest, MeResponse, VersionResponse } from '@sage-burner/shared'
+import type { AdminAccountsResponse, LoginRequest, MeResponse, VersionResponse } from '@sage-burner/shared'
 
 /**
  * The API client.
@@ -126,6 +126,13 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
     login: (body: LoginRequest) => request<MeResponse>('/auth/login', { method: 'POST', body }),
 
     logout: () => request<MeResponse>('/auth/logout', { method: 'POST' }),
+
+    /**
+     * Admin only. Throws ApiError(401) signed out, ApiError(403) without the
+     * role — a caller may treat 401 as a cue to send the visitor to login, but
+     * must not do that for 403, where signing in again changes nothing.
+     */
+    getAdminAccounts: (signal?: AbortSignal) => request<AdminAccountsResponse>('/admin/accounts', { signal }),
   }
 }
 

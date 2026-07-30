@@ -11,6 +11,7 @@ import type { Database } from '../db/index.ts'
 import { createGate } from '../auth/gate.ts'
 import { hashPassword, needsRehash, verifyPassword } from '../auth/password.ts'
 import { account, accountRole } from '../db/schema.ts'
+import { noStore } from '../http.ts'
 
 export const SESSION_COOKIE = 'sage_session'
 
@@ -182,22 +183,6 @@ export interface AuthRouteDeps {
   config: Config
   sessions: Sessions
 }
-
-/**
- * Keep identity responses out of every cache.
- *
- * These are `GET`s and `POST`s carrying per-identity data with no
- * `Cache-Control`, `ETag` or `Last-Modified`, which makes them *heuristically*
- * cacheable — by the browser's own HTTP cache, which `fetch` uses by default,
- * and by any shared cache in front. The concrete failure is logout: the cookie
- * is gone, but a reload can still be answered from cache with the old
- * `{ viewer: … }` — and since sessions are signed rather than stored, there is
- * no server-side check to catch it.
- *
- * Helmet sets no cache headers, and the static handler's `no-cache` does not
- * reach `/api`.
- */
-const noStore = (reply: FastifyReply) => reply.header('cache-control', 'no-store')
 
 /**
  * Bounds on concurrent password verification.

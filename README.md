@@ -298,8 +298,9 @@ watchtower on the host. The one thing to avoid is an _unscoped_ watchtower
 elsewhere on the same machine: that one grabs every container it can see,
 including these. If one exists, give it a scope too.
 
-> **No admin yet.** There is no open signup, so a fresh deployment currently has
-> nobody who can approve anything — seeding the first admin arrives with [#10].
+> **A fresh deployment has no admin.** There is no open signup, so run
+> [`admin:create`](#creating-the-first-admin) once against the new container
+> before anything else — until then nobody can approve anything.
 
 ### Deployment shape
 
@@ -404,8 +405,6 @@ Set it in the `:443` vhost, not in an include shared with a `:80` one. Hardcoded
 to `https` it would lie about a plain-HTTP request, and a cookie marked `Secure`
 on a connection that is not would simply never come back.
 
-[#10]: https://github.com/fiddur/sage-burner/issues/10
-
 ## Accounts and sessions
 
 There is **no open sign-up**. Accounts are created only by redeeming an invite
@@ -509,11 +508,10 @@ minutes after a merge.
 [#57]: https://github.com/fiddur/sage-burner/issues/57
 [#58]: https://github.com/fiddur/sage-burner/issues/58
 
-### Creating the first account
+### Creating the first admin
 
-There is no sign-up and no bootstrap command yet ([#10] adds one), so the first
-account is made by hand against the running container. Verified end to end
-against the built image:
+`admin:create` makes the first organiser, or grants `admin` to an account that
+already exists. Against a running container:
 
 ```sh
 read -rs -p 'Password: ' ADMIN_PASSWORD; echo
@@ -522,43 +520,66 @@ export ADMIN_PASSWORD
 docker compose exec \
   -e ADMIN_EMAIL=you@example.org \
   -e ADMIN_PASSWORD \
-  sage-burner node --input-type=module -e '
-import { randomUUID } from "node:crypto"
-import { createDb, runMigrations } from "/app/apps/backend/src/db/index.ts"
-import { account, accountRole } from "/app/apps/backend/src/db/schema.ts"
-import { hashPassword } from "/app/apps/backend/src/auth/password.ts"
-
-const handle = createDb({ url: process.env.DATABASE_URL })
-runMigrations(handle)
-const id = randomUUID()
-await handle.db.insert(account).values({
-  id,
-  email: process.env.ADMIN_EMAIL.trim().toLowerCase(),
-  password_hash: await hashPassword(process.env.ADMIN_PASSWORD),
-  created_at: new Date().toISOString(),
-})
-await handle.db.insert(accountRole).values({ account_id: id, role: "admin" })
-handle.close()
-console.log("created admin", process.env.ADMIN_EMAIL)
-'
+  sage-burner node apps/backend/src/cli/create-admin.ts
 ```
 
-`read -rs` and a bare `-e ADMIN_PASSWORD` keep the password out of two places
-it would otherwise sit in plain text: the shell history, and the host's process
-arguments, where any local user can read it off `ps` for the life of the
-command. `-e VAR` with no `=` forwards the value from the caller's environment
-rather than restating it — verified: the container receives it and it appears
-nowhere in docker's argv. This is the one password on the system at the moment
-it is created, so it is worth the extra line.
+`node` rather than `pnpm` inside the container on purpose: the image purges
+corepack's cache to keep ~24 MB out of a layer watchtower re-pulls on every
+deploy, so `pnpm` there re-downloads itself from the network first. The script
+is the same one `pnpm admin:create` runs locally.
 
-The command runs inside the container so the password is hashed by the same
-code that verifies it — a hash written any other way is a login that fails for
-reasons nothing explains. The email is lowercased for the same reason the schema does
-it: the table's `UNIQUE` is byte-exact, so `You@Example.org` and
-`you@example.org` would become two accounts for one person.
+Or locally, against `./data/sage-burner.sqlite`:
 
-Nothing guards the `admin` role yet, so it grants nothing until [#10] lands. It
-is set now so the account is already right when it does.
+```sh
+read -rs -p 'Password: ' ADMIN_PASSWORD; echo
+ADMIN_EMAIL=you@example.org ADMIN_PASSWORD="$ADMIN_PASSWORD" \
+  pnpm --filter sage-burner-backend admin:create
+```
+
+Then log in at `/login`; the nav gains an **Organise** link.
+
+Both values come from the environment, never from arguments. `read -rs` keeps
+the password out of the shell history, and `-e ADMIN_PASSWORD` with no `=`
+forwards the value from the caller's environment rather than restating it — so
+it never reaches the host's process arguments, where any local user can read it
+off `ps`. Verified: the container receives it and it appears nowhere in docker's
+argv. This is the one password on the system at the moment it is created.
+
+It runs migrations first, so it works against an empty volume — an admin can
+exist before the server has ever started.
+
+Two things it deliberately does not do:
+
+- **It never changes an existing password.** Given an address that is already
+  here, it grants the role and stops. Otherwise the bootstrap command would
+  double as an offline password reset for any account, and anyone who could run
+  it could take over the organiser's login rather than merely create one. Run it
+  twice and the second run says so.
+- **It does not lowercase-and-hope.** The email goes through the same schema the
+  API validates against, so `You@Example.org` finds the existing
+  `you@example.org` rather than creating a second account beside it — the
+  table's `UNIQUE` is byte-exact.
+
+The password must be at least 12 characters. That floor applies to a password
+being _set_, never at login: raising it later must not lock out someone whose
+existing password no longer passes.
+
+### Roles
+
+Two roles, `admin` and `member`, in `account_role`. No finer-grained
+permissions — at this size they would be more to get wrong than to gain.
+
+Authorization is a `preHandler` on the route, not a hidden link:
+`/api/admin/*` answers **401** with `{ "error": "unauthenticated" }` when nobody
+is signed in and **403** with `{ "error": "forbidden" }` for a signed-in account
+without the role. The two are different on purpose: 401 is a client's cue to
+send the visitor to login, and 403 must never be — that would bounce a member
+around a loop logging in again cannot fix. That is the contract, not yet a
+description; the web app currently renders both as a message rather than
+redirecting.
+
+The web app hides what a viewer cannot use, but that is presentation. Every
+admin route refuses server-side regardless of what the nav rendered.
 
 ## Security headers
 
