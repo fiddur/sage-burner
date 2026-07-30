@@ -88,6 +88,10 @@ export const Admin = ({ api }: { api: Pick<ApiClient, 'getAdminAccounts'> }) => 
     <section class="page">
       <h1>Organise</h1>
 
+      <p>
+        <a href="/admin/events">Events and welcome text</a>
+      </p>
+
       <h2>Accounts</h2>
 
       {roster.status === 'loading' && <p class="form-note">Loading…</p>}

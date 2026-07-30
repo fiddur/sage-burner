@@ -15,11 +15,17 @@ import { createSessions } from './auth/session.ts'
 import { clientErrorHandler, frameworkErrorHandler, registerErrorHandler } from './errors.ts'
 import { registerAdminRoutes } from './routes/admin.ts'
 import { registerAuthRoutes } from './routes/auth.ts'
+import { registerEventRoutes } from './routes/events.ts'
 import { registerVersionRoutes } from './routes/version.ts'
 
 export interface AppDeps {
   db: Database
   config: Config
+  /**
+   * Injected so the active-event rule can be tested at a fixed date. A test
+   * written against the real clock would pass in July and fail in September.
+   */
+  now?: () => Date
 }
 
 /** The API lives here; everything else is the single-page app. */
@@ -209,7 +215,11 @@ const sessionDeps = (config: Config) => ({
  * can inject an in-memory database and assert against `app.inject()` without a
  * socket, a file, or a running server.
  */
-export const createApp = async ({ db, config }: AppDeps): Promise<FastifyInstance> => {
+export const createApp = async ({
+  db,
+  config,
+  now = () => new Date(),
+}: AppDeps): Promise<FastifyInstance> => {
   const app = Fastify({
     logger: loggerOptions(config.log_level),
     // Defaults to trusting nothing. `true` would believe the whole
@@ -270,6 +280,7 @@ export const createApp = async ({ db, config }: AppDeps): Promise<FastifyInstanc
   const sessions = createSessions(sessionDeps(config))
   registerAuthRoutes(app, { db, config, sessions })
   registerAdminRoutes(app, { db, sessions })
+  registerEventRoutes(app, { db, sessions, now })
 
   const webRoot = config.web_root
   const servesWebApp = webRoot !== undefined

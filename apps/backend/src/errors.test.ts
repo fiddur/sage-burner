@@ -257,7 +257,10 @@ describe('error logging', () => {
     const response = await captured.app.inject({ method: 'GET', url: '/nothing' })
 
     expect(response.statusCode).toBe(409)
-    expect(response.json()).toEqual({ error: 'bad_request' })
+    // `conflict` since #11 gave 409 its own code; the property under test is
+    // that the status the route set survives a throw the handler cannot read,
+    // not which code 409 maps to.
+    expect(response.json()).toEqual({ error: 'conflict' })
   })
 
   it('logs a 5xx with the stack, which is ours to explain', async () => {

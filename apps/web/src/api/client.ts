@@ -1,4 +1,14 @@
-import type { AdminAccountsResponse, LoginRequest, MeResponse, VersionResponse } from '@sage-burner/shared'
+import type {
+  ActiveEventResponse,
+  AdminAccountsResponse,
+  EventCreateInput,
+  EventResponse,
+  EventUpdate,
+  EventsResponse,
+  LoginRequest,
+  MeResponse,
+  VersionResponse,
+} from '@sage-burner/shared'
 
 /**
  * The API client.
@@ -133,6 +143,20 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
      * must not do that for 403, where signing in again changes nothing.
      */
     getAdminAccounts: (signal?: AbortSignal) => request<AdminAccountsResponse>('/admin/accounts', { signal }),
+
+    /** Public. `{ event: null }` before the first event exists — not an error. */
+    getActiveEvent: (signal?: AbortSignal) => request<ActiveEventResponse>('/events/active', { signal }),
+
+    /** Admin only. */
+    getEvents: (signal?: AbortSignal) => request<EventsResponse>('/admin/events', { signal }),
+
+    /** Admin only. Throws ApiError(409, 'conflict') when the slug is taken. */
+    createEvent: (body: EventCreateInput) =>
+      request<EventResponse>('/admin/events', { method: 'POST', body }),
+
+    /** Admin only. Partial — omitted fields are left as they are. */
+    updateEvent: (id: string, body: EventUpdate) =>
+      request<EventResponse>(`/admin/events/${encodeURIComponent(id)}`, { method: 'PATCH', body }),
   }
 }
 
