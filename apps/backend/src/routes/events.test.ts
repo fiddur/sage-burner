@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 
+import { eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it } from 'vitest'
 
@@ -171,10 +172,23 @@ describe('admin event routes', () => {
     // where the guard itself is exercised; duplicating it here would test the
     // same preHandler twice.
     const server = await build()
+    const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
 
     expect((await server.inject({ method: 'GET', url: '/api/admin/events' })).statusCode).toBe(401)
     expect(
       (await server.inject({ method: 'POST', url: '/api/admin/events', payload: valid })).statusCode,
+    ).toBe(401)
+    // PATCH was missing while the name claimed the whole route group. It shares
+    // the preHandler, so the risk was low — but a test's name should not be
+    // broader than its assertions.
+    expect(
+      (
+        await server.inject({
+          method: 'PATCH',
+          url: `/api/admin/events/${id}`,
+          payload: { welcome_markdown: 'x' },
+        })
+      ).statusCode,
     ).toBe(401)
   })
 
@@ -263,35 +277,258 @@ describe('admin event routes', () => {
     expect(row).toMatchObject({ slug: 'summer-2026', start_date: '2026-08-01', member_cap: 42 })
   })
 
-  it('reject a patch that moves one date past the other', async () => {
-    // The schema cannot catch this: it has to tolerate a partial range, since a
-    // PATCH may legitimately carry only one date. Without the merged-range
-    // check this reaches the database CHECK and answers 500.
+  it('treats an empty patch as a no-op rather than a 500', async () => {
+    // `set({})` is not valid SQL, so drizzle refuses it outright — this used to
+    // answer `internal_error` with a stack in the log. A no-op PATCH is
+    // idempotent, so the row comes back unchanged.
     const server = await build()
     const cookie = await givenAdmin()
     const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
 
-    const response = await patch(server, cookie, id, { start_date: '2026-09-01' })
+    const response = await patch(server, cookie, id, {})
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().event).toMatchObject({ slug: 'summer-2026', welcome_markdown: '' })
+  })
+
+  it('rejects an unrecognised key on create too, not only on update', async () => {
+    // Otherwise `welcome` for `welcome_markdown` is stripped and the event is
+    // created with the `.default('')`, so an organiser gets a 201 for an event
+    // whose welcome text is silently empty. Same argument as the update path; the
+    // two schemas should not differ for no stated reason.
+    const server = await build()
+    const cookie = await givenAdmin()
+
+    const response = await create(server, cookie, { ...valid, welcome: 'typo' })
+
+    expect(response.statusCode).toBe(400)
+    expect(await db().select().from(event)).toHaveLength(0)
+  })
+
+  it('answers 404 for an empty patch against an event that does not exist', async () => {
+    // The one branch that decides what `{}` means when there is no row. It is the
+    // only path that still reads before writing, so it is also the only place a
+    // missing event is detected without the `UPDATE` doing it.
+    const server = await build()
+    const cookie = await givenAdmin()
+
+    const response = await patch(server, cookie, randomUUID(), {})
+
+    expect(response.statusCode).toBe(404)
+    expect(response.json()).toEqual({ error: 'not_found' })
+  })
+
+  it('rejects a whole event object patched back, the round-trip the README warns about', async () => {
+    // The documented contract — "reading an event, editing the object and sending
+    // the whole thing back is a 400 on `id` and `created_at`" — rests on two
+    // independent facts: `.strict()`, and `id`/`created_at` being omitted from the
+    // update schema. Either one changing alone breaks the promise, and the
+    // `welcome` test covers `.strict()` for a different key for a different reason.
+    const server = await build()
+    const cookie = await givenAdmin()
+    const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
+    const [whole] = await db().select().from(event)
+    if (whole === undefined) throw new Error('fixture missing')
+
+    const response = await patch(server, cookie, id, { ...whole, name: 'Renamed' })
+
+    expect(response.statusCode).toBe(400)
+    expect(response.json()).toEqual({ error: 'bad_request' })
+    const [row] = await db().select().from(event)
+    expect(row).toMatchObject({ name: 'summer-2026' })
+  })
+
+  it('rejects an unrecognised key instead of answering "saved"', async () => {
+    // `welcome` for `welcome_markdown` is a plausible typo against a partial
+    // endpoint. A non-strict schema stripped it, the body became `{}`, and the
+    // no-op path above answered 200 — which the editor renders as "Saved."
+    // while nothing was written. Silent success is worse to diagnose than a 500.
+    const server = await build()
+    const cookie = await givenAdmin()
+    const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
+
+    const response = await patch(server, cookie, id, { welcome: 'typo' })
 
     expect(response.statusCode).toBe(400)
     expect(response.json()).toEqual({ error: 'bad_request' })
   })
 
-  it('treat a patch with no recognised keys as a no-op rather than a 500', async () => {
-    // Reachable two ways: literally `{}`, and — more likely — a typo like
-    // `welcome` for `welcome_markdown`, which Zod strips. Both used to reach
-    // `set({})`, which drizzle refuses outright, so a typo answered
-    // `internal_error` with a stack in the log.
+  it('rejects a patch with both dates in the wrong order', async () => {
+    // Rejected by `withEventDateOrder` before the handler sees it, which is why
+    // the handler carries no both-dates check. Nothing covered this on the update
+    // path before — only on POST — so relaxing that refine would have gone
+    // unnoticed until an out-of-order pair reached the database CHECK.
     const server = await build()
     const cookie = await givenAdmin()
     const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
 
-    for (const body of [{}, { welcome: 'typo' }]) {
-      const response = await patch(server, cookie, id, body)
+    const response = await patch(server, cookie, id, { start_date: '2026-09-01', end_date: '2026-08-20' })
 
-      expect(response.statusCode, JSON.stringify(body)).toBe(200)
-      expect(response.json().event).toMatchObject({ slug: 'summer-2026', welcome_markdown: '' })
-    }
+    expect(response.statusCode).toBe(400)
+    const [row] = await db().select().from(event)
+    expect(row).toMatchObject({ start_date: '2026-08-01', end_date: '2026-08-05' })
+  })
+
+  it('rejects a one-sided date move in either direction, and stores nothing', async () => {
+    // The schema cannot catch this: it tolerates a partial range, since a PATCH
+    // may legitimately carry one date. The handler puts the condition in the
+    // UPDATE's `where` so it is evaluated against the row at write time.
+    //
+    // What these assertions distinguish is that a one-sided move is refused and
+    // the row is untouched — **not** that the decision happens inside the
+    // statement. A read-then-check implementation passes this identically. The
+    // in-statement property is real (it is what stops a concurrent move to the
+    // other date reaching `event_date_order_check` as a 500) but it is not
+    // observable from two sequential requests, so nothing here defends it; the
+    // reachability of `dateOrderCondition` is what this covers.
+    const server = await build()
+    const cookie = await givenAdmin()
+    const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
+
+    const movedStart = await patch(server, cookie, id, { start_date: '2026-09-01' })
+    const movedEnd = await patch(server, cookie, id, { end_date: '2026-07-01' })
+
+    expect(movedStart.statusCode).toBe(400)
+    expect(movedStart.json()).toEqual({ error: 'bad_request' })
+    expect(movedEnd.statusCode).toBe(400)
+    const [row] = await db().select().from(event)
+    expect(row).toMatchObject({ start_date: '2026-08-01', end_date: '2026-08-05' })
+  })
+
+  it('answers 200 when the welcome text is re-saved unchanged', async () => {
+    // The realistic path: an organiser opens the editor, changes nothing, clicks
+    // Save. What it pins is that a write which changes no values is still a
+    // success — not an error, and not "no such event".
+    //
+    // It used to guard something narrower and more fragile: the handler read
+    // `changes`, which meant it depended on SQLite counting a row whose SET values
+    // are identical, where MySQL reports 0. `.returning()` removed that — `RETURNING`
+    // emits a row per row the `WHERE` matched, whether or not the values differ —
+    // so this no longer defends a driver-specific coupling, because there is not
+    // one. It defends the contract instead, which is the part a member would feel.
+    const server = await build()
+    const cookie = await givenAdmin()
+    const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
+    await patch(server, cookie, id, { welcome_markdown: '# Bring water' })
+
+    const response = await patch(server, cookie, id, { welcome_markdown: '# Bring water' })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().event).toMatchObject({ welcome_markdown: '# Bring water' })
+  })
+
+  it('allows a one-sided date move that keeps the order, in either direction', async () => {
+    // The guard must not have become "no single-date patches" — and both branches
+    // of `dateOrderCondition` need a passing case, not just the rejecting one.
+    // Only `end_date` was covered here, so nothing exercised the `start_date`
+    // branch in the direction that should succeed.
+    const server = await build()
+    const cookie = await givenAdmin()
+    const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
+
+    const movedEnd = await patch(server, cookie, id, { end_date: '2026-08-09' })
+    const movedStart = await patch(server, cookie, id, { start_date: '2026-08-03' })
+
+    expect(movedEnd.statusCode).toBe(200)
+    expect(movedStart.statusCode).toBe(200)
+    const [row] = await db().select().from(event)
+    expect(row).toMatchObject({ start_date: '2026-08-03', end_date: '2026-08-09' })
+  })
+
+  it('allows moving the whole range forward, with both dates in one patch', async () => {
+    // The `return undefined` in `dateOrderCondition`'s both-dates branch. Nothing
+    // exercised it: every other both-dates PATCH here is out of order, so
+    // `withEventDateOrder` rejects it at `safeParse` and the handler never calls the
+    // function with both set.
+    //
+    // Deleting that line is not harmless — the next branch would then compare the
+    // *new* start against the *old* end column (`2026-09-01 <= 2026-08-05`), match
+    // no rows, and refuse a perfectly ordinary "the burn moved to September".
+    const server = await build()
+    const cookie = await givenAdmin()
+    const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
+
+    const response = await patch(server, cookie, id, { start_date: '2026-09-01', end_date: '2026-09-05' })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().event).toMatchObject({ start_date: '2026-09-01', end_date: '2026-09-05' })
+    const [row] = await db().select().from(event)
+    expect(row).toMatchObject({ start_date: '2026-09-01', end_date: '2026-09-05' })
+  })
+
+  // A one-day event is legal — `event_date_order_check` is `end_date >= start_date`
+  // — so both branches of `dateOrderCondition` must use `<=`, not `<`.
+  //
+  // One case each, on its own fixture. They were a single test with two sequential
+  // patches, and that only exercised the second boundary *because the first
+  // succeeded*: under a strict `<` the start move is refused, the row stays
+  // `08-01..08-05`, and the end move then evaluates `08-01 < 08-05` and passes. The
+  // mutation was still caught, but by one assertion rather than the two the comment
+  // claimed.
+  it('allows a start date landing exactly on the end date', async () => {
+    const server = await build()
+    const cookie = await givenAdmin()
+    const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
+
+    const response = await patch(server, cookie, id, { start_date: '2026-08-05' })
+
+    expect(response.statusCode).toBe(200)
+    const [row] = await db().select().from(event)
+    expect(row).toMatchObject({ start_date: '2026-08-05', end_date: '2026-08-05' })
+  })
+
+  it('allows an end date landing exactly on the start date', async () => {
+    const server = await build()
+    const cookie = await givenAdmin()
+    const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
+
+    const response = await patch(server, cookie, id, { end_date: '2026-08-01' })
+
+    expect(response.statusCode).toBe(200)
+    const [row] = await db().select().from(event)
+    expect(row).toMatchObject({ start_date: '2026-08-01', end_date: '2026-08-01' })
+  })
+
+  it('answers 404, not 400, when a valid one-sided move hits a deleted event', async () => {
+    // Zero matched rows has two causes when an ordering condition is in the
+    // `WHERE`: the condition failed, or the row is gone. Guessing attributed it to
+    // the body, so a perfectly ordered move against a deleted event answered
+    // `bad_request` — which the editor renders as "check the dates and lengths",
+    // dates that were never the problem. The handler re-reads instead.
+    //
+    // No stub any more: since the pre-read moved inside the empty-body branch,
+    // nothing is read before the write, so a deleted row reaches the same path a
+    // concurrent delete would.
+    const server = await build()
+    const cookie = await givenAdmin()
+    const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
+    await db().delete(event).where(eq(event.id, id))
+
+    // Well ordered against the row as it was: 2026-08-02 sits inside 08-01..08-05.
+    const response = await patch(server, cookie, id, { start_date: '2026-08-02' })
+
+    expect(response.statusCode).toBe(404)
+    expect(response.json()).toEqual({ error: 'not_found' })
+  })
+  it("answers 409 when a patch takes another event's slug", async () => {
+    // The 409 was only covered on POST, and it matters more here because the
+    // handler signals a conflict with an `undefined` sentinel out of `.catch()`
+    // rather than by throwing — nothing else pins that `undefined` means "slug
+    // conflict" rather than "the driver returned nothing".
+    //
+    // That distinction carries more weight since `.returning()` landed, because the
+    // handler now reads two different empty-ish results from the same statement:
+    // `undefined` from the `.catch()` is a conflict (409), and `[]` is "no row
+    // matched" (400 or 404). Collapsing them would answer the wrong one.
+    const server = await build()
+    const cookie = await givenAdmin()
+    await givenEvent({ slug: 'winter-2026', start_date: '2026-12-01', end_date: '2026-12-05' })
+    const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
+
+    const response = await patch(server, cookie, id, { slug: 'winter-2026' })
+
+    expect(response.statusCode).toBe(409)
+    expect(response.json()).toEqual({ error: 'conflict' })
   })
 
   it('answer 404 for an event that does not exist', async () => {

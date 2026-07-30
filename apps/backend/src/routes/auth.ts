@@ -167,15 +167,22 @@ export const viewerFor = async (
   const payload = deps.sessions.read(token)
   if (payload === undefined) return undefined
 
-  const [row] = await deps.db
-    .select({ id: account.id })
+  // One query, not two. A left join rather than an existence check followed by
+  // `rolesFor`: this runs on every guarded request, so the second round trip was
+  // pure overhead. Left, not inner — an account with no roles must still resolve
+  // to a viewer, since "signed in with no role" is an ordinary state (an
+  // applicant checking on their application).
+  const rows = await deps.db
+    .select({ id: account.id, role: accountRole.role })
     .from(account)
+    .leftJoin(accountRole, eq(accountRole.account_id, account.id))
     .where(eq(account.id, payload.account_id))
-    .limit(1)
 
-  if (row === undefined) return undefined
+  const first = rows[0]
+  if (first === undefined) return undefined
 
-  return { account_id: row.id, roles: await rolesFor(deps.db, row.id) }
+  // `role` is null on the no-roles row the left join produces, and only there.
+  return { account_id: first.id, roles: rows.map((row) => row.role).filter((role) => role !== null) }
 }
 
 export interface AuthRouteDeps {

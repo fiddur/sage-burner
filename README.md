@@ -628,6 +628,33 @@ the same renderer, so what it shows is what a visitor gets.
 A slug collision answers **409** rather than a generic failure — the slug appears
 in URLs, so it is something the organiser fixes by choosing another.
 
+Four more things the write routes do, for anyone writing a second client:
+
+- **An unrecognised key is a 400**, on create and update alike. A body is not
+  filtered down to what the schema knows: `welcome` instead of `welcome_markdown`
+  is refused rather than silently dropped, which on create would have produced an
+  event whose welcome text was quietly empty and on update a "saved" that saved
+  nothing.
+- **An empty PATCH body (`{}`) is a 200** for an event that exists, returning it
+  unchanged, and a **404** for one that does not. It is a no-op rather than an
+  error, and it is the only body that reads instead of writing.
+- **A PATCH names only what it changes.** Reading an event, editing the object and
+  sending the whole thing back is therefore a 400 on `id` and `created_at`.
+- **A date move that would invert the range answers 400**, not a 500 from the
+  database. That holds for a body carrying one date as well as two — the check for
+  a one-sided move rides in the `UPDATE` itself, so a second organiser moving the
+  other date concurrently cannot slip between a read and a write.
+
+A PATCH responds with the event **as written**, not with the body merged onto what
+was read a moment earlier — so if another organiser's change landed in between, the
+response reflects it rather than reporting a value nobody stored.
+
+A row that disappears before the `UPDATE` reaches it answers **404**, the same as
+one that was already gone — the body was not the problem, whatever it contained. The
+two causes of a failed write are told apart by re-reading the row afterwards rather
+than inferred from the request, so a well-ordered date move against an event someone
+else has just deleted does not come back as "check the dates".
+
 ### Markdown is escaped, not filtered
 
 `welcome_markdown` is admin-authored and rendered to every public visitor, so it
