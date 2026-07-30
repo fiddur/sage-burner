@@ -1,6 +1,6 @@
 import type { FormQuestion, FormQuestionType } from '@sage-burner/shared'
 
-import { formQuestionTypes, isFormQuestionType } from '@sage-burner/shared'
+import { formQuestionTypes, isFormQuestionType, tickBoxRequired } from '@sage-burner/shared'
 import { useEffect, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -36,15 +36,13 @@ const BLANK = { label: '', type: 'textarea' as FormQuestionType, help_text: '', 
 
 /**
  * `required` is decided by the type for the two tick-box types, not by the
- * organiser: an `agreement` is always required, a `checkbox` never is. The API
- * and the database both refuse the other combinations, so offering the choice
- * would only turn a tick into a 400.
+ * organiser. The rule itself comes from `tickBoxRequired` in the shared package,
+ * so this control cannot drift from what the API and the database enforce — which
+ * is what happened when the rule was written out separately in each place.
  */
-const requiredFor = (type: FormQuestionType, chosen: boolean) => {
-  if (type === 'agreement') return true
-  if (type === 'checkbox') return false
-  return chosen
-}
+const requiredFor = (type: FormQuestionType, chosen: boolean) => tickBoxRequired(type) ?? chosen
+
+const isFixed = (type: FormQuestionType) => tickBoxRequired(type) !== undefined
 
 const requiredNote = (type: FormQuestionType) => {
   if (type === 'agreement') return ' (always, for an agreement)'
@@ -294,7 +292,7 @@ export const QuestionEditor = ({ api, eventId }: { api: QuestionsApi; eventId: s
           <input
             type="checkbox"
             checked={requiredFor(draft.type, draft.required)}
-            disabled={draft.type === 'agreement' || draft.type === 'checkbox'}
+            disabled={isFixed(draft.type)}
             onChange={(changeEvent) => setDraft({ ...draft, required: changeEvent.currentTarget.checked })}
           />
           <span>Required{requiredNote(draft.type)}</span>
@@ -382,7 +380,7 @@ const QuestionFields = ({
         <input
           type="checkbox"
           checked={requiredFor(type, required)}
-          disabled={type === 'agreement' || type === 'checkbox'}
+          disabled={isFixed(type)}
           onChange={(changeEvent) => setRequired(changeEvent.currentTarget.checked)}
         />
         <span>Required{requiredNote(type)}</span>

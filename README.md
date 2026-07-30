@@ -666,9 +666,16 @@ hidden behind a stale response. Every write is admin-only.
   spellings of one rule is the ambiguity, so the second is refused.
 
 The API rejects both combinations, on create and on any PATCH that would produce
-one; `db/schema.ts` carries a CHECK for each, because `required` has
-`.default(false)` and an insert that omits it never touches a Zod schema; and the
-editor disables the control with a note rather than letting a tick become a 400.
+one — including a PATCH naming only `type` or only `required`, which the schema
+alone cannot decide, so the handler applies the rule to the merged row.
+`db/schema.ts` carries a CHECK for each, because `required` has `.default(false)`
+and an insert that omits it never touches a Zod schema. The editor disables the
+control with a note rather than letting a tick become a 400.
+
+All four places read the rule from one function, `tickBoxRequired`, rather than
+restating it: written out separately, the handler covered `agreement` and not
+`checkbox` within an hour, and the gap surfaced as a 500 from the CHECK instead of
+a 400.
 Settled now, while there are no rows: whichever half of such a row you believed
 later would be a guess.
 

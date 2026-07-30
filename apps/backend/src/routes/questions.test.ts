@@ -429,6 +429,46 @@ describe('editing a question', () => {
     expect(retype.statusCode).toBe(400)
   })
 
+  it('refuses a patch that would make a checkbox required', async () => {
+    // The other type, both directions. These reached the database CHECK and
+    // answered 500 while the merged-row check covered only `agreement` — the
+    // schema refine cannot catch them, since a body naming one of the two keys is
+    // not decidable on its own.
+    const server = await build()
+    const cookie = await givenAdmin()
+    const eventId = await givenEvent()
+    const requiredText = await add(server, cookie, eventId, {
+      ...question,
+      type: 'text',
+      label: 'Required text',
+      required: true,
+    })
+    const checkbox = await add(server, cookie, eventId, {
+      ...question,
+      type: 'checkbox',
+      label: 'Tick if vegan',
+      required: false,
+    })
+
+    const retype = await server.inject({
+      method: 'PATCH',
+      url: `/api/admin/questions/${requiredText.json().question.id}`,
+      headers: { cookie },
+      payload: { type: 'checkbox' },
+    })
+    const require = await server.inject({
+      method: 'PATCH',
+      url: `/api/admin/questions/${checkbox.json().question.id}`,
+      headers: { cookie },
+      payload: { required: true },
+    })
+
+    expect(retype.statusCode).toBe(400)
+    expect(retype.json()).toEqual({ error: 'bad_request' })
+    expect(require.statusCode).toBe(400)
+    expect(require.json()).toEqual({ error: 'bad_request' })
+  })
+
   it('refuses an anonymous patch', async () => {
     // POST, DELETE and the reorder each had one; PATCH was the odd one out.
     const server = await build()

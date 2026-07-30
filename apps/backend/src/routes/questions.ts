@@ -6,6 +6,7 @@ import {
   formQuestionCreateSchema,
   formQuestionOrderSchema,
   formQuestionUpdateSchema,
+  violatesTickBoxRules,
 } from '@sage-burner/shared'
 import { asc, desc, eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
@@ -125,15 +126,18 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db, sessions }: G
         return { question: existing } satisfies FormQuestionResponse
       }
 
-      // `agreement` implies `required`, and a PATCH can break that with one field
-      // — `{ required: false }` on an existing agreement question, or
-      // `{ type: 'agreement' }` on one that is optional. The schema only sees the
-      // body, so it catches a contradictory *pair*; the merged row is what
-      // actually has to hold.
+      // A PATCH can break the tick-box rule with a single field, from either
+      // direction and for either type — `{ required: false }` onto an agreement,
+      // `{ type: 'agreement' }` onto an optional question, `{ type: 'checkbox' }`
+      // onto a required one, `{ required: true }` onto a checkbox. The schema only
+      // ever sees the body, and a lone key is not decidable, so the merged row is
+      // what has to hold.
+      //
+      // Uses the same predicate as the schema refine rather than restating it:
+      // this check covered only the `agreement` half at first, and the missing
+      // clause meant a required checkbox reached the CHECK and answered 500.
       const merged = { ...existing, ...parsed.data }
-      if (merged.type === 'agreement' && !merged.required) {
-        return reply.code(400).send(errorResponse('bad_request'))
-      }
+      if (violatesTickBoxRules(merged)) return reply.code(400).send(errorResponse('bad_request'))
 
       await db.update(formQuestion).set(parsed.data).where(eq(formQuestion.id, request.params.id))
 

@@ -52,16 +52,41 @@ export type FormQuestion = z.infer<typeof formQuestionSchema>
  * so a PATCH carrying one of the two is settled by the handler against the
  * merged row.
  */
+/**
+ * What `required` must be for a type, or `undefined` when it is the organiser's
+ * choice.
+ *
+ * The single statement of the rule. It had been written out three times — the two
+ * refines below, the merged-row check in the PATCH handler, and the editor's
+ * control state — and the halves drifted immediately: the handler covered
+ * `agreement` and not `checkbox`, so a PATCH producing a required checkbox reached
+ * the database CHECK and answered 500 instead of 400. One function, three callers.
+ */
+export const tickBoxRequired = (type: string): boolean | undefined => {
+  if (type === 'agreement') return true
+  if (type === 'checkbox') return false
+  return undefined
+}
+
+/**
+ * Whether a `type`/`required` pair contradicts the rule.
+ *
+ * Absent keys pass: a PATCH body may carry one of the two, and the pair is only
+ * decidable when both are known. The handler therefore has to apply this to the
+ * *merged* row, not to the body — see `PATCH /api/admin/questions/:id`.
+ */
+export const violatesTickBoxRules = (value: { type?: string; required?: boolean }): boolean => {
+  if (value.type === undefined || value.required === undefined) return false
+  const must = tickBoxRequired(value.type)
+
+  return must !== undefined && value.required !== must
+}
+
 export const withTickBoxRules = <T extends z.ZodType<{ type?: string; required?: boolean }>>(schema: T) =>
-  schema
-    .refine((value) => value.type !== 'agreement' || value.required !== false, {
-      message: 'an agreement question must be required',
-      path: ['required'],
-    })
-    .refine((value) => value.type !== 'checkbox' || value.required !== true, {
-      message: 'a checkbox question cannot be required — use an agreement question for that',
-      path: ['required'],
-    })
+  schema.refine((value) => !violatesTickBoxRules(value), {
+    message: 'an agreement question must be required, and a checkbox question must not be',
+    path: ['required'],
+  })
 
 /**
  * Creating a question. `id` and `event_id` come from the route, not the body.
