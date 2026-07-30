@@ -30,10 +30,9 @@ export type ErrorResponse = z.infer<typeof errorResponseSchema>
  * malformed body, and a client that cannot tell them apart cannot say "try
  * again shortly".
  *
- * `unauthenticated` and `forbidden` are deliberately *absent* until #10's
- * guards emit them. They are the distinction a client cannot make from status
- * alone, and they will be wanted — but adding them now would be the thing the
- * paragraph above forbids.
+ * `unauthenticated` and `forbidden` are separate codes because 401 and 403 are
+ * the distinction a client cannot safely collapse: 401 means signing in would
+ * help, 403 means it would not. Both are emitted by the admin guard.
  *
  * `errorResponseSchema` deliberately accepts codes outside this list, so an
  * older client can still parse a newer API's response rather than failing to

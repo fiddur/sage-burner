@@ -572,9 +572,11 @@ permissions — at this size they would be more to get wrong than to gain.
 Authorization is a `preHandler` on the route, not a hidden link:
 `/api/admin/*` answers **401** with `{ "error": "unauthenticated" }` when nobody
 is signed in and **403** with `{ "error": "forbidden" }` for a signed-in account
-without the role. The two are different on purpose — the client sends a 401 to
-the login page, and must not do that for a 403, which would bounce a member
-around a loop that logging in again cannot fix.
+without the role. The two are different on purpose: 401 is a client's cue to
+send the visitor to login, and 403 must never be — that would bounce a member
+around a loop logging in again cannot fix. That is the contract, not yet a
+description; the web app currently renders both as a message rather than
+redirecting.
 
 The web app hides what a viewer cannot use, but that is presentation. Every
 admin route refuses server-side regardless of what the nav rendered.

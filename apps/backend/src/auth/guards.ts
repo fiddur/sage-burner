@@ -16,10 +16,15 @@ export interface GuardDeps {
 /**
  * `preHandler` guards. Authorization is here, not in the UI.
  *
- * 401 and 403 are deliberately different answers. 401 means "sign in", and the
- * client acts on it by sending the visitor to the login page. 403 means "signed
- * in, but not allowed" — sending *that* to login would bounce a member around a
- * loop they can never leave, since logging in again changes nothing.
+ * 401 and 403 are deliberately different answers, and the difference is the
+ * contract the client is expected to honour: 401 is its cue to send the visitor
+ * to login, 403 must never be — that would bounce a member around a loop they
+ * can never leave, since logging in again changes nothing.
+ *
+ * Stated as intent rather than as description. Nothing in `apps/web` navigates
+ * on a 401 today; both are rendered as a message. The reason the codes differ
+ * holds either way, but the comment should not claim behaviour that is not
+ * there yet.
  */
 export const createGuards = ({ db, sessions }: GuardDeps) => {
   const guard = (role?: AccountRole) => async (request: FastifyRequest, reply: FastifyReply) => {

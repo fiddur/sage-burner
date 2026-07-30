@@ -56,6 +56,16 @@ describe('Admin', () => {
     expect(getAdminAccounts).not.toHaveBeenCalled()
   })
 
+  it('points a signed-out visitor at the login form', async () => {
+    // Rather than "ask an existing organiser", which sends someone to a person
+    // when the thing they need is the form.
+    const getAdminAccounts = vi.fn(never)
+    renderAdmin(getAdminAccounts, { status: 'signed-out' })
+
+    expect(screen.getByRole('link', { name: 'Log in' }).getAttribute('href')).toBe('/login')
+    expect(getAdminAccounts).not.toHaveBeenCalled()
+  })
+
   it('waits rather than refusing while the viewer is still loading', async () => {
     // Rendering "this area is for organisers" during the first `getMe` would
     // tell an actual organiser they are not one, for as long as the round trip

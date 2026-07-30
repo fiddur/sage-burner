@@ -106,9 +106,10 @@ describe('the error envelope', () => {
 
   it('preserves the status the error chose, and names the codes a client acts on', async () => {
     // 401 and 403 get their own codes rather than the generic `bad_request`,
-    // because the client behaves differently: 401 sends the visitor to the
-    // login page, 403 must not — logging in again would change nothing. Other
-    // 4xx statuses stay `bad_request`; several tests below cover that.
+    // because a client should be able to act on them differently: 401 is the
+    // cue to send someone to login, 403 must not be — logging in again would
+    // change nothing. Other 4xx statuses stay `bad_request`; several tests
+    // below cover that.
     await build()
     app.get('/api/forbidden', async () => {
       throw Object.assign(new Error('nope'), { statusCode: 403 })

@@ -10,6 +10,7 @@ import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, accountRole } from '../db/schema.ts'
 import { SESSION_COOKIE } from '../routes/auth.ts'
+import { createGuards } from './guards.ts'
 import { createSessions } from './session.ts'
 
 /**
@@ -123,14 +124,52 @@ describe('the admin guard', () => {
   })
 
   it('does not run the route body when it refuses', async () => {
-    // A guard that answers but lets the handler run would still leak the data
-    // it was protecting into the log, and into any side effect the route has.
+    // Asserted from inside a handler, because the response cannot show this: a
+    // 403 envelope has no `accounts` key whether or not the body ran, so an
+    // assertion on the wire passes even if the lifecycle continued and Fastify
+    // merely logged FST_ERR_REP_ALREADY_SENT. A counter is observable; the
+    // body is not. What this protects is any side effect behind a refusal.
     const server = await build()
+    const db = handle?.db
+    if (db === undefined) throw new Error('build() first')
     const id = await givenAccount(['member'])
+
+    let ran = 0
+    const { requireAdmin } = createGuards({
+      db,
+      sessions: createSessions({ secret: SECRET, now: () => new Date(), ttlSeconds: 3600 }),
+    })
+    server.get('/api/admin/counted', { preHandler: requireAdmin }, async () => {
+      ran += 1
+      return { ok: true }
+    })
+
+    const refused = await server.inject({
+      method: 'GET',
+      url: '/api/admin/counted',
+      headers: { cookie: cookieFor(id) },
+    })
+
+    expect(refused.statusCode).toBe(403)
+    expect(ran).toBe(0)
+
+    // And the counter is wired up, so `ran === 0` above means "refused" rather
+    // than "never reachable".
+    const admin = await givenAccount(['admin'])
+    await server.inject({ method: 'GET', url: '/api/admin/counted', headers: { cookie: cookieFor(admin) } })
+    expect(ran).toBe(1)
+  })
+
+  it('marks the roster no-store', async () => {
+    // It carries every account's email address. Without this the browser's
+    // on-disk cache keeps the whole roster past logout, which clears the cookie
+    // and nothing else.
+    const server = await build()
+    const id = await givenAccount(['admin'])
 
     const response = await getAccounts(server, cookieFor(id))
 
-    expect(response.json()).not.toHaveProperty('accounts')
+    expect(response.headers['cache-control']).toBe('no-store')
   })
 })
 

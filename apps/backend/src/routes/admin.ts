@@ -5,6 +5,7 @@ import type { GuardDeps } from '../auth/guards.ts'
 
 import { createGuards } from '../auth/guards.ts'
 import { account, accountRole } from '../db/schema.ts'
+import { noStore } from '../http.ts'
 
 /**
  * Admin-only reads.
@@ -16,7 +17,13 @@ import { account, accountRole } from '../db/schema.ts'
 export const registerAdminRoutes = (app: FastifyInstance, { db, sessions }: GuardDeps) => {
   const { requireAdmin } = createGuards({ db, sessions })
 
-  app.get('/api/admin/accounts', { preHandler: requireAdmin }, async () => {
+  app.get('/api/admin/accounts', { preHandler: requireAdmin }, async (_request, reply) => {
+    // Every account's email address. An organiser opening this on a shared
+    // laptop would otherwise leave the whole roster in the browser's on-disk
+    // cache, which outlives the session — logging out clears the cookie, not
+    // the cache entry.
+    void noStore(reply)
+
     // Two queries and a group, rather than a join. A left join would work but
     // returns one row per role to unpick, and at 42 members the simpler shape
     // wins. An *inner* join would be wrong outright: it drops accounts with no

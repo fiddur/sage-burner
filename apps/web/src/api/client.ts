@@ -127,7 +127,11 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
 
     logout: () => request<MeResponse>('/auth/logout', { method: 'POST' }),
 
-    /** Admin only. Throws ApiError(401) signed out, ApiError(403) without the role. */
+    /**
+     * Admin only. Throws ApiError(401) signed out, ApiError(403) without the
+     * role — a caller may treat 401 as a cue to send the visitor to login, but
+     * must not do that for 403, where signing in again changes nothing.
+     */
     getAdminAccounts: (signal?: AbortSignal) => request<AdminAccountsResponse>('/admin/accounts', { signal }),
   }
 }

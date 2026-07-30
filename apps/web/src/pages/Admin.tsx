@@ -61,6 +61,20 @@ export const Admin = ({ api }: { api: Pick<ApiClient, 'getAdminAccounts'> }) => 
     )
   }
 
+  if (viewer.status === 'signed-out') {
+    // Distinct from the signed-in-without-the-role case below: telling someone
+    // to "ask an organiser" when they simply have not signed in yet sends them
+    // to a person instead of to the form that would fix it.
+    return (
+      <section class="page">
+        <h1>Organise</h1>
+        <p>
+          <a href="/login">Log in</a> to see this.
+        </p>
+      </section>
+    )
+  }
+
   if (!admin) {
     return (
       <section class="page">
