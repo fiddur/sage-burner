@@ -215,6 +215,15 @@ a:hover {
   font-size: 0.95rem;
 }
 
+/* Admin-authored markdown, on the public page and in the editor's preview.
+   Remote images load now that `img-src` allows `https:`, and nothing else bounds
+   them — a linked 3000px photo would push the layout sideways on a phone. */
+.welcome img,
+.markdown-preview img {
+  max-width: 100%;
+  height: auto;
+}
+
 /* A control, not a link — it performs an action rather than navigating —
    styled to sit with the nav links beside it. */
 .link-button {
