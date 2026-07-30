@@ -628,7 +628,7 @@ the same renderer, so what it shows is what a visitor gets.
 A slug collision answers **409** rather than a generic failure — the slug appears
 in URLs, so it is something the organiser fixes by choosing another.
 
-Three more things the write routes do, for anyone writing a second client:
+Four more things the write routes do, for anyone writing a second client:
 
 - **An unrecognised key is a 400**, on create and update alike. A body is not
   filtered down to what the schema knows: `welcome` instead of `welcome_markdown`

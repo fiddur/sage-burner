@@ -368,11 +368,11 @@ describe('admin event routes', () => {
     // path: an organiser opens the editor, changes nothing, clicks Save.
     //
     // What this test uniquely catches is a **driver swap** to one that reports 0
-    // for an update whose values are unchanged (MySQL does). This body carries no
-    // date, so `ordered` is undefined and the handler would answer **404
-    // `not_found`** — the event you are editing does not exist, for a save that
-    // changed nothing. Nothing else in the suite notices, because every other
-    // PATCH test writes a genuinely new value.
+    // for an update whose values are unchanged (MySQL does). The row is still
+    // there, so the re-read finds it and the handler answers **400
+    // `bad_request`** — "check the dates and lengths" for a save that changed
+    // nothing. Nothing else in the suite notices, because every other PATCH test
+    // writes a genuinely new value; this one fails loudly because 400 is not 200.
     //
     // Two things it does *not* catch, listed because an earlier version of this
     // comment claimed it did:

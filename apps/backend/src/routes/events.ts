@@ -191,10 +191,11 @@ export const registerEventRoutes = (
       // `rejects a one-sided date move in either direction, and stores nothing`
       //
       // Reading zero as "no row matched" also relies on SQLite counting a row
-      // whose SET values are identical; MySQL returns 0 there. A no-op save
-      // carries no date, so `ordered` is undefined and the split below would
-      // answer **404** — "the event you are editing does not exist" for a save
-      // that changed nothing, which is the more misleading of the two. Covered by:
+      // whose SET values are identical; MySQL returns 0 there. The row is still
+      // present in that case, so the re-read below finds it and the answer is a
+      // **400** — "check the dates and lengths" for a save that changed nothing,
+      // which is exactly the misdirection the re-read was added to stop happening
+      // for a deleted row. Covered by:
       // `answers 200 when the welcome text is re-saved unchanged`
       //
       // Both names are on one line each on purpose — a name wrapped across two
