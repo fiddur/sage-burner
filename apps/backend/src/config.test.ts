@@ -3,12 +3,16 @@ import { describe, expect, it } from 'vitest'
 import { createConfig } from './config.ts'
 
 describe('createConfig', () => {
-  it('runs on an empty environment, so a bare `docker run` works', () => {
+  it('runs on an empty environment, bound to loopback', () => {
     const config = createConfig({})
 
     expect(config.node_env).toBe('development')
     expect(config.port).toBe(3000)
-    expect(config.host).toBe('0.0.0.0')
+    // Loopback, not `0.0.0.0`. A bare `docker run` is unaffected — the image
+    // sets HOST itself — so the only runs this default reaches are the ones
+    // nobody documented, and those should not be on the LAN with the published
+    // development signing key.
+    expect(config.host).toBe('127.0.0.1')
     expect(config.database_url).toBe('./data/sage-burner.sqlite')
     expect(config.build_sha).toBe('unknown')
     expect(config.web_root).toBeUndefined()
@@ -72,6 +76,35 @@ describe('createConfig', () => {
       expect(() => createConfig({ SESSION_SECRET: 'too-short' })).toThrow(/SESSION_SECRET/)
     })
 
+    it('refuses the development key on anything reachable, not just in production', () => {
+      // `NODE_ENV` cannot answer "is this reachable by anyone": it defaults to
+      // `development` when unset, so a bare `node src/server.ts`, a systemd
+      // unit, or a compose file that drops the image's environment would sign
+      // sessions with a key committed to a public repository — and omit
+      // `Secure` at the same time. `HOST` is the value that knows.
+      expect(() => createConfig({ HOST: '0.0.0.0' })).toThrow(/SESSION_SECRET/)
+      expect(() => createConfig({ HOST: '192.168.1.10' })).toThrow(/SESSION_SECRET/)
+      expect(() => createConfig({ HOST: '::' })).toThrow(/SESSION_SECRET/)
+    })
+
+    it('allows it on loopback outside production, which is what `pnpm dev` is', () => {
+      for (const host of ['127.0.0.1', '127.0.0.2', 'localhost', '::1']) {
+        expect(createConfig({ HOST: host }).session_secret.length, host).toBeGreaterThanOrEqual(32)
+      }
+    })
+
+    it('refuses it in production even on loopback', () => {
+      // Production on loopback is still production — behind a proxy on the same
+      // host, which is exactly the documented deployment.
+      expect(() => createConfig({ NODE_ENV: 'production', HOST: '127.0.0.1' })).toThrow(/SESSION_SECRET/)
+    })
+
+    it('names both values in the message, so the refusal is diagnosable', () => {
+      // Two conditions decide this, and an operator who reads only "required in
+      // production" while running development will not look at HOST.
+      expect(() => createConfig({ HOST: '0.0.0.0' })).toThrow(/NODE_ENV=development.*HOST=0\.0\.0\.0/s)
+    })
+
     it('defaults the session lifetime to two weeks', () => {
       expect(createConfig({}).session_ttl_seconds).toBe(60 * 60 * 24 * 14)
     })
@@ -86,7 +119,7 @@ describe('createConfig', () => {
 
       expect(config.database_url).toBe('./data/sage-burner.sqlite')
       expect(config.port).toBe(3000)
-      expect(config.host).toBe('0.0.0.0')
+      expect(config.host).toBe('127.0.0.1')
       expect(config.build_sha).toBe('unknown')
     })
 

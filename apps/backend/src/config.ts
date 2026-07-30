@@ -68,11 +68,45 @@ const parseTrustProxy = (value: string | undefined): boolean | number | string =
   return value
 }
 
+/**
+ * Addresses that mean "only this machine can reach it".
+ *
+ * The whole 127.0.0.0/8 block, not just 127.0.0.1 — `127.0.0.2` is equally
+ * local and someone will eventually use it. An empty or unset HOST is not
+ * loopback: Node then binds every interface, which is the case this exists to
+ * catch.
+ */
+const isLoopbackHost = (host: string): boolean =>
+  host === 'localhost' || host === '::1' || host === '[::1]' || /^127\.\d+\.\d+\.\d+$/.test(host)
+
+/**
+ * Whether it is safe to fall back to the published development signing key.
+ *
+ * Both conditions, because either alone is a deployment nobody meant to make:
+ * production on loopback is still production, and development on `0.0.0.0` is
+ * a forgeable session on the LAN.
+ */
+const allowsDevelopmentSecret = (nodeEnv: string, host: string): boolean =>
+  nodeEnv !== 'production' && isLoopbackHost(host)
+
 export const envSchema = z.object({
   NODE_ENV: optional(z.enum(['development', 'test', 'production']).default('development')),
   PORT: optional(port.default(3000)),
-  /** 0.0.0.0 so the container is reachable from outside it. */
-  HOST: optional(z.string().min(1).default('0.0.0.0')),
+  /**
+   * Loopback by default; the image sets `0.0.0.0` explicitly.
+   *
+   * The default used to be `0.0.0.0` "so the container is reachable", which the
+   * container never needed — the Dockerfile has always set it. So the permissive
+   * default only ever applied to the runs nobody documented: a bare
+   * `node src/server.ts`, a systemd unit, a compose file that drops the image's
+   * environment. Those bound every interface *and* fell back to the published
+   * development signing key, which is the pairing the check in `createConfig`
+   * exists to refuse.
+   *
+   * Binding every interface is now something a deployment has to say out loud,
+   * and saying it means bringing your own `SESSION_SECRET`.
+   */
+  HOST: optional(z.string().min(1).default('127.0.0.1')),
   DATABASE_URL: optional(z.string().min(1).default(DEFAULT_DATABASE_URL)),
   LOG_LEVEL: optional(z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info')),
   /** Commit the image was built from. Surfaced by `/api/version`. */
@@ -148,14 +182,22 @@ export const createConfig = (env: NodeJS.ProcessEnv = process.env): Config => {
     throw new Error(`Invalid environment configuration:\n  TRUST_PROXY: ${detail}`)
   }
 
-  // Absent outside production is a development convenience. The check below
-  // rejects it in production — but note what that check is shaped like: it asks
-  // `NODE_ENV === 'production'`, not "is this reachable by anyone". Any run that
-  // is not that — bare-metal `node`, a systemd unit, a compose file overriding
-  // NODE_ENV — signs sessions with the key three lines down, which is committed
-  // to a public repository, and serves the cookie without `Secure` at the same
-  // time. The image sets NODE_ENV=production, so the documented path is covered;
-  // this is about the undocumented ones.
+  // Absent is a development convenience, and the check below decides when that
+  // convenience is safe by asking the question that actually matters: **is this
+  // reachable by anyone?**
+  //
+  // `NODE_ENV` alone could not answer it. It defaults to `development` when
+  // unset, so a bare `node apps/backend/src/server.ts` — a systemd unit, a
+  // hand-rolled deploy, a compose file that drops the image's NODE_ENV — would
+  // bind `0.0.0.0` and sign sessions with the key below, which is committed to
+  // a public repository, while also omitting `Secure`. `HOST` is the value that
+  // knows whether anyone else can reach the process, so it is the one that
+  // decides.
+  //
+  // The fallback therefore requires *both*: not production, and bound to
+  // loopback. `HOST` defaults to loopback for the same reason, so the safe case
+  // is the one you get by doing nothing and reaching the LAN is what you have to
+  // ask for — at which point you bring your own secret.
   //
   // Forging a token also needs the target's `account.id`, a v4 UUID that is not
   // guessable — but that is incidental rather than designed, and it weakens the
@@ -166,9 +208,9 @@ export const createConfig = (env: NodeJS.ProcessEnv = process.env): Config => {
   // invalidate the session you were testing with.
   const session_secret = value.SESSION_SECRET ?? 'development-only-session-secret-not-for-production'
 
-  if (value.NODE_ENV === 'production' && value.SESSION_SECRET === undefined) {
+  if (value.SESSION_SECRET === undefined && !allowsDevelopmentSecret(value.NODE_ENV, value.HOST)) {
     throw new Error(
-      'Invalid environment configuration:\n  SESSION_SECRET: required in production (32+ characters; generate with `openssl rand -base64 48`)',
+      `Invalid environment configuration:\n  SESSION_SECRET: required unless the app is outside production *and* bound to loopback (got NODE_ENV=${value.NODE_ENV}, HOST=${value.HOST}). 32+ characters; generate with \`openssl rand -base64 48\``,
     )
   }
 
