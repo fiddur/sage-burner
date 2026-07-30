@@ -506,7 +506,7 @@ describe('editing a question', () => {
       const real = original(...args)
 
       return {
-        from: (table: unknown) => {
+        from: (table: Parameters<typeof real.from>[0]) => {
           if (table !== formQuestion) return real.from(table)
           intercepted += 1
 
