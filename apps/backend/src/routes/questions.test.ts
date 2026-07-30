@@ -420,6 +420,48 @@ describe('editing a question', () => {
     expect(require.json()).toEqual({ error: 'bad_request' })
   })
 
+  it('allows the tick-box changes that are legitimate, in all three shapes', async () => {
+    // The passing siblings. Every PATCH here carrying `type` or `required` asserted
+    // a 400, so none of `tickBoxCondition`'s three returns had a success case — the
+    // same gap that hid two defects in `dateOrderCondition`, and the reason
+    // AGENTS.md now says a rejecting test needs a passing one.
+    const server = await build()
+    const cookie = await givenAdmin()
+
+    // type-only, condition satisfied: a required `text` may become an `agreement`.
+    const toAgreement = await add(server, cookie, { ...question, type: 'text', required: true })
+    const agreed = await server.inject({
+      method: 'PATCH',
+      url: `/api/admin/questions/${toAgreement.json().question.id}`,
+      headers: { cookie },
+      payload: { type: 'agreement' },
+    })
+    expect(agreed.statusCode).toBe(200)
+    expect(agreed.json().question).toMatchObject({ type: 'agreement', required: true })
+
+    // required-only, satisfied: a `text` question may become optional.
+    const toOptional = await add(server, cookie, { ...question, type: 'text', required: true })
+    const optional = await server.inject({
+      method: 'PATCH',
+      url: `/api/admin/questions/${toOptional.json().question.id}`,
+      headers: { cookie },
+      payload: { required: false },
+    })
+    expect(optional.statusCode).toBe(200)
+    expect(optional.json().question).toMatchObject({ type: 'text', required: false })
+
+    // both keys, consistent: the third return, where the body settles it alone.
+    const toCheckbox = await add(server, cookie, { ...question, type: 'text', required: true })
+    const both = await server.inject({
+      method: 'PATCH',
+      url: `/api/admin/questions/${toCheckbox.json().question.id}`,
+      headers: { cookie },
+      payload: { type: 'checkbox', required: false },
+    })
+    expect(both.statusCode).toBe(200)
+    expect(both.json().question).toMatchObject({ type: 'checkbox', required: false })
+  })
+
   it('refuses a patch whose read of the row is already stale', async () => {
     // The race, forced rather than hoped for. Two concurrent PATCHes each read
     // before either writes, so the loser decides against a row that no longer

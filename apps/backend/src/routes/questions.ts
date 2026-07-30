@@ -30,10 +30,9 @@ import { noStore } from '../http.ts'
  * CHECK then rejects the second UPDATE and the caller gets a 500. Deciding it
  * inside the statement makes it atomic.
  *
- * No cross-reference to `routes/events.ts`: its date-order check is a plain JS
- * comparison on the merged row and carries the same race. A branch in flight turns
- * it into a statement-level condition, but naming a symbol that does not exist here
- * is worse than saying nothing.
+ * `dateOrderCondition` in `routes/events.ts` is the same shape for the same reason,
+ * and the two should stay in step: both compose a condition into the `WHERE` rather
+ * than checking a merged row in JavaScript.
  *
  * With **both** keys present the body settles it alone and the schema refine has
  * already rejected a contradictory pair, so there is nothing to evaluate here.
@@ -151,24 +150,23 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db, sessions }: G
       // — but a read-then-check here is a race (see `tickBoxCondition`), and a JS
       // fail-fast would also pre-empt the statement in every non-racing case, so
       // nothing would exercise the condition that does the real work.
-      const merged = { ...existing, ...parsed.data }
-      const rule = tickBoxCondition(parsed.data)
-      const where =
-        rule === undefined
-          ? eq(formQuestion.id, request.params.id)
-          : and(eq(formQuestion.id, request.params.id), rule)
+      const where = and(eq(formQuestion.id, request.params.id), tickBoxCondition(parsed.data))
+      if (where === undefined) throw new Error('refusing an unfiltered UPDATE on form_question')
 
-      const result = await db.update(formQuestion).set(parsed.data).where(where)
+      // `.returning()` rather than reading `changes`, for the reasons `events.ts`
+      // gives: the row it hands back is the row as written, so the response cannot
+      // report a field from the pre-read snapshot that another write has since
+      // changed — two admins patching the same question, one sending `help_text`
+      // and one `label`, would otherwise each be told their own change landed and
+      // the other's did not.
+      const updated = await db.update(formQuestion).set(parsed.data).where(where).returning()
 
-      // Zero rows, split the way the event PATCH splits it: with a condition in the
-      // `WHERE` it is overwhelmingly the rule that failed, so 400. Without one, only
-      // the id was matched, so the row was deleted between the read and the write —
-      // 404, the same answer as a row that was already gone.
-      // Zero rows has two causes: the tick-box condition failed, or the row was
-      // deleted between the read above and this write. Told apart by asking, not
-      // guessed at from whether a condition was present — guessing answered
-      // "Request failed (400)" for a question that no longer exists.
-      if (Number(result.changes) === 0) {
+      const [row] = updated
+      if (row === undefined) {
+        // Two causes: the tick-box condition failed, or the row was deleted between
+        // the read above and this write. Told apart by asking, not guessed at from
+        // whether a condition was present — guessing answered "Request failed (400)"
+        // for a question that no longer exists.
         const [stillThere] = await db
           .select({ id: formQuestion.id })
           .from(formQuestion)
@@ -180,7 +178,7 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db, sessions }: G
           : reply.code(400).send(errorResponse('bad_request'))
       }
 
-      return { question: merged } satisfies FormQuestionResponse
+      return { question: row } satisfies FormQuestionResponse
     },
   )
 

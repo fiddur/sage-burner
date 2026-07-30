@@ -95,13 +95,12 @@ export const withTickBoxRules = <T extends z.ZodType<{ type?: string; required?:
   })
 
 /**
- * Creating a question. `id` and `order` are the server's, not the body's.
+ * The shared field list for creating and editing a question.
  *
- * `order` is assigned by the server — a new question goes last. Letting a client
- * pick would make two organisers adding questions at once produce a collision
- * over something neither of them chose.
- */
-/**
+ * `id` and `order` are the server's, not the body's: a new question goes last, and
+ * letting a client pick a position would make two organisers adding at once collide
+ * over a number neither of them chose.
+ *
  * `.strict()` on both derivations below, for the reason `eventCreateSchema` and
  * `eventUpdateSchema` give: an unrecognised key is a 400 rather than a silent
  * success. A stripped typo parses to `{}`, the handler answers 200 with the row
