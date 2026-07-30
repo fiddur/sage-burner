@@ -167,23 +167,21 @@ export const registerEventRoutes = (
       //
       // One date given: the condition goes in the `where`, so it is evaluated
       // against the row as it is at write time. See `dateOrderCondition`.
-      const ordered = dateOrderCondition(parsed.data)
-      const where = ordered === undefined ? eq(event.id, id) : and(eq(event.id, id), ordered)
+      // No ternary: `and()` drops `undefined` operands, so this is the same SQL
+      // whether or not there is an ordering condition to add.
+      const where = and(eq(event.id, id), dateOrderCondition(parsed.data))
 
-      // `and()` is typed `SQL | undefined`, and `.where(undefined)` on a drizzle
-      // update is not "match nothing" — it emits no `WHERE` clause at all, so the
-      // `SET` lands on **every** row. Unreachable as written, since `and()` only
-      // returns undefined when every argument is, and `eq(event.id, id)` never is.
+      // `.where(undefined)` on a drizzle update is not "match nothing" — it emits no
+      // `WHERE` clause at all, so the `SET` lands on **every** row. `and()` returns
+      // undefined only when every operand is, and `eq(event.id, id)` never is, so
+      // this cannot fire today.
       //
-      // Kept anyway, and deliberately not the kind of unreachable guard worth
-      // deleting: this one does not duplicate a check made elsewhere, it stands
-      // between a refactor and rewriting every event in the database. The types
-      // will not object if a later change builds the conditions somewhere they can
-      // all be undefined. Throwing gives a 500 and an error log, which is the right
-      // outcome for a state that should be impossible.
-      //
-      // No test: it cannot be reached without breaking the two lines above, and a
-      // test that has to sabotage its subject to run pins the sabotage.
+      // It is a live guard rather than a dead one, though, which is why the ternary
+      // went: branching on `ordered` produced a definite `SQL` in one arm and made
+      // this provably unreachable. Passing both operands to `and()` leaves `where`
+      // genuinely `SQL | undefined` — the state this is written to catch — so a
+      // later refactor that builds the conditions somewhere they can all be
+      // undefined is stopped here instead of rewriting every event in the database.
       if (where === undefined) throw new Error('refusing an unfiltered UPDATE on event')
 
       // `.returning()` rather than reading `changes`, for two reasons that turn out
