@@ -84,7 +84,13 @@ export type EventCreateInput = z.input<typeof eventCreateSchema>
  * than the dates, and a PATCH that had to restate the whole event would make
  * two organisers editing different fields overwrite each other.
  *
- * `.strict()`, so an unrecognised key is a 400 rather than a silent success. A
+ * `.strict()` narrows the contract as well as catching typos: a client that
+ * reads an event, edits the object and PATCHes the whole thing back now gets a
+ * 400 on `id` and `created_at`. That is intended — a PATCH body should name what
+ * it changes — and no client does it today, but it is a request-shape change and
+ * not only a typo guard.
+ *
+ * So an unrecognised key is a 400 rather than a silent success. A
  * partial schema strips unknown keys, so `{"welcome": "…"}` — a plausible typo
  * for `welcome_markdown` — parsed to `{}` and the handler answered 200 with the
  * row unchanged, which the editor rendered as "Saved." while nothing had been
@@ -93,9 +99,14 @@ export type EventCreateInput = z.input<typeof eventCreateSchema>
  * Still wrapped in `withEventDateOrder`, which tolerates a partial range: it
  * only rejects when both dates are present and out of order. A PATCH moving
  * *one* date past the other therefore passes here, so the handler has to catch
- * it — `PATCH /api/admin/events/:id` in `apps/backend/src/routes/events.ts`
- * re-reads the row and validates the *merged* range. Without that it would
- * reach the database CHECK and surface as a 500 rather than a 400.
+ * it — and it does so **inside the UPDATE**, not by re-reading first:
+ * `PATCH /api/admin/events/:id` in `apps/backend/src/routes/events.ts` puts the
+ * ordering condition in the statement's `where` and treats zero matched rows as
+ * the 400. A read-then-check would leave a window where two organisers each
+ * moving one date both validate against the pre-update row, and the second write
+ * reaches `event_date_order_check` as a 500 — the outcome the check exists to
+ * avoid. The both-dates case is settled here and in the handler directly, since
+ * the body determines the ordering with nothing to race against.
  */
 export const eventUpdateSchema = withEventDateOrder(
   eventFields.omit({ id: true, created_at: true }).partial().strict(),

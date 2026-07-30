@@ -148,11 +148,24 @@ export const registerEventRoutes = (
 
       const merged = { ...existing, ...parsed.data }
 
-      // Both dates given: the body decides the ordering on its own, so there is
-      // nothing to race with.
-      if (merged.end_date < merged.start_date) return reply.code(400).send(errorResponse('bad_request'))
+      // Only when *both* dates are given. The body settles the ordering on its
+      // own then, so there is nothing to race with and no reason to involve the
+      // statement.
+      //
+      // Deliberately not `merged.end_date < merged.start_date`, which is what
+      // this was: that runs for a one-sided patch too, comparing the submitted
+      // date against the row as it was *read* — the read-then-check the block
+      // below exists to replace. It answered correctly in every non-racing case,
+      // which is worse than being wrong: it pre-empted the statement-level
+      // decision so completely that replacing `dateOrderCondition` with
+      // `() => undefined` passed the whole suite. The race fix was unreachable
+      // from a test.
+      const { start_date, end_date } = parsed.data
+      if (start_date !== undefined && end_date !== undefined && end_date < start_date) {
+        return reply.code(400).send(errorResponse('bad_request'))
+      }
 
-      // One date given: the condition goes in the `where` so it is evaluated
+      // One date given: the condition goes in the `where`, so it is evaluated
       // against the row as it is at write time. See `dateOrderCondition`.
       const ordered = dateOrderCondition(parsed.data)
       const where = ordered === undefined ? eq(event.id, id) : and(eq(event.id, id), ordered)
@@ -171,6 +184,12 @@ export const registerEventRoutes = (
       // Zero rows means the ordering condition failed: the id matched, since the
       // row was read a moment ago. The only other way here is the row being
       // deleted concurrently, and 400 is a defensible answer to that too.
+      //
+      // This reads `changes` as "rows matched", which is true on SQLite: it
+      // counts a row whose SET values are identical to what was already there.
+      // MySQL returns 0 for that, so the same code there would turn every
+      // re-save of unchanged welcome text into a 400. An unstated coupling to
+      // `node:sqlite` otherwise.
       if (result.changes === 0) return reply.code(400).send(errorResponse('bad_request'))
 
       return { event: merged } satisfies EventResponse
