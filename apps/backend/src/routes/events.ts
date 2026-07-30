@@ -170,6 +170,22 @@ export const registerEventRoutes = (
       const ordered = dateOrderCondition(parsed.data)
       const where = ordered === undefined ? eq(event.id, id) : and(eq(event.id, id), ordered)
 
+      // `and()` is typed `SQL | undefined`, and `.where(undefined)` on a drizzle
+      // update is not "match nothing" — it emits no `WHERE` clause at all, so the
+      // `SET` lands on **every** row. Unreachable as written, since `and()` only
+      // returns undefined when every argument is, and `eq(event.id, id)` never is.
+      //
+      // Kept anyway, and deliberately not the kind of unreachable guard worth
+      // deleting: this one does not duplicate a check made elsewhere, it stands
+      // between a refactor and rewriting every event in the database. The types
+      // will not object if a later change builds the conditions somewhere they can
+      // all be undefined. Throwing gives a 500 and an error log, which is the right
+      // outcome for a state that should be impossible.
+      //
+      // No test: it cannot be reached without breaking the two lines above, and a
+      // test that has to sabotage its subject to run pins the sabotage.
+      if (where === undefined) throw new Error('refusing an unfiltered UPDATE on event')
+
       // `.returning()` rather than reading `changes`, for two reasons that turn out
       // to be the same one: the row it hands back is the row as written, so the
       // response cannot report a field from the pre-read snapshot that another
