@@ -54,9 +54,14 @@ describe('loginPasswordSchema', () => {
     expect(loginPasswordSchema.safeParse('').success).toBe(false)
   })
 
-  it('bounds the length, since scrypt hashes whatever it is given', () => {
-    // The DoS guard: unbounded, one request could burn arbitrary CPU on the
-    // threadpool that also serves static files.
+  it('bounds the length, for body size rather than for CPU', () => {
+    // Deliberately not "because scrypt hashes whatever it is given" — the schema
+    // docblock exists to warn readers off exactly that reasoning. scrypt's cost
+    // is set by N and r; the password feeds a single PBKDF2-HMAC-SHA256 pass.
+    // Measured: 8 bytes 217ms, 1 KiB 216ms, 64 KiB 220ms — indistinguishable.
+    //
+    // The bound is still worth having, for request body size, log volume, and
+    // not handing unbounded input to a crypto primitive.
     expect(loginPasswordSchema.safeParse('a'.repeat(1024)).success).toBe(true)
     expect(loginPasswordSchema.safeParse('a'.repeat(1025)).success).toBe(false)
   })

@@ -372,8 +372,9 @@ app believes it is serving plain HTTP, and `request.protocol` is wrong for every
 request — which matters for logging, for redirects, and for anything later that
 keys on the scheme.
 
-It does _not_ decide the session cookie's `Secure` flag; that keys off
-`NODE_ENV`, which the image sets. See [Accounts and sessions](#accounts-and-sessions).
+It does _not_ decide the session cookie's `Secure` flag. That is decided in
+`config.ts` from `NODE_ENV` and `HOST` — set whenever `NODE_ENV` is `production` **or** `HOST` is not loopback. See
+[Accounts and sessions](#accounts-and-sessions).
 
 Set it in the `:443` vhost, not in an include shared with a `:80` one. Hardcoded
 to `https` it would lie about a plain-HTTP request, and a cookie marked `Secure`
@@ -416,9 +417,12 @@ just next-login.
 **Sessions** are a signed value in an `HttpOnly`, `SameSite=Lax` cookie — not a
 database row.
 
-`Secure` is set whenever `NODE_ENV` is `production`, and the image sets that, so
-**every containerised deployment gets it**. Plain HTTP therefore works on
-`localhost` only, where browsers treat the origin as trustworthy. On any other
+`Secure` is set whenever `NODE_ENV` is `production` **or** `HOST` is not loopback — decided once in `config.ts` as
+`secure_cookies`, on the same predicate as the `SESSION_SECRET` requirement. The
+image sets both, so **every containerised deployment gets it**, and so does any
+hand-rolled run that binds beyond loopback. Plain HTTP therefore works on
+`localhost` only, where browsers treat the origin as trustworthy — and that is
+now true by construction rather than by coincidence of the Dockerfile. On any other
 plain-HTTP origin — a LAN address, an internal hostname — the browser discards
 the cookie silently: login answers 200, the page says you are signed in, and the
 next load says you are not. Put TLS in front, as the Apache section below does.

@@ -46,8 +46,10 @@ services:
       # header-appending proxy would then get a request.ip the client controls,
       # which is what an invite rate limiter and any admin audit trail key on.
       #
-      # Not the session cookie's Secure flag: that keys off NODE_ENV, which the
-      # image sets, so it is on in every deployment regardless of this value.
+      # Not the session cookie's Secure flag: that is `secure_cookies` in
+      # config.ts, set whenever NODE_ENV is production *or* HOST is not
+      # loopback. The image sets both, so it is on in every deployment of this
+      # image regardless of this value.
       - TRUST_PROXY=${TRUST_PROXY:-false}
       - LOG_LEVEL=${LOG_LEVEL:-info}
       # No default: the app refuses to start in production without it, which is

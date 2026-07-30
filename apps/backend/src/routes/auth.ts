@@ -95,10 +95,12 @@ const cookieHeader = (token: string, config: Config, maxAgeSeconds: number): str
  * allergies and contact details into an attacker's record. But #58's `__Host-`
  * prefix is what *ends* this, not merely a tidier spelling of it.
  *
- * `__Host-` remains the real fix and is not a drop-in, since it requires
- * `Secure` and that is set only when `NODE_ENV` is `production` — the name
- * would have to vary by environment or `pnpm dev` would have its cookie
- * rejected outright. Tracked in #58. This does not wait for it.
+ * `__Host-` remains the real fix, and it is more tractable than it was: `Secure`
+ * is now one decision, `config.secure_cookies`, so the prefix can key off the
+ * same predicate as the flag rather than needing a rule of its own. What still
+ * blocks a straight rename is that the name must vary at all — `pnpm dev` on
+ * loopback gets no `Secure`, and a `__Host-` cookie without it is rejected
+ * outright. Tracked in #58. This does not wait for it.
  */
 export const readSessionCookie = (header: string | undefined): string | undefined => {
   if (header === undefined) return undefined
