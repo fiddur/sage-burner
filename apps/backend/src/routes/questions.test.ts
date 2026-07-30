@@ -469,6 +469,72 @@ describe('editing a question', () => {
     expect(require.json()).toEqual({ error: 'bad_request' })
   })
 
+  it('refuses a patch whose read of the row is already stale', async () => {
+    // The race, forced rather than hoped for. Two concurrent PATCHes each read
+    // before either writes, so the loser decides against a row that no longer
+    // looks like that — and with a read-then-check its UPDATE then trips
+    // `form_question_checkbox_optional_check` and the caller gets a 500.
+    //
+    // `Promise.all` over two `inject`s does *not* reproduce it: they serialise, and
+    // that version of this test passed against the buggy implementation. So the
+    // stale read is injected directly: the handler is handed the row as it was
+    // before a concurrent change, which is exactly what the loser of the race sees.
+    const server = await build()
+    const cookie = await givenAdmin()
+    const eventId = await givenEvent()
+    const created = await add(server, cookie, eventId, {
+      ...question,
+      type: 'text',
+      label: 'Either way',
+      required: false,
+    })
+    const id = created.json().question.id
+    const [stale] = await db().select().from(formQuestion).where(eq(formQuestion.id, id))
+
+    // The other request already landed: the row is a checkbox now, still valid.
+    await db().update(formQuestion).set({ type: 'checkbox' }).where(eq(formQuestion.id, id))
+
+    // Targeted by *table*, not by call index. Counting was the obvious approach and
+    // it is branch-dependent: `requireAdmin` spends one select here and two on the
+    // branch where `viewerFor` still uses `rolesFor`, so an index that is right in
+    // one place stubs the guard's own query in the other and 500s for an unrelated
+    // reason. Intercepting only reads of `form_question` leaves the guard alone.
+    const live = db()
+    const original = live.select.bind(live)
+    let intercepted = 0
+    live.select = ((...args: Parameters<typeof original>) => {
+      const real = original(...args)
+
+      return {
+        from: (table: unknown) => {
+          if (table !== formQuestion) return real.from(table)
+          intercepted += 1
+
+          return { where: () => ({ limit: () => Promise.resolve([stale]) }) }
+        },
+      }
+    }) as typeof live.select
+
+    const response = await server.inject({
+      method: 'PATCH',
+      url: `/api/admin/questions/${id}`,
+      headers: { cookie },
+      payload: { required: true },
+    })
+
+    expect(response.statusCode).toBe(400)
+    expect(response.json()).toEqual({ error: 'bad_request' })
+    // The stub fired, so the 400 came from the stale-read path rather than from
+    // the existence check above it.
+    expect(intercepted).toBe(1)
+
+    // And nothing was stored: the row is still a valid, optional checkbox.
+    const [row] = await original({ type: formQuestion.type, required: formQuestion.required })
+      .from(formQuestion)
+      .where(eq(formQuestion.id, id))
+    expect(row).toMatchObject({ type: 'checkbox', required: false })
+  })
+
   it('refuses an anonymous patch', async () => {
     // POST, DELETE and the reorder each had one; PATCH was the odd one out.
     const server = await build()

@@ -6,9 +6,9 @@ import {
   formQuestionCreateSchema,
   formQuestionOrderSchema,
   formQuestionUpdateSchema,
-  violatesTickBoxRules,
+  tickBoxRequired,
 } from '@sage-burner/shared'
-import { asc, desc, eq } from 'drizzle-orm'
+import { and, asc, desc, eq, ne } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -17,6 +17,36 @@ import type { Database } from '../db/index.ts'
 import { createGuards } from '../auth/guards.ts'
 import { event, formQuestion } from '../db/schema.ts'
 import { noStore } from '../http.ts'
+
+/**
+ * The tick-box rule as SQL, for a PATCH carrying only one of the two keys — or
+ * `undefined` when the body cannot break it.
+ *
+ * The same shape as `dateOrderCondition` in `routes/events.ts`, and for the same
+ * reason: a merged-row check either side of an `await` is check-then-act. Two
+ * PATCHes arriving in one event-loop turn — `{ type: 'checkbox' }` and
+ * `{ required: true }` against `(text, false)` — each read before either writes,
+ * so both pass their own check, both write, and the row lands on
+ * `(checkbox, required=1)`. The database CHECK then rejects the second UPDATE and
+ * the caller gets a 500. Deciding it inside the statement makes it atomic.
+ *
+ * With **both** keys present the body settles it alone and the schema refine has
+ * already rejected a contradictory pair, so there is nothing to evaluate here.
+ */
+const tickBoxCondition = ({ type, required }: { type?: string; required?: boolean }) => {
+  if (type !== undefined && required !== undefined) return undefined
+
+  if (type !== undefined) {
+    const must = tickBoxRequired(type)
+    return must === undefined ? undefined : eq(formQuestion.required, must)
+  }
+
+  // `required: true` is wrong only for a checkbox, `required: false` only for an
+  // agreement — so the condition is on the type the row must *not* have.
+  if (required !== undefined) return ne(formQuestion.type, required ? 'checkbox' : 'agreement')
+
+  return undefined
+}
 
 /**
  * The application form's questions.
@@ -126,20 +156,30 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db, sessions }: G
         return { question: existing } satisfies FormQuestionResponse
       }
 
-      // A PATCH can break the tick-box rule with a single field, from either
-      // direction and for either type — `{ required: false }` onto an agreement,
-      // `{ type: 'agreement' }` onto an optional question, `{ type: 'checkbox' }`
-      // onto a required one, `{ required: true }` onto a checkbox. The schema only
-      // ever sees the body, and a lone key is not decidable, so the merged row is
-      // what has to hold.
-      //
-      // Uses the same predicate as the schema refine rather than restating it:
-      // this check covered only the `agreement` half at first, and the missing
-      // clause meant a required checkbox reached the CHECK and answered 500.
+      // No merged-row check in JS. A PATCH can break the tick-box rule with a
+      // single field from either direction, and the schema cannot decide a lone key
+      // — but a read-then-check here is a race (see `tickBoxCondition`), and a JS
+      // fail-fast would also pre-empt the statement in every non-racing case, which
+      // is how the equivalent guard in `routes/events.ts` ended up unreachable from
+      // any test.
       const merged = { ...existing, ...parsed.data }
-      if (violatesTickBoxRules(merged)) return reply.code(400).send(errorResponse('bad_request'))
+      const rule = tickBoxCondition(parsed.data)
+      const where =
+        rule === undefined
+          ? eq(formQuestion.id, request.params.id)
+          : and(eq(formQuestion.id, request.params.id), rule)
 
-      await db.update(formQuestion).set(parsed.data).where(eq(formQuestion.id, request.params.id))
+      const result = await db.update(formQuestion).set(parsed.data).where(where)
+
+      // Zero rows, split the way the event PATCH splits it: with a condition in the
+      // `WHERE` it is overwhelmingly the rule that failed, so 400. Without one, only
+      // the id was matched, so the row was deleted between the read and the write —
+      // 404, the same answer as a row that was already gone.
+      if (Number(result.changes) === 0) {
+        return rule === undefined
+          ? reply.code(404).send(errorResponse('not_found'))
+          : reply.code(400).send(errorResponse('bad_request'))
+      }
 
       return { question: merged } satisfies FormQuestionResponse
     },
