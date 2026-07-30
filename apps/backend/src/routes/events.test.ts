@@ -396,17 +396,41 @@ describe('admin event routes', () => {
     expect(response.json().event).toMatchObject({ welcome_markdown: '# Bring water' })
   })
 
-  it('allows a one-sided date move that keeps the order', async () => {
-    // The guard must not have become "no single-date patches".
+  it('allows a one-sided date move that keeps the order, in either direction', async () => {
+    // The guard must not have become "no single-date patches" — and both branches
+    // of `dateOrderCondition` need a passing case, not just the rejecting one.
+    // Only `end_date` was covered here, so nothing exercised the `start_date`
+    // branch in the direction that should succeed.
     const server = await build()
     const cookie = await givenAdmin()
     const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
 
-    const response = await patch(server, cookie, id, { end_date: '2026-08-09' })
+    const movedEnd = await patch(server, cookie, id, { end_date: '2026-08-09' })
+    const movedStart = await patch(server, cookie, id, { start_date: '2026-08-03' })
 
-    expect(response.statusCode).toBe(200)
+    expect(movedEnd.statusCode).toBe(200)
+    expect(movedStart.statusCode).toBe(200)
     const [row] = await db().select().from(event)
-    expect(row).toMatchObject({ start_date: '2026-08-01', end_date: '2026-08-09' })
+    expect(row).toMatchObject({ start_date: '2026-08-03', end_date: '2026-08-09' })
+  })
+
+  it('allows a one-day event, where the range collapses to a single date', async () => {
+    // The boundary neither branch covered. `event_date_order_check` is
+    // `end_date >= start_date`, so a one-day event is legal — but a strict `<`
+    // slipped into `dateOrderCondition` in place of `<=` would 400 both of these
+    // and no test would have noticed.
+    const server = await build()
+    const cookie = await givenAdmin()
+    const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
+
+    const startOntoEnd = await patch(server, cookie, id, { start_date: '2026-08-05' })
+    expect(startOntoEnd.statusCode).toBe(200)
+
+    const endOntoStart = await patch(server, cookie, id, { end_date: '2026-08-05' })
+    expect(endOntoStart.statusCode).toBe(200)
+
+    const [row] = await db().select().from(event)
+    expect(row).toMatchObject({ start_date: '2026-08-05', end_date: '2026-08-05' })
   })
 
   it('answers 404 when the row vanishes between the read and the write', async () => {

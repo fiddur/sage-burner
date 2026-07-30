@@ -648,6 +648,11 @@ was not the problem. With exactly one date it answers **400** instead: the order
 condition is in the `UPDATE`, so a zero-row result has two possible causes and the
 handler names the far likelier one.
 
+One exception, since `{}` is documented above as a legitimate no-op: a body with no
+recognised keys never reaches the `UPDATE` at all, so against a vanished row it
+still answers **200** with the row as it was read. The 404 rule needs at least one
+key that changes something.
+
 ### Markdown is escaped, not filtered
 
 `welcome_markdown` is admin-authored and rendered to every public visitor, so it
