@@ -17,5 +17,15 @@ data/
 *.iml
 *.swp
 
-# Local Claude Code config — never shared; develop carries none.
+# Local agent and shell config that lives in this working tree but is not the
+# project's. An unscoped `git add -A` swept these in once; ignoring them means it
+# cannot happen again. `develop` carries none of them.
 .claude/
+.mcp.json
+.bash_profile
+.bashrc
+.profile
+.zprofile
+.zshrc
+.gitconfig
+.ripgreprc
