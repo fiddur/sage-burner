@@ -24,7 +24,7 @@ export interface EventRouteDeps extends GuardDeps {
  * day it ends changes nothing an organiser would notice. A timezone setting
  * would be a configuration knob, a migration and a test matrix bought for that.
  */
-const todayIso = (now: () => Date) => now().toISOString().slice(0, 10)
+export const todayIso = (now: () => Date) => now().toISOString().slice(0, 10)
 
 /**
  * The active event: the soonest-ending event that has not ended yet.

@@ -58,12 +58,7 @@ export const Layout = ({
             </>
           )}
 
-          {isMember(viewer) && (
-            <>
-              <a href="/profile">My details</a>
-              <a href="/schedule">Schedule</a>
-            </>
-          )}
+          {isMember(viewer) && <a href="/my-burn">Your burn</a>}
 
           {isAdmin(viewer) && <a href="/admin">Organise</a>}
 

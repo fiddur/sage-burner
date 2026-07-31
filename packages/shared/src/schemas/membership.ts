@@ -87,3 +87,20 @@ export type Profile = z.infer<typeof profileSchema>
 export type ProfileCreate = z.infer<typeof profileCreateSchema>
 export type ProfileResponse = z.infer<typeof profileResponseSchema>
 export type Attendance = z.infer<typeof attendanceSchema>
+
+/**
+ * Someone's attendance at the active burn, as they see it.
+ *
+ * `null` when they have not said they are coming — the page needs to tell "not
+ * coming" from "coming and nothing filled in yet", and both are ordinary states.
+ */
+export const myAttendanceResponseSchema = z.object({
+  event: z.object({ id: idSchema, name: nonEmptyText(200), slug: nonEmptyText(120) }).nullable(),
+  attendance: attendanceSchema.nullable(),
+})
+
+/** Who an organiser is adding to a burn on someone else's behalf. */
+export const attendanceCreateSchema = z.object({ account_id: idSchema }).strict()
+
+export type MyAttendanceResponse = z.infer<typeof myAttendanceResponseSchema>
+export type AttendanceCreate = z.infer<typeof attendanceCreateSchema>

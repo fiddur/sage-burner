@@ -961,6 +961,35 @@ saying which burn you are coming to is a separate act, and #76 owns it.
 A signed-in visitor is not offered the form — redeeming would create a second
 account for the same human, and the page cannot tell whether that was meant.
 
+### Coming to a burn
+
+Being in the community and coming to a _particular_ burn are separate acts.
+Approval admits you once; then you decide, burn by burn. `attendance` is that
+second decision, keyed `(event, account)`, and it is what arrival dates, dreams
+and shifts hang off later.
+
+A member says it for themselves at `/my-burn`:
+
+- `GET /api/events/active/attendance` — the open burn and their row, either of
+  which may be null. "No burn open" and "open, not coming" are different states
+  and the page says so rather than showing a dead button.
+- `POST` — **idempotent**. Saying it twice is the same statement, not an error: a
+  double click, a retried request and a second tab all land there.
+- `DELETE` — withdrawing, but **only while nothing has been paid**. What a refund
+  means is a real decision and #31 owns it; deleting the row here would quietly
+  discard the record that money changed hands.
+
+An organiser can do it for someone, because people ask over Discord and an
+organiser should not have to talk them through a UI:
+`POST|DELETE /api/admin/events/:eventId/attendance`. The admin delete carries **no
+payment guard** — undoing a mistaken add has to be possible, and an organiser
+doing it is making the call deliberately.
+
+**Being able to sign in is not being a member.** These routes are behind
+`requireMember`, so an account with no roles — invited but not yet redeemed — and
+an admin who is not also a member are both refused. The two roles are separate
+rows in `account_role`, and redemption grants only `member`.
+
 ### Markdown is escaped, not filtered
 
 `welcome_markdown` is admin-authored and rendered to every public visitor, so it

@@ -36,6 +36,9 @@ const clientWith = (
   getQuestions: () => Promise.reject(new Error('getQuestions is not stubbed in this file')),
   submitApplication: () => Promise.reject(new Error('submitApplication is not stubbed in this file')),
   getApplications: () => Promise.reject(new Error('getApplications is not stubbed in this file')),
+  getMyAttendance: () => Promise.reject(new Error('getMyAttendance is not stubbed in this file')),
+  joinActiveEvent: () => Promise.reject(new Error('joinActiveEvent is not stubbed in this file')),
+  leaveActiveEvent: () => Promise.reject(new Error('leaveActiveEvent is not stubbed in this file')),
   getInviteState: () => Promise.reject(new Error('getInviteState is not stubbed in this file')),
   redeemInvite: () => Promise.reject(new Error('redeemInvite is not stubbed in this file')),
   getInvites: () => Promise.reject(new Error('getInvites is not stubbed in this file')),
@@ -124,7 +127,7 @@ describe('routing', () => {
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Sage Burner')
   })
 
-  it('routes every admin page the organiser landing page links to', () => {
+  it('routes every page the app links to, from the nav and the organiser landing page', () => {
     // A page can exist, be tested, and still be unreachable because no route
     // names it — which is what happened to /admin/applications.
     //
@@ -133,6 +136,11 @@ describe('routing', () => {
     // is the same failure one level up.
     const admin = { status: 'signed-in', account: { id: 'a1', roles: ['admin', 'member'] } } as const
     const { container } = renderAt('/admin', admin)
+    // Every link the nav offers, too: `/profile` and `/schedule` sat there for
+    // pages that were never routed, so a member clicking them got NotFound.
+    const navPaths = [...container.querySelectorAll('nav a[href^="/"]')].map((link) =>
+      link.getAttribute('href'),
+    )
     // Scoped to the page, not the container: `Layout`'s nav renders its own
     // `/admin` link for an admin, so scraping the whole tree would satisfy the
     // guard below even if the landing page had lost every link on it.
@@ -143,7 +151,7 @@ describe('routing', () => {
 
     expect(paths.length).toBeGreaterThan(0)
 
-    for (const path of ['/admin', ...paths.filter((href) => href !== null)]) {
+    for (const path of ['/admin', ...[...paths, ...navPaths].filter((href) => href !== null)]) {
       cleanup()
       renderAt(path, admin)
       expect(screen.getByRole('heading', { level: 1 }).textContent, path).not.toBe('Nothing here')
@@ -221,7 +229,7 @@ describe('navigation', () => {
 
     expect(linkNames()).toContain('Apply')
     expect(linkNames()).toContain('Log in')
-    expect(linkNames()).not.toContain('My details')
+    expect(linkNames()).not.toContain('Your burn')
     expect(linkNames()).not.toContain('Organise')
   })
 
@@ -231,8 +239,7 @@ describe('navigation', () => {
       account: { id: 'a1', roles: ['member'] },
     })
 
-    expect(linkNames()).toContain('My details')
-    expect(linkNames()).toContain('Schedule')
+    expect(linkNames()).toContain('Your burn')
     expect(linkNames()).not.toContain('Log in')
     expect(linkNames()).not.toContain('Organise')
   })
@@ -244,7 +251,7 @@ describe('navigation', () => {
     })
 
     expect(linkNames()).toContain('Organise')
-    expect(linkNames()).toContain('My details')
+    expect(linkNames()).toContain('Your burn')
   })
 
   it('shows nothing role-specific while the session is still loading', () => {
@@ -253,7 +260,7 @@ describe('navigation', () => {
     renderAt('/', { status: 'loading' })
 
     expect(linkNames()).not.toContain('Log in')
-    expect(linkNames()).not.toContain('My details')
+    expect(linkNames()).not.toContain('Your burn')
     expect(linkNames()).not.toContain('Organise')
   })
 })

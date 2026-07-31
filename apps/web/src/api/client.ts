@@ -1,5 +1,6 @@
 import type {
   AdminInvitesResponse,
+  Attendance,
   ApplicationCreate,
   ApplicationDecisionResponse,
   ApplicationResponse,
@@ -7,6 +8,7 @@ import type {
   Invite,
   InviteCreate,
   InviteState,
+  MyAttendanceResponse,
   RedeemRequest,
   ActiveEventResponse,
   AdminAccountsResponse,
@@ -197,6 +199,20 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
      */
     redeemInvite: (token: string, body: RedeemRequest) =>
       request<MeResponse>(`/invites/${encodeURIComponent(token)}/redeem`, { method: 'POST', body }),
+
+    /** Signed-in members only. `event` is null when no burn is open. */
+    getMyAttendance: (signal?: AbortSignal) =>
+      request<MyAttendanceResponse>('/events/active/attendance', { signal }),
+
+    /** Members only. Idempotent — saying it twice is the same statement. */
+    joinActiveEvent: () =>
+      request<{ attendance: Attendance }>('/events/active/attendance', { method: 'POST' }),
+
+    /**
+     * Members only. Answers 204. Throws ApiError(409, 'conflict') once anything
+     * has been paid — what a refund means is #31's decision.
+     */
+    leaveActiveEvent: () => request<undefined>('/events/active/attendance', { method: 'DELETE' }),
 
     /** Admin only. */
     getApplications: (signal?: AbortSignal) =>
