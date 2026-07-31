@@ -52,7 +52,7 @@ export const SESSION_COOKIE = 'sage_session'
  *   needs TLS in front.
  * - `Path=/` because the SPA and the API share an origin.
  */
-const cookieHeader = (token: string, config: Config, maxAgeSeconds: number): string => {
+export const cookieHeader = (token: string, config: Config, maxAgeSeconds: number): string => {
   const parts = [
     `${SESSION_COOKIE}=${token}`,
     'HttpOnly',

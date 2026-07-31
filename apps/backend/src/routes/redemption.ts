@@ -1,5 +1,5 @@
 import type { InviteState } from '@sage-burner/shared'
-import type { FastifyInstance, FastifyReply } from 'fastify'
+import type { FastifyInstance } from 'fastify'
 
 import { errorResponse, inviteStatusOf, redeemRequestSchema } from '@sage-burner/shared'
 import { and, eq, isNull } from 'drizzle-orm'
@@ -12,7 +12,7 @@ import type { Database } from '../db/index.ts'
 import { hashPassword } from '../auth/password.ts'
 import { account, accountRole, inviteToken } from '../db/schema.ts'
 import { noStore } from '../http.ts'
-import { SESSION_COOKIE } from './auth.ts'
+import { cookieHeader } from './auth.ts'
 
 export interface RedemptionDeps {
   db: Database
@@ -22,6 +22,10 @@ export interface RedemptionDeps {
 }
 
 const digestOf = (token: string) => createHash('sha256').update(token).digest('hex')
+
+/** Mirrors `isSlugConflict` in `events.ts`: a lost UNIQUE race is a 409, not a 500. */
+const isEmailConflict = (error: unknown) =>
+  error instanceof Error && /UNIQUE constraint failed: account\.email/i.test(error.message)
 
 /**
  * Turning an invite link into an account.
@@ -34,18 +38,6 @@ export const registerRedemptionRoutes = (
   app: FastifyInstance,
   { db, config, sessions, now = () => new Date() }: RedemptionDeps,
 ) => {
-  const signIn = (reply: FastifyReply, accountId: string) => {
-    const parts = [
-      `${SESSION_COOKIE}=${sessions.issue(accountId)}`,
-      'HttpOnly',
-      'SameSite=Lax',
-      'Path=/',
-      `Max-Age=${config.session_ttl_seconds}`,
-    ]
-    if (config.secure_cookies) parts.push('Secure')
-    void reply.header('set-cookie', parts.join('; '))
-  }
-
   app.get<{ Params: { token: string } }>('/api/invites/:token', async (request, reply) => {
     void noStore(reply)
 
@@ -101,39 +93,53 @@ export const registerRedemptionRoutes = (
     // The stamp is conditional on `used_at IS NULL` and requires one affected row,
     // so two concurrent redemptions of one token cannot both proceed: the loser's
     // UPDATE matches nothing and the whole transaction rolls back.
-    const claimed = db.transaction((tx) => {
-      const stamped = tx
-        .update(inviteToken)
-        .set({ used_at: now().toISOString() })
-        .where(and(eq(inviteToken.id, invite.id), isNull(inviteToken.used_at)))
-        .returning({ id: inviteToken.id })
-        .all()
+    // The pre-check above is not enough on its own: two requests can both pass it
+    // before either writes. The UNIQUE is the authority, and losing to it is a
+    // conflict rather than an internal error — the same distinction `events.ts`
+    // draws for a slug.
+    const claimed = ((): boolean => {
+      try {
+        return db.transaction((tx) => {
+          const stamped = tx
+            .update(inviteToken)
+            .set({ used_at: now().toISOString() })
+            .where(and(eq(inviteToken.id, invite.id), isNull(inviteToken.used_at)))
+            .returning({ id: inviteToken.id })
+            .all()
 
-      if (stamped.length !== 1) return false
+          if (stamped.length !== 1) return false
 
-      tx.insert(account)
-        .values({
-          id: accountId,
-          email: parsed.data.email,
-          password_hash,
-          name: parsed.data.name,
-          contact: parsed.data.contact,
-          allergies_notes: parsed.data.allergies_notes,
-          invite_token_id: invite.id,
-          created_at: now().toISOString(),
+          tx.insert(account)
+            .values({
+              id: accountId,
+              email: parsed.data.email,
+              password_hash,
+              name: parsed.data.name,
+              contact: parsed.data.contact,
+              allergies_notes: parsed.data.allergies_notes,
+              invite_token_id: invite.id,
+              created_at: now().toISOString(),
+            })
+            .run()
+
+          // Redeeming an invite is what makes someone a member. No attendance row:
+          // coming to a particular burn is a separate act, and #76 owns it.
+          tx.insert(accountRole).values({ account_id: accountId, role: 'member' }).run()
+
+          return true
         })
-        .run()
-
-      // Redeeming an invite is what makes someone a member. No attendance row:
-      // coming to a particular burn is a separate act, and #76 owns it.
-      tx.insert(accountRole).values({ account_id: accountId, role: 'member' }).run()
-
-      return true
-    })
+      } catch (error) {
+        if (isEmailConflict(error)) return false
+        throw error
+      }
+    })()
 
     if (!claimed) return reply.code(409).send(errorResponse('conflict'))
 
-    signIn(reply, accountId)
+    void reply.header(
+      'set-cookie',
+      cookieHeader(sessions.issue(accountId), config, config.session_ttl_seconds),
+    )
 
     return reply.code(201).send({ viewer: { account_id: accountId, roles: ['member'] } })
   })

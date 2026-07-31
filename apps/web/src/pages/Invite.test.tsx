@@ -7,7 +7,7 @@ import type { Viewer } from '../viewer.tsx'
 import type { InviteApi } from './Invite.tsx'
 
 import { apiError } from '../api/client.ts'
-import { ViewerProvider } from '../viewer.tsx'
+import { ViewerProvider, useViewer } from '../viewer.tsx'
 import { Invite } from './Invite.tsx'
 
 afterEach(cleanup)
@@ -18,10 +18,14 @@ const stub = (over: Partial<InviteApi> = {}): InviteApi => ({
   ...over,
 })
 
+/** Renders the shared viewer's state, so a test can see it change. */
+const ViewerProbe = () => <p data-testid="viewer">{useViewer().status}</p>
+
 const renderPage = (api: InviteApi, viewer: Viewer = { status: 'signed-out' }) =>
   render(
     <ViewerProvider viewer={viewer}>
       <Invite api={api} token="a-token" />
+      <ViewerProbe />
     </ViewerProvider>,
   )
 
@@ -94,6 +98,24 @@ describe('Invite', () => {
     join()
 
     expect((await screen.findByRole('status')).textContent).toContain('signed in')
+  })
+
+  it('signs them into the shared viewer, not just the cookie', async () => {
+    // The session cookie is set server-side, but `Layout`'s nav reads the shared
+    // viewer, which is populated once on mount and not refetched on client-side
+    // navigation. Without this the newly-joined member clicks through to the
+    // start page and is still offered "Log in".
+    renderPage(
+      stub({
+        redeemInvite: () => Promise.resolve({ viewer: { account_id: 'a-1', roles: ['member' as const] } }),
+      }),
+    )
+
+    await screen.findByRole('button', { name: 'Join' })
+    complete()
+    join()
+
+    await waitFor(() => expect(screen.getByTestId('viewer').textContent).toBe('signed-in'))
   })
 
   for (const [status, expected] of [

@@ -201,9 +201,9 @@ describe('redeeming', () => {
       redeem(server, tokenB, { ...applicant, email: 'same@example.org' }),
     ])
 
-    const codes = [first.statusCode, second.statusCode].toSorted()
-    expect(codes[0]).toBe(201)
-    expect(codes[1]).toBeGreaterThanOrEqual(400)
+    // 409, not "some error": losing a UNIQUE race is a conflict, and a 500 would
+    // tell the caller to report a bug rather than to use a different email.
+    expect([first.statusCode, second.statusCode].toSorted()).toEqual([201, 409])
 
     const invites = await db().select().from(inviteToken)
     expect(invites.filter((invite) => invite.used_at === null)).toHaveLength(1)

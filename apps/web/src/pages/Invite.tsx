@@ -5,7 +5,7 @@ import { useEffect, useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
-import { useViewer } from '../viewer.tsx'
+import { useSetViewer, useViewer } from '../viewer.tsx'
 
 export type InviteApi = Pick<ApiClient, 'getInviteState' | 'redeemInvite'>
 
@@ -24,6 +24,7 @@ const MIN_PASSWORD = 12
 
 export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
   const viewer = useViewer()
+  const setViewer = useSetViewer()
   const [loaded, setLoaded] = useState<Loaded>({ status: 'loading' })
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -66,13 +67,18 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
 
     setSending(true)
     try {
-      await api.redeemInvite(token, {
+      const { viewer: signedIn } = await api.redeemInvite(token, {
         email,
         password,
         name: name.trim(),
         contact: contact.trim(),
         allergies_notes: allergies.trim() === '' ? null : allergies.trim(),
       })
+      // The cookie is set server-side, but the shared viewer is populated once on
+      // mount and not refetched on client-side navigation — so without this the
+      // nav still offers "Log in" to someone holding a valid session. `Login.tsx`
+      // does the same thing after its own sign-in.
+      if (signedIn !== null) setViewer({ id: signedIn.account_id, roles: signedIn.roles })
       setDone(true)
     } catch (failure) {
       // A 409 means the invite went while this page was open, or the email is
