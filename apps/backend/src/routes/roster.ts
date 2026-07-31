@@ -115,8 +115,8 @@ export const registerRosterRoutes = (
       .innerJoin(account, eq(account.id, attendance.account_id))
       .where(eq(attendance.event_id, eventId))
 
-    // Ordered and cut in one place, shared with the member-facing list, so the
-    // two cannot disagree about who has a place.
+    // Ordered and cut by the shared rule rather than here, so #79's member-facing
+    // list gives the same answer when it arrives.
     return withPlaces(rows, cap)
   }
 }

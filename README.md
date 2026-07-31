@@ -1040,8 +1040,10 @@ why recording a payment reloads the whole list rather than ticking one row.
 
 **The cut is derived, never stored.** A `waiting` flag would go stale the moment
 anyone paid, and the whole rule is that paying re-sorts the list. `withPlaces` in
-`packages/shared` computes it, shared with the member-facing list so the two
-cannot tell someone different things about where they stand.
+`packages/shared` computes it — placed there rather than in the route because
+#79's member-facing list has to give the same answer, and two pages telling
+someone different things about where they stand is worse than one of them being
+absent.
 
 Recording a payment writes `payment_status` and `payment_date` and **nothing
 else** — an organiser recording money received has no business rewriting an

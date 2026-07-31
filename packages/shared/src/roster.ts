@@ -3,9 +3,10 @@ import type { PaymentStatus } from './enums.ts'
 /**
  * Who is coming to a burn, in the order that decides who actually gets a place.
  *
- * Type-only imports, so this module pulls in no Zod and both the admin table and
- * the member-facing list can share one definition of the rule. They must agree:
- * a member told they are 12th while the organiser's list says 9th is worse than
+ * Type-only imports, so this module pulls in no Zod and the browser can run it.
+ * Today the only caller is the admin roster; it lives here rather than in the
+ * route because #79's member-facing list has to give the same answer, and a
+ * member told they are 12th while the organiser's list says 9th is worse than
  * either page being absent.
  */
 

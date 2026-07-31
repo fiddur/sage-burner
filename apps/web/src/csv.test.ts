@@ -15,6 +15,26 @@ describe('toCsv', () => {
     expect(toCsv(['notes'], [row])).toBe('"notes"\r\n"gluten, dairy\nand ""nuts"""')
   })
 
+  it('defuses a value a spreadsheet would run as a formula', () => {
+    // Quoting does not help: Excel, LibreOffice and Sheets all evaluate a leading
+    // `=` inside quotes, and every exported field is member-editable free text.
+    const row = { notes: '=HYPERLINK("https://evil.example","Click")' }
+
+    expect(toCsv(['notes'], [row])).toContain(`"'=HYPERLINK`)
+  })
+
+  it('defuses every leading character a spreadsheet acts on', () => {
+    for (const start of ['=', '+', '-', '@', '\t', '\r']) {
+      expect(toCsv(['a'], [{ a: `${start}cmd` }]), start).toContain(`"'${start}cmd"`)
+    }
+  })
+
+  it('leaves ordinary text alone, apostrophe and all', () => {
+    // The prefix must not appear where it is not needed, or every export grows a
+    // stray quote an organiser has to strip.
+    expect(toCsv(['a'], [{ a: "Ana's tent" }])).toBe('"a"\r\n"Ana\'s tent"')
+  })
+
   it('writes an empty cell for a missing or null value', () => {
     expect(toCsv(['a', 'b'], [{ a: null }])).toBe('"a","b"\r\n"",""')
   })
