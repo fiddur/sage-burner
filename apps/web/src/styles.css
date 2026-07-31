@@ -303,6 +303,12 @@ a:hover {
   overflow-wrap: anywhere;
 }
 
+/* Below the line on a burn's list. Dimmed, not hidden: someone waiting still
+   needs to see where they stand. */
+.waiting td {
+  color: var(--muted);
+}
+
 /* The question builder, on its own admin page. */
 .questions {
   margin-top: 1.5rem;

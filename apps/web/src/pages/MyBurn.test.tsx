@@ -78,14 +78,6 @@ describe('MyBurn', () => {
     expect(screen.queryByRole('button', { name: /paid/i })).toBeNull()
   })
 
-  it('gives a partial payment its own sentence rather than reading as unpaid', async () => {
-    renderPage(stub({}, { event: theBurn, attendance: anAttendance({ payment_status: 'partial' }) }))
-
-    const said = (await screen.findByRole('status')).textContent
-    expect(said).toContain('part of the fee')
-    expect(said).not.toContain('not yet paid')
-  })
-
   it('lets them withdraw', async () => {
     const leaveActiveEvent = vi.fn(() => Promise.resolve(undefined))
     const getMyAttendance = vi

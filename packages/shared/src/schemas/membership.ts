@@ -154,3 +154,36 @@ export const attendanceCreateSchema = z.object({ account_id: idSchema }).strict(
 
 export type MyAttendanceResponse = z.infer<typeof myAttendanceResponseSchema>
 export type AttendanceCreate = z.infer<typeof attendanceCreateSchema>
+
+/**
+ * One person on a burn's list, as an organiser sees them.
+ *
+ * The person-level fields are joined in from `account` rather than duplicated,
+ * so an allergy corrected on the profile page is corrected here too.
+ */
+export const rosterEntrySchema = attendanceFields.extend({
+  email: emailSchema,
+  name: nonEmptyText(200).nullable(),
+  contact: nonEmptyText(500).nullable(),
+  allergies_notes: optionalText(2000),
+  /** Derived from payment and join order every read — never stored. */
+  waiting: z.boolean(),
+})
+
+export const rosterResponseSchema = z.object({
+  event: z.object({ id: idSchema, name: nonEmptyText(200), member_cap: z.int().positive() }).nullable(),
+  entries: z.array(rosterEntrySchema),
+})
+
+/** What an organiser may set on someone's attendance. Payment, and nothing else. */
+export const paymentUpdateSchema = z
+  .object({
+    payment_status: z.enum(paymentStatuses),
+    payment_date: dateSchema.nullable(),
+  })
+  .partial()
+  .strict()
+
+export type RosterEntry = z.infer<typeof rosterEntrySchema>
+export type RosterResponse = z.infer<typeof rosterResponseSchema>
+export type PaymentUpdate = z.infer<typeof paymentUpdateSchema>
