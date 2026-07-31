@@ -6,6 +6,8 @@ import type {
   ApplicationsResponse,
   Invite,
   InviteCreate,
+  InviteState,
+  RedeemRequest,
   ActiveEventResponse,
   AdminAccountsResponse,
   EventCreateInput,
@@ -178,6 +180,23 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
      */
     submitApplication: (body: ApplicationCreate) =>
       request<ApplicationResponse>('/applications', { method: 'POST', body }),
+
+    /**
+     * Public. Reports whether an invite is usable without saying who it was
+     * minted for — the link is forwardable, so the holder is a stranger.
+     */
+    getInviteState: (token: string, signal?: AbortSignal) =>
+      request<InviteState>(`/invites/${encodeURIComponent(token)}`, { signal }),
+
+    /**
+     * Public. Creates the account, fills in the person and signs them in.
+     *
+     * Throws ApiError(409) for a token that is expired, already spent, or lost a
+     * race, and for an email that already has an account. Throws ApiError(404)
+     * for a token nobody minted.
+     */
+    redeemInvite: (token: string, body: RedeemRequest) =>
+      request<MeResponse>(`/invites/${encodeURIComponent(token)}/redeem`, { method: 'POST', body }),
 
     /** Admin only. */
     getApplications: (signal?: AbortSignal) =>

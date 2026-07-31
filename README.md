@@ -923,6 +923,44 @@ The organiser UI offers Revoke on exactly those — every unredeemed direct invi
 **expired ones included**, since an expired link is still a row worth clearing
 out and the route deletes it happily.
 
+### Redeeming an invite
+
+`/invite/:token` is where both membership paths converge. Unauthenticated, and the
+token is the only credential — an invite is unguessable but **forwardable**, so
+whoever holds it is a stranger until they redeem.
+
+`GET /api/invites/:token` answers `200` with one of four statuses —
+`outstanding`, `expired`, `used`, `unknown` — and **nothing else**. Not a 404 for
+an unknown token, and not who the invite was minted for: either would turn a
+leaked link into a way of probing for live ones, or into a disclosure. The page
+needs the distinction because the three dead ends want three different things
+done about them: an expired link can be re-sent, a used one usually means you
+already have an account, an unknown one is usually a truncated paste.
+
+`POST /api/invites/:token/redeem` creates the account, fills in the person-level
+fields, grants the `member` role and signs them in. **One transaction**, because
+half a redemption is the worst outcome: a spent token with no account behind it
+leaves the person no way to finish and nobody a way to re-issue (#91).
+
+Two races are closed, and each has a test that fails without it:
+
+- **Two people, one link.** Both requests read the invite as outstanding, then
+  both spend ~230ms in `scrypt` before writing, so they genuinely interleave. The
+  stamp is `UPDATE … WHERE id = ? AND used_at IS NULL` requiring one affected
+  row, so the loser's transaction rolls back whole.
+- **Two links, one email.** Both pass the email pre-check before either writes, so
+  the loser's insert meets the `UNIQUE` and its stamp rolls back with it — leaving
+  that invite still usable.
+
+The password is hashed _outside_ the transaction. Holding a write transaction open
+across 230ms of scrypt would block every other writer for that long.
+
+**No `attendance` row is created.** Redeeming makes you a member of the community;
+saying which burn you are coming to is a separate act, and #76 owns it.
+
+A signed-in visitor is not offered the form — redeeming would create a second
+account for the same human, and the page cannot tell whether that was meant.
+
 ### Markdown is escaped, not filtered
 
 `welcome_markdown` is admin-authored and rendered to every public visitor, so it
