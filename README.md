@@ -456,7 +456,7 @@ quite happily, so any page could sign a member out. Nothing is disclosed and
 nothing else moves; it is a nuisance rather than a breach.
 
 So **state-changing requests are same-origin only**, enforced by a `sec-fetch-site`
-check on every non-`GET`. The header cannot be set by page script — it is a
+check on every non-`GET`/`HEAD`. The header cannot be set by page script — it is a
 forbidden header name — so `same-origin` cannot be forged. Where it is absent
 (an older browser, a `curl`, a server-to-server call) the request is left alone:
 this closes a browser-driven vector rather than standing in for authentication.

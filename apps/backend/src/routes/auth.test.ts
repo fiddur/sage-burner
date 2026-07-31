@@ -682,6 +682,47 @@ describe('cross-site reachability', () => {
     ).toBe(200)
   })
 
+  it('refuses a cross-site write to a route that is not logout, before authorization', async () => {
+    // The claim being pinned is that the guard is instance-wide, not
+    // logout-shaped: move the hook into `registerAuthRoutes` and every other
+    // assertion in this block still passes.
+    //
+    // It also pins the ordering. An anonymous cross-site caller gets 403 for the
+    // origin rather than 401 for the missing session, which is only true if the
+    // hook runs before `requireAdmin`.
+    const server = await build()
+
+    const response = await server.inject({
+      method: 'POST',
+      url: '/api/admin/events',
+      headers: { 'sec-fetch-site': 'cross-site' },
+      payload: { name: 'x', slug: 'x', start_date: '2026-08-01', end_date: '2026-08-02', member_cap: 1 },
+    })
+
+    expect(response.statusCode).toBe(403)
+    expect(response.json().error).toBe('forbidden')
+  })
+
+  it('refuses a duplicated header rather than falling through', async () => {
+    // Two `sec-fetch-site` values arrive comma-joined, matching neither trusted
+    // value.
+    //
+    // This pins the joined case only. The `string[]` the type allows cannot be
+    // produced here — node joins duplicates rather than collecting them — so the
+    // array branch is genuinely untestable, which is why the guard is written to
+    // refuse anything it does not recognise rather than to check for a string.
+    const server = await build()
+
+    const response = await server.inject({
+      method: 'POST',
+      url: '/api/auth/logout',
+      headers: { 'sec-fetch-site': ['same-origin', 'cross-site'] },
+    })
+
+    expect(response.statusCode).toBe(403)
+    expect(response.headers['set-cookie']).toBeUndefined()
+  })
+
   it('still accepts the JSON the app itself sends', async () => {
     // The guard must not cost the real client anything.
     const server = await build()

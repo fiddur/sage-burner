@@ -317,8 +317,14 @@ export const createApp = async ({
   app.addHook('onRequest', async (request, reply) => {
     const site = request.headers['sec-fetch-site']
     const changesState = request.method !== 'GET' && request.method !== 'HEAD'
+    // Absent is the only thing allowed through unexamined. Anything present and
+    // not one of the two trusted values is refused, arrays included — node
+    // comma-joins duplicate headers rather than producing one, so that branch is
+    // unreachable, but a security guard whose default is "allow" is one header
+    // parsing change away from being wrong.
+    const trusted = site === undefined || site === 'same-origin' || site === 'none'
 
-    if (changesState && typeof site === 'string' && site !== 'same-origin' && site !== 'none') {
+    if (changesState && !trusted) {
       return reply.code(403).send(errorResponse('forbidden'))
     }
 
