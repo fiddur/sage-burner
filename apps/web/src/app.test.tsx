@@ -123,19 +123,28 @@ describe('routing', () => {
   })
 
   it('routes every admin page the organiser landing page links to', () => {
-    // The whole point of mounting the real `App`: a page can exist, be tested,
-    // and still be unreachable because no route names it — which is what
-    // happened to /admin/applications.
-    for (const path of [
-      '/admin',
-      '/admin/events',
-      '/admin/questions',
-      '/admin/applications',
-      '/admin/invites',
-    ]) {
+    // A page can exist, be tested, and still be unreachable because no route
+    // names it — which is what happened to /admin/applications.
+    //
+    // The paths come from the links the landing page renders rather than a list
+    // here: a hand-written list goes stale the moment someone adds a link, which
+    // is the same failure one level up.
+    const admin = { status: 'signed-in', account: { id: 'a1', roles: ['admin', 'member'] } } as const
+    const { container } = renderAt('/admin', admin)
+    // Scoped to the page, not the container: `Layout`'s nav renders its own
+    // `/admin` link for an admin, so scraping the whole tree would satisfy the
+    // guard below even if the landing page had lost every link on it.
+    const page = container.querySelector('section.page')
+    const paths = [...(page?.querySelectorAll('a[href^="/admin"]') ?? [])].map((link) =>
+      link.getAttribute('href'),
+    )
+
+    expect(paths.length).toBeGreaterThan(0)
+
+    for (const path of ['/admin', ...paths.filter((href) => href !== null)]) {
       cleanup()
-      renderAt(path, { status: 'signed-in', account: { id: 'a1', roles: ['admin', 'member'] } })
-      expect(screen.getByRole('heading', { level: 1 }).textContent).not.toBe('Nothing here')
+      renderAt(path, admin)
+      expect(screen.getByRole('heading', { level: 1 }).textContent, path).not.toBe('Nothing here')
     }
   })
 

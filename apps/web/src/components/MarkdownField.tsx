@@ -1,17 +1,17 @@
-import { useState } from 'preact/hooks'
+import { useId, useState } from 'preact/hooks'
 
 import { renderMarkdown } from '../markdown.ts'
 
 /**
- * A markdown textarea with Write and Preview tabs.
+ * A markdown textarea with a Write and a Preview view.
  *
  * Help text carries things like the 10+1 principles someone has to agree to, so
- * it needs lists and paragraphs rather than one long line — it was a
- * 2000-character single-line `<input>`, which made writing them impossible.
+ * it needs lists and paragraphs rather than one long line.
  *
- * Tabs rather than the always-on preview `AdminEvents` uses: this sits inside a
- * form with several other fields, and a permanent second copy of one of them
- * pushes the rest off the screen.
+ * Two `aria-pressed` buttons rather than `role="tab"`: a tab promises a
+ * controlled `tabpanel`, a name pointing back at the tab, and roving focus with
+ * arrow keys. This is a pair of toggles, and claiming the tab contract without
+ * meeting it tells a screen reader something untrue.
  */
 export const MarkdownField = ({
   label,
@@ -25,16 +25,19 @@ export const MarkdownField = ({
   onInput: (value: string) => void
 }) => {
   const [previewing, setPreviewing] = useState(false)
+  const fieldId = useId()
 
   return (
     <div class="field">
-      <span>{label}</span>
+      {/* No `for` while previewing: the textarea is unmounted, and `for` must
+          name a labelable element in the same tree. It degrades to plain text,
+          which is what it was before. */}
+      <label for={previewing ? undefined : fieldId}>{label}</label>
 
-      <div class="tabs" role="tablist">
+      <div class="tabs">
         <button
           type="button"
-          role="tab"
-          aria-selected={!previewing}
+          aria-pressed={!previewing}
           class={previewing ? 'link-button' : 'link-button tab-current'}
           onClick={() => setPreviewing(false)}
         >
@@ -42,8 +45,7 @@ export const MarkdownField = ({
         </button>
         <button
           type="button"
-          role="tab"
-          aria-selected={previewing}
+          aria-pressed={previewing}
           class={previewing ? 'link-button tab-current' : 'link-button'}
           onClick={() => setPreviewing(true)}
         >
@@ -65,7 +67,7 @@ export const MarkdownField = ({
         )
       ) : (
         <textarea
-          aria-label={label}
+          id={fieldId}
           maxLength={maxLength}
           value={value}
           onInput={(inputEvent) => onInput(inputEvent.currentTarget.value)}
