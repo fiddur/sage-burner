@@ -171,10 +171,15 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db, sessions }: G
 
       const [row] = updated
       if (row === undefined) {
-        // Two causes: the tick-box condition failed, or the row was deleted between
-        // the read above and this write. Told apart by asking, not guessed at from
-        // whether a condition was present — guessing answered "Request failed (400)"
-        // for a question that no longer exists.
+        // Nothing is read before the write on this path — the only `select` above
+        // is inside the empty-body branch, which returns — so zero rows has three
+        // causes, not two: the id never existed, the row was deleted a moment ago,
+        // or the tick-box condition refused the change. The first two are the same
+        // answer and the same question to ask.
+        //
+        // Told apart by asking rather than guessed at from whether a condition was
+        // present: guessing answered "Request failed (400)" for a question that is
+        // not there.
         const [stillThere] = await db
           .select({ id: formQuestion.id })
           .from(formQuestion)
@@ -224,10 +229,12 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db, sessions }: G
     // The request must name exactly the questions that exist, no more and no
     // fewer. A partial list would renumber some rows and leave others on stale
     // positions, producing an order nobody asked for.
-    const sameSet =
-      wanted.length === existing.length &&
-      new Set(wanted).size === wanted.length &&
-      existing.every((row) => wanted.includes(row.id))
+    // No distinctness check: it is implied. `wanted` has exactly `existing.length`
+    // slots and must contain every existing id, and those are distinct because `id`
+    // is the primary key — so `existing.length` distinct values in that many slots
+    // leaves no room for a duplicate. Testing it separately would have been a
+    // conjunct that can never be the one that decides.
+    const sameSet = wanted.length === existing.length && existing.every((row) => wanted.includes(row.id))
     if (!sameSet) return reply.code(400).send(errorResponse('bad_request'))
 
     // One statement per question, but inside a transaction: a half-applied

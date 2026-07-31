@@ -651,7 +651,11 @@ describe('reordering questions', () => {
     expect(labelsOf(await publicList(server))).toEqual(['A', 'B', 'C'])
   })
 
-  it('rejects a duplicate id', async () => {
+  it('rejects a duplicate id, by way of the set check', async () => {
+    // `[a, a, a]` against `{a, b, c}` is refused because `b` and `c` are missing,
+    // not by a distinctness test — there is none, because with the lengths equal
+    // and every existing id required, a duplicate cannot fit. Named so the next
+    // reader does not go looking for the check this asserts the effect of.
     const server = await build()
     const cookie = await givenAdmin()
     const [a] = await threeQuestions(server, cookie)
