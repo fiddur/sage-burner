@@ -336,7 +336,7 @@ export const inviteToken = sqliteTable(
      *
      * NO ACTION rather than RESTRICT matters here: it is checked at the end of
      * the statement, not immediately, which is what lets an `event` delete
-     * cascade through invites and members in one go without tripping over this
+     * cascade through its attendances in one go without tripping over this
      * edge mid-cascade.
      */
     created_by: text('created_by')
@@ -353,7 +353,7 @@ export const inviteToken = sqliteTable(
     //
     // The application can win this race on its own — approving can `UPDATE ...
     // WHERE status = 'pending'` and check the row count — but the same argument
-    // used for `member_invite_token_idx` applies: an invariant this
+    // used for `account_invite_token_idx` applies: an invariant this
     // load-bearing should not depend on every future caller getting a
     // transaction right.
     //
@@ -440,16 +440,15 @@ export const session = sqliteTable(
       .references(() => event.id, { onDelete: 'cascade' }),
     title: text('title').notNull(),
     /**
-     * Not constrained to require an `attendance` for this event: a dream can name
-     * a host who is not coming to this burn. Ordinary application logic rather
-     * than a race, so the scheduling routes (#20) own it.
-     */
-    /**
+     * The host is a person, not one of their stays.
+     *
+     * Not constrained to require an `attendance` for this event, so a dream can
+     * name a host who is not coming to this burn — ordinary application logic
+     * rather than a race, so the scheduling routes (#20) own it.
+     *
      * No `onDelete`, matching `invite_token.created_by` and
      * `attendance.account_id`: an account that has hosted something cannot be
-     * deleted, rather than having its dreams silently vanish. It used to cascade
-     * from `member`, where it meant "this person's stay at this burn ended", but
-     * pointed at the account it would mean "erase everything they ever hosted".
+     * deleted, rather than having every dream it ever hosted vanish with it.
      * #35 owns what account deletion should actually do.
      */
     host_account_id: text('host_account_id')

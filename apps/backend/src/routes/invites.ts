@@ -86,7 +86,7 @@ export const registerInviteRoutes = (
       void noStore(reply)
 
       // Only an unredeemed direct invite. A redeemed one is the record of how
-      // someone got in and `member` references it; an application's invite is
+      // someone got in and `account` references it; an application's invite is
       // the only one that application will ever have, so deleting it would leave
       // the applicant approved with no way in — #91 owns re-issuing.
       const deleted = await db

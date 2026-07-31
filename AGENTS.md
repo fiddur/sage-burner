@@ -58,8 +58,14 @@ by reading Rollup's docs.
 
 - **Never hardcode a single event.** `event` exists from day one; the whole
   point is that this recurs up to 4x/year.
-- **Payment is per `(event, member)`**, not a global "has this person paid"
-  flag. The same human may attend several burns and pays separately for each.
+- **Payment is per `attendance`** — one row per `(event, account)` — not a
+  global "has this person paid" flag. The same human may attend several burns and
+  pays separately for each.
+- **The `account` carries the person**, `attendance` carries one stay. Name,
+  contact and allergies describe a human and live on the account; arrival,
+  lodging, shifts and payment describe a visit and live on the attendance. Held
+  per burn, allergies meant a copy per event and correcting one left the others
+  wrong.
 - **The application form is data, not code.** `form_question` rows are
   admin-editable — adding or reordering a question must never require a
   redeploy.
