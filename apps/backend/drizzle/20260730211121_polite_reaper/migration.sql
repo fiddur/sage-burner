@@ -14,7 +14,7 @@ CREATE TABLE `__new_form_question` (
 	CONSTRAINT "form_question_agreement_required_check" CHECK("type" <> 'agreement' or "required" = 1)
 );
 --> statement-breakpoint
-INSERT INTO `__new_form_question`(`id`, `order`, `type`, `label`, `help_text`, `required`, `options`) SELECT `id`, `order`, `type`, `label`, `help_text`, `required`, `options` FROM `form_question`;--> statement-breakpoint
+INSERT INTO `__new_form_question`(`id`, `order`, `type`, `label`, `help_text`, `required`, `options`) SELECT `id`, `order`, `type`, `label`, `help_text`, CASE `type` WHEN 'agreement' THEN 1 WHEN 'checkbox' THEN 0 ELSE `required` END, `options` FROM `form_question`;--> statement-breakpoint
 DROP TABLE `form_question`;--> statement-breakpoint
 ALTER TABLE `__new_form_question` RENAME TO `form_question`;--> statement-breakpoint
 PRAGMA foreign_keys=ON;--> statement-breakpoint
