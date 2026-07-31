@@ -990,6 +990,37 @@ doing it is making the call deliberately.
 an admin who is not also a member are both refused. The two roles are separate
 rows in `account_role`, and redemption grants only `member`.
 
+### Members maintain their own record
+
+Two pages, because the record has two lifetimes.
+
+`/profile` edits the **person**: name, contact, allergies. These follow you from
+burn to burn, so correcting an allergy corrects it everywhere — which is the
+whole reason they live on `account` rather than per stay.
+
+`/my-burn` edits the **stay**: arrival, departure, lodging, shift preference,
+notes, for the burn you have said you are coming to.
+
+**Whose row is written comes from the session, never from the body.** There is no
+id in either request to guess at or tamper with, and `account_id` in a profile
+PATCH is a 400 rather than a redirect of the write.
+
+`payment_status` and `payment_date` are omitted from what a member may send. A
+member who could write them could mark themselves paid, so the page shows the
+status and offers no control for it — a control that always failed would be worse
+than none.
+
+`email` is not editable here either: it is the login identity, and changing it is
+a different act with verification nothing implements yet. The page says so rather
+than offering a field that fails.
+
+**A partial date edit is checked against the row, not against the body.** A PATCH
+carrying only `departure_date` can invert the stored pair without ever containing
+both values, so the schema's refinement cannot see it. The condition is composed
+into the `UPDATE ... WHERE` — the same shape and the same reason as
+`dateOrderCondition` in `events.ts` — so a concurrent write cannot slip between a
+read and a check.
+
 ### Markdown is escaped, not filtered
 
 `welcome_markdown` is admin-authored and rendered to every public visitor, so it

@@ -8,7 +8,10 @@ import type {
   Invite,
   InviteCreate,
   InviteState,
+  AttendanceUpdate,
   MyAttendanceResponse,
+  ProfileResponse,
+  ProfileUpdate,
   RedeemRequest,
   ActiveEventResponse,
   AdminAccountsResponse,
@@ -213,6 +216,21 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
      * has been paid — what a refund means is #31's decision.
      */
     leaveActiveEvent: () => request<undefined>('/events/active/attendance', { method: 'DELETE' }),
+
+    /** Members only. `name` and `contact` may be null on an account never filled in. */
+    getMyProfile: (signal?: AbortSignal) => request<ProfileResponse>('/me/profile', { signal }),
+
+    /** Members only. Partial — omitted fields are left as they are. */
+    updateMyProfile: (body: ProfileUpdate) =>
+      request<ProfileResponse>('/me/profile', { method: 'PATCH', body }),
+
+    /**
+     * Members only. Partial, and only for the burn they are coming to.
+     * Throws ApiError(404) when they are not, ApiError(400) when the dates would
+     * put the departure before the arrival.
+     */
+    updateMyStay: (body: AttendanceUpdate) =>
+      request<{ attendance: Attendance }>('/events/active/attendance', { method: 'PATCH', body }),
 
     /** Admin only. */
     getApplications: (signal?: AbortSignal) =>

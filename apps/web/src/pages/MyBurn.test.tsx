@@ -33,6 +33,7 @@ const stub = (over: Partial<MyBurnApi> = {}, mine?: MyAttendanceResponse): MyBur
   getMyAttendance: () => Promise.resolve(mine ?? { event: theBurn, attendance: null }),
   joinActiveEvent: () => Promise.reject(new Error('joinActiveEvent is not stubbed here')),
   leaveActiveEvent: () => Promise.reject(new Error('leaveActiveEvent is not stubbed here')),
+  updateMyStay: () => Promise.reject(new Error('updateMyStay is not stubbed here')),
   ...over,
 })
 

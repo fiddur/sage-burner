@@ -17,6 +17,7 @@ import { Invite } from './pages/Invite.tsx'
 import { Login } from './pages/Login.tsx'
 import { MyBurn } from './pages/MyBurn.tsx'
 import { NotFound } from './pages/NotFound.tsx'
+import { ProfilePage } from './pages/Profile.tsx'
 import { FetchedViewerProvider, ViewerProvider } from './viewer.tsx'
 
 /**
@@ -39,6 +40,9 @@ export type AppApi = Pick<
   | 'deleteQuestion'
   | 'getInviteState'
   | 'redeemInvite'
+  | 'getMyProfile'
+  | 'updateMyProfile'
+  | 'updateMyStay'
   | 'getMyAttendance'
   | 'joinActiveEvent'
   | 'leaveActiveEvent'
@@ -76,6 +80,9 @@ export const Routes = ({
     | 'getEvents'
     | 'getInviteState'
     | 'redeemInvite'
+    | 'getMyProfile'
+    | 'updateMyProfile'
+    | 'updateMyStay'
     | 'getMyAttendance'
     | 'joinActiveEvent'
     | 'leaveActiveEvent'
@@ -114,6 +121,7 @@ export const Routes = ({
   const AdminInvitesRoute = useMemo(() => () => <AdminInvites api={api} />, [api])
   const HomeRoute = useMemo(() => () => <Home api={api} />, [api])
   const MyBurnRoute = useMemo(() => () => <MyBurn api={api} />, [api])
+  const ProfileRoute = useMemo(() => () => <ProfilePage api={api} />, [api])
   const ApplyRoute = useMemo(() => () => <Apply api={api} />, [api])
   // The token arrives as a prop from the route pattern, so this one takes props
   // rather than closing over nothing like the others.
@@ -128,6 +136,7 @@ export const Routes = ({
       <Route path="/" component={HomeRoute} />
       <Route path="/apply" component={ApplyRoute} />
       <Route path="/my-burn" component={MyBurnRoute} />
+      <Route path="/profile" component={ProfileRoute} />
       <Route path="/invite/:token" component={InviteRoute} />
       <Route path="/login" component={LoginRoute} />
       <Route path="/admin" component={AdminRoute} />
