@@ -1,0 +1,1 @@
+ALTER TABLE `session` ADD `host_account_id` text REFERENCES account(id);

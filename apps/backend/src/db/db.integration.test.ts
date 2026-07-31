@@ -12,7 +12,7 @@ import {
   event,
   formQuestion,
   inviteToken,
-  member,
+  attendance,
   passkey,
   session,
 } from './schema.ts'
@@ -67,16 +67,14 @@ const seedInvite = (id: string) =>
     })
     .run()
 
-const seedMember = (id: string, account_id: string, invite_token_id: string) =>
+const seedMember = (id: string, account_id: string, _invite_token_id?: string) =>
   handle.db
-    .insert(member)
+    .insert(attendance)
     .values({
       id,
       event_id: ids.event,
       account_id,
-      name: 'Someone',
-      contact: 'someone@example.org',
-      allergies_notes: null,
+      joined_at: NOW,
       arrival_date: null,
       departure_date: null,
       lodging: null,
@@ -84,7 +82,6 @@ const seedMember = (id: string, account_id: string, invite_token_id: string) =>
       notes: null,
       payment_status: 'unpaid',
       payment_date: null,
-      invite_token_id,
     })
     .run()
 
@@ -113,7 +110,7 @@ describe('migrations', () => {
       'event',
       'form_question',
       'invite_token',
-      'member',
+      'attendance',
       'passkey',
       'session',
     ]) {
@@ -178,15 +175,13 @@ describe('foreign keys', () => {
     seedInvite(ids.invite)
     expect(() =>
       handle.db
-        .insert(member)
+        .insert(attendance)
         .values({
           id: ids.member,
           event_id: 'e0000000-0000-4000-8000-00000000dead',
           account_id: ids.account,
-          name: 'Someone',
-          contact: 'someone@example.org',
+          joined_at: NOW,
           payment_status: 'unpaid',
-          invite_token_id: ids.invite,
         })
         .run(),
     ).toThrow()
@@ -201,14 +196,14 @@ describe('foreign keys', () => {
         id: 's1',
         event_id: ids.event,
         title: 'Cacao ceremony',
-        host_member_id: ids.member,
+        host_account_id: ids.account,
         description: 'Bring a cup.',
       })
       .run()
 
     handle.db.delete(event).where(eq(event.id, ids.event)).run()
 
-    expect(handle.db.select().from(member).all()).toHaveLength(0)
+    expect(handle.db.select().from(attendance).all()).toHaveLength(0)
     expect(handle.db.select().from(session).all()).toHaveLength(0)
   })
 
@@ -277,15 +272,13 @@ describe('uniqueness', () => {
 
     expect(() =>
       handle.db
-        .insert(member)
+        .insert(attendance)
         .values({
           id: ids.otherMember,
           event_id: 'e0000000-0000-4000-8000-000000000002',
           account_id: ids.account,
-          name: 'Someone',
-          contact: 'someone@example.org',
+          joined_at: NOW,
           payment_status: 'unpaid',
-          invite_token_id: 'i0000000-0000-4000-8000-000000000003',
         })
         .run(),
     ).not.toThrow()
@@ -359,15 +352,36 @@ describe('uniqueness', () => {
   })
 
   it('makes an invite genuinely single-use, even by a different account', () => {
-    // The (event, account) index only stops the *same* person joining twice.
-    // Without a unique index on invite_token_id, a forwarded invite link lets
-    // a second person redeem it — and member_cap is sized against invites
-    // issued, so the cap silently overruns too.
-    seedAccount(ids.otherAccount, 'someone.else@example.org')
+    // Enforced on `account` now that redemption creates the person rather than a
+    // per-burn row. Without it a forwarded link lets a second person redeem the
+    // same invite — and `member_cap` is sized against invites issued, so the cap
+    // silently overruns too.
     seedInvite(ids.invite)
-    seedMember(ids.member, ids.account, ids.invite)
+    seedAccount(ids.otherAccount, 'someone.else@example.org')
+    handle.db.update(account).set({ invite_token_id: ids.invite }).where(eq(account.id, ids.account)).run()
 
-    expect(() => seedMember(ids.otherMember, ids.otherAccount, ids.invite)).toThrow()
+    expect(() =>
+      handle.db
+        .update(account)
+        .set({ invite_token_id: ids.invite })
+        .where(eq(account.id, ids.otherAccount))
+        .run(),
+    ).toThrow()
+  })
+
+  it('lets many accounts carry no invite, since the CLI creates them that way', () => {
+    // The index has to be partial: NULLs compare distinct in SQLite, but a
+    // non-partial unique index would still collapse them on some engines, and
+    // every bootstrap admin has none.
+    seedAccount(ids.otherAccount, 'someone.else@example.org')
+
+    expect(
+      handle.db
+        .select()
+        .from(account)
+        .all()
+        .filter((row) => row.invite_token_id === null),
+    ).toHaveLength(2)
   })
 
   it('rejects a NULL primary key, which SQLite would otherwise allow', () => {
@@ -391,7 +405,7 @@ describe('check constraints', () => {
     expect(() =>
       handle.client
         .prepare(
-          `INSERT INTO member (id, event_id, account_id, name, contact, payment_status, invite_token_id)
+          `INSERT INTO attendance (id, event_id, account_id, joined_at, payment_status)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(ids.member, ids.event, ids.account, 'Someone', 'a@b.c', 'refunded', ids.invite),
@@ -447,7 +461,7 @@ describe('check constraints', () => {
     expect(() =>
       handle.client
         .prepare(
-          `INSERT INTO member (id, event_id, account_id, name, contact, arrival_date, departure_date,
+          `INSERT INTO attendance (id, event_id, account_id, joined_at, arrival_date, departure_date,
                                payment_status, invite_token_id)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
@@ -471,7 +485,7 @@ describe('check constraints', () => {
     expect(() =>
       handle.client
         .prepare(
-          `INSERT INTO session (id, event_id, title, host_member_id, description, time_slot_start, time_slot_end)
+          `INSERT INTO session (id, event_id, title, host_account_id, description, time_slot_start, time_slot_end)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
         )
         .run('s-half', ids.event, 'Half a slot', ids.member, '', '2026-10-03T09:00:00Z', null),
@@ -647,22 +661,20 @@ describe('transactions', () => {
 
     expect(() =>
       handle.db.transaction((tx) => {
-        tx.insert(member)
+        tx.insert(attendance)
           .values({
             id: ids.member,
             event_id: ids.event,
             account_id: ids.account,
-            name: 'Someone',
-            contact: 'someone@example.org',
+            joined_at: NOW,
             payment_status: 'unpaid',
-            invite_token_id: ids.invite,
           })
           .run()
         throw new Error('redemption failed halfway')
       }),
     ).toThrow('redemption failed halfway')
 
-    expect(handle.db.select().from(member).all()).toHaveLength(0)
+    expect(handle.db.select().from(attendance).all()).toHaveLength(0)
   })
 })
 
@@ -677,7 +689,7 @@ describe('sessions', () => {
         id: 's2',
         event_id: ids.event,
         title: 'Something unplanned',
-        host_member_id: ids.member,
+        host_account_id: ids.account,
         description: '',
         time_slot_start: null,
         time_slot_end: null,

@@ -599,6 +599,31 @@ Applications are the exception, and deliberately so: you apply to the community
 once, not to a burn. Approval admits you to any of them, so `application` and
 `form_question` carry no `event_id` and outlive any single event.
 
+### Who a person is, and which burns they come to
+
+Two different lifetimes, so two different places.
+
+**The `account` carries the person.** `name`, `contact`, `allergies_notes` and the
+invite they came in on live there, one row per human. They are nullable because an
+account can exist before anyone fills them in — the bootstrap admin is created
+from the CLI with an email and nothing else.
+
+**`attendance` carries one stay**, keyed `(event, account)`: arrival and
+departure, lodging, shift preference, notes, and payment. Payment is per burn and
+never a flag on a person.
+
+The split is not cosmetic. Held per burn, `allergies_notes` meant a copy for every
+burn someone attended, and correcting one left the others wrong — on data that
+exists to keep people safe. It is also what the central application model implies:
+you are approved into the community once, so the details describing _you_ cannot
+hang off a single event.
+
+An invite's single use is enforced by a **partial unique index on
+`account.invite_token_id`** — partial because NULLs compare distinct in SQLite and
+every CLI-created account has none. Deleting the account would stop the index
+objecting, so redemption stamps `used_at` in the same transaction; neither
+mechanism is sufficient alone.
+
 ### Which event is active
 
 The public homepage needs one event, so the rule is written down rather than

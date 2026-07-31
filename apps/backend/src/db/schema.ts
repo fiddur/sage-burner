@@ -1,6 +1,6 @@
 import type { StoredAnswers } from '@sage-burner/shared'
 import type { SQL } from 'drizzle-orm'
-import type { SQLiteColumn } from 'drizzle-orm/sqlite-core'
+import type { AnySQLiteColumn, SQLiteColumn } from 'drizzle-orm/sqlite-core'
 
 import {
   accountRoles,
@@ -209,11 +209,45 @@ export const account = sqliteTable(
     email: text('email').notNull().unique(),
     /** Nullable: a passkey-only account is legitimate. */
     password_hash: text('password_hash'),
+    /**
+     * Who this is, and how to reach them — the things that describe a person
+     * rather than a stay.
+     *
+     * Nullable because an account can exist before anyone has filled them in:
+     * the bootstrap admin is created from the CLI with an email and nothing
+     * else. Redemption sets them, and #18 lets a member edit them afterwards.
+     */
+    name: text('name'),
+    contact: text('contact'),
+    /**
+     * Free text — "gluten", "sensitive to red lentils". Never a fixed list.
+     *
+     * Here rather than per burn on purpose: held per attendance it meant a copy
+     * for every burn someone came to, and correcting one left the others wrong —
+     * on data that exists to keep people safe.
+     */
+    allergies_notes: text('allergies_notes'),
+    /**
+     * The invite this account was redeemed from, or null for one created from
+     * the CLI.
+     */
+    // Return type annotated because `account` and `invite_token` reference each
+    // other — `created_by` points back here — and TypeScript cannot infer either
+    // in a cycle.
+    invite_token_id: text('invite_token_id').references((): AnySQLiteColumn => inviteToken.id),
     created_at: text('created_at').notNull(),
   },
   (table) => [
     primaryKey({ columns: [table.id] }),
     check('account_email_lowercase_check', sql`${table.email} = lower(${table.email})`),
+    // What makes an invite single-use for as long as the account exists.
+    // Partial, because NULLs compare distinct in SQLite and every CLI-created
+    // account carries none. Delete the account and this stops objecting, so
+    // redemption also stamps `used_at` in the same transaction — neither
+    // mechanism is enough alone.
+    uniqueIndex('account_invite_token_idx')
+      .on(table.invite_token_id)
+      .where(sql`${table.invite_token_id} is not null`),
   ],
 )
 
@@ -287,8 +321,8 @@ export const inviteToken = sqliteTable(
      * Stamped on redemption, for display and auditing.
      *
      * This is a record of redemption, not the thing preventing a second one —
-     * inserting a member against an already-stamped token is accepted here.
-     * `member_invite_token_idx` is what actually enforces single use.
+     * inserting an account against an already-stamped token is accepted here.
+     * `account_invite_token_idx` is what actually enforces single use.
      */
     used_at: text('used_at'),
     /**
@@ -297,7 +331,7 @@ export const inviteToken = sqliteTable(
      * No `onDelete`, so SQLite's default NO ACTION applies and an account that
      * has issued invites cannot be deleted. Deliberate: erasing who let whom in
      * would quietly rewrite the record of how the group formed. The same
-     * applies to `member.account_id`. It does mean "delete my account" has no
+     * applies to `attendance.account_id`. It does mean "delete my account" has no
      * answer yet — see #35, which owns that decision.
      *
      * NO ACTION rather than RESTRICT matters here: it is checked at the end of
@@ -337,8 +371,16 @@ export const inviteToken = sqliteTable(
  * Scoped to `(event, account)`: the same human attending three burns has three
  * rows, each with its own payment state, allergies and arrival dates.
  */
-export const member = sqliteTable(
-  'member',
+/**
+ * One person's participation in one burn.
+ *
+ * Created when someone marks their intention to come (#76), which is a separate
+ * act from being in the community: you are approved once, then decide burn by
+ * burn. Everything here is about that stay — when they arrive, where they sleep,
+ * what they will help with, and whether they have paid.
+ */
+export const attendance = sqliteTable(
+  'attendance',
   {
     id: text('id').notNull(),
     event_id: text('event_id')
@@ -347,9 +389,8 @@ export const member = sqliteTable(
     account_id: text('account_id')
       .notNull()
       .references(() => account.id),
-    name: text('name').notNull(),
-    contact: text('contact').notNull(),
-    allergies_notes: text('allergies_notes'),
+    /** When they said they were coming. The member list is ordered by it (#79). */
+    joined_at: text('joined_at').notNull(),
     arrival_date: text('arrival_date'),
     departure_date: text('departure_date'),
     /**
@@ -362,45 +403,21 @@ export const member = sqliteTable(
     /** Admin-set only. Members can read their own status but never write it. */
     payment_status: text('payment_status', { enum: paymentStatuses }).notNull().default('unpaid'),
     payment_date: text('payment_date'),
-    /** The invite this membership was redeemed from. */
-    invite_token_id: text('invite_token_id')
-      .notNull()
-      .references(() => inviteToken.id),
   },
   (table) => [
     primaryKey({ columns: [table.id] }),
-    // One membership per person per burn.
-    uniqueIndex('member_event_account_idx').on(table.event_id, table.account_id),
-    // What makes an invite single-use, for as long as the member row exists.
-    // Note the caveat: delete a member and this index stops objecting, so
-    // anyone still holding the original link could redeem it again. Redemption
-    // (#17) closes that by making the `used_at` stamp load-bearing too —
-    // `UPDATE invite_token SET used_at = ? WHERE id = ? AND used_at IS NULL`,
-    // requiring one affected row — so the two mechanisms cover each other.
-    //
-    // Stamping `used_at` alone is a check-then-act race with nothing
-    // underneath it, and the index above only stops the *same* account joining
-    // twice — so without
-    // this, a forwarded invite link lets a second person redeem it and quietly
-    // breaks member_cap accounting, which is sized against invites issued.
-    uniqueIndex('member_invite_token_idx').on(table.invite_token_id),
-    // No separate index on event_id alone: SQLite uses the leftmost prefix of
-    // member_event_account_idx for that, so one would only add write cost.
-    // That covers one direction only — "which burns is this person a member
-    // of?" filters on account_id and falls back to a scan. Left that way
-    // deliberately: at ~42 members across a handful of events the scan is
-    // free, and an index would cost a write on every member update.
-    //
-    // Mirrors `withMemberStayOrder` in the shared schemas.
-    check('member_arrival_date_check', isIsoDate(table.arrival_date)),
-    check('member_departure_date_check', isIsoDate(table.departure_date)),
-    check('member_payment_date_check', isIsoDate(table.payment_date)),
+    // One attendance per person per burn, which is what makes opting in twice a
+    // no-op rather than a second row.
+    uniqueIndex('attendance_event_account_idx').on(table.event_id, table.account_id),
+    check('attendance_arrival_date_check', isIsoDate(table.arrival_date)),
+    check('attendance_departure_date_check', isIsoDate(table.departure_date)),
+    check('attendance_payment_date_check', isIsoDate(table.payment_date)),
     check(
-      'member_stay_order_check',
+      'attendance_stay_order_check',
       sql`${table.arrival_date} is null or ${table.departure_date} is null
           or ${table.departure_date} >= ${table.arrival_date}`,
     ),
-    check('member_payment_status_check', oneOf(table.payment_status, paymentStatuses)),
+    check('attendance_payment_status_check', oneOf(table.payment_status, paymentStatuses)),
   ],
 )
 
@@ -422,13 +439,13 @@ export const session = sqliteTable(
       .references(() => event.id, { onDelete: 'cascade' }),
     title: text('title').notNull(),
     /**
-     * Not constrained to match `event_id`: a dream can name a host who is a
-     * member of a different burn. Ordinary application logic rather than a race,
-     * so the scheduling routes (#20) own it.
+     * Not constrained to require an `attendance` for this event: a dream can name
+     * a host who is not coming to this burn. Ordinary application logic rather
+     * than a race, so the scheduling routes (#20) own it.
      */
-    host_member_id: text('host_member_id')
+    host_account_id: text('host_account_id')
       .notNull()
-      .references(() => member.id, { onDelete: 'cascade' }),
+      .references(() => account.id, { onDelete: 'cascade' }),
     description: text('description').notNull().default(''),
     time_slot_start: text('time_slot_start'),
     time_slot_end: text('time_slot_end'),
