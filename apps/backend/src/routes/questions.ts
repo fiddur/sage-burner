@@ -201,6 +201,18 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db, sessions }: G
     async (request, reply) => {
       void noStore(reply)
 
+      // A hard delete, and once #14 stores submissions that orphans answers.
+      // `application.answers` is a JSON blob keyed by `form_question.id` with no
+      // foreign key, so deleting a question leaves every stored answer to it
+      // intact but unlabelled — the text survives, and nothing can say what was
+      // asked. No submission path exists yet, so there is nothing to orphan
+      // today; the decision is recorded here rather than discovered later.
+      //
+      // #14 has to pick one: keep the hard delete and render orphans as "removed
+      // question", soft-delete so the label survives, or refuse the delete once
+      // an answer references it. The last reads strictest but ages worst — a
+      // question can never be retired once anyone has answered it.
+      //
       // One statement: `.returning()` gives the 404 from the write itself, and
       // closes the window where the row disappears between a read and the delete.
       const deleted = await db

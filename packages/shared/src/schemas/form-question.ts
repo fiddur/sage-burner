@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { formQuestionTypes } from '../enums.ts'
+import { formQuestionTypes, tickBoxRequired } from '../enums.ts'
 import { idSchema, optionalText, nonEmptyText } from './common.ts'
 
 /**
@@ -46,19 +46,11 @@ export type FormQuestion = z.infer<typeof formQuestionSchema>
  * boundary while there are no rows to migrate, and mirrored by CHECK constraints
  * in `db/schema.ts` for writes that never touch this schema.
  *
- * The three functions below are one rule with three shapes: what `required` must
- * be, whether a given pair breaks it, and the schema wrapper. It was written out
- * separately in each place first, and the copies drifted within the hour — the
- * PATCH handler covered `agreement` and not `checkbox`, so a request producing a
- * required checkbox reached the database CHECK and answered 500 instead of 400.
+ * The rule itself is `tickBoxRequired` in `enums.ts` — it lives there because the
+ * web app needs it at runtime and this module evaluates Zod at import. The two
+ * functions below are the other two shapes of it: whether a given pair breaks the
+ * rule, and the schema wrapper that applies it.
  */
-
-/** What `required` must be for a type, or `undefined` when it is the organiser's choice. */
-export const tickBoxRequired = (type: string): boolean | undefined => {
-  if (type === 'agreement') return true
-  if (type === 'checkbox') return false
-  return undefined
-}
 
 /**
  * Whether a `type`/`required` pair contradicts the rule.

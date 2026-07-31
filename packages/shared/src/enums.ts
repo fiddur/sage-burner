@@ -33,6 +33,37 @@ export type FormQuestionType = (typeof formQuestionTypes)[number]
 export const isFormQuestionType = (value: unknown): value is FormQuestionType =>
   isOneOf(formQuestionTypes, value)
 
+/**
+ * What `required` must be for a type, or `undefined` when it is the organiser's
+ * choice.
+ *
+ * An `agreement` is a checkbox that blocks submission until ticked, so
+ * `required: false` would erase the only thing distinguishing it from
+ * `checkbox`. A `checkbox` is present in the body whether ticked or not, so
+ * "must be present" is vacuous and the only other reading — "must be ticked" —
+ * is `agreement` again. Two spellings of one rule is the ambiguity, so the
+ * second is refused rather than left for a consumer to interpret.
+ *
+ * Four places enforce this: the create schema, the update schema, the PATCH
+ * handler's `UPDATE ... WHERE`, and generated CHECK constraints in the backend's
+ * `db/schema.ts`. It was written out separately in each at first and the copies
+ * drifted within the hour — the handler covered `agreement` and not `checkbox`,
+ * so a request producing a required checkbox reached the database CHECK and
+ * answered 500 instead of 400.
+ *
+ * It lives here rather than beside those schemas because the web app needs it at
+ * runtime — `QuestionEditor` decides from it whether to fix or offer the
+ * checkbox — and this module imports nothing. Defined next to `formQuestionTypes`
+ * it also sits where a fifth type gets added, which is the change it has to stay
+ * in step with.
+ */
+export const tickBoxRequired = (type: string): boolean | undefined => {
+  if (type === 'agreement') return true
+  if (type === 'checkbox') return false
+
+  return undefined
+}
+
 /** Membership fee state, tracked per (event, member) — never globally per person. */
 export const paymentStatuses = ['unpaid', 'partial', 'paid'] as const
 export type PaymentStatus = (typeof paymentStatuses)[number]
