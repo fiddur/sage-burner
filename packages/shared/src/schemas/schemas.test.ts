@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { applicationSchema } from './application.ts'
+import { applicationCreateSchema, applicationSchema } from './application.ts'
 import { slugSchema } from './common.ts'
 import { eventFields, eventSchema, withEventDateOrder } from './event.ts'
 import { formQuestionSchema } from './form-question.ts'
@@ -90,10 +90,16 @@ describe('formQuestionSchema', () => {
 })
 
 describe('applicationSchema', () => {
+  const anAnswer = {
+    question_id: OTHER_ID,
+    label: 'Why do you want to come?',
+    type: 'text',
+    value: 'because it sounds wonderful',
+  }
+
   const anApplication = {
     id: ID,
-    event_id: OTHER_ID,
-    answers: { [OTHER_ID]: 'because it sounds wonderful' },
+    answers: [anAnswer],
     status: 'pending',
     applicant_name: 'Someone',
     applicant_contact: 'someone@example.org',
@@ -106,13 +112,67 @@ describe('applicationSchema', () => {
   })
 
   it('accepts both text and boolean answers', () => {
-    const answers = { [ID]: 'a long answer', [OTHER_ID]: true }
+    const answers = [anAnswer, { question_id: ID, label: 'I agree', type: 'agreement', value: true }]
     expect(applicationSchema.safeParse({ ...anApplication, answers }).success).toBe(true)
+  })
+
+  it('requires the wording, not just a reference', () => {
+    // The whole reason answers are stored as a snapshot: an application that kept
+    // only `question_id` stops being readable the moment a question is edited or
+    // deleted, and that is not recoverable afterwards.
+    const { label: _label, ...withoutLabel } = anAnswer
+    expect(applicationSchema.safeParse({ ...anApplication, answers: [withoutLabel] }).success).toBe(false)
+  })
+
+  it('rejects an answer whose question id is not a uuid', () => {
+    const answers = [{ ...anAnswer, question_id: 'not-a-uuid' }]
+    expect(applicationSchema.safeParse({ ...anApplication, answers }).success).toBe(false)
+  })
+
+  it('rejects a question type the form cannot render', () => {
+    const answers = [{ ...anAnswer, type: 'select' }]
+    expect(applicationSchema.safeParse({ ...anApplication, answers }).success).toBe(false)
+  })
+})
+
+describe('applicationCreateSchema', () => {
+  const aSubmission = {
+    applicant_name: 'Someone',
+    applicant_contact: 'someone@example.org',
+    answers: { [OTHER_ID]: 'because it sounds wonderful' },
+  }
+
+  it('accepts answers keyed by question id', () => {
+    expect(applicationCreateSchema.safeParse(aSubmission).success).toBe(true)
   })
 
   it('rejects answers keyed by something that is not a question id', () => {
     const answers = { 'not-a-uuid': 'value' }
-    expect(applicationSchema.safeParse({ ...anApplication, answers }).success).toBe(false)
+    expect(applicationCreateSchema.safeParse({ ...aSubmission, answers }).success).toBe(false)
+  })
+
+  it('rejects a submitter who names their own status', () => {
+    // `.strict()`, so this is a 400 rather than a dropped key — otherwise the
+    // request that approves its own application looks like it succeeded.
+    expect(applicationCreateSchema.safeParse({ ...aSubmission, status: 'approved' }).success).toBe(false)
+  })
+
+  it('rejects a submitter who supplies the wording', () => {
+    // The label is the server's, read from the question rows. Accepting it here
+    // would let an application record a question that was never asked.
+    //
+    // Written in the record shape this schema does take, so the refusal comes
+    // from `answerValueSchema` rejecting an object where a string or boolean
+    // belongs. An array would be refused too, but for the wrong reason — it would
+    // fail identically for `[1, 2, 3]`, which proves nothing about labels.
+    const answers = { [OTHER_ID]: { label: 'Something else entirely', value: 'x' } }
+    expect(applicationCreateSchema.safeParse({ ...aSubmission, answers }).success).toBe(false)
+  })
+
+  it('requires a name and a contact', () => {
+    const { applicant_name: _name, ...withoutName } = aSubmission
+    expect(applicationCreateSchema.safeParse(withoutName).success).toBe(false)
+    expect(applicationCreateSchema.safeParse({ ...aSubmission, applicant_name: '   ' }).success).toBe(false)
   })
 })
 

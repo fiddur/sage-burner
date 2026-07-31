@@ -197,18 +197,6 @@ describe('foreign keys', () => {
     seedInvite(ids.invite)
     seedMember(ids.member, ids.account, ids.invite)
     handle.db
-      .insert(application)
-      .values({
-        id: 'app1',
-        event_id: ids.event,
-        answers: { q1: 'because' },
-        status: 'pending',
-        applicant_name: 'Someone',
-        applicant_contact: 'someone@example.org',
-        submitted_at: NOW,
-      })
-      .run()
-    handle.db
       .insert(session)
       .values({
         id: 's1',
@@ -221,23 +209,35 @@ describe('foreign keys', () => {
 
     handle.db.delete(event).where(eq(event.id, ids.event)).run()
 
-    expect(handle.db.select().from(application).all()).toHaveLength(0)
     expect(handle.db.select().from(member).all()).toHaveLength(0)
     expect(handle.db.select().from(session).all()).toHaveLength(0)
   })
 
-  it('leaves the application questions alone, since they are not scoped to an event', () => {
-    // The inverse of the cascade above, and the reason `form_question` lost its
-    // `event_id`: an application is to the community, so the questions outlive any
-    // single burn. Deleting last year's event must not empty the form.
+  it('leaves the questions and the applications alone, since neither belongs to an event', () => {
+    // The inverse of the cascade above, and the reason both tables lost their
+    // `event_id`: you apply to the community, not to a burn. Approval admits you
+    // to any of them, so deleting last year's event must neither empty the form
+    // nor destroy the applications people sent.
     handle.db
       .insert(formQuestion)
       .values({ id: 'q1', order: 0, type: 'text', label: 'Why do you want to join?', required: true })
+      .run()
+    handle.db
+      .insert(application)
+      .values({
+        id: 'app1',
+        answers: [{ question_id: 'q1', label: 'Why do you want to join?', type: 'text', value: 'because' }],
+        status: 'pending',
+        applicant_name: 'Someone',
+        applicant_contact: 'someone@example.org',
+        submitted_at: NOW,
+      })
       .run()
 
     handle.db.delete(event).where(eq(event.id, ids.event)).run()
 
     expect(handle.db.select().from(formQuestion).all()).toHaveLength(1)
+    expect(handle.db.select().from(application).all()).toHaveLength(1)
   })
 })
 
@@ -321,8 +321,7 @@ describe('uniqueness', () => {
       .insert(application)
       .values({
         id: 'app-dup',
-        event_id: ids.event,
-        answers: {},
+        answers: [],
         status: 'approved',
         applicant_name: 'Someone',
         applicant_contact: 'someone@example.org',
@@ -697,13 +696,17 @@ describe('sessions', () => {
 
 describe('json columns', () => {
   it('round-trips application answers', () => {
-    const answers = { 'q-1': 'a written answer', 'q-2': true }
+    // The stored shape is the snapshot, not a bare map: the wording as asked
+    // travels with the answer so it survives the question being edited or removed.
+    const answers = [
+      { question_id: 'q-1', label: 'Why do you want to come?', type: 'text', value: 'a written answer' },
+      { question_id: 'q-2', label: 'I agree to the principles', type: 'agreement', value: true },
+    ] as const
     handle.db
       .insert(application)
       .values({
         id: 'app3',
-        event_id: ids.event,
-        answers,
+        answers: [...answers],
         status: 'pending',
         applicant_name: 'Someone',
         applicant_contact: 'someone@example.org',

@@ -576,7 +576,7 @@ describe('deleting a question', () => {
   it('removes it from the public form', async () => {
     const server = await build()
     const cookie = await givenAdmin()
-    const keep = await add(server, cookie, { ...question, label: 'Keep' })
+    await add(server, cookie, { ...question, label: 'Keep' })
     const drop = await add(server, cookie, { ...question, label: 'Drop' })
 
     const response = await server.inject({
@@ -587,7 +587,6 @@ describe('deleting a question', () => {
 
     expect(response.statusCode).toBe(204)
     expect(labelsOf(await publicList(server))).toEqual(['Keep'])
-    expect(keep.json().question.id).toBeTruthy()
   })
 
   it('refuses an anonymous caller', async () => {
