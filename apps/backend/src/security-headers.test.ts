@@ -165,8 +165,11 @@ describe('security headers', () => {
     // that had nothing pinning it. Losing it is silent in *both* directions:
     // reverting to helmet's `'self' data:` still passes every test here and
     // breaks only remote images in production — the mismatch #69 existed to
-    // remove. `markdown.ts` encodes the same list in `isSafeImageSource`, so
-    // this is also what keeps the two from drifting apart.
+    // remove. `markdown.ts` allows a subset of this in `isSafeImageSource` —
+    // https and site-relative, no `data:` — deliberately, since a renderer
+    // stricter than the policy is the safe direction to differ in. What must
+    // not happen is narrowing `https:` here without narrowing it there, which
+    // puts the mismatch back.
     expect(found.get('img-src')).toEqual(["'self'", 'data:', 'https:'])
   })
 
