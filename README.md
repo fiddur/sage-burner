@@ -853,6 +853,36 @@ needs no notion of its own public URL.
 burn — the application has no event either — and which burns you then come to is
 a separate decision each time.
 
+### Direct invites
+
+For people already known — returning members, partners — who should skip the form
+entirely. `POST /api/admin/invites` mints the **same** token an approval does, so
+both kinds redeem through one path: CSPRNG bytes, digest stored, raw value
+returned once. The default is 30 days; an organiser can set `expires_at`, and one
+already in the past is refused rather than stored, since it would be a link
+nobody could use.
+
+`GET /api/admin/invites` lists them with a **derived** status — `outstanding`,
+`used`, `expired`. Derived rather than stored, because an invite becomes expired
+by time passing, not by anyone writing to it, and a stored status would be a
+value in the database that quietly stops being true. `used` beats `expired`: a
+redeemed invite that later lapses is spent, and calling it expired would suggest
+re-issuing a link to someone who is already in.
+
+The list never carries the digest, let alone the token.
+
+**Only an unredeemed direct invite can be revoked.** The other two cases are
+refused with `409`, for different reasons:
+
+- a **redeemed** invite is the record of how someone got in, and `member`
+  references it — deleting it would rewrite how the group formed;
+- an **application's** invite is the only one that application will ever have, so
+  revoking it would leave the applicant approved with no way in, which is
+  unrecoverable through the API. #91 owns re-issuing.
+
+The organiser UI offers Revoke only where it would succeed, rather than showing a
+button that exists to produce a 409.
+
 ### Markdown is escaped, not filtered
 
 `welcome_markdown` is admin-authored and rendered to every public visitor, so it

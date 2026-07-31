@@ -3,33 +3,18 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
 import { errorResponse } from '@sage-burner/shared'
 import { and, desc, eq } from 'drizzle-orm'
-import { createHash, randomBytes, randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
 
 import { createGuards } from '../auth/guards.ts'
 import { application, inviteToken } from '../db/schema.ts'
 import { noStore } from '../http.ts'
+import { defaultExpiry, mintToken } from '../invites.ts'
 import { viewerFor } from './auth.ts'
 
 export interface ApplicationReviewDeps extends GuardDeps {
   now?: () => Date
-}
-
-const INVITE_TOKEN_BYTES = 32
-const INVITE_VALID_DAYS = 30
-
-/**
- * A token that has to be unguessable, and a digest that is all we keep.
- *
- * 32 CSPRNG bytes, base64url so it survives a URL untouched. Only the SHA-256
- * goes to the database, so a leaked backup hands out no invites — and the raw
- * value exists in exactly one response and nowhere else.
- */
-const mintToken = () => {
-  const token = randomBytes(INVITE_TOKEN_BYTES).toString('base64url')
-
-  return { token, token_hash: createHash('sha256').update(token).digest('hex') }
 }
 
 /**
@@ -70,7 +55,7 @@ export const registerApplicationReviewRoutes = (
 
       const { id } = request.params
       const minted = decision === 'approved' ? mintToken() : undefined
-      const expires_at = new Date(now().getTime() + INVITE_VALID_DAYS * 24 * 60 * 60 * 1000).toISOString()
+      const expires_at = defaultExpiry(now())
 
       // One transaction, because approving is two writes and half of it is
       // worse than neither: an application left `approved` with no invite cannot

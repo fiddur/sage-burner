@@ -36,6 +36,9 @@ const clientWith = (
   getQuestions: () => Promise.reject(new Error('getQuestions is not stubbed in this file')),
   submitApplication: () => Promise.reject(new Error('submitApplication is not stubbed in this file')),
   getApplications: () => Promise.reject(new Error('getApplications is not stubbed in this file')),
+  getInvites: () => Promise.reject(new Error('getInvites is not stubbed in this file')),
+  createInvite: () => Promise.reject(new Error('createInvite is not stubbed in this file')),
+  revokeInvite: () => Promise.reject(new Error('revokeInvite is not stubbed in this file')),
   approveApplication: () => Promise.reject(new Error('approveApplication is not stubbed in this file')),
   rejectApplication: () => Promise.reject(new Error('rejectApplication is not stubbed in this file')),
   addQuestion: () => Promise.reject(new Error('addQuestion is not stubbed in this file')),
@@ -123,7 +126,13 @@ describe('routing', () => {
     // The whole point of mounting the real `App`: a page can exist, be tested,
     // and still be unreachable because no route names it — which is what
     // happened to /admin/applications.
-    for (const path of ['/admin', '/admin/events', '/admin/questions', '/admin/applications']) {
+    for (const path of [
+      '/admin',
+      '/admin/events',
+      '/admin/questions',
+      '/admin/applications',
+      '/admin/invites',
+    ]) {
       cleanup()
       renderAt(path, { status: 'signed-in', account: { id: 'a1', roles: ['admin', 'member'] } })
       expect(screen.getByRole('heading', { level: 1 }).textContent).not.toBe('Nothing here')

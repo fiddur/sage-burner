@@ -18,6 +18,7 @@ import { registerApplicationReviewRoutes } from './routes/application-review.ts'
 import { registerApplicationRoutes } from './routes/applications.ts'
 import { registerAuthRoutes } from './routes/auth.ts'
 import { registerEventRoutes } from './routes/events.ts'
+import { registerInviteRoutes } from './routes/invites.ts'
 import { registerQuestionRoutes } from './routes/questions.ts'
 import { registerVersionRoutes } from './routes/version.ts'
 
@@ -305,6 +306,7 @@ export const createApp = async ({
   registerQuestionRoutes(app, { db, sessions })
   registerApplicationRoutes(app, { db, now })
   registerApplicationReviewRoutes(app, { db, sessions, now })
+  registerInviteRoutes(app, { db, sessions, now })
 
   const webRoot = config.web_root
   const servesWebApp = webRoot !== undefined
