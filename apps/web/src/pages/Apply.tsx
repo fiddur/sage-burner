@@ -1,6 +1,12 @@
 import type { AnswerProblem, FormQuestion, SubmittedAnswers } from '@sage-burner/shared'
 
-import { answerProblems, isTickBox } from '@sage-burner/shared'
+import {
+  MAX_ANSWER_LENGTH,
+  MAX_APPLICANT_CONTACT_LENGTH,
+  MAX_APPLICANT_NAME_LENGTH,
+  answerProblems,
+  isTickBox,
+} from '@sage-burner/shared'
 import { useCallback, useEffect, useMemo, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -35,17 +41,28 @@ interface ApplyProps {
 const problemText = (reason: AnswerProblem['reason']) => {
   if (reason === 'unchecked') return 'Please tick this to continue.'
   if (reason === 'missing') return 'Please answer this.'
+  if (reason === 'too_long') return `Please keep this under ${MAX_ANSWER_LENGTH.toLocaleString()} characters.`
 
   return 'That answer is not valid.'
 }
 
 /**
- * `nonEmptyText` is `.trim().min(1)`, and the browser's `required` only rejects
- * the empty string — so `"   "` passes every native check and is then refused by
- * the API. Checked here for the same reason the answers are: a submission this
- * form accepts should not come back as a 400 the applicant cannot act on.
+ * The identity fields' own rules, mirroring `nonEmptyText(max)` exactly.
+ *
+ * Both halves matter and both were missing at first. `.trim().min(1)` means
+ * `"   "` is refused, while the browser's `required` accepts it; `.max(n)` means
+ * a long paste is refused, and nothing in the browser stops one.
+ *
+ * Either gap put the applicant in the same dead end — a 400 the page could only
+ * explain as "the questions changed, reload", which throws away what they wrote
+ * and fails identically on the retry.
  */
-const blank = (value: string) => value.trim() === ''
+const identityProblem = (value: string, max: number) => {
+  if (value.trim() === '') return 'blank'
+  if (value.length > max) return 'too_long'
+
+  return undefined
+}
 
 /**
  * Why this form uses `aria-required` rather than the native `required` that
@@ -62,6 +79,10 @@ const blank = (value: string) => value.trim() === ''
  * server. `aria-required` keeps the announcement; the visible `· required`
  * marker keeps it on screen.
  */
+
+/** The problems are `field:reason`, so a field is flagged whatever its reason. */
+const hasProblem = (problems: string[], field: string) =>
+  problems.some((problem) => problem.startsWith(`${field}:`))
 
 export const Apply = ({ api }: ApplyProps) => {
   const [questions, setQuestions] = useState<FormQuestion[] | undefined>(undefined)
@@ -112,9 +133,11 @@ export const Apply = ({ api }: ApplyProps) => {
     if (questions === undefined) return
 
     const found = answerProblems(questions, answers)
+    const nameProblem = identityProblem(name, MAX_APPLICANT_NAME_LENGTH)
+    const contactProblem = identityProblem(contact, MAX_APPLICANT_CONTACT_LENGTH)
     const identity = [
-      ...(blank(name) ? ['applicant_name'] : []),
-      ...(blank(contact) ? ['applicant_contact'] : []),
+      ...(nameProblem === undefined ? [] : [`applicant_name:${nameProblem}`]),
+      ...(contactProblem === undefined ? [] : [`applicant_contact:${contactProblem}`]),
     ]
     setProblems(found)
     setIdentityProblems(identity)
@@ -185,18 +208,21 @@ export const Apply = ({ api }: ApplyProps) => {
           <input
             name="applicant_name"
             type="text"
+            maxLength={MAX_APPLICANT_NAME_LENGTH}
             aria-required
-            aria-invalid={identityProblems.includes('applicant_name')}
+            aria-invalid={hasProblem(identityProblems, 'applicant_name')}
             aria-describedby={
-              identityProblems.includes('applicant_name') ? 'applicant_name-error' : undefined
+              hasProblem(identityProblems, 'applicant_name') ? 'applicant_name-error' : undefined
             }
             value={name}
             onInput={(event) => setName(event.currentTarget.value)}
           />
         </label>
-        {identityProblems.includes('applicant_name') && (
+        {hasProblem(identityProblems, 'applicant_name') && (
           <p class="form-error" role="alert" id="applicant_name-error">
-            Please tell us your name.
+            {identityProblems.includes('applicant_name:too_long')
+              ? `Please keep this under ${MAX_APPLICANT_NAME_LENGTH} characters.`
+              : 'Please tell us your name.'}
           </p>
         )}
 
@@ -205,18 +231,21 @@ export const Apply = ({ api }: ApplyProps) => {
           <input
             name="applicant_contact"
             type="text"
+            maxLength={MAX_APPLICANT_CONTACT_LENGTH}
             aria-required
-            aria-invalid={identityProblems.includes('applicant_contact')}
+            aria-invalid={hasProblem(identityProblems, 'applicant_contact')}
             aria-describedby={
-              identityProblems.includes('applicant_contact') ? 'applicant_contact-error' : undefined
+              hasProblem(identityProblems, 'applicant_contact') ? 'applicant_contact-error' : undefined
             }
             value={contact}
             onInput={(event) => setContact(event.currentTarget.value)}
           />
         </label>
-        {identityProblems.includes('applicant_contact') && (
+        {hasProblem(identityProblems, 'applicant_contact') && (
           <p class="form-error" role="alert" id="applicant_contact-error">
-            Please give us an email address or a phone number.
+            {identityProblems.includes('applicant_contact:too_long')
+              ? `Please keep this under ${MAX_APPLICANT_CONTACT_LENGTH} characters.`
+              : 'Please give us an email address or a phone number.'}
           </p>
         )}
 
@@ -262,6 +291,7 @@ export const Apply = ({ api }: ApplyProps) => {
                 {question.type === 'textarea' && (
                   <textarea
                     name={question.id}
+                    maxLength={MAX_ANSWER_LENGTH}
                     aria-required={question.required}
                     aria-invalid={problem !== undefined}
                     aria-describedby={described}
@@ -274,6 +304,7 @@ export const Apply = ({ api }: ApplyProps) => {
                   <input
                     name={question.id}
                     type="text"
+                    maxLength={MAX_ANSWER_LENGTH}
                     aria-required={question.required}
                     aria-invalid={problem !== undefined}
                     aria-describedby={described}

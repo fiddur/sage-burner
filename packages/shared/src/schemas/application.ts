@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { MAX_ANSWER_LENGTH, MAX_APPLICANT_CONTACT_LENGTH, MAX_APPLICANT_NAME_LENGTH } from '../answers.ts'
 import { applicationStatuses, formQuestionTypes } from '../enums.ts'
 import { dateTimeSchema, idSchema, nonEmptyText } from './common.ts'
 
@@ -7,7 +8,7 @@ import { dateTimeSchema, idSchema, nonEmptyText } from './common.ts'
  * One answer's value. Text questions yield a string; `checkbox` and `agreement`
  * questions yield a boolean.
  */
-export const answerValueSchema = z.union([z.string().max(10_000), z.boolean()])
+export const answerValueSchema = z.union([z.string().max(MAX_ANSWER_LENGTH), z.boolean()])
 
 /**
  * What a submitter sends: values keyed by `form_question.id`.
@@ -59,8 +60,8 @@ export const applicationSchema = z.object({
   id: idSchema,
   answers: storedAnswersSchema,
   status: z.enum(applicationStatuses),
-  applicant_name: nonEmptyText(200),
-  applicant_contact: nonEmptyText(500),
+  applicant_name: nonEmptyText(MAX_APPLICANT_NAME_LENGTH),
+  applicant_contact: nonEmptyText(MAX_APPLICANT_CONTACT_LENGTH),
   submitted_at: dateTimeSchema,
   /** Set when an admin approves or rejects; null while pending. */
   decided_at: dateTimeSchema.nullable(),
@@ -82,8 +83,8 @@ export const applicationSchema = z.object({
  */
 export const applicationCreateSchema = z
   .object({
-    applicant_name: nonEmptyText(200),
-    applicant_contact: nonEmptyText(500),
+    applicant_name: nonEmptyText(MAX_APPLICANT_NAME_LENGTH),
+    applicant_contact: nonEmptyText(MAX_APPLICANT_CONTACT_LENGTH),
     answers: submittedAnswersSchema,
   })
   .strict()

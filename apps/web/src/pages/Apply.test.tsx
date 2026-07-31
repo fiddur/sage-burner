@@ -1,5 +1,10 @@
 import type { FormQuestion } from '@sage-burner/shared'
 
+import {
+  MAX_ANSWER_LENGTH,
+  MAX_APPLICANT_CONTACT_LENGTH,
+  MAX_APPLICANT_NAME_LENGTH,
+} from '@sage-burner/shared'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -273,6 +278,40 @@ describe('Apply', () => {
 
     expect(await screen.findByRole('alert')).toBeTruthy()
     expect(submitApplication).not.toHaveBeenCalled()
+  })
+
+  it('caps every text control at the length the API accepts', async () => {
+    // The API caps an answer at MAX_ANSWER_LENGTH and the identity fields at
+    // their own limits. Without `maxLength` an applicant could write past them
+    // and be told "the questions changed, reload" — discarding a very long
+    // answer they had just written, and failing identically on the retry.
+    //
+    // Asserted as attributes because that is where the fix lives: the browser
+    // enforces them while typing *and* on paste, so the over-length state is
+    // never reached rather than being caught afterwards. `answerProblems` also
+    // carries a `too_long` rule, which keeps the two sides agreeing if a
+    // submission ever arrives from somewhere other than this form.
+    render(
+      <Apply
+        api={stub({
+          getQuestions: () =>
+            Promise.resolve({
+              questions: [
+                question({ id: 'q-1', type: 'textarea', label: 'Why?' }),
+                question({ id: 'q-2', type: 'text', label: 'Dust name', order: 1 }),
+              ],
+            }),
+        })}
+      />,
+    )
+
+    await ready()
+    expect(labelled('Why?').getAttribute('maxlength')).toBe(String(MAX_ANSWER_LENGTH))
+    expect(labelled('Dust name').getAttribute('maxlength')).toBe(String(MAX_ANSWER_LENGTH))
+    expect(labelled('Your name').getAttribute('maxlength')).toBe(String(MAX_APPLICANT_NAME_LENGTH))
+    expect(labelled('How can we reach you?').getAttribute('maxlength')).toBe(
+      String(MAX_APPLICANT_CONTACT_LENGTH),
+    )
   })
 
   it('sends the name and contact trimmed, which is what the server stores', async () => {

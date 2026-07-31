@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { FormQuestion } from './schemas/form-question.ts'
 
-import { answerProblems } from './answers.ts'
+import { MAX_ANSWER_LENGTH, answerProblems } from './answers.ts'
 
 const question = (over: Partial<FormQuestion> & Pick<FormQuestion, 'id' | 'type'>): FormQuestion => ({
   order: 0,
@@ -76,6 +76,22 @@ describe('answerProblems', () => {
     expect(answerProblems([box], { 'q-box': 'false' })).toEqual([
       { question_id: 'q-box', reason: 'wrong_type' },
     ])
+  })
+
+  it('rejects an answer longer than the schema allows', () => {
+    // The limit lives here rather than only in the Zod schema, so the form can
+    // refuse it too. Split, the API rejected a long answer the form had accepted
+    // — and a long answer is expected in exactly the "why do you want to come"
+    // field.
+    expect(answerProblems([optional], { 'q-opt': 'x'.repeat(MAX_ANSWER_LENGTH + 1) })).toEqual([
+      { question_id: 'q-opt', reason: 'too_long' },
+    ])
+  })
+
+  it('accepts an answer exactly at the limit', () => {
+    // The passing sibling: an off-by-one here refuses a legitimate answer, which
+    // is the failure nobody reports because they just give up.
+    expect(answerProblems([optional], { 'q-opt': 'x'.repeat(MAX_ANSWER_LENGTH) })).toEqual([])
   })
 
   it('rejects an answer to a question that does not exist', () => {

@@ -767,13 +767,25 @@ One entry is stored per question **asked**, answered or not, so a reviewer can
 tell "said no" from "was never asked". An absent tick box stores `false`; an
 absent optional text answer stores `""`.
 
-The questions are read and the application inserted in separate statements, so a
-question created between them yields an application with no entry for it. Left
-that way deliberately: the applicant answered the form they were shown, and
-recording a question they never saw would be worse than omitting it. The reverse
-case — the form having _fewer_ questions than the server — is the one that
-matters, and it is a 400, which is why the form tells the applicant to reload
-rather than to try again.
+**A question added while someone is filling the form in is recorded as unanswered
+rather than unasked**, and that is a known gap rather than a claim to the
+contrary. The server stores an entry per question it reads at submission time, so
+if an organiser adds one in that window:
+
+- a **required** text question or an `agreement` fails `answerProblems` and the
+  submission is a 400 — which is why the form says to reload rather than to try
+  again;
+- an **optional** text question or a plain `checkbox` passes, and the application
+  is stored with an empty entry for a question the applicant never saw. It reads
+  as "asked and declined" when it was never asked, which is precisely the
+  distinction the per-question entry exists to preserve.
+
+Closing it means the submission carrying the ids the form actually rendered, so
+the server can tell the two apart; #85 tracks that. Validation would still run
+against the server's own list, or "I wasn't shown that" becomes a way to skip a
+required question. Left open for now because the window is one organiser editing
+the form while one applicant is inside it, and the cost is a misleading entry
+rather than a lost or wrong answer.
 
 **What makes a submission valid** lives in `answerProblems`, in
 `packages/shared`, and both sides use it: the server refuses on it, and the form

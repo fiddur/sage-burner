@@ -16,7 +16,20 @@ import { tickBoxRequired } from './enums.ts'
  * server re-reads, not a check the client can skip past.
  */
 
-export type AnswerProblemReason = 'missing' | 'unchecked' | 'wrong_type' | 'unknown'
+/**
+ * Length limits, here rather than inline in the schemas so the form can enforce
+ * the same numbers.
+ *
+ * They were only in the Zod schemas at first, which meant the API refused a
+ * 10,001-character answer that the form had happily accepted — the drift this
+ * module exists to prevent, reached through the one field where a long answer is
+ * actually expected.
+ */
+export const MAX_ANSWER_LENGTH = 10_000
+export const MAX_APPLICANT_NAME_LENGTH = 200
+export const MAX_APPLICANT_CONTACT_LENGTH = 500
+
+export type AnswerProblemReason = 'missing' | 'unchecked' | 'wrong_type' | 'unknown' | 'too_long'
 
 export interface AnswerProblem {
   question_id: string
@@ -45,35 +58,42 @@ export const isTickBox = (type: FormQuestion['type']) => tickBoxRequired(type) !
  * returning one would walk an applicant through their mistakes a submission at
  * a time.
  */
+/**
+ * What is wrong with one answer, or `undefined` when nothing is.
+ *
+ * Split out from the loop below when adding the length rule tipped it past the
+ * complexity limit — which was a fair signal rather than a lint to appease: this
+ * is the rule for a single question, and the loop is now only the iteration.
+ */
+const problemWith = (
+  question: FormQuestion,
+  answer: string | boolean | undefined,
+): AnswerProblemReason | undefined => {
+  if (isTickBox(question.type)) {
+    // Absent means unticked: a checkbox that was never touched is simply not
+    // submitted by a browser. Treating absent as an error would reject every
+    // form with an untouched optional box, and treating it as ticked would let
+    // an applicant skip an agreement by omitting the key.
+    if (answer !== undefined && typeof answer !== 'boolean') return 'wrong_type'
+    if (question.type === 'agreement' && answer !== true) return 'unchecked'
+
+    return undefined
+  }
+
+  if (answer !== undefined && typeof answer !== 'string') return 'wrong_type'
+  if (answer !== undefined && answer.length > MAX_ANSWER_LENGTH) return 'too_long'
+  // Trimmed, so `required` means "said something" rather than "sent the key".
+  if (question.required && (answer === undefined || answer.trim() === '')) return 'missing'
+
+  return undefined
+}
+
 export const answerProblems = (questions: FormQuestion[], answers: SubmittedAnswers): AnswerProblem[] => {
   const problems: AnswerProblem[] = []
 
   for (const question of questions) {
-    const answer = answers[question.id]
-
-    if (isTickBox(question.type)) {
-      // Absent means unticked: a checkbox that was never touched is simply not
-      // submitted by a browser. Treating absent as an error would reject every
-      // form with an untouched optional box, and treating it as ticked would let
-      // an applicant skip an agreement by omitting the key.
-      if (answer !== undefined && typeof answer !== 'boolean') {
-        problems.push({ question_id: question.id, reason: 'wrong_type' })
-        continue
-      }
-      if (question.type === 'agreement' && answer !== true) {
-        problems.push({ question_id: question.id, reason: 'unchecked' })
-      }
-      continue
-    }
-
-    if (answer !== undefined && typeof answer !== 'string') {
-      problems.push({ question_id: question.id, reason: 'wrong_type' })
-      continue
-    }
-    // Trimmed, so `required` means "said something" rather than "sent the key".
-    if (question.required && (answer === undefined || answer.trim() === '')) {
-      problems.push({ question_id: question.id, reason: 'missing' })
-    }
+    const reason = problemWith(question, answers[question.id])
+    if (reason !== undefined) problems.push({ question_id: question.id, reason })
   }
 
   const asked = new Set(questions.map((question) => question.id))
