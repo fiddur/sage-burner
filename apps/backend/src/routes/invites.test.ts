@@ -243,7 +243,7 @@ describe('revoking an invite', () => {
   })
 
   it('refuses to revoke a redeemed invite', async () => {
-    // The row is what records that this person was let in, and `member`
+    // The row is what records that this person was let in, and `account`
     // references it — deleting it would rewrite how the group formed.
     const server = await build()
     const { id: adminId, cookie } = await givenAdmin()

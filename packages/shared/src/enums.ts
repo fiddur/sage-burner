@@ -3,7 +3,7 @@
  *
  * Only genuinely fixed vocabularies live here. Things that organisers change
  * between burns — lodging options, shift types — are deliberately free text on
- * the member record instead, so a new option never needs a code change.
+ * the `attendance` row instead, so a new option never needs a code change.
  */
 
 /** Narrowing helper so every guard below stays a one-liner without casting. */
@@ -89,7 +89,7 @@ export const inviteStatusOf = (
   return Date.parse(invite.expires_at) <= now.getTime() ? 'expired' : 'outstanding'
 }
 
-/** Membership fee state, tracked per (event, member) — never globally per person. */
+/** Membership fee state, tracked per `attendance` — never globally per person. */
 export const paymentStatuses = ['unpaid', 'partial', 'paid'] as const
 export type PaymentStatus = (typeof paymentStatuses)[number]
 export const isPaymentStatus = (value: unknown): value is PaymentStatus => isOneOf(paymentStatuses, value)

@@ -4,7 +4,7 @@ import { applicationCreateSchema, applicationSchema } from './application.ts'
 import { slugSchema } from './common.ts'
 import { eventFields, eventSchema, withEventDateOrder } from './event.ts'
 import { formQuestionSchema } from './form-question.ts'
-import { memberFields, memberSchema, withMemberStayOrder } from './member.ts'
+import { attendanceFields, attendanceSchema, profileSchema, withStayOrder } from './membership.ts'
 import {
   publicSessionFields,
   publicSessionSchema,
@@ -176,14 +176,39 @@ describe('applicationCreateSchema', () => {
   })
 })
 
-describe('memberSchema', () => {
+describe('profileSchema', () => {
+  const aProfile = {
+    account_id: ID,
+    email: 'someone@example.org',
+    name: 'Someone',
+    contact: 'someone@example.org',
+    allergies_notes: 'gluten. Sensitive to red lentils.',
+  }
+
+  it('accepts a person with their allergies recorded once', () => {
+    expect(profileSchema.safeParse(aProfile).success).toBe(true)
+  })
+
+  it('accepts a person who has not said anything about allergies', () => {
+    expect(profileSchema.safeParse({ ...aProfile, allergies_notes: null }).success).toBe(true)
+  })
+
+  it('requires a name and a contact, since an organiser has to reach them', () => {
+    expect(profileSchema.safeParse({ ...aProfile, name: '  ' }).success).toBe(false)
+    expect(profileSchema.safeParse({ ...aProfile, contact: '' }).success).toBe(false)
+  })
+
+  it('carries no event, because you are approved into the community once', () => {
+    expect(Object.keys(profileSchema.parse({ ...aProfile, event_id: OTHER_ID }))).not.toContain('event_id')
+  })
+})
+
+describe('attendanceSchema', () => {
   const aMember = {
     id: ID,
     event_id: OTHER_ID,
     account_id: ID,
-    name: 'Someone',
-    contact: 'someone@example.org',
-    allergies_notes: 'gluten. Sensitive to red lentils.',
+    joined_at: '2026-07-02T00:00:00Z',
     arrival_date: '2026-10-02',
     departure_date: '2026-10-04',
     lodging: 'My own (tent/van/...)',
@@ -191,14 +216,13 @@ describe('memberSchema', () => {
     notes: null,
     payment_status: 'paid',
     payment_date: '2026-09-01',
-    invite_token_id: OTHER_ID,
   }
 
-  it('accepts a fully filled member', () => {
-    expect(memberSchema.safeParse(aMember).success).toBe(true)
+  it('accepts a fully filled attendance', () => {
+    expect(attendanceSchema.safeParse(aMember).success).toBe(true)
   })
 
-  it('accepts a member who has not yet decided anything but is invited', () => {
+  it('accepts someone who has said they are coming and nothing else', () => {
     const sparse = {
       ...aMember,
       allergies_notes: null,
@@ -209,33 +233,33 @@ describe('memberSchema', () => {
       payment_status: 'unpaid',
       payment_date: null,
     }
-    expect(memberSchema.safeParse(sparse).success).toBe(true)
+    expect(attendanceSchema.safeParse(sparse).success).toBe(true)
   })
 
   it('takes lodging and shift preference as free text, so new options need no deploy', () => {
     const novel = { ...aMember, lodging: 'Hammock in the barn', shift_preference: 'Sauna tending' }
-    expect(memberSchema.safeParse(novel).success).toBe(true)
+    expect(attendanceSchema.safeParse(novel).success).toBe(true)
   })
 
   it('rejects a payment status outside the vocabulary', () => {
-    expect(memberSchema.safeParse({ ...aMember, payment_status: 'refunded' }).success).toBe(false)
+    expect(attendanceSchema.safeParse({ ...aMember, payment_status: 'refunded' }).success).toBe(false)
   })
 
   it('rejects a departure before the arrival, so no one records a negative stay', () => {
     const backwards = { ...aMember, arrival_date: '2026-10-04', departure_date: '2026-10-02' }
-    const parsed = memberSchema.safeParse(backwards)
+    const parsed = attendanceSchema.safeParse(backwards)
     expect(parsed.success).toBe(false)
     expect(parsed.error?.issues[0]?.path).toEqual(['departure_date'])
   })
 
   it('accepts arriving and departing on the same day', () => {
     const dayTrip = { ...aMember, arrival_date: '2026-10-03', departure_date: '2026-10-03' }
-    expect(memberSchema.safeParse(dayTrip).success).toBe(true)
+    expect(attendanceSchema.safeParse(dayTrip).success).toBe(true)
   })
 
   it('does not compare dates when only one end is known', () => {
-    expect(memberSchema.safeParse({ ...aMember, departure_date: null }).success).toBe(true)
-    expect(memberSchema.safeParse({ ...aMember, arrival_date: null }).success).toBe(true)
+    expect(attendanceSchema.safeParse({ ...aMember, departure_date: null }).success).toBe(true)
+    expect(attendanceSchema.safeParse({ ...aMember, arrival_date: null }).success).toBe(true)
   })
 })
 
@@ -244,9 +268,7 @@ describe('optionalText', () => {
     id: ID,
     event_id: OTHER_ID,
     account_id: ID,
-    name: 'Someone',
-    contact: 'someone@example.org',
-    allergies_notes: null,
+    joined_at: '2026-07-02T00:00:00Z',
     arrival_date: null,
     departure_date: null,
     lodging: null,
@@ -254,22 +276,21 @@ describe('optionalText', () => {
     notes,
     payment_status: 'unpaid',
     payment_date: null,
-    invite_token_id: OTHER_ID,
   })
 
   it('collapses empty and whitespace-only input to null, so "not set" has one representation', () => {
     for (const blank of ['', '   ', '\t\n']) {
-      const parsed = memberSchema.parse(aMemberWith(blank))
+      const parsed = attendanceSchema.parse(aMemberWith(blank))
       expect(parsed.notes).toBeNull()
     }
   })
 
   it('keeps real text, trimmed', () => {
-    expect(memberSchema.parse(aMemberWith('  bring a drum  ')).notes).toBe('bring a drum')
+    expect(attendanceSchema.parse(aMemberWith('  bring a drum  ')).notes).toBe('bring a drum')
   })
 
   it('still accepts an explicit null', () => {
-    expect(memberSchema.parse(aMemberWith(null)).notes).toBeNull()
+    expect(attendanceSchema.parse(aMemberWith(null)).notes).toBeNull()
   })
 })
 
@@ -278,7 +299,7 @@ describe('sessionSchema', () => {
     id: ID,
     event_id: OTHER_ID,
     title: 'Cacao ceremony',
-    host_member_id: ID,
+    host_account_id: ID,
     description: 'Bring a cup.',
     time_slot_start: '2026-10-03T09:00:00Z',
     time_slot_end: '2026-10-03T10:30:00Z',
@@ -354,13 +375,13 @@ describe('deriving schemas', () => {
     expect(eventFields.omit({ id: true, created_at: true }).safeParse(backwards).success).toBe(true)
   })
 
-  it('derives a member patch body that still enforces the stay order', () => {
-    const patchMember = withMemberStayOrder(memberFields.partial())
-    expect(patchMember.safeParse({ notes: 'just this one field' }).success).toBe(true)
+  it('derives an attendance patch body that still enforces the stay order', () => {
+    const patchAttendance = withStayOrder(attendanceFields.partial())
+    expect(patchAttendance.safeParse({ notes: 'just this one field' }).success).toBe(true)
 
     const backwards = { arrival_date: '2026-10-04', departure_date: '2026-10-02' }
-    expect(patchMember.safeParse(backwards).success).toBe(false)
-    expect(memberFields.partial().safeParse(backwards).success).toBe(true)
+    expect(patchAttendance.safeParse(backwards).success).toBe(false)
+    expect(attendanceFields.partial().safeParse(backwards).success).toBe(true)
   })
 
   it('derives a session create body that still enforces the time slot rules', () => {
@@ -369,7 +390,7 @@ describe('deriving schemas', () => {
     const halfASlot = {
       event_id: OTHER_ID,
       title: 'Cacao ceremony',
-      host_member_id: ID,
+      host_account_id: ID,
       description: '',
       time_slot_start: '2026-10-03T10:00:00Z',
       time_slot_end: null,
@@ -428,10 +449,10 @@ describe('publicSessionSchema', () => {
       time_slot_start: '2026-10-03T09:00:00Z',
       time_slot_end: '2026-10-03T10:30:00Z',
       location: 'Temple',
-      host_member_id: ID,
+      host_account_id: ID,
       allergies_notes: 'gluten',
     })
-    expect(parsed).not.toHaveProperty('host_member_id')
+    expect(parsed).not.toHaveProperty('host_account_id')
     expect(parsed).not.toHaveProperty('allergies_notes')
   })
 })
