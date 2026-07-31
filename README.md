@@ -894,8 +894,9 @@ refused with `409`, for different reasons:
   revoking it would leave the applicant approved with no way in, which is
   unrecoverable through the API. #91 owns re-issuing.
 
-The organiser UI offers Revoke only where it would succeed, rather than showing a
-button that exists to produce a 409.
+The organiser UI offers Revoke on exactly those — every unredeemed direct invite,
+**expired ones included**, since an expired link is still a row worth clearing
+out and the route deletes it happily.
 
 ### Markdown is escaped, not filtered
 

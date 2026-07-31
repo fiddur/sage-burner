@@ -5,6 +5,7 @@ import { useEffect, useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
+import { InviteLink } from '../components/InviteLink.tsx'
 import { isAdmin, useViewer } from '../viewer.tsx'
 
 export type InvitesApi = Pick<ApiClient, 'getInvites' | 'createInvite' | 'revokeInvite'>
@@ -13,8 +14,6 @@ type Loaded =
   | { status: 'loading' }
   | { status: 'ready'; invites: readonly AdminInvite[] }
   | { status: 'failed'; message: string }
-
-const inviteUrl = (token: string) => `${window.location.origin}/invite/${token}`
 
 const describe = (invite: AdminInvite) => {
   if (invite.applicant_name !== null) return `Application from ${invite.applicant_name}`
@@ -27,7 +26,6 @@ export const AdminInvites = ({ api }: { api: InvitesApi }) => {
   const admin = isAdmin(viewer)
   const [loaded, setLoaded] = useState<Loaded>({ status: 'loading' })
   const [minted, setMinted] = useState<Invite | undefined>(undefined)
-  const [copied, setCopied] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | undefined>(undefined)
 
@@ -59,7 +57,6 @@ export const AdminInvites = ({ api }: { api: InvitesApi }) => {
   const mint = async () => {
     setBusy(true)
     setError(undefined)
-    setCopied(false)
     try {
       const response = await api.createInvite()
       setMinted(response.invite)
@@ -138,27 +135,7 @@ export const AdminInvites = ({ api }: { api: InvitesApi }) => {
         </p>
       )}
 
-      {minted !== undefined && (
-        <p class="form-note" role="status">
-          Send this link — it is shown once and cannot be recovered afterwards. Expires{' '}
-          {minted.expires_at.slice(0, 10)}.
-          <br />
-          <code>{inviteUrl(minted.token)}</code>
-          <br />
-          <button
-            type="button"
-            class="link-button"
-            onClick={() => {
-              navigator.clipboard?.writeText(inviteUrl(minted.token)).then(
-                () => setCopied(true),
-                () => undefined,
-              )
-            }}
-          >
-            {copied ? 'Copied' : 'Copy link'}
-          </button>
-        </p>
-      )}
+      <InviteLink invite={minted} />
 
       {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
 
@@ -187,7 +164,7 @@ export const AdminInvites = ({ api }: { api: InvitesApi }) => {
                 <td>{invite.status}</td>
                 <td>{invite.expires_at.slice(0, 10)}</td>
                 <td>
-                  {invite.status === 'outstanding' && invite.application_id === null && (
+                  {invite.application_id === null && invite.status !== 'used' && (
                     <button
                       type="button"
                       class="link-button"

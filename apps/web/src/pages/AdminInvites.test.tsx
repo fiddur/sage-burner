@@ -84,17 +84,18 @@ describe('AdminInvites', () => {
     expect(screen.getByText('Application from Fredrik')).toBeTruthy()
   })
 
-  it('offers Revoke only for an outstanding direct invite', async () => {
-    // The other three are refused server-side; offering the button would be an
-    // invitation to meet a 409.
+  it('offers Revoke for exactly the invites the route accepts', async () => {
+    // Which is every unredeemed direct one, expired included — an expired link
+    // is still a row an organiser wants out of the list, and the route deletes
+    // it happily. Only `used` and application-backed invites are refused.
     renderPage(
       stub({
         getInvites: () =>
           Promise.resolve({
             invites: [
               anInvite({ id: 'a', status: 'outstanding' }),
-              anInvite({ id: 'b', status: 'used' }),
-              anInvite({ id: 'c', status: 'expired' }),
+              anInvite({ id: 'b', status: 'expired' }),
+              anInvite({ id: 'c', status: 'used' }),
               anInvite({ id: 'd', application_id: 'app-1', applicant_name: 'Fredrik' }),
             ],
           }),
@@ -102,7 +103,7 @@ describe('AdminInvites', () => {
     )
 
     await screen.findByText('Application from Fredrik')
-    expect(screen.getAllByRole('button', { name: 'Revoke' })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: 'Revoke' })).toHaveLength(2)
   })
 
   it('revokes and reloads', async () => {
