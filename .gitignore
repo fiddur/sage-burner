@@ -16,3 +16,6 @@ data/
 .vscode
 *.iml
 *.swp
+
+# Local Claude Code config — never shared; develop carries none.
+.claude/
