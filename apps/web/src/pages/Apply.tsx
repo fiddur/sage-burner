@@ -79,7 +79,7 @@ export const Apply = ({ api }: ApplyProps) => {
     api
       .getQuestions(controller.signal)
       .then((response) => {
-        setQuestions([...response.questions].sort((a, b) => a.order - b.order))
+        setQuestions(response.questions)
       })
       .catch(() => {
         if (!controller.signal.aborted) setLoadFailed(true)

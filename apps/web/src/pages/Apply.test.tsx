@@ -99,15 +99,18 @@ describe('Apply', () => {
     expect(labelled('Why do you want to come?')).toBeTruthy()
   })
 
-  it('renders questions in the order the organiser set, not the order they arrive', async () => {
+  it('renders the questions in the order the API serves them', async () => {
+    // Not re-sorted here: `GET /api/questions` already serves display order, and
+    // a second ordering rule on this side is one that can disagree with the one
+    // the stored answers use. The backend test pins the order itself.
     render(
       <Apply
         api={stub({
           getQuestions: () =>
             Promise.resolve({
               questions: [
-                question({ id: 'q-2', type: 'text', label: 'Second', order: 1 }),
                 question({ id: 'q-1', type: 'text', label: 'First', order: 0 }),
+                question({ id: 'q-2', type: 'text', label: 'Second', order: 1 }),
               ],
             }),
         })}
