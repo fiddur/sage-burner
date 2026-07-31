@@ -720,6 +720,20 @@ Two rules that are the server's, not the browser's:
 are — and `no-cache`, so a question added a moment ago is not hidden behind a
 stale response. Every write is admin-only.
 
+**Help text is markdown**, edited in a textarea with Write and Preview tabs. It
+carries the things that need more than a line — the 10+1 principles an
+`agreement` asks someone to accept, for instance — so it needs lists and
+paragraphs. It was a 2000-character single-line `<input>`, which made writing
+them impossible.
+
+The label stays plain single-line text: it is the field's accessible name, and a
+list inside a `<label>` is not markup a screen reader can make sense of. Long
+text belongs in the help text below it.
+
+Rendering is the same `renderMarkdown` the welcome text uses — raw HTML escaped
+rather than filtered, link and image URLs checked against an allowlist. See
+[Markdown is escaped, not filtered](#markdown-is-escaped-not-filtered).
+
 **`required` is decided by the type for the two tick-box kinds, not chosen.**
 
 - An **`agreement`** is always required. The type exists because submission is
@@ -829,6 +843,46 @@ it appear on the public form with no deploy, which is the acceptance criterion
 There is **no email**. Nothing is sent on submission and nothing is sent on
 approval, so the confirmation screen says so outright rather than leaving an
 applicant waiting for a message that will never arrive.
+
+### Reviewing applications
+
+`GET /api/admin/applications` lists everything sent in, newest first, with the
+answers as stored — the question wording included, so an organiser reads what the
+applicant was actually asked rather than what the form says today.
+
+Approving and rejecting are the same shape, and the shape is the point:
+
+```sql
+UPDATE application SET status = ?, decided_at = ? WHERE id = ? AND status = 'pending'
+```
+
+Zero affected rows means someone already decided it, which is answered `409`
+rather than silently re-deciding. The decision and the guard against
+re-deciding are **one statement**, so there is no window between them — a
+double-clicked Approve mints one invite, not two. `invite_token_application_idx`
+is the backstop underneath that, and the page tells the organiser to reload
+rather than to try again, since retrying cannot help.
+
+**Approval mints the invite.** 32 CSPRNG bytes, base64url, valid 30 days. Only
+the SHA-256 digest is stored, so the raw token exists in that one response and
+nowhere else — a leaked backup or a stray copy of the volume hands out no
+invites. The organiser copies it into Discord or Messenger themselves; there is
+no email.
+
+**A lost link is lost.** Not merely unrecoverable — there is no way to issue a
+replacement either: re-approving matches nothing on `status = 'pending'` and
+answers `409`, `invite_token_application_idx` refuses a second invite for the
+same application, and no other route mints one. The only way back today is
+editing the database. #91 owns the re-issue path; until it lands, the copy button
+is deliberately silent on failure rather than claiming a copy that did not
+happen.
+
+The link is assembled in the browser from `window.location.origin`, so the API
+needs no notion of its own public URL.
+
+**An invite carries no `event_id`.** It admits you to the community, not to a
+burn — the application has no event either — and which burns you then come to is
+a separate decision each time.
 
 ### Markdown is escaped, not filtered
 

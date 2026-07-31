@@ -91,6 +91,26 @@ export const applicationCreateSchema = z
 
 export const applicationResponseSchema = z.object({ application: applicationSchema })
 
+export const applicationsResponseSchema = z.object({ applications: z.array(applicationSchema) })
+
+/**
+ * An invite, shown exactly once.
+ *
+ * Only the SHA-256 digest is kept, so the raw token exists in this response and
+ * nowhere else — an organiser who loses the link cannot be sent it again, and
+ * that is the point rather than an oversight.
+ */
+export const inviteSchema = z.object({
+  token: nonEmptyText(200),
+  expires_at: dateTimeSchema,
+})
+
+export const applicationDecisionResponseSchema = z.object({
+  application: applicationSchema,
+  /** Null on rejection, and on approval only when something already minted one. */
+  invite: inviteSchema.nullable(),
+})
+
 export type AnswerValue = z.infer<typeof answerValueSchema>
 export type SubmittedAnswers = z.infer<typeof submittedAnswersSchema>
 export type StoredAnswer = z.infer<typeof storedAnswerSchema>
@@ -98,3 +118,6 @@ export type StoredAnswers = z.infer<typeof storedAnswersSchema>
 export type Application = z.infer<typeof applicationSchema>
 export type ApplicationCreate = z.infer<typeof applicationCreateSchema>
 export type ApplicationResponse = z.infer<typeof applicationResponseSchema>
+export type ApplicationsResponse = z.infer<typeof applicationsResponseSchema>
+export type Invite = z.infer<typeof inviteSchema>
+export type ApplicationDecisionResponse = z.infer<typeof applicationDecisionResponseSchema>
