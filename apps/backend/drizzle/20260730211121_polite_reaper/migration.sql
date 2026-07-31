@@ -10,8 +10,8 @@ CREATE TABLE `__new_form_question` (
 	CONSTRAINT "form_question_type_check" CHECK("type" in ('text', 'textarea', 'checkbox', 'agreement')),
 	CONSTRAINT "form_question_order_check" CHECK("order" >= 0),
 	CONSTRAINT "form_question_required_check" CHECK("required" in (0, 1)),
-	CONSTRAINT "form_question_agreement_required_check" CHECK("type" <> 'agreement' or "required" = 1),
-	CONSTRAINT "form_question_checkbox_optional_check" CHECK("type" <> 'checkbox' or "required" = 0)
+	CONSTRAINT "form_question_checkbox_required_check" CHECK("type" <> 'checkbox' or "required" = 0),
+	CONSTRAINT "form_question_agreement_required_check" CHECK("type" <> 'agreement' or "required" = 1)
 );
 --> statement-breakpoint
 INSERT INTO `__new_form_question`(`id`, `order`, `type`, `label`, `help_text`, `required`, `options`) SELECT `id`, `order`, `type`, `label`, `help_text`, `required`, `options` FROM `form_question`;--> statement-breakpoint

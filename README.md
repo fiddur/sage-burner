@@ -702,10 +702,14 @@ own before either wrote.
 and an insert that omits it never touches a Zod schema. The editor disables the
 control with a note rather than letting a tick become a 400.
 
-All four places read the rule from one function, `tickBoxRequired`, rather than
-restating it: written out separately, the handler covered `agreement` and not
-`checkbox` within an hour, and the gap surfaced as a 500 from the CHECK instead
-of a 400.
+All four places derive from one function, `tickBoxRequired`, rather than restating
+it — including the database, whose CHECKs are generated from the vocabulary the
+same way the type constraint is. Written out separately the copies drifted within
+the hour: the handler covered `agreement` and not `checkbox`, and the gap surfaced
+as a 500 from the CHECK instead of a 400. Generating the SQL matters for the same
+reason it mattered in the API — a fifth type with a fixed `required` would
+otherwise be enforced everywhere except the one place that is supposed to hold
+when nothing else does.
 
 `options` exists as a JSON column for future select/radio types and is not yet
 consumed by any type. Both it and `help_text` are optional in a create body —
