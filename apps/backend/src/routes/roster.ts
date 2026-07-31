@@ -29,15 +29,22 @@ export const registerRosterRoutes = (
 ) => {
   const { requireAdmin } = createGuards({ db, sessions })
 
-  app.get('/api/admin/events/:eventId/roster', { preHandler: requireAdmin }, async (request, reply) => {
-    void noStore(reply)
+  app.get<{ Params: { eventId: string } }>(
+    '/api/admin/events/:eventId/roster',
+    { preHandler: requireAdmin },
+    async (request, reply) => {
+      void noStore(reply)
 
-    const { eventId } = request.params as { eventId: string }
-    const found = await eventFor(eventId)
-    if (found === undefined) return reply.code(404).send(errorResponse('not_found'))
+      const { eventId } = request.params
+      const found = await eventFor(eventId)
+      if (found === undefined) return reply.code(404).send(errorResponse('not_found'))
 
-    return { event: found, entries: await rosterFor(eventId, found.member_cap) } satisfies RosterResponse
-  })
+      return {
+        event: found,
+        entries: await rosterFor(eventId, found.member_cap),
+      } satisfies RosterResponse
+    },
+  )
 
   app.get('/api/admin/events/active/roster', { preHandler: requireAdmin }, async (_request, reply) => {
     void noStore(reply)
@@ -50,13 +57,13 @@ export const registerRosterRoutes = (
     return { event: summary, entries: await rosterFor(open.id, open.member_cap) } satisfies RosterResponse
   })
 
-  app.patch(
+  app.patch<{ Params: { eventId: string; accountId: string } }>(
     '/api/admin/events/:eventId/attendance/:accountId/payment',
     { preHandler: requireAdmin },
     async (request, reply) => {
       void noStore(reply)
 
-      const { eventId, accountId } = request.params as { eventId: string; accountId: string }
+      const { eventId, accountId } = request.params
       const parsed = paymentUpdateSchema.safeParse(request.body)
       if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
 

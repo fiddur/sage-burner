@@ -297,6 +297,32 @@ describe('recording a payment', () => {
     ).toBe(400)
   })
 
+  it('treats an empty body as a read rather than a 500', async () => {
+    // `set({})` is not valid SQL, so the branch exists; without a test it is the
+    // one path nothing walks.
+    const server = await build()
+    const admin = await givenAccount('Org', ['admin'])
+    const eventId = await givenEvent()
+    const who = await givenAccount('Payer')
+    await givenComing(eventId, who.id, '2026-07-01T00:00:00Z', true)
+
+    const response = await setPayment(server, admin.cookie, eventId, who.id, {})
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().attendance.payment_status).toBe('paid')
+  })
+
+  it('answers 404 for an empty body against someone who is not coming', async () => {
+    // The passing sibling's opposite: the read-back path has to distinguish
+    // "nothing to change" from "no such row" just as the write path does.
+    const server = await build()
+    const admin = await givenAccount('Org', ['admin'])
+    const eventId = await givenEvent()
+    const who = await givenAccount('Absent')
+
+    expect((await setPayment(server, admin.cookie, eventId, who.id, {})).statusCode).toBe(404)
+  })
+
   it('answers 404 for someone who is not coming', async () => {
     const server = await build()
     const admin = await givenAccount('Org', ['admin'])
