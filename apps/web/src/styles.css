@@ -165,13 +165,16 @@ a:hover {
   gap: 0.35rem;
 }
 
-.field > span {
+.field > span,
+.field > label {
   font-family: ui-sans-serif, system-ui, sans-serif;
   font-size: 0.9rem;
   font-weight: 600;
 }
 
-.field input {
+.field input,
+.field select,
+.field textarea {
   padding: 0.55rem 0.7rem;
   border: 1px solid color-mix(in srgb, var(--sage) 40%, transparent);
   border-radius: var(--radius);
@@ -181,20 +184,12 @@ a:hover {
 
 .field textarea {
   min-height: 5.5rem;
-  padding: 0.55rem 0.7rem;
-  border: 1px solid color-mix(in srgb, var(--sage) 40%, transparent);
-  border-radius: var(--radius);
-  background: var(--paper);
-  font: inherit;
   resize: vertical;
 }
 
+.field input:focus-visible,
+.field select:focus-visible,
 .field textarea:focus-visible {
-  outline: 2px solid var(--ember);
-  outline-offset: 1px;
-}
-
-.field input:focus-visible {
   outline: 2px solid var(--ember);
   outline-offset: 1px;
 }
@@ -239,15 +234,6 @@ a:hover {
   height: auto;
 }
 
-/* Selects were unstyled next to the inputs beside them. */
-.field select {
-  padding: 0.55rem 0.7rem;
-  border: 1px solid color-mix(in srgb, var(--sage) 40%, transparent);
-  border-radius: var(--radius);
-  background: var(--paper);
-  font: inherit;
-}
-
 /* Marks a required question on the public form. Not colour alone — the word is
    the marker, so it survives a screen reader and a monochrome screen. */
 .required-marker {
@@ -269,9 +255,12 @@ a:hover {
   gap: 0.75rem;
 }
 
-.tab-current {
+/* `.tabs`-qualified so it out-specifies `.link-button`, whose `font: inherit`
+   shorthand resets the weight and which comes later in the file. Without that,
+   the two tabs render identically and `aria-pressed` is the only signal — which
+   a sighted user does not get. */
+.tabs .tab-current {
   font-weight: 600;
-  text-decoration: underline;
 }
 
 /* Was a class hook with no rules, so "Apply to join" and "Log in" touched. */

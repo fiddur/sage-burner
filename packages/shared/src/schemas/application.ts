@@ -107,7 +107,7 @@ export const inviteSchema = z.object({
 
 export const applicationDecisionResponseSchema = z.object({
   application: applicationSchema,
-  /** Null on rejection, and on approval only when something already minted one. */
+  /** Null on rejection. An approval either mints one or fails. */
   invite: inviteSchema.nullable(),
 })
 

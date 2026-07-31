@@ -8,9 +8,20 @@ import {
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import type { renderMarkdown as realRenderMarkdown } from '../markdown.ts'
 import type { ApplyApi } from './Apply.tsx'
 
 import { apiError } from '../api/client.ts'
+
+// Counts calls while still rendering for real, so the markdown assertions below
+// stay assertions about markdown.
+const renderMarkdown = vi.hoisted(() => vi.fn())
+vi.mock('../markdown.ts', async (importOriginal) => {
+  const actual: { renderMarkdown: typeof realRenderMarkdown } = await importOriginal()
+  renderMarkdown.mockImplementation(actual.renderMarkdown)
+
+  return { renderMarkdown }
+})
 import { Apply } from './Apply.tsx'
 
 /**
@@ -146,8 +157,8 @@ describe('Apply', () => {
   })
 
   it('renders help text as markdown, so a list of principles reads as a list', async () => {
-    // The agreement case Fiddur asked for: the 10+1 principles are a list, and
-    // an applicant should see one rather than a run of literal dashes.
+    // The 10+1 principles are a list, and an applicant should see one rather
+    // than a run of literal dashes.
     render(
       <Apply
         api={stub({
@@ -172,6 +183,31 @@ describe('Apply', () => {
       'Radical inclusion',
       'Leave no trace',
     ])
+  })
+
+  it("renders each question's markdown once, not once per keystroke", async () => {
+    // `answer()` sets `answers`, so this component re-renders on every character
+    // typed, and the help text is the longest thing on the form.
+    renderMarkdown.mockClear()
+    render(
+      <Apply
+        api={stub({
+          getQuestions: () =>
+            Promise.resolve({
+              questions: [question({ id: 'q-1', type: 'text', label: 'Why?', help_text: 'Tell us.' })],
+            }),
+        })}
+      />,
+    )
+
+    await ready()
+    const afterLoad = renderMarkdown.mock.calls.length
+    fill('Why?', 'a')
+    fill('Why?', 'ab')
+    fill('Why?', 'abc')
+
+    expect(afterLoad).toBe(1)
+    expect(renderMarkdown.mock.calls.length).toBe(afterLoad)
   })
 
   it('sends the answers keyed by question id', async () => {
