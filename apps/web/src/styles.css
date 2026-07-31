@@ -248,6 +248,38 @@ a:hover {
   gap: 0.5rem;
 }
 
+/* A line of controls. Without a gap they render as one run-on word. */
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* One application in the review list. */
+.application {
+  margin: 1.5rem 0;
+  padding: 1rem 1.2rem;
+  border: 1px solid color-mix(in srgb, var(--sage) 30%, transparent);
+  border-radius: var(--radius);
+}
+
+.application dt {
+  margin-top: 0.6rem;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.application dd {
+  margin: 0.1rem 0 0;
+}
+
+.application code {
+  overflow-wrap: anywhere;
+}
+
 /* The question builder, on its own admin page. */
 .questions {
   margin-top: 1.5rem;

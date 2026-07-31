@@ -813,6 +813,38 @@ There is **no email**. Nothing is sent on submission and nothing is sent on
 approval, so the confirmation screen says so outright rather than leaving an
 applicant waiting for a message that will never arrive.
 
+### Reviewing applications
+
+`GET /api/admin/applications` lists everything sent in, newest first, with the
+answers as stored — the question wording included, so an organiser reads what the
+applicant was actually asked rather than what the form says today.
+
+Approving and rejecting are the same shape, and the shape is the point:
+
+```sql
+UPDATE application SET status = ?, decided_at = ? WHERE id = ? AND status = 'pending'
+```
+
+Zero affected rows means someone already decided it, which is answered `409`
+rather than silently re-deciding. The decision and the guard against
+re-deciding are **one statement**, so there is no window between them — a
+double-clicked Approve mints one invite, not two. `invite_token_application_idx`
+is the backstop underneath that, and the page tells the organiser to reload
+rather than to try again, since retrying cannot help.
+
+**Approval mints the invite.** 32 CSPRNG bytes, base64url, valid 30 days. Only
+the SHA-256 digest is stored, so the raw token exists in that one response and
+nowhere else: a leaked backup hands out no invites, and a lost link cannot be
+recovered — only re-issued. The organiser copies it into Discord or Messenger
+themselves; there is no email.
+
+The link is assembled in the browser from `window.location.origin`, so the API
+needs no notion of its own public URL.
+
+**An invite carries no `event_id`.** It admits you to the community, not to a
+burn — the application has no event either — and which burns you then come to is
+a separate decision each time.
+
 ### Markdown is escaped, not filtered
 
 `welcome_markdown` is admin-authored and rendered to every public visitor, so it
