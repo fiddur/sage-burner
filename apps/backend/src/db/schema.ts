@@ -1,4 +1,4 @@
-import type { Answers } from '@sage-burner/shared'
+import type { StoredAnswers } from '@sage-burner/shared'
 import type { SQL } from 'drizzle-orm'
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core'
 
@@ -161,18 +161,18 @@ export const application = sqliteTable(
   'application',
   {
     id: text('id').notNull(),
-    event_id: text('event_id')
-      .notNull()
-      .references(() => event.id, { onDelete: 'cascade' }),
     /**
-     * Answers keyed by `form_question.id`.
+     * The questions as they were worded when asked, each beside its answer.
      *
-     * The type is imported, not restated: `Answers` is a *partial* record,
-     * because an unanswered optional question is absent at runtime. Writing
-     * `Record<string, string | boolean>` here would not be assignable from what
-     * the API layer validates, and the insert would need a cast to compile.
+     * A snapshot rather than references, because the questions are rows an
+     * organiser edits between burns: an answer keyed only by `form_question.id`
+     * either ends up filed under wording nobody was shown, or under a question
+     * that has since been deleted and cannot be labelled at all.
+     *
+     * The type is imported, not restated, so this column and what the API
+     * validates cannot drift — and the insert needs no cast to compile.
      */
-    answers: text('answers', { mode: 'json' }).$type<Answers>().notNull(),
+    answers: text('answers', { mode: 'json' }).$type<StoredAnswers>().notNull(),
     status: text('status', { enum: applicationStatuses }).notNull().default('pending'),
     applicant_name: text('applicant_name').notNull(),
     applicant_contact: text('applicant_contact').notNull(),
@@ -181,7 +181,7 @@ export const application = sqliteTable(
   },
   (table) => [
     primaryKey({ columns: [table.id] }),
-    index('application_event_status_idx').on(table.event_id, table.status),
+    index('application_status_idx').on(table.status),
     check('application_status_check', oneOf(table.status, applicationStatuses)),
   ],
 )

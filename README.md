@@ -584,13 +584,18 @@ admin route refuses server-side regardless of what the nav rendered.
 ## Events
 
 There is never "the" event. `event` rows exist from day one and the app is built
-around recurrence — up to four burns a year, each with its own applications,
-members and payments.
+around recurrence — up to four burns a year, each with its own members and
+payments.
+
+Applications are the exception, and deliberately so: you apply to the community
+once, not to a burn. Approval admits you to any of them, so `application` and
+`form_question` carry no `event_id` and outlive any single event.
 
 ### Which event is active
 
-The public homepage and application form need one event, so the rule is written
-down rather than inferred per call site:
+The public homepage needs one event, so the rule is written down rather than
+inferred per call site. (The application form does not — it is not tied to a
+burn, so it works with no events at all.)
 
 > The **active event** is the soonest-ending event whose end date has not passed.
 > Ties break on start date, then slug.
@@ -676,7 +681,15 @@ Two rules that are the server's, not the browser's:
 - **Reordering sends the complete list of ids**, in the order wanted, and a
   partial list is rejected with 400. Moving one question renumbers several, so a
   request naming only some of them would leave the rest on stale positions — an
-  order nobody chose. The renumbering runs in a transaction for the same reason.
+  order nobody chose. The renumbering itself runs in a transaction, so a reorder
+  is all-or-nothing.
+
+  The check deciding _whether_ to renumber is evaluated before that transaction
+  opens, so the check-and-apply as a whole is not atomic the way `POST`'s
+  read-and-insert is. That is fine rather than overlooked: a question created
+  concurrently takes `order = max + 1` and still sorts after the positions being
+  written, and one deleted concurrently updates zero rows and leaves a gap, which
+  `order` tolerates because it only has to sort.
 
 `GET /api/questions` is public — the application form is public, so its questions
 are — and `no-cache`, so a question added a moment ago is not hidden behind a
@@ -718,6 +731,59 @@ consumed by any type. Both it and `help_text` are optional in a create body —
 which is [#14]'s half of the work.
 
 [#14]: https://github.com/fiddur/sage-burner/issues/14
+
+### Applying
+
+`POST /api/applications` is the only public write in the app, and that is the
+point — an applicant has no account yet. Everything in the body is therefore
+attacker-controlled, so two things are true by construction:
+
+- **The submitter names only their answers.** `id`, `status` and the timestamps
+  are the server's. The schema is `.strict()`, so an attempt at any of them is a
+  400 rather than a quietly dropped key — a request that tried to approve itself
+  must not look like it succeeded.
+- **The questions are re-read from the database on every submission**, never
+  taken from the request.
+
+**Answers store the question, not a reference to it.** Each entry is
+`{ question_id, label, type, value }`: the id so a reviewer can line the same
+question up across applications, and the wording exactly as that applicant saw
+it. A bare reference does not survive the form changing, and the form is meant to
+change — questions are rows precisely so organisers can retune them between
+burns. Without the snapshot, editing a question would silently re-file every past
+answer under wording nobody was shown, and deleting one would leave answers that
+cannot be labelled at all. Neither is recoverable afterwards, which is why the
+cost is paid on write.
+
+One entry is stored per question **asked**, answered or not, so a reviewer can
+tell "said no" from "was never asked". An absent tick box stores `false`; an
+absent optional text answer stores `""`.
+
+**What makes a submission valid** lives in `answerProblems`, in
+`packages/shared`, and both sides use it: the server refuses on it, and the form
+marks its fields with it. Written twice they drift, and the drift is a form that
+says everything is fine against an API that answers 400. The rules:
+
+- a `required` question must have a non-blank answer — trimmed, so `required`
+  means "said something" rather than "sent the key";
+- an `agreement` must be ticked, which is the entire reason the type exists.
+  Absent counts as unticked, because that is what a browser sends for a box
+  nobody touched;
+- a tick box takes a boolean and a text question a string — `'false'` is truthy,
+  so accepting a string for a tick box would tick an agreement nobody ticked;
+- an answer to a question that was not asked is refused rather than stored.
+
+The module is deliberately free of Zod so the browser can import it — see the
+`sideEffects` note under [Shared schemas and types](#shared-schemas-and-types).
+
+The form itself hardcodes nothing about the questions: it renders whatever
+`GET /api/questions` returns, in `order`. Adding a question in the admin UI makes
+it appear on the public form with no deploy, which is the acceptance criterion
+`form_question` exists for.
+
+There is **no email**. Nothing is sent on submission and nothing is sent on
+approval, so the confirmation screen says so outright rather than leaving an
+applicant waiting for a message that will never arrive.
 
 ### Markdown is escaped, not filtered
 

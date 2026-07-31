@@ -227,7 +227,7 @@ export const QuestionEditor = ({ api }: { api: QuestionsApi }) => {
                 >
                   ↓
                 </button>
-                <button type="button" class="link-button" onClick={() => setEditing(row.id)}>
+                <button type="button" class="link-button" disabled={busy} onClick={() => setEditing(row.id)}>
                   Edit
                 </button>
                 <button

@@ -14,6 +14,7 @@ import type { Database } from './db/index.ts'
 import { createSessions } from './auth/session.ts'
 import { clientErrorHandler, frameworkErrorHandler, registerErrorHandler } from './errors.ts'
 import { registerAdminRoutes } from './routes/admin.ts'
+import { registerApplicationRoutes } from './routes/applications.ts'
 import { registerAuthRoutes } from './routes/auth.ts'
 import { registerEventRoutes } from './routes/events.ts'
 import { registerQuestionRoutes } from './routes/questions.ts'
@@ -301,6 +302,7 @@ export const createApp = async ({
   registerAdminRoutes(app, { db, sessions })
   registerEventRoutes(app, { db, sessions, now })
   registerQuestionRoutes(app, { db, sessions })
+  registerApplicationRoutes(app, { db, now })
 
   const webRoot = config.web_root
   const servesWebApp = webRoot !== undefined

@@ -1,4 +1,6 @@
 import type {
+  ApplicationCreate,
+  ApplicationResponse,
   ActiveEventResponse,
   AdminAccountsResponse,
   EventCreateInput,
@@ -164,6 +166,13 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
 
     /** Public. The application form's questions, in display order. One central set. */
     getQuestions: (signal?: AbortSignal) => request<FormQuestionsResponse>('/questions', { signal }),
+
+    /**
+     * Public. No session — an applicant does not have one yet, which is the
+     * whole point of the form.
+     */
+    submitApplication: (body: ApplicationCreate) =>
+      request<ApplicationResponse>('/applications', { method: 'POST', body }),
 
     /** Admin only. New questions go last; `order` is the server's to assign. */
     addQuestion: (body: FormQuestionCreateInput) =>
