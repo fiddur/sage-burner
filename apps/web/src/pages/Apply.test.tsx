@@ -145,6 +145,35 @@ describe('Apply', () => {
     expect(await screen.findByText('We cook together.')).toBeTruthy()
   })
 
+  it('renders help text as markdown, so a list of principles reads as a list', async () => {
+    // The agreement case Fiddur asked for: the 10+1 principles are a list, and
+    // an applicant should see one rather than a run of literal dashes.
+    render(
+      <Apply
+        api={stub({
+          getQuestions: () =>
+            Promise.resolve({
+              questions: [
+                question({
+                  id: 'q-1',
+                  type: 'agreement',
+                  label: 'I agree to the principles',
+                  required: true,
+                  help_text: '- Radical inclusion\n- Leave no trace',
+                }),
+              ],
+            }),
+        })}
+      />,
+    )
+
+    await ready()
+    expect(screen.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+      'Radical inclusion',
+      'Leave no trace',
+    ])
+  })
+
   it('sends the answers keyed by question id', async () => {
     const submitApplication = vi.fn(() => Promise.resolve({ application: {} as never }))
     render(
