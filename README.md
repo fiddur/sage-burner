@@ -457,9 +457,12 @@ nothing else moves; it is a nuisance rather than a breach.
 
 So **state-changing requests are same-origin only**, enforced by a `sec-fetch-site`
 check on every non-`GET`/`HEAD`. The header cannot be set by page script — it is a
-forbidden header name — so `same-origin` cannot be forged. Where it is absent
-(an older browser, a `curl`, a server-to-server call) the request is left alone:
-this closes a browser-driven vector rather than standing in for authentication.
+forbidden header name — so `same-origin` cannot be forged. Two other values pass:
+`none`, which is a typed URL or a bookmark and which no page can cause, and the
+header being **absent** — an older browser, a `curl`, a server-to-server call.
+Absent is left alone because this closes a browser-driven vector rather than
+standing in for authentication. Everything else is refused, including a header
+present with any other value.
 
 Removing the `text/plain` body parser closes the other half of the same
 door — what a cross-site **form** can post — and both halves are needed, because

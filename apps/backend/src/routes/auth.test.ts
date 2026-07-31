@@ -683,13 +683,17 @@ describe('cross-site reachability', () => {
   })
 
   it('refuses a cross-site write to a route that is not logout, before authorization', async () => {
-    // The claim being pinned is that the guard is instance-wide, not
-    // logout-shaped: move the hook into `registerAuthRoutes` and every other
-    // assertion in this block still passes.
+    // Two claims, and the first needs the right mutation to mean anything.
     //
-    // It also pins the ordering. An anonymous cross-site caller gets 403 for the
-    // origin rather than 401 for the missing session, which is only true if the
-    // hook runs before `requireAdmin`.
+    // Moving the hook into `registerAuthRoutes` does *not* scope it: no route
+    // module calls `app.register`, so they all decorate the root instance, and
+    // fastify binds instance hooks to every route context at `preReady`. Checked
+    // — the whole file stays green. What does scope it is wrapping the hook in
+    // `app.register(async (scope) => …)`, and that fails four assertions here.
+    //
+    // The second claim is the ordering: an anonymous cross-site caller gets 403
+    // for the origin rather than 401 for the missing session, which only holds
+    // if the hook runs ahead of `requireAdmin`.
     const server = await build()
 
     const response = await server.inject({
