@@ -15,6 +15,7 @@ import { Apply } from './pages/Apply.tsx'
 import { Home } from './pages/Home.tsx'
 import { Invite } from './pages/Invite.tsx'
 import { Login } from './pages/Login.tsx'
+import { MyBurn } from './pages/MyBurn.tsx'
 import { NotFound } from './pages/NotFound.tsx'
 import { FetchedViewerProvider, ViewerProvider } from './viewer.tsx'
 
@@ -38,6 +39,9 @@ export type AppApi = Pick<
   | 'deleteQuestion'
   | 'getInviteState'
   | 'redeemInvite'
+  | 'getMyAttendance'
+  | 'joinActiveEvent'
+  | 'leaveActiveEvent'
   | 'getApplications'
   | 'getInvites'
   | 'createInvite'
@@ -72,6 +76,9 @@ export const Routes = ({
     | 'getEvents'
     | 'getInviteState'
     | 'redeemInvite'
+    | 'getMyAttendance'
+    | 'joinActiveEvent'
+    | 'leaveActiveEvent'
     | 'getApplications'
     | 'getInvites'
     | 'createInvite'
@@ -106,6 +113,7 @@ export const Routes = ({
   const AdminApplicationsRoute = useMemo(() => () => <AdminApplications api={api} />, [api])
   const AdminInvitesRoute = useMemo(() => () => <AdminInvites api={api} />, [api])
   const HomeRoute = useMemo(() => () => <Home api={api} />, [api])
+  const MyBurnRoute = useMemo(() => () => <MyBurn api={api} />, [api])
   const ApplyRoute = useMemo(() => () => <Apply api={api} />, [api])
   // The token arrives as a prop from the route pattern, so this one takes props
   // rather than closing over nothing like the others.
@@ -119,6 +127,7 @@ export const Routes = ({
     <Router>
       <Route path="/" component={HomeRoute} />
       <Route path="/apply" component={ApplyRoute} />
+      <Route path="/my-burn" component={MyBurnRoute} />
       <Route path="/invite/:token" component={InviteRoute} />
       <Route path="/login" component={LoginRoute} />
       <Route path="/admin" component={AdminRoute} />

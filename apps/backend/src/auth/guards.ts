@@ -27,12 +27,9 @@ export interface GuardDeps {
  * there yet.
  */
 export const createGuards = ({ db, sessions }: GuardDeps) => {
-  // `role` is required. There was a `requireSignedIn` here built from
-  // `guard(undefined)`, with no caller and no test — so the role-less branch was
-  // dead code guarding nothing. The factory shape makes it a one-liner to add
-  // back when the first member-only route needs it, and it should arrive with a
-  // real caller and the test that distinguishes it from this one: 200 for a
-  // signed-in account with no roles at all.
+  // `role` is required, so there is no role-less branch to leave untested. An
+  // admin is not automatically a member: the two roles are separate rows in
+  // `account_role`, and redemption grants only `member`.
   const guard = (role: AccountRole) => async (request: FastifyRequest, reply: FastifyReply) => {
     const viewer = await viewerFor(request, { db, sessions })
 
@@ -42,5 +39,5 @@ export const createGuards = ({ db, sessions }: GuardDeps) => {
     return undefined
   }
 
-  return { requireAdmin: guard('admin') }
+  return { requireAdmin: guard('admin'), requireMember: guard('member') }
 }
