@@ -160,7 +160,12 @@ describe('applicationCreateSchema', () => {
   it('rejects a submitter who supplies the wording', () => {
     // The label is the server's, read from the question rows. Accepting it here
     // would let an application record a question that was never asked.
-    const answers = [{ question_id: OTHER_ID, label: 'Something else entirely', type: 'text', value: 'x' }]
+    //
+    // Written in the record shape this schema does take, so the refusal comes
+    // from `answerValueSchema` rejecting an object where a string or boolean
+    // belongs. An array would be refused too, but for the wrong reason — it would
+    // fail identically for `[1, 2, 3]`, which proves nothing about labels.
+    const answers = { [OTHER_ID]: { label: 'Something else entirely', value: 'x' } }
     expect(applicationCreateSchema.safeParse({ ...aSubmission, answers }).success).toBe(false)
   })
 

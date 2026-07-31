@@ -1,6 +1,8 @@
 import type { SubmittedAnswers } from './schemas/application.ts'
 import type { FormQuestion } from './schemas/form-question.ts'
 
+import { tickBoxRequired } from './enums.ts'
+
 /**
  * Whether a set of answers satisfies the questions asked.
  *
@@ -24,13 +26,17 @@ export interface AnswerProblem {
 /**
  * Whether a question is answered by ticking rather than writing.
  *
- * One definition, because three consumers need the same answer and they are in
- * different packages: this module deciding what a valid answer looks like, the
- * submission route deciding what an unanswered question stores, and the form
- * deciding which control to render. Written out in each, they drift — which is
- * what `tickBoxRequired` was collapsed to fix one PR ago.
+ * Derived from `tickBoxRequired` rather than listing the types again: it returns
+ * a value for exactly the two tick-box types and `undefined` otherwise, so the
+ * vocabulary lives in one place. A fifth question type is then added once.
+ *
+ * Three consumers need this answer and they are in different packages — this
+ * module deciding what a valid answer looks like, the submission route deciding
+ * what an unanswered question stores, and the form deciding which control to
+ * render — which is exactly the spread that let the copies of `tickBoxRequired`
+ * drift before they were collapsed.
  */
-export const isTickBox = (type: FormQuestion['type']) => type === 'checkbox' || type === 'agreement'
+export const isTickBox = (type: FormQuestion['type']) => tickBoxRequired(type) !== undefined
 
 /**
  * Every problem, in question order, with unknown ids last.

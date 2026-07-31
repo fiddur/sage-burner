@@ -175,7 +175,7 @@ describe('submitting an application', () => {
     expect((await submit(server, { ...applicant, answers: { [id]: true } })).statusCode).toBe(400)
   })
 
-  it('ignores a status the submitter tries to set', async () => {
+  it('refuses a status the submitter tries to set', async () => {
     // `.strict()`, so this is a 400 rather than a silent drop — a submitter who
     // could set their own status would approve themselves.
     const server = await build()

@@ -340,6 +340,14 @@ ProxyPassReverse / http://127.0.0.1:8081/
 thing between an attacker and roughly 8–9 password guesses a second against one
 address. Nothing else will stop it.
 
+`POST /api/applications` is unthrottled for the same reason and is worth a
+separate thought, because it is the only **unauthenticated write** in the app.
+The exposure is different in kind: nothing there grants access, approval is a
+deliberate human act, and the worst case is an organiser deleting junk out of the
+review list rather than anyone getting in. It is a nuisance, not a way through —
+but it is a nuisance a burst limiter on this vhost removes, and there is no
+in-app limit that will.
+
 fail2ban suits slow grinding better than a burst limiter, since the app answers
 every failure with a plain `401`:
 
@@ -758,6 +766,14 @@ cost is paid on write.
 One entry is stored per question **asked**, answered or not, so a reviewer can
 tell "said no" from "was never asked". An absent tick box stores `false`; an
 absent optional text answer stores `""`.
+
+The questions are read and the application inserted in separate statements, so a
+question created between them yields an application with no entry for it. Left
+that way deliberately: the applicant answered the form they were shown, and
+recording a question they never saw would be worse than omitting it. The reverse
+case — the form having _fewer_ questions than the server — is the one that
+matters, and it is a 400, which is why the form tells the applicant to reload
+rather than to try again.
 
 **What makes a submission valid** lives in `answerProblems`, in
 `packages/shared`, and both sides use it: the server refuses on it, and the form

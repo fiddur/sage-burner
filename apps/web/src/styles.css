@@ -233,6 +233,14 @@ a:hover {
   font: inherit;
 }
 
+/* Marks a required question on the public form. Not colour alone — the word is
+   the marker, so it survives a screen reader and a monochrome screen. */
+.required-marker {
+  color: var(--muted);
+  font-style: normal;
+  font-weight: 400;
+}
+
 /* A checkbox and its label read as one line, unlike the stacked `.field`. */
 .field-inline {
   display: flex;

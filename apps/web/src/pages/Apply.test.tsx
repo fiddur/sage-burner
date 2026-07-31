@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { ApplyApi } from './Apply.tsx'
 
+import { apiError } from '../api/client.ts'
 import { Apply } from './Apply.tsx'
 
 /**
@@ -33,17 +34,31 @@ const stub = (over: Partial<ApplyApi> = {}): ApplyApi => ({
   ...over,
 })
 
+/**
+ * Fields are found by label prefix, because a required question's accessible
+ * name carries the visible "· required" marker with it.
+ */
+const labelled = (label: string) => screen.getByLabelText(label, { exact: false })
+
+/**
+ * The submit button is disabled until the questions arrive, so a test that
+ * submits has to wait for them — otherwise it clicks a dead button and the
+ * assertion times out somewhere far less obvious.
+ */
+const ready = () =>
+  waitFor(() =>
+    expect(screen.getByRole('button', { name: 'Send application' })).toHaveProperty('disabled', false),
+  )
+
+// `fireEvent.input` with a target, matching `Login.test.tsx` — assigning `.value`
+// by hand and dispatching does not survive Preact's reconciliation of a
+// controlled input.
 const fill = (label: string, value: string) => {
-  const field = screen.getByLabelText(label)
-  if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement)) {
-    throw new Error(`${label} is not a text field`)
-  }
-  field.value = value
-  field.dispatchEvent(new Event('input', { bubbles: true }))
+  fireEvent.input(labelled(label), { target: { value } })
 }
 
 const tick = (label: string) => {
-  const box = screen.getByLabelText(label)
+  const box = labelled(label)
   if (!(box instanceof HTMLInputElement)) throw new Error(`${label} is not a checkbox`)
   // `fireEvent.click`, not `box.click()`: happy-dom does not raise the `change`
   // that a browser fires as the click's default action, so a bare click leaves
@@ -76,7 +91,7 @@ describe('Apply', () => {
     )
 
     expect(await screen.findByLabelText('What is your name in the dust?')).toBeTruthy()
-    expect(screen.getByLabelText('Why do you want to come?')).toBeTruthy()
+    expect(labelled('Why do you want to come?')).toBeTruthy()
   })
 
   it('renders questions in the order the organiser set, not the order they arrive', async () => {
@@ -137,7 +152,7 @@ describe('Apply', () => {
       />,
     )
 
-    await screen.findByLabelText('Your dust name')
+    await ready()
     identify()
     fill('Your dust name', 'Sage')
     tick('I agree')
@@ -168,7 +183,7 @@ describe('Apply', () => {
       />,
     )
 
-    await screen.findByLabelText('Your dust name')
+    await ready()
     identify()
     send()
 
@@ -190,7 +205,7 @@ describe('Apply', () => {
       />,
     )
 
-    await screen.findByLabelText('I agree')
+    await ready()
     identify()
     send()
 
@@ -203,7 +218,7 @@ describe('Apply', () => {
     // for a message that never arrives.
     render(<Apply api={stub({ submitApplication: () => Promise.resolve({ application: {} as never }) })} />)
 
-    await screen.findByRole('button', { name: 'Send application' })
+    await ready()
     identify()
     send()
 
@@ -225,7 +240,7 @@ describe('Apply', () => {
       />,
     )
 
-    await screen.findByLabelText('Why?')
+    await ready()
     identify()
     fill('Why?', 'a long and heartfelt answer')
     send()
@@ -235,10 +250,152 @@ describe('Apply', () => {
   })
 
   it('says so when the form has no questions yet', async () => {
-    // The state the app ships in; an empty page would read as broken.
+    // The state the app ships in. A page with nothing but a name box reads as
+    // broken, so it says why rather than leaving the applicant guessing.
     render(<Apply api={stub()} />)
 
-    expect(await screen.findByRole('button', { name: 'Send application' })).toBeTruthy()
+    await ready()
+    expect(screen.getByText(/no questions on the form yet/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Send application' })).toBeTruthy()
+  })
+
+  it('refuses a name of only spaces, rather than letting the server say no', async () => {
+    // `nonEmptyText` is `.trim().min(1)`, so `"   "` is a 400. Caught here it is
+    // a field to fix; caught by the API it is a dead end — the applicant is told
+    // to try again, and trying again sends exactly the same body.
+    const submitApplication = vi.fn(() => Promise.resolve({ application: {} as never }))
+    render(<Apply api={stub({ submitApplication })} />)
+
+    await ready()
+    fill('Your name', '   ')
+    fill('How can we reach you?', 'fredrik@example.org')
+    send()
+
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    expect(submitApplication).not.toHaveBeenCalled()
+  })
+
+  it('sends the name and contact trimmed, which is what the server stores', async () => {
+    const submitApplication = vi.fn(() => Promise.resolve({ application: {} as never }))
+    render(<Apply api={stub({ submitApplication })} />)
+
+    await ready()
+    fill('Your name', '  Fredrik  ')
+    fill('How can we reach you?', '  fredrik@example.org ')
+    send()
+
+    await waitFor(() =>
+      expect(submitApplication).toHaveBeenCalledWith({
+        applicant_name: 'Fredrik',
+        applicant_contact: 'fredrik@example.org',
+        answers: {},
+      }),
+    )
+  })
+
+  it('tells the applicant to reload when the server rejects, not to try again', async () => {
+    // A 400 means the questions changed since the page loaded, so both sides ran
+    // the same rules against different lists. "Try again" is false advice there:
+    // the identical body fails identically.
+    render(
+      <Apply api={stub({ submitApplication: () => Promise.reject(apiError(400, 'bad_request', 'nope')) })} />,
+    )
+
+    await ready()
+    identify()
+    send()
+
+    expect((await screen.findByRole('alert')).textContent).toContain('reload')
+  })
+
+  it('says a transport failure is worth retrying, unlike a rejection', async () => {
+    // The passing sibling to the test above: the two failures must not give the
+    // same advice, since one of them is worth acting on.
+    render(
+      <Apply api={stub({ submitApplication: () => Promise.reject(new TypeError('Failed to fetch')) })} />,
+    )
+
+    await ready()
+    identify()
+    send()
+
+    expect((await screen.findByRole('alert')).textContent).toContain('try again')
+  })
+
+  it('marks which questions are required', async () => {
+    // Otherwise an applicant discovers it by pressing Send and being bounced.
+    render(
+      <Apply
+        api={stub({
+          getQuestions: () =>
+            Promise.resolve({
+              questions: [
+                question({ id: 'q-1', type: 'text', label: 'Needed', required: true }),
+                question({ id: 'q-2', type: 'text', label: 'Optional', order: 1 }),
+              ],
+            }),
+        })}
+      />,
+    )
+
+    expect((await screen.findByText(/Needed/)).textContent).toContain('required')
+    expect(screen.getByText(/Optional/).textContent).not.toContain('required')
+  })
+
+  it('links the error to the field it belongs to', async () => {
+    // A `role="alert"` floating near an input is not associated with it: a screen
+    // reader user hears the complaint without knowing which question it is about.
+    render(
+      <Apply
+        api={stub({
+          getQuestions: () =>
+            Promise.resolve({
+              questions: [question({ id: 'q-1', type: 'text', label: 'Needed', required: true })],
+            }),
+        })}
+      />,
+    )
+
+    await ready()
+    identify()
+    send()
+
+    await screen.findByRole('alert')
+    const field = labelled('Needed')
+    expect(field.getAttribute('aria-invalid')).toBe('true')
+    expect(field.getAttribute('aria-describedby')).toContain('q-1-error')
+  })
+
+  it('keeps the help text reachable when the field also has an error', async () => {
+    // Replacing the description with the error would drop the very explanation
+    // that says how to answer.
+    render(
+      <Apply
+        api={stub({
+          getQuestions: () =>
+            Promise.resolve({
+              questions: [
+                question({
+                  id: 'q-1',
+                  type: 'text',
+                  label: 'Needed',
+                  required: true,
+                  help_text: 'Any name works.',
+                }),
+              ],
+            }),
+        })}
+      />,
+    )
+
+    await ready()
+    identify()
+    send()
+
+    await screen.findByRole('alert')
+    const described = labelled('Needed').getAttribute('aria-describedby')
+    expect(described).toContain('q-1-help')
+    expect(described).toContain('q-1-error')
   })
 
   it('will not send before the questions have loaded', async () => {

@@ -50,8 +50,13 @@ export const registerApplicationRoutes = (
     // happened to serialise.
     const questions = await db.select().from(formQuestion).orderBy(asc(formQuestion.order))
 
-    // The same function the form uses to mark its fields, so a submission the
-    // browser called complete cannot be one the server calls a 400.
+    // The same function the form marks its fields with, so the two agree about a
+    // given set of questions. That is all it buys, and the limits are worth being
+    // exact about: it says nothing about `applicant_name`/`applicant_contact`,
+    // and the form runs it against the questions as they were when the page
+    // loaded. A question added or removed since then puts the two on different
+    // lists, and this is the side that decides — hence the form telling the
+    // applicant to reload on a 400 rather than to try again.
     if (answerProblems(questions, parsed.data.answers).length > 0) {
       return reply.code(400).send(errorResponse('bad_request'))
     }
