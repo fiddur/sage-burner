@@ -270,17 +270,13 @@ export const createApp = async ({
   // cross-site HTML form can send — `enctype="text/plain"` is reachable from
   // any page, while urlencoded and multipart 415 out here.
   //
-  // It matters because `SameSite=Lax` protects less than it looks like it does.
-  // Lax stops the cookie being *sent* cross-site, which covers every route that
-  // needs a session — but logout does not need one. It ignores the body and
-  // answers with `Set-Cookie: …; Max-Age=0`, and a Set-Cookie on a top-level
-  // cross-site navigation is honoured. So `evil.com` could auto-submit a form
-  // and sign a member out. Verified: text/plain answered 200 with the clearing
-  // cookie, the other two form encodings answered 415.
+  // No route here accepts plain text, so the parser is pure attack surface
+  // whatever a browser would do with the response. Verified at the wire level:
+  // text/plain answered 200 with the clearing cookie, the other two form
+  // encodings answered 415.
   //
-  // Nuisance rather than disclosure — nothing moves and the attacker learns
-  // nothing — but no route here accepts plain text, so the parser is pure
-  // attack surface.
+  // Whether a browser would then *store* that cookie is a separate question the
+  // README answers, and not one a `curl`-level 200 settles.
   //
   // Note the scope: this is a property of the *instance*, not of the logout
   // route, and it holds only while no registered parser accepts a form
@@ -290,19 +286,16 @@ export const createApp = async ({
   // honest: it asserts all three form encodings answer 415, so the regression
   // fails CI rather than shipping.
   //
-  // It closes the *form* half only. A bodyless `fetch(..., { method: 'POST',
-  // mode: 'no-cors', credentials: 'include' })` consults no parser at all —
-  // fastify dispatches an empty body straight to the handler — so the hook
-  // below is what actually shuts the door.
+  // It covers form encodings only. A bodyless `fetch(..., { method: 'POST' })`
+  // consults no parser at all — fastify dispatches an empty body straight to the
+  // handler — which is one of the reasons the hook below exists.
   app.removeContentTypeParser('text/plain')
 
-  // Same-origin only, for anything that can change state.
-  //
-  // `SameSite=Lax` covers every route that needs a session, because the cookie
-  // is not sent cross-site. Logout is the exception: it needs no session, and
-  // the browser stores the clearing `Set-Cookie` from an opaque response
-  // perfectly happily — nothing has to be *sent*, only set. So a page on any
-  // origin could sign a member out.
+  // Same-origin only, for anything that can change state. Defence in depth, and
+  // the README says what it is and is not — the short version is that the
+  // cookie's own `SameSite=Lax` is believed to close the logout case already,
+  // and this does not depend on that attribute staying `Lax`, nor on a route
+  // answering with a cookie at all.
   //
   // Applied to the whole instance rather than to logout, because the same shape
   // reaches every body-optional POST added later and this should not be

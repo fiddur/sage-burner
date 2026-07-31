@@ -448,25 +448,39 @@ just next-login.
 **Sessions** are a signed value in an `HttpOnly`, `SameSite=Lax` cookie — not a
 database row.
 
-`SameSite=Lax` covers less than it looks like it does, and the gap is worth
-naming: it stops the cookie being **sent** cross-site, which protects every route
-that needs a session — but logout needs none. It answers with a clearing
-`Set-Cookie`, and a browser stores that from an opaque cross-origin response
-quite happily, so any page could sign a member out. Nothing is disclosed and
-nothing else moves; it is a nuisance rather than a breach.
+`SameSite=Lax` is doing more work than it might look like. It stops the cookie
+being **sent** cross-site, which protects every route that needs a session — and
+it also stops a `Lax` cookie being **stored** from a response to a cross-site
+request, which is the part that matters for logout. Logout needs no session: it
+answers with a clearing `Set-Cookie`, so the question is whether a browser keeps
+that, and per RFC 6265bis a non-`None` cookie arriving on a cross-site request is
+ignored.
 
-So **state-changing requests are same-origin only**, enforced by a `sec-fetch-site`
-check on every non-`GET`/`HEAD`. The header cannot be set by page script — it is a
-forbidden header name — so `same-origin` cannot be forged. Two other values pass:
-`none`, which is a typed URL or a bookmark and which no page can cause, and the
-header being **absent** — an older browser, a `curl`, a server-to-server call.
-Absent is left alone because this closes a browser-driven vector rather than
-standing in for authentication. Everything else is refused, including a header
-present with any other value.
+So the cross-site logout this repo once described as live is **believed closed by
+the cookie attribute itself**, and the earlier "verified" note referred to a
+`curl`-level 200 with a `Set-Cookie` in it — which shows the server answered, not
+that a browser stored anything. It has not been reproduced in a browser either
+way; #100 tracks doing that.
 
-Removing the `text/plain` body parser closes the other half of the same
-door — what a cross-site **form** can post — and both halves are needed, because
-a bodyless `fetch` consults no parser at all.
+**State-changing requests are nonetheless same-origin only**, enforced by a
+`sec-fetch-site` check on every non-`GET`/`HEAD`. What that buys, given the
+above:
+
+- it does not depend on the session cookie keeping `SameSite=Lax` — a future
+  change to `None` for an embedding case would silently reopen the logout path;
+- it covers state-changing routes that answer with **no cookie at all**, where
+  `SameSite` has nothing to say;
+- it fails closed for anything unrecognised rather than relying on one attribute.
+
+The header cannot be set by page script — it is a forbidden header name — so
+`same-origin` cannot be forged. Two other values pass: `none`, which is a typed
+URL or a bookmark and which no page can cause, and the header being **absent** —
+an older browser, a `curl`, a server-to-server call. Absent is left alone because
+this closes a browser-driven vector rather than standing in for authentication.
+Everything else is refused, including a header present with any other value.
+
+Removing the `text/plain` body parser is kept for its own sake: no route accepts
+plain text, so the parser is attack surface with no user.
 
 `Secure` is decided once in `config.ts` as `secure_cookies`, on exactly the same
 predicate as the `SESSION_SECRET` requirement: `production`, a non-loopback

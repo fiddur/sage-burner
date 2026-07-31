@@ -590,12 +590,10 @@ describe('rehashing on login', () => {
 })
 
 describe('cross-site reachability', () => {
-  // `SameSite=Lax` protects less than it appears to. It stops the cookie being
-  // *sent* cross-site, which covers every route that needs a session — but
-  // logout does not need one: it ignores the body and answers with a clearing
-  // `Set-Cookie`, which the browser stores from an opaque response. Two separate
-  // doors: the parser closes what a *form* can post, and `sec-fetch-site` closes
-  // what `fetch` can, since a bodyless request consults no parser at all.
+  // Two doors on the same room: the parser removal covers what a cross-site
+  // *form* can post, and `sec-fetch-site` covers what `fetch` can, since a
+  // bodyless request consults no parser at all. Whether a browser could ever
+  // have stored the clearing cookie is the README's question, and #100's.
   const formEncodings = ['text/plain', 'application/x-www-form-urlencoded', 'multipart/form-data; boundary=x']
 
   it('refuses every body type a cross-site form could submit', async () => {
@@ -708,13 +706,12 @@ describe('cross-site reachability', () => {
   })
 
   it('refuses a duplicated header rather than falling through', async () => {
-    // Two `sec-fetch-site` values arrive comma-joined, matching neither trusted
-    // value.
-    //
-    // This pins the joined case only. The `string[]` the type allows cannot be
-    // produced here — node joins duplicates rather than collecting them — so the
-    // array branch is genuinely untestable, which is why the guard is written to
-    // refuse anything it does not recognise rather than to check for a string.
+    // Measured rather than assumed, because `inject` is light-my-request and not
+    // node's parser, so it was not obvious which shape a duplicated header takes:
+    // a probe hook saw `"same-origin,cross-site"`, `Array.isArray` false. So this
+    // pins the joined case, and the `string[]` the type allows stays unreachable
+    // — which is why the guard refuses anything it does not recognise rather than
+    // checking for a string.
     const server = await build()
 
     const response = await server.inject({
