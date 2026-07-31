@@ -61,14 +61,47 @@ export const registerApplicationReviewRoutes = (
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       void noStore(reply)
 
-      const { id } = request.params
-      const decided = await db
-        .update(application)
-        .set({ status: decision, decided_at: now().toISOString() })
-        .where(and(eq(application.id, id), eq(application.status, 'pending')))
-        .returning()
+      // Before the write, not after: `requireAdmin` has already resolved this,
+      // and reading it afterwards meant a 401 branch that could only fire once
+      // the decision had committed — leaving exactly the orphan state the
+      // transaction below exists to prevent.
+      const viewer = await viewerFor(request, { db, sessions })
+      if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
 
-      const [settled] = decided
+      const { id } = request.params
+      const minted = decision === 'approved' ? mintToken() : undefined
+      const expires_at = new Date(now().getTime() + INVITE_VALID_DAYS * 24 * 60 * 60 * 1000).toISOString()
+
+      // One transaction, because approving is two writes and half of it is
+      // worse than neither: an application left `approved` with no invite cannot
+      // be recovered through the API — re-approving matches nothing on
+      // `status = 'pending'`, and the partial unique index refuses a second
+      // invite for the same application. The driver is synchronous, so this is
+      // the same shape `questions.ts` uses to assign `order`.
+      const settled = db.transaction((tx) => {
+        const [row] = tx
+          .update(application)
+          .set({ status: decision, decided_at: now().toISOString() })
+          .where(and(eq(application.id, id), eq(application.status, 'pending')))
+          .returning()
+          .all()
+
+        if (row === undefined || minted === undefined) return row
+
+        tx.insert(inviteToken)
+          .values({
+            id: randomUUID(),
+            token_hash: minted.token_hash,
+            application_id: row.id,
+            expires_at,
+            used_at: null,
+            created_by: viewer.account_id,
+          })
+          .run()
+
+        return row
+      })
+
       if (settled === undefined) {
         // Nothing was written, which is either "no such application" or "already
         // decided". Asked rather than inferred, the same way the question and
@@ -80,28 +113,9 @@ export const registerApplicationReviewRoutes = (
           : reply.code(409).send(errorResponse('conflict'))
       }
 
-      if (decision === 'rejected') {
-        return { application: settled, invite: null } satisfies ApplicationDecisionResponse
-      }
-
-      const viewer = await viewerFor(request, { db, sessions })
-      if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
-
-      const { token, token_hash } = mintToken()
-      const expires_at = new Date(now().getTime() + INVITE_VALID_DAYS * 24 * 60 * 60 * 1000).toISOString()
-
-      await db.insert(inviteToken).values({
-        id: randomUUID(),
-        token_hash,
-        application_id: settled.id,
-        expires_at,
-        used_at: null,
-        created_by: viewer.account_id,
-      })
-
       return {
         application: settled,
-        invite: { token, expires_at },
+        invite: minted === undefined ? null : { token: minted.token, expires_at },
       } satisfies ApplicationDecisionResponse
     }
 

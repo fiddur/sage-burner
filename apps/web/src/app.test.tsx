@@ -119,6 +119,17 @@ describe('routing', () => {
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Sage Burner')
   })
 
+  it('routes every admin page the organiser landing page links to', () => {
+    // The whole point of mounting the real `App`: a page can exist, be tested,
+    // and still be unreachable because no route names it — which is what
+    // happened to /admin/applications.
+    for (const path of ['/admin', '/admin/events', '/admin/questions', '/admin/applications']) {
+      cleanup()
+      renderAt(path, { status: 'signed-in', account: { id: 'a1', roles: ['admin', 'member'] } })
+      expect(screen.getByRole('heading', { level: 1 }).textContent).not.toBe('Nothing here')
+    }
+  })
+
   it('falls back to a not-found page for an unknown route', () => {
     renderAt('/no/such/page')
 

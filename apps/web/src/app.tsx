@@ -7,6 +7,7 @@ import type { Viewer } from './viewer.tsx'
 import { createApiClient } from './api/client.ts'
 import { Layout } from './components/Layout.tsx'
 import { Admin } from './pages/Admin.tsx'
+import { AdminApplications } from './pages/AdminApplications.tsx'
 import { AdminEvents } from './pages/AdminEvents.tsx'
 import { AdminQuestions } from './pages/AdminQuestions.tsx'
 import { Apply } from './pages/Apply.tsx'
@@ -90,6 +91,7 @@ export const Routes = ({
   const AdminRoute = useMemo(() => () => <Admin api={api} />, [api])
   const AdminEventsRoute = useMemo(() => () => <AdminEvents api={api} />, [api])
   const AdminQuestionsRoute = useMemo(() => () => <AdminQuestions api={api} />, [api])
+  const AdminApplicationsRoute = useMemo(() => () => <AdminApplications api={api} />, [api])
   const HomeRoute = useMemo(() => () => <Home api={api} />, [api])
   const ApplyRoute = useMemo(() => () => <Apply api={api} />, [api])
 
@@ -101,6 +103,7 @@ export const Routes = ({
       <Route path="/admin" component={AdminRoute} />
       <Route path="/admin/events" component={AdminEventsRoute} />
       <Route path="/admin/questions" component={AdminQuestionsRoute} />
+      <Route path="/admin/applications" component={AdminApplicationsRoute} />
       <Route default component={NotFound} />
     </Router>
   )

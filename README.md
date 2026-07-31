@@ -834,9 +834,17 @@ rather than to try again, since retrying cannot help.
 
 **Approval mints the invite.** 32 CSPRNG bytes, base64url, valid 30 days. Only
 the SHA-256 digest is stored, so the raw token exists in that one response and
-nowhere else: a leaked backup hands out no invites, and a lost link cannot be
-recovered — only re-issued. The organiser copies it into Discord or Messenger
-themselves; there is no email.
+nowhere else — a leaked backup or a stray copy of the volume hands out no
+invites. The organiser copies it into Discord or Messenger themselves; there is
+no email.
+
+**A lost link is lost.** Not merely unrecoverable — there is no way to issue a
+replacement either: re-approving matches nothing on `status = 'pending'` and
+answers `409`, `invite_token_application_idx` refuses a second invite for the
+same application, and no other route mints one. The only way back today is
+editing the database. #91 owns the re-issue path; until it lands, the copy button
+is deliberately silent on failure rather than claiming a copy that did not
+happen.
 
 The link is assembled in the browser from `window.location.origin`, so the API
 needs no notion of its own public URL.

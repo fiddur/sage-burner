@@ -182,7 +182,7 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
 
     /**
      * Admin only. Returns the invite token once — it is never stored in the
-     * clear, so a lost link cannot be recovered, only re-issued.
+     * clear, and there is no re-issue path yet (#91), so a lost link is lost.
      *
      * Throws ApiError(409, 'conflict') when the application has already been
      * decided, which is what stops a double click minting two invites.

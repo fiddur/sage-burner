@@ -61,6 +61,50 @@ describe('AdminApplications', () => {
     expect(approveApplication).toHaveBeenCalledWith('app-1')
   })
 
+  it('does not say "Copied" when the copy failed', async () => {
+    // The token is shown once and there is no re-issue path (#91), so a false
+    // "Copied" is how an organiser loses an applicant's invite.
+    const writeText = vi.fn(() => Promise.reject(new Error('denied')))
+    vi.stubGlobal('navigator', { clipboard: { writeText } })
+    renderPage(
+      stub({
+        approveApplication: () =>
+          Promise.resolve({
+            application: anApplication({ status: 'approved', decided_at: '2026-07-03T00:00:00Z' }),
+            invite: { token: 't', expires_at: '2026-08-02T00:00:00Z' },
+          }),
+      }),
+    )
+
+    ;(await screen.findByRole('button', { name: 'Approve' })).click()
+    ;(await screen.findByRole('button', { name: 'Copy link' })).click()
+
+    await waitFor(() => expect(writeText).toHaveBeenCalled())
+    expect(screen.getByRole('button', { name: 'Copy link' })).toBeTruthy()
+    vi.unstubAllGlobals()
+  })
+
+  it('survives a browser with no clipboard at all', async () => {
+    // `navigator.clipboard` is undefined on a non-secure origin, where the old
+    // code threw before the handler could do anything.
+    vi.stubGlobal('navigator', {})
+    renderPage(
+      stub({
+        approveApplication: () =>
+          Promise.resolve({
+            application: anApplication({ status: 'approved', decided_at: '2026-07-03T00:00:00Z' }),
+            invite: { token: 't', expires_at: '2026-08-02T00:00:00Z' },
+          }),
+      }),
+    )
+
+    ;(await screen.findByRole('button', { name: 'Approve' })).click()
+    ;(await screen.findByRole('button', { name: 'Copy link' })).click()
+
+    expect(screen.getByRole('button', { name: 'Copy link' })).toBeTruthy()
+    vi.unstubAllGlobals()
+  })
+
   it('stops offering a decision once one is made', async () => {
     renderPage(
       stub({

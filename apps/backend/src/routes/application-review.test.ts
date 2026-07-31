@@ -25,12 +25,15 @@ afterEach(async () => {
   handle = undefined
 })
 
-const build = async () => {
+const NOW = '2026-07-02T00:00:00.000Z'
+
+const build = async (now: () => Date = () => new Date(NOW)) => {
   handle = createDb({ url: ':memory:' })
   runMigrations(handle)
   app = await createApp({
     db: handle.db,
     config: createConfig({ LOG_LEVEL: 'silent', SESSION_SECRET: SECRET }),
+    now,
   })
   return app
 }
@@ -52,18 +55,18 @@ const givenAdmin = async () => {
   return { id, cookie: `${SESSION_COOKIE}=${sessions.issue(id)}` }
 }
 
-const givenApplication = async (over: { status?: 'pending' | 'approved' | 'rejected' } = {}) => {
+const givenApplication = async (name = 'Someone') => {
   const id = randomUUID()
   await db()
     .insert(application)
     .values({
       id,
       answers: [{ question_id: randomUUID(), label: 'Why?', type: 'text', value: 'because' }],
-      status: over.status ?? 'pending',
-      applicant_name: 'Someone',
+      status: 'pending',
+      applicant_name: name,
       applicant_contact: 'someone@example.org',
       submitted_at: '2026-07-02T00:00:00Z',
-      decided_at: over.status === undefined || over.status === 'pending' ? null : '2026-07-03T00:00:00Z',
+      decided_at: null,
     })
   return id
 }
@@ -202,13 +205,76 @@ describe('reviewing applications', () => {
     expect(row?.application_id).toBe(id)
   })
 
-  it('gives the invite an expiry in the future', async () => {
+  it('gives the invite exactly the advertised 30 days', async () => {
+    // Against an injected clock, so this tests the window rather than the fact
+    // that today is later than the fixture. On the real clock any window from
+    // -29 days upward passed.
     const server = await build()
     const { cookie } = await givenAdmin()
     const id = await givenApplication()
 
     const { expires_at } = (await decide(server, cookie, id, 'approve')).json().invite
 
-    expect(Date.parse(expires_at)).toBeGreaterThan(Date.parse('2026-07-02T00:00:00Z'))
+    expect(expires_at).toBe('2026-08-01T00:00:00.000Z')
+  })
+
+  it('lists the newest first', async () => {
+    const server = await build()
+    const { cookie } = await givenAdmin()
+    await givenApplication('Earlier')
+    const later = await givenApplication('Later')
+    await db()
+      .update(application)
+      .set({ submitted_at: '2026-07-05T00:00:00Z' })
+      .where(eq(application.id, later))
+
+    const names = (await list(server, cookie))
+      .json()
+      .applications.map((entry: { applicant_name: string }) => entry.applicant_name)
+
+    expect(names).toEqual(['Later', 'Earlier'])
+  })
+
+  it('refuses an anonymous caller on the routes that mint an invite', async () => {
+    // The list route is one thing; these grant membership.
+    const server = await build()
+    const id = await givenApplication()
+
+    for (const decision of ['approve', 'reject']) {
+      const response = await server.inject({
+        method: 'POST',
+        url: `/api/admin/applications/${id}/${decision}`,
+      })
+      expect(response.statusCode, decision).toBe(401)
+    }
+    expect((await db().select().from(application))[0]?.status).toBe('pending')
+  })
+
+  it('leaves the application pending when the invite cannot be written', async () => {
+    // Half an approval is worse than none: approved with no invite cannot be
+    // recovered through the API, since re-approving matches nothing on
+    // `status = 'pending'` and the partial unique index refuses a second invite.
+    //
+    // Forced by planting an invite for this application first, which that index
+    // then refuses — the same failure a full disk or a busy database would give.
+    const server = await build()
+    const { id: adminId, cookie } = await givenAdmin()
+    const id = await givenApplication()
+    await db().insert(inviteToken).values({
+      id: randomUUID(),
+      token_hash: 'planted',
+      application_id: id,
+      expires_at: '2026-09-01T00:00:00Z',
+      used_at: null,
+      created_by: adminId,
+    })
+
+    // A 500, not a rejection: fastify catches the failed write. The point is
+    // what the database looks like afterwards.
+    expect((await decide(server, cookie, id, 'approve')).statusCode).toBe(500)
+
+    const [row] = await db().select().from(application).where(eq(application.id, id))
+    expect(row?.status).toBe('pending')
+    expect(row?.decided_at).toBeNull()
   })
 })
