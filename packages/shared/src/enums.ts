@@ -64,6 +64,31 @@ export const tickBoxRequired = (type: string): boolean | undefined => {
   return undefined
 }
 
+/**
+ * What an outstanding invite is doing, derived rather than stored.
+ *
+ * Storing it would mean a row whose truth depends on the clock going stale in
+ * the database — an invite becomes expired by time passing, not by anyone
+ * writing to it.
+ */
+export const inviteStatuses = ['outstanding', 'used', 'expired'] as const
+export type InviteStatus = (typeof inviteStatuses)[number]
+export const isInviteStatus = (value: unknown): value is InviteStatus => isOneOf(inviteStatuses, value)
+
+/**
+ * `used` wins over `expired`: an invite that was redeemed and then ran out is
+ * spent, and calling it expired would suggest re-issuing it to someone already
+ * in.
+ */
+export const inviteStatusOf = (
+  invite: { expires_at: string; used_at: string | null },
+  now: Date,
+): InviteStatus => {
+  if (invite.used_at !== null) return 'used'
+
+  return Date.parse(invite.expires_at) <= now.getTime() ? 'expired' : 'outstanding'
+}
+
 /** Membership fee state, tracked per (event, member) — never globally per person. */
 export const paymentStatuses = ['unpaid', 'partial', 'paid'] as const
 export type PaymentStatus = (typeof paymentStatuses)[number]

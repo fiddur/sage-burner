@@ -5,6 +5,7 @@ import { useEffect, useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
+import { InviteLink } from '../components/InviteLink.tsx'
 import { isAdmin, useViewer } from '../viewer.tsx'
 
 export type ApplicationsApi = Pick<ApiClient, 'getApplications' | 'approveApplication' | 'rejectApplication'>
@@ -21,52 +22,6 @@ const answerText = (value: string | boolean) => {
   return value === '' ? '—' : value
 }
 
-/**
- * The invite link, shown once.
- *
- * Built here rather than server-side so the API needs no notion of its own
- * public URL — the page is served from the same origin the link has to point at.
- */
-const inviteUrl = (invite: Invite) => `${window.location.origin}/invite/${invite.token}`
-
-const InviteLink = ({
-  invite,
-  copied,
-  onCopy,
-}: {
-  invite: Invite | undefined
-  copied: boolean
-  onCopy: () => void
-}) => {
-  if (invite === undefined) return null
-
-  const url = inviteUrl(invite)
-
-  return (
-    <p class="form-note" role="status">
-      Send them this link — it is shown once and cannot be recovered afterwards. Expires{' '}
-      {invite.expires_at.slice(0, 10)}.
-      <br />
-      <code>{url}</code>
-      <br />
-      <button
-        type="button"
-        class="link-button"
-        onClick={() => {
-          // Only on success. `writeText` rejects on a denied permission or an
-          // unfocused document, and `navigator.clipboard` is undefined entirely
-          // on a non-secure origin. For a token shown once, with no way to
-          // re-issue it (#91), a false "Copied" is how an organiser loses an
-          // applicant's invite; the URL above stays selectable by hand.
-          navigator.clipboard?.writeText(url).then(onCopy, () => undefined)
-        }}
-      >
-        {copied ? 'Copied' : 'Copy link'}
-      </button>
-    </p>
-  )
-}
-
 export const AdminApplications = ({ api }: { api: ApplicationsApi }) => {
   const viewer = useViewer()
   const admin = isAdmin(viewer)
@@ -74,7 +29,6 @@ export const AdminApplications = ({ api }: { api: ApplicationsApi }) => {
   const [invites, setInvites] = useState<Record<string, Invite>>({})
   const [busy, setBusy] = useState<string | undefined>(undefined)
   const [error, setError] = useState<string | undefined>(undefined)
-  const [copied, setCopied] = useState<string | undefined>(undefined)
 
   useEffect(() => {
     if (!admin) return undefined
@@ -221,11 +175,7 @@ export const AdminApplications = ({ api }: { api: ApplicationsApi }) => {
               </p>
             )}
 
-            <InviteLink
-              invite={invites[entry.id]}
-              copied={copied === entry.id}
-              onCopy={() => setCopied(entry.id)}
-            />
+            <InviteLink invite={invites[entry.id]} />
           </article>
         ))}
     </section>

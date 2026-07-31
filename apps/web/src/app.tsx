@@ -9,6 +9,7 @@ import { Layout } from './components/Layout.tsx'
 import { Admin } from './pages/Admin.tsx'
 import { AdminApplications } from './pages/AdminApplications.tsx'
 import { AdminEvents } from './pages/AdminEvents.tsx'
+import { AdminInvites } from './pages/AdminInvites.tsx'
 import { AdminQuestions } from './pages/AdminQuestions.tsx'
 import { Apply } from './pages/Apply.tsx'
 import { Home } from './pages/Home.tsx'
@@ -35,6 +36,9 @@ export type AppApi = Pick<
   | 'addQuestion'
   | 'deleteQuestion'
   | 'getApplications'
+  | 'getInvites'
+  | 'createInvite'
+  | 'revokeInvite'
   | 'approveApplication'
   | 'rejectApplication'
   | 'getQuestions'
@@ -64,6 +68,9 @@ export const Routes = ({
     | 'getAdminAccounts'
     | 'getEvents'
     | 'getApplications'
+    | 'getInvites'
+    | 'createInvite'
+    | 'revokeInvite'
     | 'approveApplication'
     | 'rejectApplication'
     | 'getQuestions'
@@ -92,6 +99,7 @@ export const Routes = ({
   const AdminEventsRoute = useMemo(() => () => <AdminEvents api={api} />, [api])
   const AdminQuestionsRoute = useMemo(() => () => <AdminQuestions api={api} />, [api])
   const AdminApplicationsRoute = useMemo(() => () => <AdminApplications api={api} />, [api])
+  const AdminInvitesRoute = useMemo(() => () => <AdminInvites api={api} />, [api])
   const HomeRoute = useMemo(() => () => <Home api={api} />, [api])
   const ApplyRoute = useMemo(() => () => <Apply api={api} />, [api])
 
@@ -104,6 +112,7 @@ export const Routes = ({
       <Route path="/admin/events" component={AdminEventsRoute} />
       <Route path="/admin/questions" component={AdminQuestionsRoute} />
       <Route path="/admin/applications" component={AdminApplicationsRoute} />
+      <Route path="/admin/invites" component={AdminInvitesRoute} />
       <Route default component={NotFound} />
     </Router>
   )

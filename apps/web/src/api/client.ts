@@ -1,8 +1,11 @@
 import type {
+  AdminInvitesResponse,
   ApplicationCreate,
   ApplicationDecisionResponse,
   ApplicationResponse,
   ApplicationsResponse,
+  Invite,
+  InviteCreate,
   ActiveEventResponse,
   AdminAccountsResponse,
   EventCreateInput,
@@ -197,6 +200,24 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
       request<ApplicationDecisionResponse>(`/admin/applications/${encodeURIComponent(id)}/reject`, {
         method: 'POST',
       }),
+
+    /** Admin only. Never carries the token — only the digest is stored. */
+    getInvites: (signal?: AbortSignal) => request<AdminInvitesResponse>('/admin/invites', { signal }),
+
+    /**
+     * Admin only. Returns the token once, like approval does; there is no
+     * re-issue path yet (#91). Omit `expires_at` for the default 30 days.
+     */
+    createInvite: (body: InviteCreate = {}) =>
+      request<{ invite: Invite }>('/admin/invites', { method: 'POST', body }),
+
+    /**
+     * Admin only. Answers 204. Throws ApiError(409, 'conflict') for an invite
+     * that has been redeemed or that belongs to an application — neither is
+     * revocable.
+     */
+    revokeInvite: (id: string) =>
+      request<undefined>(`/admin/invites/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
     /** Admin only. New questions go last; `order` is the server's to assign. */
     addQuestion: (body: FormQuestionCreateInput) =>
