@@ -254,10 +254,14 @@ export const accountRole = sqliteTable(
 )
 
 /**
- * A single-use invitation to join an event.
+ * A single-use invitation to join the community.
  *
  * Both membership paths converge here: approving an application mints one with
  * `application_id` set, and an admin direct invite mints one with it null.
+ *
+ * No `event_id`. You are let into the community, not into a burn — the
+ * application carries no event either — and which burns someone then comes to is
+ * a separate decision they make each time.
  */
 export const inviteToken = sqliteTable(
   'invite_token',
@@ -276,9 +280,6 @@ export const inviteToken = sqliteTable(
      * unguessable input means there is no dictionary to run.
      */
     token_hash: text('token_hash').notNull().unique(),
-    event_id: text('event_id')
-      .notNull()
-      .references(() => event.id, { onDelete: 'cascade' }),
     /** Null for an admin-created direct invite with no application behind it. */
     application_id: text('application_id').references(() => application.id, { onDelete: 'set null' }),
     expires_at: text('expires_at').notNull(),
@@ -310,7 +311,6 @@ export const inviteToken = sqliteTable(
   },
   (table) => [
     primaryKey({ columns: [table.id] }),
-    index('invite_token_event_idx').on(table.event_id),
     // One invite per application, so an approved application can only ever
     // become one membership. Without this, a double-clicked Approve or a
     // retried request mints two invites for the same application, and since
@@ -362,16 +362,7 @@ export const member = sqliteTable(
     /** Admin-set only. Members can read their own status but never write it. */
     payment_status: text('payment_status', { enum: paymentStatuses }).notNull().default('unpaid'),
     payment_date: text('payment_date'),
-    /**
-     * The invite this membership was redeemed from.
-     *
-     * Deliberately **not** constrained to match `event_id`: nothing here stops
-     * an invite minted for the autumn burn being redeemed into the spring one.
-     * Doing that in the schema needs a unique index on `invite_token(event_id,
-     * id)` plus a composite foreign key, and unlike double redemption — which
-     * is a check-then-act race the application cannot win alone — this is
-     * ordinary application logic, so the redemption path (#17) owns it.
-     */
+    /** The invite this membership was redeemed from. */
     invite_token_id: text('invite_token_id')
       .notNull()
       .references(() => inviteToken.id),
@@ -431,10 +422,9 @@ export const session = sqliteTable(
       .references(() => event.id, { onDelete: 'cascade' }),
     title: text('title').notNull(),
     /**
-     * Not constrained to match `event_id` — same gap, and same reasoning, as
-     * `member.invite_token_id`: a dream can currently name a host who is a
-     * member of a different burn. Ordinary application logic rather than a
-     * race, so the scheduling routes (#20) own it.
+     * Not constrained to match `event_id`: a dream can name a host who is a
+     * member of a different burn. Ordinary application logic rather than a race,
+     * so the scheduling routes (#20) own it.
      */
     host_member_id: text('host_member_id')
       .notNull()

@@ -133,7 +133,7 @@ describe('submitting an application', () => {
     await givenQuestion({ id: second, type: 'text', label: 'Second', order: 0 })
     await givenQuestion({ id: first, type: 'text', label: 'First', order: 0 })
 
-    await submit(server, { ...applicant, answers: { [first]: 'a', [second]: 'b' } })
+    await submit(server, { ...applicant, answers: { [second]: 'b', [first]: 'a' } })
 
     const served = (await server.inject({ method: 'GET', url: '/api/questions' })).json()
     const [row] = await stored()
