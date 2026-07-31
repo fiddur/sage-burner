@@ -1,6 +1,8 @@
 import type {
   ApplicationCreate,
+  ApplicationDecisionResponse,
   ApplicationResponse,
+  ApplicationsResponse,
   ActiveEventResponse,
   AdminAccountsResponse,
   EventCreateInput,
@@ -173,6 +175,28 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
      */
     submitApplication: (body: ApplicationCreate) =>
       request<ApplicationResponse>('/applications', { method: 'POST', body }),
+
+    /** Admin only. */
+    getApplications: (signal?: AbortSignal) =>
+      request<ApplicationsResponse>('/admin/applications', { signal }),
+
+    /**
+     * Admin only. Returns the invite token once — it is never stored in the
+     * clear, and there is no re-issue path yet (#91), so a lost link is lost.
+     *
+     * Throws ApiError(409, 'conflict') when the application has already been
+     * decided, which is what stops a double click minting two invites.
+     */
+    approveApplication: (id: string) =>
+      request<ApplicationDecisionResponse>(`/admin/applications/${encodeURIComponent(id)}/approve`, {
+        method: 'POST',
+      }),
+
+    /** Admin only. Throws ApiError(409, 'conflict') on an already-decided application. */
+    rejectApplication: (id: string) =>
+      request<ApplicationDecisionResponse>(`/admin/applications/${encodeURIComponent(id)}/reject`, {
+        method: 'POST',
+      }),
 
     /** Admin only. New questions go last; `order` is the server's to assign. */
     addQuestion: (body: FormQuestionCreateInput) =>

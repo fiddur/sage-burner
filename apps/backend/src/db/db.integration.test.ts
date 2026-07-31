@@ -60,7 +60,6 @@ const seedInvite = (id: string) =>
     .values({
       id,
       token_hash: `hash-of-token-${id}`,
-      event_id: ids.event,
       application_id: null,
       expires_at: '2026-09-01T00:00:00Z',
       used_at: null,
@@ -271,7 +270,6 @@ describe('uniqueness', () => {
       .values({
         id: 'i0000000-0000-4000-8000-000000000003',
         token_hash: 'hash-of-token-next',
-        event_id: 'e0000000-0000-4000-8000-000000000002',
         expires_at: '2026-12-01T00:00:00Z',
         created_by: ids.account,
       })
@@ -301,7 +299,6 @@ describe('uniqueness', () => {
         .values({
           id: ids.otherInvite,
           token_hash: `hash-of-token-${ids.invite}`,
-          event_id: ids.event,
           expires_at: '2026-09-01T00:00:00Z',
           created_by: ids.account,
         })
@@ -336,7 +333,6 @@ describe('uniqueness', () => {
         .values({
           id,
           token_hash: `hash-of-${id}`,
-          event_id: ids.event,
           application_id: 'app-dup',
           expires_at: '2026-09-01T00:00:00Z',
           created_by: ids.account,
