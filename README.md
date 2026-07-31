@@ -802,7 +802,7 @@ says everything is fine against an API that answers 400. The rules:
 - an answer to a question that was not asked is refused rather than stored.
 
 The module is deliberately free of Zod so the browser can import it — see the
-`sideEffects` note under [Shared schemas and types](#shared-schemas-and-types).
+`sideEffects` note under [Shared schemas and types](AGENTS.md#shared-schemas-and-types-packagesshared).
 
 The form itself hardcodes nothing about the questions: it renders whatever
 `GET /api/questions` returns, in `order`. Adding a question in the admin UI makes

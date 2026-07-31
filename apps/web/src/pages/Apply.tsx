@@ -40,10 +40,11 @@ const problemText = (reason: AnswerProblem['reason']) => {
   return 'That answer is not valid.'
 }
 
-/** Mirrors `nonEmptyText(max)`, so the form and the API agree on these too. */
+/** Mirrors `nonEmptyText(max)`, which trims before it bounds, so both sides agree. */
 const identityProblem = (value: string, max: number) => {
-  if (value.trim() === '') return 'blank'
-  if (value.length > max) return 'too_long'
+  const trimmed = value.trim()
+  if (trimmed === '') return 'blank'
+  if (trimmed.length > max) return 'too_long'
 
   return undefined
 }
@@ -78,7 +79,7 @@ export const Apply = ({ api }: ApplyProps) => {
     api
       .getQuestions(controller.signal)
       .then((response) => {
-        setQuestions([...response.questions].sort((a, b) => a.order - b.order))
+        setQuestions(response.questions)
       })
       .catch(() => {
         if (!controller.signal.aborted) setLoadFailed(true)

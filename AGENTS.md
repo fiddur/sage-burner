@@ -34,8 +34,9 @@ type definitions. All layers import from it — never duplicate a schema.
 
 - Backend imports the **schemas** (runtime validation at the HTTP boundary).
 - Web imports **no Zod**. Types always; runtime values only from modules that do
-  not pull Zod in — today `enums.ts`, which imports nothing and holds the
-  vocabularies plus `tickBoxRequired`. Nothing under `schemas/`.
+  not pull Zod in — today `enums.ts` (the vocabularies and `tickBoxRequired`) and
+  `answers.ts` (`answerProblems`, `isTickBox`, the `MAX_*` limits), which imports
+  `enums.ts` and otherwise only types. Nothing under `schemas/`.
 - Field names are `snake_case` everywhere: schemas, REST API, DB columns, JSON
   keys, frontend types.
 
@@ -43,7 +44,7 @@ This is aurboda's `api-spec` idea without the OpenAPI/Kotlin generation — we
 have no third client and no public API contract to publish.
 
 The package sets `"sideEffects": false`, and that is load-bearing rather than
-tidiness. `index.ts` is `export *` over eleven modules, so importing any runtime
+tidiness. `index.ts` is `export *` over twelve modules, so importing any runtime
 value goes through a barrel whose schema modules evaluate `z.object(…)` at module
 scope; without the flag Rollup must assume those are side effects and keeps them,
 pulling Zod into the main chunk — which is not code-split, so it reaches the

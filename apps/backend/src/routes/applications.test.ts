@@ -51,7 +51,7 @@ const db = () => {
 }
 
 const givenQuestion = async (over: Partial<FormQuestion> & Pick<FormQuestion, 'type'>) => {
-  const id = randomUUID()
+  const id = over.id ?? randomUUID()
   await db()
     .insert(formQuestion)
     .values({
@@ -121,6 +121,28 @@ describe('submitting an application', () => {
 
     const [row] = await stored()
     expect(row?.answers.map((answer) => answer.label)).toEqual(['First', 'Second'])
+  })
+
+  it('records answers in the same order the public form serves them', async () => {
+    // `order` is not unique, so a tie is broken by id — and it has to be broken
+    // the same way in both places, or the applicant sees one order and the
+    // stored snapshot records another.
+    const server = await build()
+    const first = '00000000-0000-4000-8000-000000000001'
+    const second = '00000000-0000-4000-8000-000000000002'
+    await givenQuestion({ id: second, type: 'text', label: 'Second', order: 0 })
+    await givenQuestion({ id: first, type: 'text', label: 'First', order: 0 })
+
+    await submit(server, { ...applicant, answers: { [first]: 'a', [second]: 'b' } })
+
+    const served = (await server.inject({ method: 'GET', url: '/api/questions' })).json()
+    const [row] = await stored()
+    const storedOrder = row?.answers.map((answer) => answer.question_id)
+
+    expect(storedOrder).toEqual(served.questions.map((question: { id: string }) => question.id))
+    // Both halves: that the two agree, and that they agree on id — sharing one
+    // query makes them agree on anything, including nothing in particular.
+    expect(storedOrder).toEqual([first, second])
   })
 
   it('refuses a submission skipping a required question', async () => {

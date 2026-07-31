@@ -99,7 +99,10 @@ describe('Apply', () => {
     expect(labelled('Why do you want to come?')).toBeTruthy()
   })
 
-  it('renders questions in the order the organiser set, not the order they arrive', async () => {
+  it('renders the questions in the order the API serves them', async () => {
+    // Not re-sorted here: `GET /api/questions` already serves display order, and
+    // a second ordering rule on this side is one that can disagree with the one
+    // the stored answers use. The backend test pins the order itself.
     render(
       <Apply
         api={stub({
@@ -114,12 +117,14 @@ describe('Apply', () => {
       />,
     )
 
-    await screen.findByLabelText('First')
+    // Arrival order deliberately contradicts `order`: a fixture where the two
+    // agree cannot tell a re-added client sort from leaving the list alone.
+    await screen.findByLabelText('Second')
     expect(screen.getAllByRole('textbox').map((field) => field.getAttribute('name'))).toEqual([
       'applicant_name',
       'applicant_contact',
-      'q-1',
       'q-2',
+      'q-1',
     ])
   })
 
