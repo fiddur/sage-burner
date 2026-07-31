@@ -146,7 +146,7 @@ describe('security headers', () => {
     expect(csp).not.toContain('unsafe-eval')
   })
 
-  it('confines every fetch to this origin', async () => {
+  it('confines every fetch to this origin, images aside', async () => {
     const server = await build()
 
     const csp = (await server.inject({ method: 'GET', url: '/' })).headers['content-security-policy']
@@ -161,6 +161,16 @@ describe('security headers', () => {
     // only ones nothing would notice losing.
     expect(found.get('font-src')).toEqual(["'self'"])
     expect(found.get('base-uri')).toEqual(["'none'"])
+    // The one directive deliberately wider than the rest, and the only override
+    // that had nothing pinning it. Losing it is silent in *both* directions:
+    // reverting to helmet's `'self' data:` still passes every test here and
+    // breaks only remote images in production — the mismatch #69 existed to
+    // remove. `markdown.ts` allows a subset of this in `isSafeImageSource` —
+    // https and site-relative, no `data:` — deliberately, since a renderer
+    // stricter than the policy is the safe direction to differ in. What must
+    // not happen is narrowing `https:` here without narrowing it there, which
+    // puts the mismatch back.
+    expect(found.get('img-src')).toEqual(["'self'", 'data:', 'https:'])
   })
 
   it('asks browsers to remember the TLS, which Apache terminates', async () => {

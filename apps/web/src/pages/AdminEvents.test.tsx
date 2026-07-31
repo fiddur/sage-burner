@@ -162,13 +162,19 @@ describe('AdminEvents', () => {
     await waitFor(() => {
       expect(updateEvent).toHaveBeenCalledWith('e-1', { welcome_markdown: '# New words' })
     })
-    // The homepage renders the welcome text as of #13, so this promise is now
-    // true. It was deliberately hedged while `Home.tsx` was a placeholder — and
-    // the hedge had to come out with the placeholder, or the message would have
-    // gone on pointing an organiser at an issue that was already closed.
-    const status = (await screen.findByRole('status')).textContent
-    expect(status).toContain('Saved')
-    expect(status).not.toContain('#13')
+    // Pinned in full, because this one sentence has been wrong three times
+    // running: it over-promised, then hedged with an issue number that went
+    // stale, then over-promised again for a new reason — the list offers "Edit
+    // welcome text" on every event, while only the soonest-ending unfinished
+    // one reaches the homepage. So an organiser editing last year's burn was
+    // told the homepage shows text it does not and never will.
+    //
+    // The wording is conditional, which makes it true for every event rather
+    // than for the one the previous versions assumed. Pinning it whole means
+    // the next rewrite has to be a decision.
+    expect((await screen.findByRole('status')).textContent).toBe(
+      'Saved. It appears on the homepage while this is the current burn.',
+    )
   })
 
   it('surfaces a failed save rather than claiming success', async () => {

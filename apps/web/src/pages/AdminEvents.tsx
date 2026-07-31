@@ -213,7 +213,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
                   )}
                   {saved && (
                     <p class="form-note" role="status">
-                      Saved. The homepage shows it now.
+                      Saved. It appears on the homepage while this is the current burn.
                     </p>
                   )}
 
