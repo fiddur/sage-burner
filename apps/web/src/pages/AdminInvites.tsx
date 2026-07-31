@@ -57,6 +57,9 @@ export const AdminInvites = ({ api }: { api: InvitesApi }) => {
   const mint = async () => {
     setBusy(true)
     setError(undefined)
+    // Cleared before the call, so a failure cannot leave the previous link on
+    // screen beside the error and read as one invite.
+    setMinted(undefined)
     try {
       const response = await api.createInvite()
       setMinted(response.invite)
@@ -135,7 +138,11 @@ export const AdminInvites = ({ api }: { api: InvitesApi }) => {
         </p>
       )}
 
-      <InviteLink invite={minted} />
+      {/* Keyed on the token so a new mint remounts: `copied` lives in the
+          component, and a button still reading "Copied" after minting a second
+          invite is how an organiser pastes the first one twice and loses the
+          second for good. */}
+      <InviteLink key={minted?.token} invite={minted} />
 
       {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
 
