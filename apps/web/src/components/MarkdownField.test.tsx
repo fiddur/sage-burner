@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/preact'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { MarkdownField } from './MarkdownField.tsx'
@@ -28,7 +28,7 @@ describe('MarkdownField', () => {
   it('renders the markdown under Preview', async () => {
     render(<MarkdownField label="Help text" value={PRINCIPLES} maxLength={2000} onInput={vi.fn()} />)
 
-    screen.getByRole('tab', { name: 'Preview' }).click()
+    screen.getByRole('button', { name: 'Preview' }).click()
 
     expect((await screen.findAllByRole('listitem')).map((item) => item.textContent)).toEqual([
       'Radical inclusion',
@@ -39,9 +39,9 @@ describe('MarkdownField', () => {
   it('goes back to writing', async () => {
     render(<MarkdownField label="Help text" value={PRINCIPLES} maxLength={2000} onInput={vi.fn()} />)
 
-    screen.getByRole('tab', { name: 'Preview' }).click()
+    screen.getByRole('button', { name: 'Preview' }).click()
     await screen.findAllByRole('listitem')
-    screen.getByRole('tab', { name: 'Write' }).click()
+    screen.getByRole('button', { name: 'Write' }).click()
 
     expect(await screen.findByLabelText('Help text')).toHaveProperty('value', PRINCIPLES)
   })
@@ -49,7 +49,7 @@ describe('MarkdownField', () => {
   it('says there is nothing to preview rather than showing a blank pane', async () => {
     render(<MarkdownField label="Help text" value="   " maxLength={2000} onInput={vi.fn()} />)
 
-    screen.getByRole('tab', { name: 'Preview' }).click()
+    screen.getByRole('button', { name: 'Preview' }).click()
 
     expect(await screen.findByText('Nothing to preview yet.')).toBeTruthy()
   })
@@ -64,10 +64,36 @@ describe('MarkdownField', () => {
       />,
     )
 
-    screen.getByRole('tab', { name: 'Preview' }).click()
+    screen.getByRole('button', { name: 'Preview' }).click()
 
     expect(await screen.findByText(/alert\(1\)/)).toBeTruthy()
     expect(document.querySelector('script')).toBeNull()
+  })
+
+  it('focuses the field when the label is clicked, like every other field', () => {
+    // A real `<label for>`, not a duplicated `aria-label`: the accessible name
+    // and the click target come from one place.
+    render(<MarkdownField label="Help text" value="" maxLength={2000} onInput={vi.fn()} />)
+
+    const field = screen.getByLabelText('Help text')
+    expect(field.id).not.toBe('')
+    expect(document.querySelector(`label[for="${field.id}"]`)?.textContent).toBe('Help text')
+  })
+
+  it('says which view is showing without claiming to be a tab widget', async () => {
+    // `role="tab"` promises a controlled panel and roving focus; these are
+    // toggles, so they say so.
+    render(<MarkdownField label="Help text" value="x" maxLength={2000} onInput={vi.fn()} />)
+
+    expect(screen.queryAllByRole('tab')).toHaveLength(0)
+    expect(screen.getByRole('button', { name: 'Write' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Preview' }).getAttribute('aria-pressed')).toBe('false')
+
+    screen.getByRole('button', { name: 'Preview' }).click()
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Preview' }).getAttribute('aria-pressed')).toBe('true'),
+    )
   })
 
   it('caps the text at the length the API accepts', () => {

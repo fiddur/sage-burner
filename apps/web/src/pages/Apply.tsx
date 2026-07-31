@@ -89,6 +89,18 @@ export const Apply = ({ api }: ApplyProps) => {
     return () => controller.abort()
   }, [api])
 
+  // Once per load, not once per keystroke: `answer()` sets `answers`, so this
+  // component re-renders on every character typed, and the help text this exists
+  // to render is the longest thing on the form.
+  const helpHtml = useMemo(() => {
+    const byId = new Map<string, string>()
+    for (const question of questions ?? []) {
+      if (question.help_text !== null) byId.set(question.id, renderMarkdown(question.help_text))
+    }
+
+    return byId
+  }, [questions])
+
   const problemFor = useMemo(() => {
     const byId = new Map(problems.map((problem) => [problem.question_id, problem]))
 
@@ -276,14 +288,14 @@ export const Apply = ({ api }: ApplyProps) => {
                 )}
               </label>
 
-              {question.help_text !== null && (
+              {helpHtml.get(question.id) !== undefined && (
                 // A div, not a p: markdown renders block content, and a list
                 // inside a paragraph is invalid HTML the browser silently
                 // reshapes. Escaped rather than filtered — see `markdown.ts`.
                 <div
                   class="form-note markdown-preview"
                   id={helpId}
-                  dangerouslySetInnerHTML={{ __html: renderMarkdown(question.help_text) }}
+                  dangerouslySetInnerHTML={{ __html: helpHtml.get(question.id) ?? '' }}
                 />
               )}
 
