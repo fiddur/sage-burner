@@ -2,13 +2,13 @@ import type { Application, ApplicationResponse, StoredAnswers } from '@sage-burn
 import type { FastifyInstance } from 'fastify'
 
 import { answerProblems, applicationCreateSchema, errorResponse, isTickBox } from '@sage-burner/shared'
-import { asc } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { Database } from '../db/index.ts'
 
-import { application, formQuestion } from '../db/schema.ts'
+import { application } from '../db/schema.ts'
 import { noStore } from '../http.ts'
+import { questionsFor } from './questions.ts'
 
 export interface ApplicationRouteDeps {
   db: Database
@@ -39,7 +39,7 @@ export const registerApplicationRoutes = (
     const parsed = applicationCreateSchema.safeParse(request.body)
     if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
 
-    const questions = await db.select().from(formQuestion).orderBy(asc(formQuestion.order))
+    const questions = await questionsFor(db)
 
     // Sharing these rules with the form buys agreement about the answers given
     // the same questions, not that a client-complete submission is
