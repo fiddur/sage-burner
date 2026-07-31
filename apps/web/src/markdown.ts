@@ -52,6 +52,13 @@ const escapeHtml = (value: string) =>
  * renderer overrides bypass its `cleanUrl()` nothing percent-encodes them — so
  * `</\t/evil.com>` would reach the attribute as `/<tab>/evil.com`, and the
  * browser discards tab, CR and LF while parsing a URL, leaving `//evil.com`.
+ *
+ * The renderers emit `escapeHtml(clean(href))`, not `escapeHtml(href)`, so the
+ * string reaching the attribute is the one that was tested. They used to
+ * differ — the check ran on the cleaned value while the raw one was written
+ * out. No href was found that is safe cleaned and unsafe raw, so this closes a
+ * seam rather than a hole; the point is that the property now holds without
+ * anyone having to re-derive it.
  */
 const clean = (href: string) => href.trim().replaceAll(/[\u0000-\u001f]/gu, '')
 
@@ -96,14 +103,14 @@ const marked = new Marked({
       if (!isSafeUrl(token.href)) return text
 
       const title = titleAttribute(token.title)
-      return `<a href="${escapeHtml(token.href)}"${title}>${text}</a>`
+      return `<a href="${escapeHtml(clean(token.href))}"${title}>${text}</a>`
     },
 
     image(token) {
       if (!isSafeImageSource(token.href)) return escapeHtml(token.text)
 
       const title = titleAttribute(token.title)
-      return `<img src="${escapeHtml(token.href)}" alt="${escapeHtml(token.text)}"${title}>`
+      return `<img src="${escapeHtml(clean(token.href))}" alt="${escapeHtml(token.text)}"${title}>`
     },
   },
 })
