@@ -2,7 +2,13 @@ import type { Answers } from '@sage-burner/shared'
 import type { SQL } from 'drizzle-orm'
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core'
 
-import { accountRoles, applicationStatuses, formQuestionTypes, paymentStatuses } from '@sage-burner/shared'
+import {
+  accountRoles,
+  applicationStatuses,
+  formQuestionTypes,
+  paymentStatuses,
+  tickBoxRequired,
+} from '@sage-burner/shared'
 import { sql } from 'drizzle-orm'
 import { check, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
@@ -37,6 +43,36 @@ const oneOf = (column: SQLiteColumn, values: readonly string[]): SQL => {
   const literals = values.map((value) => `'${value.replaceAll("'", "''")}'`).join(', ')
   return sql`${column} in (${sql.raw(literals)})`
 }
+
+/**
+ * `CHECK`s for the tick-box rule, generated from `tickBoxRequired` rather than
+ * spelled out again in SQL.
+ *
+ * The rule is that `agreement` must be required and `checkbox` must not. Writing
+ * it here by hand would leave the database as the one enforcement site that does
+ * *not* derive from the shared function — so adding a fifth type with a fixed
+ * `required` would be enforced by the schema, the `UPDATE` and the editor, and
+ * silently not by the database, which is the exact gap the API-level version of
+ * this rule already fell into once.
+ *
+ * `sql.raw` for the same reason as `oneOf`: a bound parameter is meaningless DDL.
+ * The values come from our own vocabulary, and the quote-doubling keeps that from
+ * being load-bearing.
+ */
+const tickBoxChecks = (table: { type: SQLiteColumn; required: SQLiteColumn }) =>
+  formQuestionTypes.flatMap((type) => {
+    const must = tickBoxRequired(type)
+    if (must === undefined) return []
+
+    const literal = `'${type.replaceAll("'", "''")}'`
+
+    return [
+      check(
+        `form_question_${type}_required_check`,
+        sql`${table.type} <> ${sql.raw(literal)} or ${table.required} = ${sql.raw(must ? '1' : '0')}`,
+      ),
+    ]
+  })
 
 /**
  * Database schema.
@@ -79,18 +115,20 @@ export const event = sqliteTable(
 )
 
 /**
- * One question on an event's application form.
+ * The application form's questions — **one central set**, not one per event.
  *
  * Rows, not code: organisers retune these between burns, so adding, editing or
  * reordering a question must never require a redeploy.
+ *
+ * Someone applies to join the community once, the way they would be admitted to a
+ * Discord server; coming to a particular burn is a separate act afterwards. An
+ * `event_id` here would have made the same person answer the same questions again
+ * for every burn, and made "the questions" ambiguous the moment two events existed.
  */
 export const formQuestion = sqliteTable(
   'form_question',
   {
     id: text('id').notNull(),
-    event_id: text('event_id')
-      .notNull()
-      .references(() => event.id, { onDelete: 'cascade' }),
     // Not unique: reordering swaps positions, and a transient collision
     // mid-swap must not be rejected by the database.
     order: integer('order').notNull(),
@@ -103,11 +141,18 @@ export const formQuestion = sqliteTable(
   },
   (table) => [
     primaryKey({ columns: [table.id] }),
-    index('form_question_event_order_idx').on(table.event_id, table.order),
+    index('form_question_order_idx').on(table.order),
     check('form_question_type_check', oneOf(table.type, formQuestionTypes)),
     check('form_question_order_check', sql`${table.order} >= 0`),
     // SQLite has no boolean type, so without this the column accepts 7.
     check('form_question_required_check', sql`${table.required} in (0, 1)`),
+    // `required` is not a free choice for the two tick-box types, and the rule is
+    // here rather than only in the API: `required` has `.default(false)`, so an
+    // insert that simply omits it — a migration, a manual fix, a backfill —
+    // produces the contradictory row without ever touching a Zod schema. Same
+    // argument as `oneOf` above, and generated the same way so the database is not
+    // the one enforcement site holding its own copy of the rule.
+    ...tickBoxChecks(table),
   ],
 )
 

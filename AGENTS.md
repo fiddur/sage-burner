@@ -33,12 +33,25 @@ One Node process serves everything in production.
 type definitions. All layers import from it — never duplicate a schema.
 
 - Backend imports the **schemas** (runtime validation at the HTTP boundary).
-- Web imports **types only** — no runtime Zod in the browser bundle.
+- Web imports **no Zod**. Types always; runtime values only from modules that do
+  not pull Zod in — today `enums.ts`, which imports nothing and holds the
+  vocabularies plus `tickBoxRequired`. Nothing under `schemas/`.
 - Field names are `snake_case` everywhere: schemas, REST API, DB columns, JSON
   keys, frontend types.
 
 This is aurboda's `api-spec` idea without the OpenAPI/Kotlin generation — we
 have no third client and no public API contract to publish.
+
+The package sets `"sideEffects": false`, and that is load-bearing rather than
+tidiness. `index.ts` is `export *` over eleven modules, so importing any runtime
+value goes through a barrel whose schema modules evaluate `z.object(…)` at module
+scope; without the flag Rollup must assume those are side effects and keeps them,
+pulling Zod into the main chunk — which is not code-split, so it reaches the
+public homepage. Measured on the `apps/web` bundle: 150,493 bytes with Zod
+against 79,826 without. Both halves are needed — moving a value out of a schema
+module without the flag, or the flag while the value stays put, each still ships
+Zod. Verify with `pnpm --filter sage-burner-web build` and grep the bundle, not
+by reading Rollup's docs.
 
 ## Data model rules
 
@@ -72,6 +85,39 @@ have no third client and no public API contract to publish.
   clear dependency injection.
 - The backend should be well covered.
 - Always run tests non-watch (`pnpm test`, `pnpm check`) so no process hangs.
+
+### Claims must be executed, not reasoned about
+
+Roughly seventy review threads across #73 and #74 were one failure repeating:
+**behaviour changes, and its description somewhere else goes one step stale.**
+These are the habits that would have caught nearly all of them.
+
+- **Never write a claim you have not run.** Any "this catches X", "without this,
+  Y", or "the failure mode is Z" gets the mutation applied and the suite run
+  _before_ the sentence is written. This caught a test that passed against the
+  very implementation it existed to reject, and stopped an overstated claim about
+  what a boundary test covers. A failure mode described from memory has been
+  wrong more often than right here — including twice in the same direction.
+- **A rejecting test needs a passing sibling.** Two real defects hid behind this:
+  the `start_date` branch and the both-dates branch of `dateOrderCondition` each
+  had a test proving refusal and none proving success. Refusal cases are easier
+  to think of, so the success path is where the gap lands.
+- **After changing behaviour, grep for its own vocabulary** — the function names,
+  status codes and terms the old design used. Prose at a distance does not fail
+  to compile, and a comment naming the wrong thing is worse than none because the
+  next reader trusts it. This turned up a second stale reference twice.
+- **Prefer deleting the thing that needs syncing over syncing it.** Every durable
+  fix in those PRs was this shape: one `tickBoxRequired` replacing the same rule
+  written out in four places; `.returning()` removing the `changes` coupling and
+  the three comments describing it; scoping a pre-read removing a stub duplicated
+  across three tests. If a comment has to keep being corrected, the code is
+  telling you something.
+- **Comments must not reference branch state.** "this branch", "two commits ago",
+  or a symbol the PR deletes all dangle after the squash merge. Write what is true
+  of the merged tree.
+- **Gate the push on `pnpm check`, not on an `echo` beside it.** Two commits went
+  out red from exactly that shell mistake:
+  `if pnpm check >/dev/null 2>&1; then git push …; else echo "refusing"; fi`.
 
 ## Security expectations
 

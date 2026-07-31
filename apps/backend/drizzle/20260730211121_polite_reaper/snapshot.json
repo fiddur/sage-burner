@@ -1,0 +1,1135 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "id": "be9bb10c-8721-4a88-8e8e-80d24e8c405c",
+  "prevIds": ["ce8fec22-888e-4430-a086-e43900d240dd"],
+  "ddl": [
+    {
+      "name": "account",
+      "entityType": "tables"
+    },
+    {
+      "name": "account_role",
+      "entityType": "tables"
+    },
+    {
+      "name": "application",
+      "entityType": "tables"
+    },
+    {
+      "name": "event",
+      "entityType": "tables"
+    },
+    {
+      "name": "form_question",
+      "entityType": "tables"
+    },
+    {
+      "name": "invite_token",
+      "entityType": "tables"
+    },
+    {
+      "name": "member",
+      "entityType": "tables"
+    },
+    {
+      "name": "passkey",
+      "entityType": "tables"
+    },
+    {
+      "name": "session",
+      "entityType": "tables"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "account"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "email",
+      "entityType": "columns",
+      "table": "account"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "password_hash",
+      "entityType": "columns",
+      "table": "account"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "table": "account"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "account_id",
+      "entityType": "columns",
+      "table": "account_role"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "role",
+      "entityType": "columns",
+      "table": "account_role"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "application"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "event_id",
+      "entityType": "columns",
+      "table": "application"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "answers",
+      "entityType": "columns",
+      "table": "application"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'pending'",
+      "generated": null,
+      "name": "status",
+      "entityType": "columns",
+      "table": "application"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "applicant_name",
+      "entityType": "columns",
+      "table": "application"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "applicant_contact",
+      "entityType": "columns",
+      "table": "application"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "submitted_at",
+      "entityType": "columns",
+      "table": "application"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "decided_at",
+      "entityType": "columns",
+      "table": "application"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "event"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "name",
+      "entityType": "columns",
+      "table": "event"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "slug",
+      "entityType": "columns",
+      "table": "event"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "start_date",
+      "entityType": "columns",
+      "table": "event"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "end_date",
+      "entityType": "columns",
+      "table": "event"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "''",
+      "generated": null,
+      "name": "welcome_markdown",
+      "entityType": "columns",
+      "table": "event"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "member_cap",
+      "entityType": "columns",
+      "table": "event"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "table": "event"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "form_question"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "order",
+      "entityType": "columns",
+      "table": "form_question"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "type",
+      "entityType": "columns",
+      "table": "form_question"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "label",
+      "entityType": "columns",
+      "table": "form_question"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "help_text",
+      "entityType": "columns",
+      "table": "form_question"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "name": "required",
+      "entityType": "columns",
+      "table": "form_question"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "options",
+      "entityType": "columns",
+      "table": "form_question"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "invite_token"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "token_hash",
+      "entityType": "columns",
+      "table": "invite_token"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "event_id",
+      "entityType": "columns",
+      "table": "invite_token"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "application_id",
+      "entityType": "columns",
+      "table": "invite_token"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "expires_at",
+      "entityType": "columns",
+      "table": "invite_token"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "used_at",
+      "entityType": "columns",
+      "table": "invite_token"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "created_by",
+      "entityType": "columns",
+      "table": "invite_token"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "member"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "event_id",
+      "entityType": "columns",
+      "table": "member"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "account_id",
+      "entityType": "columns",
+      "table": "member"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "name",
+      "entityType": "columns",
+      "table": "member"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "contact",
+      "entityType": "columns",
+      "table": "member"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "allergies_notes",
+      "entityType": "columns",
+      "table": "member"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "arrival_date",
+      "entityType": "columns",
+      "table": "member"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "departure_date",
+      "entityType": "columns",
+      "table": "member"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "lodging",
+      "entityType": "columns",
+      "table": "member"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "shift_preference",
+      "entityType": "columns",
+      "table": "member"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "notes",
+      "entityType": "columns",
+      "table": "member"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'unpaid'",
+      "generated": null,
+      "name": "payment_status",
+      "entityType": "columns",
+      "table": "member"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "payment_date",
+      "entityType": "columns",
+      "table": "member"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "invite_token_id",
+      "entityType": "columns",
+      "table": "member"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "passkey"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "account_id",
+      "entityType": "columns",
+      "table": "passkey"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "credential_id",
+      "entityType": "columns",
+      "table": "passkey"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "public_key",
+      "entityType": "columns",
+      "table": "passkey"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "name": "counter",
+      "entityType": "columns",
+      "table": "passkey"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "table": "passkey"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "session"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "event_id",
+      "entityType": "columns",
+      "table": "session"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "title",
+      "entityType": "columns",
+      "table": "session"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "host_member_id",
+      "entityType": "columns",
+      "table": "session"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "''",
+      "generated": null,
+      "name": "description",
+      "entityType": "columns",
+      "table": "session"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "time_slot_start",
+      "entityType": "columns",
+      "table": "session"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "time_slot_end",
+      "entityType": "columns",
+      "table": "session"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "location",
+      "entityType": "columns",
+      "table": "session"
+    },
+    {
+      "columns": ["account_id"],
+      "tableTo": "account",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "name": "fk_account_role_account_id_account_id_fk",
+      "entityType": "fks",
+      "table": "account_role"
+    },
+    {
+      "columns": ["event_id"],
+      "tableTo": "event",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "name": "fk_application_event_id_event_id_fk",
+      "entityType": "fks",
+      "table": "application"
+    },
+    {
+      "columns": ["event_id"],
+      "tableTo": "event",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "name": "fk_invite_token_event_id_event_id_fk",
+      "entityType": "fks",
+      "table": "invite_token"
+    },
+    {
+      "columns": ["application_id"],
+      "tableTo": "application",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "nameExplicit": false,
+      "name": "fk_invite_token_application_id_application_id_fk",
+      "entityType": "fks",
+      "table": "invite_token"
+    },
+    {
+      "columns": ["created_by"],
+      "tableTo": "account",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "name": "fk_invite_token_created_by_account_id_fk",
+      "entityType": "fks",
+      "table": "invite_token"
+    },
+    {
+      "columns": ["event_id"],
+      "tableTo": "event",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "name": "fk_member_event_id_event_id_fk",
+      "entityType": "fks",
+      "table": "member"
+    },
+    {
+      "columns": ["account_id"],
+      "tableTo": "account",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "name": "fk_member_account_id_account_id_fk",
+      "entityType": "fks",
+      "table": "member"
+    },
+    {
+      "columns": ["invite_token_id"],
+      "tableTo": "invite_token",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "name": "fk_member_invite_token_id_invite_token_id_fk",
+      "entityType": "fks",
+      "table": "member"
+    },
+    {
+      "columns": ["account_id"],
+      "tableTo": "account",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "name": "fk_passkey_account_id_account_id_fk",
+      "entityType": "fks",
+      "table": "passkey"
+    },
+    {
+      "columns": ["event_id"],
+      "tableTo": "event",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "name": "fk_session_event_id_event_id_fk",
+      "entityType": "fks",
+      "table": "session"
+    },
+    {
+      "columns": ["host_member_id"],
+      "tableTo": "member",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "name": "fk_session_host_member_id_member_id_fk",
+      "entityType": "fks",
+      "table": "session"
+    },
+    {
+      "columns": ["id"],
+      "nameExplicit": false,
+      "name": "account_pk",
+      "entityType": "pks",
+      "table": "account"
+    },
+    {
+      "columns": ["account_id", "role"],
+      "nameExplicit": false,
+      "name": "account_role_pk",
+      "entityType": "pks",
+      "table": "account_role"
+    },
+    {
+      "columns": ["id"],
+      "nameExplicit": false,
+      "name": "application_pk",
+      "entityType": "pks",
+      "table": "application"
+    },
+    {
+      "columns": ["id"],
+      "nameExplicit": false,
+      "name": "event_pk",
+      "entityType": "pks",
+      "table": "event"
+    },
+    {
+      "columns": ["id"],
+      "nameExplicit": false,
+      "name": "form_question_pk",
+      "entityType": "pks",
+      "table": "form_question"
+    },
+    {
+      "columns": ["id"],
+      "nameExplicit": false,
+      "name": "invite_token_pk",
+      "entityType": "pks",
+      "table": "invite_token"
+    },
+    {
+      "columns": ["id"],
+      "nameExplicit": false,
+      "name": "member_pk",
+      "entityType": "pks",
+      "table": "member"
+    },
+    {
+      "columns": ["id"],
+      "nameExplicit": false,
+      "name": "passkey_pk",
+      "entityType": "pks",
+      "table": "passkey"
+    },
+    {
+      "columns": ["id"],
+      "nameExplicit": false,
+      "name": "session_pk",
+      "entityType": "pks",
+      "table": "session"
+    },
+    {
+      "columns": [
+        {
+          "value": "event_id",
+          "isExpression": false
+        },
+        {
+          "value": "status",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "application_event_status_idx",
+      "entityType": "indexes",
+      "table": "application"
+    },
+    {
+      "columns": [
+        {
+          "value": "order",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "form_question_order_idx",
+      "entityType": "indexes",
+      "table": "form_question"
+    },
+    {
+      "columns": [
+        {
+          "value": "event_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "invite_token_event_idx",
+      "entityType": "indexes",
+      "table": "invite_token"
+    },
+    {
+      "columns": [
+        {
+          "value": "application_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "\"invite_token\".\"application_id\" is not null",
+      "origin": "manual",
+      "name": "invite_token_application_idx",
+      "entityType": "indexes",
+      "table": "invite_token"
+    },
+    {
+      "columns": [
+        {
+          "value": "event_id",
+          "isExpression": false
+        },
+        {
+          "value": "account_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "member_event_account_idx",
+      "entityType": "indexes",
+      "table": "member"
+    },
+    {
+      "columns": [
+        {
+          "value": "invite_token_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "member_invite_token_idx",
+      "entityType": "indexes",
+      "table": "member"
+    },
+    {
+      "columns": [
+        {
+          "value": "account_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "passkey_account_idx",
+      "entityType": "indexes",
+      "table": "passkey"
+    },
+    {
+      "columns": [
+        {
+          "value": "event_id",
+          "isExpression": false
+        },
+        {
+          "value": "time_slot_start",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "session_event_slot_idx",
+      "entityType": "indexes",
+      "table": "session"
+    },
+    {
+      "columns": ["email"],
+      "nameExplicit": false,
+      "name": "account_email_unique",
+      "entityType": "uniques",
+      "table": "account"
+    },
+    {
+      "columns": ["slug"],
+      "nameExplicit": false,
+      "name": "event_slug_unique",
+      "entityType": "uniques",
+      "table": "event"
+    },
+    {
+      "columns": ["token_hash"],
+      "nameExplicit": false,
+      "name": "invite_token_token_hash_unique",
+      "entityType": "uniques",
+      "table": "invite_token"
+    },
+    {
+      "columns": ["credential_id"],
+      "nameExplicit": false,
+      "name": "passkey_credential_id_unique",
+      "entityType": "uniques",
+      "table": "passkey"
+    },
+    {
+      "value": "\"email\" = lower(\"email\")",
+      "name": "account_email_lowercase_check",
+      "entityType": "checks",
+      "table": "account"
+    },
+    {
+      "value": "\"role\" in ('admin', 'member')",
+      "name": "account_role_check",
+      "entityType": "checks",
+      "table": "account_role"
+    },
+    {
+      "value": "\"status\" in ('pending', 'approved', 'rejected')",
+      "name": "application_status_check",
+      "entityType": "checks",
+      "table": "application"
+    },
+    {
+      "value": "\"start_date\" is null or \"start_date\" glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'",
+      "name": "event_start_date_check",
+      "entityType": "checks",
+      "table": "event"
+    },
+    {
+      "value": "\"end_date\" is null or \"end_date\" glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'",
+      "name": "event_end_date_check",
+      "entityType": "checks",
+      "table": "event"
+    },
+    {
+      "value": "\"end_date\" >= \"start_date\"",
+      "name": "event_date_order_check",
+      "entityType": "checks",
+      "table": "event"
+    },
+    {
+      "value": "\"member_cap\" > 0",
+      "name": "event_member_cap_check",
+      "entityType": "checks",
+      "table": "event"
+    },
+    {
+      "value": "\"type\" in ('text', 'textarea', 'checkbox', 'agreement')",
+      "name": "form_question_type_check",
+      "entityType": "checks",
+      "table": "form_question"
+    },
+    {
+      "value": "\"order\" >= 0",
+      "name": "form_question_order_check",
+      "entityType": "checks",
+      "table": "form_question"
+    },
+    {
+      "value": "\"required\" in (0, 1)",
+      "name": "form_question_required_check",
+      "entityType": "checks",
+      "table": "form_question"
+    },
+    {
+      "value": "\"type\" <> 'checkbox' or \"required\" = 0",
+      "name": "form_question_checkbox_required_check",
+      "entityType": "checks",
+      "table": "form_question"
+    },
+    {
+      "value": "\"type\" <> 'agreement' or \"required\" = 1",
+      "name": "form_question_agreement_required_check",
+      "entityType": "checks",
+      "table": "form_question"
+    },
+    {
+      "value": "\"arrival_date\" is null or \"arrival_date\" glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'",
+      "name": "member_arrival_date_check",
+      "entityType": "checks",
+      "table": "member"
+    },
+    {
+      "value": "\"departure_date\" is null or \"departure_date\" glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'",
+      "name": "member_departure_date_check",
+      "entityType": "checks",
+      "table": "member"
+    },
+    {
+      "value": "\"payment_date\" is null or \"payment_date\" glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'",
+      "name": "member_payment_date_check",
+      "entityType": "checks",
+      "table": "member"
+    },
+    {
+      "value": "\"arrival_date\" is null or \"departure_date\" is null\n          or \"departure_date\" >= \"arrival_date\"",
+      "name": "member_stay_order_check",
+      "entityType": "checks",
+      "table": "member"
+    },
+    {
+      "value": "\"payment_status\" in ('unpaid', 'partial', 'paid')",
+      "name": "member_payment_status_check",
+      "entityType": "checks",
+      "table": "member"
+    },
+    {
+      "value": "\"counter\" >= 0",
+      "name": "passkey_counter_check",
+      "entityType": "checks",
+      "table": "passkey"
+    },
+    {
+      "value": "(\"time_slot_start\" is null) = (\"time_slot_end\" is null)",
+      "name": "session_slot_whole_check",
+      "entityType": "checks",
+      "table": "session"
+    }
+  ],
+  "renames": []
+}

@@ -91,6 +91,9 @@ export const Admin = ({ api }: { api: Pick<ApiClient, 'getAdminAccounts'> }) => 
       <p>
         <a href="/admin/events">Events and welcome text</a>
       </p>
+      <p>
+        <a href="/admin/questions">Application questions</a>
+      </p>
 
       <h2>Accounts</h2>
 

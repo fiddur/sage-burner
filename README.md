@@ -655,6 +655,70 @@ two causes of a failed write are told apart by re-reading the row afterwards rat
 than inferred from the request, so a well-ordered date move against an event someone
 else has just deleted does not come back as "check the dates".
 
+### The application form's questions
+
+`form_question` rows, never code — and **one central set**, not one per burn.
+Someone applies to join the community once, the way they would be let into the
+Discord server; attending a particular burn is a separate act afterwards (#76).
+Organisers retune the questions between burns, so adding, editing, reordering or
+removing one must never need a redeploy, and the web app renders whatever it is
+handed rather than knowing the questions.
+
+Organise → **Application questions**. Types in v1: short text, long text,
+checkbox, and _agreement_ — a checkbox that must be ticked to submit.
+
+Two rules that are the server's, not the browser's:
+
+- **`order` is assigned by the server.** A new question goes last; a client
+  cannot pick a position. Two organisers adding at once would otherwise collide
+  over a number neither of them chose, so the read and the insert run in one
+  transaction.
+- **Reordering sends the complete list of ids**, in the order wanted, and a
+  partial list is rejected with 400. Moving one question renumbers several, so a
+  request naming only some of them would leave the rest on stale positions — an
+  order nobody chose. The renumbering runs in a transaction for the same reason.
+
+`GET /api/questions` is public — the application form is public, so its questions
+are — and `no-cache`, so a question added a moment ago is not hidden behind a
+stale response. Every write is admin-only.
+
+**`required` is decided by the type for the two tick-box kinds, not chosen.**
+
+- An **`agreement`** is always required. The type exists because submission is
+  blocked when it is unticked, so `{ type: 'agreement', required: false }`
+  contradicts itself.
+- A **`checkbox`** is never required. It always has an answer — `false` is one —
+  so "must be present" is vacuous, and the only other reading of a required
+  checkbox is "must be ticked", which is what `agreement` already means. Two
+  spellings of one rule is the ambiguity, so the second is refused.
+
+The API rejects both combinations, on create and on any PATCH that would produce
+one — including a PATCH naming only `type` or only `required`. The schema cannot
+decide a lone key, so that case is settled **inside the `UPDATE` statement**
+rather than by re-reading the row and checking in JavaScript: a check either side
+of an `await` is check-then-act, and two concurrent patches could each pass their
+own before either wrote.
+`db/schema.ts` carries a CHECK for each, because `required` has `.default(false)`
+and an insert that omits it never touches a Zod schema. The editor disables the
+control with a note rather than letting a tick become a 400.
+
+All four places derive from one function, `tickBoxRequired`, rather than restating
+it — including the database, whose CHECKs are generated from the vocabulary the
+same way the type constraint is. Written out separately the copies drifted within
+the hour: the handler covered `agreement` and not `checkbox`, and the gap surfaced
+as a 500 from the CHECK instead of a 400. Generating the SQL matters for the same
+reason it mattered in the API — a fifth type with a fixed `required` would
+otherwise be enforced everywhere except the one place that is supposed to hold
+when nothing else does.
+
+`options` exists as a JSON column for future select/radio types and is not yet
+consumed by any type. Both it and `help_text` are optional in a create body —
+`.nullable()` does not make a key optional, so omitting them used to be a bare
+`bad_request` naming no field. `required` is enforced server-side on submission,
+which is [#14]'s half of the work.
+
+[#14]: https://github.com/fiddur/sage-burner/issues/14
+
 ### Markdown is escaped, not filtered
 
 `welcome_markdown` is admin-authored and rendered to every public visitor, so it

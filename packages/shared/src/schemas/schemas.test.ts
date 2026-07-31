@@ -66,7 +66,6 @@ describe('eventSchema', () => {
 describe('formQuestionSchema', () => {
   const aQuestion = {
     id: ID,
-    event_id: OTHER_ID,
     order: 0,
     type: 'agreement',
     label: 'I agree to the 10+1 principles',

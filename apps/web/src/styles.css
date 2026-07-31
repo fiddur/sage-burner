@@ -224,6 +224,49 @@ a:hover {
   height: auto;
 }
 
+/* Selects were unstyled next to the inputs beside them. */
+.field select {
+  padding: 0.55rem 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--sage) 40%, transparent);
+  border-radius: var(--radius);
+  background: var(--paper);
+  font: inherit;
+}
+
+/* A checkbox and its label read as one line, unlike the stacked `.field`. */
+.field-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* The question builder, on its own admin page. */
+.questions {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid color-mix(in srgb, var(--sage) 25%, transparent);
+}
+
+.question-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-left: 1.25rem;
+}
+
+.question-label {
+  font-weight: 600;
+}
+
+.question-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--sage) 30%, transparent);
+  border-radius: var(--radius);
+}
+
 /* A control, not a link — it performs an action rather than navigating —
    styled to sit with the nav links beside it. */
 .link-button {

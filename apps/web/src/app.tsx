@@ -8,6 +8,7 @@ import { createApiClient } from './api/client.ts'
 import { Layout } from './components/Layout.tsx'
 import { Admin } from './pages/Admin.tsx'
 import { AdminEvents } from './pages/AdminEvents.tsx'
+import { AdminQuestions } from './pages/AdminQuestions.tsx'
 import { Home } from './pages/Home.tsx'
 import { Login } from './pages/Login.tsx'
 import { NotFound } from './pages/NotFound.tsx'
@@ -29,6 +30,11 @@ export type AppApi = Pick<
   | 'login'
   | 'logout'
   | 'updateEvent'
+  | 'addQuestion'
+  | 'deleteQuestion'
+  | 'getQuestions'
+  | 'reorderQuestions'
+  | 'updateQuestion'
 >
 
 /**
@@ -45,7 +51,17 @@ export const Routes = ({
 }: {
   api: Pick<
     ApiClient,
-    'createEvent' | 'getActiveEvent' | 'getAdminAccounts' | 'getEvents' | 'login' | 'updateEvent'
+    | 'addQuestion'
+    | 'createEvent'
+    | 'deleteQuestion'
+    | 'getActiveEvent'
+    | 'getAdminAccounts'
+    | 'getEvents'
+    | 'getQuestions'
+    | 'login'
+    | 'reorderQuestions'
+    | 'updateEvent'
+    | 'updateQuestion'
   >
 }) => {
   // Memoised because `component` is compared by identity: a fresh arrow each
@@ -64,6 +80,7 @@ export const Routes = ({
   const LoginRoute = useMemo(() => () => <Login api={api} />, [api])
   const AdminRoute = useMemo(() => () => <Admin api={api} />, [api])
   const AdminEventsRoute = useMemo(() => () => <AdminEvents api={api} />, [api])
+  const AdminQuestionsRoute = useMemo(() => () => <AdminQuestions api={api} />, [api])
   const HomeRoute = useMemo(() => () => <Home api={api} />, [api])
 
   return (
@@ -72,6 +89,7 @@ export const Routes = ({
       <Route path="/login" component={LoginRoute} />
       <Route path="/admin" component={AdminRoute} />
       <Route path="/admin/events" component={AdminEventsRoute} />
+      <Route path="/admin/questions" component={AdminQuestionsRoute} />
       <Route default component={NotFound} />
     </Router>
   )

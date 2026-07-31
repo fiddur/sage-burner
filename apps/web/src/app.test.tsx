@@ -13,8 +13,18 @@ import { App } from './app.tsx'
  * This was `as unknown as ApiClient`, which is the double cast the standards
  * are aimed at: through `unknown` the object stops being checked against the
  * type at all, so it would have survived `App` calling a method the stub does
- * not have. The two unused entries reject rather than resolve, so a test that
- * comes to depend on them fails loudly instead of quietly seeing a null viewer.
+ * not have.
+ *
+ * Every entry rejects except `getActiveEvent`, so a test that comes to depend on
+ * one fails loudly instead of quietly reading an empty result and asserting
+ * against it. `getActiveEvent` is the single exception because `Home` fetches it
+ * on mount, so it is called by every `renderAt` here — rejecting would drive
+ * `Home`'s failure branch through the whole routing suite, which is not what
+ * those tests are about.
+ *
+ * The exception is meant to stay a single one: a stub added for a route this
+ * file never visits should reject, or the first test that does visit it gets an
+ * empty screen instead of the failure this convention exists to produce.
  */
 const clientWith = (
   logout: AppApi['logout'] = () => Promise.reject(new Error('logout is not stubbed in this file')),
@@ -23,6 +33,11 @@ const clientWith = (
   getMe: () => Promise.reject(new Error('getMe is not stubbed in this file')),
   login: () => Promise.reject(new Error('login is not stubbed in this file')),
   getAdminAccounts: () => Promise.reject(new Error('getAdminAccounts is not stubbed in this file')),
+  getQuestions: () => Promise.reject(new Error('getQuestions is not stubbed in this file')),
+  addQuestion: () => Promise.reject(new Error('addQuestion is not stubbed in this file')),
+  updateQuestion: () => Promise.reject(new Error('updateQuestion is not stubbed in this file')),
+  deleteQuestion: () => Promise.reject(new Error('deleteQuestion is not stubbed in this file')),
+  reorderQuestions: () => Promise.reject(new Error('reorderQuestions is not stubbed in this file')),
   getEvents: () => Promise.reject(new Error('getEvents is not stubbed in this file')),
   createEvent: () => Promise.reject(new Error('createEvent is not stubbed in this file')),
   updateEvent: () => Promise.reject(new Error('updateEvent is not stubbed in this file')),

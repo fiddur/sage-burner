@@ -16,6 +16,7 @@ import { clientErrorHandler, frameworkErrorHandler, registerErrorHandler } from 
 import { registerAdminRoutes } from './routes/admin.ts'
 import { registerAuthRoutes } from './routes/auth.ts'
 import { registerEventRoutes } from './routes/events.ts'
+import { registerQuestionRoutes } from './routes/questions.ts'
 import { registerVersionRoutes } from './routes/version.ts'
 
 export interface AppDeps {
@@ -299,6 +300,7 @@ export const createApp = async ({
   registerAuthRoutes(app, { db, config, sessions })
   registerAdminRoutes(app, { db, sessions })
   registerEventRoutes(app, { db, sessions, now })
+  registerQuestionRoutes(app, { db, sessions })
 
   const webRoot = config.web_root
   const servesWebApp = webRoot !== undefined
