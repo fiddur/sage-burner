@@ -109,20 +109,22 @@ describe('Apply', () => {
           getQuestions: () =>
             Promise.resolve({
               questions: [
-                question({ id: 'q-1', type: 'text', label: 'First', order: 0 }),
                 question({ id: 'q-2', type: 'text', label: 'Second', order: 1 }),
+                question({ id: 'q-1', type: 'text', label: 'First', order: 0 }),
               ],
             }),
         })}
       />,
     )
 
-    await screen.findByLabelText('First')
+    // Arrival order deliberately contradicts `order`: a fixture where the two
+    // agree cannot tell a re-added client sort from leaving the list alone.
+    await screen.findByLabelText('Second')
     expect(screen.getAllByRole('textbox').map((field) => field.getAttribute('name'))).toEqual([
       'applicant_name',
       'applicant_contact',
-      'q-1',
       'q-2',
+      'q-1',
     ])
   })
 
