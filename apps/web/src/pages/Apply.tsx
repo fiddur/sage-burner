@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
+import { renderMarkdown } from '../markdown.ts'
 
 /**
  * The public application form.
@@ -276,9 +277,14 @@ export const Apply = ({ api }: ApplyProps) => {
               </label>
 
               {question.help_text !== null && (
-                <p class="form-note" id={helpId}>
-                  {question.help_text}
-                </p>
+                // A div, not a p: markdown renders block content, and a list
+                // inside a paragraph is invalid HTML the browser silently
+                // reshapes. Escaped rather than filtered — see `markdown.ts`.
+                <div
+                  class="form-note markdown-preview"
+                  id={helpId}
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(question.help_text) }}
+                />
               )}
 
               {problem !== undefined && (
