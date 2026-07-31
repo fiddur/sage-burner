@@ -10,9 +10,11 @@ import type {
   InviteState,
   AttendanceUpdate,
   MyAttendanceResponse,
+  PaymentUpdate,
   ProfileResponse,
   ProfileUpdate,
   RedeemRequest,
+  RosterResponse,
   ActiveEventResponse,
   AdminAccountsResponse,
   EventCreateInput,
@@ -231,6 +233,21 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
      */
     updateMyStay: (body: AttendanceUpdate) =>
       request<{ attendance: Attendance }>('/events/active/attendance', { method: 'PATCH', body }),
+
+    /** Admin only. Ordered paid-first then by joining, with `waiting` derived. */
+    getRoster: (eventId: string, signal?: AbortSignal) =>
+      request<RosterResponse>(`/admin/events/${encodeURIComponent(eventId)}/roster`, { signal }),
+
+    /** Admin only. The open burn's roster; `event` is null when none is open. */
+    getActiveRoster: (signal?: AbortSignal) =>
+      request<RosterResponse>('/admin/events/active/roster', { signal }),
+
+    /** Admin only. Payment and payment date; nothing else on the row. */
+    setPayment: (eventId: string, accountId: string, body: PaymentUpdate) =>
+      request<{ attendance: Attendance }>(
+        `/admin/events/${encodeURIComponent(eventId)}/attendance/${encodeURIComponent(accountId)}/payment`,
+        { method: 'PATCH', body },
+      ),
 
     /** Admin only. */
     getApplications: (signal?: AbortSignal) =>

@@ -23,6 +23,7 @@ import { registerInviteRoutes } from './routes/invites.ts'
 import { registerProfileRoutes } from './routes/profile.ts'
 import { registerQuestionRoutes } from './routes/questions.ts'
 import { registerRedemptionRoutes } from './routes/redemption.ts'
+import { registerRosterRoutes } from './routes/roster.ts'
 import { registerVersionRoutes } from './routes/version.ts'
 
 export interface AppDeps {
@@ -313,6 +314,7 @@ export const createApp = async ({
   registerRedemptionRoutes(app, { db, config, sessions, now })
   registerAttendanceRoutes(app, { db, sessions, now })
   registerProfileRoutes(app, { db, sessions, now })
+  registerRosterRoutes(app, { db, sessions, now })
 
   const webRoot = config.web_root
   const servesWebApp = webRoot !== undefined

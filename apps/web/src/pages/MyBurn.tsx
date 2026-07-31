@@ -18,7 +18,6 @@ import { isMember, useViewer } from '../viewer.tsx'
  */
 const PAYMENT_NOTES: Record<PaymentStatus, string> = {
   unpaid: ', not yet paid.',
-  partial: ', and part of the fee is paid.',
   paid: ', and you have paid.',
 }
 

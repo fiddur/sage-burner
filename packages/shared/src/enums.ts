@@ -89,7 +89,14 @@ export const inviteStatusOf = (
   return Date.parse(invite.expires_at) <= now.getTime() ? 'expired' : 'outstanding'
 }
 
-/** Membership fee state, tracked per `attendance` — never globally per person. */
-export const paymentStatuses = ['unpaid', 'partial', 'paid'] as const
+/**
+ * Membership fee state, tracked per `attendance` — never globally per person.
+ *
+ * Two values, not three. A half-payment is chased out of band rather than
+ * modelled: `partial` was never set by anything, drove a database CHECK and a
+ * branch in the member's page, and an unreachable value that every consumer has
+ * to handle is the trap the error-code vocabulary already argues against.
+ */
+export const paymentStatuses = ['unpaid', 'paid'] as const
 export type PaymentStatus = (typeof paymentStatuses)[number]
 export const isPaymentStatus = (value: unknown): value is PaymentStatus => isOneOf(paymentStatuses, value)

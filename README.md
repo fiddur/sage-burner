@@ -1021,6 +1021,45 @@ into the `UPDATE ... WHERE` — the same shape and the same reason as
 `dateOrderCondition` in `events.ts` — so a concurrent write cannot slip between a
 read and a check.
 
+### Who is coming, and who has a place
+
+`/admin/roster` is the spreadsheet's Members tab. Person-level fields are joined
+in from `account` rather than copied, so an allergy corrected on someone's own
+profile page is corrected here in the same moment.
+
+**The order decides who gets a place:**
+
+> Paid first, then unpaid. Within each group, order of joining that burn. The
+> first `member_cap` entries have a place; everything below the line is waiting.
+
+The consequence is the point rather than a side effect: **paying moves you above
+every unpaid member**, regardless of who joined first — so an unpaid member can
+be pushed onto the waiting list by someone else paying, without doing anything
+themselves. That is what makes paying the thing that secures a place, and it is
+why recording a payment reloads the whole list rather than ticking one row.
+
+**The cut is derived, never stored.** A `waiting` flag would go stale the moment
+anyone paid, and the whole rule is that paying re-sorts the list. `withPlaces` in
+`packages/shared` computes it — placed there rather than in the route because
+#79's member-facing list has to give the same answer, and two pages telling
+someone different things about where they stand is worse than one of them being
+absent.
+
+Recording a payment writes `payment_status` and `payment_date` and **nothing
+else** — an organiser recording money received has no business rewriting an
+arrival date in the same request — and unmarking clears the date, so one never
+outlives the payment it recorded.
+
+**`partial` is gone from the payment vocabulary.** Two values, not three: a
+half-payment is chased out of band. It was never set by anything, drove a
+database CHECK and a branch in the member's page, and an unreachable value every
+consumer has to handle is the trap the error-code vocabulary already argues
+against.
+
+CSV export quotes every field unconditionally rather than only when needed.
+Allergies and notes are free text that will contain commas, quotes and newlines,
+and a rule applied some of the time is one that gets tested some of the time.
+
 ### Markdown is escaped, not filtered
 
 `welcome_markdown` is admin-authored and rendered to every public visitor, so it
