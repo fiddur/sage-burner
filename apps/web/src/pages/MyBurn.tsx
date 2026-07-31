@@ -1,4 +1,4 @@
-import type { MyAttendanceResponse } from '@sage-burner/shared'
+import type { MyAttendanceResponse, PaymentStatus } from '@sage-burner/shared'
 
 import { useEffect, useState } from 'preact/hooks'
 
@@ -6,6 +6,22 @@ import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
 import { isMember, useViewer } from '../viewer.tsx'
+
+/**
+ * Every status gets its own sentence.
+ *
+ * A `Record` rather than a conditional, so adding a fourth status is a
+ * type error here instead of quietly reading as one of the others — which is
+ * what `partial` did: it showed the same ", not yet paid." as having paid
+ * nothing.
+ */
+const PAYMENT_NOTES: Record<PaymentStatus, string> = {
+  unpaid: ', not yet paid.',
+  partial: ', and part of the fee is paid.',
+  paid: ', and you have paid.',
+}
+
+const paymentNote = (status: PaymentStatus) => PAYMENT_NOTES[status]
 
 export type MyBurnApi = Pick<ApiClient, 'getMyAttendance' | 'joinActiveEvent' | 'leaveActiveEvent'>
 
@@ -127,9 +143,7 @@ export const MyBurn = ({ api }: { api: MyBurnApi }) => {
             <>
               <p role="status">
                 You are on the list for {loaded.mine.event.name}
-                {loaded.mine.attendance.payment_status === 'paid'
-                  ? ', and you have paid.'
-                  : ', not yet paid.'}
+                {paymentNote(loaded.mine.attendance.payment_status)}
               </p>
               <p class="row">
                 <button

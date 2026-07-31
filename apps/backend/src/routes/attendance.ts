@@ -16,6 +16,18 @@ import { activeEvent, todayIso } from './events.ts'
 const isMissingReference = (error: unknown) =>
   error instanceof Error && /FOREIGN KEY constraint failed/i.test(error.message)
 
+/**
+ * The one-row-per-person-per-burn index, which is what makes joining idempotent.
+ *
+ * Exported because it is the only part of the race that is testable here:
+ * `inject` serialises two requests to the admin route, so that catch never fires
+ * under test even though two organisers clicking at once over HTTP will reach it.
+ * `attendance.test.ts` pins this predicate against a real violation instead, so
+ * at least the message it matches cannot drift unnoticed.
+ */
+export const isAlreadyJoined = (error: unknown) =>
+  error instanceof Error && /UNIQUE constraint failed: attendance\./i.test(error.message)
+
 export interface AttendanceDeps extends GuardDeps {
   now?: () => Date
 }
@@ -70,16 +82,27 @@ export const registerAttendanceRoutes = (
 
     // Idempotent: saying it twice is the same statement, not an error. A double
     // click, a retried request and a second tab all land here.
+    //
+    // The read is a shortcut, not the guarantee — two requests can both pass it
+    // before either writes. `attendance_event_account_idx` is what actually holds
+    // the invariant, so losing to it means someone else just said the same thing,
+    // which is the answer this route gives anyway.
     const existing = await joinedRow(found.id, viewer.account_id)
     if (existing !== undefined) return { attendance: existing }
 
-    await db.insert(attendance).values({
-      id: randomUUID(),
-      event_id: found.id,
-      account_id: viewer.account_id,
-      joined_at: now().toISOString(),
-      payment_status: 'unpaid',
-    })
+    try {
+      await db.insert(attendance).values({
+        id: randomUUID(),
+        event_id: found.id,
+        account_id: viewer.account_id,
+        joined_at: now().toISOString(),
+        payment_status: 'unpaid',
+      })
+    } catch (error) {
+      if (!isAlreadyJoined(error)) throw error
+
+      return { attendance: await joinedRow(found.id, viewer.account_id) }
+    }
 
     return reply.code(201).send({ attendance: await joinedRow(found.id, viewer.account_id) })
   })
@@ -139,10 +162,14 @@ export const registerAttendanceRoutes = (
       } catch (error) {
         // No pre-read for either id: the foreign keys already reject a missing
         // event or account, and asking first would be a second query that says
-        // the same thing. Narrowed to that failure so a real bug still surfaces
+        // the same thing. Narrowed to those failures so a real bug still surfaces
         // as a 500 rather than as a confident 404.
         if (isMissingReference(error)) return reply.code(404).send(errorResponse('not_found'))
-        throw error
+        // The same race the member route has, and one it shares with it: an
+        // organiser adding someone at the moment they add themselves.
+        if (!isAlreadyJoined(error)) throw error
+
+        return { attendance: await joinedRow(request.params.eventId, parsed.data.account_id) }
       }
 
       return reply

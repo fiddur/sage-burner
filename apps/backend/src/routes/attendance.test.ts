@@ -11,6 +11,7 @@ import { createSessions } from '../auth/session.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, accountRole, attendance, event } from '../db/schema.ts'
+import { isAlreadyJoined } from './attendance.ts'
 import { SESSION_COOKIE } from './auth.ts'
 
 /**
@@ -129,6 +130,44 @@ describe('a member saying they are coming', () => {
     expect(first.statusCode).toBe(201)
     expect(second.statusCode).toBe(200)
     expect(second.json().attendance.id).toBe(first.json().attendance.id)
+    expect(await db().select().from(attendance)).toHaveLength(1)
+  })
+
+  it('is still a no-op when the two requests are concurrent', async () => {
+    // The sequential test above passes even without a unique-constraint catch,
+    // because the first request has finished before the second reads. This is the
+    // case the comment in the route actually describes — a double click — and it
+    // is the one that reached the insert twice and answered 500.
+    const server = await build()
+    await givenEvent()
+    const member = await givenAccount(['member'])
+
+    const [first, second] = await Promise.all([join(server, member.cookie), join(server, member.cookie)])
+
+    expect([first.statusCode, second.statusCode].toSorted()).toEqual([200, 201])
+    expect(await db().select().from(attendance)).toHaveLength(1)
+  })
+
+  it('is a no-op for two concurrent organiser adds too', async () => {
+    // The admin route has the same check-then-insert, so it needs its own case:
+    // pairing it with a member's join does not reliably interleave, and passed
+    // whether or not the admin branch caught the violation.
+    const server = await build()
+    const eventId = await givenEvent()
+    const admin = await givenAccount(['admin'])
+    const member = await givenAccount(['member'])
+
+    const add = () =>
+      server.inject({
+        method: 'POST',
+        url: `/api/admin/events/${eventId}/attendance`,
+        headers: { cookie: admin.cookie },
+        payload: { account_id: member.id },
+      })
+
+    const [first, second] = await Promise.all([add(), add()])
+
+    expect([first.statusCode, second.statusCode].toSorted()).toEqual([200, 201])
     expect(await db().select().from(attendance)).toHaveLength(1)
   })
 
@@ -357,5 +396,41 @@ describe('one row per person per burn', () => {
     expect(response.statusCode).toBe(201)
     const rows = await db().select().from(attendance).where(eq(attendance.account_id, member.id))
     expect(rows.map((row) => row.event_id).toSorted()).toEqual([first, second].toSorted())
+  })
+})
+
+describe('isAlreadyJoined', () => {
+  it('matches what the database actually throws, not what I assumed it throws', async () => {
+    // The regex is the fragile part: an index rename or a driver change alters
+    // the message and the catch silently stops catching, turning a double click
+    // back into a 500. So the error comes from a real violation rather than a
+    // string literal.
+    await build()
+    const eventId = await givenEvent()
+    const member = await givenAccount(['member'])
+    const row = {
+      event_id: eventId,
+      account_id: member.id,
+      joined_at: NOW,
+      payment_status: 'unpaid' as const,
+    }
+    await db()
+      .insert(attendance)
+      .values({ id: randomUUID(), ...row })
+
+    const thrown = await db()
+      .insert(attendance)
+      .values({ id: randomUUID(), ...row })
+      .then(() => undefined)
+      .catch((error: unknown) => error)
+
+    expect(thrown).toBeInstanceOf(Error)
+    expect(isAlreadyJoined(thrown)).toBe(true)
+  })
+
+  it('does not match an unrelated failure', async () => {
+    expect(isAlreadyJoined(new Error('UNIQUE constraint failed: account.email'))).toBe(false)
+    expect(isAlreadyJoined(new Error('FOREIGN KEY constraint failed'))).toBe(false)
+    expect(isAlreadyJoined(undefined)).toBe(false)
   })
 })
