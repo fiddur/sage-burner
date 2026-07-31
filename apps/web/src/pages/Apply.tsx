@@ -89,6 +89,18 @@ export const Apply = ({ api }: ApplyProps) => {
     return () => controller.abort()
   }, [api])
 
+  // Once per load, not once per keystroke: `answer()` sets `answers`, so this
+  // component re-renders on every character typed, and the help text this exists
+  // to render is the longest thing on the form.
+  const helpHtml = useMemo(() => {
+    const byId = new Map<string, string>()
+    for (const question of questions ?? []) {
+      if (question.help_text !== null) byId.set(question.id, renderMarkdown(question.help_text))
+    }
+
+    return byId
+  }, [questions])
+
   const problemFor = useMemo(() => {
     const byId = new Map(problems.map((problem) => [problem.question_id, problem]))
 
@@ -222,7 +234,8 @@ export const Apply = ({ api }: ApplyProps) => {
 
         {questions?.map((question) => {
           const problem = problemFor(question.id)
-          const helpId = question.help_text === null ? undefined : `${question.id}-help`
+          const help = helpHtml.get(question.id)
+          const helpId = help === undefined ? undefined : `${question.id}-help`
           const errorId = problem === undefined ? undefined : `${question.id}-error`
           // Both, when both apply: announcing the error by replacing the
           // description would drop the explanation of how to answer.
@@ -276,14 +289,14 @@ export const Apply = ({ api }: ApplyProps) => {
                 )}
               </label>
 
-              {question.help_text !== null && (
+              {help !== undefined && (
                 // A div, not a p: markdown renders block content, and a list
                 // inside a paragraph is invalid HTML the browser silently
                 // reshapes. Escaped rather than filtered — see `markdown.ts`.
                 <div
                   class="form-note markdown-preview"
                   id={helpId}
-                  dangerouslySetInnerHTML={{ __html: renderMarkdown(question.help_text) }}
+                  dangerouslySetInnerHTML={{ __html: help }}
                 />
               )}
 

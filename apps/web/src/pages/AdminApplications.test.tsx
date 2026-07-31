@@ -85,8 +85,7 @@ describe('AdminApplications', () => {
   })
 
   it('survives a browser with no clipboard at all', async () => {
-    // `navigator.clipboard` is undefined on a non-secure origin, where the old
-    // code threw before the handler could do anything.
+    // `navigator.clipboard` is undefined on a non-secure origin.
     vi.stubGlobal('navigator', {})
     renderPage(
       stub({

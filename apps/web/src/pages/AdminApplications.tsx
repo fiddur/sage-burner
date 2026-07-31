@@ -55,10 +55,9 @@ const InviteLink = ({
         onClick={() => {
           // Only on success. `writeText` rejects on a denied permission or an
           // unfocused document, and `navigator.clipboard` is undefined entirely
-          // on a non-secure origin — so this threw before saying anything. For a
-          // token shown once, with no way to re-issue it (#91), a false "Copied"
-          // is how an organiser loses an applicant's invite. The URL above stays
-          // selectable by hand either way.
+          // on a non-secure origin. For a token shown once, with no way to
+          // re-issue it (#91), a false "Copied" is how an organiser loses an
+          // applicant's invite; the URL above stays selectable by hand.
           navigator.clipboard?.writeText(url).then(onCopy, () => undefined)
         }}
       >
