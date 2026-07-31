@@ -70,14 +70,24 @@ describe('MarkdownField', () => {
     expect(document.querySelector('script')).toBeNull()
   })
 
-  it('focuses the field when the label is clicked, like every other field', () => {
-    // A real `<label for>`, not a duplicated `aria-label`: the accessible name
-    // and the click target come from one place.
+  it('names the textarea with a real <label for>, not a duplicated aria-label', () => {
+    // The accessible name and the click target come from one place, which is
+    // what the `<label class="field">` this replaced already gave every other
+    // field.
     render(<MarkdownField label="Help text" value="" maxLength={2000} onInput={vi.fn()} />)
 
     const field = screen.getByLabelText('Help text')
     expect(field.id).not.toBe('')
     expect(document.querySelector(`label[for="${field.id}"]`)?.textContent).toBe('Help text')
+  })
+
+  it('drops the label association while previewing, when there is no field to name', async () => {
+    render(<MarkdownField label="Help text" value="x" maxLength={2000} onInput={vi.fn()} />)
+
+    screen.getByRole('button', { name: 'Preview' }).click()
+
+    await waitFor(() => expect(screen.queryByLabelText('Help text')).toBeNull())
+    expect(document.querySelector('label')?.getAttribute('for')).toBeNull()
   })
 
   it('says which view is showing without claiming to be a tab widget', async () => {

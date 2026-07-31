@@ -29,7 +29,10 @@ export const MarkdownField = ({
 
   return (
     <div class="field">
-      <label for={fieldId}>{label}</label>
+      {/* No `for` while previewing: the textarea is unmounted, and `for` must
+          name a labelable element in the same tree. It degrades to plain text,
+          which is what it was before. */}
+      <label for={previewing ? undefined : fieldId}>{label}</label>
 
       <div class="tabs">
         <button
