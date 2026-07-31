@@ -149,8 +149,7 @@ export const registerEventRoutes = (
       // other body: the row comes back from the write, and a vanished row is
       // answered by the re-read below. All the pre-read did was spend a third
       // query to produce a 404 the write path produces anyway — and it left the
-      // handler holding a pre-write snapshot, which is what the response was
-      // wrongly built from two commits ago.
+      // handler holding a pre-write snapshot to build the response from.
       if (Object.keys(parsed.data).length === 0) {
         const [existing] = await db.select().from(event).where(eq(event.id, id)).limit(1)
 

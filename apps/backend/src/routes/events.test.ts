@@ -400,12 +400,11 @@ describe('admin event routes', () => {
     // Save. What it pins is that a write which changes no values is still a
     // success — not an error, and not "no such event".
     //
-    // It used to guard something narrower and more fragile: the handler read
-    // `changes`, which meant it depended on SQLite counting a row whose SET values
-    // are identical, where MySQL reports 0. `.returning()` removed that — `RETURNING`
-    // emits a row per row the `WHERE` matched, whether or not the values differ —
-    // so this no longer defends a driver-specific coupling, because there is not
-    // one. It defends the contract instead, which is the part a member would feel.
+    // It pins the contract rather than a driver quirk, which matters because the
+    // obvious implementation has one: a handler that decided from `changes` would
+    // depend on SQLite counting a row whose SET values are identical, where MySQL
+    // reports 0. `RETURNING` emits a row per row the `WHERE` matched, differing
+    // values or not, so the answer here is the same on either engine.
     const server = await build()
     const cookie = await givenAdmin()
     const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })

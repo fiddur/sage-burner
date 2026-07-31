@@ -86,6 +86,16 @@ describe('renderMarkdown', () => {
     expect(html).not.toContain('href=')
   })
 
+  it('emits the href it checked, not the raw one', () => {
+    // The seam: the safety test ran on `clean(href)` while the attribute was
+    // written from `href`, so the string that was validated and the string that
+    // shipped could differ. A tab inside an otherwise fine path is the cheapest
+    // way to tell them apart — it reaches the attribute only if the raw value
+    // is what gets emitted. Both renderers had it, so both are pinned.
+    expect(renderMarkdown('[x](</pa\tge>)')).toContain('href="/page"')
+    expect(renderMarkdown('![x](<https://a.example/i\tmg.png>)')).toContain('src="https://a.example/img.png"')
+  })
+
   it('strips other executable schemes, not just javascript:', () => {
     // An allowlist, so this holds without knowing each scheme by name.
     for (const href of ['data:text/html;base64,PHNjcmlwdD4=', 'vbscript:msgbox(1)', 'JaVaScRiPt:alert(1)']) {
