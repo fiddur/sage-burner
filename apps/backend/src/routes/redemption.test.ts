@@ -1,0 +1,311 @@
+import type { FastifyInstance, LightMyRequestResponse } from 'fastify'
+
+import { eq } from 'drizzle-orm'
+import { createHash, randomUUID } from 'node:crypto'
+import { afterEach, describe, expect, it } from 'vitest'
+
+import type { DbHandle } from '../db/index.ts'
+
+import { createApp } from '../app.ts'
+import { createConfig } from '../config.ts'
+import { createDb, runMigrations } from '../db/index.ts'
+import { account, attendance, inviteToken } from '../db/schema.ts'
+import { SESSION_COOKIE } from './auth.ts'
+
+/**
+ * Redeeming an invite: the single funnel both membership paths converge on.
+ *
+ * Unauthenticated, and the token is the only credential — so the properties worth
+ * proving are that it cannot be spent twice, that a spent or lapsed one says so
+ * rather than 404ing, and that a failure anywhere leaves the token still usable.
+ */
+
+const SECRET = 's'.repeat(40)
+const NOW = '2026-07-02T00:00:00.000Z'
+
+let handle: DbHandle | undefined
+let app: FastifyInstance | undefined
+
+afterEach(async () => {
+  await app?.close()
+  handle?.close()
+  app = undefined
+  handle = undefined
+})
+
+const build = async (now: () => Date = () => new Date(NOW)) => {
+  handle = createDb({ url: ':memory:' })
+  runMigrations(handle)
+  app = await createApp({
+    db: handle.db,
+    config: createConfig({ LOG_LEVEL: 'silent', SESSION_SECRET: SECRET }),
+    now,
+  })
+  return app
+}
+
+const db = () => {
+  const found = handle?.db
+  if (found === undefined) throw new Error('build() first')
+  return found
+}
+
+const givenInvite = async (over: { expires_at?: string; used_at?: string | null } = {}) => {
+  const token = `token-${randomUUID()}`
+  const admin = randomUUID()
+  await db()
+    .insert(account)
+    .values({ id: admin, email: `${admin}@example.org`, password_hash: null, created_at: NOW })
+  await db()
+    .insert(inviteToken)
+    .values({
+      id: randomUUID(),
+      token_hash: createHash('sha256').update(token).digest('hex'),
+      application_id: null,
+      expires_at: over.expires_at ?? '2026-08-01T00:00:00.000Z',
+      used_at: over.used_at ?? null,
+      created_by: admin,
+    })
+  return token
+}
+
+const applicant = {
+  email: 'fredrik@example.org',
+  password: 'a-long-enough-password',
+  name: 'Fredrik',
+  contact: 'fredrik on discord',
+  allergies_notes: 'peanuts',
+}
+
+const look = (server: FastifyInstance, token: string): Promise<LightMyRequestResponse> =>
+  server.inject({ method: 'GET', url: `/api/invites/${encodeURIComponent(token)}` })
+
+const redeem = (
+  server: FastifyInstance,
+  token: string,
+  body: Record<string, unknown> = applicant,
+): Promise<LightMyRequestResponse> =>
+  server.inject({ method: 'POST', url: `/api/invites/${encodeURIComponent(token)}/redeem`, payload: body })
+
+describe('looking at an invite before redeeming it', () => {
+  it('says a live one is outstanding', async () => {
+    const server = await build()
+    const token = await givenInvite()
+
+    const response = await look(server, token)
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().status).toBe('outstanding')
+  })
+
+  it('says an expired one is expired rather than 404', async () => {
+    const server = await build()
+    const token = await givenInvite({ expires_at: '2026-07-01T00:00:00.000Z' })
+
+    const response = await look(server, token)
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().status).toBe('expired')
+  })
+
+  it('says a spent one is used', async () => {
+    const server = await build()
+    const token = await givenInvite({ used_at: '2026-07-01T00:00:00.000Z' })
+
+    expect((await look(server, token)).json().status).toBe('used')
+  })
+
+  it('says unknown for a token nobody minted, without saying which', async () => {
+    // Same 200 and the same shape as the others: a different status code or body
+    // for "no such token" would let someone probe for valid ones.
+    const server = await build()
+
+    const response = await look(server, 'not-a-real-token')
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().status).toBe('unknown')
+  })
+
+  it('never echoes the token or who it was for', async () => {
+    // An invite link is unguessable but forwardable, so whoever holds it is a
+    // stranger until they redeem. Naming the applicant would turn a leaked link
+    // into a disclosure.
+    const server = await build()
+    const token = await givenInvite()
+
+    const body = (await look(server, token)).body
+
+    expect(body).not.toContain(token)
+    expect(Object.keys(JSON.parse(body))).toEqual(['status'])
+  })
+})
+
+describe('redeeming', () => {
+  it('creates the account, fills in the person, and signs them in', async () => {
+    const server = await build()
+    const token = await givenInvite()
+
+    const response = await redeem(server, token)
+
+    expect(response.statusCode).toBe(201)
+    expect(response.headers['set-cookie']).toContain(SESSION_COOKIE)
+
+    const [row] = await db().select().from(account).where(eq(account.email, 'fredrik@example.org'))
+    expect(row?.name).toBe('Fredrik')
+    expect(row?.contact).toBe('fredrik on discord')
+    expect(row?.allergies_notes).toBe('peanuts')
+    expect(row?.password_hash).toBeTruthy()
+  })
+
+  it('stamps the token used, so the same link cannot be spent twice', async () => {
+    const server = await build()
+    const token = await givenInvite()
+
+    expect((await redeem(server, token)).statusCode).toBe(201)
+    const second = await redeem(server, token, { ...applicant, email: 'someone.else@example.org' })
+
+    expect(second.statusCode).toBe(409)
+    expect(await db().select().from(account)).toHaveLength(2)
+  })
+
+  it('lets exactly one of two concurrent redemptions through', async () => {
+    // The real race, not a simulation of one: both requests read the invite as
+    // outstanding, then both await `hashPassword` (~230ms) before writing, so
+    // they genuinely interleave. Only the conditional `used_at IS NULL` on the
+    // stamp separates them — a plain `WHERE id = ?` lets both in and creates two
+    // accounts from one invite.
+    const server = await build()
+    const token = await givenInvite()
+
+    const [first, second] = await Promise.all([
+      redeem(server, token, { ...applicant, email: 'first@example.org' }),
+      redeem(server, token, { ...applicant, email: 'second@example.org' }),
+    ])
+
+    expect([first.statusCode, second.statusCode].toSorted()).toEqual([201, 409])
+    // The admin from `givenInvite`, plus exactly one redeemer.
+    expect(await db().select().from(account)).toHaveLength(2)
+  })
+
+  it('leaves the token unspent when the account cannot be written', async () => {
+    // Two invites, one email. Both requests pass the email pre-check before
+    // either writes, so the loser's insert meets the UNIQUE and the whole
+    // transaction rolls back — including its stamp. Without the transaction its
+    // token is spent with no account behind it, which cannot be recovered: the
+    // person has no link and there is no re-issue path (#91).
+    const server = await build()
+    const [tokenA, tokenB] = [await givenInvite(), await givenInvite()]
+
+    const [first, second] = await Promise.all([
+      redeem(server, tokenA, { ...applicant, email: 'same@example.org' }),
+      redeem(server, tokenB, { ...applicant, email: 'same@example.org' }),
+    ])
+
+    const codes = [first.statusCode, second.statusCode].toSorted()
+    expect(codes[0]).toBe(201)
+    expect(codes[1]).toBeGreaterThanOrEqual(400)
+
+    const invites = await db().select().from(inviteToken)
+    expect(invites.filter((invite) => invite.used_at === null)).toHaveLength(1)
+  })
+
+  it('gives the account the member role, so it can reach member pages', async () => {
+    const server = await build()
+    const token = await givenInvite()
+
+    const cookie = (await redeem(server, token)).headers['set-cookie']
+    const me = await server.inject({
+      method: 'GET',
+      url: '/api/auth/me',
+      headers: { cookie: String(cookie).split(';')[0] ?? '' },
+    })
+
+    expect(me.json().viewer.roles).toEqual(['member'])
+  })
+
+  it('links the account to the invite it came in on', async () => {
+    const server = await build()
+    const token = await givenInvite()
+
+    await redeem(server, token)
+
+    const [row] = await db().select().from(account).where(eq(account.email, 'fredrik@example.org'))
+    const [invite] = await db().select().from(inviteToken)
+    expect(row?.invite_token_id).toBe(invite?.id)
+  })
+
+  it('refuses an expired token and leaves it unspent', async () => {
+    const server = await build()
+    const token = await givenInvite({ expires_at: '2026-07-01T00:00:00.000Z' })
+
+    expect((await redeem(server, token)).statusCode).toBe(409)
+    expect(await db().select().from(account)).toHaveLength(1)
+  })
+
+  it('refuses a token nobody minted', async () => {
+    const server = await build()
+
+    expect((await redeem(server, 'not-a-real-token')).statusCode).toBe(404)
+  })
+
+  it('refuses an email that already has an account, without spending the token', async () => {
+    // Otherwise the token is gone and the person is told a name is taken, with no
+    // way to try again.
+    const server = await build()
+    const token = await givenInvite()
+    await db()
+      .insert(account)
+      .values({ id: randomUUID(), email: 'fredrik@example.org', password_hash: null, created_at: NOW })
+
+    const response = await redeem(server, token)
+
+    expect(response.statusCode).toBe(409)
+    const [invite] = await db().select().from(inviteToken)
+    expect(invite?.used_at).toBeNull()
+  })
+
+  it('refuses a password too short to be worth hashing', async () => {
+    const server = await build()
+    const token = await givenInvite()
+
+    const response = await redeem(server, token, { ...applicant, password: 'short' })
+
+    expect(response.statusCode).toBe(400)
+    const [invite] = await db().select().from(inviteToken)
+    expect(invite?.used_at).toBeNull()
+  })
+
+  it('refuses a body missing the person, since an organiser has to reach them', async () => {
+    const server = await build()
+    const token = await givenInvite()
+
+    expect((await redeem(server, token, { ...applicant, name: '   ' })).statusCode).toBe(400)
+    expect((await redeem(server, token, { ...applicant, contact: '' })).statusCode).toBe(400)
+  })
+
+  it('refuses an unrecognised key rather than dropping it', async () => {
+    const server = await build()
+    const token = await givenInvite()
+
+    expect((await redeem(server, token, { ...applicant, roles: ['admin'] })).statusCode).toBe(400)
+  })
+
+  it('lowercases the email, so one human cannot become two accounts', async () => {
+    const server = await build()
+    const token = await givenInvite()
+
+    await redeem(server, token, { ...applicant, email: 'Fredrik@Example.ORG' })
+
+    const [row] = await db().select().from(account).where(eq(account.email, 'fredrik@example.org'))
+    expect(row).toBeDefined()
+  })
+
+  it('does not create an attendance — coming to a burn is a separate act', async () => {
+    const server = await build()
+    const token = await givenInvite()
+
+    await redeem(server, token)
+
+    expect(await db().select().from(attendance)).toHaveLength(0)
+  })
+})

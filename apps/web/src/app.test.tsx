@@ -36,6 +36,8 @@ const clientWith = (
   getQuestions: () => Promise.reject(new Error('getQuestions is not stubbed in this file')),
   submitApplication: () => Promise.reject(new Error('submitApplication is not stubbed in this file')),
   getApplications: () => Promise.reject(new Error('getApplications is not stubbed in this file')),
+  getInviteState: () => Promise.reject(new Error('getInviteState is not stubbed in this file')),
+  redeemInvite: () => Promise.reject(new Error('redeemInvite is not stubbed in this file')),
   getInvites: () => Promise.reject(new Error('getInvites is not stubbed in this file')),
   createInvite: () => Promise.reject(new Error('createInvite is not stubbed in this file')),
   revokeInvite: () => Promise.reject(new Error('revokeInvite is not stubbed in this file')),
@@ -154,10 +156,22 @@ describe('routing', () => {
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Nothing here')
   })
 
-  it('explains expired invites on the not-found page, since that is how people arrive there', () => {
+  it('handles an invite path rather than sending it to the not-found page', () => {
+    // The whole point of #17: an invite link used to fall through to NotFound,
+    // which explained single-use invites because that is where people landed.
     renderAt('/invite/an-expired-token')
 
-    expect(screen.getByRole('article').textContent).toContain('single-use')
+    expect(screen.getByRole('heading', { level: 1 }).textContent).not.toBe('Nothing here')
+  })
+
+  it('routes a base64url token, which is what the API mints', () => {
+    // `app.tsx` forbids a dot in any route, because the backend tells a missing
+    // asset from a client route by whether the last segment has an extension.
+    // base64url has no dot, so a real token is safe — asserted rather than
+    // assumed, since minting is one module away from routing.
+    renderAt('/invite/tqYh-_9Zx0AbCdEfGhIjKlMnOpQrStUvWxYz012345')
+
+    expect(screen.getByRole('heading', { level: 1 }).textContent).not.toBe('Nothing here')
   })
 })
 
