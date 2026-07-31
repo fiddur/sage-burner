@@ -5,6 +5,7 @@ import { useEffect, useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
+import { StayForm } from '../components/StayForm.tsx'
 import { isMember, useViewer } from '../viewer.tsx'
 
 /**
@@ -23,7 +24,10 @@ const PAYMENT_NOTES: Record<PaymentStatus, string> = {
 
 const paymentNote = (status: PaymentStatus) => PAYMENT_NOTES[status]
 
-export type MyBurnApi = Pick<ApiClient, 'getMyAttendance' | 'joinActiveEvent' | 'leaveActiveEvent'>
+export type MyBurnApi = Pick<
+  ApiClient,
+  'getMyAttendance' | 'joinActiveEvent' | 'leaveActiveEvent' | 'updateMyStay'
+>
 
 type Loaded =
   | { status: 'loading' }
@@ -145,6 +149,14 @@ export const MyBurn = ({ api }: { api: MyBurnApi }) => {
                 You are on the list for {loaded.mine.event.name}
                 {paymentNote(loaded.mine.attendance.payment_status)}
               </p>
+              <StayForm
+                api={api}
+                attendance={loaded.mine.attendance}
+                onSaved={(saved) =>
+                  setLoaded({ status: 'ready', mine: { ...loaded.mine, attendance: saved } })
+                }
+              />
+
               <p class="row">
                 <button
                   type="button"

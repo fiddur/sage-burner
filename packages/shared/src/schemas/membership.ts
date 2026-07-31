@@ -43,12 +43,33 @@ export const profileFields = z.object({
  */
 export const profileCreateSchema = profileFields.strict()
 
+/**
+ * A profile as it is read back.
+ *
+ * `name` and `contact` are nullable here but required by `profileCreateSchema`,
+ * and the asymmetry is the table's: an account can exist before anyone fills them
+ * in — the CLI bootstrap admin is created with an email and nothing else. So
+ * "required to set" and "may not be there yet" are both true, and a reader that
+ * assumed non-null would be wrong for exactly that account.
+ */
 export const profileSchema = profileFields.extend({
   account_id: idSchema,
   email: emailSchema,
+  name: profileFields.shape.name.nullable(),
+  contact: profileFields.shape.contact.nullable(),
 })
 
 export const profileResponseSchema = z.object({ profile: profileSchema })
+
+/**
+ * What a member may change about themselves.
+ *
+ * Partial, because the profile page and the stay form save separately and a
+ * PATCH should name only what it changes. Not `email` — that is the login
+ * identity, and changing it is a different act with its own verification, which
+ * nothing implements yet.
+ */
+export const profileUpdateSchema = profileFields.partial().strict()
 
 /** The field list, unrefined — see `eventFields` for why this is separate. */
 export const attendanceFields = z.object({
@@ -83,10 +104,39 @@ export const attendanceFields = z.object({
  */
 export const attendanceSchema = withStayOrder(attendanceFields)
 
+/**
+ * What a member may change about their own stay.
+ *
+ * `payment_status` and `payment_date` are omitted deliberately: they are the
+ * organiser's to set, and a member who could write them could mark themselves
+ * paid. `event_id` and `account_id` are omitted for the same reason in a
+ * different direction — they identify whose row it is, and the route derives
+ * both from the session rather than the body.
+ *
+ * Wrapped in `withStayOrder`, so a PATCH carrying both dates still cannot record
+ * a departure before the arrival — see `withEventDateOrder` for why deriving
+ * from the unrefined object would drop that.
+ */
+export const attendanceUpdateSchema = withStayOrder(
+  attendanceFields
+    .omit({
+      id: true,
+      event_id: true,
+      account_id: true,
+      joined_at: true,
+      payment_status: true,
+      payment_date: true,
+    })
+    .partial()
+    .strict(),
+)
+
 export type Profile = z.infer<typeof profileSchema>
 export type ProfileCreate = z.infer<typeof profileCreateSchema>
 export type ProfileResponse = z.infer<typeof profileResponseSchema>
 export type Attendance = z.infer<typeof attendanceSchema>
+export type ProfileUpdate = z.infer<typeof profileUpdateSchema>
+export type AttendanceUpdate = z.infer<typeof attendanceUpdateSchema>
 
 /**
  * Someone's attendance at the active burn, as they see it.

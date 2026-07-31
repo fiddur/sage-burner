@@ -58,7 +58,12 @@ export const Layout = ({
             </>
           )}
 
-          {isMember(viewer) && <a href="/my-burn">Your burn</a>}
+          {isMember(viewer) && (
+            <>
+              <a href="/my-burn">Your burn</a>
+              <a href="/profile">Your details</a>
+            </>
+          )}
 
           {isAdmin(viewer) && <a href="/admin">Organise</a>}
 

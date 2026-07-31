@@ -1,0 +1,178 @@
+import type { Profile } from '@sage-burner/shared'
+
+import { useEffect, useState } from 'preact/hooks'
+
+import type { ApiClient } from '../api/client.ts'
+
+import { isApiError } from '../api/client.ts'
+import { isMember, useViewer } from '../viewer.tsx'
+
+export type ProfileApi = Pick<ApiClient, 'getMyProfile' | 'updateMyProfile'>
+
+type Loaded = { status: 'loading' } | { status: 'ready'; profile: Profile } | { status: 'failed' }
+
+export const ProfilePage = ({ api }: { api: ProfileApi }) => {
+  const viewer = useViewer()
+  const member = isMember(viewer)
+  const [loaded, setLoaded] = useState<Loaded>({ status: 'loading' })
+  const [name, setName] = useState('')
+  const [contact, setContact] = useState('')
+  const [allergies, setAllergies] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | undefined>(undefined)
+
+  useEffect(() => {
+    if (!member) return undefined
+
+    const controller = new AbortController()
+
+    api
+      .getMyProfile(controller.signal)
+      .then(({ profile }) => {
+        if (controller.signal.aborted) return
+        setLoaded({ status: 'ready', profile })
+        setName(profile.name ?? '')
+        setContact(profile.contact ?? '')
+        setAllergies(profile.allergies_notes ?? '')
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setLoaded({ status: 'failed' })
+      })
+
+    return () => controller.abort()
+  }, [api, member])
+
+  const save = async () => {
+    setError(undefined)
+    setSaved(false)
+    if (name.trim() === '' || contact.trim() === '') {
+      setError('Please keep a name and a way to reach you — organisers need both.')
+      return
+    }
+
+    setSaving(true)
+    try {
+      const { profile } = await api.updateMyProfile({
+        name: name.trim(),
+        contact: contact.trim(),
+        allergies_notes: allergies.trim() === '' ? null : allergies.trim(),
+      })
+      setLoaded({ status: 'ready', profile })
+      setSaved(true)
+    } catch (failure) {
+      setError(isApiError(failure) ? failure.message : 'Could not save that. Please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (viewer.status === 'loading') {
+    return (
+      <section class="page">
+        <h1>Your details</h1>
+        <p class="form-note">One moment…</p>
+      </section>
+    )
+  }
+
+  if (!member) {
+    return (
+      <section class="page">
+        <h1>Your details</h1>
+        <p>
+          This is for members. <a href="/login">Log in</a> to see it.
+        </p>
+      </section>
+    )
+  }
+
+  return (
+    <section class="page">
+      <h1>Your details</h1>
+
+      <p class="form-note">
+        These follow you from burn to burn. What you fill in for one particular burn — when you arrive, where
+        you sleep — lives on <a href="/my-burn">your burn</a>.
+      </p>
+
+      {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
+
+      {loaded.status === 'failed' && (
+        <p class="form-error" role="alert">
+          Could not load your details. Please reload the page.
+        </p>
+      )}
+
+      {loaded.status === 'ready' && (
+        <form
+          class="form"
+          onSubmit={(submitEvent) => {
+            submitEvent.preventDefault()
+            void save()
+          }}
+        >
+          {error !== undefined && (
+            <p class="form-error" role="alert">
+              {error}
+            </p>
+          )}
+
+          <label class="field">
+            <span>Your name</span>
+            <input
+              type="text"
+              name="name"
+              maxLength={200}
+              aria-required
+              value={name}
+              onInput={(inputEvent) => setName(inputEvent.currentTarget.value)}
+            />
+          </label>
+
+          <label class="field">
+            <span>How can we reach you?</span>
+            <input
+              type="text"
+              name="contact"
+              maxLength={500}
+              aria-required
+              value={contact}
+              onInput={(inputEvent) => setContact(inputEvent.currentTarget.value)}
+            />
+          </label>
+
+          <label class="field">
+            <span>Allergies or food you cannot eat</span>
+            <textarea
+              name="allergies_notes"
+              maxLength={2000}
+              value={allergies}
+              onInput={(inputEvent) => setAllergies(inputEvent.currentTarget.value)}
+            />
+          </label>
+
+          <p class="form-note">
+            Read by whoever plans the meals, for every burn you come to — so correcting it here corrects it
+            everywhere.
+          </p>
+
+          {saved && (
+            <p class="form-note" role="status">
+              Saved.
+            </p>
+          )}
+
+          <button type="submit" disabled={saving}>
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </form>
+      )}
+
+      <p class="form-note">
+        Signed in as {loaded.status === 'ready' ? loaded.profile.email : 'you'}. Changing that address is not
+        possible yet — ask an organiser.
+      </p>
+    </section>
+  )
+}

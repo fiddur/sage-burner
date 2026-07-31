@@ -1,0 +1,133 @@
+import type { Profile } from '@sage-burner/shared'
+
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+import type { Viewer } from '../viewer.tsx'
+import type { ProfileApi } from './Profile.tsx'
+
+import { apiError } from '../api/client.ts'
+import { ViewerProvider } from '../viewer.tsx'
+import { ProfilePage } from './Profile.tsx'
+
+afterEach(cleanup)
+
+const aProfile = (over: Partial<Profile> = {}): Profile => ({
+  account_id: 'a-1',
+  email: 'fredrik@example.org',
+  name: 'Fredrik',
+  contact: 'fredrik on discord',
+  allergies_notes: 'peanuts',
+  ...over,
+})
+
+const stub = (over: Partial<ProfileApi> = {}, profile = aProfile()): ProfileApi => ({
+  getMyProfile: () => Promise.resolve({ profile }),
+  updateMyProfile: () => Promise.reject(new Error('updateMyProfile is not stubbed here')),
+  ...over,
+})
+
+const renderPage = (
+  api: ProfileApi,
+  viewer: Viewer = { status: 'signed-in', account: { id: 'a-1', roles: ['member'] } },
+) =>
+  render(
+    <ViewerProvider viewer={viewer}>
+      <ProfilePage api={api} />
+    </ViewerProvider>,
+  )
+
+const fill = (label: string, value: string) => {
+  fireEvent.input(screen.getByLabelText(label, { exact: false }), { target: { value } })
+}
+
+describe('ProfilePage', () => {
+  it('shows what is stored', async () => {
+    renderPage(stub())
+
+    expect(await screen.findByLabelText('Your name')).toHaveProperty('value', 'Fredrik')
+    expect(screen.getByLabelText(/Allergies/)).toHaveProperty('value', 'peanuts')
+  })
+
+  it('starts empty rather than blank-crashing on an account never filled in', async () => {
+    // The CLI bootstrap admin has no name or contact, and may hold the member
+    // role too, so null is a state this page must render.
+    renderPage(stub({}, aProfile({ name: null, contact: null, allergies_notes: null })))
+
+    expect(await screen.findByLabelText('Your name')).toHaveProperty('value', '')
+  })
+
+  it('saves what was typed', async () => {
+    const updateMyProfile = vi.fn(() => Promise.resolve({ profile: aProfile({ name: 'Fredrik L' }) }))
+    renderPage(stub({ updateMyProfile }))
+
+    await screen.findByLabelText('Your name')
+    fill('Your name', '  Fredrik L  ')
+    screen.getByRole('button', { name: 'Save' }).click()
+
+    await waitFor(() =>
+      expect(updateMyProfile).toHaveBeenCalledWith({
+        name: 'Fredrik L',
+        contact: 'fredrik on discord',
+        allergies_notes: 'peanuts',
+      }),
+    )
+    expect((await screen.findByRole('status')).textContent).toContain('Saved')
+  })
+
+  it('sends null rather than an empty string for cleared allergies', async () => {
+    const updateMyProfile = vi.fn(() => Promise.resolve({ profile: aProfile() }))
+    renderPage(stub({ updateMyProfile }))
+
+    await screen.findByLabelText('Your name')
+    fill('Allergies', '   ')
+    screen.getByRole('button', { name: 'Save' }).click()
+
+    await waitFor(() =>
+      expect(updateMyProfile).toHaveBeenCalledWith(expect.objectContaining({ allergies_notes: null })),
+    )
+  })
+
+  it('refuses to clear the name, which an organiser needs', async () => {
+    const updateMyProfile = vi.fn(() => Promise.resolve({ profile: aProfile() }))
+    renderPage(stub({ updateMyProfile }))
+
+    await screen.findByLabelText('Your name')
+    fill('Your name', '  ')
+    screen.getByRole('button', { name: 'Save' }).click()
+
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    expect(updateMyProfile).not.toHaveBeenCalled()
+  })
+
+  it('surfaces a failed save rather than claiming success', async () => {
+    renderPage(stub({ updateMyProfile: () => Promise.reject(apiError(400, 'bad_request', 'Nope.')) }))
+
+    await screen.findByLabelText('Your name')
+    screen.getByRole('button', { name: 'Save' }).click()
+
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    expect(screen.queryByRole('status')).toBeNull()
+  })
+
+  it('says the email cannot be changed here, rather than offering a field that fails', async () => {
+    renderPage(stub())
+
+    expect(await screen.findByText(/not possible yet/)).toBeTruthy()
+    expect(screen.queryByLabelText(/email/i)).toBeNull()
+  })
+
+  it('does not fetch for someone who is not a member', async () => {
+    const getMyProfile = vi.fn(() => Promise.resolve({ profile: aProfile() }))
+    renderPage(stub({ getMyProfile }), { status: 'signed-out' })
+
+    expect(screen.getByText(/for members/)).toBeTruthy()
+    expect(getMyProfile).not.toHaveBeenCalled()
+  })
+
+  it('surfaces a failure to load', async () => {
+    renderPage(stub({ getMyProfile: () => Promise.reject(new Error('nope')) }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('reload')
+  })
+})
