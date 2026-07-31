@@ -593,9 +593,9 @@ describe('cross-site reachability', () => {
   // `SameSite=Lax` protects less than it appears to. It stops the cookie being
   // *sent* cross-site, which covers every route that needs a session — but
   // logout does not need one: it ignores the body and answers with a clearing
-  // `Set-Cookie`, and a Set-Cookie on a top-level cross-site navigation is
-  // honoured. The only body type an HTML form can send that Fastify would parse
-  // is `text/plain`, so that parser is removed.
+  // `Set-Cookie`, which the browser stores from an opaque response. Two separate
+  // doors: the parser closes what a *form* can post, and `sec-fetch-site` closes
+  // what `fetch` can, since a bodyless request consults no parser at all.
   const formEncodings = ['text/plain', 'application/x-www-form-urlencoded', 'multipart/form-data; boundary=x']
 
   it('refuses every body type a cross-site form could submit', async () => {
@@ -612,6 +612,74 @@ describe('cross-site reachability', () => {
       expect(response.statusCode, contentType).toBe(415)
       expect(response.headers['set-cookie'], contentType).toBeUndefined()
     }
+  })
+
+  it('refuses a bodyless cross-site fetch, which no parser would have seen', async () => {
+    // The half the parser removal did not close: fastify dispatches an empty
+    // body straight to the handler, so `fetch(..., { method: 'POST', mode:
+    // 'no-cors', credentials: 'include' })` reached logout from any origin and
+    // the browser stored the clearing cookie.
+    const server = await build()
+
+    const response = await server.inject({
+      method: 'POST',
+      url: '/api/auth/logout',
+      headers: { 'sec-fetch-site': 'cross-site' },
+    })
+
+    expect(response.statusCode).toBe(403)
+    expect(response.headers['set-cookie']).toBeUndefined()
+  })
+
+  it('refuses a same-site request too, since a sibling subdomain is not us', async () => {
+    const server = await build()
+
+    const response = await server.inject({
+      method: 'POST',
+      url: '/api/auth/logout',
+      headers: { 'sec-fetch-site': 'same-site' },
+    })
+
+    expect(response.statusCode).toBe(403)
+  })
+
+  it('leaves reads alone, since they change nothing', async () => {
+    const server = await build()
+
+    const response = await server.inject({
+      method: 'GET',
+      url: '/api/auth/me',
+      headers: { 'sec-fetch-site': 'cross-site' },
+    })
+
+    expect(response.statusCode).toBe(200)
+  })
+
+  it('allows a request the browser calls same-origin', async () => {
+    const server = await build()
+
+    const response = await server.inject({
+      method: 'POST',
+      url: '/api/auth/logout',
+      headers: { 'sec-fetch-site': 'same-origin' },
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.headers['set-cookie']).toBeTruthy()
+  })
+
+  it('allows a bookmark or a typed URL, which no page can cause', async () => {
+    const server = await build()
+
+    expect(
+      (
+        await server.inject({
+          method: 'POST',
+          url: '/api/auth/logout',
+          headers: { 'sec-fetch-site': 'none' },
+        })
+      ).statusCode,
+    ).toBe(200)
   })
 
   it('still accepts the JSON the app itself sends', async () => {

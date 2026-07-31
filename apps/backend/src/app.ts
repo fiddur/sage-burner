@@ -288,7 +288,41 @@ export const createApp = async ({
   // `cross-site reachability` block in `routes/auth.test.ts` is what keeps that
   // honest: it asserts all three form encodings answer 415, so the regression
   // fails CI rather than shipping.
+  //
+  // It closes the *form* half only. A bodyless `fetch(..., { method: 'POST',
+  // mode: 'no-cors', credentials: 'include' })` consults no parser at all —
+  // fastify dispatches an empty body straight to the handler — so the hook
+  // below is what actually shuts the door.
   app.removeContentTypeParser('text/plain')
+
+  // Same-origin only, for anything that can change state.
+  //
+  // `SameSite=Lax` covers every route that needs a session, because the cookie
+  // is not sent cross-site. Logout is the exception: it needs no session, and
+  // the browser stores the clearing `Set-Cookie` from an opaque response
+  // perfectly happily — nothing has to be *sent*, only set. So a page on any
+  // origin could sign a member out.
+  //
+  // Applied to the whole instance rather than to logout, because the same shape
+  // reaches every body-optional POST added later and this should not be
+  // something each new route has to remember.
+  //
+  // `sec-fetch-site` is absent on browsers that do not send it and on
+  // server-to-server calls, and it cannot be set by page script — it is a
+  // forbidden header name — so an attacker cannot forge `same-origin`. Absent
+  // therefore means "not a browser doing this", which is left alone: this closes
+  // a browser-driven vector rather than pretending to be authentication.
+  // `none` is a user-typed URL or a bookmark, which no page can cause.
+  app.addHook('onRequest', async (request, reply) => {
+    const site = request.headers['sec-fetch-site']
+    const changesState = request.method !== 'GET' && request.method !== 'HEAD'
+
+    if (changesState && typeof site === 'string' && site !== 'same-origin' && site !== 'none') {
+      return reply.code(403).send(errorResponse('forbidden'))
+    }
+
+    return undefined
+  })
 
   app.decorate('db', db)
   app.decorate('config', config)

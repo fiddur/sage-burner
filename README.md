@@ -448,6 +448,23 @@ just next-login.
 **Sessions** are a signed value in an `HttpOnly`, `SameSite=Lax` cookie — not a
 database row.
 
+`SameSite=Lax` covers less than it looks like it does, and the gap is worth
+naming: it stops the cookie being **sent** cross-site, which protects every route
+that needs a session — but logout needs none. It answers with a clearing
+`Set-Cookie`, and a browser stores that from an opaque cross-origin response
+quite happily, so any page could sign a member out. Nothing is disclosed and
+nothing else moves; it is a nuisance rather than a breach.
+
+So **state-changing requests are same-origin only**, enforced by a `sec-fetch-site`
+check on every non-`GET`. The header cannot be set by page script — it is a
+forbidden header name — so `same-origin` cannot be forged. Where it is absent
+(an older browser, a `curl`, a server-to-server call) the request is left alone:
+this closes a browser-driven vector rather than standing in for authentication.
+
+Removing the `text/plain` body parser closes the other half of the same
+door — what a cross-site **form** can post — and both halves are needed, because
+a bodyless `fetch` consults no parser at all.
+
 `Secure` is decided once in `config.ts` as `secure_cookies`, on exactly the same
 predicate as the `SESSION_SECRET` requirement: `production`, a non-loopback
 `HOST`, or a set `WEB_ROOT`. The image is all three, so **every containerised
