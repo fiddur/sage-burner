@@ -311,11 +311,16 @@ describe('editing a question', () => {
     // field name would answer `internal_error`.
     //
     // The row is read back, because the status alone does not test the "no-op"
-    // half of the name. `formQuestionFields` gives `help_text` and `options` a
-    // `.default(null)`, suppressed by `.partial()` — if that ever stopped holding,
-    // `parsed.data` would be `{ help_text: null, options: null }` for a `{}` body:
-    // non-empty, so this guard is skipped, `set()` is valid SQL, the response is
-    // still 200, and every PATCH silently wipes the help text.
+    // half of the name. `{}` stays `{}` because the update schema carries no
+    // defaults at all — it is built from the plain `formQuestionSchema`, not from
+    // `formQuestionFields`, whose `.default(null)` on `help_text` and `options`
+    // survives `.partial()` in Zod 4.
+    //
+    // Rebuilt from `formQuestionFields`, a `{}` body would parse to
+    // `{ help_text: null, options: null }`: non-empty, so this guard is skipped,
+    // `set()` is valid SQL, the response is still 200 — and every PATCH silently
+    // wipes the help text. That is not hypothetical; it is the bug this test was
+    // written for, and the read-back below is what catches it.
     const server = await build()
     const cookie = await givenAdmin()
     const created = await add(server, cookie, {

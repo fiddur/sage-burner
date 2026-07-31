@@ -87,13 +87,16 @@ export const withTickBoxRules = <T extends z.ZodType<{ type?: string; required?:
   })
 
 /**
- * The shared field list for creating and editing a question.
+ * The field list for **creating** a question.
+ *
+ * Not for editing: `formQuestionUpdateSchema` below is deliberately built from
+ * `formQuestionSchema` instead, and says why.
  *
  * `id` and `order` are the server's, not the body's: a new question goes last, and
  * letting a client pick a position would make two organisers adding at once collide
  * over a number neither of them chose.
  *
- * `.strict()` on both derivations below, for the reason `eventCreateSchema` and
+ * `.strict()` on both schemas below, for the reason `eventCreateSchema` and
  * `eventUpdateSchema` give: an unrecognised key is a 400 rather than a silent
  * success. A stripped typo parses to `{}`, the handler answers 200 with the row
  * unchanged, and the editor renders "Saved." over a write that never happened —
@@ -107,8 +110,11 @@ export const formQuestionFields = formQuestionSchema.omit({ id: true, order: tru
   // `.nullable()` does not make a key optional, so omitting these was a bare
   // `bad_request` naming no field — and `options` is a column no question type
   // consumes yet, so every caller was sending an explicit `null` for something
-  // inert. The update path already omitted them, so the two halves of the editor
-  // disagreed about whether they are fields you send.
+  // inert. A PATCH could always omit them, since every key there is optional, so
+  // the two halves of the editor disagreed about whether they are fields you send.
+  //
+  // The defaults are why editing must not derive from this object: on create,
+  // absent means "use this"; on a PATCH it means "leave it alone".
   help_text: formQuestionSchema.shape.help_text.nullish().default(null),
   options: formQuestionSchema.shape.options.nullish().default(null),
 })
