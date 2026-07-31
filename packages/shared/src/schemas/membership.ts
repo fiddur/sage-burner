@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { paymentStatuses } from '../enums.ts'
+import { emailSchema } from './auth.ts'
 import { dateSchema, dateTimeSchema, idSchema, nonEmptyText, optionalText } from './common.ts'
 
 /** Tolerates missing keys so `.partial()` and `.omit()` derivations still typecheck. */
@@ -44,7 +45,7 @@ export const profileCreateSchema = profileFields.strict()
 
 export const profileSchema = profileFields.extend({
   account_id: idSchema,
-  email: z.email(),
+  email: emailSchema,
 })
 
 export const profileResponseSchema = z.object({ profile: profileSchema })

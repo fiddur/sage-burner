@@ -67,7 +67,7 @@ const seedInvite = (id: string) =>
     })
     .run()
 
-const seedMember = (id: string, account_id: string, _invite_token_id?: string) =>
+const seedAttendance = (id: string, account_id: string) =>
   handle.db
     .insert(attendance)
     .values({
@@ -154,7 +154,7 @@ describe('migrations', () => {
     // foreign_key_check this commits silently and an organiser opens an empty
     // member list; with it, the boot fails instead.
     seedInvite(ids.invite)
-    seedMember(ids.member, ids.account, ids.invite)
+    seedAttendance(ids.member, ids.account)
 
     handle.client.exec('PRAGMA foreign_keys = OFF')
     handle.client.exec(`DELETE FROM event WHERE id = '${ids.event}'`)
@@ -189,7 +189,7 @@ describe('foreign keys', () => {
 
   it('cascades an event deletion to everything scoped to it', () => {
     seedInvite(ids.invite)
-    seedMember(ids.member, ids.account, ids.invite)
+    seedAttendance(ids.member, ids.account)
     handle.db
       .insert(session)
       .values({
@@ -239,14 +239,14 @@ describe('uniqueness', () => {
   it('allows only one membership per account per event', () => {
     seedInvite(ids.invite)
     seedInvite(ids.otherInvite)
-    seedMember(ids.member, ids.account, ids.invite)
+    seedAttendance(ids.member, ids.account)
 
-    expect(() => seedMember(ids.otherMember, ids.account, ids.otherInvite)).toThrow()
+    expect(() => seedAttendance(ids.otherMember, ids.account)).toThrow()
   })
 
   it('lets the same account be a member of a different event', () => {
     seedInvite(ids.invite)
-    seedMember(ids.member, ids.account, ids.invite)
+    seedAttendance(ids.member, ids.account)
 
     handle.db
       .insert(event)
@@ -400,16 +400,20 @@ describe('uniqueness', () => {
 })
 
 describe('check constraints', () => {
+  const insertAttendance = (paymentStatus: string) =>
+    handle.client
+      .prepare(
+        `INSERT INTO attendance (id, event_id, account_id, joined_at, payment_status)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .run(ids.member, ids.event, ids.account, NOW, paymentStatus)
+
   it('rejects a payment status outside the shared vocabulary', () => {
-    seedInvite(ids.invite)
-    expect(() =>
-      handle.client
-        .prepare(
-          `INSERT INTO attendance (id, event_id, account_id, joined_at, payment_status)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .run(ids.member, ids.event, ids.account, 'Someone', 'a@b.c', 'refunded', ids.invite),
-    ).toThrow()
+    expect(() => insertAttendance('refunded')).toThrow()
+  })
+
+  it('accepts one inside it, so the rejection above is the CHECK and not the statement', () => {
+    expect(() => insertAttendance('unpaid')).not.toThrow()
   })
 
   it('rejects an unknown role', () => {
@@ -456,39 +460,30 @@ describe('check constraints', () => {
     ).toThrow()
   })
 
+  const insertStay = (arrival: string, departure: string) =>
+    handle.client
+      .prepare(
+        `INSERT INTO attendance (id, event_id, account_id, joined_at, arrival_date, departure_date, payment_status)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(ids.member, ids.event, ids.account, NOW, arrival, departure, 'unpaid')
+
   it('rejects a member departing before they arrive', () => {
-    seedInvite(ids.invite)
-    expect(() =>
-      handle.client
-        .prepare(
-          `INSERT INTO attendance (id, event_id, account_id, joined_at, arrival_date, departure_date,
-                               payment_status, invite_token_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .run(
-          ids.member,
-          ids.event,
-          ids.account,
-          'Someone',
-          'a@b.c',
-          '2026-10-04',
-          '2026-10-02',
-          'unpaid',
-          ids.invite,
-        ),
-    ).toThrow()
+    expect(() => insertStay('2026-10-04', '2026-10-02')).toThrow()
+  })
+
+  it('accepts the same row with the dates in order', () => {
+    expect(() => insertStay('2026-10-02', '2026-10-04')).not.toThrow()
   })
 
   it('rejects half a time slot', () => {
-    seedInvite(ids.invite)
-    seedMember(ids.member, ids.account, ids.invite)
     expect(() =>
       handle.client
         .prepare(
           `INSERT INTO session (id, event_id, title, host_account_id, description, time_slot_start, time_slot_end)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
         )
-        .run('s-half', ids.event, 'Half a slot', ids.member, '', '2026-10-03T09:00:00Z', null),
+        .run('s-half', ids.event, 'Half a slot', ids.account, '', '2026-10-03T09:00:00Z', null),
     ).toThrow()
   })
 
@@ -507,7 +502,7 @@ describe('check constraints', () => {
 
   it('still accepts a null date, since arrival and departure are optional', () => {
     seedInvite(ids.invite)
-    expect(() => seedMember(ids.member, ids.account, ids.invite)).not.toThrow()
+    expect(() => seedAttendance(ids.member, ids.account)).not.toThrow()
   })
 
   it('rejects a negative question order', () => {
@@ -644,7 +639,7 @@ describe('account deletion', () => {
   it('is blocked for an account that is a member somewhere', () => {
     seedAccount(ids.otherAccount, 'someone.else@example.org')
     seedInvite(ids.invite)
-    seedMember(ids.member, ids.otherAccount, ids.invite)
+    seedAttendance(ids.member, ids.otherAccount)
 
     expect(() => handle.db.delete(account).where(eq(account.id, ids.otherAccount)).run()).toThrow()
   })
@@ -681,7 +676,7 @@ describe('transactions', () => {
 describe('sessions', () => {
   it('accepts an unscheduled dream — the normal state before the burn', () => {
     seedInvite(ids.invite)
-    seedMember(ids.member, ids.account, ids.invite)
+    seedAttendance(ids.member, ids.account)
 
     handle.db
       .insert(session)

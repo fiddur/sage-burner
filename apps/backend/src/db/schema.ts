@@ -366,10 +366,13 @@ export const inviteToken = sqliteTable(
 )
 
 /**
- * A person's participation in one specific burn.
+ * These three migrations are safe only because both tables are empty everywhere.
  *
- * Scoped to `(event, account)`: the same human attending three burns has three
- * rows, each with its own payment state, allergies and arrival dates.
+ * `DROP TABLE member` discards rows rather than moving them, and the `session`
+ * rebuild makes `host_account_id` NOT NULL while backfilling nothing — either
+ * would fail or lose data against a populated database. Nothing outside tests has
+ * ever written `member` or `session`, which is what makes that acceptable here
+ * and is not a precedent for the next table rebuild.
  */
 /**
  * One person's participation in one burn.
@@ -443,9 +446,17 @@ export const session = sqliteTable(
      * a host who is not coming to this burn. Ordinary application logic rather
      * than a race, so the scheduling routes (#20) own it.
      */
+    /**
+     * No `onDelete`, matching `invite_token.created_by` and
+     * `attendance.account_id`: an account that has hosted something cannot be
+     * deleted, rather than having its dreams silently vanish. It used to cascade
+     * from `member`, where it meant "this person's stay at this burn ended", but
+     * pointed at the account it would mean "erase everything they ever hosted".
+     * #35 owns what account deletion should actually do.
+     */
     host_account_id: text('host_account_id')
       .notNull()
-      .references(() => account.id, { onDelete: 'cascade' }),
+      .references(() => account.id),
     description: text('description').notNull().default(''),
     time_slot_start: text('time_slot_start'),
     time_slot_end: text('time_slot_end'),

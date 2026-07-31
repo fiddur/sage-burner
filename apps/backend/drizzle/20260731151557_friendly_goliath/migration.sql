@@ -9,7 +9,7 @@ CREATE TABLE `__new_session` (
 	`time_slot_end` text,
 	`location` text,
 	CONSTRAINT `fk_session_event_id_event_id_fk` FOREIGN KEY (`event_id`) REFERENCES `event`(`id`) ON DELETE CASCADE,
-	CONSTRAINT `fk_session_host_account_id_account_id_fk` FOREIGN KEY (`host_account_id`) REFERENCES `account`(`id`) ON DELETE CASCADE,
+	CONSTRAINT `fk_session_host_account_id_account_id_fk` FOREIGN KEY (`host_account_id`) REFERENCES `account`(`id`),
 	CONSTRAINT "session_slot_whole_check" CHECK(("time_slot_start" is null) = ("time_slot_end" is null))
 );
 --> statement-breakpoint

@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "bd086620-649d-46b6-8042-43bcfb67814e",
+  "id": "6f26baf8-2158-4b1d-8285-bb80052c1deb",
   "prevIds": ["c356d82d-ca43-484a-a45a-b26470dcfc0e"],
   "ddl": [
     {
@@ -763,7 +763,7 @@
       "tableTo": "account",
       "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
+      "onDelete": "NO ACTION",
       "nameExplicit": false,
       "name": "fk_session_host_account_id_account_id_fk",
       "entityType": "fks",
