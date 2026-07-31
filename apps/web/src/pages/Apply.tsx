@@ -234,7 +234,8 @@ export const Apply = ({ api }: ApplyProps) => {
 
         {questions?.map((question) => {
           const problem = problemFor(question.id)
-          const helpId = question.help_text === null ? undefined : `${question.id}-help`
+          const help = helpHtml.get(question.id)
+          const helpId = help === undefined ? undefined : `${question.id}-help`
           const errorId = problem === undefined ? undefined : `${question.id}-error`
           // Both, when both apply: announcing the error by replacing the
           // description would drop the explanation of how to answer.
@@ -288,14 +289,14 @@ export const Apply = ({ api }: ApplyProps) => {
                 )}
               </label>
 
-              {helpHtml.get(question.id) !== undefined && (
+              {help !== undefined && (
                 // A div, not a p: markdown renders block content, and a list
                 // inside a paragraph is invalid HTML the browser silently
                 // reshapes. Escaped rather than filtered — see `markdown.ts`.
                 <div
                   class="form-note markdown-preview"
                   id={helpId}
-                  dangerouslySetInnerHTML={{ __html: helpHtml.get(question.id) ?? '' }}
+                  dangerouslySetInnerHTML={{ __html: help }}
                 />
               )}
 

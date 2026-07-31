@@ -128,13 +128,17 @@ describe('routing', () => {
     // is the same failure one level up.
     const admin = { status: 'signed-in', account: { id: 'a1', roles: ['admin', 'member'] } } as const
     const { container } = renderAt('/admin', admin)
-    const paths = [...container.querySelectorAll('a[href^="/admin"]')].map(
-      (link) => link.getAttribute('href') ?? '/admin',
+    // Scoped to the page, not the container: `Layout`'s nav renders its own
+    // `/admin` link for an admin, so scraping the whole tree would satisfy the
+    // guard below even if the landing page had lost every link on it.
+    const page = container.querySelector('section.page')
+    const paths = [...(page?.querySelectorAll('a[href^="/admin"]') ?? [])].map((link) =>
+      link.getAttribute('href'),
     )
 
     expect(paths.length).toBeGreaterThan(0)
 
-    for (const path of ['/admin', ...paths]) {
+    for (const path of ['/admin', ...paths.filter((href) => href !== null)]) {
       cleanup()
       renderAt(path, admin)
       expect(screen.getByRole('heading', { level: 1 }).textContent, path).not.toBe('Nothing here')

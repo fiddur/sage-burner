@@ -255,7 +255,11 @@ a:hover {
   gap: 0.75rem;
 }
 
-.tab-current {
+/* `.tabs`-qualified so it out-specifies `.link-button`, whose `font: inherit`
+   shorthand resets the weight and which comes later in the file. Without that,
+   the two tabs render identically and `aria-pressed` is the only signal — which
+   a sighted user does not get. */
+.tabs .tab-current {
   font-weight: 600;
 }
 
