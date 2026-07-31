@@ -703,6 +703,20 @@ Two rules that are the server's, not the browser's:
 are — and `no-cache`, so a question added a moment ago is not hidden behind a
 stale response. Every write is admin-only.
 
+**Help text is markdown**, edited in a textarea with Write and Preview tabs. It
+carries the things that need more than a line — the 10+1 principles an
+`agreement` asks someone to accept, for instance — so it needs lists and
+paragraphs. It was a 2000-character single-line `<input>`, which made writing
+them impossible.
+
+The label stays plain single-line text: it is the field's accessible name, and a
+list inside a `<label>` is not markup a screen reader can make sense of. Long
+text belongs in the help text below it.
+
+Rendering is the same `renderMarkdown` the welcome text uses — raw HTML escaped
+rather than filtered, link and image URLs checked against an allowlist. See
+[Markdown is escaped, not filtered](#markdown-is-escaped-not-filtered).
+
 **`required` is decided by the type for the two tick-box kinds, not chosen.**
 
 - An **`agreement`** is always required. The type exists because submission is

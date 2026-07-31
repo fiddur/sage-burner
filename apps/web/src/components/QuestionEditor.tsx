@@ -6,6 +6,7 @@ import { useEffect, useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
+import { MarkdownField } from './MarkdownField.tsx'
 
 export type QuestionsApi = Pick<
   ApiClient,
@@ -203,8 +204,8 @@ export const QuestionEditor = ({ api }: { api: QuestionsApi }) => {
                 }
               />
             ) : (
-              <>
-                <span class="question-label">{row.label}</span>{' '}
+              <div class="question-row">
+                <span class="question-label">{row.label}</span>
                 <span class="form-note">
                   {TYPE_LABELS[row.type]}
                   {row.required ? ' · required' : ''}
@@ -240,7 +241,7 @@ export const QuestionEditor = ({ api }: { api: QuestionsApi }) => {
                 >
                   Remove
                 </button>
-              </>
+              </div>
             )}
           </li>
         ))}
@@ -273,14 +274,12 @@ export const QuestionEditor = ({ api }: { api: QuestionsApi }) => {
           </select>
         </label>
 
-        <label class="field">
-          <span>Help text (optional)</span>
-          <input
-            maxLength={2000}
-            value={draft.help_text}
-            onInput={(inputEvent) => setDraft({ ...draft, help_text: inputEvent.currentTarget.value })}
-          />
-        </label>
+        <MarkdownField
+          label="Help text (optional, markdown)"
+          value={draft.help_text}
+          maxLength={2000}
+          onInput={(help_text) => setDraft({ ...draft, help_text })}
+        />
 
         {/*
           Disabled for `agreement`, not merely defaulted: that type exists because
@@ -367,14 +366,7 @@ const QuestionFields = ({
         </select>
       </label>
 
-      <label class="field">
-        <span>Help text</span>
-        <input
-          maxLength={2000}
-          value={helpText}
-          onInput={(inputEvent) => setHelpText(inputEvent.currentTarget.value)}
-        />
-      </label>
+      <MarkdownField label="Help text (markdown)" value={helpText} maxLength={2000} onInput={setHelpText} />
 
       <label class="field-inline">
         <input

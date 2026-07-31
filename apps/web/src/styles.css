@@ -179,6 +179,21 @@ a:hover {
   font: inherit;
 }
 
+.field textarea {
+  min-height: 5.5rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--sage) 40%, transparent);
+  border-radius: var(--radius);
+  background: var(--paper);
+  font: inherit;
+  resize: vertical;
+}
+
+.field textarea:focus-visible {
+  outline: 2px solid var(--ember);
+  outline-offset: 1px;
+}
+
 .field input:focus-visible {
   outline: 2px solid var(--ember);
   outline-offset: 1px;
@@ -248,6 +263,25 @@ a:hover {
   gap: 0.5rem;
 }
 
+/* Write / Preview on a markdown field. */
+.tabs {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.tab-current {
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+/* Was a class hook with no rules, so "Apply to join" and "Log in" touched. */
+.home-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+}
+
 /* The question builder, on its own admin page. */
 .questions {
   margin-top: 1.5rem;
@@ -260,6 +294,16 @@ a:hover {
   flex-direction: column;
   gap: 0.5rem;
   padding-left: 1.25rem;
+}
+
+/* The label, the type note and the four controls, which otherwise render as one
+   run-on word: "required↑↓EditRemove". Not on the `li`, which also holds the
+   edit form. */
+.question-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
 }
 
 .question-label {
