@@ -31,8 +31,6 @@ describe('answerProblems', () => {
   })
 
   it('accepts an optional question left out entirely', () => {
-    // Absent is how an unanswered optional question arrives — the answers record
-    // is partial precisely so this is expressible.
     expect(answerProblems([optional, agree], { 'q-agree': true })).toEqual([])
   })
 
@@ -41,8 +39,6 @@ describe('answerProblems', () => {
   })
 
   it('rejects a required question answered with whitespace', () => {
-    // Otherwise `required` means "the key was present", which is not what an
-    // organiser reading the application needs it to mean.
     expect(answerProblems([text], { 'q-text': '   ' })).toEqual([
       { question_id: 'q-text', reason: 'missing' },
     ])
@@ -55,8 +51,6 @@ describe('answerProblems', () => {
   })
 
   it('rejects a missing agreement the same way as an unticked one', () => {
-    // Absent and false mean the same thing for a tick box, and answering
-    // otherwise would let a submitter skip the agreement by omitting the key.
     expect(answerProblems([agree], {})).toEqual([{ question_id: 'q-agree', reason: 'unchecked' }])
   })
 
@@ -79,10 +73,6 @@ describe('answerProblems', () => {
   })
 
   it('rejects an answer longer than the schema allows', () => {
-    // The limit lives here rather than only in the Zod schema, so the form can
-    // refuse it too. Split, the API rejected a long answer the form had accepted
-    // — and a long answer is expected in exactly the "why do you want to come"
-    // field.
     expect(answerProblems([optional], { 'q-opt': 'x'.repeat(MAX_ANSWER_LENGTH + 1) })).toEqual([
       { question_id: 'q-opt', reason: 'too_long' },
     ])
@@ -95,16 +85,12 @@ describe('answerProblems', () => {
   })
 
   it('rejects an answer to a question that does not exist', () => {
-    // A deleted or invented id. Storing it would put a key in `answers` that
-    // nothing can ever label, which is the orphaning the DELETE handler warns of.
     expect(answerProblems([text], { 'q-text': 'Fredrik', 'q-gone': 'x' })).toEqual([
       { question_id: 'q-gone', reason: 'unknown' },
     ])
   })
 
   it('reports every problem, not just the first', () => {
-    // The form marks all of them at once; returning one would walk the applicant
-    // through their mistakes one submission at a time.
     expect(answerProblems([text, agree], {})).toEqual([
       { question_id: 'q-text', reason: 'missing' },
       { question_id: 'q-agree', reason: 'unchecked' },

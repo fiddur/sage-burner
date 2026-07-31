@@ -32,12 +32,6 @@ interface ApplyProps {
   api: ApplyApi
 }
 
-/**
- * What to say about a field the applicant has not filled in properly.
- *
- * Keyed off the same `answerProblems` the server refuses on, so the two agree
- * about a given set of questions.
- */
 const problemText = (reason: AnswerProblem['reason']) => {
   if (reason === 'unchecked') return 'Please tick this to continue.'
   if (reason === 'missing') return 'Please answer this.'
@@ -46,17 +40,7 @@ const problemText = (reason: AnswerProblem['reason']) => {
   return 'That answer is not valid.'
 }
 
-/**
- * The identity fields' own rules, mirroring `nonEmptyText(max)` exactly.
- *
- * Both halves matter and both were missing at first. `.trim().min(1)` means
- * `"   "` is refused, while the browser's `required` accepts it; `.max(n)` means
- * a long paste is refused, and nothing in the browser stops one.
- *
- * Either gap put the applicant in the same dead end — a 400 the page could only
- * explain as "the questions changed, reload", which throws away what they wrote
- * and fails identically on the retry.
- */
+/** Mirrors `nonEmptyText(max)`, so the form and the API agree on these too. */
 const identityProblem = (value: string, max: number) => {
   if (value.trim() === '') return 'blank'
   if (value.length > max) return 'too_long'
@@ -65,19 +49,11 @@ const identityProblem = (value: string, max: number) => {
 }
 
 /**
- * Why this form uses `aria-required` rather than the native `required` that
- * `Login` uses.
- *
- * Native validation blocks submission before the handler runs, so the browser
- * would decide the empty cases and this page the rest — two validators with
- * different verdicts. The browser's is the weaker of the two: it accepts
- * `"   "`, which the API refuses, and it has no idea an `agreement` must be
- * ticked rather than merely present.
- *
- * Leaving one authority means every message below is reachable and testable, and
- * the verdict the applicant sees is the same one `answerProblems` gives the
- * server. `aria-required` keeps the announcement; the visible `· required`
- * marker keeps it on screen.
+ * The controls below are `aria-required`, not natively `required`, because
+ * native validation blocks submission before this page's handler runs — leaving
+ * the browser to decide the empty cases and `answerProblems` the rest. The
+ * browser is the weaker of the two: it accepts `"   "`, and it does not know an
+ * `agreement` must be ticked rather than merely present.
  */
 
 /** The problems are `field:reason`, so a field is flagged whatever its reason. */
@@ -102,14 +78,9 @@ export const Apply = ({ api }: ApplyProps) => {
     api
       .getQuestions(controller.signal)
       .then((response) => {
-        // Sorted here rather than trusted from the wire: the ordering is what an
-        // organiser arranged, and a form that renders it differently from the
-        // admin preview is a bug an organiser cannot diagnose.
         setQuestions([...response.questions].sort((a, b) => a.order - b.order))
       })
       .catch(() => {
-        // Distinguished from "no questions yet": an empty form after a failed
-        // load would invite someone to apply without answering anything.
         if (!controller.signal.aborted) setLoadFailed(true)
       })
 
@@ -127,9 +98,7 @@ export const Apply = ({ api }: ApplyProps) => {
   }, [])
 
   const submit = async () => {
-    // Guarded by the disabled button as well, so this is the belt to that brace:
-    // validating against a list that has not arrived would pass every rule
-    // vacuously and send an empty application the server then refuses.
+    // Every rule passes vacuously against a list that has not arrived.
     if (questions === undefined) return
 
     const found = answerProblems(questions, answers)
@@ -146,8 +115,6 @@ export const Apply = ({ api }: ApplyProps) => {
 
     setSending(true)
     try {
-      // Trimmed, because that is what the server stores — `nonEmptyText` trims,
-      // so sending the padding would only have it thrown away.
       await api.submitApplication({
         applicant_name: name.trim(),
         applicant_contact: contact.trim(),
@@ -155,14 +122,9 @@ export const Apply = ({ api }: ApplyProps) => {
       })
       setSent(true)
     } catch (error) {
-      // A 400 here means the server disagrees with this page about the questions
-      // — one was added or removed since it loaded — so the two ran the same
-      // rules against different lists. "Try again" would be false advice:
-      // retrying sends an identical body and fails identically. Anything else is
-      // a transport failure, where retrying is exactly right.
-      //
-      // The answers stay on screen either way. A dropped connection losing a
-      // long written answer is the one failure here that costs real work.
+      // A 400 means the questions changed since this page loaded, so retrying
+      // sends an identical body and fails identically. The answers stay on
+      // screen either way.
       setSendError(
         isApiError(error) && error.status === 400
           ? 'The questions changed while you were filling this in. Please reload the page and send it again.'
@@ -260,9 +222,8 @@ export const Apply = ({ api }: ApplyProps) => {
           const problem = problemFor(question.id)
           const helpId = question.help_text === null ? undefined : `${question.id}-help`
           const errorId = problem === undefined ? undefined : `${question.id}-error`
-          // Both, when both apply: `aria-describedby` takes a list, and dropping
-          // the help text in order to announce the error would remove the very
-          // explanation that says how to answer.
+          // Both, when both apply: announcing the error by replacing the
+          // description would drop the explanation of how to answer.
           const describedBy = [helpId, errorId].filter((id) => id !== undefined).join(' ')
           const described = describedBy === '' ? undefined : describedBy
 
@@ -277,8 +238,7 @@ export const Apply = ({ api }: ApplyProps) => {
                     aria-invalid={problem !== undefined}
                     aria-describedby={described}
                     checked={answers[question.id] === true}
-                    // `onChange`, matching `QuestionEditor` — a click on a
-                    // checkbox does not reliably raise `input`.
+                    // A click on a checkbox does not reliably raise `input`.
                     onChange={(event) => answer(question.id, event.currentTarget.checked)}
                   />
                 )}
@@ -335,11 +295,6 @@ export const Apply = ({ api }: ApplyProps) => {
           </p>
         )}
 
-        {/*
-          Disabled until the questions are known: submitting before they arrive
-          would mean answering a form nobody has seen, and the server — which
-          reads the questions itself — would refuse it.
-        */}
         <button type="submit" disabled={sending || questions === undefined}>
           {sending ? 'Sending…' : 'Send application'}
         </button>

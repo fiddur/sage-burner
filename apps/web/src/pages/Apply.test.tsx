@@ -173,8 +173,6 @@ describe('Apply', () => {
   })
 
   it('refuses to send while a required question is unanswered', async () => {
-    // The same rule the server enforces, from the same function — the form marks
-    // the field rather than letting the applicant discover it via a 400.
     const submitApplication = vi.fn(() => Promise.resolve({ application: {} as never }))
     render(
       <Apply
@@ -219,8 +217,6 @@ describe('Apply', () => {
   })
 
   it('confirms after submitting, and says what happens next', async () => {
-    // No email is sent in v1, so leaving this vague would have applicants waiting
-    // for a message that never arrives.
     render(<Apply api={stub({ submitApplication: () => Promise.resolve({ application: {} as never }) })} />)
 
     await ready()
@@ -233,8 +229,6 @@ describe('Apply', () => {
   })
 
   it('keeps the answers on screen when the request fails', async () => {
-    // Losing a long "why do you want to come" answer to a dropped connection is
-    // the one failure here that costs the applicant real work.
     render(
       <Apply
         api={stub({
@@ -255,8 +249,6 @@ describe('Apply', () => {
   })
 
   it('says so when the form has no questions yet', async () => {
-    // The state the app ships in. A page with nothing but a name box reads as
-    // broken, so it says why rather than leaving the applicant guessing.
     render(<Apply api={stub()} />)
 
     await ready()
@@ -265,9 +257,6 @@ describe('Apply', () => {
   })
 
   it('refuses a name of only spaces, rather than letting the server say no', async () => {
-    // `nonEmptyText` is `.trim().min(1)`, so `"   "` is a 400. Caught here it is
-    // a field to fix; caught by the API it is a dead end — the applicant is told
-    // to try again, and trying again sends exactly the same body.
     const submitApplication = vi.fn(() => Promise.resolve({ application: {} as never }))
     render(<Apply api={stub({ submitApplication })} />)
 
@@ -348,8 +337,6 @@ describe('Apply', () => {
   })
 
   it('says a transport failure is worth retrying, unlike a rejection', async () => {
-    // The passing sibling to the test above: the two failures must not give the
-    // same advice, since one of them is worth acting on.
     render(
       <Apply api={stub({ submitApplication: () => Promise.reject(new TypeError('Failed to fetch')) })} />,
     )
@@ -362,7 +349,6 @@ describe('Apply', () => {
   })
 
   it('marks which questions are required', async () => {
-    // Otherwise an applicant discovers it by pressing Send and being bounced.
     render(
       <Apply
         api={stub({
@@ -382,8 +368,6 @@ describe('Apply', () => {
   })
 
   it('links the error to the field it belongs to', async () => {
-    // A `role="alert"` floating near an input is not associated with it: a screen
-    // reader user hears the complaint without knowing which question it is about.
     render(
       <Apply
         api={stub({
@@ -406,8 +390,6 @@ describe('Apply', () => {
   })
 
   it('keeps the help text reachable when the field also has an error', async () => {
-    // Replacing the description with the error would drop the very explanation
-    // that says how to answer.
     render(
       <Apply
         api={stub({
@@ -438,9 +420,6 @@ describe('Apply', () => {
   })
 
   it('will not send before the questions have loaded', async () => {
-    // Otherwise every rule passes vacuously against an empty question list, and
-    // the applicant sends a form nobody has seen — which the server, reading the
-    // questions itself, then refuses.
     const submitApplication = vi.fn(() => Promise.resolve({ application: {} as never }))
     render(<Apply api={stub({ submitApplication, getQuestions: () => new Promise(() => undefined) })} />)
 

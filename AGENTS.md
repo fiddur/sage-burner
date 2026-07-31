@@ -72,6 +72,18 @@ by reading Rollup's docs.
   (db handle, clock, config) in as arguments rather than importing singletons.
 - Avoid global variables, module-level mutable state, and singletons.
 - Avoid casting. Use proper typing and type guards.
+- **Comment sparingly.** Good naming should carry the code; in almost every case
+  it can. Add a comment only where a reader needs to know _why_ the code is as it
+  is — a decision they would otherwise undo, a constraint that is not visible
+  locally. Do not narrate what the next line does, restate a well-named function,
+  or record how a bug was found; that belongs in the commit message.
+
+  If a block needs a comment to say what it does, give it a name instead.
+
+  Much of the existing code predates this and is far more heavily commented.
+  Follow the rule, not the surroundings, and thin the prose where you are editing
+  anyway.
+
 - `pnpm fix` formats and auto-fixes lint. `pnpm check` verifies formatting,
   type-checks, and lints — it is the same gate CI runs, so a green `check`
   locally means a green CI.

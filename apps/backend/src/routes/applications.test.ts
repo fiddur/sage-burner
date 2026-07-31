@@ -66,8 +66,6 @@ const givenQuestion = async (over: Partial<FormQuestion> & Pick<FormQuestion, 't
   return id
 }
 
-// Return type named, so `(await submit(...)).statusCode` resolves — `inject`'s
-// chainable union does not survive an inline await.
 const submit = (server: FastifyInstance, payload: Record<string, unknown>): Promise<LightMyRequestResponse> =>
   server.inject({ method: 'POST', url: '/api/applications', payload })
 
@@ -91,8 +89,6 @@ describe('submitting an application', () => {
   })
 
   it('stores the wording as asked, not just the question id', async () => {
-    // The point of the snapshot: an organiser edits the question afterwards and
-    // the stored application still reads as the applicant saw it.
     const server = await build()
     const id = await givenQuestion({ type: 'text', label: 'Why do you want to come?', required: true })
 
@@ -121,8 +117,6 @@ describe('submitting an application', () => {
     const second = await givenQuestion({ type: 'text', label: 'Second', order: 1 })
     const first = await givenQuestion({ type: 'text', label: 'First', order: 0 })
 
-    // Sent in the wrong order on purpose: the stored order must come from the
-    // questions, not from however the client serialised its object.
     await submit(server, { ...applicant, answers: { [second]: 'b', [first]: 'a' } })
 
     const [row] = await stored()
@@ -140,8 +134,6 @@ describe('submitting an application', () => {
   })
 
   it('refuses a submission with an unticked agreement', async () => {
-    // The acceptance criterion #14 names. `agreement` exists so that submission
-    // is blocked when it is unticked; if this passes, the type means nothing.
     const server = await build()
     const agree = await givenQuestion({ type: 'agreement', label: 'I agree', required: true })
 
@@ -197,16 +189,12 @@ describe('submitting an application', () => {
   })
 
   it('accepts a form with no questions yet', async () => {
-    // The state the app ships in. Refusing here would make the form unusable
-    // until an organiser had written a question.
     const server = await build()
 
     expect((await submit(server, { ...applicant, answers: {} })).statusCode).toBe(201)
   })
 
   it('stores an unticked checkbox as false rather than dropping it', async () => {
-    // Every question asked is recorded, answered or not — otherwise a reviewer
-    // cannot tell "said no" from "was never asked".
     const server = await build()
     const box = await givenQuestion({ type: 'checkbox', label: 'Bring food', required: false })
 

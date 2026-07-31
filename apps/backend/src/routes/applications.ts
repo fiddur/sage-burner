@@ -16,24 +16,18 @@ export interface ApplicationRouteDeps {
 }
 
 /**
- * Applying to join.
+ * Applying to join — the one write in this app open to the public, since an
+ * applicant has no account yet.
  *
- * The one write in this app open to the public, which is the whole point — an
- * applicant has no account yet. Everything in the body is therefore
- * attacker-controlled, and two things follow:
+ * Everything in the body is attacker-controlled, so the submitter names only
+ * their answers: `.strict()` turns an attempt at `status` or `id` into a 400
+ * rather than a silently dropped key, and the labels stored beside each answer
+ * come from the question rows, so nobody can record a question that was never
+ * asked.
  *
- * - The submitter names only their answers. `status`, `id` and the timestamps
- *   are the server's, and `.strict()` turns an attempt at any of them into a 400
- *   rather than a silently dropped key.
- * - The questions are re-read here rather than taken from the request. The
- *   labels stored beside each answer come from those rows, so a submitter cannot
- *   record a question that was never asked.
- *
- * Not rate-limited in the app, consistent with the login route: throttling lives
- * in the reverse proxy, where an operator can see and tune it, and the README's
- * deployment section says so. The realistic abuse here is someone filling the
- * organisers' review list with junk, which is a nuisance to delete rather than a
- * way in — nothing here grants access, and approval is a deliberate human act.
+ * Not rate-limited here, consistent with login: throttling lives in the reverse
+ * proxy where an operator can see it. Nothing here grants access, so the
+ * realistic abuse is junk in the review list.
  */
 export const registerApplicationRoutes = (
   app: FastifyInstance,
@@ -45,26 +39,19 @@ export const registerApplicationRoutes = (
     const parsed = applicationCreateSchema.safeParse(request.body)
     if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
 
-    // Read in display order, so the stored answers read top to bottom the way the
-    // applicant filled them in rather than in whatever order the client's object
-    // happened to serialise.
     const questions = await db.select().from(formQuestion).orderBy(asc(formQuestion.order))
 
-    // The same function the form marks its fields with, so the two agree about a
-    // given set of questions. That is all it buys, and the limits are worth being
-    // exact about: it says nothing about `applicant_name`/`applicant_contact`,
-    // and the form runs it against the questions as they were when the page
-    // loaded. A question added or removed since then puts the two on different
-    // lists, and this is the side that decides — hence the form telling the
-    // applicant to reload on a 400 rather than to try again.
+    // Sharing these rules with the form buys agreement about the answers given
+    // the same questions, not that a client-complete submission is
+    // server-complete: the form ran them against the questions as they were when
+    // the page loaded, and this is the side that decides.
     if (answerProblems(questions, parsed.data.answers).length > 0) {
       return reply.code(400).send(errorResponse('bad_request'))
     }
 
-    // One entry per question asked, answered or not: a reviewer has to be able to
-    // tell "said no" from "was never asked", and an absent tick box means the
-    // first. The label is snapshotted here — see `storedAnswerSchema` for why a
-    // reference alone does not survive the questions being edited.
+    // One entry per question asked, answered or not, so a reviewer can tell "said
+    // no" from "was never asked". `storedAnswerSchema` says why the wording is
+    // snapshotted rather than referenced.
     const answers: StoredAnswers = questions.map((question) => ({
       question_id: question.id,
       label: question.label,
