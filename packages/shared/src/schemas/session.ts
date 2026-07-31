@@ -44,7 +44,7 @@ export const sessionFields = z.object({
   id: idSchema,
   event_id: idSchema,
   title: nonEmptyText(200),
-  host_member_id: idSchema,
+  host_account_id: idSchema,
   description: z.string().max(20_000),
   time_slot_start: dateTimeSchema.nullable(),
   time_slot_end: dateTimeSchema.nullable(),

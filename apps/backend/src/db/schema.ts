@@ -365,15 +365,13 @@ export const inviteToken = sqliteTable(
   ],
 )
 
-/**
- * These three migrations are safe only because both tables are empty everywhere.
- *
- * `DROP TABLE member` discards rows rather than moving them, and the `session`
- * rebuild makes `host_account_id` NOT NULL while backfilling nothing — either
- * would fail or lose data against a populated database. Nothing outside tests has
- * ever written `member` or `session`, which is what makes that acceptable here
- * and is not a precedent for the next table rebuild.
- */
+// The migrations introducing this table are safe only because both `member` and
+// `session` are empty everywhere. `DROP TABLE member` discards rows rather than
+// moving them, and the `session` rebuild makes `host_account_id` NOT NULL while
+// backfilling nothing — either would fail or lose data against a populated
+// database. Nothing outside tests has ever written either table, which is what
+// makes that acceptable here and is not a precedent for the next rebuild.
+
 /**
  * One person's participation in one burn.
  *

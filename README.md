@@ -913,7 +913,7 @@ The list never carries the digest, let alone the token.
 **Only an unredeemed direct invite can be revoked.** The other two cases are
 refused with `409`, for different reasons:
 
-- a **redeemed** invite is the record of how someone got in, and `member`
+- a **redeemed** invite is the record of how someone got in, and `account`
   references it — deleting it would rewrite how the group formed;
 - an **application's** invite is the only one that application will ever have, so
   revoking it would leave the applicant approved with no way in, which is

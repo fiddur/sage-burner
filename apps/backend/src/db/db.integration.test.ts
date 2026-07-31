@@ -28,8 +28,8 @@ const ids = {
   event: 'e0000000-0000-4000-8000-000000000001',
   invite: 'i0000000-0000-4000-8000-000000000001',
   otherInvite: 'i0000000-0000-4000-8000-000000000002',
-  member: 'm0000000-0000-4000-8000-000000000001',
-  otherMember: 'm0000000-0000-4000-8000-000000000002',
+  attendance: 'm0000000-0000-4000-8000-000000000001',
+  otherAttendance: 'm0000000-0000-4000-8000-000000000002',
 }
 
 const NOW = '2026-07-28T10:00:00Z'
@@ -154,7 +154,7 @@ describe('migrations', () => {
     // foreign_key_check this commits silently and an organiser opens an empty
     // member list; with it, the boot fails instead.
     seedInvite(ids.invite)
-    seedAttendance(ids.member, ids.account)
+    seedAttendance(ids.attendance, ids.account)
 
     handle.client.exec('PRAGMA foreign_keys = OFF')
     handle.client.exec(`DELETE FROM event WHERE id = '${ids.event}'`)
@@ -177,7 +177,7 @@ describe('foreign keys', () => {
       handle.db
         .insert(attendance)
         .values({
-          id: ids.member,
+          id: ids.attendance,
           event_id: 'e0000000-0000-4000-8000-00000000dead',
           account_id: ids.account,
           joined_at: NOW,
@@ -189,7 +189,7 @@ describe('foreign keys', () => {
 
   it('cascades an event deletion to everything scoped to it', () => {
     seedInvite(ids.invite)
-    seedAttendance(ids.member, ids.account)
+    seedAttendance(ids.attendance, ids.account)
     handle.db
       .insert(session)
       .values({
@@ -239,14 +239,14 @@ describe('uniqueness', () => {
   it('allows only one membership per account per event', () => {
     seedInvite(ids.invite)
     seedInvite(ids.otherInvite)
-    seedAttendance(ids.member, ids.account)
+    seedAttendance(ids.attendance, ids.account)
 
-    expect(() => seedAttendance(ids.otherMember, ids.account)).toThrow()
+    expect(() => seedAttendance(ids.otherAttendance, ids.account)).toThrow()
   })
 
   it('lets the same account be a member of a different event', () => {
     seedInvite(ids.invite)
-    seedAttendance(ids.member, ids.account)
+    seedAttendance(ids.attendance, ids.account)
 
     handle.db
       .insert(event)
@@ -274,7 +274,7 @@ describe('uniqueness', () => {
       handle.db
         .insert(attendance)
         .values({
-          id: ids.otherMember,
+          id: ids.otherAttendance,
           event_id: 'e0000000-0000-4000-8000-000000000002',
           account_id: ids.account,
           joined_at: NOW,
@@ -406,7 +406,7 @@ describe('check constraints', () => {
         `INSERT INTO attendance (id, event_id, account_id, joined_at, payment_status)
          VALUES (?, ?, ?, ?, ?)`,
       )
-      .run(ids.member, ids.event, ids.account, NOW, paymentStatus)
+      .run(ids.attendance, ids.event, ids.account, NOW, paymentStatus)
 
   it('rejects a payment status outside the shared vocabulary', () => {
     expect(() => insertAttendance('refunded')).toThrow()
@@ -466,7 +466,7 @@ describe('check constraints', () => {
         `INSERT INTO attendance (id, event_id, account_id, joined_at, arrival_date, departure_date, payment_status)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
-      .run(ids.member, ids.event, ids.account, NOW, arrival, departure, 'unpaid')
+      .run(ids.attendance, ids.event, ids.account, NOW, arrival, departure, 'unpaid')
 
   it('rejects a member departing before they arrive', () => {
     expect(() => insertStay('2026-10-04', '2026-10-02')).toThrow()
@@ -502,7 +502,7 @@ describe('check constraints', () => {
 
   it('still accepts a null date, since arrival and departure are optional', () => {
     seedInvite(ids.invite)
-    expect(() => seedAttendance(ids.member, ids.account)).not.toThrow()
+    expect(() => seedAttendance(ids.attendance, ids.account)).not.toThrow()
   })
 
   it('rejects a negative question order', () => {
@@ -639,7 +639,7 @@ describe('account deletion', () => {
   it('is blocked for an account that is a member somewhere', () => {
     seedAccount(ids.otherAccount, 'someone.else@example.org')
     seedInvite(ids.invite)
-    seedAttendance(ids.member, ids.otherAccount)
+    seedAttendance(ids.attendance, ids.otherAccount)
 
     expect(() => handle.db.delete(account).where(eq(account.id, ids.otherAccount)).run()).toThrow()
   })
@@ -658,7 +658,7 @@ describe('transactions', () => {
       handle.db.transaction((tx) => {
         tx.insert(attendance)
           .values({
-            id: ids.member,
+            id: ids.attendance,
             event_id: ids.event,
             account_id: ids.account,
             joined_at: NOW,
@@ -676,7 +676,7 @@ describe('transactions', () => {
 describe('sessions', () => {
   it('accepts an unscheduled dream — the normal state before the burn', () => {
     seedInvite(ids.invite)
-    seedAttendance(ids.member, ids.account)
+    seedAttendance(ids.attendance, ids.account)
 
     handle.db
       .insert(session)

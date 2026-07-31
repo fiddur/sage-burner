@@ -299,7 +299,7 @@ describe('sessionSchema', () => {
     id: ID,
     event_id: OTHER_ID,
     title: 'Cacao ceremony',
-    host_member_id: ID,
+    host_account_id: ID,
     description: 'Bring a cup.',
     time_slot_start: '2026-10-03T09:00:00Z',
     time_slot_end: '2026-10-03T10:30:00Z',
@@ -390,7 +390,7 @@ describe('deriving schemas', () => {
     const halfASlot = {
       event_id: OTHER_ID,
       title: 'Cacao ceremony',
-      host_member_id: ID,
+      host_account_id: ID,
       description: '',
       time_slot_start: '2026-10-03T10:00:00Z',
       time_slot_end: null,
@@ -449,10 +449,10 @@ describe('publicSessionSchema', () => {
       time_slot_start: '2026-10-03T09:00:00Z',
       time_slot_end: '2026-10-03T10:30:00Z',
       location: 'Temple',
-      host_member_id: ID,
+      host_account_id: ID,
       allergies_notes: 'gluten',
     })
-    expect(parsed).not.toHaveProperty('host_member_id')
+    expect(parsed).not.toHaveProperty('host_account_id')
     expect(parsed).not.toHaveProperty('allergies_notes')
   })
 })
