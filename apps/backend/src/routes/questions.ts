@@ -30,9 +30,10 @@ import { noStore } from '../http.ts'
  * CHECK then rejects the second UPDATE and the caller gets a 500. Deciding it
  * inside the statement makes it atomic.
  *
- * `dateOrderCondition` in `routes/events.ts` is the same shape for the same reason,
- * and the two should stay in step: both compose a condition into the `WHERE` rather
- * than checking a merged row in JavaScript.
+ * `stayOrderCondition` in `routes/profile.ts` is the same shape for the same
+ * reason. `events.ts` and `sessions.ts` answer it the other way — reading the row
+ * and checking the merge — because their rules came to span fields a SQL string
+ * comparison cannot judge soundly.
  *
  * With **both** keys present the body settles it alone and the schema refine has
  * already rejected a contradictory pair, so there is nothing to evaluate here.

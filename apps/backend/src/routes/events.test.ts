@@ -380,7 +380,7 @@ describe('admin event routes', () => {
     // in-statement property is real (it is what stops a concurrent move to the
     // other date reaching `event_date_order_check` as a 500) but it is not
     // observable from two sequential requests, so nothing here defends it; the
-    // reachability of `dateOrderCondition` is what this covers.
+    // reachability of the ordering check is what this covers.
     const server = await build()
     const cookie = await givenAdmin()
     const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
@@ -417,10 +417,9 @@ describe('admin event routes', () => {
   })
 
   it('allows a one-sided date move that keeps the order, in either direction', async () => {
-    // The guard must not have become "no single-date patches" — and both branches
-    // of `dateOrderCondition` need a passing case, not just the rejecting one.
-    // Only `end_date` was covered here, so nothing exercised the `start_date`
-    // branch in the direction that should succeed.
+    // The guard must not have become "no single-date patches", and moving either
+    // date needs a passing case, not just a rejecting one. Only `end_date` was
+    // covered here, so nothing exercised a `start_date` move that should succeed.
     const server = await build()
     const cookie = await givenAdmin()
     const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
@@ -435,9 +434,9 @@ describe('admin event routes', () => {
   })
 
   it('allows moving the whole range forward, with both dates in one patch', async () => {
-    // The `return undefined` in `dateOrderCondition`'s both-dates branch. Nothing
-    // exercised it: every other both-dates PATCH here is out of order, so
-    // `withEventDateOrder` rejects it at `safeParse` and the handler never calls the
+    // A both-dates patch that is in order. Nothing exercised it: every other
+    // both-dates PATCH here is out of order, so
+    // `withEventDateOrder` rejects it at `safeParse` and the handler never reaches the
     // function with both set.
     //
     // Deleting that line is not harmless — the next branch would then compare the
@@ -455,8 +454,8 @@ describe('admin event routes', () => {
     expect(row).toMatchObject({ start_date: '2026-09-01', end_date: '2026-09-05' })
   })
 
-  // A one-day event is legal — `event_date_order_check` is `end_date >= start_date`
-  // — so both branches of `dateOrderCondition` must use `<=`, not `<`.
+  // A one-day event is legal, so the ordering rule must admit an equal pair —
+  // `<=`, not `<`, in the schema and in `event_date_order_check` alike.
   //
   // One case each, on its own fixture. They were a single test with two sequential
   // patches, and that only exercised the second boundary *because the first
@@ -644,6 +643,38 @@ describe('the hours a burn is open', () => {
     expect(row('9:00', '12:00')).toThrow()
     expect(row('24:00', '12:00')).toThrow()
     expect(row('10:00', '12:00')).not.toThrow()
+  })
+
+  it('answers 400, not 500, when a patch would invert the stored hours', async () => {
+    // A multi-day burn may run 22:00 to 10:00. Narrowing it to one day makes that
+    // pair invalid, and the body alone cannot see it.
+    const server = await build()
+    const cookie = await givenAdmin()
+    const id = (await create(server, cookie, { ...valid, start_time: '22:00', end_time: '10:00' })).json()
+      .event.id
+
+    const response = await patch(server, cookie, id, {
+      start_date: '2026-08-01',
+      end_date: '2026-08-01',
+    })
+
+    expect(response.statusCode).toBe(400)
+  })
+
+  it('answers 400, not 500, when a patch inverts the times on a single-day burn', async () => {
+    const server = await build()
+    const cookie = await givenAdmin()
+    const id = (
+      await create(server, cookie, {
+        ...valid,
+        start_date: '2026-08-01',
+        end_date: '2026-08-01',
+        start_time: '10:00',
+        end_time: '22:00',
+      })
+    ).json().event.id
+
+    expect((await patch(server, cookie, id, { start_time: '23:00' })).statusCode).toBe(400)
   })
 
   it('keeps an inverted single-day pair out too', async () => {

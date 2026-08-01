@@ -1,8 +1,8 @@
 import type { ActiveEventResponse, Event, EventResponse, EventsResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { errorResponse, eventCreateSchema, eventUpdateSchema } from '@sage-burner/shared'
-import { and, asc, eq, gte, sql } from 'drizzle-orm'
+import { errorResponse, eventCreateSchema, eventUpdateSchema, hasOrderedRange } from '@sage-burner/shared'
+import { asc, eq, gte } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -50,28 +50,6 @@ export const activeEvent = async (db: Database, today: string): Promise<Event | 
     .limit(1)
 
   return row
-}
-
-/**
- * The start-before-end condition for a PATCH, as SQL — or `undefined` when the
- * body cannot break the order.
- *
- * `eventUpdateSchema` tolerates a partial range, because a PATCH may legitimately
- * carry one date. When it carries **one**, the check has to compare the new value
- * against the column, inside the statement: a read-then-check leaves a window
- * where two organisers each moving one date both validate against the pre-update
- * row, and the second UPDATE then trips `event_date_order_check` and answers 500
- * — the outcome the check exists to avoid.
- *
- * When it carries **both**, `withEventDateOrder`'s refine has already rejected an
- * out-of-order pair and `safeParse` answered 400, so the handler never sees one —
- * which is why returning `undefined` here is safe rather than a gap.
- */
-const dateOrderCondition = ({ start_date, end_date }: { start_date?: string; end_date?: string }) => {
-  if (start_date !== undefined && end_date !== undefined) return undefined
-  if (start_date !== undefined) return sql`${start_date} <= ${event.end_date}`
-  if (end_date !== undefined) return sql`${event.start_date} <= ${end_date}`
-  return undefined
 }
 
 /** Whether `error` is SQLite refusing a duplicate `slug`. */
@@ -158,30 +136,21 @@ export const registerEventRoutes = (
           : ({ event: existing } satisfies EventResponse)
       }
 
-      // No both-dates check here. `withEventDateOrder` already rejects a body
-      // carrying both dates in the wrong order, so `safeParse` above answers 400
-      // and this handler never sees one — a guard for it would be unreachable.
-      // `rejects a patch with both dates in the wrong order` covers that path at
-      // the schema, where it actually lives.
+      // The rule applied to the row as it would be, because a body carrying one
+      // date — or only a time — cannot be judged on its own. A multi-day burn may
+      // run 22:00 to 10:00; narrowing it to a single day makes that pair invalid,
+      // and nothing in the body says so.
       //
-      // One date given: the condition goes in the `where`, so it is evaluated
-      // against the row as it is at write time. See `dateOrderCondition`.
-      // No ternary: `and()` drops `undefined` operands, so this is the same SQL
-      // whether or not there is an ordering condition to add.
-      const where = and(eq(event.id, id), dateOrderCondition(parsed.data))
+      // This replaced a condition composed into the WHERE. That handled one date
+      // against the stored other, but had no way to see the times, so those two
+      // patches reached the database and came back as a 500 from
+      // `event_date_order_check`.
+      const [before] = await db.select().from(event).where(eq(event.id, id)).limit(1)
+      if (before === undefined) return reply.code(404).send(errorResponse('not_found'))
 
-      // `.where(undefined)` on a drizzle update is not "match nothing" — it emits no
-      // `WHERE` clause at all, so the `SET` lands on **every** row. `and()` returns
-      // undefined only when every operand is, and `eq(event.id, id)` never is, so
-      // this cannot fire today.
-      //
-      // It is a live guard rather than a dead one, though, which is why the ternary
-      // went: branching on `ordered` produced a definite `SQL` in one arm and made
-      // this provably unreachable. Passing both operands to `and()` leaves `where`
-      // genuinely `SQL | undefined` — the state this is written to catch — so a
-      // later refactor that builds the conditions somewhere they can all be
-      // undefined is stopped here instead of rewriting every event in the database.
-      if (where === undefined) throw new Error('refusing an unfiltered UPDATE on event')
+      if (!hasOrderedRange({ ...before, ...parsed.data })) {
+        return reply.code(400).send(errorResponse('bad_request'))
+      }
 
       // `.returning()` rather than reading `changes`, for two reasons that turn out
       // to be the same one: the row it hands back is the row as written, so the
@@ -192,7 +161,7 @@ export const registerEventRoutes = (
       const updated = await db
         .update(event)
         .set(parsed.data)
-        .where(where)
+        .where(eq(event.id, id))
         .returning()
         .catch((error: unknown) => {
           if (isSlugConflict(error)) return undefined
@@ -203,15 +172,8 @@ export const registerEventRoutes = (
 
       const [row] = updated
       if (row === undefined) {
-        // Two causes: the ordering condition failed, or the row does not exist —
-        // whether it never did or was deleted a moment ago, which are the same thing
-        // from here. There is no read above on this path any more, so there is no
-        // read-then-write window to reason about; the `UPDATE` is the first and only
-        // look at the row.
-        //
-        // Told apart by asking, not guessed at — guessing answered "check the dates
-        // and lengths" for a perfectly ordered move against an event someone else
-        // had just deleted.
+        // One cause left, now the ordering is settled above: the row is gone,
+        // deleted between the read and the write.
         const [stillThere] = await db.select({ id: event.id }).from(event).where(eq(event.id, id)).limit(1)
 
         return stillThere === undefined
