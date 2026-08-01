@@ -265,11 +265,14 @@ describe('AdminEvents', () => {
     await screen.findByLabelText('Name of summer-2026')
 
     fill('Name of summer-2026', '  Something Else  ')
+    fill('Welcome text (markdown)', '# Typed but not stored')
     screen.getByRole('button', { name: 'Save event' }).click()
 
     await waitFor(() =>
       expect(screen.getByLabelText('Name of summer-2026')).toHaveProperty('value', 'Trimmed By Server'),
     )
+    // Bound separately from the rest, so it needs resyncing on its own.
+    expect(screen.getByLabelText('Welcome text (markdown)')).toHaveProperty('value', '# Hello')
   })
 
   it('saves the whole event, not only the welcome text', async () => {
