@@ -23,6 +23,8 @@ const anEvent = {
   slug: 'burning-sage-autumn-2026',
   start_date: '2026-10-02',
   end_date: '2026-10-04',
+  start_time: '15:00',
+  end_time: '12:00',
   welcome_markdown: '# Welcome!',
   member_cap: 42,
   created_at: '2026-07-28T10:00:00Z',
@@ -48,7 +50,13 @@ describe('eventSchema', () => {
   })
 
   it('accepts a single-day event', () => {
-    const parsed = eventSchema.safeParse({ ...anEvent, start_date: '2026-10-02', end_date: '2026-10-02' })
+    const parsed = eventSchema.safeParse({
+      ...anEvent,
+      start_date: '2026-10-02',
+      end_date: '2026-10-02',
+      start_time: '10:00',
+      end_time: '22:00',
+    })
     expect(parsed.success).toBe(true)
   })
 
@@ -56,6 +64,42 @@ describe('eventSchema', () => {
     const parsed = eventSchema.safeParse({ ...anEvent, start_date: '2026-10-04', end_date: '2026-10-02' })
     expect(parsed.success).toBe(false)
     expect(parsed.error?.issues[0]?.path).toEqual(['end_date'])
+  })
+
+  it('accepts an end time earlier in the clock than the start, across days', () => {
+    // The ordinary case, and the reason the times only decide it when the days
+    // are equal: 15:00 Friday to 12:00 Sunday is a normal burn.
+    expect(eventSchema.safeParse(anEvent).success).toBe(true)
+  })
+
+  it('rejects a one-day burn that ends earlier in the day than it starts', () => {
+    const parsed = eventSchema.safeParse({
+      ...anEvent,
+      start_date: '2026-10-02',
+      end_date: '2026-10-02',
+      start_time: '22:00',
+      end_time: '10:00',
+    })
+
+    expect(parsed.success).toBe(false)
+  })
+
+  it('accepts a one-day burn that runs forwards', () => {
+    expect(
+      eventSchema.safeParse({
+        ...anEvent,
+        start_date: '2026-10-02',
+        end_date: '2026-10-02',
+        start_time: '10:00',
+        end_time: '22:00',
+      }).success,
+    ).toBe(true)
+  })
+
+  it('rejects a time that is not a 24-hour clock time', () => {
+    for (const bad of ['9:00', '24:00', '10:60', '1000', '10:00:00', '']) {
+      expect(eventSchema.safeParse({ ...anEvent, start_time: bad }).success, bad).toBe(false)
+    }
   })
 
   it('rejects a non-positive member cap', () => {

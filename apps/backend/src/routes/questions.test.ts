@@ -428,7 +428,7 @@ describe('editing a question', () => {
   it('allows the tick-box changes that are legitimate, in all three shapes', async () => {
     // The passing siblings. Every PATCH here carrying `type` or `required` asserted
     // a 400, so none of `tickBoxCondition`'s three returns had a success case — the
-    // same gap that hid two defects in `dateOrderCondition`, and the reason
+    // same gap that hid two defects in the event date ordering, and the reason
     // AGENTS.md now says a rejecting test needs a passing one.
     const server = await build()
     const cookie = await givenAdmin()

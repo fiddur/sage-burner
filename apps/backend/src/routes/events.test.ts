@@ -9,6 +9,7 @@ import type { DbHandle } from '../db/index.ts'
 import { createApp } from '../app.ts'
 import { createSessions } from '../auth/session.ts'
 import { createConfig } from '../config.ts'
+import { isCheckViolation } from '../db/errors.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, accountRole, event } from '../db/schema.ts'
 import { SESSION_COOKIE } from './auth.ts'
@@ -371,16 +372,8 @@ describe('admin event routes', () => {
 
   it('rejects a one-sided date move in either direction, and stores nothing', async () => {
     // The schema cannot catch this: it tolerates a partial range, since a PATCH
-    // may legitimately carry one date. The handler puts the condition in the
-    // UPDATE's `where` so it is evaluated against the row at write time.
-    //
-    // What these assertions distinguish is that a one-sided move is refused and
-    // the row is untouched — **not** that the decision happens inside the
-    // statement. A read-then-check implementation passes this identically. The
-    // in-statement property is real (it is what stops a concurrent move to the
-    // other date reaching `event_date_order_check` as a 500) but it is not
-    // observable from two sequential requests, so nothing here defends it; the
-    // reachability of `dateOrderCondition` is what this covers.
+    // may legitimately carry one date. The handler reads the row, merges the
+    // patch onto it and checks the result.
     const server = await build()
     const cookie = await givenAdmin()
     const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
@@ -417,10 +410,9 @@ describe('admin event routes', () => {
   })
 
   it('allows a one-sided date move that keeps the order, in either direction', async () => {
-    // The guard must not have become "no single-date patches" — and both branches
-    // of `dateOrderCondition` need a passing case, not just the rejecting one.
-    // Only `end_date` was covered here, so nothing exercised the `start_date`
-    // branch in the direction that should succeed.
+    // The guard must not have become "no single-date patches", and moving either
+    // date needs a passing case, not just a rejecting one. Only `end_date` was
+    // covered here, so nothing exercised a `start_date` move that should succeed.
     const server = await build()
     const cookie = await givenAdmin()
     const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
@@ -435,9 +427,9 @@ describe('admin event routes', () => {
   })
 
   it('allows moving the whole range forward, with both dates in one patch', async () => {
-    // The `return undefined` in `dateOrderCondition`'s both-dates branch. Nothing
-    // exercised it: every other both-dates PATCH here is out of order, so
-    // `withEventDateOrder` rejects it at `safeParse` and the handler never calls the
+    // A both-dates patch that is in order. Nothing exercised it: every other
+    // both-dates PATCH here is out of order, so
+    // `withEventDateOrder` rejects it at `safeParse` and the handler never reaches the
     // function with both set.
     //
     // Deleting that line is not harmless — the next branch would then compare the
@@ -455,8 +447,8 @@ describe('admin event routes', () => {
     expect(row).toMatchObject({ start_date: '2026-09-01', end_date: '2026-09-05' })
   })
 
-  // A one-day event is legal — `event_date_order_check` is `end_date >= start_date`
-  // — so both branches of `dateOrderCondition` must use `<=`, not `<`.
+  // A one-day event is legal, so the ordering rule must admit an equal pair —
+  // `<=`, not `<`, in the schema and in `event_date_order_check` alike.
   //
   // One case each, on its own fixture. They were a single test with two sequential
   // patches, and that only exercised the second boundary *because the first
@@ -546,5 +538,202 @@ describe('admin event routes', () => {
     const response = await server.inject({ method: 'GET', url: '/api/admin/events', headers: { cookie } })
 
     expect(response.headers['cache-control']).toBe('no-store')
+  })
+})
+
+describe('the hours a burn is open', () => {
+  const client = () => {
+    const found = handle?.client
+    if (found === undefined) throw new Error('build() first')
+    return found
+  }
+
+  it('defaults to the whole of both days, so a create form need not ask', async () => {
+    const server = await build()
+    const cookie = await givenAdmin()
+
+    const response = await create(server, cookie, valid)
+
+    expect(response.statusCode).toBe(201)
+    expect(response.json().event).toMatchObject({ start_time: '00:00', end_time: '23:59' })
+  })
+
+  it('takes the hours an organiser gives it', async () => {
+    const server = await build()
+    const cookie = await givenAdmin()
+
+    const response = await create(server, cookie, {
+      ...valid,
+      start_time: '15:00',
+      end_time: '12:00',
+    })
+
+    expect(response.statusCode).toBe(201)
+    expect(response.json().event).toMatchObject({ start_time: '15:00', end_time: '12:00' })
+  })
+
+  it('refuses a one-day burn that ends earlier in the day than it starts', async () => {
+    const server = await build()
+    const cookie = await givenAdmin()
+
+    const response = await create(server, cookie, {
+      ...valid,
+      start_date: '2026-08-01',
+      end_date: '2026-08-01',
+      start_time: '22:00',
+      end_time: '10:00',
+    })
+
+    expect(response.statusCode).toBe(400)
+  })
+
+  it('accepts a one-day burn that runs forwards', async () => {
+    // The passing sibling: the rule must refuse the inverted pair, not every
+    // single-day burn.
+    const server = await build()
+    const cookie = await givenAdmin()
+
+    const response = await create(server, cookie, {
+      ...valid,
+      start_date: '2026-08-01',
+      end_date: '2026-08-01',
+      start_time: '10:00',
+      end_time: '22:00',
+    })
+
+    expect(response.statusCode).toBe(201)
+  })
+
+  it('refuses a time that is not a clock time', async () => {
+    const server = await build()
+    const cookie = await givenAdmin()
+
+    for (const bad of ['9:00', '24:00', '10:60', '1000']) {
+      expect((await create(server, cookie, { ...valid, start_time: bad })).statusCode, bad).toBe(400)
+    }
+  })
+
+  it('keeps a nonsense time out of the database, whatever the caller is', async () => {
+    // The CHECK earns its place against writes that never see the Zod schema.
+    await build()
+    const row = (start: string, end: string) => () =>
+      client()
+        .prepare(
+          'insert into event (id, name, slug, start_date, end_date, start_time, end_time, member_cap, created_at) values (?,?,?,?,?,?,?,?,?)',
+        )
+        .run(
+          randomUUID(),
+          'x',
+          `s-${randomUUID().slice(0, 8)}`,
+          '2026-08-01',
+          '2026-08-05',
+          start,
+          end,
+          42,
+          '2026-01-01T00:00:00.000Z',
+        )
+
+    expect(row('9:00', '12:00')).toThrow()
+    expect(row('24:00', '12:00')).toThrow()
+    expect(row('10:00', '12:00')).not.toThrow()
+  })
+
+  it('answers 400, not 500, when a patch would invert the stored hours', async () => {
+    // A multi-day burn may run 22:00 to 10:00. Narrowing it to one day makes that
+    // pair invalid, and the body alone cannot see it.
+    const server = await build()
+    const cookie = await givenAdmin()
+    const id = (await create(server, cookie, { ...valid, start_time: '22:00', end_time: '10:00' })).json()
+      .event.id
+
+    const response = await patch(server, cookie, id, {
+      start_date: '2026-08-01',
+      end_date: '2026-08-01',
+    })
+
+    expect(response.statusCode).toBe(400)
+  })
+
+  it('answers 400, not 500, when a patch inverts the times on a single-day burn', async () => {
+    const server = await build()
+    const cookie = await givenAdmin()
+    const id = (
+      await create(server, cookie, {
+        ...valid,
+        start_date: '2026-08-01',
+        end_date: '2026-08-01',
+        start_time: '10:00',
+        end_time: '22:00',
+      })
+    ).json().event.id
+
+    expect((await patch(server, cookie, id, { start_time: '23:00' })).statusCode).toBe(400)
+  })
+
+  it('answers 404 for a patch against an event that is not there', async () => {
+    // Answered by the read the ordering check needs, before the UPDATE runs —
+    // not by the guard after it. That guard is for a row deleted *between* the
+    // two, which `inject` cannot produce, so nothing here reaches it and this
+    // test should not be read as covering it.
+    const server = await build()
+    const cookie = await givenAdmin()
+
+    expect((await patch(server, cookie, randomUUID(), { name: 'Ghost' })).statusCode).toBe(404)
+  })
+
+  it('recognises the ordering CHECK by its message, so the race answers 400', async () => {
+    // The predicate, pinned against a real violation rather than a hand-written
+    // string — `inject` serialises two requests, so the path that uses it cannot
+    // be reached under test. Same shape as `isAlreadyJoined` in `attendance.ts`,
+    // and for the same reason: at least the message it matches cannot drift
+    // unnoticed.
+    await build()
+    let raised: unknown
+
+    try {
+      client()
+        .prepare(
+          'insert into event (id, name, slug, start_date, end_date, start_time, end_time, member_cap, created_at) values (?,?,?,?,?,?,?,?,?)',
+        )
+        .run(
+          randomUUID(),
+          'x',
+          'backwards-probe',
+          '2026-08-01',
+          '2026-08-01',
+          '22:00',
+          '10:00',
+          42,
+          '2026-01-01T00:00:00.000Z',
+        )
+    } catch (failure) {
+      raised = failure
+    }
+
+    expect(isCheckViolation(raised, 'event_date_order_check')).toBe(true)
+    expect(isCheckViolation(raised, 'event_member_cap_check')).toBe(false)
+    expect(isCheckViolation(new Error('something else'), 'event_date_order_check')).toBe(false)
+  })
+
+  it('keeps an inverted single-day pair out too', async () => {
+    await build()
+
+    expect(() =>
+      client()
+        .prepare(
+          'insert into event (id, name, slug, start_date, end_date, start_time, end_time, member_cap, created_at) values (?,?,?,?,?,?,?,?,?)',
+        )
+        .run(
+          randomUUID(),
+          'x',
+          'backwards',
+          '2026-08-01',
+          '2026-08-01',
+          '22:00',
+          '10:00',
+          42,
+          '2026-01-01T00:00:00.000Z',
+        ),
+    ).toThrow()
   })
 })

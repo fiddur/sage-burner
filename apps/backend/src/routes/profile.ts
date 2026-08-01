@@ -22,8 +22,13 @@ export interface ProfileDeps extends GuardDeps {
  * A partial body can invert the stored pair without ever containing both values,
  * so the schema's refinement cannot see it. Comparing against a row read a moment
  * earlier is check-then-act; composing the condition into the `WHERE` decides it
- * against the row as it is at write time. Same shape as `dateOrderCondition` in
- * `events.ts`, and the same reason.
+ * against the row as it is at write time.
+ *
+ * `events.ts` and `sessions.ts` had the same problem and answered it the other
+ * way, by reading the row and checking the merge in JavaScript — because their
+ * rules grew to span fields a SQL comparison could not see soundly. This one is
+ * still two fixed-width dates, where the comparison is sound and the statement is
+ * one query rather than two.
  */
 const stayOrderCondition = ({ arrival_date, departure_date }: AttendanceUpdate) => {
   if (arrival_date === undefined && departure_date === undefined) return undefined

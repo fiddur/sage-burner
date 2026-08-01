@@ -7,7 +7,7 @@ import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
 import { fromLocalInput, toLocalInput } from '../datetime.ts'
-import { dayAfter, endFor, hourOf, hoursOf, laneCells } from '../schedule.ts'
+import { endFor, hourOf, hoursOf, laneCells } from '../schedule.ts'
 import { isMember, useViewer } from '../viewer.tsx'
 
 export type ScheduleApi = Pick<ApiClient, 'getSessions' | 'getPlaces' | 'getActiveEvent' | 'updateSession'>
@@ -135,7 +135,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
     )
   }
 
-  const rows = hoursOf(event.start_date, dayAfter(event.end_date))
+  const rows = hoursOf(event.start_date, event.end_date, event.start_time, event.end_time)
 
   // The pool holds whatever the grid does not draw, rather than a guess at which
   // dreams those are. Missing a time or a place is the common case; a dream timed

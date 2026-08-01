@@ -911,7 +911,7 @@ row, merges the update onto it, and runs `hasValidTimeSlot` — the same rule, o
 copy of it.
 
 Deliberately **not** composed into the `UPDATE`'s `WHERE`, unlike
-`dateOrderCondition` in `events.ts` and `stayOrderCondition` in `profile.ts`.
+`stayOrderCondition` in `profile.ts`.
 Those compare calendar dates, which are fixed-width `YYYY-MM-DD` and so sort
 correctly as SQL strings. These are ISO **instants**, where
 `'…T09:00:00.500Z' < '…T09:00:00Z'` is true lexicographically — a string
@@ -956,12 +956,36 @@ different fields and one loses anyway.
 
 ### The timetable
 
-`/schedule` draws places across and hours down: every hour of every day from the
-burn's start date through the day _after_ its end date, so a burn running the 1st
-to the 5th is six days of rows — 144 of them. The extra day is the last night,
-which is explained below. Beside it sits the
-pool of dreams nobody has placed. Dragging one into a cell schedules it for that
-hour; dragging one back to the pool unschedules it.
+`/schedule` draws places across and hours down, over **the hours the burn is
+actually open** — `start_date`/`start_time` through `end_date`/`end_time`. A burn
+that opens midday Friday and closes midday Sunday is 49 rows, not three whole
+days of mostly-empty grid.
+
+Those hours are the organiser's, set on the event form beside the dates. They
+replaced a guess: the grid used to run 00:00 on the first day through the last
+hour of the day _after_ `end_date`, the extra day being a stand-in for a last
+night that carries past midnight. An organiser who can say "ends 04:00 on the
+6th" does not need the app inventing anything.
+
+Rows are walked by adding an hour to an instant rather than by setting hours on a
+date, which also disposed of a bug: on the spring-forward day `setHours(2)` lands
+on 03:00, so 03:00 appeared twice and two rows shared a key. Crossing the gap by
+addition passes it exactly once, and the deduplication that used to paper over it
+is gone.
+
+Editing an event reads the row, merges the patch onto it, and checks the result.
+A body carrying one date — or only a time — cannot be judged on its own: a
+multi-day burn may legitimately run 22:00 to 10:00, and narrowing it to a single
+day makes that pair invalid without the body saying anything. The condition this
+replaced was composed into the `UPDATE ... WHERE`, which handled one date against
+the stored other but could not see the times at all, so those patches reached the
+database and came back as a **500** from `event_date_order_check`.
+
+The times are `HH:MM`, fixed width, and both Zod and a CHECK compare them as
+strings — sound only because `09:00` cannot also arrive as `9:00`, which is why
+the format is enforced in both places. The ordering rule compares the **pair**:
+times decide it only when the days are equal, since across days an end earlier on
+the clock than the start is the ordinary case.
 
 **A dream occupies every row it runs through**, via `rowSpan`. Drawn only in its
 start row, a three-hour session reads as an hour long — which is exactly how one
@@ -1302,9 +1326,10 @@ than offering a field that fails.
 **A partial date edit is checked against the row, not against the body.** A PATCH
 carrying only `departure_date` can invert the stored pair without ever containing
 both values, so the schema's refinement cannot see it. The condition is composed
-into the `UPDATE ... WHERE` — the same shape and the same reason as
-`dateOrderCondition` in `events.ts` — so a concurrent write cannot slip between a
-read and a check.
+into the `UPDATE ... WHERE`, which is sound here because both are fixed-width
+calendar dates. `events.ts` and `sessions.ts` read the row and check the merge
+instead, their rules having grown to span fields a string comparison cannot
+judge.
 
 ### Who is coming, and who has a place
 

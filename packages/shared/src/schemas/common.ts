@@ -9,6 +9,15 @@ export const idSchema = z.uuid()
 /** Calendar day, `YYYY-MM-DD`. Lexicographic order matches chronological order. */
 export const dateSchema = z.iso.date()
 
+/**
+ * Time of day, `HH:MM`, local to wherever the burn is.
+ *
+ * Fixed width on purpose: the burn's start and end are compared as strings both
+ * in Zod and in a CHECK, and that is only sound while `09:00` cannot also arrive
+ * as `9:00`.
+ */
+export const timeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'must be a 24-hour time, HH:MM')
+
 /** Instant, ISO 8601. Dates cross the API boundary as strings, never as `Date`. */
 export const dateTimeSchema = z.iso.datetime()
 

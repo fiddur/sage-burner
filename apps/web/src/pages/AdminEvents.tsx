@@ -15,7 +15,17 @@ type Events =
 
 export type EventsApi = Pick<ApiClient, 'createEvent' | 'getEvents' | 'updateEvent'>
 
-const BLANK = { name: '', slug: '', start_date: '', end_date: '', member_cap: '42' }
+const BLANK = {
+  name: '',
+  slug: '',
+  start_date: '',
+  end_date: '',
+  // The whole of both days, which is what the schedule assumed before the hours
+  // existed. An organiser who knows the gate times narrows it.
+  start_time: '00:00',
+  end_time: '23:59',
+  member_cap: '42',
+}
 
 const messageFor = (failure: unknown, fallback: string) => {
   if (!isApiError(failure)) return fallback
@@ -101,6 +111,8 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
         slug: draft.slug,
         start_date: draft.start_date,
         end_date: draft.end_date,
+        start_time: draft.start_time,
+        end_time: draft.end_time,
         welcome_markdown: '',
         member_cap: Number(draft.member_cap),
       })
@@ -178,7 +190,8 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
             <article key={row.id} class="event-row">
               <h2>{row.name}</h2>
               <p class="form-note">
-                {row.start_date} – {row.end_date} · /{row.slug} · cap {row.member_cap}
+                {row.start_date} {row.start_time} – {row.end_date} {row.end_time} · /{row.slug} · cap{' '}
+                {row.member_cap}
               </p>
 
               {editing === row.id ? (
@@ -274,6 +287,17 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
         </label>
 
         <label class="field">
+          <span>Starting time</span>
+          <input
+            type="time"
+            required
+            aria-label="Starting time"
+            value={draft.start_time}
+            onInput={(inputEvent) => setDraft({ ...draft, start_time: inputEvent.currentTarget.value })}
+          />
+        </label>
+
+        <label class="field">
           <span>Ends</span>
           <input
             type="date"
@@ -282,6 +306,22 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
             onInput={(inputEvent) => setDraft({ ...draft, end_date: inputEvent.currentTarget.value })}
           />
         </label>
+
+        <label class="field">
+          <span>Ending time</span>
+          <input
+            type="time"
+            required
+            aria-label="Ending time"
+            value={draft.end_time}
+            onInput={(inputEvent) => setDraft({ ...draft, end_time: inputEvent.currentTarget.value })}
+          />
+        </label>
+
+        <p class="form-note">
+          The schedule runs between these, so a burn that opens at midday and closes at midday is two half
+          days of grid rather than three whole ones.
+        </p>
 
         <label class="field">
           <span>Member cap</span>
