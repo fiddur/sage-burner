@@ -80,13 +80,20 @@ export const attendanceFields = z.object({
   arrival_date: dateSchema.nullable(),
   departure_date: dateSchema.nullable(),
   /**
-   * Free text rather than an enum: the options differ per event and per site
-   * (tents, tiny house floor, caravans, ...), so organisers must be able to add
-   * one without a deploy.
+   * Which `event_option` they picked to sleep in, or null for not said.
+   *
+   * A reference rather than the free text this used to be. The options still
+   * differ per event and per site, and organisers still add one without a
+   * deploy — they are rows now — but an id is what lets anyone count who is
+   * sleeping where.
    */
-  /** Which `event_option` they picked to sleep in, or null for not said. */
   lodging_option_id: idSchema.nullable(),
-  /** Likewise free text — "Cooking", "Cleaning", "Either/both", or whatever's next. */
+  /**
+   * Still free text — "Cooking", "Cleaning", "Either/both", or whatever is next.
+   *
+   * The helping list in `event_option` exists but nothing consumes it yet; this
+   * becomes a set of references and a write-in when it does.
+   */
   shift_preference: optionalText(200),
   notes: optionalText(2000),
   /** Set by admins only. Members see their own status but cannot change it. */

@@ -429,6 +429,46 @@ describe('picking somewhere to sleep', () => {
     expect(response.json().attendance.lodging_option_id).toBeNull()
   })
 
+  it('refuses an option belonging to another burn', async () => {
+    // The select cannot offer it, but the API takes what it is sent. Without the
+    // event filter the id resolves, has no capacity for this burn, and is quietly
+    // accepted.
+    const server = await build()
+    const eventId = await givenEvent()
+    const member = await givenMember()
+    await givenComing(eventId, member.id)
+
+    const elsewhere = randomUUID()
+    await db()
+      .insert(event)
+      .values({
+        id: elsewhere,
+        name: 'Another burn',
+        slug: `other-${elsewhere.slice(0, 8)}`,
+        start_date: '2027-08-01',
+        end_date: '2027-08-05',
+        member_cap: 42,
+        created_at: NOW,
+      })
+    const theirs = await givenOption(elsewhere, 'Their temple', 9)
+
+    expect((await pick(server, member.cookie, theirs)).statusCode).toBe(400)
+  })
+
+  it('refuses a helping option, which has no capacity to be full of', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const member = await givenMember()
+    await givenComing(eventId, member.id)
+
+    const id = randomUUID()
+    await db()
+      .insert(eventOption)
+      .values({ id, event_id: eventId, kind: 'helping', order: 0, label: 'Sauna', capacity: null })
+
+    expect((await pick(server, member.cookie, id)).statusCode).toBe(400)
+  })
+
   it('refuses an option that is not a real one', async () => {
     const server = await build()
     const eventId = await givenEvent()

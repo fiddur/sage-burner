@@ -46,27 +46,33 @@ const stayOrderCondition = ({ arrival_date, departure_date }: AttendanceUpdate) 
 }
 
 /**
- * A member maintaining their own record.
+ * Whether this burn's lodging list will take one more person here.
  *
- * Two halves, because they have two lifetimes: who you are lives on the account
- * and outlives every burn, while when you arrive and where you sleep belong to
- * one stay. Both routes derive whose row it is from the session, so there is no
- * id in either body to get wrong or to tamper with.
- */
-/**
- * Whether a lodging option has no room left for this person.
+ * Scoped to the event **and** the kind, not just the id: the select disables a
+ * full option but the API takes what it is sent, so a direct PATCH could
+ * otherwise name another burn's option, or a `helping` one — which has no
+ * capacity and so could never be full. Both are refused as invalid, the same as
+ * an id that names nothing.
  *
- * Their own current choice does not count against them, or re-saving an unrelated
- * field would refuse the bed they are already in.
+ * Their own current choice does not count against them, or re-saving an
+ * unrelated field would refuse the bed they are already in.
  */
-const isFull = async (db: Database, eventId: string, optionId: string, accountId: string) => {
+const lodgingVerdict = async (
+  db: Database,
+  eventId: string,
+  optionId: string,
+  accountId: string,
+): Promise<'ok' | 'invalid' | 'full'> => {
   const [option] = await db
     .select({ capacity: eventOption.capacity })
     .from(eventOption)
-    .where(eq(eventOption.id, optionId))
+    .where(
+      and(eq(eventOption.id, optionId), eq(eventOption.event_id, eventId), eq(eventOption.kind, 'lodging')),
+    )
     .limit(1)
 
-  if (option?.capacity == null) return false
+  if (option === undefined) return 'invalid'
+  if (option.capacity === null) return 'ok'
 
   const others = await db
     .select({ id: attendance.id })
@@ -79,9 +85,17 @@ const isFull = async (db: Database, eventId: string, optionId: string, accountId
       ),
     )
 
-  return others.length >= option.capacity
+  return others.length >= option.capacity ? 'full' : 'ok'
 }
 
+/**
+ * A member maintaining their own record.
+ *
+ * Two halves, because they have two lifetimes: who you are lives on the account
+ * and outlives every burn, while when you arrive and where you sleep belong to
+ * one stay. Both routes derive whose row it is from the session, so there is no
+ * id in either body to get wrong or to tamper with.
+ */
 export const registerProfileRoutes = (
   app: FastifyInstance,
   { db, sessions, now = () => new Date() }: ProfileDeps,
@@ -163,8 +177,9 @@ export const registerProfileRoutes = (
     // Refusing is the point — a disabled `<option>` is presentation, and the API
     // takes whatever it is sent.
     if (parsed.data.lodging_option_id != null) {
-      const full = await isFull(db, found.id, parsed.data.lodging_option_id, viewer.account_id)
-      if (full) return reply.code(409).send(errorResponse('conflict'))
+      const verdict = await lodgingVerdict(db, found.id, parsed.data.lodging_option_id, viewer.account_id)
+      if (verdict === 'invalid') return reply.code(400).send(errorResponse('bad_request'))
+      if (verdict === 'full') return reply.code(409).send(errorResponse('conflict'))
     }
 
     let updated: (typeof attendance.$inferSelect)[]
