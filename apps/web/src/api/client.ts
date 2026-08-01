@@ -20,6 +20,10 @@ import type {
   AdminAccountResponse,
   AdminAccountsResponse,
   EventCreateInput,
+  EventOption,
+  EventOptionCreateInput,
+  EventOptionUpdate,
+  EventOptionsResponse,
   EventResponse,
   EventUpdate,
   EventsResponse,
@@ -229,6 +233,35 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
     /** Admin only. Every place exactly once, in the order they should appear. */
     reorderPlaces: (ids: readonly string[]) =>
       request<PlacesResponse>('/admin/places/order', { method: 'PUT', body: { ids } }),
+
+    /** Public, like the places: nothing in either list is about a person. */
+    getEventOptions: (eventId: string, signal?: AbortSignal) =>
+      request<EventOptionsResponse>(`/events/${encodeURIComponent(eventId)}/options`, { signal }),
+
+    /** Admin only. `order` is the server's to assign, per kind. */
+    addEventOption: (eventId: string, body: EventOptionCreateInput) =>
+      request<{ option: EventOption }>(`/admin/events/${encodeURIComponent(eventId)}/options`, {
+        method: 'POST',
+        body,
+      }),
+
+    /** Admin only. `kind` is not editable — moving one is deleting and adding. */
+    updateEventOption: (id: string, body: EventOptionUpdate) =>
+      request<{ option: EventOption }>(`/admin/event-options/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body,
+      }),
+
+    /** Admin only. */
+    deleteEventOption: (id: string) =>
+      request<undefined>(`/admin/event-options/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+    /** Admin only. Every option of that kind exactly once. */
+    reorderEventOptions: (eventId: string, kind: string, ids: readonly string[]) =>
+      request<EventOptionsResponse>(
+        `/admin/events/${encodeURIComponent(eventId)}/options/${encodeURIComponent(kind)}/order`,
+        { method: 'PUT', body: { ids } },
+      ),
 
     /** Admin only. */
     getEvents: (signal?: AbortSignal) => request<EventsResponse>('/admin/events', { signal }),

@@ -11,6 +11,7 @@ import { Admin } from './pages/Admin.tsx'
 import { AdminApplications } from './pages/AdminApplications.tsx'
 import { AdminEvents } from './pages/AdminEvents.tsx'
 import { AdminInvites } from './pages/AdminInvites.tsx'
+import { AdminOptions } from './pages/AdminOptions.tsx'
 import { AdminPlaces } from './pages/AdminPlaces.tsx'
 import { AdminQuestions } from './pages/AdminQuestions.tsx'
 import { AdminRoster } from './pages/AdminRoster.tsx'
@@ -60,6 +61,11 @@ export type AppApi = Pick<
   | 'updatePlace'
   | 'deletePlace'
   | 'reorderPlaces'
+  | 'getEventOptions'
+  | 'addEventOption'
+  | 'updateEventOption'
+  | 'deleteEventOption'
+  | 'reorderEventOptions'
   | 'getSessions'
   | 'offerSession'
   | 'updateSession'
@@ -114,6 +120,11 @@ export const Routes = ({
     | 'updatePlace'
     | 'deletePlace'
     | 'reorderPlaces'
+    | 'getEventOptions'
+    | 'addEventOption'
+    | 'updateEventOption'
+    | 'deleteEventOption'
+    | 'reorderEventOptions'
     | 'getSessions'
     | 'offerSession'
     | 'updateSession'
@@ -153,6 +164,7 @@ export const Routes = ({
   const AdminQuestionsRoute = useMemo(() => () => <AdminQuestions api={api} />, [api])
   const AdminApplicationsRoute = useMemo(() => () => <AdminApplications api={api} />, [api])
   const AdminInvitesRoute = useMemo(() => () => <AdminInvites api={api} />, [api])
+  const AdminOptionsRoute = useMemo(() => () => <AdminOptions api={api} />, [api])
   const AdminPlacesRoute = useMemo(() => () => <AdminPlaces api={api} />, [api])
   const AdminRosterRoute = useMemo(() => () => <AdminRoster api={api} />, [api])
   const AdminSettingsRoute = useMemo(() => () => <AdminSettings api={api} />, [api])
@@ -185,6 +197,7 @@ export const Routes = ({
       <Route path="/admin/questions" component={AdminQuestionsRoute} />
       <Route path="/admin/applications" component={AdminApplicationsRoute} />
       <Route path="/admin/invites" component={AdminInvitesRoute} />
+      <Route path="/admin/options" component={AdminOptionsRoute} />
       <Route path="/admin/places" component={AdminPlacesRoute} />
       <Route path="/admin/roster" component={AdminRosterRoute} />
       <Route path="/admin/settings" component={AdminSettingsRoute} />

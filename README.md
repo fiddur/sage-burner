@@ -1050,6 +1050,36 @@ reason: **in UTC every wrong implementation of that conversion looks right**, so
 running the suite in UTC would silently stop testing it. Verified — with the pin,
 the slicing shortcut fails whatever the ambient `TZ`; without it, it passes in CI.
 
+## Lodging, and helping out
+
+The two things a member says about their stay used to be free text, so nobody
+could count them and every burn re-invented the vocabulary. `event_option` holds
+both lists as rows — **per event**, unlike the application questions and the
+places, because what there is to sleep in depends on the site and what wants
+doing depends on the year.
+
+Organise → **Lodging and helping**, which follows the burn that is open. Setting
+them up before it starts works, since "active" is the soonest-ending burn that has
+not finished.
+
+A lodging entry can carry a number of spaces — "Temple mattress: 9" — or leave it
+blank for the ones that do not run out, like a tent of one's own. Helping entries
+never do: nothing runs short of people willing to tend a sauna. Zero spaces is
+refused rather than allowed; an option nobody fits in is a deleted option spelled
+confusingly.
+
+`kind` is not editable. The two lists number independently, so changing it would
+leave an entry ordered against the list it came from — moving one is deleting and
+adding.
+
+The number of spaces is checked by `min` and the input's implicit whole-number
+step, and by nothing in JavaScript. A browser will not submit a form containing an
+invalid number, so a guard beside it is unreachable code — the same two-validator
+trap as `required` versus `aria-required`, reaching the opposite conclusion: for a
+name the page must be the authority because it has something to say, for a count
+the browser already says it. There is a test asserting the form does not submit,
+which is what proves the guard would have been dead.
+
 ## Places
 
 Somewhere a dream can happen — the Temple, the Sauna, the Front Lawn. Rows
