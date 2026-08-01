@@ -901,6 +901,47 @@ This is not optimistic locking and does not pretend to be: two members editing
 the same _field_ still last-writer-wins. It removes the case where they edit
 different fields and one loses anyway.
 
+### The timetable
+
+`/schedule` draws places across and hours down: every hour of every day from the
+burn's start date through the day _after_ its end date, so a burn running the 1st
+to the 5th is six days of rows — 144 of them. The extra day is the last night,
+which is explained below. Beside it sits the
+pool of dreams nobody has placed. Dragging one into a cell schedules it for that
+hour; dragging one back to the pool unschedules it.
+
+**The pool holds whatever the grid does not draw**, derived rather than guessed.
+Missing a time or a place is the common case, but a dream can also be timed
+outside the days on show, and guessing "unplaced means a null field" left that one
+in neither the grid nor the pool — gone from the page while still fine on
+`/dreams`. Deriving it means nothing can vanish whatever the date.
+
+The grid runs one day **past** `end_date`, because a burn's last night regularly
+carries into the small hours of the day after. A dream at 01:00 is part of the
+burn whatever the calendar says.
+
+Dragging an already-scheduled dream to another lane **keeps the length it had**.
+Forcing an hour would quietly shorten a two-hour session for the crime of being
+moved.
+
+Rows are built from the event's calendar days rather than from any instant,
+because that is what "the burn runs the 1st to the 5th" means to whoever typed
+it. They are also deduplicated, for the one hour a year that does not exist:
+on the spring-forward day `setHours(2)` lands on 03:00, so 03:00 would appear
+twice and two rows would share a key. Checked in Europe/Stockholm, which the web
+suite is pinned to.
+
+Both drag sources write to `dataTransfer` on `dragstart`. The id travels in
+component state, so nothing reads it back — but Firefox refuses to begin a drag
+whose data store was never written to, so without it the gesture simply does not
+start there. Test it in Firefox as well as Chrome.
+
+**Dragging is not really unit-tested, and cannot be.** `fireEvent.drop` exercises
+these handlers, not a browser's drag implementation — so the tests prove the
+wiring and the drag itself wants one click-through in a browser. The Dreams page
+is the precise route and the accessible one: a form with a place and two datetime
+fields, reachable by keyboard, which is what anyone who cannot drag should use.
+
 ### Times are UTC, wall clocks are not
 
 The API stores and transports UTC; `<input type="datetime-local">` has no timezone

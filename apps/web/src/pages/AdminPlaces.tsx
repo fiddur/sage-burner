@@ -198,7 +198,11 @@ export const AdminPlaces = ({ api }: { api: PlacesApi }) => {
               draggable
               disabled={busy}
               aria-label={`Move ${row.name}`}
-              onDragStart={() => setDragging(index)}
+              onDragStart={(dragEvent) => {
+                // Firefox will not start a drag whose data store is empty.
+                dragEvent.dataTransfer?.setData('text/plain', row.id)
+                setDragging(index)
+              }}
               onDragEnd={() => setDragging(undefined)}
               onKeyDown={(keyEvent) => {
                 // The handle is the keyboard route too. Dragging is a pointer
