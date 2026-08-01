@@ -836,11 +836,24 @@ the gathering.** That is the trade that lets descriptions go out in full.
 
 What leaves the building is the title, the description, the times, and the place's
 name, emoji and colour. No host, no contact details, no allergies, no payment
-state. `schedule.test.ts` asserts that against the **rendered feed** rather than
-the query, so a join added later cannot widen it quietly. That check is a denylist
-and only catches what someone thought of, so it is seeded with every field the
-fixtures carry; the structural guard is `schemas.test.ts`, which pins the exact
-key set of `publicSessionFields` and fails when a field is _added_.
+state.
+
+Two guards, catching different things:
+
+- **The route parses every row through `publicSessionSchema`**, which strips what
+  it does not name. Widening the `select` cannot widen the feed — the extra
+  column is dropped before rendering. Adding the field to that schema instead
+  fails `schemas.test.ts`, which pins its exact key set. So a field reaches the
+  feed only if someone deliberately edits the allowlist and its test.
+- **A denylist in `schedule.test.ts`**, asserted against the **rendered feed**
+  rather than the query. It only catches what someone thought of, so it is seeded
+  with every field the fixtures carry.
+
+The first was written before the feed existed and then not wired in: the schema
+was declared "the guard rail for an unauthenticated endpoint" while the route
+hand-built the same shape beside it, so the key-set test gated nothing anyone
+used. It is invoked now, and a test bypasses the parse to prove the feed depends
+on it.
 
 ### Choices worth knowing
 
