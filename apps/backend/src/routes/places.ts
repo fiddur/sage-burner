@@ -9,6 +9,7 @@ import type { GuardDeps } from '../auth/guards.ts'
 import type { Database } from '../db/index.ts'
 
 import { createGuards } from '../auth/guards.ts'
+import { isForeignKeyViolation } from '../db/errors.ts'
 import { place } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 
@@ -98,10 +99,18 @@ export const registerPlaceRoutes = (app: FastifyInstance, { db, sessions }: Guar
     async (request, reply) => {
       void noStore(reply)
 
-      const deleted = await db
-        .delete(place)
-        .where(eq(place.id, request.params.id))
-        .returning({ id: place.id })
+      // A dream sitting in this lane holds the row: `session.place_id` has no
+      // `onDelete`, so SQLite refuses rather than quietly unscheduling it. A
+      // pre-read would be check-then-act — the dream can be created between the
+      // read and the delete — so the constraint is the authority and this only
+      // translates it.
+      let deleted
+      try {
+        deleted = await db.delete(place).where(eq(place.id, request.params.id)).returning({ id: place.id })
+      } catch (failure) {
+        if (isForeignKeyViolation(failure)) return reply.code(409).send(errorResponse('conflict'))
+        throw failure
+      }
 
       if (deleted.length === 0) return reply.code(404).send(errorResponse('not_found'))
 

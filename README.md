@@ -824,6 +824,95 @@ which is [#14]'s half of the work.
 
 [#14]: https://github.com/fiddur/sage-burner/issues/14
 
+## Dreams
+
+The workshops, ceremonies and happenings members offer each other. **A dream with
+no time slot is offered but not yet scheduled** — that is where most of them sit
+right up until the burn, and it is the normal state, not an error.
+
+**Members**, not admins. `/api/events/active/sessions` and `/api/sessions/:id` are
+behind `requireMember`, because the schedule belongs to the people coming: any
+member may reschedule any dream, not only the one who offered it. Gated on the
+`member` role rather than on having an `attendance` row, so someone can help plan
+next burn's programme before they have said they are coming.
+
+The host is **the member who offered it**, taken from the session and never from
+the body — `sessionCreateSchema` omits `host_account_id` entirely, so a dream in
+someone else's name is a 400 rather than an edit anyone can make by hand.
+Reassigning one needs a member-visible list of members to pick from, which does
+not exist yet.
+
+`session.location` was free text; it is now `place_id`, referencing #78's places.
+The scheduling grid draws one column per place, and a column cannot be spelled
+three ways. The column has no `onDelete`, so **deleting a place a dream stands in
+is refused with a 409** rather than quietly unscheduling it; `places.ts`
+translates the foreign key failure. Not a pre-read, which would be check-then-act
+— the dream can be created between the read and the delete.
+
+### The slot rule, applied to the row as it would be
+
+A slot is both ends or neither, and the end comes after the start.
+`withValidTimeSlot` enforces both at the boundary whenever both keys are present.
+A PATCH carrying **one** end cannot be judged on its own, so the handler reads the
+row, merges the update onto it, and runs `hasValidTimeSlot` — the same rule, one
+copy of it.
+
+Deliberately **not** composed into the `UPDATE`'s `WHERE`, unlike
+`dateOrderCondition` in `events.ts` and `stayOrderCondition` in `profile.ts`.
+Those compare calendar dates, which are fixed-width `YYYY-MM-DD` and so sort
+correctly as SQL strings. These are ISO **instants**, where
+`'…T09:00:00.500Z' < '…T09:00:00Z'` is true lexicographically — a string
+comparison would accept a slot ending half a second before it starts. Reading the
+row and comparing with `Date.parse` is both simpler and the only sound option.
+
+Two bugs lived here, and both were single-user, no concurrency needed:
+
+- `hasWholeSlot` used `== null`, so an **absent** key read the same as a null one
+  and every single-ended reschedule was a 400 before the row was consulted. An
+  absent key now defers to the merged-row check, exactly as
+  `violatesTickBoxRules` already did for the tick-box pair.
+- The first attempt at the merged rule only checked that the _other_ end existed,
+  never that the two were in order — so `PATCH { time_slot_start: '23:00' }` on an
+  18:00–20:00 dream stored an inverted slot and answered 200.
+
+### Editing is scoped to the burn that is open
+
+`PATCH` and `DELETE` take a session id, and both check that the dream belongs to
+the active event, the way every other member-facing route does. A finished burn's
+programme is history; an id noted while it was current is not a way to rewrite
+it.
+
+### Editing sends only what changed
+
+The edit form seeds its state once, at mount. Sending all five fields back would
+carry the values it loaded — so fixing a typo in a title would put the place and
+slot back as they were then, undoing whatever another member scheduled in the
+meantime. Concurrent editing is the _premise_ of this page, so that is the
+ordinary case rather than a rare one. The form sends only the fields it changed, which
+`sessionUpdateSchema`'s `.partial()` already accepts. An untouched save sends
+`{}`, the documented no-op read.
+
+Each field is compared **in the form's own units**. Comparing a round-tripped
+timestamp against the stored one instead calls an untouched slot changed whenever
+the stored value carries seconds — the inputs are minute-precision — and quietly
+zeroes them.
+
+This is not optimistic locking and does not pretend to be: two members editing
+the same _field_ still last-writer-wins. It removes the case where they edit
+different fields and one loses anyway.
+
+### Times are UTC, wall clocks are not
+
+The API stores and transports UTC; `<input type="datetime-local">` has no timezone
+at all and speaks the browser's wall clock. `apps/web/src/datetime.ts` converts
+both ways. Slicing the ISO string is the obvious-looking shortcut and is wrong by
+the UTC offset everywhere but London in winter.
+
+The web suite is pinned to `Europe/Stockholm` in `vite.config.ts` for exactly this
+reason: **in UTC every wrong implementation of that conversion looks right**, so
+running the suite in UTC would silently stop testing it. Verified — with the pin,
+the slicing shortcut fails whatever the ambient `TZ`; without it, it passes in CI.
+
 ## Places
 
 Somewhere a dream can happen — the Temple, the Sauna, the Front Lawn. Rows

@@ -507,7 +507,14 @@ export const session = sqliteTable(
     description: text('description').notNull().default(''),
     time_slot_start: text('time_slot_start'),
     time_slot_end: text('time_slot_end'),
-    location: text('location'),
+    /**
+     * Which lane the dream sits in. Null while it is only offered.
+     *
+     * No `onDelete`, so SQLite refuses to remove a place that still has dreams
+     * in it rather than quietly unscheduling them — `places.ts` turns that into
+     * a 409 the organiser can act on.
+     */
+    place_id: text('place_id').references(() => place.id),
   },
   (table) => [
     primaryKey({ columns: [table.id] }),
