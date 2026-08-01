@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { dayAfter, hourOf, hourAfter, hoursOf } from './schedule.ts'
+import { dayAfter, hourOf, hoursOf } from './schedule.ts'
 
 describe('the timetable rows', () => {
   it('covers every hour of every day of the burn', () => {
@@ -59,13 +59,5 @@ describe('placing a dream in a row', () => {
 
   it('places nothing for a dream that is not scheduled', () => {
     expect(hourOf(null)).toBeUndefined()
-  })
-
-  it('ends an hour after the row it was dropped in', () => {
-    expect(hourAfter('2026-08-02T20:00')).toBe('2026-08-02T21:00')
-  })
-
-  it('rolls over midnight rather than producing 24:00', () => {
-    expect(hourAfter('2026-08-02T23:00')).toBe('2026-08-03T00:00')
   })
 })

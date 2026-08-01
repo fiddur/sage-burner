@@ -43,14 +43,6 @@ export const hourOf = (iso: string | null): string | undefined => {
   return local === '' ? undefined : `${local.slice(0, 13)}:00`
 }
 
-/** The end of the hour a dream dropped into that row should run until. */
-export const hourAfter = (row: string): string => {
-  const at = new Date(row)
-  at.setHours(at.getHours() + 1)
-
-  return toLocalInput(at.toISOString())
-}
-
 /**
  * The calendar day after this one.
  *
