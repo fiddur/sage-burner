@@ -9,6 +9,7 @@ import type { DbHandle } from '../db/index.ts'
 import { createApp } from '../app.ts'
 import { createSessions } from '../auth/session.ts'
 import { createConfig } from '../config.ts'
+import { isCheckViolation } from '../db/errors.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, accountRole, event } from '../db/schema.ts'
 import { SESSION_COOKIE } from './auth.ts'
@@ -371,16 +372,8 @@ describe('admin event routes', () => {
 
   it('rejects a one-sided date move in either direction, and stores nothing', async () => {
     // The schema cannot catch this: it tolerates a partial range, since a PATCH
-    // may legitimately carry one date. The handler puts the condition in the
-    // UPDATE's `where` so it is evaluated against the row at write time.
-    //
-    // What these assertions distinguish is that a one-sided move is refused and
-    // the row is untouched — **not** that the decision happens inside the
-    // statement. A read-then-check implementation passes this identically. The
-    // in-statement property is real (it is what stops a concurrent move to the
-    // other date reaching `event_date_order_check` as a 500) but it is not
-    // observable from two sequential requests, so nothing here defends it; the
-    // reachability of the ordering check is what this covers.
+    // may legitimately carry one date. The handler reads the row, merges the
+    // patch onto it and checks the result.
     const server = await build()
     const cookie = await givenAdmin()
     const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
@@ -675,6 +668,40 @@ describe('the hours a burn is open', () => {
     ).json().event.id
 
     expect((await patch(server, cookie, id, { start_time: '23:00' })).statusCode).toBe(400)
+  })
+
+  it('recognises the ordering CHECK by its message, so the race answers 400', async () => {
+    // The predicate, pinned against a real violation rather than a hand-written
+    // string — `inject` serialises two requests, so the path that uses it cannot
+    // be reached under test. Same shape as `isAlreadyJoined` in `attendance.ts`,
+    // and for the same reason: at least the message it matches cannot drift
+    // unnoticed.
+    await build()
+    let raised: unknown
+
+    try {
+      client()
+        .prepare(
+          'insert into event (id, name, slug, start_date, end_date, start_time, end_time, member_cap, created_at) values (?,?,?,?,?,?,?,?,?)',
+        )
+        .run(
+          randomUUID(),
+          'x',
+          'backwards-probe',
+          '2026-08-01',
+          '2026-08-01',
+          '22:00',
+          '10:00',
+          42,
+          '2026-01-01T00:00:00.000Z',
+        )
+    } catch (failure) {
+      raised = failure
+    }
+
+    expect(isCheckViolation(raised, 'event_date_order_check')).toBe(true)
+    expect(isCheckViolation(raised, 'event_member_cap_check')).toBe(false)
+    expect(isCheckViolation(new Error('something else'), 'event_date_order_check')).toBe(false)
   })
 
   it('keeps an inverted single-day pair out too', async () => {

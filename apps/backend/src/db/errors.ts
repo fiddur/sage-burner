@@ -20,3 +20,15 @@
  */
 export const isForeignKeyViolation = (failure: unknown): boolean =>
   failure instanceof Error && /FOREIGN KEY constraint failed/i.test(failure.message)
+
+/**
+ * SQLite refusing a named CHECK.
+ *
+ * The handler validates before writing, so this only fires for a combination no
+ * single request sent — two patches merged against the same pre-write row. Not
+ * defended against beyond this, at forty-odd people and four burns a year, but
+ * the difference between a 400 and a 500 is the difference between "that did not
+ * work, try again" and a stack trace.
+ */
+export const isCheckViolation = (failure: unknown, name: string): boolean =>
+  failure instanceof Error && failure.message.includes(`CHECK constraint failed: ${name}`)

@@ -134,22 +134,29 @@ export type EventCreateInput = z.input<typeof eventCreateSchema>
  * written. `{}` itself stays a legitimate no-op.
  *
  * Still wrapped in `withEventDateOrder`, which tolerates a partial range: it
- * only rejects when both dates are present and out of order. A PATCH moving
- * *one* date past the other therefore passes here, so the handler has to catch
- * it — and it does so **inside the UPDATE**, not by re-reading first:
- * `PATCH /api/admin/events/:id` in `apps/backend/src/routes/events.ts` puts the
- * ordering condition in the statement's `where`, so it is evaluated against the
- * row at write time. Zero matched rows is then resolved by re-reading: **404** if
- * the row is gone, 400 only if it is still there and the condition is what failed.
- * A read-then-check would leave a window where two organisers each
- * moving one date both validate against the pre-update row, and the second write
- * reaches `event_date_order_check` as a 500 — the outcome the check exists to
- * avoid. The both-dates case never reaches the handler at all: the refine below
- * rejects it, so `safeParse` answers 400 — which is why the handler carries no
- * check for it. Relaxing this refine would therefore not merely loosen
- * validation, it would let an out-of-order pair through to the database CHECK;
- * `rejects a patch with both dates in the wrong order` in `events.test.ts` is what
- * notices.
+ * only rejects when every field it needs is present and they are out of order. A
+ * PATCH moving *one* date past the other, or carrying only a time, therefore
+ * passes here — so `PATCH /api/admin/events/:id` in
+ * `apps/backend/src/routes/events.ts` reads the row, merges the patch onto it and
+ * applies `hasOrderedRange` to the result.
+ *
+ * That used to be a condition composed into the statement's `where`, which
+ * decided it at write time. The times ended that: a multi-day burn may run 22:00
+ * to 10:00, and narrowing it to one day makes the pair invalid without the body
+ * containing either time — nothing a `WHERE` on the supplied dates can see. Both
+ * such patches reached `event_date_order_check` and came back as a 500.
+ *
+ * The honest cost of the merged-row check is that two organisers patching at the
+ * same moment can each validate against the same pre-update row and produce a
+ * combination neither sent. The CHECK still refuses it, and the handler answers
+ * 400 rather than 500 — see `isCheckViolation`. Not defended further: this is
+ * forty-odd people and four burns a year.
+ *
+ * The both-dates case never reaches the handler at all: the refine below rejects
+ * it, so `safeParse` answers 400. Relaxing this refine would therefore not merely
+ * loosen validation, it would let an out-of-order pair through to the database
+ * CHECK; `rejects a patch with both dates in the wrong order` in `events.test.ts`
+ * is what notices.
  */
 export const eventUpdateSchema = withEventDateOrder(
   eventFields.omit({ id: true, created_at: true }).partial().strict(),

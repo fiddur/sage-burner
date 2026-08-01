@@ -9,6 +9,7 @@ import type { GuardDeps } from '../auth/guards.ts'
 import type { Database } from '../db/index.ts'
 
 import { createGuards } from '../auth/guards.ts'
+import { isCheckViolation } from '../db/errors.ts'
 import { event } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 
@@ -164,11 +165,16 @@ export const registerEventRoutes = (
         .where(eq(event.id, id))
         .returning()
         .catch((error: unknown) => {
-          if (isSlugConflict(error)) return undefined
+          if (isSlugConflict(error)) return 'conflict' as const
+          // Only reachable when two patches merged against the same pre-write
+          // row into a combination neither sent. Answered rather than thrown:
+          // the caller can retry, and a 500 tells them nothing.
+          if (isCheckViolation(error, 'event_date_order_check')) return 'unordered' as const
           throw error
         })
 
-      if (updated === undefined) return reply.code(409).send(errorResponse('conflict'))
+      if (updated === 'conflict') return reply.code(409).send(errorResponse('conflict'))
+      if (updated === 'unordered') return reply.code(400).send(errorResponse('bad_request'))
 
       const [row] = updated
       if (row === undefined) {
