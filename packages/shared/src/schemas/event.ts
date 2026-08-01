@@ -34,6 +34,12 @@ const hasOrderedDates = ({ start_date, end_date, start_time, end_time }: DateRan
  * `YYYY-MM-DD` and rejects impossible calendar dates, so lexicographic order is
  * chronological order. Timestamps are a different story — see `session.ts`.
  */
+export const withEventDateOrder = <T extends z.ZodType<DateRange>>(schema: T) =>
+  schema.refine(hasOrderedDates, {
+    message: 'the burn must not end before it starts',
+    path: ['end_date'],
+  })
+
 /**
  * Whether a whole event — every one of the four fields present — is ordered.
  *
@@ -42,12 +48,6 @@ const hasOrderedDates = ({ start_date, end_date, start_time, end_time }: DateRan
  * stored, and this is the same rule rather than a second copy of it in SQL.
  */
 export const hasOrderedRange = (range: Required<DateRange>) => hasOrderedDates(range)
-
-export const withEventDateOrder = <T extends z.ZodType<DateRange>>(schema: T) =>
-  schema.refine(hasOrderedDates, {
-    message: 'the burn must not end before it starts',
-    path: ['end_date'],
-  })
 
 /**
  * The field list, unrefined.
