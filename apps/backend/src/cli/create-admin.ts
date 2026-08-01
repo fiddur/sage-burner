@@ -7,7 +7,8 @@ import { runMigrations } from '../db/migrate.ts'
  *
  * ```sh
  * read -rs -p 'Password: ' ADMIN_PASSWORD; echo
- * ADMIN_EMAIL=you@example.org ADMIN_PASSWORD="$ADMIN_PASSWORD" pnpm admin:create
+ * ADMIN_EMAIL=you@example.org ADMIN_PASSWORD="$ADMIN_PASSWORD" \
+ *   pnpm --filter sage-burner-backend admin:create
  * ```
  *
  * Both values come from the environment, never from `argv`: arguments are

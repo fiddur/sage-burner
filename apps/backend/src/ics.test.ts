@@ -16,11 +16,10 @@ describe('escaping', () => {
     // Order matters: `\` → `\\` must run before `;` → `\;`, or the backslash the
     // second rule adds gets doubled by the first and the value arrives corrupted.
     //
-    // Written with `String.fromCharCode(92)` rather than literals on purpose.
-    // The first version of this file spelled the escape `'\;'`, which in
-    // TypeScript is simply `';'` — so the implementation escaped nothing and the
-    // expectation agreed with it. Two mistakes cancelling is exactly what a
-    // literal-heavy test of escaping invites.
+    // Written with `String.fromCharCode(92)` rather than literals on purpose:
+    // `'\;'` in TypeScript is simply `';'`, so a literal-heavy test of escaping
+    // can spell the escape wrong in both the implementation and the expectation
+    // and pass on the two mistakes cancelling.
     expect(escapeText(BACKSLASH + ';')).toBe(BACKSLASH + BACKSLASH + BACKSLASH + ';')
   })
 

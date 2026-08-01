@@ -95,7 +95,7 @@ describe('ViewerProvider', () => {
     // `useState(viewer)` makes the prop an initial value only, which silently
     // breaks the seam a test uses to say who is looking: re-rendering with a
     // different viewer does nothing, and a test written that way passes against
-    // genuinely broken code. That happened during this PR.
+    // genuinely broken code.
     const { rerender } = render(
       <ViewerProvider viewer={{ status: 'loading' }}>
         <StatusProbe />

@@ -138,6 +138,33 @@ These are the habits that would have caught nearly all of them.
   out red from exactly that shell mistake:
   `if pnpm check >/dev/null 2>&1; then git push …; else echo "refusing"; fi`.
 
+- **A mutation that does not apply looks exactly like one that was caught.**
+  Every "0 failed" is a result to check, not to celebrate: the anchor may have
+  gone stale after `pnpm fix` reflowed the line, the mutation may be rejected by
+  a schema before it can take effect, or deleting a whole `export const` line may
+  break the import so the suite never runs. Assert the anchor was found, and be
+  suspicious of a mutation that kills nothing in code you believe is load-bearing.
+
+- **Grep the claim, not just the deleted symbol.** Removing a function and
+  grepping its name misses every comment that describes what it _did_ — "it does
+  so inside the UPDATE", "this is what stops a concurrent write". Those survive
+  the rename and go on asserting a guarantee the code no longer gives.
+
+- **Mutate the migration, not `schema.ts`.** The test database is built by
+  `runMigrations` from the generated SQL and never reads the Drizzle schema at
+  runtime, so deleting a `check(...)` there fails nothing — not because the
+  constraint is covered but because the mutation had no effect. A CHECK is only
+  exercised by a write that skips the API; pair each one with a direct
+  `client().prepare(...)` test.
+
+- **A timezone-dependent test in a UTC runner is not a weak test, it is no test.**
+  `apps/web` pins `TZ=Europe/Stockholm` in `vite.config.ts` for exactly this: in
+  UTC every wrong implementation of a local-time conversion looks right.
+
+- **Adding a function above an existing one steals its doc comment.** The
+  orphaned block then reads as though it describes the new function, which is
+  worse than no comment because it is plausible.
+
 ## Security expectations
 
 These are member records, so treat them as such:
