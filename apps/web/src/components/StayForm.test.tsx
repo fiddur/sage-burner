@@ -118,6 +118,25 @@ describe('StayForm', () => {
     expect(screen.getByLabelText(/sleeping/)).toHaveProperty('value', 'o-1')
   })
 
+  it('keeps their own full option reselectable after clicking away from it', async () => {
+    // Against the live value this reads as "not theirs" the moment they pick
+    // something else, and a native select will not let you choose a disabled
+    // option — so they could not go back without reloading.
+    render(
+      <StayForm
+        api={{ updateMyStay: vi.fn() }}
+        attendance={anAttendance({ lodging_option_id: 'o-1' })}
+        lodgingOptions={LODGING}
+        taken={{ 'o-1': 9 }}
+        onSaved={vi.fn()}
+      />,
+    )
+
+    fireEvent.change(screen.getByLabelText(/sleeping/), { target: { value: 'o-2' } })
+
+    expect(screen.getByRole('option', { name: 'Temple mattress — full' })).toHaveProperty('disabled', false)
+  })
+
   it('sends the option id, and null for not decided', async () => {
     const updateMyStay = vi.fn(() => Promise.resolve({ attendance: anAttendance() }))
     render(

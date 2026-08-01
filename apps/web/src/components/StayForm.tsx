@@ -120,13 +120,19 @@ export const StayForm = ({
         >
           <option value="">Not decided yet</option>
           {lodgingOptions.map((option) => {
-            // Disabled once it is full — unless it is the one already chosen,
+            // Disabled once it is full — unless it is the one they already have,
             // which would otherwise be unselectable and silently reset to "not
             // decided" the next time this form is saved.
+            //
+            // Compared against what is *saved*, not what is currently picked:
+            // against the live value, clicking away from a full option and back
+            // would find it disabled, and a native select will not let you choose
+            // a disabled option. You would be stuck until you reloaded.
             const full = option.capacity !== null && (taken[option.id] ?? 0) >= option.capacity
+            const theirs = option.id === attendance.lodging_option_id
 
             return (
-              <option key={option.id} value={option.id} disabled={full && option.id !== lodging}>
+              <option key={option.id} value={option.id} disabled={full && !theirs}>
                 {option.label}
                 {option.capacity === null
                   ? ''

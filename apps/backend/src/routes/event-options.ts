@@ -143,10 +143,20 @@ export const registerEventOptionRoutes = (app: FastifyInstance, { db, sessions }
     async (request, reply) => {
       void noStore(reply)
 
-      const deleted = await db
-        .delete(eventOption)
-        .where(eq(eventOption.id, request.params.id))
-        .returning({ id: eventOption.id })
+      // Somebody sleeping here holds the row: `attendance.lodging_option_id` has
+      // no `onDelete`, so SQLite refuses rather than quietly unbooking them. A
+      // pre-read would be check-then-act — someone can pick it between the read
+      // and the delete — so the constraint is the authority and this translates.
+      let deleted
+      try {
+        deleted = await db
+          .delete(eventOption)
+          .where(eq(eventOption.id, request.params.id))
+          .returning({ id: eventOption.id })
+      } catch (failure) {
+        if (isForeignKeyViolation(failure)) return reply.code(409).send(errorResponse('conflict'))
+        throw failure
+      }
 
       if (deleted.length === 0) return reply.code(404).send(errorResponse('not_found'))
 

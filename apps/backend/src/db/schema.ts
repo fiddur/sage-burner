@@ -500,14 +500,15 @@ export const attendance = sqliteTable(
     arrival_date: text('arrival_date'),
     departure_date: text('departure_date'),
     /**
-     * Free text, not an enum. The options differ per event and per site, so
-     * organisers must be able to add one without a deploy.
-     */
-    /**
      * Which `event_option` they picked to sleep in, or null for not said.
+     *
+     * Free text until the per-event lists existed. The options still differ per
+     * event and per site and an organiser still adds one without a deploy — they
+     * are rows now — and an id is what lets anyone count who is sleeping where.
      *
      * No `onDelete`: removing somewhere people are already sleeping is refused
      * rather than silently unbooking them, the same as a place a dream stands in.
+     * `event-options.ts` turns the refusal into a 409.
      */
     lodging_option_id: text('lodging_option_id').references(() => eventOption.id),
     shift_preference: text('shift_preference'),

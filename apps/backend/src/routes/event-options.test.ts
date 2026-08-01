@@ -330,6 +330,29 @@ describe('the lists a member picks from', () => {
     expect(await labels(server, eventId, 'lodging')).toEqual([])
   })
 
+  it('cannot be removed while somebody is sleeping in it', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const admin = await givenAccount(['admin'])
+    const who = await givenAccount(['member'])
+    const id = (
+      await add(server, admin.cookie, eventId, { kind: 'lodging', label: 'Temple', capacity: 9 })
+    ).json().option.id
+    await db().insert(attendance).values({
+      id: randomUUID(),
+      event_id: eventId,
+      account_id: who.id,
+      joined_at: NOW,
+      payment_status: 'unpaid',
+      lodging_option_id: id,
+    })
+
+    const response = await remove(server, admin.cookie, id)
+
+    expect(response.statusCode).toBe(409)
+    expect(await labels(server, eventId, 'lodging')).toEqual(['Temple'])
+  })
+
   it('goes with the burn when the burn goes', async () => {
     const server = await build()
     const eventId = await givenEvent()
