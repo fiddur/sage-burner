@@ -1,9 +1,10 @@
 import type { AdminAccountsResponse } from '@sage-burner/shared'
 
-import { cleanup, render, screen, waitFor } from '@testing-library/preact'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Viewer } from '../viewer.tsx'
+import type { AdminApi } from './Admin.tsx'
 
 import { apiError } from '../api/client.ts'
 import { ViewerProvider } from '../viewer.tsx'
@@ -14,10 +15,15 @@ afterEach(cleanup)
 const ADMIN: Viewer = { status: 'signed-in', account: { id: 'a-1', roles: ['admin'] } }
 const MEMBER: Viewer = { status: 'signed-in', account: { id: 'a-2', roles: ['member'] } }
 
-const renderAdmin = (getAdminAccounts: () => Promise<AdminAccountsResponse>, viewer: Viewer = ADMIN) =>
+const renderAdmin = (
+  getAdminAccounts: AdminApi['getAdminAccounts'],
+  viewer: Viewer = ADMIN,
+  setAccountRoles: AdminApi['setAccountRoles'] = () =>
+    Promise.reject(new Error('setAccountRoles is not stubbed here')),
+) =>
   render(
     <ViewerProvider viewer={viewer}>
-      <Admin api={{ getAdminAccounts }} />
+      <Admin api={{ getAdminAccounts, setAccountRoles }} />
     </ViewerProvider>,
   )
 
@@ -38,12 +44,92 @@ describe('Admin', () => {
     expect(screen.getByText('grace@example.org')).toBeTruthy()
   })
 
-  it('says so rather than showing an empty cell for an account with no roles', async () => {
+  it('shows which roles an account holds', async () => {
     renderAdmin(
-      roster([{ id: 'a-3', email: 'new@example.org', roles: [], created_at: '2026-01-03T00:00:00.000Z' }]),
+      roster([
+        { id: 'a-1', email: 'ada@example.org', roles: ['admin'], created_at: '2026-01-01T00:00:00.000Z' },
+      ]),
     )
 
-    expect(await screen.findByText('none yet')).toBeTruthy()
+    expect(await screen.findByRole('checkbox', { name: 'admin — ada@example.org' })).toHaveProperty(
+      'checked',
+      true,
+    )
+    expect(screen.getByRole('checkbox', { name: 'member — ada@example.org' })).toHaveProperty(
+      'checked',
+      false,
+    )
+  })
+
+  it('grants a role, sending the whole set rather than a delta', async () => {
+    // #110: the bootstrapped organiser has `admin` alone and cannot reach their
+    // own profile until this adds `member`.
+    const setAccountRoles = vi.fn<AdminApi['setAccountRoles']>(() =>
+      Promise.resolve({
+        account: {
+          id: 'a-1',
+          email: 'ada@example.org',
+          roles: ['admin', 'member'],
+          created_at: '2026-01-01T00:00:00.000Z',
+        },
+      }),
+    )
+    renderAdmin(
+      roster([
+        { id: 'a-1', email: 'ada@example.org', roles: ['admin'], created_at: '2026-01-01T00:00:00.000Z' },
+      ]),
+      ADMIN,
+      setAccountRoles,
+    )
+
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'member — ada@example.org' }))
+
+    await waitFor(() => expect(setAccountRoles).toHaveBeenCalledWith('a-1', { roles: ['admin', 'member'] }))
+    expect(screen.getByRole('checkbox', { name: 'member — ada@example.org' })).toHaveProperty('checked', true)
+  })
+
+  it('takes one away without disturbing the other', async () => {
+    const setAccountRoles = vi.fn<AdminApi['setAccountRoles']>(() =>
+      Promise.resolve({
+        account: {
+          id: 'a-1',
+          email: 'ada@example.org',
+          roles: ['member'],
+          created_at: '2026-01-01T00:00:00.000Z',
+        },
+      }),
+    )
+    renderAdmin(
+      roster([
+        {
+          id: 'a-1',
+          email: 'ada@example.org',
+          roles: ['admin', 'member'],
+          created_at: '2026-01-01T00:00:00.000Z',
+        },
+      ]),
+      ADMIN,
+      setAccountRoles,
+    )
+
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'admin — ada@example.org' }))
+
+    await waitFor(() => expect(setAccountRoles).toHaveBeenCalledWith('a-1', { roles: ['member'] }))
+  })
+
+  it('explains a refused last-organiser change rather than saying try again', async () => {
+    // A 409 means they are the only one left, and retrying cannot change that.
+    renderAdmin(
+      roster([
+        { id: 'a-1', email: 'ada@example.org', roles: ['admin'], created_at: '2026-01-01T00:00:00.000Z' },
+      ]),
+      ADMIN,
+      () => Promise.reject(apiError(409, 'conflict', 'nope')),
+    )
+
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'admin — ada@example.org' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('has to stay an organiser')
   })
 
   it('does not fetch for someone without the role', async () => {

@@ -1,5 +1,6 @@
-import type { AdminAccount } from '@sage-burner/shared'
+import type { AccountRole, AdminAccount } from '@sage-burner/shared'
 
+import { accountRoles } from '@sage-burner/shared'
 import { useEffect, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -7,25 +8,28 @@ import type { ApiClient } from '../api/client.ts'
 import { isApiError } from '../api/client.ts'
 import { isAdmin, useViewer } from '../viewer.tsx'
 
+export type AdminApi = Pick<ApiClient, 'getAdminAccounts' | 'setAccountRoles'>
+
 type Roster =
   | { status: 'loading' }
   | { status: 'ready'; accounts: readonly AdminAccount[] }
   | { status: 'failed'; message: string }
 
+const withRole = (roles: readonly AccountRole[], role: AccountRole, held: boolean): AccountRole[] =>
+  held ? [...new Set([...roles, role])] : roles.filter((entry) => entry !== role)
+
 /**
  * The organiser's landing page.
- *
- * Only the roster for now — approving applications, invites and scheduling get
- * their own pages. It exists this early because it is the first thing that
- * answers "did the bootstrap work, and who else is here?".
  *
  * The role check below decides what to *render*. It is not the access control:
  * `/api/admin/accounts` refuses a non-admin with a 403 whatever this does.
  */
-export const Admin = ({ api }: { api: Pick<ApiClient, 'getAdminAccounts'> }) => {
+export const Admin = ({ api }: { api: AdminApi }) => {
   const viewer = useViewer()
   const admin = isAdmin(viewer)
   const [roster, setRoster] = useState<Roster>({ status: 'loading' })
+  const [saving, setSaving] = useState<string | undefined>(undefined)
+  const [error, setError] = useState<string | undefined>(undefined)
 
   useEffect(() => {
     if (!admin) return undefined
@@ -51,6 +55,32 @@ export const Admin = ({ api }: { api: Pick<ApiClient, 'getAdminAccounts'> }) => 
     // `admin` rather than `viewer`: the provider hands out a new object on every
     // render, so depending on the viewer itself would refetch continuously.
   }, [api, admin])
+
+  const toggle = async (entry: AdminAccount, role: AccountRole, held: boolean) => {
+    setError(undefined)
+    setSaving(entry.id)
+    try {
+      const { account } = await api.setAccountRoles(entry.id, { roles: withRole(entry.roles, role, held) })
+      setRoster((current) =>
+        current.status === 'ready'
+          ? {
+              status: 'ready',
+              accounts: current.accounts.map((row) => (row.id === account.id ? account : row)),
+            }
+          : current,
+      )
+    } catch (failure) {
+      setError(
+        isApiError(failure) && failure.status === 409
+          ? 'Someone has to stay an organiser. Give the role to another account first.'
+          : isApiError(failure)
+            ? failure.message
+            : 'Could not change that. Please try again.',
+      )
+    } finally {
+      setSaving(undefined)
+    }
+  }
 
   if (viewer.status === 'loading') {
     return (
@@ -117,27 +147,52 @@ export const Admin = ({ api }: { api: Pick<ApiClient, 'getAdminAccounts'> }) => 
         </p>
       )}
 
+      {error !== undefined && (
+        <p class="form-error" role="alert">
+          {error}
+        </p>
+      )}
+
       {roster.status === 'ready' && (
         <table class="table">
           <thead>
             <tr>
               <th scope="col">Email</th>
-              <th scope="col">Roles</th>
+              {accountRoles.map((role) => (
+                <th key={role} scope="col">
+                  {role}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {roster.accounts.map((entry) => (
               <tr key={entry.id}>
                 <td>{entry.email}</td>
-                {/* An account with no roles is normal — an applicant, or someone
-                    invited but not yet made a member — so it says so rather
-                    than rendering an empty cell that reads as a bug. */}
-                <td>{entry.roles.length === 0 ? 'none yet' : entry.roles.join(', ')}</td>
+                {accountRoles.map((role) => (
+                  <td key={role}>
+                    <input
+                      type="checkbox"
+                      checked={entry.roles.includes(role)}
+                      disabled={saving !== undefined}
+                      aria-label={`${role} — ${entry.email}`}
+                      onChange={(changeEvent) => {
+                        void toggle(entry, role, changeEvent.currentTarget.checked)
+                      }}
+                    />
+                  </td>
+                ))}
               </tr>
             ))}
           </tbody>
         </table>
       )}
+
+      <p class="form-note">
+        An account with neither is normal — an applicant, or someone invited who has not finished. Member
+        opens someone&rsquo;s own details and saying they are coming; admin opens this page. Most organisers
+        want both.
+      </p>
     </section>
   )
 }

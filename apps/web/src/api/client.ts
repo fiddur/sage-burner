@@ -16,6 +16,8 @@ import type {
   RedeemRequest,
   RosterResponse,
   ActiveEventResponse,
+  AccountRolesUpdate,
+  AdminAccountResponse,
   AdminAccountsResponse,
   EventCreateInput,
   EventResponse,
@@ -175,6 +177,17 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
 
     /** Public. `{ event: null }` before the first event exists — not an error. */
     getActiveEvent: (signal?: AbortSignal) => request<ActiveEventResponse>('/events/active', { signal }),
+
+    /**
+     * Admin only. The whole set the account should end up with, not a delta.
+     *
+     * Throws ApiError(409, 'conflict') when it would leave no organiser at all.
+     */
+    setAccountRoles: (accountId: string, body: AccountRolesUpdate) =>
+      request<AdminAccountResponse>(`/admin/accounts/${encodeURIComponent(accountId)}/roles`, {
+        method: 'PUT',
+        body,
+      }),
 
     /** Admin only. */
     getEvents: (signal?: AbortSignal) => request<EventsResponse>('/admin/events', { signal }),

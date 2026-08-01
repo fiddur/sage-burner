@@ -1,5 +1,8 @@
-import type { AdminAccount, AdminAccountsResponse } from '@sage-burner/shared'
+import type { AdminAccount, AdminAccountResponse, AdminAccountsResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
+
+import { accountRolesUpdateSchema, errorResponse } from '@sage-burner/shared'
+import { count, eq } from 'drizzle-orm'
 
 import type { GuardDeps } from '../auth/guards.ts'
 
@@ -7,12 +10,16 @@ import { createGuards } from '../auth/guards.ts'
 import { account, accountRole } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 
+/** Thrown to roll the transaction back; never leaves this module. */
+const LAST_ADMIN = new Error('the last organiser cannot give up the role')
+
 /**
- * Admin-only reads.
+ * Who exists, and who holds which role.
  *
- * One route for now — the roster. It is what proves the guard works end to end,
- * and it is the first thing an organiser needs after bootstrapping themselves
- * in: whether anyone else exists yet.
+ * The list is the first thing an organiser needs after bootstrapping themselves
+ * in: whether anyone else is here yet. Editing the roles is the second, because
+ * `admin:create` grants `admin` alone — so without it the account every
+ * installation starts with can organise a burn but not come to one.
  */
 export const registerAdminRoutes = (app: FastifyInstance, { db, sessions }: GuardDeps) => {
   const { requireAdmin } = createGuards({ db, sessions })
@@ -41,4 +48,51 @@ export const registerAdminRoutes = (app: FastifyInstance, { db, sessions }: Guar
 
     return { accounts } satisfies AdminAccountsResponse
   })
+
+  app.put<{ Params: { accountId: string } }>(
+    '/api/admin/accounts/:accountId/roles',
+    { preHandler: requireAdmin },
+    async (request, reply) => {
+      void noStore(reply)
+
+      const parsed = accountRolesUpdateSchema.safeParse(request.body)
+      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+
+      const { accountId } = request.params
+      const [found] = await db
+        .select({ id: account.id, email: account.email, created_at: account.created_at })
+        .from(account)
+        .where(eq(account.id, accountId))
+        .limit(1)
+      if (found === undefined) return reply.code(404).send(errorResponse('not_found'))
+
+      const { roles } = parsed.data
+
+      // Counted inside the transaction, after the write, so the rule is decided
+      // against the state the write actually produced with nothing in between,
+      // and a `throw` rolls the whole thing back. A count taken beforehand is a
+      // check-then-act; two `inject` requests could not be made to interleave one
+      // here, the same as the admin-side race in `roster.ts`, so this is ordering
+      // that costs nothing rather than a reproduced bug.
+      try {
+        db.transaction((tx) => {
+          tx.delete(accountRole).where(eq(accountRole.account_id, accountId)).run()
+          for (const role of roles) tx.insert(accountRole).values({ account_id: accountId, role }).run()
+
+          const [remaining] = tx
+            .select({ admins: count() })
+            .from(accountRole)
+            .where(eq(accountRole.role, 'admin'))
+            .all()
+
+          if ((remaining?.admins ?? 0) === 0) throw LAST_ADMIN
+        })
+      } catch (failure) {
+        if (failure === LAST_ADMIN) return reply.code(409).send(errorResponse('conflict'))
+        throw failure
+      }
+
+      return { account: { ...found, roles } } satisfies AdminAccountResponse
+    },
+  )
 }
