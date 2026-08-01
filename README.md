@@ -518,8 +518,8 @@ minutes after a merge.
 
 ### Creating the first admin
 
-`admin:create` makes the first organiser, or grants `admin` to an account that
-already exists. Against a running container:
+`admin:create` makes the first organiser, or grants the roles to an account
+that already exists. Against a running container:
 
 ```sh
 read -rs -p 'Password: ' ADMIN_PASSWORD; echo
@@ -544,7 +544,9 @@ ADMIN_EMAIL=you@example.org ADMIN_PASSWORD="$ADMIN_PASSWORD" \
   pnpm --filter sage-burner-backend admin:create
 ```
 
-Then log in at `/login`; the nav gains an **Organise** link.
+Then log in at `/login`; the nav gains an **Organise** link, plus **Your burn**
+and **Your details** — it grants `member` alongside `admin`, because an
+organiser is almost always also coming.
 
 Both values come from the environment, never from arguments. `read -rs` keeps
 the password out of the shell history, and `-e ADMIN_PASSWORD` with no `=`
@@ -559,7 +561,7 @@ exist before the server has ever started.
 Two things it deliberately does not do:
 
 - **It never changes an existing password.** Given an address that is already
-  here, it grants the role and stops. Otherwise the bootstrap command would
+  here, it grants the roles and stops. Otherwise the bootstrap command would
   double as an offline password reset for any account, and anyone who could run
   it could take over the organiser's login rather than merely create one. Run it
   twice and the second run says so.
@@ -576,6 +578,25 @@ existing password no longer passes.
 
 Two roles, `admin` and `member`, in `account_role`. No finer-grained
 permissions — at this size they would be more to get wrong than to gain.
+
+They are separate concepts and neither implies the other. `admin` opens the
+organising pages; `member` opens a person's own details and saying they are
+coming to a burn. An organiser who is not attending is coherent, so `admin`
+deliberately does not confer `member` — but the ordinary case is both, which is
+why `admin:create` grants both.
+
+Organise → the **Accounts** table sets them, a checkbox per role per account.
+`PUT /api/admin/accounts/:id/roles` takes the whole set the account should end
+up with, not a delta: the editor sends what the row now says, so it cannot
+express "add admin, forget to remove member".
+
+Removing the last `admin` is refused with **409**. The count is taken inside the
+transaction, after the write, so the rule is decided against the state the write
+actually produced; a `throw` rolls it back. Two organisers stepping down at the
+same moment leave one, and a test asserts it.
+
+Nothing stops an organiser removing their _own_ `admin` while another exists —
+that is stepping down, not a lockout.
 
 Authorization is a `preHandler` on the route, not a hidden link:
 `/api/admin/*` answers **401** with `{ "error": "unauthenticated" }` when nobody
@@ -1012,7 +1033,9 @@ doing it is making the call deliberately.
 **Being able to sign in is not being a member.** These routes are behind
 `requireMember`, so an account with no roles — invited but not yet redeemed — and
 an admin who is not also a member are both refused. The two roles are separate
-rows in `account_role`, and redemption grants only `member`.
+rows in `account_role`, and redemption grants only `member`. `admin:create`
+grants both, and the accounts table under Organise is where either is added or
+taken away afterwards.
 
 ### Members maintain their own record
 

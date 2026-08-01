@@ -33,6 +33,7 @@ const clientWith = (
   getMe: () => Promise.reject(new Error('getMe is not stubbed in this file')),
   login: () => Promise.reject(new Error('login is not stubbed in this file')),
   getAdminAccounts: () => Promise.reject(new Error('getAdminAccounts is not stubbed in this file')),
+  setAccountRoles: () => Promise.reject(new Error('setAccountRoles is not stubbed in this file')),
   getQuestions: () => Promise.reject(new Error('getQuestions is not stubbed in this file')),
   submitApplication: () => Promise.reject(new Error('submitApplication is not stubbed in this file')),
   getApplications: () => Promise.reject(new Error('getApplications is not stubbed in this file')),

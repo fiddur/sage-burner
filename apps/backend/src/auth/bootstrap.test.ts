@@ -25,7 +25,7 @@ const database = () => {
 
 const rolesOf = async (db: ReturnType<typeof database>, accountId: string) => {
   const rows = await db.select().from(accountRole).where(eq(accountRole.account_id, accountId))
-  return rows.map((row) => row.role)
+  return rows.map((row) => row.role).sort()
 }
 
 describe('ensureAdmin', () => {
@@ -40,7 +40,7 @@ describe('ensureAdmin', () => {
     })
 
     expect(result.created).toBe(true)
-    expect(await rolesOf(db, result.account_id)).toEqual(['admin'])
+    expect(await rolesOf(db, result.account_id)).toEqual(['admin', 'member'])
 
     const [row] = await db.select().from(account).where(eq(account.id, result.account_id))
     await expect(verifyPassword('a good long passphrase', row?.password_hash ?? null)).resolves.toBe(true)
@@ -65,11 +65,11 @@ describe('ensureAdmin', () => {
     })
 
     expect(second).toEqual({ account_id: first.account_id, created: false })
-    expect(await rolesOf(db, first.account_id)).toEqual(['admin'])
+    expect(await rolesOf(db, first.account_id)).toEqual(['admin', 'member'])
     expect(await db.select().from(account)).toHaveLength(1)
   })
 
-  it('grants the role to an account that already exists', async () => {
+  it('grants the roles to an account that already exists', async () => {
     const db = database()
     await db.insert(account).values({
       id: 'existing',
@@ -86,7 +86,7 @@ describe('ensureAdmin', () => {
     })
 
     expect(result).toEqual({ account_id: 'existing', created: false })
-    expect(await rolesOf(db, 'existing')).toEqual(['admin'])
+    expect(await rolesOf(db, 'existing')).toEqual(['admin', 'member'])
   })
 
   it('never changes an existing password', async () => {
@@ -146,7 +146,7 @@ describe('ensureAdmin', () => {
     ).rejects.toThrow(/valid email/)
   })
 
-  it('still grants the role when the password would be too short', async () => {
+  it('still grants the roles when the password would be too short', async () => {
     // The length rule guards a password being *set*. Refusing to grant a role
     // over it would fail for a reason that has nothing to do with the request.
     const db = database()
@@ -161,6 +161,6 @@ describe('ensureAdmin', () => {
     const second = await ensureAdmin({ db, email: 'ada@example.org', password: 'x', params: cheap })
 
     expect(second.created).toBe(false)
-    expect(await rolesOf(db, first.account_id)).toEqual(['admin'])
+    expect(await rolesOf(db, first.account_id)).toEqual(['admin', 'member'])
   })
 })
