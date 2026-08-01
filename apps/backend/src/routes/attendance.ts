@@ -9,7 +9,7 @@ import type { GuardDeps } from '../auth/guards.ts'
 
 import { createGuards } from '../auth/guards.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
-import { attendance } from '../db/schema.ts'
+import { attendance, event } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 import { viewerFor } from './auth.ts'
 import { activeEvent, todayIso } from './events.ts'
@@ -95,6 +95,13 @@ export const registerAttendanceRoutes = (
         account_id: viewer.account_id,
         joined_at: now().toISOString(),
         payment_status: 'unpaid',
+        // The whole burn, which is what almost everyone means by coming to it.
+        // Written rather than left null and prefilled in the form: an organiser
+        // reading the roster wants the common answer already there, and the
+        // people arriving late or leaving early are the ones who should have to
+        // change something.
+        arrival_date: found.start_date,
+        departure_date: found.end_date,
       })
     } catch (error) {
       if (!isAlreadyJoined(error)) throw error
@@ -149,6 +156,14 @@ export const registerAttendanceRoutes = (
       const existing = await joinedRow(request.params.eventId, parsed.data.account_id)
       if (existing !== undefined) return { attendance: existing }
 
+      // Only for the dates. A missing event is still the foreign key's to
+      // reject below, so this read cannot answer 404 on its own.
+      const [burn] = await db
+        .select({ start_date: event.start_date, end_date: event.end_date })
+        .from(event)
+        .where(eq(event.id, request.params.eventId))
+        .limit(1)
+
       try {
         await db.insert(attendance).values({
           id: randomUUID(),
@@ -156,6 +171,9 @@ export const registerAttendanceRoutes = (
           account_id: parsed.data.account_id,
           joined_at: now().toISOString(),
           payment_status: 'unpaid',
+          // The same default an organiser would otherwise type in for them.
+          arrival_date: burn?.start_date ?? null,
+          departure_date: burn?.end_date ?? null,
         })
       } catch (error) {
         // No pre-read for either id: the foreign keys already reject a missing

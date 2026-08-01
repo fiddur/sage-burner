@@ -434,3 +434,58 @@ describe('isAlreadyJoined', () => {
     expect(isAlreadyJoined(undefined)).toBe(false)
   })
 })
+
+describe('the dates a stay starts with', () => {
+  it('is the whole burn, so nobody types what the event already knows', async () => {
+    const server = await build()
+    await givenEvent()
+    const member = await givenAccount(['member'])
+
+    const response = await join(server, member.cookie)
+
+    expect(response.statusCode).toBe(201)
+    expect(response.json().attendance).toMatchObject({
+      arrival_date: '2026-08-01',
+      departure_date: '2026-08-05',
+    })
+  })
+
+  it('is the burn an organiser adds them to, too', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const admin = await givenAccount(['admin'])
+    const someone = await givenAccount(['member'])
+
+    const response = await server.inject({
+      method: 'POST',
+      url: `/api/admin/events/${eventId}/attendance`,
+      headers: { cookie: admin.cookie },
+      payload: { account_id: someone.id },
+    })
+
+    expect(response.statusCode).toBe(201)
+    expect(response.json().attendance).toMatchObject({
+      arrival_date: '2026-08-01',
+      departure_date: '2026-08-05',
+    })
+  })
+
+  it('is still theirs to change afterwards', async () => {
+    // A default, not a decision. Someone arriving a day late must be able to say
+    // so, and the ordering rule still applies to what they say.
+    const server = await build()
+    await givenEvent()
+    const member = await givenAccount(['member'])
+    await join(server, member.cookie)
+
+    const response = await server.inject({
+      method: 'PATCH',
+      url: '/api/events/active/attendance',
+      headers: { cookie: member.cookie },
+      payload: { arrival_date: '2026-08-02' },
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().attendance.arrival_date).toBe('2026-08-02')
+  })
+})

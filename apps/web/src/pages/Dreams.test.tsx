@@ -245,6 +245,25 @@ describe('Dreams', () => {
     await waitFor(() => expect(updateSession).toHaveBeenCalledWith('s-1', {}))
   })
 
+  it('binds the two ends of the slot to each other', async () => {
+    renderPage(
+      stub({}, [
+        aDream({
+          id: 's-1',
+          title: 'Cacao ceremony',
+          time_slot_start: '2026-08-02T18:00:00.000Z',
+          time_slot_end: '2026-08-02T20:00:00.000Z',
+        }),
+      ]),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Cacao ceremony' }))
+
+    // Local time, since the suite is pinned to Europe/Stockholm.
+    expect(screen.getByLabelText('Start of Cacao ceremony').getAttribute('max')).toBe('2026-08-02T22:00')
+    expect(screen.getByLabelText('End of Cacao ceremony').getAttribute('min')).toBe('2026-08-02T20:00')
+  })
+
   it('withdraws one', async () => {
     const withdrawSession = vi.fn<DreamsApi['withdrawSession']>(() => Promise.resolve(undefined))
     renderPage(stub({ withdrawSession }, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))

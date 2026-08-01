@@ -281,6 +281,9 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
           <input
             type="date"
             required
+            // Bound to its partner, so the picker will not offer a burn that ends
+            // before it starts. The schema and the CHECK still decide it.
+            max={draft.end_date === '' ? undefined : draft.end_date}
             value={draft.start_date}
             onInput={(inputEvent) => setDraft({ ...draft, start_date: inputEvent.currentTarget.value })}
           />
@@ -302,6 +305,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
           <input
             type="date"
             required
+            min={draft.start_date === '' ? undefined : draft.start_date}
             value={draft.end_date}
             onInput={(inputEvent) => setDraft({ ...draft, end_date: inputEvent.currentTarget.value })}
           />
