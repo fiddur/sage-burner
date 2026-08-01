@@ -114,6 +114,20 @@ describe('AdminPlaces', () => {
     )
   })
 
+  it('refuses to save an edit that empties a field, with the message adding gives', async () => {
+    const updatePlace = vi.fn<PlacesApi['updatePlace']>(() =>
+      Promise.resolve({ place: aPlace({ id: 'p-2', name: 'x' }) }),
+    )
+    renderPage(stub({ updatePlace }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Sauna' }))
+    fireEvent.input(screen.getByRole('textbox', { name: 'Name of Sauna' }), { target: { value: '  ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('needs a name and an emoji')
+    expect(updatePlace).not.toHaveBeenCalled()
+  })
+
   it('removes one behind the trashcan', async () => {
     const deletePlace = vi.fn<PlacesApi['deletePlace']>(() => Promise.resolve(undefined))
     renderPage(stub({ deletePlace }))

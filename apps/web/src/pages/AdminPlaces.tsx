@@ -26,6 +26,11 @@ interface Draft {
 
 const BLANK: Draft = { name: '', emoji: '', color: 'blue' }
 
+const NEEDS_BOTH = 'A place needs a name and an emoji — both show in the schedule.'
+
+const isBlank = (fields: { name: string; emoji: string }) =>
+  fields.name.trim() === '' || fields.emoji.trim() === ''
+
 const swap = (ids: readonly string[], index: number, by: -1 | 1): string[] | undefined => {
   const target = index + by
   if (target < 0 || target >= ids.length) return undefined
@@ -104,14 +109,14 @@ export const AdminPlaces = ({ api }: { api: PlacesApi }) => {
     }
   }
 
-  const reorderTo = (places: readonly Place[], ids: string[] | undefined) => {
+  const reorderTo = (ids: string[] | undefined) => {
     if (ids === undefined) return
     void run(() => api.reorderPlaces(ids), 'Could not reorder the places.')
   }
 
   const add = () => {
-    if (draft.name.trim() === '' || draft.emoji.trim() === '') {
-      setError('A place needs a name and an emoji — both show in the schedule.')
+    if (isBlank(draft)) {
+      setError(NEEDS_BOTH)
       return
     }
 
@@ -183,7 +188,7 @@ export const AdminPlaces = ({ api }: { api: PlacesApi }) => {
             }}
             onDrop={(dropEvent) => {
               dropEvent.preventDefault()
-              if (dragging !== undefined) reorderTo(places, moveTo(ids, dragging, index))
+              if (dragging !== undefined) reorderTo(moveTo(ids, dragging, index))
               setDragging(undefined)
             }}
           >
@@ -202,7 +207,7 @@ export const AdminPlaces = ({ api }: { api: PlacesApi }) => {
                 const by = keyEvent.key === 'ArrowUp' ? -1 : keyEvent.key === 'ArrowDown' ? 1 : undefined
                 if (by === undefined) return
                 keyEvent.preventDefault()
-                reorderTo(places, swap(ids, index, by))
+                reorderTo(swap(ids, index, by))
               }}
             >
               ⠿
@@ -213,12 +218,20 @@ export const AdminPlaces = ({ api }: { api: PlacesApi }) => {
                 place={row}
                 busy={busy}
                 onCancel={() => setEditing(undefined)}
-                onSave={(changes) =>
+                onSave={(changes) => {
+                  // The same rule as adding, and the same message. Without it a
+                  // cleared field reaches the server and comes back as a bare
+                  // "Request failed (400)".
+                  if (isBlank(changes)) {
+                    setError(NEEDS_BOTH)
+                    return
+                  }
+
                   void run(async () => {
                     await api.updatePlace(row.id, changes)
                     setEditing(undefined)
                   }, 'Could not save the place.')
-                }
+                }}
               />
             ) : (
               <>
