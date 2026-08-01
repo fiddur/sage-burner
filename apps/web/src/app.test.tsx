@@ -60,6 +60,11 @@ const clientWith = (
   createEvent: () => Promise.reject(new Error('createEvent is not stubbed in this file')),
   updateEvent: () => Promise.reject(new Error('updateEvent is not stubbed in this file')),
   getActiveEvent: () => Promise.resolve({ event: null }),
+  getPlaces: () => Promise.reject(new Error('getPlaces is not stubbed in this file')),
+  addPlace: () => Promise.reject(new Error('addPlace is not stubbed in this file')),
+  updatePlace: () => Promise.reject(new Error('updatePlace is not stubbed in this file')),
+  deletePlace: () => Promise.reject(new Error('deletePlace is not stubbed in this file')),
+  reorderPlaces: () => Promise.reject(new Error('reorderPlaces is not stubbed in this file')),
   getInstallation: () => Promise.reject(new Error('getInstallation is not stubbed in this file')),
   updateInstallation: () => Promise.reject(new Error('updateInstallation is not stubbed in this file')),
 })

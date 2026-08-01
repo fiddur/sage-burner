@@ -15,6 +15,18 @@ export const accountRoles = ['admin', 'member'] as const
 export type AccountRole = (typeof accountRoles)[number]
 export const isAccountRole = (value: unknown): value is AccountRole => isOneOf(accountRoles, value)
 
+/**
+ * Lane colours for the scheduling grid.
+ *
+ * A fixed vocabulary rather than free hex, so the grid can be styled once and
+ * stay legible: an organiser picking `#fefefe` for a lane would produce
+ * unreadable text nothing in the app could correct. Named rather than valued so
+ * light and dark themes can each choose their own shade of `red`.
+ */
+export const placeColors = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'pink', 'grey'] as const
+export type PlaceColor = (typeof placeColors)[number]
+export const isPlaceColor = (value: unknown): value is PlaceColor => isOneOf(placeColors, value)
+
 /** Lifecycle of a membership application. */
 export const applicationStatuses = ['pending', 'approved', 'rejected'] as const
 export type ApplicationStatus = (typeof applicationStatuses)[number]
