@@ -309,8 +309,8 @@ describe('sessionSchema', () => {
 
   it('lets a partial edit carry one end of the slot, which only the row can judge', () => {
     // An absent key is not a null one. Conflating them made every single-ended
-    // PATCH a 400 before the stored row was ever consulted — `slotStaysWhole` in
-    // `sessions.ts` is what decides these.
+    // PATCH a 400 before the stored row was ever consulted. `sessions.ts` merges
+    // the update onto the row and runs `hasValidTimeSlot` on the result.
     expect(sessionUpdateSchema.safeParse({ time_slot_end: '2026-10-03T10:30:00Z' }).success).toBe(true)
     expect(sessionUpdateSchema.safeParse({ time_slot_start: null }).success).toBe(true)
   })

@@ -206,6 +206,31 @@ describe('Dreams', () => {
     await waitFor(() => expect(updateSession).toHaveBeenCalledWith('s-1', { title: 'Renamed' }))
   })
 
+  it('leaves a slot carrying seconds alone when only the title was touched', async () => {
+    // The inputs are minute-precision, so a stored slot with seconds does not
+    // round-trip. Comparing the round-tripped value against the raw one would
+    // call an untouched field changed and quietly zero the seconds.
+    const updateSession = vi.fn<DreamsApi['updateSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'Renamed' }) }),
+    )
+    renderPage(
+      stub({ updateSession }, [
+        aDream({
+          id: 's-1',
+          title: 'Cacao ceremony',
+          time_slot_start: '2026-08-02T18:00:30.000Z',
+          time_slot_end: '2026-08-02T20:00:45.000Z',
+        }),
+      ]),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Cacao ceremony' }))
+    fireEvent.input(screen.getByLabelText('Title of Cacao ceremony'), { target: { value: 'Renamed' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(updateSession).toHaveBeenCalledWith('s-1', { title: 'Renamed' }))
+  })
+
   it('sends nothing at all when the form was opened and closed unchanged', async () => {
     // An empty body is the documented no-op read, so this is harmless — but it
     // is worth pinning that an untouched save cannot carry a value.

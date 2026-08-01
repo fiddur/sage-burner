@@ -888,9 +888,14 @@ The edit form seeds its state once, at mount. Sending all five fields back would
 carry the values it loaded — so fixing a typo in a title would put the place and
 slot back as they were then, undoing whatever another member scheduled in the
 meantime. Concurrent editing is the _premise_ of this page, so that is the
-ordinary case rather than a rare one. `changed()` diffs against the loaded dream
-and sends only the difference, which `sessionUpdateSchema`'s `.partial()` already
-accepts. An untouched save sends `{}`, which is the documented no-op read.
+ordinary case rather than a rare one. The form sends only the fields it changed, which
+`sessionUpdateSchema`'s `.partial()` already accepts. An untouched save sends
+`{}`, the documented no-op read.
+
+Each field is compared **in the form's own units**. Comparing a round-tripped
+timestamp against the stored one instead calls an untouched slot changed whenever
+the stored value carries seconds — the inputs are minute-precision — and quietly
+zeroes them.
 
 This is not optimistic locking and does not pretend to be: two members editing
 the same _field_ still last-writer-wins. It removes the case where they edit

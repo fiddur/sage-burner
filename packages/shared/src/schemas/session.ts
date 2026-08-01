@@ -11,8 +11,9 @@ type TimeSlot = { time_slot_start?: string | null; time_slot_end?: string | null
  * An absent key is not the same as a null one, and conflating them made every
  * single-ended PATCH a 400: `{ time_slot_end }` alone read as "end set, start
  * cleared" and was refused before the row could be consulted. A lone key is
- * decidable only against the stored row, which is `slotStaysWhole` in
- * `sessions.ts`. Same reasoning as `violatesTickBoxRules`.
+ * decidable only against the stored row, which is what the PATCH handler in
+ * `sessions.ts` uses `hasValidTimeSlot` for. Same reasoning as
+ * `violatesTickBoxRules`.
  *
  * The create schema defaults both to null, so they are always present there and
  * this still refuses half a slot at creation.

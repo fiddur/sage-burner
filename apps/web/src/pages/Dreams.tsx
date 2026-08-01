@@ -18,15 +18,6 @@ type Loaded =
   | { status: 'ready'; sessions: readonly Session[]; places: readonly Place[] }
   | { status: 'failed'; message: string }
 
-/**
- * The fields that differ from the dream as loaded.
- *
- * An untouched field is left out rather than sent unchanged, so this form can
- * only ever overwrite what the person editing actually touched.
- */
-export const changed = (dream: Session, edited: Required<SessionUpdate>): SessionUpdate =>
-  Object.fromEntries(Object.entries(edited).filter(([key, value]) => value !== dream[key as keyof Session]))
-
 const placeLabel = (places: readonly Place[], id: string | null) => {
   const found = places.find((row) => row.id === id)
 
@@ -251,6 +242,23 @@ const DreamFields = ({
   const [start, setStart] = useState(toLocalInput(dream.time_slot_start))
   const [end, setEnd] = useState(toLocalInput(dream.time_slot_end))
 
+  // Only the fields this form actually changed. Sending all five would carry the
+  // values it loaded at mount, so fixing a typo in the title would put the place
+  // and slot back as they were then, undoing whatever someone else scheduled
+  // meanwhile — the ordinary case on a page several people edit at once.
+  //
+  // Each comparison is in the form's own units. Comparing a round-tripped
+  // timestamp against the stored one instead would call an untouched slot
+  // changed whenever the stored value carries seconds, because the inputs are
+  // minute-precision, and quietly zero them.
+  const edits = (): SessionUpdate => ({
+    ...(title.trim() === dream.title ? {} : { title: title.trim() }),
+    ...(description === dream.description ? {} : { description }),
+    ...(placeId === (dream.place_id ?? '') ? {} : { place_id: placeId === '' ? null : placeId }),
+    ...(start === toLocalInput(dream.time_slot_start) ? {} : { time_slot_start: fromLocalInput(start) }),
+    ...(end === toLocalInput(dream.time_slot_end) ? {} : { time_slot_end: fromLocalInput(end) }),
+  })
+
   return (
     <div class="dream-edit">
       <label class="field">
@@ -310,26 +318,7 @@ const DreamFields = ({
         />
       </label>
 
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() =>
-          onSave(
-            // Only what this form actually changed. Sending all five would carry
-            // the values it loaded at mount, so fixing a typo in the title would
-            // put back the place and slot as they were then — undoing whatever
-            // another member scheduled in the meantime. Concurrent editing is the
-            // premise of this page, so that is the ordinary case, not a rare one.
-            changed(dream, {
-              title: title.trim(),
-              description,
-              place_id: placeId === '' ? null : placeId,
-              time_slot_start: fromLocalInput(start),
-              time_slot_end: fromLocalInput(end),
-            }),
-          )
-        }
-      >
+      <button type="button" disabled={busy} onClick={() => onSave(edits())}>
         Save
       </button>
       <button type="button" class="link-button" disabled={busy} onClick={onCancel}>
