@@ -20,6 +20,8 @@ const BURN: Event = {
   slug: 'summer-2026',
   start_date: '2026-08-01',
   end_date: '2026-08-02',
+  start_time: '00:00',
+  end_time: '23:59',
   welcome_markdown: '',
   member_cap: 42,
   created_at: '2026-07-02T00:00:00.000Z',
@@ -76,9 +78,9 @@ describe('Schedule', () => {
 
     expect(await screen.findByRole('columnheader', { name: /Temple/ })).toBeTruthy()
     expect(screen.getByRole('columnheader', { name: /Sauna/ })).toBeTruthy()
-    // Two days of burn plus the night after it ends, 24 rows each: the last
-    // night regularly runs past midnight and those hours need somewhere to go.
-    expect(document.querySelectorAll('.schedule-grid th[scope="row"]')).toHaveLength(72)
+    // Two whole days, 24 rows each. The burn's own hours decide this now — an
+    // organiser who says 12:00 to 12:00 gets a grid that starts and stops there.
+    expect(document.querySelectorAll('.schedule-grid th[scope="row"]')).toHaveLength(48)
   })
 
   it('lists an unplaced dream in the pool rather than in the grid', async () => {
@@ -137,10 +139,10 @@ describe('Schedule', () => {
     expect(cell('08:00', 1).textContent).not.toContain('Cacao ceremony')
   })
 
-  it('keeps a dream scheduled past the last midnight visible', async () => {
-    // A burn's last night runs into the day after `end_date`. Such a dream has
-    // both a place and a time, so it is not \u201cunplaced\u201d — without a row for it
-    // it would render nowhere at all.
+  it("keeps a dream scheduled outside the burn's hours visible", async () => {
+    // It has both a place and a time, so it is not \u201cunplaced\u201d; without a row
+    // for it, and without the pool being derived from what the grid draws, it
+    // would render nowhere at all.
     renderPage(
       stub({}, [
         aDream({

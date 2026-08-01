@@ -19,6 +19,8 @@ const summer: Event = {
   slug: 'summer-2026',
   start_date: '2026-08-01',
   end_date: '2026-08-05',
+  start_time: '00:00',
+  end_time: '23:59',
   welcome_markdown: '# Hello',
   member_cap: 42,
   created_at: '2026-01-01T00:00:00.000Z',
@@ -55,6 +57,30 @@ describe('AdminEvents', () => {
     expect(await screen.findByText(/No events yet/)).toBeTruthy()
   })
 
+  it('lets an organiser set the hours the burn is open', async () => {
+    // The grid runs between these, so they are on the create form rather than
+    // hidden behind an edit — an organiser who has to find them later gets a
+    // schedule covering three whole days for a burn that is two half ones.
+    const created: Event = { ...summer, id: 'e-3', slug: 'winter-2026' }
+    const createEvent = vi.fn(() => Promise.resolve({ event: created }))
+    renderPage(stub({ createEvent }))
+    await screen.findByText('Summer Burn 2026')
+
+    fill('Name', 'Winter Burn')
+    fill('Slug', 'winter-2026')
+    fill('Starts', '2026-12-01')
+    fill('Starting time', '15:00')
+    fill('Ends', '2026-12-05')
+    fill('Ending time', '12:00')
+    screen.getByRole('button', { name: 'Create event' }).click()
+
+    await waitFor(() =>
+      expect(createEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ start_time: '15:00', end_time: '12:00' }),
+      ),
+    )
+  })
+
   it('creates an event and shows it without a reload', async () => {
     const created: Event = { ...summer, id: 'e-2', name: 'Winter Burn', slug: 'winter-2026' }
     const createEvent = vi.fn(() => Promise.resolve({ event: created }))
@@ -73,6 +99,8 @@ describe('AdminEvents', () => {
         slug: 'winter-2026',
         start_date: '2026-12-01',
         end_date: '2026-12-05',
+        start_time: '00:00',
+        end_time: '23:59',
         welcome_markdown: '',
         member_cap: 42,
       })

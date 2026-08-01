@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { dayAfter, hourOf, hoursOf, laneCells, rowSpanOf } from './schedule.ts'
+import { hourOf, hoursOf, laneCells, rowSpanOf } from './schedule.ts'
 
 describe('the timetable rows', () => {
-  it('covers every hour of every day of the burn', () => {
+  it('covers every hour of every day when the burn runs the whole days', () => {
     const rows = hoursOf('2026-08-01', '2026-08-03')
 
     expect(rows).toHaveLength(72)
@@ -25,19 +25,34 @@ describe('the timetable rows', () => {
 
   it('does not repeat an hour on the day the clocks go forward', () => {
     // 2026-03-29 in Europe/Stockholm, which the suite is pinned to: 02:00 does
-    // not exist, and `setHours(2)` lands on 03:00. Without deduplication two
-    // rows share a key and a dream at 03:00 renders twice.
+    // not exist. Walking by adding an hour to an instant crosses the gap once, so
+    // no row repeats and none is invented — the earlier version set hours on a
+    // date and needed deduplicating.
     const rows = hoursOf('2026-03-29', '2026-03-29')
 
     expect(rows).toEqual([...new Set(rows)])
     expect(rows).toHaveLength(23)
   })
 
-  it('is 144 rows for a five-day burn, which is the number the README quotes', () => {
-    // The README states this figure, and a figure in prose goes stale silently.
-    // `Schedule.tsx` passes `dayAfter(end_date)`, so the 1st to the 5th is six
-    // days of rows rather than five.
-    expect(hoursOf('2026-08-01', dayAfter('2026-08-05'))).toHaveLength(144)
+  it('is 49 rows for midday Friday to midday Sunday, the figure the README quotes', () => {
+    // A number in prose goes stale silently, so it is asserted here.
+    expect(hoursOf('2026-08-01', '2026-08-03', '12:00', '12:00')).toHaveLength(49)
+  })
+
+  it('starts at the hour the burn opens, not at midnight', () => {
+    const rows = hoursOf('2026-08-01', '2026-08-01', '15:30', '22:00')
+
+    expect(rows[0]).toBe('2026-08-01T15:00')
+    expect(rows.at(-1)).toBe('2026-08-01T22:00')
+  })
+
+  it('runs past midnight when the burn does, without an extra day of empties', () => {
+    // What `dayAfter` used to guess at. The organiser says 04:00 on the 3rd and
+    // gets exactly that.
+    const rows = hoursOf('2026-08-01', '2026-08-03', '18:00', '04:00')
+
+    expect(rows[0]).toBe('2026-08-01T18:00')
+    expect(rows.at(-1)).toBe('2026-08-03T04:00')
   })
 
   it('is empty for dates that make no sense, rather than looping forever', () => {

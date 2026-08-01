@@ -1,12 +1,25 @@
 import { z } from 'zod'
 
-import { dateSchema, dateTimeSchema, idSchema, slugSchema, nonEmptyText } from './common.ts'
+import { dateSchema, dateTimeSchema, idSchema, slugSchema, nonEmptyText, timeSchema } from './common.ts'
 
 /** Tolerates missing keys so `.partial()` and `.omit()` derivations still typecheck. */
-type DateRange = { start_date?: string; end_date?: string }
+type DateRange = { start_date?: string; end_date?: string; start_time?: string; end_time?: string }
 
-const hasOrderedDates = ({ start_date, end_date }: DateRange) =>
-  start_date === undefined || end_date === undefined || start_date <= end_date
+/**
+ * The burn must not end before it starts — compared as a day *and* a time, since
+ * a one-day burn can now be 10:00 to 22:00 or, wrongly, 22:00 to 10:00.
+ *
+ * The times only decide it when the days are equal. On different days the day
+ * comparison already answers, and an end time earlier in the clock than the start
+ * is ordinary for any burn spanning midnight.
+ */
+const hasOrderedDates = ({ start_date, end_date, start_time, end_time }: DateRange) => {
+  if (start_date === undefined || end_date === undefined) return true
+  if (start_date !== end_date) return start_date < end_date
+  if (start_time === undefined || end_time === undefined) return true
+
+  return start_time <= end_time
+}
 
 /**
  * Re-applies the start/end ordering check to a schema derived from
@@ -23,7 +36,7 @@ const hasOrderedDates = ({ start_date, end_date }: DateRange) =>
  */
 export const withEventDateOrder = <T extends z.ZodType<DateRange>>(schema: T) =>
   schema.refine(hasOrderedDates, {
-    message: 'end_date must not be before start_date',
+    message: 'the burn must not end before it starts',
     path: ['end_date'],
   })
 
@@ -41,6 +54,9 @@ export const eventFields = z.object({
   slug: slugSchema,
   start_date: dateSchema,
   end_date: dateSchema,
+  /** When the gates open and close, local time. The schedule grid runs between. */
+  start_time: timeSchema,
+  end_time: timeSchema,
   /** Rendered on the public homepage. Admin-authored, sanitized before display. */
   welcome_markdown: z.string().max(100_000),
   /** Membership cap, e.g. 42. Approvals past this go to the waiting list. */
@@ -66,7 +82,14 @@ export type Event = z.infer<typeof eventSchema>
 export const eventCreateSchema = withEventDateOrder(
   eventFields
     .omit({ id: true, created_at: true })
-    .extend({ welcome_markdown: eventFields.shape.welcome_markdown.default('') })
+    .extend({
+      welcome_markdown: eventFields.shape.welcome_markdown.default(''),
+      // Defaulted so an organiser naming dates and a cap is not stopped by two
+      // fields they may not have decided yet. The whole day, which is what the
+      // grid did before the hours existed.
+      start_time: eventFields.shape.start_time.default('00:00'),
+      end_time: eventFields.shape.end_time.default('23:59'),
+    })
     // `.strict()` for the same reason as the update schema, and so the two do not
     // differ for no stated reason: a stripped `welcome` for `welcome_markdown`
     // would otherwise 201 an event whose welcome text is silently the `.default('')`

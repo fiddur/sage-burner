@@ -16,6 +16,8 @@ const summer: Event = {
   slug: 'summer-2026',
   start_date: '2026-08-01',
   end_date: '2026-08-05',
+  start_time: '00:00',
+  end_time: '23:59',
   welcome_markdown: '# Bring water\n\nAnd a [map](/map).',
   member_cap: 42,
   created_at: '2026-01-01T00:00:00.000Z',

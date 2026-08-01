@@ -14,6 +14,15 @@ import { sql } from 'drizzle-orm'
 import { check, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 /**
+ * `column` is a fixed-width 24-hour `HH:MM`.
+ *
+ * Shape only, and fixed width is the point: the order CHECK above compares these
+ * as strings, which is sound while `09:00` cannot also arrive as `9:00`.
+ */
+const isClockTime = (column: SQLiteColumn): SQL =>
+  sql`${column} glob '[0-2][0-9]:[0-5][0-9]' and cast(substr(${column}, 1, 2) as integer) < 24`
+
+/**
  * `column` is a fixed-width `YYYY-MM-DD` date, or null.
  *
  * The date-ordering CHECKs compare these as strings, which is only sound
@@ -124,6 +133,8 @@ export const event = sqliteTable(
     slug: text('slug').notNull().unique(),
     start_date: text('start_date').notNull(),
     end_date: text('end_date').notNull(),
+    start_time: text('start_time').notNull().default('00:00'),
+    end_time: text('end_time').notNull().default('23:59'),
     welcome_markdown: text('welcome_markdown').notNull().default(''),
     member_cap: integer('member_cap').notNull(),
     created_at: text('created_at').notNull(),
@@ -134,7 +145,16 @@ export const event = sqliteTable(
     // ISO, so a string comparison is chronological here.
     check('event_start_date_check', isIsoDate(table.start_date)),
     check('event_end_date_check', isIsoDate(table.end_date)),
-    check('event_date_order_check', sql`${table.end_date} >= ${table.start_date}`),
+    // The pair, not just the days: a one-day burn can be 10:00 to 22:00, or
+    // wrongly 22:00 to 10:00. Times only decide it when the days are equal —
+    // across days an earlier clock time is ordinary. Both are fixed-width
+    // strings, so the comparison is sound for the same reason the dates are.
+    check(
+      'event_date_order_check',
+      sql`${table.end_date} > ${table.start_date} or (${table.end_date} = ${table.start_date} and ${table.end_time} >= ${table.start_time})`,
+    ),
+    check('event_start_time_check', isClockTime(table.start_time)),
+    check('event_end_time_check', isClockTime(table.end_time)),
     check('event_member_cap_check', sql`${table.member_cap} > 0`),
   ],
 )

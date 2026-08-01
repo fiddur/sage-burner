@@ -548,3 +548,123 @@ describe('admin event routes', () => {
     expect(response.headers['cache-control']).toBe('no-store')
   })
 })
+
+describe('the hours a burn is open', () => {
+  const client = () => {
+    const found = handle?.client
+    if (found === undefined) throw new Error('build() first')
+    return found
+  }
+
+  it('defaults to the whole of both days, so a create form need not ask', async () => {
+    const server = await build()
+    const cookie = await givenAdmin()
+
+    const response = await create(server, cookie, valid)
+
+    expect(response.statusCode).toBe(201)
+    expect(response.json().event).toMatchObject({ start_time: '00:00', end_time: '23:59' })
+  })
+
+  it('takes the hours an organiser gives it', async () => {
+    const server = await build()
+    const cookie = await givenAdmin()
+
+    const response = await create(server, cookie, {
+      ...valid,
+      start_time: '15:00',
+      end_time: '12:00',
+    })
+
+    expect(response.statusCode).toBe(201)
+    expect(response.json().event).toMatchObject({ start_time: '15:00', end_time: '12:00' })
+  })
+
+  it('refuses a one-day burn that ends earlier in the day than it starts', async () => {
+    const server = await build()
+    const cookie = await givenAdmin()
+
+    const response = await create(server, cookie, {
+      ...valid,
+      start_date: '2026-08-01',
+      end_date: '2026-08-01',
+      start_time: '22:00',
+      end_time: '10:00',
+    })
+
+    expect(response.statusCode).toBe(400)
+  })
+
+  it('accepts a one-day burn that runs forwards', async () => {
+    // The passing sibling: the rule must refuse the inverted pair, not every
+    // single-day burn.
+    const server = await build()
+    const cookie = await givenAdmin()
+
+    const response = await create(server, cookie, {
+      ...valid,
+      start_date: '2026-08-01',
+      end_date: '2026-08-01',
+      start_time: '10:00',
+      end_time: '22:00',
+    })
+
+    expect(response.statusCode).toBe(201)
+  })
+
+  it('refuses a time that is not a clock time', async () => {
+    const server = await build()
+    const cookie = await givenAdmin()
+
+    for (const bad of ['9:00', '24:00', '10:60', '1000']) {
+      expect((await create(server, cookie, { ...valid, start_time: bad })).statusCode, bad).toBe(400)
+    }
+  })
+
+  it('keeps a nonsense time out of the database, whatever the caller is', async () => {
+    // The CHECK earns its place against writes that never see the Zod schema.
+    await build()
+    const row = (start: string, end: string) => () =>
+      client()
+        .prepare(
+          'insert into event (id, name, slug, start_date, end_date, start_time, end_time, member_cap, created_at) values (?,?,?,?,?,?,?,?,?)',
+        )
+        .run(
+          randomUUID(),
+          'x',
+          `s-${randomUUID().slice(0, 8)}`,
+          '2026-08-01',
+          '2026-08-05',
+          start,
+          end,
+          42,
+          '2026-01-01T00:00:00.000Z',
+        )
+
+    expect(row('9:00', '12:00')).toThrow()
+    expect(row('24:00', '12:00')).toThrow()
+    expect(row('10:00', '12:00')).not.toThrow()
+  })
+
+  it('keeps an inverted single-day pair out too', async () => {
+    await build()
+
+    expect(() =>
+      client()
+        .prepare(
+          'insert into event (id, name, slug, start_date, end_date, start_time, end_time, member_cap, created_at) values (?,?,?,?,?,?,?,?,?)',
+        )
+        .run(
+          randomUUID(),
+          'x',
+          'backwards',
+          '2026-08-01',
+          '2026-08-01',
+          '22:00',
+          '10:00',
+          42,
+          '2026-01-01T00:00:00.000Z',
+        ),
+    ).toThrow()
+  })
+})

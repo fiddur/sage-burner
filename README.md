@@ -956,12 +956,28 @@ different fields and one loses anyway.
 
 ### The timetable
 
-`/schedule` draws places across and hours down: every hour of every day from the
-burn's start date through the day _after_ its end date, so a burn running the 1st
-to the 5th is six days of rows — 144 of them. The extra day is the last night,
-which is explained below. Beside it sits the
-pool of dreams nobody has placed. Dragging one into a cell schedules it for that
-hour; dragging one back to the pool unschedules it.
+`/schedule` draws places across and hours down, over **the hours the burn is
+actually open** — `start_date`/`start_time` through `end_date`/`end_time`. A burn
+that opens midday Friday and closes midday Sunday is 49 rows, not three whole
+days of mostly-empty grid.
+
+Those hours are the organiser's, set on the event form beside the dates. They
+replaced a guess: the grid used to run 00:00 on the first day through the last
+hour of the day _after_ `end_date`, the extra day being a stand-in for a last
+night that carries past midnight. An organiser who can say "ends 04:00 on the
+6th" does not need the app inventing anything.
+
+Rows are walked by adding an hour to an instant rather than by setting hours on a
+date, which also disposed of a bug: on the spring-forward day `setHours(2)` lands
+on 03:00, so 03:00 appeared twice and two rows shared a key. Crossing the gap by
+addition passes it exactly once, and the deduplication that used to paper over it
+is gone.
+
+The times are `HH:MM`, fixed width, and both Zod and a CHECK compare them as
+strings — sound only because `09:00` cannot also arrive as `9:00`, which is why
+the format is enforced in both places. The ordering rule compares the **pair**:
+times decide it only when the days are equal, since across days an end earlier on
+the clock than the start is the ordinary case.
 
 **A dream occupies every row it runs through**, via `rowSpan`. Drawn only in its
 start row, a three-hour session reads as an hour long — which is exactly how one
