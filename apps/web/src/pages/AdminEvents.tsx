@@ -183,6 +183,20 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
         welcome_markdown: welcome,
       }
       const { event: updated } = await api.updateEvent(id, changes)
+
+      // The still-open form gets the canonical row too. Updating only the list
+      // leaves the header showing what was stored and the inputs showing what was
+      // typed — the same inconsistency this avoids one level down.
+      setDetails({
+        name: updated.name,
+        start_date: updated.start_date,
+        end_date: updated.end_date,
+        start_time: updated.start_time,
+        end_time: updated.end_time,
+        member_cap: String(updated.member_cap),
+      })
+      setWelcome(updated.welcome_markdown)
+
       setEvents((current) =>
         current.status === 'ready'
           ? {
@@ -233,7 +247,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
                     <input
                       type="text"
                       maxLength={200}
-                      aria-label={`Name of ${row.name}`}
+                      aria-label={`Name of ${row.slug}`}
                       value={details.name}
                       onInput={(inputEvent) =>
                         setDetails({ ...details, name: inputEvent.currentTarget.value })
@@ -245,7 +259,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
                     <span>Starts</span>
                     <input
                       type="date"
-                      aria-label={`Start date of ${row.name}`}
+                      aria-label={`Start date of ${row.slug}`}
                       max={details.end_date === '' ? undefined : details.end_date}
                       value={details.start_date}
                       onInput={(inputEvent) =>
@@ -258,7 +272,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
                     <span>Starting time</span>
                     <input
                       type="time"
-                      aria-label={`Start time of ${row.name}`}
+                      aria-label={`Start time of ${row.slug}`}
                       value={details.start_time}
                       onInput={(inputEvent) =>
                         setDetails({ ...details, start_time: inputEvent.currentTarget.value })
@@ -270,7 +284,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
                     <span>Ends</span>
                     <input
                       type="date"
-                      aria-label={`End date of ${row.name}`}
+                      aria-label={`End date of ${row.slug}`}
                       min={details.start_date === '' ? undefined : details.start_date}
                       value={details.end_date}
                       onInput={(inputEvent) =>
@@ -283,7 +297,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
                     <span>Ending time</span>
                     <input
                       type="time"
-                      aria-label={`End time of ${row.name}`}
+                      aria-label={`End time of ${row.slug}`}
                       value={details.end_time}
                       onInput={(inputEvent) =>
                         setDetails({ ...details, end_time: inputEvent.currentTarget.value })
@@ -296,7 +310,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
                     <input
                       type="number"
                       min="1"
-                      aria-label={`Member cap of ${row.name}`}
+                      aria-label={`Member cap of ${row.slug}`}
                       value={details.member_cap}
                       onInput={(inputEvent) =>
                         setDetails({ ...details, member_cap: inputEvent.currentTarget.value })
