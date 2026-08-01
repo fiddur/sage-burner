@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { hourAfter, hourOf, hoursOf } from './schedule.ts'
+import { dayAfter, hourOf, hourAfter, hoursOf } from './schedule.ts'
 
 describe('the timetable rows', () => {
   it('covers every hour of every day of the burn', () => {
@@ -31,6 +31,13 @@ describe('the timetable rows', () => {
 
     expect(rows).toEqual([...new Set(rows)])
     expect(rows).toHaveLength(23)
+  })
+
+  it('is 144 rows for a five-day burn, which is the number the README quotes', () => {
+    // The README states this figure, and a figure in prose goes stale silently.
+    // `Schedule.tsx` passes `dayAfter(end_date)`, so the 1st to the 5th is six
+    // days of rows rather than five.
+    expect(hoursOf('2026-08-01', dayAfter('2026-08-05'))).toHaveLength(144)
   })
 
   it('is empty for dates that make no sense, rather than looping forever', () => {

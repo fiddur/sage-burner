@@ -903,8 +903,10 @@ different fields and one loses anyway.
 
 ### The timetable
 
-`/schedule` draws places across and hours down, from the burn's start date to its
-end — every hour of every day, so a five-day burn is 120 rows. Beside it sits the
+`/schedule` draws places across and hours down: every hour of every day from the
+burn's start date through the day _after_ its end date, so a burn running the 1st
+to the 5th is six days of rows — 144 of them. The extra day is the last night,
+which is explained below. Beside it sits the
 pool of dreams nobody has placed. Dragging one into a cell schedules it for that
 hour; dragging one back to the pool unschedules it.
 
