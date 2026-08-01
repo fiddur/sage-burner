@@ -207,6 +207,72 @@ describe('Schedule', () => {
     )
   })
 
+  it('draws a three-hour dream across three rows, not one', async () => {
+    // The bug as reported: a dream edited to 18–21 still read as 18–19, because
+    // the cell was drawn in the start row and nothing spanned.
+    renderPage(
+      stub({}, [
+        aDream({
+          id: 's-1',
+          title: 'Welcome Sauna Sharing',
+          place_id: 'p-1',
+          time_slot_start: '2026-08-01T16:00:00.000Z',
+          time_slot_end: '2026-08-01T19:00:00.000Z',
+        }),
+      ]),
+    )
+
+    await screen.findByRole('columnheader', { name: /Temple/ })
+    const anchor = cell('18:00', 0)
+
+    expect(anchor.getAttribute('rowspan')).toBe('3')
+    expect(anchor.textContent).toContain('Welcome Sauna Sharing')
+  })
+
+  it('renders no cell under a spanning dream, so the lane does not shift', async () => {
+    // `rowSpan` already occupies those rows; a cell of their own would push every
+    // later lane one column across.
+    renderPage(
+      stub({}, [
+        aDream({
+          id: 's-1',
+          title: 'Long one',
+          place_id: 'p-1',
+          time_slot_start: '2026-08-01T16:00:00.000Z',
+          time_slot_end: '2026-08-01T19:00:00.000Z',
+        }),
+      ]),
+    )
+
+    await screen.findByRole('columnheader', { name: /Temple/ })
+    const rowOf = (labelText: string) =>
+      [...document.querySelectorAll('.schedule-grid th[scope="row"]')].find(
+        (node) => node.textContent === labelText,
+      )?.parentElement
+
+    // Two lanes: an ordinary row has two cells, a covered one only the Sauna lane.
+    expect(rowOf('17:00')?.querySelectorAll('td')).toHaveLength(2)
+    expect(rowOf('19:00')?.querySelectorAll('td')).toHaveLength(1)
+    expect(rowOf('20:00')?.querySelectorAll('td')).toHaveLength(1)
+    expect(rowOf('21:00')?.querySelectorAll('td')).toHaveLength(2)
+  })
+
+  it('writes the times on the chip, so the length is readable without counting rows', async () => {
+    renderPage(
+      stub({}, [
+        aDream({
+          id: 's-1',
+          title: 'Welcome Sauna Sharing',
+          place_id: 'p-1',
+          time_slot_start: '2026-08-01T16:00:00.000Z',
+          time_slot_end: '2026-08-01T19:00:00.000Z',
+        }),
+      ]),
+    )
+
+    expect((await screen.findByLabelText('Move Welcome Sauna Sharing')).textContent).toContain('18:00–21:00')
+  })
+
   it('schedules a dream dropped into a cell, for that hour', async () => {
     const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
       Promise.resolve({ session: aDream({ id: 's-1', title: 'Sunrise yoga' }) }),

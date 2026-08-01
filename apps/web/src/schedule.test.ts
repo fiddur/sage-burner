@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { dayAfter, hourOf, hoursOf } from './schedule.ts'
+import { dayAfter, hourOf, hoursOf, laneCells, rowSpanOf } from './schedule.ts'
 
 describe('the timetable rows', () => {
   it('covers every hour of every day of the burn', () => {
@@ -59,5 +59,104 @@ describe('placing a dream in a row', () => {
 
   it('places nothing for a dream that is not scheduled', () => {
     expect(hourOf(null)).toBeUndefined()
+  })
+})
+
+const ROWS = hoursOf('2026-08-01', '2026-08-01')
+
+const placed = (id: string, start: string, end: string) => ({
+  id,
+  title: id,
+  time_slot_start: start,
+  time_slot_end: end,
+})
+
+// 08:00Z is 10:00 local in August; the suite is pinned to Europe/Stockholm.
+const at = (hourUtc: number) => `2026-08-01T${String(hourUtc).padStart(2, '0')}:00:00.000Z`
+
+describe('how many rows a dream covers', () => {
+  it('covers one row for an hour', () => {
+    expect(rowSpanOf(ROWS, at(8), at(9))).toBe(1)
+  })
+
+  it('covers three rows for three hours — the 18-to-21 case', () => {
+    expect(rowSpanOf(ROWS, at(8), at(11))).toBe(3)
+  })
+
+  it('still covers a row when it is shorter than one', () => {
+    expect(rowSpanOf(ROWS, at(8), '2026-08-01T08:30:00.000Z')).toBe(1)
+  })
+
+  it('covers the row its end spills into', () => {
+    expect(rowSpanOf(ROWS, at(8), '2026-08-01T10:30:00.000Z')).toBe(3)
+  })
+
+  it('is clamped to the grid rather than running off the end', () => {
+    expect(rowSpanOf(ROWS, at(21), '2026-08-05T00:00:00.000Z')).toBe(1)
+  })
+})
+
+describe('a lane as table cells', () => {
+  const kinds = (cells: ReturnType<typeof laneCells>) => cells.map((cell) => cell.kind)
+
+  it('anchors a three-hour dream and covers the two rows under it', () => {
+    const cells = laneCells(ROWS, [placed('a', at(8), at(11))])
+    const anchor = ROWS.indexOf('2026-08-01T10:00')
+
+    expect(cells[anchor]).toMatchObject({ kind: 'anchor', span: 3 })
+    expect(kinds(cells).slice(anchor, anchor + 4)).toEqual(['anchor', 'covered', 'covered', 'empty'])
+  })
+
+  it('leaves every other row empty', () => {
+    const cells = laneCells(ROWS, [placed('a', at(8), at(9))])
+
+    expect(kinds(cells).filter((kind) => kind === 'empty')).toHaveLength(ROWS.length - 1)
+  })
+
+  it('shares one cell between two dreams starting in the same hour', () => {
+    const cells = laneCells(ROWS, [placed('a', at(8), at(9)), placed('b', at(8), at(9))])
+    const anchor = cells[ROWS.indexOf('2026-08-01T10:00')]
+
+    expect(anchor?.kind === 'anchor' && anchor.dreams.map((d) => d.id)).toEqual(['a', 'b'])
+  })
+
+  it('keeps a dream that starts inside another, rather than dropping it', () => {
+    // An overlap in one lane is an organiser's mistake to see. The covered rows
+    // render no cell of their own, so the only place left is the block above.
+    const cells = laneCells(ROWS, [placed('long', at(8), at(11)), placed('inside', at(9), at(10))])
+    const anchor = cells[ROWS.indexOf('2026-08-01T10:00')]
+
+    expect(anchor?.kind === 'anchor' && anchor.dreams.map((d) => d.id)).toEqual(['long', 'inside'])
+  })
+
+  it('grows the block when the dream inside it runs past the end', () => {
+    const cells = laneCells(ROWS, [placed('long', at(8), at(10)), placed('later', at(9), at(13))])
+    const anchor = cells[ROWS.indexOf('2026-08-01T10:00')]
+
+    // 10:00 through 15:00 exclusive is five rows, not four: the block has to
+    // reach the end of the dream that joined it.
+    expect(anchor).toMatchObject({ kind: 'anchor', span: 5 })
+    expect(kinds(cells).slice(ROWS.indexOf('2026-08-01T10:00'), ROWS.indexOf('2026-08-01T16:00'))).toEqual([
+      'anchor',
+      'covered',
+      'covered',
+      'covered',
+      'covered',
+      'empty',
+    ])
+  })
+
+  it('emits exactly one cell per row once covered rows are dropped', () => {
+    // The invariant `rowSpan` depends on: anchors plus their spans must account
+    // for every row, or the column shifts sideways.
+    const cells = laneCells(ROWS, [placed('a', at(8), at(11)), placed('b', at(14), at(15))])
+    const rendered = cells.reduce((total, cell) => total + (cell.kind === 'covered' ? 0 : 1), 0)
+    const spanned = cells.reduce(
+      (total, cell) => total + (cell.kind === 'anchor' ? cell.span : cell.kind === 'empty' ? 1 : 0),
+      0,
+    )
+
+    expect(spanned).toBe(ROWS.length)
+    expect(rendered).toBeLessThan(ROWS.length)
   })
 })

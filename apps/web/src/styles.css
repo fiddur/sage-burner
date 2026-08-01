@@ -544,3 +544,26 @@ a:hover {
 .schedule-daybreak td {
   border-top: 2px solid currentColor;
 }
+
+/*
+  A timetable is not prose. `--measure` is a reading width and squeezes the grid
+  into a sliver on a wide screen, which is what it did.
+*/
+.site-main:has(.schedule-page) {
+  max-width: none;
+}
+
+.schedule-cell {
+  position: relative;
+}
+
+.dream-span {
+  display: block;
+  font-size: 0.75rem;
+  opacity: 0.75;
+}
+
+.dream-chip {
+  height: 100%;
+  box-sizing: border-box;
+}
