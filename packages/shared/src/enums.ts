@@ -1,9 +1,10 @@
 /**
  * Domain enumerations shared by the API, the database layer and the web app.
  *
- * Only genuinely fixed vocabularies live here. Things that organisers change
- * between burns — lodging options, shift types — are deliberately free text on
- * the `attendance` row instead, so a new option never needs a code change.
+ * Only genuinely fixed vocabularies live here. Things organisers change between
+ * burns are rows instead — `event_option` holds the lodging and helping-out
+ * lists, per event, so a new option never needs a code change. The kinds of list
+ * are fixed; what is in them is not.
  */
 
 /** Narrowing helper so every guard below stays a one-liner without casting. */
@@ -26,6 +27,18 @@ export const isAccountRole = (value: unknown): value is AccountRole => isOneOf(a
 export const placeColors = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'pink', 'grey'] as const
 export type PlaceColor = (typeof placeColors)[number]
 export const isPlaceColor = (value: unknown): value is PlaceColor => isOneOf(placeColors, value)
+
+/**
+ * The two per-event lists in `event_option`.
+ *
+ * `lodging` is a single choice and can carry a capacity — "Temple mattress: 9".
+ * `helping` is a multiple choice and does not: nothing runs out of people
+ * willing to tend the sauna.
+ */
+export const eventOptionKinds = ['lodging', 'helping'] as const
+export type EventOptionKind = (typeof eventOptionKinds)[number]
+export const isEventOptionKind = (value: unknown): value is EventOptionKind =>
+  isOneOf(eventOptionKinds, value)
 
 /** Lifecycle of a membership application. */
 export const applicationStatuses = ['pending', 'approved', 'rejected'] as const

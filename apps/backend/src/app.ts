@@ -18,6 +18,7 @@ import { registerApplicationReviewRoutes } from './routes/application-review.ts'
 import { registerApplicationRoutes } from './routes/applications.ts'
 import { registerAttendanceRoutes } from './routes/attendance.ts'
 import { registerAuthRoutes } from './routes/auth.ts'
+import { registerEventOptionRoutes } from './routes/event-options.ts'
 import { registerEventRoutes } from './routes/events.ts'
 import { registerInstallationRoutes } from './routes/installation.ts'
 import { registerInviteRoutes } from './routes/invites.ts'
@@ -312,6 +313,7 @@ export const createApp = async ({
   registerAdminRoutes(app, { db, sessions })
   registerInstallationRoutes(app, { db, sessions })
   registerEventRoutes(app, { db, sessions, now })
+  registerEventOptionRoutes(app, { db, sessions })
   registerQuestionRoutes(app, { db, sessions })
   registerPlaceRoutes(app, { db, sessions })
   registerApplicationRoutes(app, { db, now })
