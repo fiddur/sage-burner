@@ -55,6 +55,19 @@ describe('the timetable rows', () => {
     expect(rows.at(-1)).toBe('2026-08-03T04:00')
   })
 
+  it('does not repeat an hour on the day the clocks go back', () => {
+    // The other direction, and the one the removed deduplication also covered.
+    // 2026-10-25 has 25 real hours in Europe/Stockholm, two of them 02:00.
+    // Stepping the wall clock gives one row per label, so nothing collides as a
+    // key — checked rather than assumed, since the answer depends on how
+    // `setHours` resolves an ambiguous local time.
+    const rows = hoursOf('2026-10-25', '2026-10-25')
+
+    expect(rows).toEqual([...new Set(rows)])
+    expect(rows).toHaveLength(24)
+    expect(rows.filter((row) => row.endsWith('T02:00'))).toHaveLength(1)
+  })
+
   it('is empty for dates that make no sense, rather than looping forever', () => {
     expect(hoursOf('2026-08-05', '2026-08-01')).toEqual([])
     expect(hoursOf('not a date', '2026-08-01')).toEqual([])

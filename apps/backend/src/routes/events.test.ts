@@ -670,6 +670,17 @@ describe('the hours a burn is open', () => {
     expect((await patch(server, cookie, id, { start_time: '23:00' })).statusCode).toBe(400)
   })
 
+  it('answers 404 for a patch against an event that is not there', async () => {
+    // Answered by the read the ordering check needs, before the UPDATE runs —
+    // not by the guard after it. That guard is for a row deleted *between* the
+    // two, which `inject` cannot produce, so nothing here reaches it and this
+    // test should not be read as covering it.
+    const server = await build()
+    const cookie = await givenAdmin()
+
+    expect((await patch(server, cookie, randomUUID(), { name: 'Ghost' })).statusCode).toBe(404)
+  })
+
   it('recognises the ordering CHECK by its message, so the race answers 400', async () => {
     // The predicate, pinned against a real violation rather than a hand-written
     // string — `inject` serialises two requests, so the path that uses it cannot

@@ -9,9 +9,16 @@ import { toLocalInput } from './datetime.ts'
  * hour containing the end. A burn that runs midday Friday to midday Sunday is
  * 49 rows rather than three whole days.
  *
- * Walking by hours rather than by days also removes the spring-forward problem
- * that deduplication used to paper over: adding an hour to an instant crosses the
- * missing 02:00 exactly once, so the hour that does not exist never appears.
+ * Walking hour by hour also removes the deduplication the day-by-day version
+ * needed. `setHours(getHours() + 1)` steps the **wall clock**, not the instant,
+ * so each label appears exactly once whichever way the clocks go: the hour that
+ * does not exist in spring is stepped over, and the hour that happens twice in
+ * autumn gets one row. Measured in Europe/Stockholm — 23 rows on 2026-03-29, 24
+ * on 2026-10-25 — and both are pinned by tests, because which of those two a
+ * `Date` method gives you is not something to reason about.
+ *
+ * The autumn row covers two real hours. A dream in either lands in it, so nothing
+ * disappears; the schedule is simply an hour vaguer for one night a year.
  */
 export const hoursOf = (
   startDate: string,

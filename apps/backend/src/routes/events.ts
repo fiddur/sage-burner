@@ -177,17 +177,18 @@ export const registerEventRoutes = (
       if (updated === 'unordered') return reply.code(400).send(errorResponse('bad_request'))
 
       const [row] = updated
-      if (row === undefined) {
-        // One cause left, now the ordering is settled above: the row is gone,
-        // deleted between the read and the write.
-        const [stillThere] = await db.select({ id: event.id }).from(event).where(eq(event.id, id)).limit(1)
 
-        return stillThere === undefined
-          ? reply.code(404).send(errorResponse('not_found'))
-          : reply.code(400).send(errorResponse('bad_request'))
-      }
-
-      return { event: row } satisfies EventResponse
+      // One cause left. The `WHERE` is the id alone and the ordering was settled
+      // before the write, so no row matching means the row was deleted between
+      // the read above and this statement — the re-read that used to tell that
+      // apart from a refused condition has nothing left to distinguish.
+      //
+      // Not reachable under test: `inject` serialises requests, so nothing can
+      // delete the row in that gap. Kept because the alternative is answering 200
+      // with `{ event: undefined }`, and a 404 is simply what happened.
+      return row === undefined
+        ? reply.code(404).send(errorResponse('not_found'))
+        : ({ event: row } satisfies EventResponse)
     },
   )
 }
