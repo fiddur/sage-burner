@@ -72,8 +72,8 @@ export const registerAdminRoutes = (app: FastifyInstance, { db, sessions }: Guar
       // against the state the write actually produced with nothing in between,
       // and a `throw` rolls the whole thing back. A count taken beforehand is a
       // check-then-act; two `inject` requests could not be made to interleave one
-      // here, the same as the admin-side race in `roster.ts`, so this is ordering
-      // that costs nothing rather than a reproduced bug.
+      // here, the same limitation `isAlreadyJoined` in `attendance.ts` records,
+      // so this is ordering that costs nothing rather than a reproduced bug.
       try {
         db.transaction((tx) => {
           tx.delete(accountRole).where(eq(accountRole.account_id, accountId)).run()
