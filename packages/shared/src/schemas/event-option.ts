@@ -28,7 +28,17 @@ export const eventOptionSchema = z.object({
 
 export type EventOption = z.infer<typeof eventOptionSchema>
 
-export const eventOptionsResponseSchema = z.object({ options: z.array(eventOptionSchema) })
+/**
+ * An option as the lists are read, with how many have taken it.
+ *
+ * A count, not a roster: the member picking a bed needs to know the Temple is
+ * full, and that is the only way to say so without a member-visible list of who
+ * is sleeping where. Derived every read, never stored.
+ */
+export const eventOptionTakenSchema = eventOptionSchema.extend({ taken: z.int().nonnegative() })
+export type EventOptionTaken = z.infer<typeof eventOptionTakenSchema>
+
+export const eventOptionsResponseSchema = z.object({ options: z.array(eventOptionTakenSchema) })
 export type EventOptionsResponse = z.infer<typeof eventOptionsResponseSchema>
 
 /** `id`, `event_id` and `order` are the server's to assign. */

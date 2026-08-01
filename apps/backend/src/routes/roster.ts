@@ -7,7 +7,7 @@ import { and, eq } from 'drizzle-orm'
 import type { GuardDeps } from '../auth/guards.ts'
 
 import { createGuards } from '../auth/guards.ts'
-import { account, attendance, event } from '../db/schema.ts'
+import { account, attendance, event, eventOption } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 import { activeEvent, todayIso } from './events.ts'
 
@@ -108,7 +108,8 @@ export const registerRosterRoutes = (
         joined_at: attendance.joined_at,
         arrival_date: attendance.arrival_date,
         departure_date: attendance.departure_date,
-        lodging: attendance.lodging,
+        lodging_option_id: attendance.lodging_option_id,
+        lodging: eventOption.label,
         shift_preference: attendance.shift_preference,
         notes: attendance.notes,
         payment_status: attendance.payment_status,
@@ -120,6 +121,10 @@ export const registerRosterRoutes = (
       })
       .from(attendance)
       .innerJoin(account, eq(account.id, attendance.account_id))
+      // Left, so someone who has not said where they are sleeping is still on
+      // the roster. An inner join would quietly shorten the list an organiser
+      // counts heads from.
+      .leftJoin(eventOption, eq(eventOption.id, attendance.lodging_option_id))
       .where(eq(attendance.event_id, eventId))
 
     // Ordered and cut by the shared rule rather than here, so #79's member-facing

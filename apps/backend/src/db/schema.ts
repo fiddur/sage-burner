@@ -503,7 +503,13 @@ export const attendance = sqliteTable(
      * Free text, not an enum. The options differ per event and per site, so
      * organisers must be able to add one without a deploy.
      */
-    lodging: text('lodging'),
+    /**
+     * Which `event_option` they picked to sleep in, or null for not said.
+     *
+     * No `onDelete`: removing somewhere people are already sleeping is refused
+     * rather than silently unbooking them, the same as a place a dream stands in.
+     */
+    lodging_option_id: text('lodging_option_id').references(() => eventOption.id),
     shift_preference: text('shift_preference'),
     notes: text('notes'),
     /** Admin-set only. Members can read their own status but never write it. */

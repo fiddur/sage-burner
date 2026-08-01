@@ -1,0 +1,1 @@
+ALTER TABLE `attendance` DROP COLUMN `lodging`;

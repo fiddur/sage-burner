@@ -84,7 +84,8 @@ export const attendanceFields = z.object({
    * (tents, tiny house floor, caravans, ...), so organisers must be able to add
    * one without a deploy.
    */
-  lodging: optionalText(200),
+  /** Which `event_option` they picked to sleep in, or null for not said. */
+  lodging_option_id: idSchema.nullable(),
   /** Likewise free text — "Cooking", "Cleaning", "Either/both", or whatever's next. */
   shift_preference: optionalText(200),
   notes: optionalText(2000),
@@ -166,6 +167,14 @@ export const rosterEntrySchema = attendanceFields.extend({
   name: nonEmptyText(200).nullable(),
   contact: nonEmptyText(500).nullable(),
   allergies_notes: optionalText(2000),
+  /**
+   * The lodging option's label, resolved at read time.
+   *
+   * A projection beside the id, not a second place to store it: the organiser
+   * reading this wants "Temple mattress", and a CSV of UUIDs is no use to
+   * anybody.
+   */
+  lodging: optionalText(200),
   /** Derived from payment and join order every read — never stored. */
   waiting: z.boolean(),
 })

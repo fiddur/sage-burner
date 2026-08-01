@@ -1,0 +1,1 @@
+ALTER TABLE `attendance` ADD `lodging_option_id` text REFERENCES event_option(id);

@@ -2,12 +2,14 @@ import type { AttendanceUpdate, ProfileResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
 import { attendanceUpdateSchema, errorResponse, profileUpdateSchema } from '@sage-burner/shared'
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq, ne, sql } from 'drizzle-orm'
 
 import type { GuardDeps } from '../auth/guards.ts'
+import type { Database } from '../db/index.ts'
 
 import { createGuards } from '../auth/guards.ts'
-import { account, attendance } from '../db/schema.ts'
+import { isForeignKeyViolation } from '../db/errors.ts'
+import { account, attendance, eventOption } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 import { viewerFor } from './auth.ts'
 import { activeEvent, todayIso } from './events.ts'
@@ -51,6 +53,35 @@ const stayOrderCondition = ({ arrival_date, departure_date }: AttendanceUpdate) 
  * one stay. Both routes derive whose row it is from the session, so there is no
  * id in either body to get wrong or to tamper with.
  */
+/**
+ * Whether a lodging option has no room left for this person.
+ *
+ * Their own current choice does not count against them, or re-saving an unrelated
+ * field would refuse the bed they are already in.
+ */
+const isFull = async (db: Database, eventId: string, optionId: string, accountId: string) => {
+  const [option] = await db
+    .select({ capacity: eventOption.capacity })
+    .from(eventOption)
+    .where(eq(eventOption.id, optionId))
+    .limit(1)
+
+  if (option?.capacity == null) return false
+
+  const others = await db
+    .select({ id: attendance.id })
+    .from(attendance)
+    .where(
+      and(
+        eq(attendance.event_id, eventId),
+        eq(attendance.lodging_option_id, optionId),
+        ne(attendance.account_id, accountId),
+      ),
+    )
+
+  return others.length >= option.capacity
+}
+
 export const registerProfileRoutes = (
   app: FastifyInstance,
   { db, sessions, now = () => new Date() }: ProfileDeps,
@@ -126,13 +157,33 @@ export const registerProfileRoutes = (
       return row === undefined ? reply.code(404).send(errorResponse('not_found')) : { attendance: row }
     }
 
-    const [updated] = await db
-      .update(attendance)
-      .set(parsed.data)
-      .where(and(mine, stayOrderCondition(parsed.data)))
-      .returning()
+    // Counted and compared, not composed into the statement: at forty-odd people
+    // two members taking the last mattress in the same millisecond is not a
+    // failure worth machinery, and an organiser moves one of them in ten seconds.
+    // Refusing is the point — a disabled `<option>` is presentation, and the API
+    // takes whatever it is sent.
+    if (parsed.data.lodging_option_id != null) {
+      const full = await isFull(db, found.id, parsed.data.lodging_option_id, viewer.account_id)
+      if (full) return reply.code(409).send(errorResponse('conflict'))
+    }
 
-    if (updated !== undefined) return { attendance: updated }
+    let updated: (typeof attendance.$inferSelect)[]
+    try {
+      updated = await db
+        .update(attendance)
+        .set(parsed.data)
+        .where(and(mine, stayOrderCondition(parsed.data)))
+        .returning()
+    } catch (failure) {
+      // A `lodging_option_id` naming no option. The foreign key is the authority
+      // rather than a pre-read, which would be a second query saying the same.
+      if (isForeignKeyViolation(failure)) return reply.code(400).send(errorResponse('bad_request'))
+      throw failure
+    }
+
+    const [first] = updated
+
+    if (first !== undefined) return { attendance: first }
 
     // Nothing was written, which is either "not coming to this burn" or "that
     // would put the departure before the arrival". Asked rather than inferred.

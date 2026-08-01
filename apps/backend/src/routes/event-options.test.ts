@@ -9,7 +9,7 @@ import { createApp } from '../app.ts'
 import { createSessions } from '../auth/session.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, event, eventOption } from '../db/schema.ts'
+import { account, accountRole, attendance, event, eventOption } from '../db/schema.ts'
 import { SESSION_COOKIE } from './auth.ts'
 
 const SECRET = 's'.repeat(40)
@@ -189,6 +189,36 @@ describe('the lists a member picks from', () => {
 
     expect(helping.json().option.order).toBe(0)
     expect(await labels(server, eventId, 'lodging')).toEqual(['Temple mattress', 'Own tent'])
+  })
+
+  it('counts how many have taken each one, so a member can be told it is full', async () => {
+    // The only way to say "full" without a member-visible list of who is sleeping
+    // where. A count, not a roster.
+    const server = await build()
+    const eventId = await givenEvent()
+    const admin = await givenAccount(['admin'])
+    const temple = (
+      await add(server, admin.cookie, eventId, { kind: 'lodging', label: 'Temple', capacity: 9 })
+    ).json().option.id
+    const tent = (await add(server, admin.cookie, eventId, { kind: 'lodging', label: 'Own tent' })).json()
+      .option.id
+
+    for (const _ of [1, 2]) {
+      const who = await givenAccount(['member'])
+      await db().insert(attendance).values({
+        id: randomUUID(),
+        event_id: eventId,
+        account_id: who.id,
+        joined_at: NOW,
+        payment_status: 'unpaid',
+        lodging_option_id: temple,
+      })
+    }
+
+    const counted = (await list(server, eventId)).json().options as { id: string; taken: number }[]
+
+    expect(counted.find((row) => row.id === temple)?.taken).toBe(2)
+    expect(counted.find((row) => row.id === tent)?.taken).toBe(0)
   })
 
   it('keeps one burn out of another', async () => {

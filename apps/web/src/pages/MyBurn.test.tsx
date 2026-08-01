@@ -19,7 +19,7 @@ const anAttendance = (over: Partial<Attendance> = {}): Attendance => ({
   joined_at: '2026-07-02T00:00:00.000Z',
   arrival_date: null,
   departure_date: null,
-  lodging: null,
+  lodging_option_id: null,
   shift_preference: null,
   notes: null,
   payment_status: 'unpaid',
@@ -34,6 +34,7 @@ const stub = (over: Partial<MyBurnApi> = {}, mine?: MyAttendanceResponse): MyBur
   joinActiveEvent: () => Promise.reject(new Error('joinActiveEvent is not stubbed here')),
   leaveActiveEvent: () => Promise.reject(new Error('leaveActiveEvent is not stubbed here')),
   updateMyStay: () => Promise.reject(new Error('updateMyStay is not stubbed here')),
+  getEventOptions: () => Promise.resolve({ options: [] }),
   ...over,
 })
 

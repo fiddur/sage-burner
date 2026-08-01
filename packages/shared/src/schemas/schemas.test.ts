@@ -256,7 +256,7 @@ describe('attendanceSchema', () => {
     joined_at: '2026-07-02T00:00:00Z',
     arrival_date: '2026-10-02',
     departure_date: '2026-10-04',
-    lodging: 'My own (tent/van/...)',
+    lodging_option_id: OTHER_ID,
     shift_preference: 'Either/both',
     notes: null,
     payment_status: 'paid',
@@ -273,7 +273,7 @@ describe('attendanceSchema', () => {
       allergies_notes: null,
       arrival_date: null,
       departure_date: null,
-      lodging: null,
+      lodging_option_id: null,
       shift_preference: null,
       payment_status: 'unpaid',
       payment_date: null,
@@ -281,9 +281,16 @@ describe('attendanceSchema', () => {
     expect(attendanceSchema.safeParse(sparse).success).toBe(true)
   })
 
-  it('takes lodging and shift preference as free text, so new options need no deploy', () => {
-    const novel = { ...aMember, lodging: 'Hammock in the barn', shift_preference: 'Sauna tending' }
-    expect(attendanceSchema.safeParse(novel).success).toBe(true)
+  it('takes lodging as a reference and refuses anything that is not one', () => {
+    // Free text until the per-event lists existed. The point of the reference is
+    // that an organiser can count who is sleeping where, which a typed-in string
+    // cannot support — so an id is the only thing that parses.
+    expect(attendanceSchema.safeParse({ ...aMember, lodging_option_id: null }).success).toBe(true)
+    expect(attendanceSchema.safeParse({ ...aMember, lodging_option_id: 'Hammock' }).success).toBe(false)
+  })
+
+  it('still takes what to help with as free text, which the lists have not replaced yet', () => {
+    expect(attendanceSchema.safeParse({ ...aMember, shift_preference: 'Sauna tending' }).success).toBe(true)
   })
 
   it('rejects a payment status outside the vocabulary', () => {
@@ -316,7 +323,7 @@ describe('optionalText', () => {
     joined_at: '2026-07-02T00:00:00Z',
     arrival_date: null,
     departure_date: null,
-    lodging: null,
+    lodging_option_id: null,
     shift_preference: null,
     notes,
     payment_status: 'unpaid',

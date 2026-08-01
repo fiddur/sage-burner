@@ -1,4 +1,4 @@
-import type { Event, EventOption } from '@sage-burner/shared'
+import type { Event, EventOptionTaken } from '@sage-burner/shared'
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -27,20 +27,29 @@ const BURN: Event = {
   created_at: '2026-07-02T00:00:00.000Z',
 }
 
-const anOption = (over: Partial<EventOption> & Pick<EventOption, 'id' | 'label' | 'kind'>): EventOption => ({
+const anOption = (
+  over: Partial<EventOptionTaken> & Pick<EventOptionTaken, 'id' | 'label' | 'kind'>,
+): EventOptionTaken => ({
   event_id: 'e-1',
   order: 0,
   capacity: null,
+  taken: 0,
   ...over,
 })
 
-const TEMPLE = anOption({ id: 'o-1', label: 'Temple mattress', kind: 'lodging', capacity: 9, order: 0 })
+const TEMPLE: EventOptionTaken = anOption({
+  id: 'o-1',
+  label: 'Temple mattress',
+  kind: 'lodging',
+  capacity: 9,
+  order: 0,
+})
 const TENT = anOption({ id: 'o-2', label: 'Own tent', kind: 'lodging', order: 1 })
 const SAUNA = anOption({ id: 'o-3', label: 'Sauna tending', kind: 'helping', order: 0 })
 
 const stub = (
   over: Partial<OptionsApi> = {},
-  options: EventOption[] = [TEMPLE, TENT, SAUNA],
+  options: EventOptionTaken[] = [TEMPLE, TENT, SAUNA],
   event: Event | null = BURN,
 ): OptionsApi => ({
   getActiveEvent: () => Promise.resolve({ event }),
