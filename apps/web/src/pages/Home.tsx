@@ -4,6 +4,7 @@ import { useEffect, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
+import { useInstallationTitle } from '../installation.tsx'
 import { renderMarkdown } from '../markdown.ts'
 import { isMember, useViewer } from '../viewer.tsx'
 
@@ -23,6 +24,7 @@ export type HomeApi = Pick<ApiClient, 'getActiveEvent'>
  */
 export const Home = ({ api }: { api: HomeApi }) => {
   const viewer = useViewer()
+  const title = useInstallationTitle()
   const [active, setActive] = useState<Active>({ status: 'loading' })
 
   useEffect(() => {
@@ -47,7 +49,7 @@ export const Home = ({ api }: { api: HomeApi }) => {
 
   return (
     <article class="prose">
-      <h1>Sage Burner</h1>
+      <h1>{title}</h1>
 
       {active.status === 'loading' && <p class="form-note">One moment…</p>}
 

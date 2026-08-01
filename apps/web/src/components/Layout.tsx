@@ -2,6 +2,7 @@ import type { ComponentChildren } from 'preact'
 
 import type { ApiClient } from '../api/client.ts'
 
+import { useInstallationTitle } from '../installation.tsx'
 import { isAdmin, isMember, useSetViewer, useViewer } from '../viewer.tsx'
 
 /**
@@ -21,6 +22,7 @@ export const Layout = ({
 }) => {
   const viewer = useViewer()
   const setViewer = useSetViewer()
+  const title = useInstallationTitle()
 
   const logOut = async () => {
     // The cookie is cleared server-side; the local viewer is cleared either
@@ -47,7 +49,7 @@ export const Layout = ({
           <span class="brand-mark" aria-hidden="true">
             🔥
           </span>
-          <span class="brand-name">Sage Burner</span>
+          <span class="brand-name">{title}</span>
         </a>
 
         <nav aria-label="Main">

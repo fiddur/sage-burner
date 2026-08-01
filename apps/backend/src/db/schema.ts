@@ -90,6 +90,30 @@ const tickBoxChecks = (table: { type: SQLiteColumn; required: SQLiteColumn }) =>
  *   `@sage-burner/shared`, so the database and the API cannot drift apart.
  */
 
+/**
+ * What this deployment calls itself.
+ *
+ * One row, and the CHECK is what makes that true rather than a convention:
+ * a second row cannot be inserted, so no read has to decide which is
+ * authoritative and no write has to find the right one. The migration seeds it,
+ * so every read finds it there.
+ */
+export const installation = sqliteTable(
+  'installation',
+  {
+    id: text('id').notNull(),
+    title: text('title').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    check('installation_singleton_check', sql`${table.id} = 'installation'`),
+    check('installation_title_check', sql`length(trim(${table.title})) > 0`),
+  ],
+)
+
+/** The id of the one `installation` row. */
+export const INSTALLATION_ID = 'installation'
+
 /** A single burn. Never assume there is only one — the whole point is recurrence. */
 export const event = sqliteTable(
   'event',

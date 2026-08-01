@@ -6,12 +6,14 @@ import type { Viewer } from './viewer.tsx'
 
 import { createApiClient } from './api/client.ts'
 import { Layout } from './components/Layout.tsx'
+import { FetchedInstallationProvider, InstallationProvider } from './installation.tsx'
 import { Admin } from './pages/Admin.tsx'
 import { AdminApplications } from './pages/AdminApplications.tsx'
 import { AdminEvents } from './pages/AdminEvents.tsx'
 import { AdminInvites } from './pages/AdminInvites.tsx'
 import { AdminQuestions } from './pages/AdminQuestions.tsx'
 import { AdminRoster } from './pages/AdminRoster.tsx'
+import { AdminSettings } from './pages/AdminSettings.tsx'
 import { Apply } from './pages/Apply.tsx'
 import { Home } from './pages/Home.tsx'
 import { Invite } from './pages/Invite.tsx'
@@ -49,6 +51,8 @@ export type AppApi = Pick<
   | 'leaveActiveEvent'
   | 'getActiveRoster'
   | 'setPayment'
+  | 'getInstallation'
+  | 'updateInstallation'
   | 'getApplications'
   | 'getInvites'
   | 'createInvite'
@@ -91,6 +95,8 @@ export const Routes = ({
     | 'leaveActiveEvent'
     | 'getActiveRoster'
     | 'setPayment'
+    | 'getInstallation'
+    | 'updateInstallation'
     | 'getApplications'
     | 'getInvites'
     | 'createInvite'
@@ -125,6 +131,7 @@ export const Routes = ({
   const AdminApplicationsRoute = useMemo(() => () => <AdminApplications api={api} />, [api])
   const AdminInvitesRoute = useMemo(() => () => <AdminInvites api={api} />, [api])
   const AdminRosterRoute = useMemo(() => () => <AdminRoster api={api} />, [api])
+  const AdminSettingsRoute = useMemo(() => () => <AdminSettings api={api} />, [api])
   const HomeRoute = useMemo(() => () => <Home api={api} />, [api])
   const MyBurnRoute = useMemo(() => () => <MyBurn api={api} />, [api])
   const ProfileRoute = useMemo(() => () => <ProfilePage api={api} />, [api])
@@ -151,22 +158,24 @@ export const Routes = ({
       <Route path="/admin/applications" component={AdminApplicationsRoute} />
       <Route path="/admin/invites" component={AdminInvitesRoute} />
       <Route path="/admin/roster" component={AdminRosterRoute} />
+      <Route path="/admin/settings" component={AdminSettingsRoute} />
       <Route default component={NotFound} />
     </Router>
   )
 }
 
 /**
- * `viewer` and `api` are injectable so tests drive the real route table and the
- * real layout rather than a copy that can silently fall out of step with this
- * one.
+ * `viewer`, `title` and `api` are injectable so tests drive the real route
+ * table and the real layout rather than a copy that can silently fall out of
+ * step with this one.
  *
- * Passing `viewer` also selects the provider: a test that states who is looking
- * gets that, and the app — which passes nothing — gets the one that asks the
- * API. Two providers rather than a flag, because "fetch unless told otherwise"
- * is the kind of conditional that ends up fetching in a test suite.
+ * `viewer` and `title` each select their provider: a test that states who is
+ * looking, or what this installation is called, gets that, and the app — which
+ * passes neither — gets the pair that ask the API. Two providers rather than a
+ * flag, because "fetch unless told otherwise" is the kind of conditional that
+ * ends up fetching in a test suite.
  */
-export const App = ({ viewer, api }: { viewer?: Viewer; api?: AppApi }) => {
+export const App = ({ viewer, title, api }: { viewer?: Viewer; title?: string; api?: AppApi }) => {
   // Not a default parameter. `api = createApiClient()` builds a fresh client on
   // every render of `App`, and that identity is load-bearing twice over: it is
   // the `useEffect` dependency in `FetchedViewerProvider`, so a new one aborts
@@ -179,11 +188,18 @@ export const App = ({ viewer, api }: { viewer?: Viewer; api?: AppApi }) => {
   // written to survive that changing; this would have stopped it.
   const client = useMemo(() => api ?? createApiClient(), [api])
 
-  const content = (
+  const framed = (
     <Layout api={client}>
       <Routes api={client} />
     </Layout>
   )
+
+  const content =
+    title === undefined ? (
+      <FetchedInstallationProvider api={client}>{framed}</FetchedInstallationProvider>
+    ) : (
+      <InstallationProvider title={title}>{framed}</InstallationProvider>
+    )
 
   return (
     <LocationProvider>

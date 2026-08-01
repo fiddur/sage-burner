@@ -589,6 +589,30 @@ redirecting.
 The web app hides what a viewer cannot use, but that is presentation. Every
 admin route refuses server-side regardless of what the nav rendered.
 
+## What this installation is called
+
+`sage-burner` is the software. What the people running it call their gathering
+is something else — "The Burning Sage", or whatever it is where you are — and it
+is the heading on the homepage, the name in the header, and the browser tab
+title.
+
+Organise → **Settings**. `PATCH /api/admin/installation` takes `{ "title": … }`,
+trimmed, 1–200 characters; `GET /api/installation` is public, because the header
+renders for signed-out visitors too.
+
+One row, in an `installation` table whose `id` a CHECK pins to `'installation'`.
+The singleton is a constraint rather than a convention, so no read has to decide
+which row is authoritative, and the migration seeds it — with `Sage Burner`, so
+a fresh deployment looks exactly as it did before anyone renamed anything.
+
+`index.html` still ships `<title>Sage Burner</title>`, which is what the browser
+tab says for the moment before the app boots. That is the software's name and it
+is accurate until the app knows better; serving a per-installation shell would
+mean injecting into the HTML at three separate entry points, which is not worth
+it for one frame. Until the fetch lands the header renders no name at all,
+rather than the software's — showing it and then replacing it is what would look
+like a bug.
+
 ## Events
 
 There is never "the" event. `event` rows exist from day one and the app is built
