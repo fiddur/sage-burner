@@ -151,6 +151,17 @@ describe('AdminPlaces', () => {
     await waitFor(() => expect(reorderPlaces).toHaveBeenCalledWith(['p-3', 'p-1', 'p-2']))
   })
 
+  it('writes to the drag data store, which Firefox needs to start a drag at all', async () => {
+    const setData = vi.fn()
+    renderPage(stub())
+
+    fireEvent.dragStart(await screen.findByRole('button', { name: 'Move Temple' }), {
+      dataTransfer: { setData },
+    })
+
+    expect(setData).toHaveBeenCalledWith('text/plain', 'p-1')
+  })
+
   it('reorders from the keyboard, so a mouse is not required', async () => {
     // The handle is the keyboard route as well as the drag one. A reorder only
     // a pointer can do is one some people here cannot do at all.

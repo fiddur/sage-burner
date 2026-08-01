@@ -265,6 +265,15 @@ describe('Schedule', () => {
     expect(updateSession).not.toHaveBeenCalled()
   })
 
+  it('writes to the drag data store, which Firefox needs to start a drag at all', async () => {
+    const setData = vi.fn()
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))
+
+    fireEvent.dragStart(await screen.findByLabelText('Move Sunrise yoga'), { dataTransfer: { setData } })
+
+    expect(setData).toHaveBeenCalledWith('text/plain', 's-1')
+  })
+
   it('says so when no burn is open, rather than drawing an empty grid', async () => {
     renderPage(stub({}, [], [TEMPLE], null))
 

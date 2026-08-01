@@ -929,6 +929,11 @@ on the spring-forward day `setHours(2)` lands on 03:00, so 03:00 would appear
 twice and two rows would share a key. Checked in Europe/Stockholm, which the web
 suite is pinned to.
 
+Both drag sources write to `dataTransfer` on `dragstart`. The id travels in
+component state, so nothing reads it back — but Firefox refuses to begin a drag
+whose data store was never written to, so without it the gesture simply does not
+start there. Test it in Firefox as well as Chrome.
+
 **Dragging is not really unit-tested, and cannot be.** `fireEvent.drop` exercises
 these handlers, not a browser's drag implementation — so the tests prove the
 wiring and the drag itself wants one click-through in a browser. The Dreams page

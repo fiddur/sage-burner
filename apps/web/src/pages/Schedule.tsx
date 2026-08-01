@@ -209,7 +209,14 @@ const Chip = ({
     class="dream-chip"
     draggable={!busy}
     aria-label={`Move ${dream.title}`}
-    onDragStart={() => onDragStart(dream.id)}
+    onDragStart={(dragEvent) => {
+      // Firefox refuses to start a drag whose data store was never written to,
+      // so this is what makes the gesture work at all there. The id is carried
+      // in state rather than read back out of the transfer; this only has to
+      // exist.
+      dragEvent.dataTransfer?.setData('text/plain', dream.id)
+      onDragStart(dream.id)
+    }}
   >
     {dream.title}
   </span>
