@@ -25,6 +25,8 @@ import type {
   FormQuestionResponse,
   FormQuestionUpdate,
   FormQuestionsResponse,
+  InstallationResponse,
+  InstallationUpdate,
   LoginRequest,
   MeResponse,
   VersionResponse,
@@ -149,6 +151,13 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
     request,
     getVersion: () => request<VersionResponse>('/version'),
 
+    /** Public: the title is in the header of every page, signed in or not. */
+    getInstallation: (signal?: AbortSignal) => request<InstallationResponse>('/installation', { signal }),
+
+    /** Admin only. Partial — omitted fields are left as they are. */
+    updateInstallation: (body: InstallationUpdate) =>
+      request<InstallationResponse>('/admin/installation', { method: 'PATCH', body }),
+
     /** 200 with `{ viewer: null }` when signed out — not an error. */
     getMe: (signal?: AbortSignal) => request<MeResponse>('/auth/me', { signal }),
 
@@ -233,10 +242,6 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
      */
     updateMyStay: (body: AttendanceUpdate) =>
       request<{ attendance: Attendance }>('/events/active/attendance', { method: 'PATCH', body }),
-
-    /** Admin only. Ordered paid-first then by joining, with `waiting` derived. */
-    getRoster: (eventId: string, signal?: AbortSignal) =>
-      request<RosterResponse>(`/admin/events/${encodeURIComponent(eventId)}/roster`, { signal }),
 
     /** Admin only. The open burn's roster; `event` is null when none is open. */
     getActiveRoster: (signal?: AbortSignal) =>

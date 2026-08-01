@@ -59,6 +59,8 @@ const clientWith = (
   createEvent: () => Promise.reject(new Error('createEvent is not stubbed in this file')),
   updateEvent: () => Promise.reject(new Error('updateEvent is not stubbed in this file')),
   getActiveEvent: () => Promise.resolve({ event: null }),
+  getInstallation: () => Promise.reject(new Error('getInstallation is not stubbed in this file')),
+  updateInstallation: () => Promise.reject(new Error('updateInstallation is not stubbed in this file')),
 })
 
 /**
@@ -68,7 +70,12 @@ const clientWith = (
  */
 
 /**
- * Signed-out by default, and always explicit — in both arguments.
+ * Signed-out by default, and always explicit — in every argument.
+ *
+ * `title` is here for the same reason as `viewer`: omitting it selects the
+ * provider that asks the API, and the assertion below would catch the fetch.
+ * Its value is deliberately not the software's name, so the homepage heading
+ * and the header can only pass by reading the installation.
  *
  * Omitting `viewer` selects the provider that asks the API — which is right for
  * the app and wrong for a suite, where it would mean every render reaching for
@@ -87,7 +94,7 @@ const clientWith = (
 const renderAt = (path: string, viewer: Viewer = { status: 'signed-out' }) => {
   window.history.replaceState(null, '', path)
 
-  return render(<App viewer={viewer} api={clientWith()} />)
+  return render(<App viewer={viewer} title="The Burning Sage" api={clientWith()} />)
 }
 
 /**
@@ -129,7 +136,7 @@ describe('routing', () => {
   it('renders the home page at the root', () => {
     renderAt('/')
 
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Sage Burner')
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('The Burning Sage')
   })
 
   it('routes every page the app links to, from the nav and the organiser landing page', () => {
@@ -160,6 +167,17 @@ describe('routing', () => {
       cleanup()
       renderAt(path, admin)
       expect(screen.getByRole('heading', { level: 1 }).textContent, path).not.toBe('Nothing here')
+    }
+  })
+
+  it('names the installation in the header, on every page', () => {
+    // The header is `Layout`, which every route sits inside, so this is the one
+    // place the name has to be right — and it is the software's name that used
+    // to be hardcoded there.
+    for (const path of ['/', '/login', '/no/such/page']) {
+      cleanup()
+      const { container } = renderAt(path)
+      expect(container.querySelector('.brand-name')?.textContent, path).toBe('The Burning Sage')
     }
   })
 
