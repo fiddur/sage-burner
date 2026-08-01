@@ -118,13 +118,17 @@ These are the habits that would have caught nearly all of them.
   what a boundary test covers. A failure mode described from memory has been
   wrong more often than right here — including twice in the same direction.
 - **A rejecting test needs a passing sibling.** Two real defects hid behind this:
-  the `start_date` branch and the both-dates branch of `dateOrderCondition` each
-  had a test proving refusal and none proving success. Refusal cases are easier
-  to think of, so the success path is where the gap lands.
-- **After changing behaviour, grep for its own vocabulary** — the function names,
-  status codes and terms the old design used. Prose at a distance does not fail
-  to compile, and a comment naming the wrong thing is worse than none because the
-  next reader trusts it. This turned up a second stale reference twice.
+  the event's date-ordering guard had a test proving it refused a one-sided move
+  and none proving it allowed an ordinary one, in either direction. Refusal cases
+  are easier to think of, so the success path is where the gap lands.
+- **After changing behaviour, grep for the old vocabulary _and_ for the claim.**
+  The names are the easy half: function names, status codes, the terms the old
+  design used. The harder half is prose that describes what the removed thing
+  _did_ without naming it — "it does so inside the UPDATE", "this is what stops a
+  concurrent write". Those survive a rename and go on asserting a guarantee the
+  code no longer gives. Prose at a distance does not fail to compile, and a
+  comment naming the wrong thing is worse than none because the next reader
+  trusts it.
 - **Prefer deleting the thing that needs syncing over syncing it.** Every durable
   fix in those PRs was this shape: one `tickBoxRequired` replacing the same rule
   written out in four places; `.returning()` removing the `changes` coupling and
@@ -137,6 +141,24 @@ These are the habits that would have caught nearly all of them.
 - **Gate the push on `pnpm check`, not on an `echo` beside it.** Two commits went
   out red from exactly that shell mistake:
   `if pnpm check >/dev/null 2>&1; then git push …; else echo "refusing"; fi`.
+- **A mutation that does not apply looks exactly like one that was caught.**
+  Every "0 failed" is a result to check, not to celebrate: the anchor may have
+  gone stale after `pnpm fix` reflowed the line, the mutation may be rejected by
+  a schema before it can take effect, or deleting a whole `export const` line may
+  break the import so the suite never runs. Assert the anchor was found, and be
+  suspicious of a mutation that kills nothing in code you believe is load-bearing.
+- **Mutate the migration, not `schema.ts`.** The test database is built by
+  `runMigrations` from the generated SQL and never reads the Drizzle schema at
+  runtime, so deleting a `check(...)` there fails nothing — not because the
+  constraint is covered but because the mutation had no effect. A CHECK is only
+  exercised by a write that skips the API; pair each one with a direct
+  `client().prepare(...)` test.
+- **A timezone-dependent test in a UTC runner is not a weak test, it is no test.**
+  `apps/web` pins `TZ=Europe/Stockholm` in `vite.config.ts` for exactly this: in
+  UTC every wrong implementation of a local-time conversion looks right.
+- **Adding a function above an existing one steals its doc comment.** The
+  orphaned block then reads as though it describes the new function, which is
+  worse than no comment because it is plausible.
 
 ## Security expectations
 

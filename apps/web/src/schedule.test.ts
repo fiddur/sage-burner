@@ -25,9 +25,9 @@ describe('the timetable rows', () => {
 
   it('does not repeat an hour on the day the clocks go forward', () => {
     // 2026-03-29 in Europe/Stockholm, which the suite is pinned to: 02:00 does
-    // not exist. Walking by adding an hour to an instant crosses the gap once, so
-    // no row repeats and none is invented — the earlier version set hours on a
-    // date and needed deduplicating.
+    // not exist. Stepping the wall clock crosses the gap once, so no row repeats
+    // and none is invented. Setting hours on a date instead lands on 03:00 twice,
+    // which is what makes this worth asserting.
     const rows = hoursOf('2026-03-29', '2026-03-29')
 
     expect(rows).toEqual([...new Set(rows)])

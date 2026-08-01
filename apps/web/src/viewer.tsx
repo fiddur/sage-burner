@@ -51,11 +51,10 @@ export const ViewerProvider = ({
   // The prop stays live until something actually changes the viewer, rather
   // than being seeded into `useState` and then ignored.
   //
-  // That distinction bit me while writing this PR: a test re-rendered `App`
-  // with a different `viewer` to simulate the viewer resolving, nothing
-  // happened, and the test passed against code that was genuinely broken. With
-  // `useState(viewer)` the prop is an *initial value only* — a seam whose whole
-  // purpose is letting a test state who is looking, silently ignoring the
+  // The distinction matters because of how it fails: with `useState(viewer)` the
+  // prop is an *initial value only*, so a test re-rendering with a different
+  // viewer changes nothing and passes against genuinely broken code. A seam whose
+  // whole purpose is letting a test say who is looking would silently ignore the
   // second thing it is told.
   //
   // After a login or logout the override wins, because at that point the local

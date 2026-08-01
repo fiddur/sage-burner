@@ -534,7 +534,7 @@ docker compose exec \
 `node` rather than `pnpm` inside the container on purpose: the image purges
 corepack's cache to keep ~24 MB out of a layer watchtower re-pulls on every
 deploy, so `pnpm` there re-downloads itself from the network first. The script
-is the same one `pnpm admin:create` runs locally.
+is the same one `pnpm --filter sage-burner-backend admin:create` runs locally.
 
 Or locally, against `./data/sage-burner.sqlite`:
 
@@ -555,8 +555,11 @@ it never reaches the host's process arguments, where any local user can read it
 off `ps`. Verified: the container receives it and it appears nowhere in docker's
 argv. This is the one password on the system at the moment it is created.
 
-It runs migrations first, so it works against an empty volume — an admin can
-exist before the server has ever started.
+The **local** invocation runs migrations first, so it works against an empty
+volume: an admin can exist before the server has ever started. That is not what
+makes the container recipe above work — `docker compose exec` needs a container
+already running, which has already migrated on boot. There the migration has
+happened regardless.
 
 Two things it deliberately does not do:
 
