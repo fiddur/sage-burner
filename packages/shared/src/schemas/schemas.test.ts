@@ -431,6 +431,7 @@ describe('publicSessionSchema', () => {
     // denylist only catches leaks that were thought of in advance, and
     // `host_name` is exactly the field most likely to get added here.
     expect(Object.keys(publicSessionFields.shape).sort()).toEqual([
+      'color',
       'description',
       'id',
       'location',
@@ -454,6 +455,7 @@ describe('publicSessionSchema', () => {
       time_slot_start: '2026-10-03T10:00:00Z',
       time_slot_end: '2026-10-03T09:00:00Z',
       location: 'Temple',
+      color: 'yellow',
     }
     expect(publicSessionSchema.safeParse(backwards).success).toBe(false)
   })
@@ -466,6 +468,7 @@ describe('publicSessionSchema', () => {
       time_slot_start: '2026-10-03T09:00:00Z',
       time_slot_end: '2026-10-03T10:30:00Z',
       location: 'Temple',
+      color: 'yellow',
       host_account_id: ID,
       allergies_notes: 'gluten',
     })

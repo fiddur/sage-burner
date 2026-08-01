@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 
-import { errorResponse } from '@sage-burner/shared'
+import { errorResponse, publicSessionSchema } from '@sage-burner/shared'
 import { asc, eq } from 'drizzle-orm'
 
 import type { Database } from '../db/index.ts'
@@ -50,8 +50,8 @@ export const registerScheduleRoutes = (
         id: session.id,
         title: session.title,
         description: session.description,
-        starts_at: session.time_slot_start,
-        ends_at: session.time_slot_end,
+        time_slot_start: session.time_slot_start,
+        time_slot_end: session.time_slot_end,
         place_name: place.name,
         place_emoji: place.emoji,
         color: place.color,
@@ -65,21 +65,22 @@ export const registerScheduleRoutes = (
     // an end. This is also what narrows the nullable columns, so filtering in SQL
     // as well would be a second copy of the rule that no test could tell from
     // this one.
-    const events: CalendarEvent[] = rows.flatMap((row) =>
-      row.starts_at === null || row.ends_at === null
-        ? []
-        : [
-            {
-              id: row.id,
-              title: row.title,
-              description: row.description,
-              starts_at: row.starts_at,
-              ends_at: row.ends_at,
-              location: row.place_name === null ? null : `${row.place_emoji ?? ''} ${row.place_name}`.trim(),
-              color: row.color,
-            },
-          ],
-    )
+    // Parsed through `publicSessionSchema` rather than handed straight over. It
+    // strips anything not in the public shape, so a column added to the select
+    // above cannot reach the feed by being spread along with the rest — and
+    // adding it to that schema instead fails `schemas.test.ts`, which pins the
+    // key set. Without this the guard rail was written and never bolted on.
+    const events: CalendarEvent[] = rows.flatMap((row) => {
+      const parsed = publicSessionSchema.safeParse({
+        ...row,
+        location: row.place_name === null ? null : `${row.place_emoji ?? ''} ${row.place_name}`.trim(),
+      })
+
+      // Only what is actually scheduled: a dream with no slot fails the schema's
+      // required timestamps, which is the same rule stated once rather than
+      // filtered for here and asserted there.
+      return parsed.success ? [parsed.data] : []
+    })
 
     return reply
       .header('content-type', 'text/calendar; charset=utf-8')

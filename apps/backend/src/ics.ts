@@ -1,4 +1,4 @@
-import type { PlaceColor } from '@sage-burner/shared'
+import type { PublicSession, PlaceColor } from '@sage-burner/shared'
 
 /**
  * iCalendar rendering, by hand.
@@ -68,15 +68,15 @@ export const toIcsInstant = (iso: string): string =>
  */
 export const cssColor = (color: PlaceColor): string => (color === 'grey' ? 'gray' : color)
 
-export interface CalendarEvent {
-  id: string
-  title: string
-  description: string
-  starts_at: string
-  ends_at: string
-  location: string | null
-  color: PlaceColor | null
-}
+/**
+ * Exactly what a calendar entry may carry, and no wider.
+ *
+ * `PublicSession` rather than a shape declared here: that schema is the guard
+ * rail for this unauthenticated endpoint, and a second definition beside it
+ * would be the thing that drifts. A field cannot reach the feed without being
+ * added there, and `schemas.test.ts` fails when one is.
+ */
+export type CalendarEvent = PublicSession
 
 export interface CalendarInput {
   name: string
@@ -88,15 +88,15 @@ export interface CalendarInput {
 }
 
 const event = (
-  { id, title, description, starts_at, ends_at, location, color }: CalendarEvent,
+  { id, title, description, time_slot_start, time_slot_end, location, color }: CalendarEvent,
   input: CalendarInput,
 ) => [
   'BEGIN:VEVENT',
   // Stable per session, so a client replaces rather than duplicates.
   `UID:${id}@${input.domain}`,
   `DTSTAMP:${toIcsInstant(input.now.toISOString())}`,
-  `DTSTART:${toIcsInstant(starts_at)}`,
-  `DTEND:${toIcsInstant(ends_at)}`,
+  `DTSTART:${toIcsInstant(time_slot_start)}`,
+  `DTEND:${toIcsInstant(time_slot_end)}`,
   `SUMMARY:${escapeText(title)}`,
   ...(description === '' ? [] : [`DESCRIPTION:${escapeText(description)}`]),
   ...(location === null ? [] : [`LOCATION:${escapeText(location)}`]),

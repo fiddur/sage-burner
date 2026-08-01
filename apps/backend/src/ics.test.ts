@@ -97,8 +97,8 @@ const anEvent = {
   id: 's-1',
   title: 'Cacao ceremony',
   description: 'Bring a cup.',
-  starts_at: '2026-08-02T18:00:00.000Z',
-  ends_at: '2026-08-02T20:00:00.000Z',
+  time_slot_start: '2026-08-02T18:00:00.000Z',
+  time_slot_end: '2026-08-02T20:00:00.000Z',
   location: '🛕 Temple',
   color: 'yellow' as const,
 }

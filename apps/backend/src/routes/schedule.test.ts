@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 
+import { publicSessionSchema } from '@sage-burner/shared'
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it } from 'vitest'
 
@@ -256,6 +257,35 @@ describe('the public calendar feed', () => {
     ]) {
       expect(body, secret).not.toContain(secret)
     }
+  })
+
+  it('strips a field the public shape does not name, even when the query selects it', async () => {
+    // The guard rail, exercised rather than merely declared. `publicSessionSchema`
+    // strips what it does not know, so widening the select cannot widen the feed
+    // — a field has to be added to that schema too, and `schemas.test.ts` fails
+    // when one is.
+    const server = await build()
+    const eventId = await givenEvent()
+    const host = await givenHost()
+    await givenDream(eventId, host)
+
+    const body = (await feed(server, eventId)).body
+    const smuggled = publicSessionSchema.safeParse({
+      id: randomUUID(),
+      title: 'x',
+      description: '',
+      time_slot_start: '2026-08-02T18:00:00.000Z',
+      time_slot_end: '2026-08-02T20:00:00.000Z',
+      location: null,
+      color: null,
+      host_account_id: host,
+      allergies_notes: 'peanuts',
+    })
+
+    expect(smuggled.success).toBe(true)
+    expect(smuggled.success && 'host_account_id' in smuggled.data).toBe(false)
+    expect(smuggled.success && 'allergies_notes' in smuggled.data).toBe(false)
+    expect(body).not.toContain('peanuts')
   })
 
   it('escapes a description rather than letting it break the format', async () => {
