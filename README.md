@@ -901,6 +901,30 @@ This is not optimistic locking and does not pretend to be: two members editing
 the same _field_ still last-writer-wins. It removes the case where they edit
 different fields and one loses anyway.
 
+### The timetable
+
+`/schedule` draws places across and hours down, from the burn's start date to its
+end — every hour of every day, so a five-day burn is 120 rows. Beside it sits the
+pool of dreams nobody has placed. Dragging one into a cell schedules it for that
+hour; dragging one back to the pool unschedules it.
+
+A dream is "not placed" if it is missing **either** a time or a place. Both
+halves matter: with only a place it has no row to sit in, with only a time no
+lane — either way it would be invisible if the pool did not hold it.
+
+Rows are built from the event's calendar days rather than from any instant,
+because that is what "the burn runs the 1st to the 5th" means to whoever typed
+it. They are also deduplicated, for the one hour a year that does not exist:
+on the spring-forward day `setHours(2)` lands on 03:00, so 03:00 would appear
+twice and two rows would share a key. Checked in Europe/Stockholm, which the web
+suite is pinned to.
+
+**Dragging is not really unit-tested, and cannot be.** `fireEvent.drop` exercises
+these handlers, not a browser's drag implementation — so the tests prove the
+wiring and the drag itself wants one click-through in a browser. The Dreams page
+is the precise route and the accessible one: a form with a place and two datetime
+fields, reachable by keyboard, which is what anyone who cannot drag should use.
+
 ### Times are UTC, wall clocks are not
 
 The API stores and transports UTC; `<input type="datetime-local">` has no timezone

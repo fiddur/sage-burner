@@ -474,3 +474,73 @@ a:hover {
   gap: 0.5rem;
   flex: 1;
 }
+
+.schedule {
+  display: grid;
+  grid-template-columns: minmax(12rem, 16rem) 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (max-width: 45rem) {
+  .schedule {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dream-pool {
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  position: sticky;
+  top: 1rem;
+}
+
+.dream-pool h2 {
+  margin-top: 0;
+  font-size: 1rem;
+}
+
+.dream-chip {
+  display: block;
+  margin: 0.25rem 0;
+  padding: 0.2rem 0.45rem;
+  border-radius: 0.35rem;
+  background: var(--place-color, var(--line));
+  cursor: grab;
+  font-size: 0.85rem;
+}
+
+.schedule-grid-wrap {
+  overflow-x: auto;
+}
+
+.schedule-grid {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.schedule-grid th,
+.schedule-grid td {
+  border: 1px solid var(--line);
+  padding: 0.15rem 0.35rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.schedule-grid th[scope='row'] {
+  font-weight: normal;
+  opacity: 0.6;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.schedule-cell {
+  min-width: 7rem;
+  height: 1.6rem;
+}
+
+.schedule-daybreak th,
+.schedule-daybreak td {
+  border-top: 2px solid currentColor;
+}

@@ -1,0 +1,52 @@
+import { toLocalInput } from './datetime.ts'
+
+/**
+ * The rows of the timetable: every hour of the burn, as local wall-clock time.
+ *
+ * Built from the event's calendar days rather than from any instant, because
+ * that is what an organiser means by "the burn runs the 1st to the 5th" — the
+ * whole of both days, in the timezone they are standing in.
+ */
+export const hoursOf = (startDate: string, endDate: string): string[] => {
+  const first = new Date(`${startDate}T00:00`)
+  const last = new Date(`${endDate}T00:00`)
+  if (Number.isNaN(first.getTime()) || Number.isNaN(last.getTime()) || last < first) return []
+
+  const rows: string[] = []
+  for (const day = new Date(first); day <= last; day.setDate(day.getDate() + 1)) {
+    for (let hour = 0; hour < 24; hour += 1) {
+      const at = new Date(day)
+      at.setHours(hour, 0, 0, 0)
+      rows.push(toLocalInput(at.toISOString()))
+    }
+  }
+
+  // Deduplicated for the hour that does not exist on the spring-forward day:
+  // `setHours(2)` there lands on 03:00, so 03:00 would otherwise appear twice
+  // and two rows would share a key. Checked in Europe/Stockholm, which the web
+  // suite is pinned to. On the autumn day the repeated hour collapses to one
+  // row, which is the right amount of attention to pay it.
+  return [...new Set(rows)]
+}
+
+/**
+ * Which row an instant belongs in.
+ *
+ * Truncating the local string is safe in a way truncating the ISO one is not —
+ * the conversion to wall-clock time has already happened.
+ */
+export const hourOf = (iso: string | null): string | undefined => {
+  if (iso === null) return undefined
+
+  const local = toLocalInput(iso)
+
+  return local === '' ? undefined : `${local.slice(0, 13)}:00`
+}
+
+/** The end of the hour a dream dropped into that row should run until. */
+export const hourAfter = (row: string): string => {
+  const at = new Date(row)
+  at.setHours(at.getHours() + 1)
+
+  return toLocalInput(at.toISOString())
+}

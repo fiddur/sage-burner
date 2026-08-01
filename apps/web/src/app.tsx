@@ -23,6 +23,7 @@ import { Login } from './pages/Login.tsx'
 import { MyBurn } from './pages/MyBurn.tsx'
 import { NotFound } from './pages/NotFound.tsx'
 import { ProfilePage } from './pages/Profile.tsx'
+import { Schedule } from './pages/Schedule.tsx'
 import { FetchedViewerProvider, ViewerProvider } from './viewer.tsx'
 
 /**
@@ -158,6 +159,7 @@ export const Routes = ({
   const HomeRoute = useMemo(() => () => <Home api={api} />, [api])
   const MyBurnRoute = useMemo(() => () => <MyBurn api={api} />, [api])
   const DreamsRoute = useMemo(() => () => <Dreams api={api} />, [api])
+  const ScheduleRoute = useMemo(() => () => <Schedule api={api} />, [api])
   const ProfileRoute = useMemo(() => () => <ProfilePage api={api} />, [api])
   const ApplyRoute = useMemo(() => () => <Apply api={api} />, [api])
   // The token arrives as a prop from the route pattern, so this one takes props
@@ -174,6 +176,7 @@ export const Routes = ({
       <Route path="/apply" component={ApplyRoute} />
       <Route path="/my-burn" component={MyBurnRoute} />
       <Route path="/dreams" component={DreamsRoute} />
+      <Route path="/schedule" component={ScheduleRoute} />
       <Route path="/profile" component={ProfileRoute} />
       <Route path="/invite/:token" component={InviteRoute} />
       <Route path="/login" component={LoginRoute} />
