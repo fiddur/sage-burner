@@ -908,9 +908,19 @@ end — every hour of every day, so a five-day burn is 120 rows. Beside it sits 
 pool of dreams nobody has placed. Dragging one into a cell schedules it for that
 hour; dragging one back to the pool unschedules it.
 
-A dream is "not placed" if it is missing **either** a time or a place. Both
-halves matter: with only a place it has no row to sit in, with only a time no
-lane — either way it would be invisible if the pool did not hold it.
+**The pool holds whatever the grid does not draw**, derived rather than guessed.
+Missing a time or a place is the common case, but a dream can also be timed
+outside the days on show, and guessing "unplaced means a null field" left that one
+in neither the grid nor the pool — gone from the page while still fine on
+`/dreams`. Deriving it means nothing can vanish whatever the date.
+
+The grid runs one day **past** `end_date`, because a burn's last night regularly
+carries into the small hours of the day after. A dream at 01:00 is part of the
+burn whatever the calendar says.
+
+Dragging an already-scheduled dream to another lane **keeps the length it had**.
+Forcing an hour would quietly shorten a two-hour session for the crime of being
+moved.
 
 Rows are built from the event's calendar days rather than from any instant,
 because that is what "the burn runs the 1st to the 5th" means to whoever typed

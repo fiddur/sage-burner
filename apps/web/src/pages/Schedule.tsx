@@ -7,7 +7,7 @@ import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
 import { fromLocalInput } from '../datetime.ts'
-import { hourAfter, hourOf, hoursOf } from '../schedule.ts'
+import { dayAfter, endFor, hourOf, hoursOf } from '../schedule.ts'
 import { isMember, useViewer } from '../viewer.tsx'
 
 export type ScheduleApi = Pick<ApiClient, 'getSessions' | 'getPlaces' | 'getActiveEvent' | 'updateSession'>
@@ -129,14 +129,28 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
     )
   }
 
-  const unscheduled = sessions.filter((dream) => dream.time_slot_start === null || dream.place_id === null)
+  const rows = hoursOf(event.start_date, dayAfter(event.end_date))
+
+  // The pool holds whatever the grid does not draw, rather than a guess at which
+  // dreams those are. Missing a time or a place is the common case; a dream timed
+  // outside these days is the one that used to render nowhere at all.
+  const drawn = new Set(
+    sessions
+      .filter((dream) => dream.place_id !== null && rows.includes(hourOf(dream.time_slot_start) ?? ''))
+      .map((dream) => dream.id),
+  )
+  const unscheduled = sessions.filter((dream) => !drawn.has(dream.id))
 
   const dropInto = (row: string, placeId: string) => {
-    if (dragged === undefined) return
-    move(dragged, {
+    const dream = sessions.find((candidate) => candidate.id === dragged)
+    if (dream === undefined) return
+
+    // Keeps whatever length it already had. Forcing an hour would quietly
+    // shorten a two-hour session just because someone moved it to another lane.
+    move(dream.id, {
       place_id: placeId,
       time_slot_start: fromLocalInput(row),
-      time_slot_end: fromLocalInput(hourAfter(row)),
+      time_slot_end: endFor(row, dream),
     })
     setDragged(undefined)
   }
@@ -163,7 +177,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
         />
 
         <Timetable
-          rows={hoursOf(event.start_date, event.end_date)}
+          rows={rows}
           places={places}
           dreams={sessions}
           busy={busy}

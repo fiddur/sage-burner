@@ -76,8 +76,9 @@ describe('Schedule', () => {
 
     expect(await screen.findByRole('columnheader', { name: /Temple/ })).toBeTruthy()
     expect(screen.getByRole('columnheader', { name: /Sauna/ })).toBeTruthy()
-    // Two days, 24 rows each.
-    expect(document.querySelectorAll('.schedule-grid th[scope="row"]')).toHaveLength(48)
+    // Two days of burn plus the night after it ends, 24 rows each: the last
+    // night regularly runs past midnight and those hours need somewhere to go.
+    expect(document.querySelectorAll('.schedule-grid th[scope="row"]')).toHaveLength(72)
   })
 
   it('lists an unplaced dream in the pool rather than in the grid', async () => {
@@ -134,6 +135,76 @@ describe('Schedule', () => {
     expect(cell('10:00', 1).textContent).toContain('Cacao ceremony')
     expect(cell('10:00', 0).textContent).not.toContain('Cacao ceremony')
     expect(cell('08:00', 1).textContent).not.toContain('Cacao ceremony')
+  })
+
+  it('keeps a dream scheduled past the last midnight visible', async () => {
+    // A burn's last night runs into the day after `end_date`. Such a dream has
+    // both a place and a time, so it is not \u201cunplaced\u201d — without a row for it
+    // it would render nowhere at all.
+    renderPage(
+      stub({}, [
+        aDream({
+          id: 's-1',
+          title: 'Last dance',
+          place_id: 'p-1',
+          time_slot_start: '2026-08-02T23:00:00.000Z',
+          time_slot_end: '2026-08-03T01:00:00.000Z',
+        }),
+      ]),
+    )
+
+    await screen.findByRole('columnheader', { name: /Temple/ })
+
+    expect(document.body.textContent).toContain('Last dance')
+  })
+
+  it('pools a dream timed outside the grid entirely, rather than losing it', async () => {
+    // It has a place and a time, so guessing \u201cunplaced means a null field\u201d would
+    // leave it in neither the grid nor the pool. The pool is derived from what
+    // the grid actually draws so that cannot happen, whatever the date.
+    renderPage(
+      stub({}, [
+        aDream({
+          id: 's-1',
+          title: 'Wrong week',
+          place_id: 'p-1',
+          time_slot_start: '2026-08-20T10:00:00.000Z',
+          time_slot_end: '2026-08-20T11:00:00.000Z',
+        }),
+      ]),
+    )
+
+    expect((await screen.findByRole('complementary')).textContent).toContain('Wrong week')
+  })
+
+  it('keeps the length of a dream that already had one when it is moved', async () => {
+    // Re-dragging a two-hour session into another lane must not silently make it
+    // an hour long.
+    const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'Cacao ceremony' }) }),
+    )
+    renderPage(
+      stub({ updateSession }, [
+        aDream({
+          id: 's-1',
+          title: 'Cacao ceremony',
+          place_id: 'p-1',
+          time_slot_start: '2026-08-01T08:00:00.000Z',
+          time_slot_end: '2026-08-01T11:00:00.000Z',
+        }),
+      ]),
+    )
+
+    fireEvent.dragStart(await screen.findByLabelText('Move Cacao ceremony'))
+    fireEvent.drop(cell('14:00', 1))
+
+    await waitFor(() =>
+      expect(updateSession).toHaveBeenCalledWith('s-1', {
+        place_id: 'p-2',
+        time_slot_start: '2026-08-01T12:00:00.000Z',
+        time_slot_end: '2026-08-01T15:00:00.000Z',
+      }),
+    )
   })
 
   it('schedules a dream dropped into a cell, for that hour', async () => {

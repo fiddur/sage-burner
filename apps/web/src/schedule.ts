@@ -50,3 +50,35 @@ export const hourAfter = (row: string): string => {
 
   return toLocalInput(at.toISOString())
 }
+
+/**
+ * The calendar day after this one.
+ *
+ * The grid runs one day past the burn's `end_date`, because a burn's last night
+ * regularly carries into the small hours of the day after — a dream at 01:00 is
+ * part of the burn whatever the calendar says.
+ */
+export const dayAfter = (date: string): string => {
+  const at = new Date(`${date}T00:00`)
+  if (Number.isNaN(at.getTime())) return date
+  at.setDate(at.getDate() + 1)
+
+  return toLocalInput(at.toISOString()).slice(0, 10)
+}
+
+/** Where a dream ends when it is dropped into `row`, keeping the length it had. */
+export const endFor = (
+  row: string,
+  dream: { time_slot_start: string | null; time_slot_end: string | null },
+) => {
+  const hour = 60 * 60 * 1000
+  const kept =
+    dream.time_slot_start === null || dream.time_slot_end === null
+      ? hour
+      : Date.parse(dream.time_slot_end) - Date.parse(dream.time_slot_start)
+
+  const at = new Date(row)
+  at.setTime(at.getTime() + (kept > 0 ? kept : hour))
+
+  return at.toISOString()
+}
