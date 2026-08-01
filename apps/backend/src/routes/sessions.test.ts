@@ -247,6 +247,21 @@ describe('dreams', () => {
     expect(row?.time_slot_start).toBeNull()
   })
 
+  it('refuses a single end that would invert the stored slot', async () => {
+    const server = await build()
+    await givenEvent()
+    const member = await givenAccount(['member'])
+    const id = (await offer(server, member.cookie, { title: 'Scheduled', ...SLOT })).json().session.id
+
+    const late = await editDream(server, member.cookie, id, { time_slot_start: '2026-08-02T23:00:00.000Z' })
+    const early = await editDream(server, member.cookie, id, { time_slot_end: '2026-08-02T09:00:00.000Z' })
+
+    expect([late.statusCode, early.statusCode]).toEqual([400, 400])
+    const [row] = await db().select().from(session).where(eq(session.id, id))
+    expect(row?.time_slot_start).toBe(SLOT.time_slot_start)
+    expect(row?.time_slot_end).toBe(SLOT.time_slot_end)
+  })
+
   it('accepts a single end that keeps the slot whole', async () => {
     // The passing sibling: the condition must not refuse an ordinary reschedule.
     const server = await build()
@@ -363,6 +378,38 @@ describe('dreams', () => {
       .sessions.map((row: { title: string }) => row.title)
 
     expect(titles).toEqual(['Earlier', 'Later', 'Offered only'])
+  })
+
+  it('leaves a finished burn\u2019s dreams alone, even to whoever noted the id', async () => {
+    // Every other member-facing route scopes to the burn that is open. A dream
+    // from a finished burn is history: still visible in a past-events view one
+    // day, not still editable by anyone who kept the URL.
+    const server = await build()
+    await givenEvent()
+    const member = await givenAccount(['member'])
+
+    const finished = randomUUID()
+    await db()
+      .insert(event)
+      .values({
+        id: finished,
+        name: 'Last spring',
+        slug: `past-${finished.slice(0, 8)}`,
+        start_date: '2026-05-01',
+        end_date: '2026-05-05',
+        member_cap: 42,
+        created_at: NOW,
+      })
+    const old = randomUUID()
+    await db()
+      .insert(session)
+      .values({ id: old, event_id: finished, title: 'Last year', host_account_id: member.id })
+
+    expect((await editDream(server, member.cookie, old, { title: 'Rewritten' })).statusCode).toBe(404)
+    expect((await drop(server, member.cookie, old)).statusCode).toBe(404)
+
+    const [row] = await db().select().from(session).where(eq(session.id, old))
+    expect(row?.title).toBe('Last year')
   })
 
   it('refuses everyone who is not a member', async () => {

@@ -1,8 +1,13 @@
 import type { Session, SessionResponse, SessionsResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { errorResponse, sessionCreateSchema, sessionUpdateSchema } from '@sage-burner/shared'
-import { and, asc, eq, isNotNull, isNull } from 'drizzle-orm'
+import {
+  errorResponse,
+  hasValidTimeSlot,
+  sessionCreateSchema,
+  sessionUpdateSchema,
+} from '@sage-burner/shared'
+import { and, asc, eq, isNull } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -95,32 +100,33 @@ export const registerSessionRoutes = (
       const parsed = sessionUpdateSchema.safeParse(request.body)
       if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
 
-      // `set({})` is not valid SQL, so the one body that never reaches the
-      // UPDATE needs a read of its own.
-      if (Object.keys(parsed.data).length === 0) {
-        const [existing] = await db.select().from(session).where(eq(session.id, request.params.id)).limit(1)
+      const open = await activeEvent(db, todayIso(now))
+      const [existing] = await db.select().from(session).where(eq(session.id, request.params.id)).limit(1)
 
-        return existing === undefined
-          ? reply.code(404).send(errorResponse('not_found'))
-          : ({ session: existing } satisfies SessionResponse)
+      // Scoped to the burn that is open, like every other member-facing route:
+      // a dream from a finished burn is history, and an id noted while it was
+      // current should not still be a way to rewrite it.
+      if (existing === undefined || open === undefined || existing.event_id !== open.id) {
+        return reply.code(404).send(errorResponse('not_found'))
       }
 
-      // The half-a-slot rule as SQL, for the same reason `profile.ts` composes
-      // the stay-order rule into its WHERE: a PATCH carrying one end of the slot
-      // cannot be judged by the schema alone, and comparing against a row read a
-      // moment earlier is check-then-act.
-      const whole = slotStaysWhole(parsed.data)
+      if (Object.keys(parsed.data).length === 0) return { session: existing } satisfies SessionResponse
+
+      // The rule applied to the row as it would be, because a body carrying one
+      // end of the slot cannot be judged on its own — `hasValidTimeSlot` is the
+      // same check the schema makes when both ends are present. Not composed
+      // into the WHERE: these are ISO instants, and comparing them as SQL
+      // strings is wrong when the ends differ in fractional-second precision.
+      if (!hasValidTimeSlot({ ...existing, ...parsed.data })) {
+        return reply.code(400).send(errorResponse('bad_request'))
+      }
 
       let updated: Session[]
       try {
         updated = await db
           .update(session)
           .set(parsed.data)
-          .where(
-            whole === undefined
-              ? eq(session.id, request.params.id)
-              : and(eq(session.id, request.params.id), whole),
-          )
+          .where(eq(session.id, request.params.id))
           .returning()
       } catch (failure) {
         if (isForeignKeyViolation(failure)) return reply.code(400).send(errorResponse('bad_request'))
@@ -128,19 +134,8 @@ export const registerSessionRoutes = (
       }
 
       const [row] = updated
-      if (row !== undefined) return { session: row } satisfies SessionResponse
 
-      // Nothing written is either "no such dream" or "that would leave half a
-      // slot". Asked rather than inferred.
-      const [stillThere] = await db
-        .select({ id: session.id })
-        .from(session)
-        .where(eq(session.id, request.params.id))
-        .limit(1)
-
-      return stillThere === undefined
-        ? reply.code(404).send(errorResponse('not_found'))
-        : reply.code(400).send(errorResponse('bad_request'))
+      return row === undefined ? reply.code(404).send(errorResponse('not_found')) : { session: row }
     },
   )
 
@@ -150,9 +145,12 @@ export const registerSessionRoutes = (
     async (request, reply) => {
       void noStore(reply)
 
+      const open = await activeEvent(db, todayIso(now))
+      if (open === undefined) return reply.code(404).send(errorResponse('not_found'))
+
       const deleted = await db
         .delete(session)
-        .where(eq(session.id, request.params.id))
+        .where(and(eq(session.id, request.params.id), eq(session.event_id, open.id)))
         .returning({ id: session.id })
 
       if (deleted.length === 0) return reply.code(404).send(errorResponse('not_found'))
@@ -160,31 +158,4 @@ export const registerSessionRoutes = (
       return reply.code(204).send()
     },
   )
-}
-
-/**
- * The both-ends-or-neither rule for a PATCH carrying only one end of the slot.
- *
- * A partial body can leave half a slot behind without ever containing both
- * values, so the schema's refinement cannot see it. Composed into the `WHERE`
- * rather than compared after a read, so a concurrent write cannot slip between.
- */
-const slotStaysWhole = (update: { time_slot_start?: string | null; time_slot_end?: string | null }) => {
-  const { time_slot_start, time_slot_end } = update
-  const startGiven = 'time_slot_start' in update
-  const endGiven = 'time_slot_end' in update
-
-  // Both present: the schema's own refinement already compared them.
-  if (startGiven && endGiven) return undefined
-  if (!startGiven && !endGiven) return undefined
-
-  // Setting one end requires the other to already be there; clearing one end
-  // requires the other to already be absent.
-  return startGiven
-    ? time_slot_start === null
-      ? isNull(session.time_slot_end)
-      : isNotNull(session.time_slot_end)
-    : time_slot_end === null
-      ? isNull(session.time_slot_start)
-      : isNotNull(session.time_slot_start)
 }

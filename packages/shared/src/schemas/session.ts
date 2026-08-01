@@ -31,6 +31,16 @@ const hasOrderedSlot = ({ time_slot_start, time_slot_end }: TimeSlot) =>
   time_slot_start == null || time_slot_end == null || Date.parse(time_slot_start) < Date.parse(time_slot_end)
 
 /**
+ * Whether a whole slot — both keys present — is valid.
+ *
+ * Exported so the PATCH handler can apply the same rule to the row merged with
+ * the update, which is the only way to judge a body carrying one end. One rule
+ * in one place rather than the same comparison written again in SQL, where
+ * fractional seconds would make it wrong anyway.
+ */
+export const hasValidTimeSlot = (slot: TimeSlot) => hasWholeSlot(slot) && hasOrderedSlot(slot)
+
+/**
  * Re-applies the time slot checks to a schema derived from `sessionFields`.
  *
  * Wrap every derived create/update body in this — see `withEventDateOrder` for

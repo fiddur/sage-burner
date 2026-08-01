@@ -849,19 +849,38 @@ is refused with a 409** rather than quietly unscheduling it; `places.ts`
 translates the foreign key failure. Not a pre-read, which would be check-then-act
 — the dream can be created between the read and the delete.
 
-### The half-a-slot rule, and why it is in two places
+### The slot rule, applied to the row as it would be
 
-A slot is both ends or neither. `withValidTimeSlot` enforces that at the boundary
-whenever both keys are present, and `slotStaysWhole` in `sessions.ts` composes the
-rest into the `UPDATE`'s `WHERE` — a PATCH carrying one end can only be judged
-against the stored row, and comparing against a row read a moment earlier is
-check-then-act. Same shape as `dateOrderCondition` in `events.ts` and
-`stayOrderCondition` in `profile.ts`.
+A slot is both ends or neither, and the end comes after the start.
+`withValidTimeSlot` enforces both at the boundary whenever both keys are present.
+A PATCH carrying **one** end cannot be judged on its own, so the handler reads the
+row, merges the update onto it, and runs `hasValidTimeSlot` — the same rule, one
+copy of it.
 
-Worth knowing why this needed fixing: `hasWholeSlot` used `== null`, which treats
-an **absent** key the same as a null one. Every single-ended reschedule was
-therefore a 400 before the row was ever consulted. An absent key now defers to the
-SQL rule, exactly as `violatesTickBoxRules` already did for the tick-box pair.
+Deliberately **not** composed into the `UPDATE`'s `WHERE`, unlike
+`dateOrderCondition` in `events.ts` and `stayOrderCondition` in `profile.ts`.
+Those compare calendar dates, which are fixed-width `YYYY-MM-DD` and so sort
+correctly as SQL strings. These are ISO **instants**, where
+`'…T09:00:00.500Z' < '…T09:00:00Z'` is true lexicographically — a string
+comparison would accept a slot ending half a second before it starts. Reading the
+row and comparing with `Date.parse` is both simpler and the only sound option.
+
+Two bugs lived here, and both were single-user, no concurrency needed:
+
+- `hasWholeSlot` used `== null`, so an **absent** key read the same as a null one
+  and every single-ended reschedule was a 400 before the row was consulted. An
+  absent key now defers to the merged-row check, exactly as
+  `violatesTickBoxRules` already did for the tick-box pair.
+- The first attempt at the merged rule only checked that the _other_ end existed,
+  never that the two were in order — so `PATCH { time_slot_start: '23:00' }` on an
+  18:00–20:00 dream stored an inverted slot and answered 200.
+
+### Editing is scoped to the burn that is open
+
+`PATCH` and `DELETE` take a session id, and both check that the dream belongs to
+the active event, the way every other member-facing route does. A finished burn's
+programme is history; an id noted while it was current is not a way to rewrite
+it.
 
 ### Editing sends only what changed
 
