@@ -1,6 +1,6 @@
 import type { Event } from '@sage-burner/shared'
 
-import { useEffect, useState } from 'preact/hooks'
+import { useEffect, useRef, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
@@ -14,6 +14,27 @@ type Events =
   | { status: 'failed'; message: string }
 
 export type EventsApi = Pick<ApiClient, 'createEvent' | 'getEvents' | 'updateEvent'>
+
+type Editable = Pick<
+  Event,
+  'name' | 'start_date' | 'end_date' | 'start_time' | 'end_time' | 'member_cap' | 'welcome_markdown'
+>
+
+/**
+ * The fields that differ from the event as loaded.
+ *
+ * Sending the whole event means an organiser fixing the cap overwrites the
+ * welcome text someone else edited in between — `eventUpdateSchema` is
+ * `.partial()` precisely so that does not happen. Two organisers editing the
+ * *same* field still last-writer-wins; this is only about the ones they did not
+ * touch.
+ */
+export const changedFields = (before: Editable | undefined, now: Editable): Partial<Editable> =>
+  before === undefined
+    ? now
+    : Object.fromEntries(
+        Object.entries(now).filter(([key, value]) => value !== before[key as keyof Editable]),
+      )
 
 const BLANK = {
   name: '',
@@ -57,6 +78,11 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
   const [createError, setCreateError] = useState<string | undefined>(undefined)
 
   const [editing, setEditing] = useState<string | undefined>(undefined)
+  // Which row the form is on *now*, readable from inside an awaited save whose
+  // `editing` is pinned to the row it started on.
+  const editingNow = useRef<string | undefined>(undefined)
+  // The row as loaded into the form, so a save can send only what differs.
+  const original = useRef<Event | undefined>(undefined)
   const [welcome, setWelcome] = useState('')
   const [details, setDetails] = useState({
     name: '',
@@ -147,6 +173,8 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
 
   const startEditing = (row: Event) => {
     setEditing(row.id)
+    editingNow.current = row.id
+    original.current = row
     setWelcome(row.welcome_markdown)
     setDetails({
       name: row.name,
@@ -173,7 +201,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
     setSaveError(undefined)
     setSaved(false)
     try {
-      const changes = {
+      const changes = changedFields(original.current, {
         name: details.name,
         start_date: details.start_date,
         end_date: details.end_date,
@@ -181,21 +209,29 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
         end_time: details.end_time,
         member_cap: cap,
         welcome_markdown: welcome,
-      }
+      })
+
       const { event: updated } = await api.updateEvent(id, changes)
 
       // The still-open form gets the canonical row too. Updating only the list
       // leaves the header showing what was stored and the inputs showing what was
       // typed — the same inconsistency this avoids one level down.
-      setDetails({
-        name: updated.name,
-        start_date: updated.start_date,
-        end_date: updated.end_date,
-        start_time: updated.start_time,
-        end_time: updated.end_time,
-        member_cap: String(updated.member_cap),
-      })
-      setWelcome(updated.welcome_markdown)
+      //
+      // Only if the form is still on this row: clicking Edit on another event
+      // while a save is in flight would otherwise drop this response into that
+      // form and report "Saved." under fields nobody sent.
+      if (editingNow.current === id) {
+        original.current = updated
+        setDetails({
+          name: updated.name,
+          start_date: updated.start_date,
+          end_date: updated.end_date,
+          start_time: updated.start_time,
+          end_time: updated.end_time,
+          member_cap: String(updated.member_cap),
+        })
+        setWelcome(updated.welcome_markdown)
+      }
 
       setEvents((current) =>
         current.status === 'ready'

@@ -256,6 +256,30 @@ describe('AdminEvents', () => {
     expect(await screen.findByText('Trimmed By Server')).toBeTruthy()
   })
 
+  it('does not resync a response that arrives after the form moved to another event', async () => {
+    // Clicking Edit on a second event while the first save is in flight: the
+    // response must not land in the form now showing someone else's burn, nor
+    // report "Saved." under fields nobody sent.
+    let settle: (value: { event: Event }) => void = () => undefined
+    const updateEvent = vi.fn(() => new Promise<{ event: Event }>((resolve) => (settle = resolve)))
+    const winterBurn: Event = { ...summer, id: 'e-2', name: 'Winter Burn', slug: 'winter-2026' }
+    renderPage(stub({ updateEvent, getEvents: () => Promise.resolve({ events: [summer, winterBurn] }) }))
+    await screen.findByText('Summer Burn 2026')
+
+    const [editSummer, editWinter] = screen.getAllByRole('button', { name: 'Edit event' })
+    editSummer?.click()
+    await screen.findByLabelText('Name of summer-2026')
+    fill('Name of summer-2026', 'Renamed')
+    screen.getByRole('button', { name: 'Save event' }).click()
+
+    editWinter?.click()
+    await screen.findByLabelText('Name of winter-2026')
+    settle({ event: { ...summer, name: 'Trimmed By Server' } })
+
+    await waitFor(() => expect(screen.getByText('Trimmed By Server')).toBeTruthy())
+    expect(screen.getByLabelText('Name of winter-2026')).toHaveProperty('value', 'Winter Burn')
+  })
+
   it('resyncs the open form from the server, not only the list', async () => {
     // Otherwise the header shows what was stored and the inputs still show what
     // was typed, which is the same inconsistency one level in.
@@ -275,7 +299,7 @@ describe('AdminEvents', () => {
     expect(screen.getByLabelText('Welcome text (markdown)')).toHaveProperty('value', '# Hello')
   })
 
-  it('saves the whole event, not only the welcome text', async () => {
+  it('sends only what the form changed, so a cap fix cannot clobber the welcome text', async () => {
     const updateEvent = vi.fn(() => Promise.resolve({ event: summer }))
     renderPage(stub({ updateEvent }))
     ;(await screen.findByRole('button', { name: 'Edit event' })).click()
@@ -285,15 +309,7 @@ describe('AdminEvents', () => {
     screen.getByRole('button', { name: 'Save event' }).click()
 
     await waitFor(() => {
-      expect(updateEvent).toHaveBeenCalledWith('e-1', {
-        name: 'Summer Burn 2026',
-        start_date: '2026-08-01',
-        end_date: '2026-08-05',
-        start_time: '00:00',
-        end_time: '23:59',
-        member_cap: 42,
-        welcome_markdown: '# New words',
-      })
+      expect(updateEvent).toHaveBeenCalledWith('e-1', { welcome_markdown: '# New words' })
     })
     // Pinned in full, because this one sentence has been wrong three times
     // running: it over-promised, then hedged with an issue number that went
