@@ -1,4 +1,4 @@
-import type { Place, Session } from '@sage-burner/shared'
+import type { Place, Session, SessionUpdate } from '@sage-burner/shared'
 
 import { useEffect, useState } from 'preact/hooks'
 
@@ -17,6 +17,15 @@ type Loaded =
   | { status: 'loading' }
   | { status: 'ready'; sessions: readonly Session[]; places: readonly Place[] }
   | { status: 'failed'; message: string }
+
+/**
+ * The fields that differ from the dream as loaded.
+ *
+ * An untouched field is left out rather than sent unchanged, so this form can
+ * only ever overwrite what the person editing actually touched.
+ */
+export const changed = (dream: Session, edited: Required<SessionUpdate>): SessionUpdate =>
+  Object.fromEntries(Object.entries(edited).filter(([key, value]) => value !== dream[key as keyof Session]))
 
 const placeLabel = (places: readonly Place[], id: string | null) => {
   const found = places.find((row) => row.id === id)
@@ -233,13 +242,7 @@ const DreamFields = ({
   dream: Session
   places: readonly Place[]
   busy: boolean
-  onSave: (changes: {
-    title: string
-    description: string
-    place_id: string | null
-    time_slot_start: string | null
-    time_slot_end: string | null
-  }) => void
+  onSave: (changes: SessionUpdate) => void
   onCancel: () => void
 }) => {
   const [title, setTitle] = useState(dream.title)
@@ -311,13 +314,20 @@ const DreamFields = ({
         type="button"
         disabled={busy}
         onClick={() =>
-          onSave({
-            title: title.trim(),
-            description,
-            place_id: placeId === '' ? null : placeId,
-            time_slot_start: fromLocalInput(start),
-            time_slot_end: fromLocalInput(end),
-          })
+          onSave(
+            // Only what this form actually changed. Sending all five would carry
+            // the values it loaded at mount, so fixing a typo in the title would
+            // put back the place and slot as they were then — undoing whatever
+            // another member scheduled in the meantime. Concurrent editing is the
+            // premise of this page, so that is the ordinary case, not a rare one.
+            changed(dream, {
+              title: title.trim(),
+              description,
+              place_id: placeId === '' ? null : placeId,
+              time_slot_start: fromLocalInput(start),
+              time_slot_end: fromLocalInput(end),
+            }),
+          )
         }
       >
         Save

@@ -863,6 +863,20 @@ an **absent** key the same as a null one. Every single-ended reschedule was
 therefore a 400 before the row was ever consulted. An absent key now defers to the
 SQL rule, exactly as `violatesTickBoxRules` already did for the tick-box pair.
 
+### Editing sends only what changed
+
+The edit form seeds its state once, at mount. Sending all five fields back would
+carry the values it loaded — so fixing a typo in a title would put the place and
+slot back as they were then, undoing whatever another member scheduled in the
+meantime. Concurrent editing is the _premise_ of this page, so that is the
+ordinary case rather than a rare one. `changed()` diffs against the loaded dream
+and sends only the difference, which `sessionUpdateSchema`'s `.partial()` already
+accepts. An untouched save sends `{}`, which is the documented no-op read.
+
+This is not optimistic locking and does not pretend to be: two members editing
+the same _field_ still last-writer-wins. It removes the case where they edit
+different fields and one loses anyway.
+
 ### Times are UTC, wall clocks are not
 
 The API stores and transports UTC; `<input type="datetime-local">` has no timezone

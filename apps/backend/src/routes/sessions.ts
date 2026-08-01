@@ -9,6 +9,7 @@ import type { GuardDeps } from '../auth/guards.ts'
 import type { Database } from '../db/index.ts'
 
 import { createGuards } from '../auth/guards.ts'
+import { isForeignKeyViolation } from '../db/errors.ts'
 import { session } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 import { viewerFor } from './auth.ts'
@@ -17,10 +18,6 @@ import { activeEvent, todayIso } from './events.ts'
 export interface SessionDeps extends GuardDeps {
   now?: () => Date
 }
-
-/** A `place_id` that names no place, which SQLite reports as a foreign key failure. */
-export const isMissingPlace = (failure: unknown): boolean =>
-  failure instanceof Error && failure.message.includes('FOREIGN KEY constraint failed')
 
 const sessionsFor = (db: Database, eventId: string): Promise<Session[]> =>
   db
@@ -82,7 +79,7 @@ export const registerSessionRoutes = (
     try {
       await db.insert(session).values(row)
     } catch (failure) {
-      if (isMissingPlace(failure)) return reply.code(400).send(errorResponse('bad_request'))
+      if (isForeignKeyViolation(failure)) return reply.code(400).send(errorResponse('bad_request'))
       throw failure
     }
 
@@ -126,7 +123,7 @@ export const registerSessionRoutes = (
           )
           .returning()
       } catch (failure) {
-        if (isMissingPlace(failure)) return reply.code(400).send(errorResponse('bad_request'))
+        if (isForeignKeyViolation(failure)) return reply.code(400).send(errorResponse('bad_request'))
         throw failure
       }
 

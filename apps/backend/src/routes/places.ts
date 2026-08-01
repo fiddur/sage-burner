@@ -9,15 +9,9 @@ import type { GuardDeps } from '../auth/guards.ts'
 import type { Database } from '../db/index.ts'
 
 import { createGuards } from '../auth/guards.ts'
+import { isForeignKeyViolation } from '../db/errors.ts'
 import { place } from '../db/schema.ts'
 import { noStore } from '../http.ts'
-
-/**
- * A place a dream still points at. SQLite reports the refusal as a foreign key
- * failure, and the message is the only thing distinguishing it.
- */
-export const isPlaceInUse = (failure: unknown): boolean =>
-  failure instanceof Error && failure.message.includes('FOREIGN KEY constraint failed')
 
 export const placesFor = (db: Database): Promise<Place[]> =>
   db.select().from(place).orderBy(asc(place.order), asc(place.id))
@@ -114,7 +108,7 @@ export const registerPlaceRoutes = (app: FastifyInstance, { db, sessions }: Guar
       try {
         deleted = await db.delete(place).where(eq(place.id, request.params.id)).returning({ id: place.id })
       } catch (failure) {
-        if (isPlaceInUse(failure)) return reply.code(409).send(errorResponse('conflict'))
+        if (isForeignKeyViolation(failure)) return reply.code(409).send(errorResponse('conflict'))
         throw failure
       }
 

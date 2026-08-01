@@ -8,13 +8,11 @@ import { randomUUID } from 'node:crypto'
 import type { GuardDeps } from '../auth/guards.ts'
 
 import { createGuards } from '../auth/guards.ts'
+import { isForeignKeyViolation } from '../db/errors.ts'
 import { attendance } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 import { viewerFor } from './auth.ts'
 import { activeEvent, todayIso } from './events.ts'
-
-const isMissingReference = (error: unknown) =>
-  error instanceof Error && /FOREIGN KEY constraint failed/i.test(error.message)
 
 /**
  * The one-row-per-person-per-burn index, which is what makes joining idempotent.
@@ -164,7 +162,7 @@ export const registerAttendanceRoutes = (
         // event or account, and asking first would be a second query that says
         // the same thing. Narrowed to those failures so a real bug still surfaces
         // as a 500 rather than as a confident 404.
-        if (isMissingReference(error)) return reply.code(404).send(errorResponse('not_found'))
+        if (isForeignKeyViolation(error)) return reply.code(404).send(errorResponse('not_found'))
         // The same race the member route has, and one it shares with it: an
         // organiser adding someone at the moment they add themselves.
         if (!isAlreadyJoined(error)) throw error

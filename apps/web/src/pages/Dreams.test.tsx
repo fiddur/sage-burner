@@ -123,8 +123,6 @@ describe('Dreams', () => {
 
     await waitFor(() =>
       expect(updateSession).toHaveBeenCalledWith('s-1', {
-        title: 'Sunrise yoga',
-        description: '',
         place_id: 'p-1',
         time_slot_start: '2026-08-02T18:00:00.000Z',
         time_slot_end: '2026-08-02T20:00:00.000Z',
@@ -175,13 +173,51 @@ describe('Dreams', () => {
 
     await waitFor(() =>
       expect(updateSession).toHaveBeenCalledWith('s-1', {
-        title: 'Cacao ceremony',
-        description: '',
         place_id: null,
         time_slot_start: null,
         time_slot_end: null,
       }),
     )
+  })
+
+  it('sends only what this form changed, so a title fix cannot unschedule a dream', async () => {
+    // Concurrent editing is the premise of the page: another member may schedule
+    // this dream while the form is open. Sending the whole row would put back the
+    // place and slot as they were at mount and undo their work.
+    const updateSession = vi.fn<DreamsApi['updateSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'Renamed' }) }),
+    )
+    renderPage(
+      stub({ updateSession }, [
+        aDream({
+          id: 's-1',
+          title: 'Cacao ceremony',
+          place_id: 'p-1',
+          time_slot_start: '2026-08-02T18:00:00.000Z',
+          time_slot_end: '2026-08-02T20:00:00.000Z',
+        }),
+      ]),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Cacao ceremony' }))
+    fireEvent.input(screen.getByLabelText('Title of Cacao ceremony'), { target: { value: 'Renamed' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(updateSession).toHaveBeenCalledWith('s-1', { title: 'Renamed' }))
+  })
+
+  it('sends nothing at all when the form was opened and closed unchanged', async () => {
+    // An empty body is the documented no-op read, so this is harmless — but it
+    // is worth pinning that an untouched save cannot carry a value.
+    const updateSession = vi.fn<DreamsApi['updateSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'Cacao ceremony' }) }),
+    )
+    renderPage(stub({ updateSession }, [aDream({ id: 's-1', title: 'Cacao ceremony', place_id: 'p-1' })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Cacao ceremony' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(updateSession).toHaveBeenCalledWith('s-1', {}))
   })
 
   it('withdraws one', async () => {
