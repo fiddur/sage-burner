@@ -6,8 +6,8 @@ import { useEffect, useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
-import { fromLocalInput } from '../datetime.ts'
-import { dayAfter, endFor, hourOf, hoursOf } from '../schedule.ts'
+import { fromLocalInput, toLocalInput } from '../datetime.ts'
+import { dayAfter, endFor, hourOf, hoursOf, laneCells } from '../schedule.ts'
 import { isMember, useViewer } from '../viewer.tsx'
 
 export type ScheduleApi = Pick<ApiClient, 'getSessions' | 'getPlaces' | 'getActiveEvent' | 'updateSession'>
@@ -18,6 +18,12 @@ type Loaded =
   | { status: 'failed'; message: string }
 
 const label = (row: string) => row.slice(11)
+
+/** `18:00–21:00`, or null for a dream with no slot. */
+const span = (dream: Session) =>
+  dream.time_slot_start === null || dream.time_slot_end === null
+    ? null
+    : `${toLocalInput(dream.time_slot_start).slice(11)}–${toLocalInput(dream.time_slot_end).slice(11)}`
 
 const dayOf = (row: string) => row.slice(0, 10)
 
@@ -209,6 +215,7 @@ const Chip = ({
     class="dream-chip"
     draggable={!busy}
     aria-label={`Move ${dream.title}`}
+    title={span(dream) ?? undefined}
     onDragStart={(dragEvent) => {
       // Firefox refuses to start a drag whose data store was never written to,
       // so this is what makes the gesture work at all there. The id is carried
@@ -219,6 +226,7 @@ const Chip = ({
     }}
   >
     {dream.title}
+    {span(dream) !== null && <span class="dream-span">{span(dream)}</span>}
   </span>
 )
 
@@ -271,43 +279,66 @@ const Timetable = ({
   busy: boolean
   onDragStart: (id: string) => void
   onDrop: (row: string, placeId: string) => void
-}) => (
-  <div class="schedule-grid-wrap">
-    <table class="schedule-grid">
-      <thead>
-        <tr>
-          <th scope="col">Time</th>
-          {places.map((place) => (
-            <th key={place.id} scope="col">
-              <span aria-hidden="true">{place.emoji}</span> {place.name}
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row) => (
-          <tr key={row} class={label(row) === '00:00' ? 'schedule-daybreak' : undefined}>
-            <th scope="row">{label(row) === '00:00' ? `${dayOf(row)} 00:00` : label(row)}</th>
+}) => {
+  const lanes = new Map(
+    places.map((place) => [
+      place.id,
+      laneCells(
+        rows,
+        dreams.filter((dream) => dream.place_id === place.id),
+      ),
+    ]),
+  )
+
+  return (
+    <div class="schedule-grid-wrap">
+      <table class="schedule-grid">
+        <thead>
+          <tr>
+            <th scope="col">Time</th>
             {places.map((place) => (
-              <td
-                key={place.id}
-                class={`schedule-cell place-${place.color}`}
-                onDragOver={(dragEvent) => dragEvent.preventDefault()}
-                onDrop={(dropEvent) => {
-                  dropEvent.preventDefault()
-                  onDrop(row, place.id)
-                }}
-              >
-                {dreams
-                  .filter((dream) => dream.place_id === place.id && hourOf(dream.time_slot_start) === row)
-                  .map((dream) => (
-                    <Chip key={dream.id} dream={dream} busy={busy} onDragStart={onDragStart} />
-                  ))}
-              </td>
+              <th key={place.id} scope="col">
+                <span aria-hidden="true">{place.emoji}</span> {place.name}
+              </th>
             ))}
           </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-)
+        </thead>
+        <tbody>
+          {rows.map((row, index) => (
+            <tr key={row} class={label(row) === '00:00' ? 'schedule-daybreak' : undefined}>
+              <th scope="row">{label(row) === '00:00' ? `${dayOf(row)} 00:00` : label(row)}</th>
+              {places.map((place) => {
+                const cell = lanes.get(place.id)?.[index]
+                // A covered row renders no cell at all: the `rowSpan` above is
+                // already occupying it, and adding one here shifts the column.
+                if (cell === undefined || cell.kind === 'covered') return null
+
+                return (
+                  <td
+                    key={place.id}
+                    rowSpan={cell.kind === 'anchor' ? cell.span : undefined}
+                    class={`schedule-cell place-${place.color}`}
+                    onDragOver={(dragEvent) => dragEvent.preventDefault()}
+                    onDrop={(dropEvent) => {
+                      dropEvent.preventDefault()
+                      onDrop(row, place.id)
+                    }}
+                  >
+                    {cell.kind === 'anchor' &&
+                      cell.dreams.map((dream) => {
+                        const full = dreams.find((entry) => entry.id === dream.id)
+
+                        return full === undefined ? null : (
+                          <Chip key={full.id} dream={full} busy={busy} onDragStart={onDragStart} />
+                        )
+                      })}
+                  </td>
+                )
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}

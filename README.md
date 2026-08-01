@@ -963,6 +963,22 @@ which is explained below. Beside it sits the
 pool of dreams nobody has placed. Dragging one into a cell schedules it for that
 hour; dragging one back to the pool unschedules it.
 
+**A dream occupies every row it runs through**, via `rowSpan`. Drawn only in its
+start row, a three-hour session reads as an hour long — which is exactly how one
+was misread. The rows underneath must then render no cell at all, or the whole
+column shifts sideways; `laneCells` returns `covered` for those. Two dreams
+starting in the same hour share a cell, and one starting inside another's block
+joins it rather than disappearing, because an overlap in one lane is an
+organiser's mistake to see.
+
+Each chip also carries its own `18:00–21:00`, so the length is readable without
+counting rows.
+
+The page opts out of the site's reading measure — `--measure` is a width for
+prose and squeezes a timetable into a sliver on a wide screen. **That one is not
+covered by a test**: the suite renders in happy-dom, which applies no CSS, so
+nothing here can tell a styled grid from an unstyled one.
+
 **The pool holds whatever the grid does not draw**, derived rather than guessed.
 Missing a time or a place is the common case, but a dream can also be timed
 outside the days on show, and guessing "unplaced means a null field" left that one
