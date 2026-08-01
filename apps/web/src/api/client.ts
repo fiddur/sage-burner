@@ -35,6 +35,10 @@ import type {
   PlaceCreate,
   PlaceUpdate,
   PlacesResponse,
+  SessionCreateInput,
+  SessionResponse,
+  SessionUpdate,
+  SessionsResponse,
   VersionResponse,
 } from '@sage-burner/shared'
 
@@ -192,6 +196,21 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
         method: 'PUT',
         body,
       }),
+
+    /** Members only. Scheduled dreams first, then the ones only offered. */
+    getSessions: (signal?: AbortSignal) => request<SessionsResponse>('/events/active/sessions', { signal }),
+
+    /** Members only. The host is the caller, and the burn is whichever is open. */
+    offerSession: (body: SessionCreateInput) =>
+      request<SessionResponse>('/events/active/sessions', { method: 'POST', body }),
+
+    /** Members only — any member may arrange the schedule, not just the host. */
+    updateSession: (id: string, body: SessionUpdate) =>
+      request<SessionResponse>(`/sessions/${encodeURIComponent(id)}`, { method: 'PATCH', body }),
+
+    /** Members only. */
+    withdrawSession: (id: string) =>
+      request<undefined>(`/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
     /** Public: the ICS feed publishes locations anyway, so the list is not secret. */
     getPlaces: (signal?: AbortSignal) => request<PlacesResponse>('/places', { signal }),

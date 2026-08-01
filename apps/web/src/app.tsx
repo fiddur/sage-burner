@@ -16,6 +16,7 @@ import { AdminQuestions } from './pages/AdminQuestions.tsx'
 import { AdminRoster } from './pages/AdminRoster.tsx'
 import { AdminSettings } from './pages/AdminSettings.tsx'
 import { Apply } from './pages/Apply.tsx'
+import { Dreams } from './pages/Dreams.tsx'
 import { Home } from './pages/Home.tsx'
 import { Invite } from './pages/Invite.tsx'
 import { Login } from './pages/Login.tsx'
@@ -58,6 +59,10 @@ export type AppApi = Pick<
   | 'updatePlace'
   | 'deletePlace'
   | 'reorderPlaces'
+  | 'getSessions'
+  | 'offerSession'
+  | 'updateSession'
+  | 'withdrawSession'
   | 'getInstallation'
   | 'updateInstallation'
   | 'getApplications'
@@ -108,6 +113,10 @@ export const Routes = ({
     | 'updatePlace'
     | 'deletePlace'
     | 'reorderPlaces'
+    | 'getSessions'
+    | 'offerSession'
+    | 'updateSession'
+    | 'withdrawSession'
     | 'getInstallation'
     | 'updateInstallation'
     | 'getApplications'
@@ -148,6 +157,7 @@ export const Routes = ({
   const AdminSettingsRoute = useMemo(() => () => <AdminSettings api={api} />, [api])
   const HomeRoute = useMemo(() => () => <Home api={api} />, [api])
   const MyBurnRoute = useMemo(() => () => <MyBurn api={api} />, [api])
+  const DreamsRoute = useMemo(() => () => <Dreams api={api} />, [api])
   const ProfileRoute = useMemo(() => () => <ProfilePage api={api} />, [api])
   const ApplyRoute = useMemo(() => () => <Apply api={api} />, [api])
   // The token arrives as a prop from the route pattern, so this one takes props
@@ -163,6 +173,7 @@ export const Routes = ({
       <Route path="/" component={HomeRoute} />
       <Route path="/apply" component={ApplyRoute} />
       <Route path="/my-burn" component={MyBurnRoute} />
+      <Route path="/dreams" component={DreamsRoute} />
       <Route path="/profile" component={ProfileRoute} />
       <Route path="/invite/:token" component={InviteRoute} />
       <Route path="/login" component={LoginRoute} />

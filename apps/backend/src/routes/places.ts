@@ -12,6 +12,13 @@ import { createGuards } from '../auth/guards.ts'
 import { place } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 
+/**
+ * A place a dream still points at. SQLite reports the refusal as a foreign key
+ * failure, and the message is the only thing distinguishing it.
+ */
+export const isPlaceInUse = (failure: unknown): boolean =>
+  failure instanceof Error && failure.message.includes('FOREIGN KEY constraint failed')
+
 export const placesFor = (db: Database): Promise<Place[]> =>
   db.select().from(place).orderBy(asc(place.order), asc(place.id))
 
@@ -98,10 +105,18 @@ export const registerPlaceRoutes = (app: FastifyInstance, { db, sessions }: Guar
     async (request, reply) => {
       void noStore(reply)
 
-      const deleted = await db
-        .delete(place)
-        .where(eq(place.id, request.params.id))
-        .returning({ id: place.id })
+      // A dream sitting in this lane holds the row: `session.place_id` has no
+      // `onDelete`, so SQLite refuses rather than quietly unscheduling it. A
+      // pre-read would be check-then-act — the dream can be created between the
+      // read and the delete — so the constraint is the authority and this only
+      // translates it.
+      let deleted
+      try {
+        deleted = await db.delete(place).where(eq(place.id, request.params.id)).returning({ id: place.id })
+      } catch (failure) {
+        if (isPlaceInUse(failure)) return reply.code(409).send(errorResponse('conflict'))
+        throw failure
+      }
 
       if (deleted.length === 0) return reply.code(404).send(errorResponse('not_found'))
 

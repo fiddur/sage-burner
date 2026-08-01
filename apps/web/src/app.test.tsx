@@ -65,6 +65,10 @@ const clientWith = (
   updatePlace: () => Promise.reject(new Error('updatePlace is not stubbed in this file')),
   deletePlace: () => Promise.reject(new Error('deletePlace is not stubbed in this file')),
   reorderPlaces: () => Promise.reject(new Error('reorderPlaces is not stubbed in this file')),
+  getSessions: () => Promise.reject(new Error('getSessions is not stubbed in this file')),
+  offerSession: () => Promise.reject(new Error('offerSession is not stubbed in this file')),
+  updateSession: () => Promise.reject(new Error('updateSession is not stubbed in this file')),
+  withdrawSession: () => Promise.reject(new Error('withdrawSession is not stubbed in this file')),
   getInstallation: () => Promise.reject(new Error('getInstallation is not stubbed in this file')),
   updateInstallation: () => Promise.reject(new Error('updateInstallation is not stubbed in this file')),
 })

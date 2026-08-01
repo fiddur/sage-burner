@@ -824,6 +824,57 @@ which is [#14]'s half of the work.
 
 [#14]: https://github.com/fiddur/sage-burner/issues/14
 
+## Dreams
+
+The workshops, ceremonies and happenings members offer each other. **A dream with
+no time slot is offered but not yet scheduled** — that is where most of them sit
+right up until the burn, and it is the normal state, not an error.
+
+**Members**, not admins. `/api/events/active/sessions` and `/api/sessions/:id` are
+behind `requireMember`, because the schedule belongs to the people coming: any
+member may reschedule any dream, not only the one who offered it. Gated on the
+`member` role rather than on having an `attendance` row, so someone can help plan
+next burn's programme before they have said they are coming.
+
+The host is **the member who offered it**, taken from the session and never from
+the body — `sessionCreateSchema` omits `host_account_id` entirely, so a dream in
+someone else's name is a 400 rather than an edit anyone can make by hand.
+Reassigning one needs a member-visible list of members to pick from, which does
+not exist yet.
+
+`session.location` was free text; it is now `place_id`, referencing #78's places.
+The scheduling grid draws one column per place, and a column cannot be spelled
+three ways. The column has no `onDelete`, so **deleting a place a dream stands in
+is refused with a 409** rather than quietly unscheduling it; `places.ts`
+translates the foreign key failure. Not a pre-read, which would be check-then-act
+— the dream can be created between the read and the delete.
+
+### The half-a-slot rule, and why it is in two places
+
+A slot is both ends or neither. `withValidTimeSlot` enforces that at the boundary
+whenever both keys are present, and `slotStaysWhole` in `sessions.ts` composes the
+rest into the `UPDATE`'s `WHERE` — a PATCH carrying one end can only be judged
+against the stored row, and comparing against a row read a moment earlier is
+check-then-act. Same shape as `dateOrderCondition` in `events.ts` and
+`stayOrderCondition` in `profile.ts`.
+
+Worth knowing why this needed fixing: `hasWholeSlot` used `== null`, which treats
+an **absent** key the same as a null one. Every single-ended reschedule was
+therefore a 400 before the row was ever consulted. An absent key now defers to the
+SQL rule, exactly as `violatesTickBoxRules` already did for the tick-box pair.
+
+### Times are UTC, wall clocks are not
+
+The API stores and transports UTC; `<input type="datetime-local">` has no timezone
+at all and speaks the browser's wall clock. `apps/web/src/datetime.ts` converts
+both ways. Slicing the ISO string is the obvious-looking shortcut and is wrong by
+the UTC offset everywhere but London in winter.
+
+The web suite is pinned to `Europe/Stockholm` in `vite.config.ts` for exactly this
+reason: **in UTC every wrong implementation of that conversion looks right**, so
+running the suite in UTC would silently stop testing it. Verified — with the pin,
+the slicing shortcut fails whatever the ambient `TZ`; without it, it passes in CI.
+
 ## Places
 
 Somewhere a dream can happen — the Temple, the Sauna, the Front Lawn. Rows

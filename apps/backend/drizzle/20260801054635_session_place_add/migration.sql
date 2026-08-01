@@ -1,0 +1,1 @@
+ALTER TABLE `session` ADD `place_id` text REFERENCES place(id);

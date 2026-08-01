@@ -10,6 +10,7 @@ import {
   publicSessionSchema,
   sessionFields,
   sessionSchema,
+  sessionUpdateSchema,
   withValidTimeSlot,
 } from './session.ts'
 
@@ -303,8 +304,24 @@ describe('sessionSchema', () => {
     description: 'Bring a cup.',
     time_slot_start: '2026-10-03T09:00:00Z',
     time_slot_end: '2026-10-03T10:30:00Z',
-    location: 'Temple',
+    place_id: OTHER_ID,
   }
+
+  it('lets a partial edit carry one end of the slot, which only the row can judge', () => {
+    // An absent key is not a null one. Conflating them made every single-ended
+    // PATCH a 400 before the stored row was ever consulted — `slotStaysWhole` in
+    // `sessions.ts` is what decides these.
+    expect(sessionUpdateSchema.safeParse({ time_slot_end: '2026-10-03T10:30:00Z' }).success).toBe(true)
+    expect(sessionUpdateSchema.safeParse({ time_slot_start: null }).success).toBe(true)
+  })
+
+  it('still refuses half a slot when the edit carries both keys', () => {
+    // The passing sibling: deferring the lone-key case must not disarm the rule
+    // where it is decidable.
+    expect(
+      sessionUpdateSchema.safeParse({ time_slot_start: '2026-10-03T09:00:00Z', time_slot_end: null }).success,
+    ).toBe(false)
+  })
 
   it('accepts a scheduled session', () => {
     expect(sessionSchema.safeParse(aSession).success).toBe(true)
@@ -394,7 +411,7 @@ describe('deriving schemas', () => {
       description: '',
       time_slot_start: '2026-10-03T10:00:00Z',
       time_slot_end: null,
-      location: null,
+      place_id: null,
     }
     expect(createSession.safeParse(halfASlot).success).toBe(false)
 
