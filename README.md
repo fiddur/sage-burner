@@ -824,6 +824,59 @@ which is [#14]'s half of the work.
 
 [#14]: https://github.com/fiddur/sage-burner/issues/14
 
+## The calendar feed
+
+`GET /events/:eventId/schedule.ics` is the programme as a calendar subscription,
+so people can put it in their phone rather than reloading a page.
+
+**Unauthenticated**, because a calendar client cannot hold a session — subscribing
+is a URL a phone re-fetches on its own. The event id is a UUID, so the URL is
+unguessable, but it is not a secret beyond that: **do not post it anywhere outside
+the gathering.** That is the trade that lets descriptions go out in full.
+
+What leaves the building is the title, the description, the times, and the place's
+name, emoji and colour. No host, no contact details, no allergies, no payment
+state.
+
+Two guards, catching different things:
+
+- **The route parses every row through `publicSessionSchema`**, which strips what
+  it does not name. Widening the `select` cannot widen the feed — the extra
+  column is dropped before rendering. Adding the field to that schema instead
+  fails `schemas.test.ts`, which pins its exact key set. So a field reaches the
+  feed only if someone deliberately edits the allowlist and its test.
+- **A denylist in `schedule.test.ts`**, asserted against the **rendered feed**
+  rather than the query. It only catches what someone thought of, so it is seeded
+  with every field the fixtures carry.
+
+The first was written before the feed existed and then not wired in: the schema
+was declared "the guard rail for an unauthenticated endpoint" while the route
+hand-built the same shape beside it, so the key-set test gated nothing anyone
+used. It is invoked now, and a test bypasses the parse to prove the feed depends
+on it.
+
+### Choices worth knowing
+
+**Everything is emitted in UTC `Z` form.** No `VTIMEZONE`, nothing to get wrong
+across a DST boundary: an instant is an instant and the client renders it wherever
+the reader is. Emitting Europe/Stockholm wall-clock time would mean shipping
+timezone rules that go stale. There is a test for an October burn, which is where
+a local-time renderer drifts by an hour.
+
+**No `SEQUENCE`.** It exists for iTIP — emailed invitations, where a client has to
+tell a newer copy of one event from an older one. A subscription feed is refetched
+whole and replaced by `UID`, so there is nothing for it to decide, and there is no
+version column to derive an honest number from. Always-`0` would look like
+handling and be none.
+
+**`grey` is emitted as `gray`.** RFC 7986 `COLOR` takes CSS3 names, and a name
+outside that list is silently ignored — the lane would just lose its colour with
+nothing to say why.
+
+Folding counts **octets, not characters**, per RFC 5545: a place emoji is four
+bytes, so a line that looks short can be well over the 75-octet limit, and a fold
+in the middle of a multi-byte sequence corrupts it.
+
 ## Dreams
 
 The workshops, ceremonies and happenings members offer each other. **A dream with

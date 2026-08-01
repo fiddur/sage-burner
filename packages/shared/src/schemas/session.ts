@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { placeColors } from '../enums.ts'
 import { dateTimeSchema, idSchema, optionalText, nonEmptyText } from './common.ts'
 
 /** Tolerates missing keys so `.partial()` and `.omit()` derivations still typecheck. */
@@ -111,8 +112,9 @@ export const publicSessionFields = sessionFields.pick({ id: true, title: true, d
   time_slot_end: dateTimeSchema,
   // Resolved from the place rather than carried as an id — a calendar client
   // has nothing to do with a UUID. A projection, not a `pick`, which is why
-  // this is spelled out instead of derived.
+  // these two are spelled out instead of derived.
   location: optionalText(200),
+  color: z.enum(placeColors).nullable(),
 })
 
 export const publicSessionSchema = withValidTimeSlot(publicSessionFields)
