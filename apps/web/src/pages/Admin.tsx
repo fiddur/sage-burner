@@ -119,7 +119,7 @@ export const Admin = ({ api }: { api: AdminApi }) => {
       <h1>Organise</h1>
 
       <p>
-        <a href="/admin/events">Events and welcome text</a>
+        <a href="/admin/events">Events</a>
       </p>
       <p>
         <a href="/admin/questions">Application questions</a>

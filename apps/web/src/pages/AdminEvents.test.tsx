@@ -164,7 +164,7 @@ describe('AdminEvents', () => {
     // The reason the preview exists: otherwise the way to see a heading render
     // is to publish it to the public homepage.
     renderPage(stub())
-    ;(await screen.findByRole('button', { name: 'Edit welcome text' })).click()
+    ;(await screen.findByRole('button', { name: 'Edit event' })).click()
     await screen.findByLabelText('Welcome text (markdown)')
 
     fill('Welcome text (markdown)', '# Bring water')
@@ -178,7 +178,7 @@ describe('AdminEvents', () => {
 
   it('escapes raw HTML in the preview, so it shows what a visitor gets', async () => {
     renderPage(stub())
-    ;(await screen.findByRole('button', { name: 'Edit welcome text' })).click()
+    ;(await screen.findByRole('button', { name: 'Edit event' })).click()
     await screen.findByLabelText('Welcome text (markdown)')
 
     fill('Welcome text (markdown)', '<script>alert(1)</script>')
@@ -189,14 +189,124 @@ describe('AdminEvents', () => {
     expect(document.querySelector('.markdown-preview script')).toBeNull()
   })
 
-  it('saves the welcome text and confirms it', async () => {
+  it('edits the hours and the cap of a burn that already exists', async () => {
+    // There was no way to change either after creation — the edit form offered
+    // the welcome text and nothing else, so a burn created with the default
+    // 00:00–23:59 was stuck with a schedule covering whole days.
     const updateEvent = vi.fn(() => Promise.resolve({ event: summer }))
     renderPage(stub({ updateEvent }))
-    ;(await screen.findByRole('button', { name: 'Edit welcome text' })).click()
+    ;(await screen.findByRole('button', { name: 'Edit event' })).click()
+    await screen.findByLabelText('Start time of summer-2026')
+
+    fill('Start time of summer-2026', '15:00')
+    fill('End time of summer-2026', '12:00')
+    fill('Member cap of summer-2026', '30')
+    screen.getByRole('button', { name: 'Save event' }).click()
+
+    await waitFor(() =>
+      expect(updateEvent).toHaveBeenCalledWith(
+        'e-1',
+        expect.objectContaining({ start_time: '15:00', end_time: '12:00', member_cap: 30 }),
+      ),
+    )
+  })
+
+  it('seeds the edit form from the event rather than leaving it blank', async () => {
+    renderPage(stub())
+    ;(await screen.findByRole('button', { name: 'Edit event' })).click()
+
+    expect(await screen.findByLabelText('Name of summer-2026')).toHaveProperty('value', 'Summer Burn 2026')
+    expect(screen.getByLabelText('Start date of summer-2026')).toHaveProperty('value', '2026-08-01')
+    expect(screen.getByLabelText('Member cap of summer-2026')).toHaveProperty('value', '42')
+  })
+
+  it('binds the editor\u2019s date pair too, not only the create form\u2019s', async () => {
+    renderPage(stub())
+    ;(await screen.findByRole('button', { name: 'Edit event' })).click()
+    await screen.findByLabelText('Start date of summer-2026')
+
+    expect(screen.getByLabelText('Start date of summer-2026').getAttribute('max')).toBe('2026-08-05')
+    expect(screen.getByLabelText('End date of summer-2026').getAttribute('min')).toBe('2026-08-01')
+  })
+
+  it('refuses a cap that is not a whole number, rather than sending NaN', async () => {
+    const updateEvent = vi.fn(() => Promise.resolve({ event: summer }))
+    renderPage(stub({ updateEvent }))
+    ;(await screen.findByRole('button', { name: 'Edit event' })).click()
+    await screen.findByLabelText('Member cap of summer-2026')
+
+    fill('Member cap of summer-2026', '0')
+    screen.getByRole('button', { name: 'Save event' }).click()
+
+    expect((await screen.findByRole('alert')).textContent).toContain('whole number')
+    expect(updateEvent).not.toHaveBeenCalled()
+  })
+
+  it('shows the row the server returned, not the draft that was sent', async () => {
+    // The server trims and may adjust; echoing the draft would draw a save that
+    // did not happen the way it is shown.
+    const updateEvent = vi.fn(() => Promise.resolve({ event: { ...summer, name: 'Trimmed By Server' } }))
+    renderPage(stub({ updateEvent }))
+    ;(await screen.findByRole('button', { name: 'Edit event' })).click()
+    await screen.findByLabelText('Name of summer-2026')
+
+    fill('Name of summer-2026', '  Something Else  ')
+    screen.getByRole('button', { name: 'Save event' }).click()
+
+    expect(await screen.findByText('Trimmed By Server')).toBeTruthy()
+  })
+
+  it('does not resync a response that arrives after the form moved to another event', async () => {
+    // Clicking Edit on a second event while the first save is in flight: the
+    // response must not land in the form now showing someone else's burn, nor
+    // report "Saved." under fields nobody sent.
+    let settle: (value: { event: Event }) => void = () => undefined
+    const updateEvent = vi.fn(() => new Promise<{ event: Event }>((resolve) => (settle = resolve)))
+    const winterBurn: Event = { ...summer, id: 'e-2', name: 'Winter Burn', slug: 'winter-2026' }
+    renderPage(stub({ updateEvent, getEvents: () => Promise.resolve({ events: [summer, winterBurn] }) }))
+    await screen.findByText('Summer Burn 2026')
+
+    const [editSummer, editWinter] = screen.getAllByRole('button', { name: 'Edit event' })
+    editSummer?.click()
+    await screen.findByLabelText('Name of summer-2026')
+    fill('Name of summer-2026', 'Renamed')
+    screen.getByRole('button', { name: 'Save event' }).click()
+
+    editWinter?.click()
+    await screen.findByLabelText('Name of winter-2026')
+    settle({ event: { ...summer, name: 'Trimmed By Server' } })
+
+    await waitFor(() => expect(screen.getByText('Trimmed By Server')).toBeTruthy())
+    expect(screen.getByLabelText('Name of winter-2026')).toHaveProperty('value', 'Winter Burn')
+  })
+
+  it('resyncs the open form from the server, not only the list', async () => {
+    // Otherwise the header shows what was stored and the inputs still show what
+    // was typed, which is the same inconsistency one level in.
+    const updateEvent = vi.fn(() => Promise.resolve({ event: { ...summer, name: 'Trimmed By Server' } }))
+    renderPage(stub({ updateEvent }))
+    ;(await screen.findByRole('button', { name: 'Edit event' })).click()
+    await screen.findByLabelText('Name of summer-2026')
+
+    fill('Name of summer-2026', '  Something Else  ')
+    fill('Welcome text (markdown)', '# Typed but not stored')
+    screen.getByRole('button', { name: 'Save event' }).click()
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Name of summer-2026')).toHaveProperty('value', 'Trimmed By Server'),
+    )
+    // Bound separately from the rest, so it needs resyncing on its own.
+    expect(screen.getByLabelText('Welcome text (markdown)')).toHaveProperty('value', '# Hello')
+  })
+
+  it('sends only what the form changed, so a cap fix cannot clobber the welcome text', async () => {
+    const updateEvent = vi.fn(() => Promise.resolve({ event: summer }))
+    renderPage(stub({ updateEvent }))
+    ;(await screen.findByRole('button', { name: 'Edit event' })).click()
     await screen.findByLabelText('Welcome text (markdown)')
 
     fill('Welcome text (markdown)', '# New words')
-    screen.getByRole('button', { name: 'Save welcome text' }).click()
+    screen.getByRole('button', { name: 'Save event' }).click()
 
     await waitFor(() => {
       expect(updateEvent).toHaveBeenCalledWith('e-1', { welcome_markdown: '# New words' })
@@ -225,10 +335,10 @@ describe('AdminEvents', () => {
           ),
       }),
     )
-    ;(await screen.findByRole('button', { name: 'Edit welcome text' })).click()
+    ;(await screen.findByRole('button', { name: 'Edit event' })).click()
     await screen.findByLabelText('Welcome text (markdown)')
 
-    screen.getByRole('button', { name: 'Save welcome text' }).click()
+    screen.getByRole('button', { name: 'Save event' }).click()
 
     expect((await screen.findByRole('alert')).textContent).toContain('went wrong')
     expect(screen.queryByRole('status')).toBeNull()
