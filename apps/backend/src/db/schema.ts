@@ -5,6 +5,7 @@ import type { AnySQLiteColumn, SQLiteColumn } from 'drizzle-orm/sqlite-core'
 import {
   accountRoles,
   applicationStatuses,
+  eventOptionKinds,
   formQuestionTypes,
   paymentStatuses,
   placeColors,
@@ -156,6 +157,40 @@ export const event = sqliteTable(
     check('event_start_time_check', isClockTime(table.start_time)),
     check('event_end_time_check', isClockTime(table.end_time)),
     check('event_member_cap_check', sql`${table.member_cap} > 0`),
+  ],
+)
+
+/**
+ * The per-event lists a member picks from: where to sleep, what to help with.
+ *
+ * Per event, unlike `form_question` and `place`, because these are the answers
+ * that change with the site and the year — what is available at this burn, not
+ * what the community asks once.
+ */
+export const eventOption = sqliteTable(
+  'event_option',
+  {
+    id: text('id').notNull(),
+    event_id: text('event_id')
+      .notNull()
+      .references(() => event.id, { onDelete: 'cascade' }),
+    kind: text('kind', { enum: eventOptionKinds }).notNull(),
+    // Not unique: reordering swaps positions, and a transient collision mid-swap
+    // must not be rejected.
+    order: integer('order').notNull(),
+    label: text('label').notNull(),
+    /** How many fit, or null for no limit. Only lodging uses it. */
+    capacity: integer('capacity'),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    index('event_option_event_kind_idx').on(table.event_id, table.kind, table.order),
+    check('event_option_kind_check', oneOf(table.kind, eventOptionKinds)),
+    check('event_option_order_check', sql`${table.order} >= 0`),
+    check('event_option_label_check', sql`length(trim(${table.label})) > 0`),
+    // Null means no limit; zero would mean the option exists and nobody fits,
+    // which is a deleted option spelled confusingly.
+    check('event_option_capacity_check', sql`${table.capacity} is null or ${table.capacity} > 0`),
   ],
 )
 
