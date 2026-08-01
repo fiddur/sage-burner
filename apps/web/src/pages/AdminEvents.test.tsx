@@ -164,7 +164,7 @@ describe('AdminEvents', () => {
     // The reason the preview exists: otherwise the way to see a heading render
     // is to publish it to the public homepage.
     renderPage(stub())
-    ;(await screen.findByRole('button', { name: 'Edit welcome text' })).click()
+    ;(await screen.findByRole('button', { name: 'Edit event' })).click()
     await screen.findByLabelText('Welcome text (markdown)')
 
     fill('Welcome text (markdown)', '# Bring water')
@@ -178,7 +178,7 @@ describe('AdminEvents', () => {
 
   it('escapes raw HTML in the preview, so it shows what a visitor gets', async () => {
     renderPage(stub())
-    ;(await screen.findByRole('button', { name: 'Edit welcome text' })).click()
+    ;(await screen.findByRole('button', { name: 'Edit event' })).click()
     await screen.findByLabelText('Welcome text (markdown)')
 
     fill('Welcome text (markdown)', '<script>alert(1)</script>')
@@ -189,17 +189,95 @@ describe('AdminEvents', () => {
     expect(document.querySelector('.markdown-preview script')).toBeNull()
   })
 
-  it('saves the welcome text and confirms it', async () => {
+  it('edits the hours and the cap of a burn that already exists', async () => {
+    // There was no way to change either after creation — the edit form offered
+    // the welcome text and nothing else, so a burn created with the default
+    // 00:00–23:59 was stuck with a schedule covering whole days.
     const updateEvent = vi.fn(() => Promise.resolve({ event: summer }))
     renderPage(stub({ updateEvent }))
-    ;(await screen.findByRole('button', { name: 'Edit welcome text' })).click()
+    ;(await screen.findByRole('button', { name: 'Edit event' })).click()
+    await screen.findByLabelText('Start time of Summer Burn 2026')
+
+    fill('Start time of Summer Burn 2026', '15:00')
+    fill('End time of Summer Burn 2026', '12:00')
+    fill('Member cap of Summer Burn 2026', '30')
+    screen.getByRole('button', { name: 'Save event' }).click()
+
+    await waitFor(() =>
+      expect(updateEvent).toHaveBeenCalledWith(
+        'e-1',
+        expect.objectContaining({ start_time: '15:00', end_time: '12:00', member_cap: 30 }),
+      ),
+    )
+  })
+
+  it('seeds the edit form from the event rather than leaving it blank', async () => {
+    renderPage(stub())
+    ;(await screen.findByRole('button', { name: 'Edit event' })).click()
+
+    expect(await screen.findByLabelText('Name of Summer Burn 2026')).toHaveProperty(
+      'value',
+      'Summer Burn 2026',
+    )
+    expect(screen.getByLabelText('Start date of Summer Burn 2026')).toHaveProperty('value', '2026-08-01')
+    expect(screen.getByLabelText('Member cap of Summer Burn 2026')).toHaveProperty('value', '42')
+  })
+
+  it('binds the editor\u2019s date pair too, not only the create form\u2019s', async () => {
+    renderPage(stub())
+    ;(await screen.findByRole('button', { name: 'Edit event' })).click()
+    await screen.findByLabelText('Start date of Summer Burn 2026')
+
+    expect(screen.getByLabelText('Start date of Summer Burn 2026').getAttribute('max')).toBe('2026-08-05')
+    expect(screen.getByLabelText('End date of Summer Burn 2026').getAttribute('min')).toBe('2026-08-01')
+  })
+
+  it('refuses a cap that is not a whole number, rather than sending NaN', async () => {
+    const updateEvent = vi.fn(() => Promise.resolve({ event: summer }))
+    renderPage(stub({ updateEvent }))
+    ;(await screen.findByRole('button', { name: 'Edit event' })).click()
+    await screen.findByLabelText('Member cap of Summer Burn 2026')
+
+    fill('Member cap of Summer Burn 2026', '0')
+    screen.getByRole('button', { name: 'Save event' }).click()
+
+    expect((await screen.findByRole('alert')).textContent).toContain('whole number')
+    expect(updateEvent).not.toHaveBeenCalled()
+  })
+
+  it('shows the row the server returned, not the draft that was sent', async () => {
+    // The server trims and may adjust; echoing the draft would draw a save that
+    // did not happen the way it is shown.
+    const updateEvent = vi.fn(() => Promise.resolve({ event: { ...summer, name: 'Trimmed By Server' } }))
+    renderPage(stub({ updateEvent }))
+    ;(await screen.findByRole('button', { name: 'Edit event' })).click()
+    await screen.findByLabelText('Name of Summer Burn 2026')
+
+    fill('Name of Summer Burn 2026', '  Something Else  ')
+    screen.getByRole('button', { name: 'Save event' }).click()
+
+    expect(await screen.findByText('Trimmed By Server')).toBeTruthy()
+  })
+
+  it('saves the whole event, not only the welcome text', async () => {
+    const updateEvent = vi.fn(() => Promise.resolve({ event: summer }))
+    renderPage(stub({ updateEvent }))
+    ;(await screen.findByRole('button', { name: 'Edit event' })).click()
     await screen.findByLabelText('Welcome text (markdown)')
 
     fill('Welcome text (markdown)', '# New words')
-    screen.getByRole('button', { name: 'Save welcome text' }).click()
+    screen.getByRole('button', { name: 'Save event' }).click()
 
     await waitFor(() => {
-      expect(updateEvent).toHaveBeenCalledWith('e-1', { welcome_markdown: '# New words' })
+      expect(updateEvent).toHaveBeenCalledWith('e-1', {
+        name: 'Summer Burn 2026',
+        start_date: '2026-08-01',
+        end_date: '2026-08-05',
+        start_time: '00:00',
+        end_time: '23:59',
+        member_cap: 42,
+        welcome_markdown: '# New words',
+      })
     })
     // Pinned in full, because this one sentence has been wrong three times
     // running: it over-promised, then hedged with an issue number that went
@@ -225,10 +303,10 @@ describe('AdminEvents', () => {
           ),
       }),
     )
-    ;(await screen.findByRole('button', { name: 'Edit welcome text' })).click()
+    ;(await screen.findByRole('button', { name: 'Edit event' })).click()
     await screen.findByLabelText('Welcome text (markdown)')
 
-    screen.getByRole('button', { name: 'Save welcome text' }).click()
+    screen.getByRole('button', { name: 'Save event' }).click()
 
     expect((await screen.findByRole('alert')).textContent).toContain('went wrong')
     expect(screen.queryByRole('status')).toBeNull()

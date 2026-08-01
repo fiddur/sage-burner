@@ -58,6 +58,14 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
 
   const [editing, setEditing] = useState<string | undefined>(undefined)
   const [welcome, setWelcome] = useState('')
+  const [details, setDetails] = useState({
+    name: '',
+    start_date: '',
+    end_date: '',
+    start_time: '',
+    end_time: '',
+    member_cap: '',
+  })
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | undefined>(undefined)
   const [saved, setSaved] = useState(false)
@@ -140,31 +148,55 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
   const startEditing = (row: Event) => {
     setEditing(row.id)
     setWelcome(row.welcome_markdown)
+    setDetails({
+      name: row.name,
+      start_date: row.start_date,
+      end_date: row.end_date,
+      start_time: row.start_time,
+      end_time: row.end_time,
+      member_cap: String(row.member_cap),
+    })
     setSaveError(undefined)
     setSaved(false)
   }
 
-  const saveWelcome = async (id: string) => {
+  const saveEvent = async (id: string) => {
     if (saving) return
+
+    const cap = Number(details.member_cap)
+    if (!Number.isInteger(cap) || cap < 1) {
+      setSaveError('The member cap has to be a whole number, at least one.')
+      return
+    }
 
     setSaving(true)
     setSaveError(undefined)
     setSaved(false)
     try {
-      await api.updateEvent(id, { welcome_markdown: welcome })
+      const changes = {
+        name: details.name,
+        start_date: details.start_date,
+        end_date: details.end_date,
+        start_time: details.start_time,
+        end_time: details.end_time,
+        member_cap: cap,
+        welcome_markdown: welcome,
+      }
+      const { event: updated } = await api.updateEvent(id, changes)
       setEvents((current) =>
         current.status === 'ready'
           ? {
               status: 'ready',
-              events: current.events.map((row) =>
-                row.id === id ? { ...row, welcome_markdown: welcome } : row,
-              ),
+              // The row as written, rather than the draft: the server trims and
+              // may refuse part of it, and echoing the draft would show a save
+              // that did not happen the way it is drawn.
+              events: current.events.map((row) => (row.id === id ? updated : row)),
             }
           : current,
       )
       setSaved(true)
     } catch (failure) {
-      setSaveError(messageFor(failure, 'Could not save the welcome text.'))
+      setSaveError(messageFor(failure, 'Could not save the event.'))
     } finally {
       setSaving(false)
     }
@@ -196,6 +228,82 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
 
               {editing === row.id ? (
                 <>
+                  <label class="field">
+                    <span>Name</span>
+                    <input
+                      type="text"
+                      maxLength={200}
+                      aria-label={`Name of ${row.name}`}
+                      value={details.name}
+                      onInput={(inputEvent) =>
+                        setDetails({ ...details, name: inputEvent.currentTarget.value })
+                      }
+                    />
+                  </label>
+
+                  <label class="field">
+                    <span>Starts</span>
+                    <input
+                      type="date"
+                      aria-label={`Start date of ${row.name}`}
+                      max={details.end_date === '' ? undefined : details.end_date}
+                      value={details.start_date}
+                      onInput={(inputEvent) =>
+                        setDetails({ ...details, start_date: inputEvent.currentTarget.value })
+                      }
+                    />
+                  </label>
+
+                  <label class="field">
+                    <span>Starting time</span>
+                    <input
+                      type="time"
+                      aria-label={`Start time of ${row.name}`}
+                      value={details.start_time}
+                      onInput={(inputEvent) =>
+                        setDetails({ ...details, start_time: inputEvent.currentTarget.value })
+                      }
+                    />
+                  </label>
+
+                  <label class="field">
+                    <span>Ends</span>
+                    <input
+                      type="date"
+                      aria-label={`End date of ${row.name}`}
+                      min={details.start_date === '' ? undefined : details.start_date}
+                      value={details.end_date}
+                      onInput={(inputEvent) =>
+                        setDetails({ ...details, end_date: inputEvent.currentTarget.value })
+                      }
+                    />
+                  </label>
+
+                  <label class="field">
+                    <span>Ending time</span>
+                    <input
+                      type="time"
+                      aria-label={`End time of ${row.name}`}
+                      value={details.end_time}
+                      onInput={(inputEvent) =>
+                        setDetails({ ...details, end_time: inputEvent.currentTarget.value })
+                      }
+                    />
+                  </label>
+
+                  <label class="field">
+                    <span>Member cap</span>
+                    <input
+                      type="number"
+                      min="1"
+                      aria-label={`Member cap of ${row.name}`}
+                      value={details.member_cap}
+                      onInput={(inputEvent) =>
+                        setDetails({ ...details, member_cap: inputEvent.currentTarget.value })
+                      }
+                    />
+                  </label>
+
                   <label class="field">
                     <span>Welcome text (markdown)</span>
                     <textarea
@@ -230,8 +338,8 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
                     </p>
                   )}
 
-                  <button type="button" disabled={saving} onClick={() => void saveWelcome(row.id)}>
-                    {saving ? 'Saving…' : 'Save welcome text'}
+                  <button type="button" disabled={saving} onClick={() => void saveEvent(row.id)}>
+                    {saving ? 'Saving…' : 'Save event'}
                   </button>
                   <button type="button" class="link-button" onClick={() => setEditing(undefined)}>
                     Done
@@ -239,7 +347,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
                 </>
               ) : (
                 <button type="button" onClick={() => startEditing(row)}>
-                  Edit welcome text
+                  Edit event
                 </button>
               )}
             </article>

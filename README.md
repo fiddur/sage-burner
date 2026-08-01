@@ -702,10 +702,10 @@ deployment, not an error.
 
 ### Editing an event
 
-Organise → **Events and welcome text**. Create events there, and edit the welcome
-markdown with a live preview. Saving takes effect immediately in the API: the
-public response is `Cache-Control: no-cache`, so a browser may store it but must
-revalidate, and a correction cannot sit invisible in a cache.
+Organise → **Events**. Create burns there, and edit any of it afterwards — name,
+dates, hours, member cap and the welcome text are all on the same form. The hours
+in particular need to be editable: a burn created before anyone thought about them
+takes the whole-day default, and the schedule grid is drawn from them.
 
 The public homepage renders it: name, dates and the welcome markdown, with
 "Apply to join" and "Log in" for a signed-out visitor. The editor's preview uses

@@ -492,8 +492,17 @@ a:hover {
   border: 1px solid var(--line);
   border-radius: 0.5rem;
   padding: 0.75rem;
-  position: sticky;
-  top: 1rem;
+}
+
+/*
+  Sticky only beside the grid. Stacked above it on a narrow screen, sticking
+  means the pool sits on top of the timetable as it scrolls past.
+*/
+@media (min-width: 45.01rem) {
+  .dream-pool {
+    position: sticky;
+    top: 1rem;
+  }
 }
 
 .dream-pool h2 {
@@ -563,7 +572,12 @@ a:hover {
   opacity: 0.75;
 }
 
+/*
+  No `height: 100%` here. Inside a table cell it resolves against the row rather
+  than the spanned block, so a chip in a three-hour slot painted its background
+  one row tall and let the title overflow below it — which is what a two-hour
+  dream looked like before anyone noticed the rows.
+*/
 .dream-chip {
-  height: 100%;
   box-sizing: border-box;
 }
