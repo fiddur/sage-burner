@@ -824,6 +824,45 @@ which is [#14]'s half of the work.
 
 [#14]: https://github.com/fiddur/sage-burner/issues/14
 
+## Places
+
+Somewhere a dream can happen — the Temple, the Sauna, the Front Lawn. Rows
+rather than code, the same as the application questions: the site changes
+between burns and adding a place must never need a redeploy. **One central set,
+not one per event** — the venue outlives the burn.
+
+Organise → **Places**. A pencil edits, a trashcan removes, and the ⠿ handle
+reorders — by dragging, and by ArrowUp/ArrowDown while it has focus. The handle
+takes keys as well as drags because a reorder only a pointer can do is one some
+people cannot do at all.
+
+Each place carries an emoji and a colour, which is how a lane is recognised at a
+glance in the scheduling grid (#20) and what the ICS feed will carry alongside
+the location (#21).
+
+The colour is a **name from a fixed palette** — `red`, `orange`, `yellow`,
+`green`, `blue`, `purple`, `pink`, `grey` — not free hex. An organiser who
+picked `#fefefe` for a lane would produce unreadable text that nothing in the
+app could correct, and naming the colour rather than valuing it lets light and
+dark themes each choose their own shade. A CHECK generated from the same
+vocabulary keeps the database from drifting.
+
+The emoji is bounded but not pattern-matched. A ZWJ sequence such as 👩‍🚀 is
+several code points and the set grows with every Unicode release, so a regex
+would reject valid input on a schedule nobody could fix without a deploy.
+
+`GET /api/places` is **public**, like `/api/questions`: the ICS feed publishes a
+session's location to anyone holding the link, so the list of places is already
+public by design. Every write is admin-only.
+
+`order` is the server's to assign, so `POST` refuses a caller that sends one —
+otherwise two places could claim the same lane. New places land after the last,
+assigned inside a transaction so two simultaneous adds cannot both read the same
+last row. `PUT /api/admin/places/order` takes **every** place exactly once; a
+partial list would renumber some rows and leave the rest on stale positions.
+Deleting does not renumber the survivors: `order` only has to sort, not be
+contiguous.
+
 ### Applying
 
 `POST /api/applications` is the only public write in the app, and that is the

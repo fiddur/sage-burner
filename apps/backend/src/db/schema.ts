@@ -7,6 +7,7 @@ import {
   applicationStatuses,
   formQuestionTypes,
   paymentStatuses,
+  placeColors,
   tickBoxRequired,
 } from '@sage-burner/shared'
 import { sql } from 'drizzle-orm'
@@ -177,6 +178,31 @@ export const formQuestion = sqliteTable(
     // argument as `oneOf` above, and generated the same way so the database is not
     // the one enforcement site holding its own copy of the rule.
     ...tickBoxChecks(table),
+  ],
+)
+
+/**
+ * Somewhere a dream can happen. One central set, not one per event — the venue
+ * outlives the burn.
+ */
+export const place = sqliteTable(
+  'place',
+  {
+    id: text('id').notNull(),
+    // Not unique, for the same reason as `form_question.order`: reordering swaps
+    // positions, and a transient collision mid-swap must not be rejected.
+    order: integer('order').notNull(),
+    name: text('name').notNull(),
+    emoji: text('emoji').notNull(),
+    color: text('color', { enum: placeColors }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    index('place_order_idx').on(table.order),
+    check('place_color_check', oneOf(table.color, placeColors)),
+    check('place_order_check', sql`${table.order} >= 0`),
+    check('place_name_check', sql`length(trim(${table.name})) > 0`),
+    check('place_emoji_check', sql`length(trim(${table.emoji})) > 0`),
   ],
 )
 

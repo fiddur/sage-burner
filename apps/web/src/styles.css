@@ -357,3 +357,85 @@ a:hover {
   text-decoration: underline;
   cursor: pointer;
 }
+
+.place-list {
+  list-style: none;
+  margin: 1rem 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.place-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+}
+
+.place-dragging {
+  opacity: 0.5;
+}
+
+.drag-handle {
+  background: none;
+  border: 0;
+  cursor: grab;
+  font-size: 1.1rem;
+  padding: 0.25rem;
+  color: inherit;
+}
+
+.place-emoji {
+  font-size: 1.3rem;
+}
+
+.place-swatch {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  display: inline-block;
+  background: var(--place-color);
+}
+
+.place-name {
+  flex: 1;
+}
+
+.place-color-name {
+  opacity: 0.6;
+  font-size: 0.85rem;
+}
+
+.place-edit {
+  display: grid;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.place-red {
+  --place-color: #d94f4f;
+}
+.place-orange {
+  --place-color: #dd8a3a;
+}
+.place-yellow {
+  --place-color: #d7b13c;
+}
+.place-green {
+  --place-color: #4fa05a;
+}
+.place-blue {
+  --place-color: #4a7fc1;
+}
+.place-purple {
+  --place-color: #8a63c4;
+}
+.place-pink {
+  --place-color: #c95f9b;
+}
+.place-grey {
+  --place-color: #8b8b8b;
+}

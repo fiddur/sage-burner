@@ -31,6 +31,10 @@ import type {
   InstallationUpdate,
   LoginRequest,
   MeResponse,
+  Place,
+  PlaceCreate,
+  PlaceUpdate,
+  PlacesResponse,
   VersionResponse,
 } from '@sage-burner/shared'
 
@@ -188,6 +192,24 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
         method: 'PUT',
         body,
       }),
+
+    /** Public: the ICS feed publishes locations anyway, so the list is not secret. */
+    getPlaces: (signal?: AbortSignal) => request<PlacesResponse>('/places', { signal }),
+
+    /** Admin only. `order` is the server's to assign, so it is not offered. */
+    addPlace: (body: PlaceCreate) => request<{ place: Place }>('/admin/places', { method: 'POST', body }),
+
+    /** Admin only. Partial — omitted fields are left as they are. */
+    updatePlace: (id: string, body: PlaceUpdate) =>
+      request<{ place: Place }>(`/admin/places/${encodeURIComponent(id)}`, { method: 'PATCH', body }),
+
+    /** Admin only. */
+    deletePlace: (id: string) =>
+      request<undefined>(`/admin/places/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+    /** Admin only. Every place exactly once, in the order they should appear. */
+    reorderPlaces: (ids: readonly string[]) =>
+      request<PlacesResponse>('/admin/places/order', { method: 'PUT', body: { ids } }),
 
     /** Admin only. */
     getEvents: (signal?: AbortSignal) => request<EventsResponse>('/admin/events', { signal }),
