@@ -1299,6 +1299,36 @@ rows in `account_role`, and redemption grants only `member`. `admin:create`
 grants both, and the accounts table under Organise is where either is added or
 taken away afterwards.
 
+### A stay starts as the whole burn
+
+Joining writes `arrival_date` and `departure_date` from the event, rather than
+leaving them null for everyone to type in what the event already knows. The
+organiser adding someone gets the same default.
+
+Written on join, not merely prefilled in the form. Prefilling keeps "never said"
+distinguishable from "said the whole burn", but it leaves the roster showing
+blanks for almost everyone — which is the column an organiser is reading it for.
+The people arriving late or leaving early are the ones who should have to change
+something.
+
+It is a default, not a decision: the dates stay editable, and the ordering rule
+still applies to whatever replaces them.
+
+### Every date pair binds to its partner
+
+`arrival`/`departure`, a burn's `start`/`end`, and a dream's slot each set `min`
+or `max` from the other end, so the picker will not offer an inverted range. No
+date library — two native inputs bound to each other were enough, which is worth
+knowing before anyone reaches for a dependency.
+
+**A hint, not a rule.** A `max` is something a keyboard can walk straight past and
+an API client never sees, so `withStayOrder`, `withEventDateOrder` and
+`hasValidTimeSlot` all still decide it, along with their CHECKs. What this removes
+is the ordinary way to produce an invalid pair and be told off afterwards.
+
+One detail with a test on it: an unset partner means the attribute is **absent**,
+not empty. `max=""` is not reliably "no maximum".
+
 ### Members maintain their own record
 
 Two pages, because the record has two lifetimes.

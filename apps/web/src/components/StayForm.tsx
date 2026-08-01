@@ -84,6 +84,11 @@ export const StayForm = ({
         <input
           type="date"
           name="arrival_date"
+          // Bound to its partner so the picker cannot offer an inverted range at
+          // all. The server still refuses one — a `max` is a hint a keyboard can
+          // walk straight past — but this is the difference between being told
+          // afterwards and never being able to say it.
+          max={departure === '' ? undefined : departure}
           value={arrival}
           onInput={(inputEvent) => setArrival(inputEvent.currentTarget.value)}
         />
@@ -94,6 +99,7 @@ export const StayForm = ({
         <input
           type="date"
           name="departure_date"
+          min={arrival === '' ? undefined : arrival}
           value={departure}
           onInput={(inputEvent) => setDeparture(inputEvent.currentTarget.value)}
         />

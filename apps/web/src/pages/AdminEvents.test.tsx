@@ -57,6 +57,17 @@ describe('AdminEvents', () => {
     expect(await screen.findByText(/No events yet/)).toBeTruthy()
   })
 
+  it('binds the two dates to each other, so the picker cannot invert the burn', async () => {
+    renderPage(stub())
+    await screen.findByText('Summer Burn 2026')
+
+    fill('Starts', '2026-12-01')
+    fill('Ends', '2026-12-05')
+
+    expect(screen.getByLabelText('Starts').getAttribute('max')).toBe('2026-12-05')
+    expect(screen.getByLabelText('Ends').getAttribute('min')).toBe('2026-12-01')
+  })
+
   it('lets an organiser set the hours the burn is open', async () => {
     // The grid runs between these, so they are on the create form rather than
     // hidden behind an edit — an organiser who has to find them later gets a

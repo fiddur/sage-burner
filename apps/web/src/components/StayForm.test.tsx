@@ -30,6 +30,30 @@ const fill = (label: string, value: string) => {
 const saveIt = () => screen.getByRole('button', { name: 'Save these details' }).click()
 
 describe('StayForm', () => {
+  it('binds each end of the stay to the other, so the picker cannot invert it', async () => {
+    // A hint, not the rule — the server refuses an inverted pair either way. What
+    // this removes is the ordinary way to produce one.
+    render(
+      <StayForm
+        attendance={anAttendance({ arrival_date: '2026-08-02', departure_date: '2026-08-04' })}
+        busy={false}
+        onSave={() => undefined}
+      />,
+    )
+
+    expect((await screen.findByLabelText('Arriving')).getAttribute('max')).toBe('2026-08-04')
+    expect(screen.getByLabelText('Leaving').getAttribute('min')).toBe('2026-08-02')
+  })
+
+  it('leaves the other end unbounded while it is empty', async () => {
+    // `max=""` on a date input is not "no maximum" in every engine, so an unset
+    // partner has to mean the attribute is absent.
+    render(<StayForm attendance={anAttendance({})} busy={false} onSave={() => undefined} />)
+
+    expect((await screen.findByLabelText('Arriving')).hasAttribute('max')).toBe(false)
+    expect(screen.getByLabelText('Leaving').hasAttribute('min')).toBe(false)
+  })
+
   it('shows what is already recorded', () => {
     render(
       <StayForm

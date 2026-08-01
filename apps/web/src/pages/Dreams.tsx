@@ -303,6 +303,7 @@ const DreamFields = ({
         <input
           type="datetime-local"
           aria-label={`Start of ${dream.title}`}
+          max={end === '' ? undefined : end}
           value={start}
           onInput={(inputEvent) => setStart(inputEvent.currentTarget.value)}
         />
@@ -313,6 +314,7 @@ const DreamFields = ({
         <input
           type="datetime-local"
           aria-label={`End of ${dream.title}`}
+          min={start === '' ? undefined : start}
           value={end}
           onInput={(inputEvent) => setEnd(inputEvent.currentTarget.value)}
         />
