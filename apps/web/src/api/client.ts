@@ -125,6 +125,26 @@ const codeFrom = async (response: Response): Promise<string> => {
   }
 }
 
+/**
+ * A `fetch` rejection, as an `ApiError` like every other failure.
+ *
+ * Offline, DNS gone, or the backend not running in dev all reject with a raw
+ * `TypeError` whose message is the browser's own — `Failed to fetch` in Chrome,
+ * something else again in Firefox. It is the most likely failure a member meets
+ * and the one that used to skip this module's mapping entirely.
+ *
+ * Status 0 because there was no response to have one: nothing reached a server
+ * that could answer.
+ *
+ * A cancellation gets its own code rather than being lumped in. A page that
+ * aborts an in-flight request on navigation is tidying up, not failing, and
+ * without the distinction it raises an error about its own housekeeping.
+ */
+const failureToReach = (cause: unknown): ApiError =>
+  cause instanceof DOMException && cause.name === 'AbortError'
+    ? apiError(0, 'aborted', 'Request cancelled.')
+    : apiError(0, 'network', 'Could not reach the server. Check your connection and try again.')
+
 export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
   body?: unknown
@@ -141,15 +161,20 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
   const request = async <T>(path: string, options: RequestOptions = {}): Promise<T> => {
     const { method = 'GET', body, signal } = options
 
-    const response = await doFetch(`/api${path}`, {
-      method,
-      signal,
-      // Sessions are cookie-based; without this the browser omits them on
-      // fetch by default and every authenticated call would 401.
-      credentials: 'same-origin',
-      headers: body === undefined ? undefined : { 'content-type': 'application/json' },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    })
+    let response: Response
+    try {
+      response = await doFetch(`/api${path}`, {
+        method,
+        signal,
+        // Sessions are cookie-based; without this the browser omits them on
+        // fetch by default and every authenticated call would 401.
+        credentials: 'same-origin',
+        headers: body === undefined ? undefined : { 'content-type': 'application/json' },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      })
+    } catch (cause) {
+      throw failureToReach(cause)
+    }
 
     if (!response.ok) {
       const code = await codeFrom(response)
@@ -158,7 +183,19 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
 
     if (response.status === 204) return undefined as T
 
-    return (await response.json()) as T
+    // Read as text first: a 200 or 201 with no body is a success, and
+    // `response.json()` would answer it with a parse error instead.
+    const text = await response.text()
+    if (text.trim() === '') return undefined as T
+
+    try {
+      return JSON.parse(text) as T
+    } catch {
+      // A proxy's HTML on a 200, or a truncated response. Same reasoning as
+      // `codeFrom` on the error path: the request did not give us what it said
+      // it would, and a raw `SyntaxError` names the wrong thing.
+      throw apiError(response.status, 'unparseable', messageFor(500))
+    }
   }
 
   return {
