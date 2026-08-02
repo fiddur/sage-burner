@@ -7,7 +7,6 @@ import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
 
-import { createGuards } from '../auth/guards.ts'
 import { application, inviteToken } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 import { defaultExpiry, mintToken } from '../invites.ts'
@@ -31,9 +30,7 @@ export const registerApplicationReviewRoutes = (
   app: FastifyInstance,
   { db, sessions, now = () => new Date() }: ApplicationReviewDeps,
 ) => {
-  const { requireAdmin } = createGuards({ db, sessions })
-
-  app.get('/api/admin/applications', { preHandler: requireAdmin }, async (_request, reply) => {
+  app.get('/api/admin/applications', async (_request, reply) => {
     void noStore(reply)
 
     const applications = await db.select().from(application).orderBy(desc(application.submitted_at))
@@ -46,8 +43,8 @@ export const registerApplicationReviewRoutes = (
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       void noStore(reply)
 
-      // Before the write, not after: `requireAdmin` has already resolved this,
-      // and reading it afterwards meant a 401 branch that could only fire once
+      // Before the write, not after: the admin prefix guard has already resolved
+      // this, and reading it afterwards meant a 401 branch that could only fire once
       // the decision had committed — leaving exactly the orphan state the
       // transaction below exists to prevent.
       const viewer = await viewerFor(request, { db, sessions })
@@ -104,15 +101,7 @@ export const registerApplicationReviewRoutes = (
       } satisfies ApplicationDecisionResponse
     }
 
-  app.post<{ Params: { id: string } }>(
-    '/api/admin/applications/:id/approve',
-    { preHandler: requireAdmin },
-    settle('approved'),
-  )
+  app.post<{ Params: { id: string } }>('/api/admin/applications/:id/approve', settle('approved'))
 
-  app.post<{ Params: { id: string } }>(
-    '/api/admin/applications/:id/reject',
-    { preHandler: requireAdmin },
-    settle('rejected'),
-  )
+  app.post<{ Params: { id: string } }>('/api/admin/applications/:id/reject', settle('rejected'))
 }

@@ -8,9 +8,11 @@ import Fastify from 'fastify'
 import { existsSync, statSync } from 'node:fs'
 import path from 'node:path'
 
+import type { GuardDeps } from './auth/guards.ts'
 import type { Config } from './config.ts'
 import type { Database } from './db/index.ts'
 
+import { createGuards } from './auth/guards.ts'
 import { createSessions } from './auth/session.ts'
 import { clientErrorHandler, frameworkErrorHandler, registerErrorHandler } from './errors.ts'
 import { registerAdminRoutes } from './routes/admin.ts'
@@ -246,6 +248,32 @@ const sessionDeps = (config: Config) => ({
  * can inject an in-memory database and assert against `app.inject()` without a
  * socket, a file, or a running server.
  */
+/**
+ * Everything under `/api/admin/` requires the role, whether or not its route
+ * asked for it.
+ *
+ * A per-route `preHandler` is one line a new route has to remember, and
+ * forgetting it ships that route world-readable: nothing type-checks it,
+ * nothing fails, and the tests written beside it pass. The hook makes the
+ * guard a property of the path instead of a property of the author.
+ *
+ * Keyed on the matched route's own pattern rather than the raw URL, so it
+ * cannot be stepped around with encoding — an unmatched path has no route to
+ * guard and 404s before this runs. A Fastify plugin scope would be the other
+ * way, and is weaker here: it covers what is registered on it, so a future
+ * route declared on the root instance with an `/api/admin` path would slip
+ * past. The prefix is what the paths already agree on.
+ */
+const registerAdminPrefixGuard = (app: FastifyInstance, deps: GuardDeps) => {
+  const { requireAdmin } = createGuards(deps)
+
+  app.addHook('onRequest', async (request, reply) => {
+    if (request.routeOptions.url?.startsWith('/api/admin/') !== true) return undefined
+
+    return requireAdmin(request, reply)
+  })
+}
+
 export const createApp = async ({
   db,
   config,
@@ -309,6 +337,9 @@ export const createApp = async ({
 
   // One `Sessions` for both, so the guards verify what the login route signed.
   const sessions = createSessions(sessionDeps(config))
+
+  registerAdminPrefixGuard(app, { db, sessions })
+
   registerAuthRoutes(app, { db, config, sessions })
   registerAdminRoutes(app, { db, sessions })
   registerInstallationRoutes(app, { db, sessions })

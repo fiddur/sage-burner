@@ -73,6 +73,111 @@ const getAccounts = (server: FastifyInstance, cookie?: string) =>
     headers: cookie === undefined ? {} : { cookie },
   })
 
+describe('an admin route nobody remembered to guard', () => {
+  /**
+   * The property the prefix hook buys, which per-route `preHandler` could not:
+   * a route added later is refused whether or not its author knew to ask.
+   *
+   * Registered here rather than in `app.ts` precisely because the point is a
+   * route the application does not know about. `createApp` does not call
+   * `ready`, so the instance still takes routes.
+   */
+  const withLateRoute = async (path: string) => {
+    const server = await build()
+    server.get(path, async () => ({ secret: 'the roster' }))
+    return server
+  }
+
+  it('refuses an unguarded /api/admin route to a signed-out caller', async () => {
+    const server = await withLateRoute('/api/admin/late-addition')
+
+    const response = await server.inject({ method: 'GET', url: '/api/admin/late-addition' })
+
+    expect(response.statusCode).toBe(401)
+    expect(response.body).not.toContain('the roster')
+  })
+
+  it('refuses it to a member without the role', async () => {
+    const server = await withLateRoute('/api/admin/late-addition')
+    const id = await givenAccount(['member'])
+
+    const response = await server.inject({
+      method: 'GET',
+      url: '/api/admin/late-addition',
+      headers: { cookie: cookieFor(id) },
+    })
+
+    expect(response.statusCode).toBe(403)
+    expect(response.body).not.toContain('the roster')
+  })
+
+  it('lets an admin have it, so the hook gates rather than blocks', async () => {
+    // The passing sibling: refusing everything would satisfy the two above.
+    const server = await withLateRoute('/api/admin/late-addition')
+    const id = await givenAccount(['admin'])
+
+    const response = await server.inject({
+      method: 'GET',
+      url: '/api/admin/late-addition',
+      headers: { cookie: cookieFor(id) },
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toEqual({ secret: 'the roster' })
+  })
+
+  it('leaves a route outside the prefix alone', async () => {
+    // The other passing sibling: the hook must key on the prefix, not on being
+    // installed at all. A public route answering 401 would be a worse bug.
+    const server = await withLateRoute('/api/not-admin-at-all')
+
+    const response = await server.inject({ method: 'GET', url: '/api/not-admin-at-all' })
+
+    expect(response.statusCode).toBe(200)
+  })
+
+  it('is not fooled by a path that merely starts with the letters', async () => {
+    // `/api/administrivia` is not under `/api/admin/`, and a `startsWith` on the
+    // bare prefix would guard it by accident — harmless here, but the same
+    // sloppiness in the other direction is what this hook exists to prevent.
+    const server = await withLateRoute('/api/administrivia')
+
+    expect((await server.inject({ method: 'GET', url: '/api/administrivia' })).statusCode).toBe(200)
+  })
+})
+
+describe('an admin route asked for by a stranger', () => {
+  it('refuses before parsing the body, not after', async () => {
+    // `onRequest` runs ahead of parsing, where a `preHandler` ran after it. So a
+    // caller with no session now gets 401 rather than a parse error describing
+    // their own JSON — the body of an unauthorized request is never read.
+    const server = await build()
+
+    const response = await server.inject({
+      method: 'POST',
+      url: '/api/admin/events',
+      headers: { 'content-type': 'application/json' },
+      payload: '{ this is not json',
+    })
+
+    expect(response.statusCode).toBe(401)
+  })
+
+  it('still parses for an admin, so the 400 survives where it belongs', async () => {
+    const server = await build()
+    const id = await givenAccount(['admin'])
+
+    const response = await server.inject({
+      method: 'POST',
+      url: '/api/admin/events',
+      headers: { 'content-type': 'application/json', cookie: cookieFor(id) },
+      payload: '{ this is not json',
+    })
+
+    expect(response.statusCode).toBe(400)
+  })
+})
+
 describe('the admin guard', () => {
   it('answers 401 when nobody is signed in', async () => {
     const server = await build()

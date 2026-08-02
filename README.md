@@ -590,6 +590,25 @@ coming to a burn. An organiser who is not attending is coherent, so `admin`
 deliberately does not confer `member` — but the ordinary case is both, which is
 why `admin:create` grants both.
 
+**Every route under `/api/admin/` requires `admin`, whether or not the route
+asked.** One `onRequest` hook on the prefix, rather than a `preHandler` per
+route: opt-in protection is a line a new route has to remember, and forgetting
+it ships that route world-readable — nothing type-checks it, nothing fails, and
+the tests written beside it pass. There is a test that registers a route and
+never guards it, and it is refused.
+
+The hook keys on the matched route's own pattern, so an encoded path cannot step
+around it; an unmatched one has no route to guard and 404s first. A Fastify
+plugin scope would be the more idiomatic seam and is weaker here — it covers
+what is registered on it, so a future route declared on the root instance with
+an `/api/admin` path would slip past. The prefix is what the paths already agree
+on.
+
+One consequence worth knowing: `onRequest` runs _before_ body parsing, where a
+`preHandler` ran after it. A caller with no session gets 401 rather than a parse
+error describing their own JSON, and the body of an unauthorized request is
+never read at all.
+
 Organise → the **Accounts** table sets them, a checkbox per role per account.
 `PUT /api/admin/accounts/:id/roles` takes the whole set the account should end
 up with, not a delta: the editor sends what the row now says, so it cannot
