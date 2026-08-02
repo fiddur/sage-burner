@@ -157,7 +157,14 @@ export const MyBurn = ({ api }: { api: MyBurnApi }) => {
                 attendance={loaded.mine.attendance}
                 lodgingOptions={loaded.lodging.filter((option) => option.kind === 'lodging')}
                 taken={Object.fromEntries(loaded.lodging.map((option) => [option.id, option.taken]))}
-                onSaved={(saved) => setLoaded({ ...loaded, mine: { ...loaded.mine, attendance: saved } })}
+                onSaved={() => {
+                  // Reloaded rather than spliced: the `taken` counts move when a
+                  // member changes where they are sleeping, and a stale map leaves
+                  // the option they just left reading as full — now disabled,
+                  // since it is no longer theirs — which a native select cannot
+                  // pick back.
+                  void load()
+                }}
               />
 
               <p class="row">

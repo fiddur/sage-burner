@@ -79,6 +79,21 @@ describe('MyBurn', () => {
     expect(screen.queryByRole('button', { name: /paid/i })).toBeNull()
   })
 
+  it('refetches the lodging counts after a save, not just the attendance', async () => {
+    // The counts move when someone changes where they sleep. Left stale, the
+    // option they just vacated still reads as full — and is now disabled, since
+    // it is no longer theirs — so a native select cannot pick it back.
+    const getEventOptions = vi.fn(() => Promise.resolve({ options: [] }))
+    const updateMyStay = vi.fn(() => Promise.resolve({ attendance: anAttendance() }))
+    renderPage(stub({ getEventOptions, updateMyStay }, { event: theBurn, attendance: anAttendance() }))
+
+    await screen.findByRole('button', { name: 'Save these details' })
+    const before = getEventOptions.mock.calls.length
+    screen.getByRole('button', { name: 'Save these details' }).click()
+
+    await waitFor(() => expect(getEventOptions.mock.calls.length).toBeGreaterThan(before))
+  })
+
   it('lets them withdraw', async () => {
     const leaveActiveEvent = vi.fn(() => Promise.resolve(undefined))
     const getMyAttendance = vi
