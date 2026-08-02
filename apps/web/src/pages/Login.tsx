@@ -3,7 +3,7 @@ import { useRef, useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
-import { FormError } from '../components/FormError.tsx'
+import { FormError, useFormError } from '../components/FormError.tsx'
 import { useSetViewer, useViewer } from '../viewer.tsx'
 
 /**
@@ -38,7 +38,7 @@ export const Login = ({ api }: { api: Pick<ApiClient, 'login'> }) => {
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | undefined>(undefined)
+  const [error, setError] = useFormError()
   const [submitting, setSubmitting] = useState(false)
 
   // A ref rather than the `submitting` state, because state updates are
@@ -142,7 +142,7 @@ export const Login = ({ api }: { api: Pick<ApiClient, 'login'> }) => {
           />
         </label>
 
-        <FormError message={error} />
+        <FormError error={error} />
 
         <button type="submit" disabled={submitting}>
           {submitting ? 'Signing in…' : 'Log in'}

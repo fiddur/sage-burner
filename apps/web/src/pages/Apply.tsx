@@ -12,7 +12,7 @@ import { useCallback, useEffect, useMemo, useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
-import { FormError } from '../components/FormError.tsx'
+import { FormError, useFormError } from '../components/FormError.tsx'
 import { renderMarkdown } from '../markdown.ts'
 
 /**
@@ -71,7 +71,7 @@ export const Apply = ({ api }: ApplyProps) => {
   const [answers, setAnswers] = useState<SubmittedAnswers>({})
   const [problems, setProblems] = useState<AnswerProblem[]>([])
   const [identityProblems, setIdentityProblems] = useState<string[]>([])
-  const [sendError, setSendError] = useState<string | undefined>(undefined)
+  const [sendError, setSendError] = useFormError()
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
 
@@ -310,7 +310,7 @@ export const Apply = ({ api }: ApplyProps) => {
           )
         })}
 
-        <FormError message={sendError} />
+        <FormError error={sendError} />
 
         <button type="submit" disabled={sending || questions === undefined}>
           {sending ? 'Sending…' : 'Send application'}

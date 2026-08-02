@@ -194,6 +194,46 @@ describe('Invite', () => {
     expect(button.previousElementSibling).toBe(alert)
   })
 
+  it('says it again on a second attempt, rather than looking broken twice', async () => {
+    // The first tap focuses the alert. If the second tap does not, someone who
+    // scrolled off to look at a field is left with a button that appears to do
+    // nothing — which is the whole symptom this is here to fix, reappearing on
+    // attempt two. Both `setError` calls land in one commit, so the message that
+    // reaches the DOM is unchanged and only the attempt tells them apart.
+    renderPage(stub())
+
+    await screen.findByRole('button', { name: 'Join' })
+    complete()
+    fill('Your name', '   ')
+    join()
+
+    const alert = await screen.findByRole('alert')
+    alert.blur()
+    expect(document.activeElement).not.toBe(alert)
+
+    join()
+
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('alert')))
+  })
+
+  it('leaves the focus alone while they are typing the fix', async () => {
+    // The other half of the same rule: refocusing on every render would snatch
+    // the caret out of the field mid-correction.
+    renderPage(stub())
+
+    await screen.findByRole('button', { name: 'Join' })
+    complete()
+    fill('Your name', '   ')
+    join()
+    await screen.findByRole('alert')
+
+    const nameBox = screen.getByLabelText('Your name')
+    nameBox.focus()
+    fill('Your name', 'Fredrik')
+
+    expect(document.activeElement).toBe(nameBox)
+  })
+
   it('refuses a blank name', async () => {
     const redeemInvite = vi.fn(() => Promise.resolve({ viewer: null }))
     renderPage(stub({ redeemInvite }))

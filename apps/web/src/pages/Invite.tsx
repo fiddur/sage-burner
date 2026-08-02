@@ -5,7 +5,7 @@ import { useEffect, useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
-import { FormError } from '../components/FormError.tsx'
+import { FormError, useFormError } from '../components/FormError.tsx'
 import { useSetViewer, useViewer } from '../viewer.tsx'
 
 export type InviteApi = Pick<ApiClient, 'getInviteState' | 'redeemInvite'>
@@ -29,7 +29,7 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
   const [allergies, setAllergies] = useState('')
-  const [error, setError] = useState<string | undefined>(undefined)
+  const [error, setError] = useFormError()
   const [sending, setSending] = useState(false)
   const [done, setDone] = useState(false)
 
@@ -231,7 +231,7 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
           We cook together, so this is read by whoever plans the meals. You can change it later.
         </p>
 
-        <FormError message={error} />
+        <FormError error={error} />
 
         <button type="submit" disabled={sending}>
           {sending ? 'Setting you up…' : 'Join'}

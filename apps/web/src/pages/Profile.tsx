@@ -5,7 +5,7 @@ import { useEffect, useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
-import { FormError } from '../components/FormError.tsx'
+import { FormError, useFormError } from '../components/FormError.tsx'
 import { isMember, useViewer } from '../viewer.tsx'
 
 export type ProfileApi = Pick<ApiClient, 'getMyProfile' | 'updateMyProfile'>
@@ -21,7 +21,7 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
   const [allergies, setAllergies] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
-  const [error, setError] = useState<string | undefined>(undefined)
+  const [error, setError] = useFormError()
 
   useEffect(() => {
     if (!member) return undefined
@@ -158,7 +158,7 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
             </p>
           )}
 
-          <FormError message={error} />
+          <FormError error={error} />
 
           <button type="submit" disabled={saving}>
             {saving ? 'Saving…' : 'Save'}
