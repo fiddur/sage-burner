@@ -13,7 +13,7 @@ import type {
   PaymentUpdate,
   ProfileResponse,
   ProfileUpdate,
-  RedeemRequest,
+  RedeemRequestInput,
   RosterResponse,
   ActiveEventResponse,
   AccountRolesUpdate,
@@ -298,7 +298,7 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
      * race, and for an email that already has an account. Throws ApiError(404)
      * for a token nobody minted.
      */
-    redeemInvite: (token: string, body: RedeemRequest) =>
+    redeemInvite: (token: string, body: RedeemRequestInput) =>
       request<MeResponse>(`/invites/${encodeURIComponent(token)}/redeem`, { method: 'POST', body }),
 
     /** Signed-in members only. `event` is null when no burn is open. */

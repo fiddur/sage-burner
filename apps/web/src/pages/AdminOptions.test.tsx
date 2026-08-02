@@ -268,14 +268,14 @@ describe('AdminOptions', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('In use.')
   })
 
-  it('offers nothing to someone who is not an organiser, and asks the API nothing', async () => {
+  it('offers nothing to someone who does not have admin, and asks the API nothing', async () => {
     // Asserted after a flush, not synchronously: the fetch is two awaits deep, so
     // an immediate assertion passes whether or not the guard is there.
     const getActiveEvent = vi.fn<OptionsApi['getActiveEvent']>(() => Promise.resolve({ event: BURN }))
     const getEventOptions = vi.fn<OptionsApi['getEventOptions']>(() => Promise.resolve({ options: [] }))
     renderPage(stub({ getActiveEvent, getEventOptions }), { status: 'signed-out' })
 
-    expect(screen.getByText(/for organisers/)).toBeTruthy()
+    expect(screen.getByText(/admin page/)).toBeTruthy()
     await waitFor(() => expect(getActiveEvent).not.toHaveBeenCalled())
     expect(getEventOptions).not.toHaveBeenCalled()
   })

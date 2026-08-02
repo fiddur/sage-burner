@@ -174,14 +174,14 @@ describe('AdminRoster', () => {
     expect(await screen.findAllByText(/x@example.org/)).not.toHaveLength(0)
   })
 
-  it('does not fetch for someone who is not an organiser', async () => {
+  it('does not fetch for someone who does not have admin', async () => {
     const getActiveRoster = vi.fn(() => Promise.resolve(aRoster()))
     renderPage(stub({ getActiveRoster }), {
       status: 'signed-in',
       account: { id: 'a-1', roles: ['member'] },
     })
 
-    expect(screen.getByText(/for organisers/)).toBeTruthy()
+    expect(screen.getByText(/admin page/)).toBeTruthy()
     expect(getActiveRoster).not.toHaveBeenCalled()
   })
 

@@ -300,7 +300,7 @@ export const QuestionEditor = ({ api }: { api: QuestionsApi }) => {
         {/*
           Also disabled on a whitespace-only label. `required` does not catch
           `'   '` — it satisfies HTML constraint validation, the form submits, and
-          `nonEmptyText(500)` trims it to `''` server-side, so the organiser reads
+          `nonEmptyText(500)` trims it to `''` server-side, so the admin reads
           the unmapped "Request failed (400)". This is what makes the parity with
           the edit form below real rather than only true for a genuinely empty box.
         */}

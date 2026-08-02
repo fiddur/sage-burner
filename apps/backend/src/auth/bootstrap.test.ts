@@ -129,12 +129,20 @@ describe('ensureAdmin', () => {
     expect(await db.select().from(account)).toHaveLength(1)
   })
 
-  it('rejects a password too short to be worth having', async () => {
+  it('takes any password that is a password at all', async () => {
     const db = database()
 
     await expect(
-      ensureAdmin({ db, email: 'ada@example.org', password: 'short', params: cheap }),
-    ).rejects.toThrow(/12 characters/)
+      ensureAdmin({ db, email: 'ada@example.org', password: 'hi', params: cheap }),
+    ).resolves.toMatchObject({ created: true })
+  })
+
+  it('rejects an empty password, which is not one', async () => {
+    const db = database()
+
+    await expect(ensureAdmin({ db, email: 'ada@example.org', password: '', params: cheap })).rejects.toThrow(
+      /ADMIN_PASSWORD is empty/,
+    )
     expect(await db.select().from(account)).toHaveLength(0)
   })
 
@@ -146,7 +154,7 @@ describe('ensureAdmin', () => {
     ).rejects.toThrow(/valid email/)
   })
 
-  it('still grants the roles when the password would be too short', async () => {
+  it('still grants the roles when the password would be refused', async () => {
     // The length rule guards a password being *set*. Refusing to grant a role
     // over it would fail for a reason that has nothing to do with the request.
     const db = database()

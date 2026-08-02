@@ -3,6 +3,7 @@ import { useRef, useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
+import { FormError } from '../components/FormError.tsx'
 import { useSetViewer, useViewer } from '../viewer.tsx'
 
 /**
@@ -117,15 +118,6 @@ export const Login = ({ api }: { api: Pick<ApiClient, 'login'> }) => {
         handle it also catches a mistyped address before a round trip.
       */}
       <form class="form" onSubmit={submit}>
-        {error !== undefined && (
-          // `alert` so it is announced when it appears — a member using a
-          // screen reader would otherwise resubmit a form that has already
-          // told them what is wrong.
-          <p class="form-error" role="alert">
-            {error}
-          </p>
-        )}
-
         <label class="field">
           <span>Email</span>
           <input
@@ -150,6 +142,8 @@ export const Login = ({ api }: { api: Pick<ApiClient, 'login'> }) => {
           />
         </label>
 
+        <FormError message={error} />
+
         <button type="submit" disabled={submitting}>
           {submitting ? 'Signing in…' : 'Log in'}
         </button>
@@ -157,7 +151,7 @@ export const Login = ({ api }: { api: Pick<ApiClient, 'login'> }) => {
 
       <p class="form-note">
         Accounts are created by invitation, so there is nothing to sign up for here. If you have lost your
-        password, ask an organiser — there is no mail service to send a reset through yet.
+        password, ask someone with admin — there is no mail service to send a reset through yet.
       </p>
     </section>
   )

@@ -5,6 +5,7 @@ import { useEffect, useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
+import { FormError } from '../components/FormError.tsx'
 import { isMember, useViewer } from '../viewer.tsx'
 
 export type ProfileApi = Pick<ApiClient, 'getMyProfile' | 'updateMyProfile'>
@@ -47,7 +48,7 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
     setError(undefined)
     setSaved(false)
     if (name.trim() === '' || contact.trim() === '') {
-      setError('Please keep a name and a way to reach you — organisers need both.')
+      setError('Please keep a name and a way to reach you — both are needed for planning.')
       return
     }
 
@@ -112,12 +113,6 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
             void save()
           }}
         >
-          {error !== undefined && (
-            <p class="form-error" role="alert">
-              {error}
-            </p>
-          )}
-
           <label class="field">
             <span>Your name</span>
             <input
@@ -153,8 +148,8 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
           </label>
 
           <p class="form-note">
-            Read by whoever plans the meals, for every burn you come to — so correcting it here corrects it
-            everywhere.
+            Food is primarily vegetarian, with vegan options. Read by whoever plans the meals, for every burn
+            you come to — so correcting it here corrects it everywhere.
           </p>
 
           {saved && (
@@ -162,6 +157,8 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
               Saved.
             </p>
           )}
+
+          <FormError message={error} />
 
           <button type="submit" disabled={saving}>
             {saving ? 'Saving…' : 'Save'}
@@ -171,7 +168,7 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
 
       <p class="form-note">
         Signed in as {loaded.status === 'ready' ? loaded.profile.email : 'you'}. Changing that address is not
-        possible yet — ask an organiser.
+        possible yet — ask someone with admin.
       </p>
     </section>
   )

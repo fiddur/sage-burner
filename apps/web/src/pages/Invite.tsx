@@ -5,6 +5,7 @@ import { useEffect, useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
+import { FormError } from '../components/FormError.tsx'
 import { useSetViewer, useViewer } from '../viewer.tsx'
 
 export type InviteApi = Pick<ApiClient, 'getInviteState' | 'redeemInvite'>
@@ -20,7 +21,6 @@ type Loaded = { status: 'loading' } | { status: 'ready'; state: InviteState } | 
  * browser deciding the empty cases and this page the rest. The browser's rules
  * are the weaker ones — it accepts `"   "` for a name.
  */
-const MIN_PASSWORD = 12
 
 export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
   const viewer = useViewer()
@@ -29,7 +29,6 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
-  const [contact, setContact] = useState('')
   const [allergies, setAllergies] = useState('')
   const [error, setError] = useState<string | undefined>(undefined)
   const [sending, setSending] = useState(false)
@@ -56,12 +55,12 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
       setError('Please give us an email address — it becomes your login.')
       return
     }
-    if (name.trim() === '' || contact.trim() === '') {
-      setError('Please tell us your name and how to reach you.')
+    if (name.trim() === '') {
+      setError('Please tell us your name.')
       return
     }
-    if (password.length < MIN_PASSWORD) {
-      setError(`Please choose a password of at least ${MIN_PASSWORD} characters.`)
+    if (password === '') {
+      setError('Please choose a password.')
       return
     }
 
@@ -71,7 +70,6 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
         email,
         password,
         name: name.trim(),
-        contact: contact.trim(),
         allergies_notes: allergies.trim() === '' ? null : allergies.trim(),
       })
       // The cookie is set server-side, but the shared viewer is populated once on
@@ -86,7 +84,7 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
       // request fails the same way.
       setError(
         isApiError(failure) && failure.status === 409
-          ? 'That invite has already been used, or there is already an account with that email. Ask an organiser for a fresh link.'
+          ? 'That invite has already been used, or there is already an account with that email. Ask someone with admin for a fresh link.'
           : 'Could not finish signing you up. Please check your connection and try again.',
       )
     } finally {
@@ -148,7 +146,7 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
     // expired link can be re-sent, a used one probably means you already have an
     // account, and an unknown one is usually a truncated paste.
     const explanation = {
-      expired: 'This invitation has expired. Ask an organiser for a fresh one.',
+      expired: 'This invitation has expired. Ask someone with admin for a fresh one.',
       used: 'This invitation has already been used. If that was you, log in instead.',
       unknown: 'We do not recognise this invitation link. Check you copied all of it.',
     }[loaded.state.status]
@@ -172,8 +170,8 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
       <h1>Welcome — let us set you up</h1>
 
       <p class="form-note">
-        This invitation is good for one person. The email and password become your login; the rest is what
-        organisers need to look after you.
+        This invitation is good for one person. The email and password become your login; the rest is for
+        planning. Food is primarily vegetarian, with vegan options.
       </p>
 
       <form
@@ -183,12 +181,6 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
           void submit()
         }}
       >
-        {error !== undefined && (
-          <p class="form-error" role="alert">
-            {error}
-          </p>
-        )}
-
         <label class="field">
           <span>Email</span>
           <input
@@ -226,19 +218,8 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
         </label>
 
         <label class="field">
-          <span>How can we reach you?</span>
-          <input
-            type="text"
-            name="contact"
-            maxLength={500}
-            aria-required
-            value={contact}
-            onInput={(event) => setContact(event.currentTarget.value)}
-          />
-        </label>
-
-        <label class="field">
           <span>Allergies or food you cannot eat (optional)</span>
+          <span class="form-note">Food is primarily vegetarian, with vegan options.</span>
           <textarea
             name="allergies_notes"
             maxLength={2000}
@@ -250,6 +231,8 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
         <p class="form-note">
           We cook together, so this is read by whoever plans the meals. You can change it later.
         </p>
+
+        <FormError message={error} />
 
         <button type="submit" disabled={sending}>
           {sending ? 'Setting you up…' : 'Join'}

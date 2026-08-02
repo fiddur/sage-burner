@@ -115,7 +115,9 @@ export const registerRedemptionRoutes = (
               email: parsed.data.email,
               password_hash,
               name: parsed.data.name,
-              contact: parsed.data.contact,
+              // The email is a way to reach them, so nobody has to answer "how
+              // can we reach you?" on the form where they just typed it.
+              contact: parsed.data.contact ?? parsed.data.email,
               allergies_notes: parsed.data.allergies_notes,
               invite_token_id: invite.id,
               created_at: now().toISOString(),

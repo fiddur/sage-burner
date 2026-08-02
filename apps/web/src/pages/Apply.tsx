@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
+import { FormError } from '../components/FormError.tsx'
 import { renderMarkdown } from '../markdown.ts'
 
 /**
@@ -309,11 +310,7 @@ export const Apply = ({ api }: ApplyProps) => {
           )
         })}
 
-        {sendError !== undefined && (
-          <p class="form-error" role="alert">
-            {sendError}
-          </p>
-        )}
+        <FormError message={sendError} />
 
         <button type="submit" disabled={sending || questions === undefined}>
           {sending ? 'Sending…' : 'Send application'}

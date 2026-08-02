@@ -72,11 +72,11 @@ export const ensureAdmin = async ({
     return { account_id: existing.id, created: false }
   }
 
-  // Checked only on the branch that uses it: rejecting a short password while
+  // Checked only on the branch that uses it: refusing over the password while
   // merely granting a role to an existing account would refuse to do something
   // the password has no part in.
   if (!newPasswordSchema.safeParse(password).success) {
-    throw new Error('Password must be at least 12 characters.')
+    throw new Error('Set a password — ADMIN_PASSWORD is empty.')
   }
 
   const id = newId()

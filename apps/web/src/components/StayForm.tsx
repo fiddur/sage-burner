@@ -5,6 +5,7 @@ import { useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
+import { FormError } from './FormError.tsx'
 
 /**
  * The details that belong to one burn rather than to the person.
@@ -79,12 +80,6 @@ export const StayForm = ({
         void save()
       }}
     >
-      {error !== undefined && (
-        <p class="form-error" role="alert">
-          {error}
-        </p>
-      )}
-
       <label class="field">
         <span>Arriving</span>
         <input
@@ -171,6 +166,8 @@ export const StayForm = ({
           Saved.
         </p>
       )}
+
+      <FormError message={error} />
 
       <button type="submit" disabled={saving}>
         {saving ? 'Saving…' : 'Save these details'}

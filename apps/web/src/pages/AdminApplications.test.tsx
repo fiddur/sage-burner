@@ -136,7 +136,7 @@ describe('AdminApplications', () => {
     expect(screen.queryByRole('status')).toBeNull()
   })
 
-  it('tells the organiser to reload when someone else decided first', async () => {
+  it('says to reload when someone else decided first', async () => {
     // A 409 means the list on screen is stale, so "try again" would send them
     // round the same loop.
     renderPage(stub({ approveApplication: () => Promise.reject(apiError(409, 'conflict', 'nope')) }))
@@ -172,7 +172,7 @@ describe('AdminApplications', () => {
     const getApplications = vi.fn(() => Promise.resolve({ applications: [] }))
     renderPage(stub({ getApplications }), ['member'])
 
-    expect(screen.getByText(/for organisers/)).toBeTruthy()
+    expect(screen.getByText(/admin page/)).toBeTruthy()
     expect(getApplications).not.toHaveBeenCalled()
   })
 
