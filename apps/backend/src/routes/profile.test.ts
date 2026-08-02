@@ -10,8 +10,9 @@ import { createApp } from '../app.ts'
 import { createSessions } from '../auth/session.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, attendance, event, eventOption } from '../db/schema.ts'
+import { account, accountRole, attendance, attendanceHelping, event, eventOption } from '../db/schema.ts'
 import { SESSION_COOKIE } from './auth.ts'
+import { helpingIdsFor, setHelping } from './helping.ts'
 
 /**
  * A member maintaining their own record.
@@ -43,6 +44,11 @@ const build = async () => {
     now: () => new Date(NOW),
   })
   return app
+}
+
+const close = () => {
+  handle?.close()
+  handle = undefined
 }
 
 const client = () => {
@@ -641,5 +647,83 @@ describe('what someone will help with', () => {
       headers: { cookie: member.cookie },
     })
     expect(after.json().attendance.helping_option_ids).toEqual([])
+  })
+})
+
+describe('a helping option that vanishes mid-save', () => {
+  it('answers gone rather than throwing', async () => {
+    // Reachable without concurrency after all: `setHelping` is exported, so the
+    // option can simply be deleted before it is called. The HTTP route cannot
+    // produce the gap under `inject`, which is not the same as the branch being
+    // untestable.
+    await build()
+    const eventId = await givenEvent()
+    const member = await givenMember()
+    const stay = await givenComing(eventId, member.id)
+
+    const sauna = randomUUID()
+    await db()
+      .insert(eventOption)
+      .values({ id: sauna, event_id: eventId, kind: 'helping', order: 0, label: 'Sauna', capacity: null })
+    client().prepare('delete from event_option where id = ?').run(sauna)
+
+    expect(setHelping(db(), stay, [sauna])).toBe('gone')
+  })
+
+  it('writes the ticks when the option is still there', async () => {
+    // The passing sibling: `gone` must mean the option vanished, not that writing
+    // ticks fails generally.
+    await build()
+    const eventId = await givenEvent()
+    const member = await givenMember()
+    const stay = await givenComing(eventId, member.id)
+
+    const sauna = randomUUID()
+    await db()
+      .insert(eventOption)
+      .values({ id: sauna, event_id: eventId, kind: 'helping', order: 0, label: 'Sauna', capacity: null })
+
+    expect(setHelping(db(), stay, [sauna])).toBe('ok')
+    expect(await helpingIdsFor(db(), stay)).toEqual([sauna])
+  })
+
+  it('rethrows anything that is not the option vanishing', async () => {
+    // `gone` must mean that one thing. Swallowing every failure would turn a real
+    // fault into a 400 telling the member their choice was invalid.
+    await build()
+    const eventId = await givenEvent()
+    const member = await givenMember()
+    const stay = await givenComing(eventId, member.id)
+    const handleNow = db()
+
+    const sauna = randomUUID()
+    await handleNow
+      .insert(eventOption)
+      .values({ id: sauna, event_id: eventId, kind: 'helping', order: 0, label: 'Sauna', capacity: null })
+
+    // A closed database is not a foreign key problem, and must not be reported as
+    // one. Closed here rather than stubbed, so the error is a real driver error.
+    close()
+
+    expect(() => setHelping(handleNow, stay, [sauna])).toThrow()
+  })
+
+  it('takes the ticks with the stay when someone withdraws', async () => {
+    // The other side of the cascade. The option side is covered in
+    // `roster.test.ts`; nothing covered this one.
+    await build()
+    const eventId = await givenEvent()
+    const member = await givenMember()
+    const stay = await givenComing(eventId, member.id)
+
+    const sauna = randomUUID()
+    await db()
+      .insert(eventOption)
+      .values({ id: sauna, event_id: eventId, kind: 'helping', order: 0, label: 'Sauna', capacity: null })
+    setHelping(db(), stay, [sauna])
+
+    client().prepare('delete from attendance where id = ?').run(stay)
+
+    expect(await db().select().from(attendanceHelping)).toEqual([])
   })
 })
