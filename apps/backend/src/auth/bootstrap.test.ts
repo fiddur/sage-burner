@@ -155,7 +155,7 @@ describe('ensureAdmin', () => {
   })
 
   it('still grants the roles when the password would be refused', async () => {
-    // The length rule guards a password being *set*. Refusing to grant a role
+    // The password rule guards a password being *set*. Refusing to grant a role
     // over it would fail for a reason that has nothing to do with the request.
     const db = database()
     const first = await ensureAdmin({

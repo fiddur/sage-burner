@@ -218,7 +218,6 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
 
         <label class="field">
           <span>Allergies or food you cannot eat (optional)</span>
-          <span class="form-note">Food is primarily vegetarian, with vegan options.</span>
           <textarea
             name="allergies_notes"
             maxLength={2000}
