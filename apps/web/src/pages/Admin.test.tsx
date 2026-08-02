@@ -117,7 +117,7 @@ describe('Admin', () => {
     await waitFor(() => expect(setAccountRoles).toHaveBeenCalledWith('a-1', { roles: ['member'] }))
   })
 
-  it('explains a refused last-organiser change rather than saying try again', async () => {
+  it('explains a refused last-admin change rather than saying try again', async () => {
     // A 409 means they are the only one left, and retrying cannot change that.
     renderAdmin(
       roster([
@@ -129,7 +129,7 @@ describe('Admin', () => {
 
     fireEvent.click(await screen.findByRole('checkbox', { name: 'admin — ada@example.org' }))
 
-    expect((await screen.findByRole('alert')).textContent).toContain('has to stay an organiser')
+    expect((await screen.findByRole('alert')).textContent).toContain('has to keep admin')
   })
 
   it('does not fetch for someone without the role', async () => {
@@ -138,7 +138,7 @@ describe('Admin', () => {
     const getAdminAccounts = vi.fn(never)
     renderAdmin(getAdminAccounts, MEMBER)
 
-    expect(await screen.findByText(/for organisers/)).toBeTruthy()
+    expect(await screen.findByText(/admin page/)).toBeTruthy()
     expect(getAdminAccounts).not.toHaveBeenCalled()
   })
 
@@ -160,7 +160,7 @@ describe('Admin', () => {
     renderAdmin(getAdminAccounts, { status: 'loading' })
 
     expect(screen.getByText('One moment…')).toBeTruthy()
-    expect(screen.queryByText(/for organisers/)).toBeNull()
+    expect(screen.queryByText(/admin page/)).toBeNull()
     expect(getAdminAccounts).not.toHaveBeenCalled()
   })
 

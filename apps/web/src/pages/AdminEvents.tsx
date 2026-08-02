@@ -128,7 +128,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
     return (
       <section class="page">
         <h1>Events</h1>
-        <p>This area is for organisers.</p>
+        <p>This is an admin page.</p>
       </section>
     )
   }

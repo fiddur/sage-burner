@@ -71,7 +71,7 @@ describe('MyBurn', () => {
     expect((await screen.findByRole('status')).textContent).toContain('on the list')
   })
 
-  it('says whether they have paid, which only an organiser can change', async () => {
+  it('says whether they have paid, which only admin can change', async () => {
     renderPage(stub({}, { event: theBurn, attendance: anAttendance({ payment_status: 'paid' }) }))
 
     expect((await screen.findByRole('status')).textContent).toContain('you have paid')

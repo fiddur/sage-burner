@@ -35,10 +35,26 @@ export const redeemRequestSchema = z
     email: emailSchema,
     password: newPasswordSchema,
     name: nonEmptyText(200),
-    contact: nonEmptyText(500),
+    /**
+     * How to reach them beyond the email they just gave.
+     *
+     * Optional, because asking "how can we reach you?" on the form where someone
+     * has just typed their email reads as a question already answered. The
+     * account falls back to the email when this is empty, so the field is never
+     * blank for whoever is doing the planning.
+     */
+    // `.optional()` as well as nullable: `optionalText` allows an explicit null
+    // but still requires the key, and the point here is a form that never asks.
+    contact: optionalText(500).optional(),
     allergies_notes: optionalText(2000),
   })
   .strict()
 
 export type InviteState = z.infer<typeof inviteStateSchema>
 export type RedeemRequest = z.infer<typeof redeemRequestSchema>
+
+/**
+ * What a *client* may send. `contact` is optional here and present-but-nullable
+ * in the parsed result, which is the same split as `EventCreateInput`.
+ */
+export type RedeemRequestInput = z.input<typeof redeemRequestSchema>

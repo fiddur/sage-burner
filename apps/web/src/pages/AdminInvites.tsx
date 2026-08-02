@@ -112,7 +112,7 @@ export const AdminInvites = ({ api }: { api: InvitesApi }) => {
     return (
       <section class="page">
         <h1>Invites</h1>
-        <p>This area is for organisers. If that should be you, ask an existing organiser.</p>
+        <p>This is an admin page. If it should be open to you, ask someone who already has admin.</p>
       </section>
     )
   }
@@ -140,7 +140,7 @@ export const AdminInvites = ({ api }: { api: InvitesApi }) => {
 
       {/* Keyed on the token so a new mint remounts: `copied` lives in the
           component, and a button still reading "Copied" after minting a second
-          invite is how an organiser pastes the first one twice and loses the
+          invite is how someone pastes the first one twice and loses the
           second for good. */}
       <InviteLink key={minted?.token} invite={minted} />
 
