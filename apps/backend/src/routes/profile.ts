@@ -13,7 +13,7 @@ import { account, attendance, eventOption } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 import { viewerFor } from './auth.ts'
 import { activeEvent, todayIso } from './events.ts'
-import { helpingIdsFor, setHelping } from './helping.ts'
+import { areHelpingOptions, helpingIdsFor, setHelping } from './helping.ts'
 
 export interface ProfileDeps extends GuardDeps {
   now?: () => Date
@@ -180,6 +180,14 @@ export const registerProfileRoutes = (
       if (verdict === 'full') return reply.code(409).send(errorResponse('conflict'))
     }
 
+    // Checked before the write, like the lodging verdict above. Validating after
+    // it means a rejected tick answers 400 with the columns already committed —
+    // and the form sends both in one PATCH, so an organiser deleting an option
+    // while someone has the page open is enough to produce it.
+    if (helping !== undefined && !(await areHelpingOptions(db, found.id, helping))) {
+      return reply.code(400).send(errorResponse('bad_request'))
+    }
+
     let updated: (typeof attendance.$inferSelect)[]
     try {
       // No columns to set is not an error: the body may be empty, or may carry
@@ -203,10 +211,7 @@ export const registerProfileRoutes = (
     const [first] = updated
 
     if (first !== undefined) {
-      if (helping !== undefined) {
-        const verdict = await setHelping(db, first.id, found.id, helping)
-        if (verdict === 'invalid') return reply.code(400).send(errorResponse('bad_request'))
-      }
+      if (helping !== undefined) await setHelping(db, first.id, helping)
 
       return { attendance: { ...first, helping_option_ids: await helpingIdsFor(db, first.id) } }
     }

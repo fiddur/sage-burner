@@ -10,7 +10,7 @@ import { createGuards } from '../auth/guards.ts'
 import { account, attendance, event, eventOption } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 import { activeEvent, todayIso } from './events.ts'
-import { helpingFor } from './helping.ts'
+import { helpingLabelsFor } from './helping.ts'
 
 export interface RosterDeps extends GuardDeps {
   now?: () => Date
@@ -129,7 +129,7 @@ export const registerRosterRoutes = (
       .where(eq(attendance.event_id, eventId))
 
     // One query for the whole page's ticks rather than one per row.
-    const helping = await helpingFor(
+    const helping = await helpingLabelsFor(
       db,
       rows.map((row) => row.id),
     )
@@ -137,7 +137,15 @@ export const registerRosterRoutes = (
     // Ordered and cut by the shared rule rather than here, so #79's member-facing
     // list gives the same answer when it arrives.
     return withPlaces(
-      rows.map((row) => ({ ...row, helping_option_ids: helping.get(row.id) ?? [] })),
+      rows.map((row) => {
+        const ticked = helping.get(row.id) ?? []
+
+        return {
+          ...row,
+          helping_option_ids: ticked.map((entry) => entry.id),
+          helping: ticked.length === 0 ? null : ticked.map((entry) => entry.label).join(', '),
+        }
+      }),
       cap,
     )
   }

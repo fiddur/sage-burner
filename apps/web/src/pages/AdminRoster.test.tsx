@@ -21,6 +21,7 @@ const anEntry = (over: Partial<RosterEntry> = {}): RosterEntry => ({
   departure_date: null,
   lodging_option_id: null,
   lodging: null,
+  helping: null,
   helping_option_ids: [],
   helping_other: null,
   notes: null,

@@ -190,6 +190,14 @@ export const rosterEntrySchema = attendanceFields.extend({
    * anybody.
    */
   lodging: optionalText(200),
+  /**
+   * The ticked helping options' labels, resolved at read time and joined.
+   *
+   * A projection beside the ids, for the same reason `lodging` is one: an
+   * organiser reading the roster or its CSV wants "Sauna, Kitchen", and a column
+   * of UUIDs is no use to anybody.
+   */
+  helping: optionalText(2000),
   /** Derived from payment and join order every read — never stored. */
   waiting: z.boolean(),
 })

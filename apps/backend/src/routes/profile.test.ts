@@ -579,6 +579,26 @@ describe('what someone will help with', () => {
     expect((await tick(server, member.cookie, [theirs])).statusCode).toBe(400)
   })
 
+  it('writes nothing at all when a tick is refused', async () => {
+    // The form sends the columns and the ticks in one PATCH. Validating the ticks
+    // after the column update answers 400 with the notes already saved.
+    const server = await build()
+    const eventId = await givenEvent()
+    const member = await givenMember()
+    await givenComing(eventId, member.id)
+
+    const response = await server.inject({
+      method: 'PATCH',
+      url: '/api/events/active/attendance',
+      headers: { cookie: member.cookie },
+      payload: { notes: 'Should not be saved', helping_option_ids: [randomUUID()] },
+    })
+
+    expect(response.statusCode).toBe(400)
+    const [row] = await db().select().from(attendance).where(eq(attendance.account_id, member.id))
+    expect(row?.notes).toBeNull()
+  })
+
   it('keeps a write-in beside the ticks', async () => {
     const server = await build()
     const eventId = await givenEvent()

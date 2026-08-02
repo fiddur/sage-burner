@@ -10,7 +10,7 @@ import { createApp } from '../app.ts'
 import { createSessions } from '../auth/session.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, attendance, event } from '../db/schema.ts'
+import { account, accountRole, attendance, attendanceHelping, event, eventOption } from '../db/schema.ts'
 import { SESSION_COOKIE } from './auth.ts'
 
 /**
@@ -368,5 +368,61 @@ describe('recording a payment', () => {
 
     const rows = await db().select().from(attendance).where(eq(attendance.account_id, who.id))
     expect(rows.filter((row) => row.payment_status === 'paid')).toHaveLength(1)
+  })
+})
+
+describe('what the roster says about helping out', () => {
+  const givenStay = async (eventId: string, accountId: string) => {
+    const id = randomUUID()
+    await db().insert(attendance).values({
+      id,
+      event_id: eventId,
+      account_id: accountId,
+      joined_at: '2026-07-01T00:00:00Z',
+      payment_status: 'unpaid',
+    })
+    return id
+  }
+
+  it('resolves the labels, since a CSV of UUIDs is no use to anybody', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const admin = await givenAccount('Ada', ['admin'])
+    const who = await givenAccount('Grace')
+    const stay = await givenStay(eventId, who.id)
+
+    const sauna = randomUUID()
+    const kitchen = randomUUID()
+    await db()
+      .insert(eventOption)
+      .values([
+        { id: sauna, event_id: eventId, kind: 'helping', order: 0, label: 'Sauna', capacity: null },
+        { id: kitchen, event_id: eventId, kind: 'helping', order: 1, label: 'Kitchen', capacity: null },
+      ])
+    await db()
+      .insert(attendanceHelping)
+      .values([
+        { attendance_id: stay, option_id: kitchen },
+        { attendance_id: stay, option_id: sauna },
+      ])
+
+    const entry = (await roster(server, admin.cookie, eventId)).json().entries[0]
+
+    // The organiser's order, not the order they happened to be ticked in.
+    expect(entry.helping).toBe('Sauna, Kitchen')
+    expect([...entry.helping_option_ids].sort()).toEqual([sauna, kitchen].sort())
+  })
+
+  it('says nothing rather than an empty string when nobody ticked anything', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const admin = await givenAccount('Ada', ['admin'])
+    const who = await givenAccount('Grace')
+    await givenStay(eventId, who.id)
+
+    const entry = (await roster(server, admin.cookie, eventId)).json().entries[0]
+
+    expect(entry.helping).toBeNull()
+    expect(entry.helping_option_ids).toEqual([])
   })
 })
