@@ -154,7 +154,7 @@ describe('routing', () => {
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('The Burning Sage')
   })
 
-  it('routes every page the app links to, from the nav and the organiser landing page', () => {
+  it('routes every page the app links to, from the nav and the admin landing page', () => {
     // A page can exist, be tested, and still be unreachable because no route
     // names it — which is what happened to /admin/applications.
     //

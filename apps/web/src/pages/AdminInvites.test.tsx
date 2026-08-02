@@ -189,7 +189,7 @@ describe('AdminInvites', () => {
     const getInvites = vi.fn(() => Promise.resolve({ invites: [] }))
     renderPage(stub({ getInvites }), ['member'])
 
-    expect(screen.getByText(/for organisers/)).toBeTruthy()
+    expect(screen.getByText(/admin page/)).toBeTruthy()
     expect(getInvites).not.toHaveBeenCalled()
   })
 })

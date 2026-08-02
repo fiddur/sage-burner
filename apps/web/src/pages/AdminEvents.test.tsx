@@ -68,7 +68,7 @@ describe('AdminEvents', () => {
     expect(screen.getByLabelText('Ends').getAttribute('min')).toBe('2026-12-01')
   })
 
-  it('lets an organiser set the hours the burn is open', async () => {
+  it('lets the hours the burn is open be set', async () => {
     // The grid runs between these, so they are on the create form rather than
     // hidden behind an edit — an organiser who has to find them later gets a
     // schedule covering three whole days for a burn that is two half ones.
@@ -352,7 +352,7 @@ describe('AdminEvents', () => {
       </ViewerProvider>,
     )
 
-    expect(await screen.findByText(/for organisers/)).toBeTruthy()
+    expect(await screen.findByText(/admin page/)).toBeTruthy()
     expect(getEvents).not.toHaveBeenCalled()
   })
 })

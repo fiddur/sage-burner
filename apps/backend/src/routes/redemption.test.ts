@@ -157,6 +157,20 @@ describe('redeeming', () => {
     expect(row?.password_hash).toBeTruthy()
   })
 
+  it('falls back to the email when the body carries no contact', async () => {
+    // The join form stopped asking how to reach someone once it had taken their
+    // email — asking twice on one page was the reported confusion. The column
+    // stays non-null, so the answer they already gave fills it.
+    const server = await build()
+    const token = await givenInvite()
+    const { contact: _omitted, ...noContact } = applicant
+
+    expect((await redeem(server, token, noContact)).statusCode).toBe(201)
+
+    const [row] = await db().select().from(account).where(eq(account.email, 'fredrik@example.org'))
+    expect(row?.contact).toBe('fredrik@example.org')
+  })
+
   it('stamps the token used, so the same link cannot be spent twice', async () => {
     const server = await build()
     const token = await givenInvite()
@@ -264,23 +278,35 @@ describe('redeeming', () => {
     expect(invite?.used_at).toBeNull()
   })
 
-  it('refuses a password too short to be worth hashing', async () => {
+  it('takes a password of any shape, and spends the invite on it', async () => {
+    // No length or composition rule: what makes a good password is the member's
+    // business, and a floor here mostly pushes people to the one they reuse.
     const server = await build()
     const token = await givenInvite()
 
-    const response = await redeem(server, token, { ...applicant, password: 'short' })
+    const response = await redeem(server, token, { ...applicant, password: 'hi' })
+
+    expect(response.statusCode).toBe(201)
+    const [invite] = await db().select().from(inviteToken)
+    expect(invite?.used_at).not.toBeNull()
+  })
+
+  it('refuses an empty password, which is not one', async () => {
+    const server = await build()
+    const token = await givenInvite()
+
+    const response = await redeem(server, token, { ...applicant, password: '' })
 
     expect(response.statusCode).toBe(400)
     const [invite] = await db().select().from(inviteToken)
     expect(invite?.used_at).toBeNull()
   })
 
-  it('refuses a body missing the person, since an organiser has to reach them', async () => {
+  it('refuses a body with no name, which is the one thing the form insists on', async () => {
     const server = await build()
     const token = await givenInvite()
 
     expect((await redeem(server, token, { ...applicant, name: '   ' })).statusCode).toBe(400)
-    expect((await redeem(server, token, { ...applicant, contact: '' })).statusCode).toBe(400)
   })
 
   it('refuses an unrecognised key rather than dropping it', async () => {

@@ -180,6 +180,6 @@ describe('Login', () => {
     renderLogin(vi.fn(() => Promise.resolve({ viewer: null })))
 
     const note = await screen.findByText(/Accounts are created by invitation/)
-    expect(note.textContent).toContain('ask an organiser')
+    expect(note.textContent).toContain('ask someone with admin')
   })
 })

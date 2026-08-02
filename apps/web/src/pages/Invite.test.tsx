@@ -35,9 +35,8 @@ const fill = (label: string, value: string) => {
 
 const complete = () => {
   fill('Email', 'fredrik@example.org')
-  fill('Password', 'a-long-enough-password')
+  fill('Password', 'a-password')
   fill('Your name', 'Fredrik')
-  fill('How can we reach you?', 'fredrik on discord')
 }
 
 const join = () => screen.getByRole('button', { name: 'Join' }).click()
@@ -64,9 +63,8 @@ describe('Invite', () => {
     await waitFor(() =>
       expect(redeemInvite).toHaveBeenCalledWith('a-token', {
         email: 'fredrik@example.org',
-        password: 'a-long-enough-password',
+        password: 'a-password',
         name: 'Fredrik',
-        contact: 'fredrik on discord',
         allergies_notes: 'peanuts',
       }),
     )
@@ -133,20 +131,110 @@ describe('Invite', () => {
     })
   }
 
-  it('refuses a short password here rather than letting the API say no', async () => {
+  it('takes a password of any shape, since what makes a good one is theirs to decide', async () => {
     const redeemInvite = vi.fn(() => Promise.resolve({ viewer: null }))
     renderPage(stub({ redeemInvite }))
 
     await screen.findByRole('button', { name: 'Join' })
     complete()
-    fill('Password', 'short')
+    fill('Password', 'hi')
     join()
 
-    expect((await screen.findByRole('alert')).textContent).toContain('12 characters')
+    await waitFor(() =>
+      expect(redeemInvite).toHaveBeenCalledWith('a-token', expect.objectContaining({ password: 'hi' })),
+    )
+  })
+
+  it('asks for a password, a blank one being no password at all', async () => {
+    const redeemInvite = vi.fn(() => Promise.resolve({ viewer: null }))
+    renderPage(stub({ redeemInvite }))
+
+    await screen.findByRole('button', { name: 'Join' })
+    complete()
+    fill('Password', '')
+    join()
+
+    expect((await screen.findByRole('alert')).textContent).toContain('choose a password')
     expect(redeemInvite).not.toHaveBeenCalled()
   })
 
-  it('refuses a blank name or contact', async () => {
+  it('never asks how to reach them, the email it just took being the answer', async () => {
+    const redeemInvite = vi.fn(() => Promise.resolve({ viewer: null }))
+    renderPage(stub({ redeemInvite }))
+
+    await screen.findByRole('button', { name: 'Join' })
+    expect(screen.queryByLabelText(/reach you/)).toBeNull()
+    complete()
+    join()
+
+    await waitFor(() =>
+      expect(redeemInvite).toHaveBeenCalledWith(
+        'a-token',
+        expect.not.objectContaining({ contact: expect.anything() }),
+      ),
+    )
+  })
+
+  it('puts the complaint by the button that was clicked, and focuses it', async () => {
+    // The reported symptom: on a phone this form is taller than the screen, so an
+    // error rendered above the first field is off screen when Join is tapped and
+    // the button reads as broken. Both halves are asserted — placement after the
+    // button in document order, and focus, which is what scrolls it into view.
+    renderPage(stub())
+
+    await screen.findByRole('button', { name: 'Join' })
+    complete()
+    fill('Your name', '   ')
+    join()
+
+    const alert = await screen.findByRole('alert')
+    const button = screen.getByRole('button', { name: 'Join' })
+
+    expect(document.activeElement).toBe(alert)
+    expect(button.previousElementSibling).toBe(alert)
+  })
+
+  it('says it again on a second attempt, rather than looking broken twice', async () => {
+    // The first tap focuses the alert. If the second tap does not, someone who
+    // scrolled off to look at a field is left with a button that appears to do
+    // nothing — which is the whole symptom this is here to fix, reappearing on
+    // attempt two. Both `setError` calls land in one commit, so the message that
+    // reaches the DOM is unchanged and only the attempt tells them apart.
+    renderPage(stub())
+
+    await screen.findByRole('button', { name: 'Join' })
+    complete()
+    fill('Your name', '   ')
+    join()
+
+    const alert = await screen.findByRole('alert')
+    alert.blur()
+    expect(document.activeElement).not.toBe(alert)
+
+    join()
+
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('alert')))
+  })
+
+  it('leaves the focus alone while they are typing the fix', async () => {
+    // The other half of the same rule: refocusing on every render would snatch
+    // the caret out of the field mid-correction.
+    renderPage(stub())
+
+    await screen.findByRole('button', { name: 'Join' })
+    complete()
+    fill('Your name', '   ')
+    join()
+    await screen.findByRole('alert')
+
+    const nameBox = screen.getByLabelText('Your name')
+    nameBox.focus()
+    fill('Your name', 'Fredrik')
+
+    expect(document.activeElement).toBe(nameBox)
+  })
+
+  it('refuses a blank name', async () => {
     const redeemInvite = vi.fn(() => Promise.resolve({ viewer: null }))
     renderPage(stub({ redeemInvite }))
 

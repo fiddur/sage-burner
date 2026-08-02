@@ -119,13 +119,13 @@ describe('AdminSettings', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('Could not load')
   })
 
-  it('offers nothing to someone who is not an organiser', async () => {
+  it('offers nothing to someone who does not have admin', async () => {
     const getInstallation = vi.fn<AdminSettingsApi['getInstallation']>(() =>
       Promise.resolve({ installation: { title: 'Sage Burner' } }),
     )
     renderPage(stub({ getInstallation }), { status: 'signed-out' })
 
-    expect(screen.getByText(/for organisers/)).toBeTruthy()
+    expect(screen.getByText(/admin page/)).toBeTruthy()
     expect(screen.queryByRole('textbox')).toBeNull()
     expect(getInstallation).not.toHaveBeenCalled()
   })

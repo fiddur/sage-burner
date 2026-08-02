@@ -76,7 +76,7 @@ export const AdminSettings = ({ api }: { api: AdminSettingsApi }) => {
     return (
       <section class="page">
         <h1>Settings</h1>
-        <p>This area is for organisers. If that should be you, ask an existing organiser.</p>
+        <p>This is an admin page. If it should be open to you, ask someone who already has admin.</p>
       </section>
     )
   }
