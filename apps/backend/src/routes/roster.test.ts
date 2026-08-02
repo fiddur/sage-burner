@@ -413,6 +413,39 @@ describe('what the roster says about helping out', () => {
     expect([...entry.helping_option_ids].sort()).toEqual([sauna, kitchen].sort())
   })
 
+  it('carries the ticks on a payment response too, which `Attendance` promises', async () => {
+    // Nothing reads them off this endpoint today. The type says every attendance
+    // carries them, and a route quietly answering a narrower shape is how that
+    // stops being true.
+    const server = await build()
+    const eventId = await givenEvent()
+    const admin = await givenAccount('Ada', ['admin'])
+    const who = await givenAccount('Grace')
+    const stay = await givenStay(eventId, who.id)
+
+    const sauna = randomUUID()
+    await db()
+      .insert(eventOption)
+      .values({ id: sauna, event_id: eventId, kind: 'helping', order: 0, label: 'Sauna', capacity: null })
+    await db().insert(attendanceHelping).values({ attendance_id: stay, option_id: sauna })
+
+    const paid = await server.inject({
+      method: 'PATCH',
+      url: `/api/admin/events/${eventId}/attendance/${who.id}/payment`,
+      headers: { cookie: admin.cookie },
+      payload: { payment_status: 'paid' },
+    })
+    const read = await server.inject({
+      method: 'PATCH',
+      url: `/api/admin/events/${eventId}/attendance/${who.id}/payment`,
+      headers: { cookie: admin.cookie },
+      payload: {},
+    })
+
+    expect(paid.json().attendance.helping_option_ids).toEqual([sauna])
+    expect(read.json().attendance.helping_option_ids).toEqual([sauna])
+  })
+
   it('says nothing rather than an empty string when nobody ticked anything', async () => {
     const server = await build()
     const eventId = await givenEvent()

@@ -10,7 +10,7 @@ import { createGuards } from '../auth/guards.ts'
 import { account, attendance, event, eventOption } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 import { activeEvent, todayIso } from './events.ts'
-import { helpingLabelsFor } from './helping.ts'
+import { helpingIdsFor, helpingLabelsFor } from './helping.ts'
 
 export interface RosterDeps extends GuardDeps {
   now?: () => Date
@@ -75,7 +75,9 @@ export const registerRosterRoutes = (
           .where(and(eq(attendance.event_id, eventId), eq(attendance.account_id, accountId)))
           .limit(1)
 
-        return row === undefined ? reply.code(404).send(errorResponse('not_found')) : { attendance: row }
+        return row === undefined
+          ? reply.code(404).send(errorResponse('not_found'))
+          : { attendance: await withHelping(row) }
       }
 
       const [updated] = await db
@@ -86,9 +88,20 @@ export const registerRosterRoutes = (
 
       return updated === undefined
         ? reply.code(404).send(errorResponse('not_found'))
-        : { attendance: updated }
+        : { attendance: await withHelping(updated) }
     },
   )
+
+  /**
+   * The ticks travel with the row here too.
+   *
+   * Nothing reads them off a payment response today, but `Attendance` says every
+   * one of these carries them, and a route quietly answering a different shape is
+   * how that stops being true.
+   */
+  async function withHelping(row: typeof attendance.$inferSelect) {
+    return { ...row, helping_option_ids: await helpingIdsFor(db, row.id) }
+  }
 
   async function eventFor(eventId: string) {
     const [row] = await db
