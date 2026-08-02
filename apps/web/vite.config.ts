@@ -15,6 +15,11 @@ export default defineConfig({
   },
 
   build: {
+    // Publishes the TypeScript at `/assets/*.map`, served publicly and
+    // `immutable`. Kept deliberately: the licence is AGPL, so the source is
+    // public whatever this setting says, and a stack trace from a member's
+    // browser that names a real line is worth far more than the nothing this
+    // would hide.
     sourcemap: true,
   },
 
