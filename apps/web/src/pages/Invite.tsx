@@ -13,15 +13,14 @@ export type InviteApi = Pick<ApiClient, 'getInviteState' | 'redeemInvite'>
 type Loaded = { status: 'loading' } | { status: 'ready'; state: InviteState } | { status: 'failed' }
 
 /**
- * Matches `newPasswordSchema`'s floor, so the page refuses what the API would.
+ * Spending an invitation: the page where someone becomes a member.
  *
- * The controls below are `aria-required` rather than natively `required`, and
- * carry no `minLength`, for the reason the application form gives: native
- * validation blocks submission before this handler runs, which would leave the
- * browser deciding the empty cases and this page the rest. The browser's rules
- * are the weaker ones — it accepts `"   "` for a name.
+ * The controls are `aria-required` rather than natively `required`, and carry no
+ * `minLength`, for the reason the application form gives: native validation
+ * blocks submission before this handler runs, which would leave the browser
+ * deciding the empty cases and this page the rest. The browser's rules are the
+ * weaker ones — it accepts `"   "` for a name.
  */
-
 export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
   const viewer = useViewer()
   const setViewer = useSetViewer()

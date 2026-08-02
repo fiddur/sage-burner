@@ -32,20 +32,16 @@ export const emailSchema = z.string().trim().toLowerCase().pipe(z.email().max(25
 export const loginPasswordSchema = z.string().min(1).max(1024)
 
 /**
- * A password being *set*, where a strength floor is fair game.
- *
- * Separate from `loginPasswordSchema` on purpose: a rule added here must never
- * be applied at login, or raising it locks out everyone whose existing password
- * no longer passes. Length only — composition rules push people toward
- * `Passw0rd!` and NIST dropped them.
- */
-/**
  * A password being set, with no quality rule beyond existing.
  *
  * Length minimums are the app deciding what a good password is on someone else's
  * behalf, and they push people towards the one they already reuse. Fredrik's
  * call: that is the member's business. `min(1)` only because a blank password is
  * not a password, and the max is a storage bound rather than a judgement.
+ *
+ * Identical to `loginPasswordSchema` today and still separate on purpose: a rule
+ * added here must never reach login, where it would lock out everyone whose
+ * existing password no longer passes.
  */
 export const newPasswordSchema = z.string().min(1).max(1024)
 
