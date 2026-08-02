@@ -78,7 +78,7 @@ const seedAttendance = (id: string, account_id: string) =>
       arrival_date: null,
       departure_date: null,
       lodging_option_id: null,
-      shift_preference: null,
+      helping_other: null,
       notes: null,
       payment_status: 'unpaid',
       payment_date: null,

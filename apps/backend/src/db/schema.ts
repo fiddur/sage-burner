@@ -511,7 +511,13 @@ export const attendance = sqliteTable(
      * `event-options.ts` turns the refusal into a 409.
      */
     lodging_option_id: text('lodging_option_id').references(() => eventOption.id),
-    shift_preference: text('shift_preference'),
+    /**
+     * Something to help with that the list does not have.
+     *
+     * Beside the ticked options rather than instead of them: the point of the
+     * list is counting, and the point of this is that a list is never complete.
+     */
+    helping_other: text('helping_other'),
     notes: text('notes'),
     /** Admin-set only. Members can read their own status but never write it. */
     payment_status: text('payment_status', { enum: paymentStatuses }).notNull().default('unpaid'),
@@ -532,6 +538,31 @@ export const attendance = sqliteTable(
     ),
     check('attendance_payment_status_check', oneOf(table.payment_status, paymentStatuses)),
   ],
+)
+
+/**
+ * What one member ticked on the helping-out list.
+ *
+ * A row per choice rather than a JSON array on `attendance`: the whole reason the
+ * list exists is so an organiser can count who is up for the kitchen, and counting
+ * inside a JSON column is the thing that gets rewritten later.
+ *
+ * Both sides cascade. Withdrawing from a burn takes the ticks with it, and so does
+ * an organiser removing an option — unlike lodging, where a bed someone is in must
+ * not vanish underneath them. Nobody is displaced by "kitchen" ceasing to be
+ * offered.
+ */
+export const attendanceHelping = sqliteTable(
+  'attendance_helping',
+  {
+    attendance_id: text('attendance_id')
+      .notNull()
+      .references(() => attendance.id, { onDelete: 'cascade' }),
+    option_id: text('option_id')
+      .notNull()
+      .references(() => eventOption.id, { onDelete: 'cascade' }),
+  },
+  (table) => [primaryKey({ columns: [table.attendance_id, table.option_id] })],
 )
 
 /**

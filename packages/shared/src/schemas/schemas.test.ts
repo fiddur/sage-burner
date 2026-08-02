@@ -257,7 +257,8 @@ describe('attendanceSchema', () => {
     arrival_date: '2026-10-02',
     departure_date: '2026-10-04',
     lodging_option_id: OTHER_ID,
-    shift_preference: 'Either/both',
+    helping_option_ids: [ID],
+    helping_other: 'Chopping wood',
     notes: null,
     payment_status: 'paid',
     payment_date: '2026-09-01',
@@ -274,7 +275,8 @@ describe('attendanceSchema', () => {
       arrival_date: null,
       departure_date: null,
       lodging_option_id: null,
-      shift_preference: null,
+      helping_option_ids: [],
+      helping_other: null,
       payment_status: 'unpaid',
       payment_date: null,
     }
@@ -287,10 +289,6 @@ describe('attendanceSchema', () => {
     // cannot support — so an id is the only thing that parses.
     expect(attendanceSchema.safeParse({ ...aMember, lodging_option_id: null }).success).toBe(true)
     expect(attendanceSchema.safeParse({ ...aMember, lodging_option_id: 'Hammock' }).success).toBe(false)
-  })
-
-  it('still takes what to help with as free text, which the lists have not replaced yet', () => {
-    expect(attendanceSchema.safeParse({ ...aMember, shift_preference: 'Sauna tending' }).success).toBe(true)
   })
 
   it('rejects a payment status outside the vocabulary', () => {
@@ -324,7 +322,8 @@ describe('optionalText', () => {
     arrival_date: null,
     departure_date: null,
     lodging_option_id: null,
-    shift_preference: null,
+    helping_option_ids: [],
+    helping_other: null,
     notes,
     payment_status: 'unpaid',
     payment_date: null,
