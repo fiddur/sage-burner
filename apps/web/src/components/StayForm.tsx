@@ -17,6 +17,7 @@ export const StayForm = ({
   api,
   attendance,
   lodgingOptions = [],
+  helpingOptions = [],
   taken = {},
   onSaved,
 }: {
@@ -24,6 +25,8 @@ export const StayForm = ({
   attendance: Attendance
   /** This burn's lodging list, in the organiser's order. */
   lodgingOptions?: readonly EventOption[]
+  /** This burn's helping-out list, in the organiser's order. */
+  helpingOptions?: readonly EventOption[]
   /** How many have already picked each option, by option id. */
   taken?: Readonly<Record<string, number>>
   onSaved: (saved: Attendance) => void
@@ -31,7 +34,8 @@ export const StayForm = ({
   const [arrival, setArrival] = useState(attendance.arrival_date ?? '')
   const [departure, setDeparture] = useState(attendance.departure_date ?? '')
   const [lodging, setLodging] = useState(attendance.lodging_option_id ?? '')
-  const [shift, setShift] = useState(attendance.shift_preference ?? '')
+  const [helping, setHelping] = useState<readonly string[]>(attendance.helping_option_ids)
+  const [helpingOther, setHelpingOther] = useState(attendance.helping_other ?? '')
   const [notes, setNotes] = useState(attendance.notes ?? '')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -55,7 +59,8 @@ export const StayForm = ({
         arrival_date: blankToNull(arrival),
         departure_date: blankToNull(departure),
         lodging_option_id: lodging === '' ? null : lodging,
-        shift_preference: blankToNull(shift),
+        helping_option_ids: [...helping],
+        helping_other: blankToNull(helpingOther),
         notes: blankToNull(notes),
       })
       onSaved(updated)
@@ -145,16 +150,41 @@ export const StayForm = ({
         </select>
       </label>
 
-      <label class="field">
-        <span>What would you rather help with?</span>
-        <input
-          type="text"
-          name="shift_preference"
-          maxLength={200}
-          value={shift}
-          onInput={(inputEvent) => setShift(inputEvent.currentTarget.value)}
-        />
-      </label>
+      <fieldset class="field">
+        <legend>What would you like to help with?</legend>
+
+        {helpingOptions.length === 0 && (
+          <p class="form-note">Nothing listed yet — write it in below if you already know.</p>
+        )}
+
+        {helpingOptions.map((option) => (
+          <label key={option.id} class="field-inline">
+            <input
+              type="checkbox"
+              checked={helping.includes(option.id)}
+              onChange={(changeEvent) =>
+                setHelping(
+                  changeEvent.currentTarget.checked
+                    ? [...helping, option.id]
+                    : helping.filter((id) => id !== option.id),
+                )
+              }
+            />
+            <span>{option.label}</span>
+          </label>
+        ))}
+
+        <label class="field">
+          <span>Something else</span>
+          <input
+            type="text"
+            name="helping_other"
+            maxLength={200}
+            value={helpingOther}
+            onInput={(inputEvent) => setHelpingOther(inputEvent.currentTarget.value)}
+          />
+        </label>
+      </fieldset>
 
       <label class="field">
         <span>Anything else we should know?</span>

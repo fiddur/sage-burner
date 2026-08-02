@@ -89,12 +89,20 @@ export const attendanceFields = z.object({
    */
   lodging_option_id: idSchema.nullable(),
   /**
-   * Still free text — "Cooking", "Cleaning", "Either/both", or whatever is next.
+   * Which helping-out options they ticked, as ids.
    *
-   * The helping list in `event_option` exists but nothing consumes it yet; this
-   * becomes a set of references and a write-in when it does.
+   * A set, because people help with more than one thing, and references rather
+   * than text so an organiser can count who is up for the kitchen. Stored as rows
+   * in `attendance_helping`; a field here only on the way in and out.
    */
-  shift_preference: optionalText(200),
+  helping_option_ids: z.array(idSchema),
+  /**
+   * Something to help with that the list does not have.
+   *
+   * Beside the ticks rather than instead of them. The point of the list is
+   * counting; the point of this is that a list is never complete.
+   */
+  helping_other: optionalText(200),
   notes: optionalText(2000),
   /** Set by admins only. Members see their own status but cannot change it. */
   payment_status: z.enum(paymentStatuses),

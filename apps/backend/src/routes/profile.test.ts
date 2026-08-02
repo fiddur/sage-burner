@@ -45,6 +45,12 @@ const build = async () => {
   return app
 }
 
+const client = () => {
+  const found = handle?.client
+  if (found === undefined) throw new Error('build() first')
+  return found
+}
+
 const db = () => {
   const found = handle?.db
   if (found === undefined) throw new Error('build() first')
@@ -214,11 +220,11 @@ describe('a member editing their stay', () => {
       arrival_date: '2026-08-01',
       departure_date: '2026-08-05',
       lodging_option_id: null,
-      shift_preference: 'Sauna tending',
+      helping_other: 'Sauna tending',
     })
 
     expect(response.statusCode).toBe(200)
-    expect(response.json().attendance.shift_preference).toBe('Sauna tending')
+    expect(response.json().attendance.helping_other).toBe('Sauna tending')
     expect(response.json().attendance.arrival_date).toBe('2026-08-01')
   })
 
@@ -476,5 +482,138 @@ describe('picking somewhere to sleep', () => {
     await givenComing(eventId, member.id)
 
     expect((await pick(server, member.cookie, randomUUID())).statusCode).toBe(400)
+  })
+})
+
+describe('what someone will help with', () => {
+  const givenHelping = async (eventId: string, label: string) => {
+    const id = randomUUID()
+    await db()
+      .insert(eventOption)
+      .values({ id, event_id: eventId, kind: 'helping', order: 0, label, capacity: null })
+    return id
+  }
+
+  const tick = (server: FastifyInstance, cookie: string, ids: string[]) =>
+    server.inject({
+      method: 'PATCH',
+      url: '/api/events/active/attendance',
+      headers: { cookie },
+      payload: { helping_option_ids: ids },
+    })
+
+  it('records several at once, because people help with more than one thing', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const member = await givenMember()
+    await givenComing(eventId, member.id)
+    const sauna = await givenHelping(eventId, 'Sauna')
+    const kitchen = await givenHelping(eventId, 'Kitchen')
+
+    const response = await tick(server, member.cookie, [sauna, kitchen])
+
+    expect(response.statusCode).toBe(200)
+    expect([...response.json().attendance.helping_option_ids].sort()).toEqual([sauna, kitchen].sort())
+  })
+
+  it('replaces the set rather than adding to it', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const member = await givenMember()
+    await givenComing(eventId, member.id)
+    const sauna = await givenHelping(eventId, 'Sauna')
+    const kitchen = await givenHelping(eventId, 'Kitchen')
+    await tick(server, member.cookie, [sauna, kitchen])
+
+    const response = await tick(server, member.cookie, [kitchen])
+
+    expect(response.json().attendance.helping_option_ids).toEqual([kitchen])
+  })
+
+  it('takes them all back off', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const member = await givenMember()
+    await givenComing(eventId, member.id)
+    const sauna = await givenHelping(eventId, 'Sauna')
+    await tick(server, member.cookie, [sauna])
+
+    expect((await tick(server, member.cookie, [])).json().attendance.helping_option_ids).toEqual([])
+  })
+
+  it('refuses a lodging option ticked as a thing to help with', async () => {
+    // The checkboxes only offer the helping list, but the API takes what it is
+    // sent — and a bed is not a chore.
+    const server = await build()
+    const eventId = await givenEvent()
+    const member = await givenMember()
+    await givenComing(eventId, member.id)
+    const bed = randomUUID()
+    await db()
+      .insert(eventOption)
+      .values({ id: bed, event_id: eventId, kind: 'lodging', order: 0, label: 'Temple', capacity: 9 })
+
+    expect((await tick(server, member.cookie, [bed])).statusCode).toBe(400)
+  })
+
+  it('refuses another burn\u2019s helping option', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const member = await givenMember()
+    await givenComing(eventId, member.id)
+
+    const elsewhere = randomUUID()
+    await db()
+      .insert(event)
+      .values({
+        id: elsewhere,
+        name: 'Another burn',
+        slug: `other-${elsewhere.slice(0, 8)}`,
+        start_date: '2027-08-01',
+        end_date: '2027-08-05',
+        member_cap: 42,
+        created_at: NOW,
+      })
+    const theirs = await givenHelping(elsewhere, 'Their sauna')
+
+    expect((await tick(server, member.cookie, [theirs])).statusCode).toBe(400)
+  })
+
+  it('keeps a write-in beside the ticks', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const member = await givenMember()
+    await givenComing(eventId, member.id)
+    const sauna = await givenHelping(eventId, 'Sauna')
+
+    const response = await server.inject({
+      method: 'PATCH',
+      url: '/api/events/active/attendance',
+      headers: { cookie: member.cookie },
+      payload: { helping_option_ids: [sauna], helping_other: 'Chopping wood' },
+    })
+
+    expect(response.json().attendance.helping_option_ids).toEqual([sauna])
+    expect(response.json().attendance.helping_other).toBe('Chopping wood')
+  })
+
+  it('lets an organiser remove an option someone ticked, unlike a bed', async () => {
+    // Nobody is displaced by "kitchen" ceasing to be offered, so this cascades
+    // where lodging refuses.
+    const server = await build()
+    const eventId = await givenEvent()
+    const member = await givenMember()
+    await givenComing(eventId, member.id)
+    const sauna = await givenHelping(eventId, 'Sauna')
+    await tick(server, member.cookie, [sauna])
+
+    client().prepare('delete from event_option where id = ?').run(sauna)
+
+    const after = await server.inject({
+      method: 'GET',
+      url: '/api/events/active/attendance',
+      headers: { cookie: member.cookie },
+    })
+    expect(after.json().attendance.helping_option_ids).toEqual([])
   })
 })

@@ -13,6 +13,7 @@ import { account, attendance, eventOption } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 import { viewerFor } from './auth.ts'
 import { activeEvent, todayIso } from './events.ts'
+import { helpingIdsFor, setHelping } from './helping.ts'
 
 export interface ProfileDeps extends GuardDeps {
   now?: () => Date
@@ -165,11 +166,8 @@ export const registerProfileRoutes = (
 
     const mine = and(eq(attendance.event_id, found.id), eq(attendance.account_id, viewer.account_id))
 
-    if (Object.keys(parsed.data).length === 0) {
-      const [row] = await db.select().from(attendance).where(mine).limit(1)
-
-      return row === undefined ? reply.code(404).send(errorResponse('not_found')) : { attendance: row }
-    }
+    // `helping_option_ids` lives in its own table, so it never reaches `set()`.
+    const { helping_option_ids: helping, ...columns } = parsed.data
 
     // Counted and compared, not composed into the statement: at forty-odd people
     // two members taking the last mattress in the same millisecond is not a
@@ -184,11 +182,17 @@ export const registerProfileRoutes = (
 
     let updated: (typeof attendance.$inferSelect)[]
     try {
-      updated = await db
-        .update(attendance)
-        .set(parsed.data)
-        .where(and(mine, stayOrderCondition(parsed.data)))
-        .returning()
+      // No columns to set is not an error: the body may be empty, or may carry
+      // only the helping ticks, which live in their own table. `set({})` is not
+      // valid SQL, so both read instead of writing.
+      updated =
+        Object.keys(columns).length === 0
+          ? await db.select().from(attendance).where(mine).limit(1)
+          : await db
+              .update(attendance)
+              .set(columns)
+              .where(and(mine, stayOrderCondition(columns)))
+              .returning()
     } catch (failure) {
       // A `lodging_option_id` naming no option. The foreign key is the authority
       // rather than a pre-read, which would be a second query saying the same.
@@ -198,7 +202,14 @@ export const registerProfileRoutes = (
 
     const [first] = updated
 
-    if (first !== undefined) return { attendance: first }
+    if (first !== undefined) {
+      if (helping !== undefined) {
+        const verdict = await setHelping(db, first.id, found.id, helping)
+        if (verdict === 'invalid') return reply.code(400).send(errorResponse('bad_request'))
+      }
+
+      return { attendance: { ...first, helping_option_ids: await helpingIdsFor(db, first.id) } }
+    }
 
     // Nothing was written, which is either "not coming to this burn" or "that
     // would put the departure before the arrival". Asked rather than inferred.

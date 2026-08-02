@@ -156,6 +156,7 @@ export const MyBurn = ({ api }: { api: MyBurnApi }) => {
                 api={api}
                 attendance={loaded.mine.attendance}
                 lodgingOptions={loaded.lodging.filter((option) => option.kind === 'lodging')}
+                helpingOptions={loaded.lodging.filter((option) => option.kind === 'helping')}
                 taken={Object.fromEntries(loaded.lodging.map((option) => [option.id, option.taken]))}
                 onSaved={() => {
                   // Reloaded rather than spliced: the `taken` counts move when a
