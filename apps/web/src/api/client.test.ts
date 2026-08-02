@@ -220,6 +220,38 @@ describe('createApiClient', () => {
     })
   })
 
+  it('maps a connection that drops mid-body, not just one that never opened', async () => {
+    // Headers arrived, so `doFetch` resolved and its catch is behind us; the
+    // stream then fails. Same failure family as an unreachable server, a later
+    // point in the same request — and the last thing standing between a member
+    // and the browser's own wording.
+    const dropped = new ReadableStream({
+      start: (controller) => controller.error(new TypeError('network error')),
+    })
+    const doFetch = vi.fn<typeof fetch>(() => Promise.resolve(new Response(dropped, { status: 200 })))
+
+    const failure = createApiClient(doFetch).getVersion()
+
+    await expect(failure).rejects.toThrow('Could not reach the server')
+    await expect(failure).rejects.toMatchObject({ status: 0, code: 'network' })
+  })
+
+  it('does not call a body it cannot serialise a network failure', async () => {
+    // `JSON.stringify` used to run inside the same `try` as the fetch, so a
+    // circular body — a client bug — was reported as the server being
+    // unreachable, which sends whoever reads it to check their wifi.
+    const circular: Record<string, unknown> = {}
+    circular.self = circular
+    const doFetch = vi.fn<typeof fetch>(() => Promise.resolve(new Response('{}')))
+
+    const thrown = await createApiClient(doFetch)
+      .request('/things', { method: 'POST', body: circular })
+      .catch((failure: unknown) => failure)
+
+    expect(isApiError(thrown)).toBe(false)
+    expect(doFetch).not.toHaveBeenCalled()
+  })
+
   it('passes an abort signal through so navigation can cancel in-flight requests', async () => {
     const doFetch = respondWith({ build_sha: 'abc' })
     const controller = new AbortController()

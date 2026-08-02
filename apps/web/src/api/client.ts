@@ -162,6 +162,11 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
     const { method = 'GET', body, signal } = options
 
     let response: Response
+    // Serialised outside the `try`: a body that will not stringify is a bug in
+    // the caller, and reporting it as "could not reach the server" sends whoever
+    // reads that to check their wifi.
+    const payload = body === undefined ? undefined : JSON.stringify(body)
+
     try {
       response = await doFetch(`/api${path}`, {
         method,
@@ -169,8 +174,8 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
         // Sessions are cookie-based; without this the browser omits them on
         // fetch by default and every authenticated call would 401.
         credentials: 'same-origin',
-        headers: body === undefined ? undefined : { 'content-type': 'application/json' },
-        body: body === undefined ? undefined : JSON.stringify(body),
+        headers: payload === undefined ? undefined : { 'content-type': 'application/json' },
+        body: payload,
       })
     } catch (cause) {
       throw failureToReach(cause)
@@ -185,7 +190,16 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
 
     // Read as text first: a 200 or 201 with no body is a success, and
     // `response.json()` would answer it with a parse error instead.
-    const text = await response.text()
+    //
+    // Wrapped too, and not only the fetch above: headers can arrive and the
+    // connection drop while the body is still streaming, which is the same
+    // failure at a later point in the same request.
+    let text: string
+    try {
+      text = await response.text()
+    } catch (cause) {
+      throw failureToReach(cause)
+    }
     if (text.trim() === '') return undefined as T
 
     try {
