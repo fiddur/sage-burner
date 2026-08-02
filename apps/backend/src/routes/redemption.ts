@@ -19,6 +19,7 @@ export interface RedemptionDeps {
   config: Config
   sessions: Sessions
   now?: () => Date
+  hash?: (password: string) => Promise<string>
 }
 
 const digestOf = (token: string) => createHash('sha256').update(token).digest('hex')
@@ -36,7 +37,7 @@ const isEmailConflict = (error: unknown) =>
  */
 export const registerRedemptionRoutes = (
   app: FastifyInstance,
-  { db, config, sessions, now = () => new Date() }: RedemptionDeps,
+  { db, config, sessions, now = () => new Date(), hash = hashPassword }: RedemptionDeps,
 ) => {
   app.get<{ Params: { token: string } }>('/api/invites/:token', async (request, reply) => {
     void noStore(reply)
@@ -65,10 +66,28 @@ export const registerRedemptionRoutes = (
     const digest = digestOf(request.params.token)
     const [invite] = await db.select().from(inviteToken).where(eq(inviteToken.token_hash, digest)).limit(1)
 
-    if (invite === undefined) return reply.code(404).send(errorResponse('not_found'))
-    if (inviteStatusOf(invite, now()) !== 'outstanding') {
+    // One answer for unknown, expired and spent alike. The GET handler hides the
+    // same distinction and says why; a POST that gave it away made the file argue
+    // one way and act the other twenty lines apart.
+    if (invite === undefined || inviteStatusOf(invite, now()) !== 'outstanding') {
       return reply.code(409).send(errorResponse('conflict'))
     }
+
+    // Before the taken-address check, not after, and this ordering is the whole
+    // point: the 409 for an address that already has an account used to return
+    // without hashing while a success spent ~230ms in scrypt, so the two were
+    // told apart by latency. Anyone holding one unspent invite could then ask
+    // "is this person a member?" for any address, repeatedly — a 409 does not
+    // spend the token — which is the private fact this app exists to hold.
+    // `auth.ts`'s login is deliberately shaped the same way.
+    //
+    // The cost is real: a redemption that cannot finish still burns a scrypt
+    // slot. Redemption is rare and gated behind holding an invite, so that is a
+    // fair trade rather than an oversight.
+    //
+    // Outside the transaction either way: holding a write transaction open
+    // across scrypt would block every other writer for that long.
+    const password_hash = await hash(parsed.data.password)
 
     // Checked before the write so the token is not spent on a request that cannot
     // finish: an account whose email is taken has nothing to retry with, and the
@@ -80,10 +99,6 @@ export const registerRedemptionRoutes = (
       .where(eq(account.email, parsed.data.email))
       .limit(1)
     if (taken !== undefined) return reply.code(409).send(errorResponse('conflict'))
-
-    // Hashed outside the transaction: scrypt costs ~230ms, and holding a write
-    // transaction open across it would block every other writer for that long.
-    const password_hash = await hashPassword(parsed.data.password)
     const accountId = randomUUID()
 
     // One transaction for the account, its role and the stamp. Half a redemption

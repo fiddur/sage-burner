@@ -1333,6 +1333,20 @@ Two races are closed, and each has a test that fails without it:
 The password is hashed _outside_ the transaction. Holding a write transaction open
 across 230ms of scrypt would block every other writer for that long.
 
+It is also hashed **before** the check for an address that already has an
+account, and that ordering is load-bearing. Returning the `409` without hashing
+made the two outcomes tell themselves apart by latency, and a `409` does not
+spend the token — so one unspent invite became an unlimited "is this person a
+member?" oracle for any address the holder chose. That is the private fact this
+app exists to hold. `POST /api/auth/login` is shaped the same way and for the
+same reason. The cost is that a redemption which cannot finish still burns a
+scrypt slot; redemption is rare and gated behind holding an invite.
+
+The `POST` gives **one answer** — `409` — for unknown, expired and spent alike,
+matching what the `GET` above deliberately hides. There is nothing to enumerate
+either way, the token being 256 bits of CSPRNG, but a file that argues one way
+and acts the other twenty lines apart is how the argument gets lost.
+
 **No `attendance` row is created.** Redeeming makes you a member of the community;
 saying which burn you are coming to is a separate act, and #76 owns it.
 

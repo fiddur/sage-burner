@@ -39,6 +39,11 @@ export interface AppDeps {
    * written against the real clock would pass in July and fail in September.
    */
   now?: () => Date
+  /**
+   * Password hashing, injected only so redemption's equal-cost property can be
+   * asserted as a wait rather than as ~230ms of real scrypt in the suite.
+   */
+  hash?: (password: string) => Promise<string>
 }
 
 /** The API lives here; everything else is the single-page app. */
@@ -249,6 +254,7 @@ const sessionDeps = (config: Config) => ({
 export const createApp = async ({
   db,
   config,
+  hash,
   now = () => new Date(),
 }: AppDeps): Promise<FastifyInstance> => {
   const app = Fastify({
@@ -319,7 +325,7 @@ export const createApp = async ({
   registerApplicationRoutes(app, { db, now })
   registerApplicationReviewRoutes(app, { db, sessions, now })
   registerInviteRoutes(app, { db, sessions, now })
-  registerRedemptionRoutes(app, { db, config, sessions, now })
+  registerRedemptionRoutes(app, { db, config, sessions, now, hash })
   registerAttendanceRoutes(app, { db, sessions, now })
   registerProfileRoutes(app, { db, sessions, now })
   registerRosterRoutes(app, { db, sessions, now })

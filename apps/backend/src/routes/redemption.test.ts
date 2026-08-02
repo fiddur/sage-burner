@@ -2,7 +2,7 @@ import type { FastifyInstance, LightMyRequestResponse } from 'fastify'
 
 import { eq } from 'drizzle-orm'
 import { createHash, randomUUID } from 'node:crypto'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { DbHandle } from '../db/index.ts'
 
@@ -33,16 +33,24 @@ afterEach(async () => {
   handle = undefined
 })
 
-const build = async (now: () => Date = () => new Date(NOW)) => {
+const build = async (now: () => Date = () => new Date(NOW), hash?: (password: string) => Promise<string>) => {
   handle = createDb({ url: ':memory:' })
   runMigrations(handle)
   app = await createApp({
     db: handle.db,
     config: createConfig({ LOG_LEVEL: 'silent', SESSION_SECRET: SECRET }),
     now,
+    hash,
   })
   return app
 }
+
+/** Stands in for scrypt at a known, small cost, so a wait can be asserted. */
+const slowHash = (ms: number) =>
+  vi.fn(async (password: string) => {
+    await new Promise((resolve) => setTimeout(resolve, ms))
+    return `hashed:${password}`
+  })
 
 const db = () => {
   const found = handle?.db
@@ -242,10 +250,55 @@ describe('redeeming', () => {
     expect(await db().select().from(account)).toHaveLength(1)
   })
 
-  it('refuses a token nobody minted', async () => {
+  it('answers a token nobody minted exactly as it answers a spent one', async () => {
+    // The GET handler hides this distinction on purpose, and said so in a comment
+    // twenty lines from a POST that gave it away. Both are 409 now: the token is
+    // 256 bits of CSPRNG so there is nothing to enumerate, but a file that argues
+    // one way and acts the other is how the argument gets lost.
     const server = await build()
+    const spent = await givenInvite({ used_at: NOW })
 
-    expect((await redeem(server, 'not-a-real-token')).statusCode).toBe(404)
+    const unknown = await redeem(server, 'not-a-real-token')
+    const used = await redeem(server, spent)
+
+    expect(unknown.statusCode).toBe(409)
+    expect(unknown.json()).toEqual(used.json())
+  })
+
+  it('spends the hash before deciding the address is taken', async () => {
+    // The oracle this closes: the 409 for a taken address used to return before
+    // scrypt ran, while a success spent ~230ms in it. Anyone holding one unspent
+    // invite could then ask "is this person a member?" for any address they
+    // liked, repeatedly — the 409 does not spend the token — and read the answer
+    // off the latency. Membership is the private fact this app holds.
+    //
+    // Asserted as a wait rather than a call count: a hash started and not waited
+    // for would be called and still answer fast.
+    const hash = slowHash(60)
+    const server = await build(() => new Date(NOW), hash)
+    const token = await givenInvite()
+    await db()
+      .insert(account)
+      .values({ id: randomUUID(), email: 'fredrik@example.org', password_hash: null, created_at: NOW })
+
+    const started = Date.now()
+    const response = await redeem(server, token)
+
+    expect(response.statusCode).toBe(409)
+    expect(hash).toHaveBeenCalledWith('a-long-enough-password')
+    expect(Date.now() - started).toBeGreaterThanOrEqual(50)
+  })
+
+  it('hashes for real when nothing is injected', async () => {
+    // The seam above is only honest if the default is the actual scrypt. A stored
+    // hash that verifies is what says so.
+    const server = await build()
+    const token = await givenInvite()
+
+    expect((await redeem(server, token)).statusCode).toBe(201)
+
+    const [row] = await db().select().from(account).where(eq(account.email, 'fredrik@example.org'))
+    expect(row?.password_hash).toMatch(/^\$scrypt\$n=/)
   })
 
   it('refuses an email that already has an account, without spending the token', async () => {
