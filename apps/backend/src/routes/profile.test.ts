@@ -390,6 +390,9 @@ describe('picking somewhere to sleep', () => {
     const response = await pick(server, second.cookie, bed)
 
     expect(response.statusCode).toBe(409)
+    // The code and the slug travel together; a 409 carrying `bad_request` would
+    // tell a client one thing in the status and another in the body.
+    expect(response.json()).toEqual({ error: 'conflict' })
     const [row] = await db().select().from(attendance).where(eq(attendance.account_id, second.id))
     expect(row?.lodging_option_id).toBeNull()
   })
@@ -481,7 +484,10 @@ describe('picking somewhere to sleep', () => {
     const member = await givenMember()
     await givenComing(eventId, member.id)
 
-    expect((await pick(server, member.cookie, randomUUID())).statusCode).toBe(400)
+    const response = await pick(server, member.cookie, randomUUID())
+
+    expect(response.statusCode).toBe(400)
+    expect(response.json()).toEqual({ error: 'bad_request' })
   })
 })
 

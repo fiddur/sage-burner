@@ -90,6 +90,35 @@ const lodgingVerdict = async (
 }
 
 /**
+ * What is wrong with a stay update, before anything is written.
+ *
+ * Both checks live here rather than in the handler because both must happen
+ * *before* the column write: the form sends the ticks and the columns in one
+ * PATCH, so rejecting either afterwards answers an error with the rest already
+ * saved.
+ */
+const stayProblem = async (
+  db: Database,
+  eventId: string,
+  accountId: string,
+  update: AttendanceUpdate,
+): Promise<400 | 409 | undefined> => {
+  if (update.lodging_option_id != null) {
+    const verdict = await lodgingVerdict(db, eventId, update.lodging_option_id, accountId)
+    if (verdict === 'invalid') return 400
+    if (verdict === 'full') return 409
+  }
+
+  if (update.helping_option_ids !== undefined) {
+    if (!(await areHelpingOptions(db, eventId, update.helping_option_ids))) return 400
+  }
+
+  return undefined
+}
+
+const problemBody = (code: 400 | 409) => (code === 409 ? 'conflict' : 'bad_request')
+
+/**
  * A member maintaining their own record.
  *
  * Two halves, because they have two lifetimes: who you are lives on the account
@@ -169,24 +198,8 @@ export const registerProfileRoutes = (
     // `helping_option_ids` lives in its own table, so it never reaches `set()`.
     const { helping_option_ids: helping, ...columns } = parsed.data
 
-    // Counted and compared, not composed into the statement: at forty-odd people
-    // two members taking the last mattress in the same millisecond is not a
-    // failure worth machinery, and an organiser moves one of them in ten seconds.
-    // Refusing is the point — a disabled `<option>` is presentation, and the API
-    // takes whatever it is sent.
-    if (parsed.data.lodging_option_id != null) {
-      const verdict = await lodgingVerdict(db, found.id, parsed.data.lodging_option_id, viewer.account_id)
-      if (verdict === 'invalid') return reply.code(400).send(errorResponse('bad_request'))
-      if (verdict === 'full') return reply.code(409).send(errorResponse('conflict'))
-    }
-
-    // Checked before the write, like the lodging verdict above. Validating after
-    // it means a rejected tick answers 400 with the columns already committed —
-    // and the form sends both in one PATCH, so an organiser deleting an option
-    // while someone has the page open is enough to produce it.
-    if (helping !== undefined && !(await areHelpingOptions(db, found.id, helping))) {
-      return reply.code(400).send(errorResponse('bad_request'))
-    }
+    const problem = await stayProblem(db, found.id, viewer.account_id, parsed.data)
+    if (problem !== undefined) return reply.code(problem).send(errorResponse(problemBody(problem)))
 
     let updated: (typeof attendance.$inferSelect)[]
     try {
@@ -211,7 +224,9 @@ export const registerProfileRoutes = (
     const [first] = updated
 
     if (first !== undefined) {
-      if (helping !== undefined) await setHelping(db, first.id, helping)
+      if (helping !== undefined && setHelping(db, first.id, helping) === 'gone') {
+        return reply.code(400).send(errorResponse('bad_request'))
+      }
 
       return { attendance: { ...first, helping_option_ids: await helpingIdsFor(db, first.id) } }
     }

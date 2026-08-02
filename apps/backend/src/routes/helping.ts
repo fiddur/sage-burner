@@ -2,6 +2,7 @@ import { and, asc, eq, inArray } from 'drizzle-orm'
 
 import type { Database } from '../db/index.ts'
 
+import { isForeignKeyViolation } from '../db/errors.ts'
 import { attendanceHelping, eventOption } from '../db/schema.ts'
 
 /**
@@ -66,15 +67,35 @@ export const areHelpingOptions = async (
  * code than it saves, and the result is the same set either way. Validity is
  * `areHelpingOptions`' job, and the caller's to ask before writing anything.
  */
-export const setHelping = (db: Database, attendanceId: string, optionIds: readonly string[]) => {
+export const setHelping = (
+  db: Database,
+  attendanceId: string,
+  optionIds: readonly string[],
+): 'ok' | 'gone' => {
   const wanted = [...new Set(optionIds)]
 
-  db.transaction((tx) => {
-    tx.delete(attendanceHelping).where(eq(attendanceHelping.attendance_id, attendanceId)).run()
-    for (const option_id of wanted) {
-      tx.insert(attendanceHelping).values({ attendance_id: attendanceId, option_id }).run()
-    }
-  })
+  try {
+    db.transaction((tx) => {
+      tx.delete(attendanceHelping).where(eq(attendanceHelping.attendance_id, attendanceId)).run()
+      for (const option_id of wanted) {
+        tx.insert(attendanceHelping).values({ attendance_id: attendanceId, option_id }).run()
+      }
+    })
+  } catch (failure) {
+    // The option was removed between `areHelpingOptions` and here — an organiser
+    // deleting a chore in the same breath as a member ticking it. Not defended
+    // against, but answered rather than thrown, so it matches what the lodging
+    // path gives for the same class of thing.
+    //
+    // Not reachable under test: `inject` serialises requests, so nothing can
+    // delete the row in that gap. `isForeignKeyViolation` is pinned against a
+    // real violation elsewhere, which is what keeps the message it matches from
+    // drifting unnoticed.
+    if (isForeignKeyViolation(failure)) return 'gone'
+    throw failure
+  }
+
+  return 'ok'
 }
 
 /**
