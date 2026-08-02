@@ -88,7 +88,7 @@ describe('ProfilePage', () => {
     )
   })
 
-  it('refuses to clear the name, which an organiser needs', async () => {
+  it('refuses to clear the name, which planning needs', async () => {
     const updateMyProfile = vi.fn(() => Promise.resolve({ profile: aProfile() }))
     renderPage(stub({ updateMyProfile }))
 

@@ -206,11 +206,11 @@ describe('AdminPlaces', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('Could not load')
   })
 
-  it('offers nothing to someone who is not an organiser', async () => {
+  it('offers nothing to someone who does not have admin', async () => {
     const getPlaces = vi.fn<PlacesApi['getPlaces']>(() => Promise.resolve({ places: THREE }))
     renderPage(stub({ getPlaces }), { status: 'signed-out' })
 
-    expect(screen.getByText(/for organisers/)).toBeTruthy()
+    expect(screen.getByText(/admin page/)).toBeTruthy()
     expect(getPlaces).not.toHaveBeenCalled()
   })
 })

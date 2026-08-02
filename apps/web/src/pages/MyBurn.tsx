@@ -176,7 +176,7 @@ export const MyBurn = ({ api }: { api: MyBurnApi }) => {
                   onClick={() =>
                     void act(
                       api.leaveActiveEvent,
-                      'You have already paid for this burn, so an organiser needs to sort this one out with you.',
+                      'You have already paid for this burn, so someone with admin needs to sort this one out with you.',
                     )
                   }
                 >

@@ -573,9 +573,11 @@ Two things it deliberately does not do:
   `you@example.org` rather than creating a second account beside it — the
   table's `UNIQUE` is byte-exact.
 
-The password must be at least 12 characters. That floor applies to a password
-being _set_, never at login: raising it later must not lock out someone whose
-existing password no longer passes.
+The password only has to be non-empty. There is no length or composition rule:
+those are the app deciding what a good password is on someone else's behalf, and
+they push people towards the one they already reuse everywhere. A rule here would
+also have to apply to a password being _set_ and never at login, so that adding
+one later cannot lock out an existing member.
 
 ### Roles
 

@@ -128,7 +128,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
     return (
       <Framed>
         <p class="notice">
-          No places yet, so there are no lanes to put anything in. An organiser adds them under{' '}
+          No places yet, so there are no lanes to put anything in. They are added under{' '}
           <a href="/admin/places">Places</a>.
         </p>
       </Framed>

@@ -72,7 +72,7 @@ export const Admin = ({ api }: { api: AdminApi }) => {
     } catch (failure) {
       setError(
         isApiError(failure) && failure.status === 409
-          ? 'Someone has to stay an organiser. Give the role to another account first.'
+          ? 'Someone has to keep admin. Give it to another account first.'
           : isApiError(failure)
             ? failure.message
             : 'Could not change that. Please try again.',
@@ -109,7 +109,7 @@ export const Admin = ({ api }: { api: AdminApi }) => {
     return (
       <section class="page">
         <h1>Organise</h1>
-        <p>This area is for organisers. If that should be you, ask an existing organiser.</p>
+        <p>This is an admin page. If it should be open to you, ask someone who already has admin.</p>
       </section>
     )
   }
@@ -196,7 +196,7 @@ export const Admin = ({ api }: { api: AdminApi }) => {
 
       <p class="form-note">
         An account with neither is normal — an applicant, or someone invited who has not finished. Member
-        opens someone&rsquo;s own details and saying they are coming; admin opens this page. Most organisers
+        opens someone&rsquo;s own details and saying they are coming; admin opens this page. Most people here
         want both.
       </p>
     </section>
