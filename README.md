@@ -1068,6 +1068,11 @@ never do: nothing runs short of people willing to tend a sauna. Zero spaces is
 refused rather than allowed; an option nobody fits in is a deleted option spelled
 confusingly.
 
+Free text became a reference, and the migration folds whatever was already typed
+into `notes` rather than dropping it — "hammock in the barn" is not an id, so
+there is nothing to map it onto, but an organiser still reads notes. Truncated to
+2000 there, which is what the schema allows.
+
 A member picks one lodging option on **your burn**, and the select disables the
 ones that are full, reading "— full". That is presentation: the API takes what it
 is sent, so `PATCH /api/events/active/attendance` counts the takers and answers
