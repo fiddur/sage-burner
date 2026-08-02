@@ -13,6 +13,7 @@ import { attendance, event } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 import { viewerFor } from './auth.ts'
 import { activeEvent, todayIso } from './events.ts'
+import { helpingIdsFor } from './helping.ts'
 
 /**
  * The one-row-per-person-per-burn index, which is what makes joining idempotent.
@@ -51,7 +52,9 @@ export const registerAttendanceRoutes = (
       .where(and(eq(attendance.event_id, eventId), eq(attendance.account_id, accountId)))
       .limit(1)
 
-    return row
+    // The ticks travel with the row everywhere it is returned, so a caller never
+    // has to know they live in another table.
+    return row === undefined ? undefined : { ...row, helping_option_ids: await helpingIdsFor(db, row.id) }
   }
 
   app.get('/api/events/active/attendance', { preHandler: requireMember }, async (request, reply) => {

@@ -235,7 +235,7 @@ describe('the public calendar feed', () => {
       payment_status: 'paid',
       payment_date: '2026-07-01',
       lodging_option_id: null,
-      shift_preference: 'Sauna tending',
+      helping_other: 'Sauna tending',
       notes: 'arriving late',
     })
 

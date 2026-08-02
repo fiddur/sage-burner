@@ -16,7 +16,8 @@ const anAttendance = (over: Partial<Attendance> = {}): Attendance => ({
   arrival_date: null,
   departure_date: null,
   lodging_option_id: null,
-  shift_preference: null,
+  helping_option_ids: [],
+  helping_other: null,
   notes: null,
   payment_status: 'unpaid',
   payment_date: null,
@@ -30,6 +31,11 @@ const anOption = (over: Partial<EventOption> & Pick<EventOption, 'id' | 'label'>
   capacity: null,
   ...over,
 })
+
+const HELPING: EventOption[] = [
+  anOption({ id: 'h-1', label: 'Sauna', kind: 'helping', order: 0 }),
+  anOption({ id: 'h-2', label: 'Kitchen', kind: 'helping', order: 1 }),
+]
 
 const LODGING: EventOption[] = [
   anOption({ id: 'o-1', label: 'Temple mattress', capacity: 9, order: 0 }),
@@ -156,6 +162,74 @@ describe('StayForm', () => {
     )
   })
 
+  it('ticks several things to help with, and keeps a write-in beside them', async () => {
+    const updateMyStay = vi.fn(() => Promise.resolve({ attendance: anAttendance() }))
+    render(
+      <StayForm
+        api={{ updateMyStay }}
+        attendance={anAttendance()}
+        helpingOptions={HELPING}
+        onSaved={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Sauna' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Kitchen' }))
+    fill('Something else', 'Chopping wood')
+    saveIt()
+
+    await waitFor(() =>
+      expect(updateMyStay).toHaveBeenCalledWith(
+        expect.objectContaining({
+          helping_option_ids: ['h-1', 'h-2'],
+          helping_other: 'Chopping wood',
+        }),
+      ),
+    )
+  })
+
+  it('unticks one without disturbing the rest', async () => {
+    const updateMyStay = vi.fn(() => Promise.resolve({ attendance: anAttendance() }))
+    render(
+      <StayForm
+        api={{ updateMyStay }}
+        attendance={anAttendance({ helping_option_ids: ['h-1', 'h-2'] })}
+        helpingOptions={HELPING}
+        onSaved={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Sauna' }))
+    saveIt()
+
+    await waitFor(() =>
+      expect(updateMyStay).toHaveBeenCalledWith(expect.objectContaining({ helping_option_ids: ['h-2'] })),
+    )
+  })
+
+  it('shows which are already ticked', () => {
+    render(
+      <StayForm
+        api={{ updateMyStay: vi.fn() }}
+        attendance={anAttendance({ helping_option_ids: ['h-2'] })}
+        helpingOptions={HELPING}
+        onSaved={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('checkbox', { name: 'Sauna' })).toHaveProperty('checked', false)
+    expect(screen.getByRole('checkbox', { name: 'Kitchen' })).toHaveProperty('checked', true)
+  })
+
+  it('still offers the write-in when the list is empty', () => {
+    // A burn whose organiser has not set the list up yet still lets someone say
+    // what they are up for.
+    render(<StayForm api={{ updateMyStay: vi.fn() }} attendance={anAttendance()} onSaved={vi.fn()} />)
+
+    expect(screen.getByLabelText('Something else')).toBeTruthy()
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
+  })
+
   it('shows what is already recorded', () => {
     render(
       <StayForm
@@ -182,7 +256,8 @@ describe('StayForm', () => {
         arrival_date: null,
         departure_date: null,
         lodging_option_id: null,
-        shift_preference: null,
+        helping_option_ids: [],
+        helping_other: null,
         notes: null,
       }),
     )

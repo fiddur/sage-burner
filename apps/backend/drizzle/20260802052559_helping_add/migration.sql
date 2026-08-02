@@ -1,0 +1,1 @@
+ALTER TABLE `attendance` ADD `helping_other` text;

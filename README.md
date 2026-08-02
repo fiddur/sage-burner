@@ -1091,6 +1091,23 @@ select fall back to "not decided" and quietly give the bed up on the next save.
 The lists carry a `taken` count per option, derived every read. It is the only way
 to tell a member the Temple is full without showing them who is sleeping in it.
 
+A member ticks **as many helping-out options as they like**, and can write in one
+the list does not have. The ticks are rows in `attendance_helping`, not a JSON
+array: the whole reason the list exists is so an organiser can count who is up for
+the kitchen, and counting inside a JSON column is the thing that gets rewritten
+later. The write-in sits beside them rather than instead of them — the point of
+the list is counting, the point of the write-in is that a list is never complete.
+
+The columns and the ticks arrive in one PATCH and are written in one transaction.
+The ticks are validated before anything is written, but that check has a window:
+an option deleted in the moment between it and the write rolls the column write
+back too, rather than answering an error over a half-saved stay.
+
+Both sides of that join cascade. Withdrawing from a burn takes the ticks with it,
+and so does an organiser removing an option — **unlike lodging**, where a bed
+someone is in must not vanish underneath them. Nobody is displaced by "kitchen"
+ceasing to be offered.
+
 `kind` is not editable. The two lists number independently, so changing it would
 leave an entry ordered against the list it came from — moving one is deleting and
 adding.

@@ -1,4 +1,5 @@
 import type { AttendanceUpdate, ProfileResponse } from '@sage-burner/shared'
+import type { SQL } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 
 import { attendanceUpdateSchema, errorResponse, profileUpdateSchema } from '@sage-burner/shared'
@@ -13,6 +14,7 @@ import { account, attendance, eventOption } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 import { viewerFor } from './auth.ts'
 import { activeEvent, todayIso } from './events.ts'
+import { areHelpingOptions, helpingIdsFor, writeHelping } from './helping.ts'
 
 export interface ProfileDeps extends GuardDeps {
   now?: () => Date
@@ -87,6 +89,73 @@ const lodgingVerdict = async (
 
   return others.length >= option.capacity ? 'full' : 'ok'
 }
+
+/**
+ * What is wrong with a stay update, before anything is written.
+ *
+ * Both checks live here rather than in the handler because both must happen
+ * *before* the column write: the form sends the ticks and the columns in one
+ * PATCH, so rejecting either afterwards answers an error with the rest already
+ * saved.
+ */
+const stayProblem = async (
+  db: Database,
+  eventId: string,
+  accountId: string,
+  update: AttendanceUpdate,
+): Promise<400 | 409 | undefined> => {
+  if (update.lodging_option_id != null) {
+    const verdict = await lodgingVerdict(db, eventId, update.lodging_option_id, accountId)
+    if (verdict === 'invalid') return 400
+    if (verdict === 'full') return 409
+  }
+
+  if (update.helping_option_ids !== undefined) {
+    if (!(await areHelpingOptions(db, eventId, update.helping_option_ids))) return 400
+  }
+
+  return undefined
+}
+
+const problemBody = (code: 400 | 409) => (code === 409 ? 'conflict' : 'bad_request')
+
+/**
+ * The stay's two writes, as one.
+ *
+ * The columns live on `attendance` and the ticks in `attendance_helping`, but
+ * they arrive in a single PATCH, so committing one without the other would
+ * answer an error over a half-saved stay. `stayProblem` catches what it can
+ * beforehand; this is what makes the answer honest when the pre-check's own
+ * window closes underneath it.
+ *
+ * Exported for the test that proves the rollback — the window it guards cannot
+ * be opened through `inject`, which serialises requests.
+ */
+export const writeStay = (
+  db: Database,
+  mine: SQL | undefined,
+  columns: Omit<AttendanceUpdate, 'helping_option_ids'>,
+  helping: readonly string[] | undefined,
+): (typeof attendance.$inferSelect)[] =>
+  db.transaction((tx) => {
+    // No columns to set is not an error: the body may be empty, or may carry only
+    // the helping ticks, which live in their own table. `set({})` is not valid
+    // SQL, so both read instead of writing.
+    const rows =
+      Object.keys(columns).length === 0
+        ? tx.select().from(attendance).where(mine).limit(1).all()
+        : tx
+            .update(attendance)
+            .set(columns)
+            .where(and(mine, stayOrderCondition(columns)))
+            .returning()
+            .all()
+
+    const [first] = rows
+    if (first !== undefined && helping !== undefined) writeHelping(tx, first.id, helping)
+
+    return rows
+  })
 
 /**
  * A member maintaining their own record.
@@ -165,40 +234,29 @@ export const registerProfileRoutes = (
 
     const mine = and(eq(attendance.event_id, found.id), eq(attendance.account_id, viewer.account_id))
 
-    if (Object.keys(parsed.data).length === 0) {
-      const [row] = await db.select().from(attendance).where(mine).limit(1)
+    // `helping_option_ids` lives in its own table, so it never reaches `set()`.
+    const { helping_option_ids: helping, ...columns } = parsed.data
 
-      return row === undefined ? reply.code(404).send(errorResponse('not_found')) : { attendance: row }
-    }
-
-    // Counted and compared, not composed into the statement: at forty-odd people
-    // two members taking the last mattress in the same millisecond is not a
-    // failure worth machinery, and an organiser moves one of them in ten seconds.
-    // Refusing is the point — a disabled `<option>` is presentation, and the API
-    // takes whatever it is sent.
-    if (parsed.data.lodging_option_id != null) {
-      const verdict = await lodgingVerdict(db, found.id, parsed.data.lodging_option_id, viewer.account_id)
-      if (verdict === 'invalid') return reply.code(400).send(errorResponse('bad_request'))
-      if (verdict === 'full') return reply.code(409).send(errorResponse('conflict'))
-    }
+    const problem = await stayProblem(db, found.id, viewer.account_id, parsed.data)
+    if (problem !== undefined) return reply.code(problem).send(errorResponse(problemBody(problem)))
 
     let updated: (typeof attendance.$inferSelect)[]
     try {
-      updated = await db
-        .update(attendance)
-        .set(parsed.data)
-        .where(and(mine, stayOrderCondition(parsed.data)))
-        .returning()
+      updated = writeStay(db, mine, columns, helping)
     } catch (failure) {
-      // A `lodging_option_id` naming no option. The foreign key is the authority
-      // rather than a pre-read, which would be a second query saying the same.
+      // A `lodging_option_id` naming no option, or a tick naming an option that
+      // has just been deleted. The foreign key is the authority rather than a
+      // pre-read, which would be a second query saying the same — and because
+      // both writes are one transaction, neither half survives being told no.
       if (isForeignKeyViolation(failure)) return reply.code(400).send(errorResponse('bad_request'))
       throw failure
     }
 
     const [first] = updated
 
-    if (first !== undefined) return { attendance: first }
+    if (first !== undefined) {
+      return { attendance: { ...first, helping_option_ids: await helpingIdsFor(db, first.id) } }
+    }
 
     // Nothing was written, which is either "not coming to this burn" or "that
     // would put the departure before the arrival". Asked rather than inferred.
