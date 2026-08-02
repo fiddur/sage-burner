@@ -1096,6 +1096,11 @@ the kitchen, and counting inside a JSON column is the thing that gets rewritten
 later. The write-in sits beside them rather than instead of them — the point of
 the list is counting, the point of the write-in is that a list is never complete.
 
+The columns and the ticks arrive in one PATCH and are written in one transaction.
+The ticks are validated before anything is written, but that check has a window:
+an option deleted in the moment between it and the write rolls the column write
+back too, rather than answering an error over a half-saved stay.
+
 Both sides of that join cascade. Withdrawing from a burn takes the ticks with it,
 and so does an organiser removing an option — **unlike lodging**, where a bed
 someone is in must not vanish underneath them. Nobody is displaced by "kitchen"

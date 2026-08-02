@@ -1,4 +1,5 @@
 import type { AttendanceUpdate, ProfileResponse } from '@sage-burner/shared'
+import type { SQL } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 
 import { attendanceUpdateSchema, errorResponse, profileUpdateSchema } from '@sage-burner/shared'
@@ -13,7 +14,7 @@ import { account, attendance, eventOption } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 import { viewerFor } from './auth.ts'
 import { activeEvent, todayIso } from './events.ts'
-import { areHelpingOptions, helpingIdsFor, setHelping } from './helping.ts'
+import { areHelpingOptions, helpingIdsFor, writeHelping } from './helping.ts'
 
 export interface ProfileDeps extends GuardDeps {
   now?: () => Date
@@ -119,6 +120,44 @@ const stayProblem = async (
 const problemBody = (code: 400 | 409) => (code === 409 ? 'conflict' : 'bad_request')
 
 /**
+ * The stay's two writes, as one.
+ *
+ * The columns live on `attendance` and the ticks in `attendance_helping`, but
+ * they arrive in a single PATCH, so committing one without the other would
+ * answer an error over a half-saved stay. `stayProblem` catches what it can
+ * beforehand; this is what makes the answer honest when the pre-check's own
+ * window closes underneath it.
+ *
+ * Exported for the test that proves the rollback — the window it guards cannot
+ * be opened through `inject`, which serialises requests.
+ */
+export const writeStay = (
+  db: Database,
+  mine: SQL | undefined,
+  columns: Omit<AttendanceUpdate, 'helping_option_ids'>,
+  helping: readonly string[] | undefined,
+): (typeof attendance.$inferSelect)[] =>
+  db.transaction((tx) => {
+    // No columns to set is not an error: the body may be empty, or may carry only
+    // the helping ticks, which live in their own table. `set({})` is not valid
+    // SQL, so both read instead of writing.
+    const rows =
+      Object.keys(columns).length === 0
+        ? tx.select().from(attendance).where(mine).limit(1).all()
+        : tx
+            .update(attendance)
+            .set(columns)
+            .where(and(mine, stayOrderCondition(columns)))
+            .returning()
+            .all()
+
+    const [first] = rows
+    if (first !== undefined && helping !== undefined) writeHelping(tx, first.id, helping)
+
+    return rows
+  })
+
+/**
  * A member maintaining their own record.
  *
  * Two halves, because they have two lifetimes: who you are lives on the account
@@ -203,20 +242,12 @@ export const registerProfileRoutes = (
 
     let updated: (typeof attendance.$inferSelect)[]
     try {
-      // No columns to set is not an error: the body may be empty, or may carry
-      // only the helping ticks, which live in their own table. `set({})` is not
-      // valid SQL, so both read instead of writing.
-      updated =
-        Object.keys(columns).length === 0
-          ? await db.select().from(attendance).where(mine).limit(1)
-          : await db
-              .update(attendance)
-              .set(columns)
-              .where(and(mine, stayOrderCondition(columns)))
-              .returning()
+      updated = writeStay(db, mine, columns, helping)
     } catch (failure) {
-      // A `lodging_option_id` naming no option. The foreign key is the authority
-      // rather than a pre-read, which would be a second query saying the same.
+      // A `lodging_option_id` naming no option, or a tick naming an option that
+      // has just been deleted. The foreign key is the authority rather than a
+      // pre-read, which would be a second query saying the same — and because
+      // both writes are one transaction, neither half survives being told no.
       if (isForeignKeyViolation(failure)) return reply.code(400).send(errorResponse('bad_request'))
       throw failure
     }
@@ -224,10 +255,6 @@ export const registerProfileRoutes = (
     const [first] = updated
 
     if (first !== undefined) {
-      if (helping !== undefined && setHelping(db, first.id, helping) === 'gone') {
-        return reply.code(400).send(errorResponse('bad_request'))
-      }
-
       return { attendance: { ...first, helping_option_ids: await helpingIdsFor(db, first.id) } }
     }
 

@@ -1,6 +1,6 @@
 import type { FastifyInstance, LightMyRequestResponse } from 'fastify'
 
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it } from 'vitest'
 
@@ -9,10 +9,12 @@ import type { DbHandle } from '../db/index.ts'
 import { createApp } from '../app.ts'
 import { createSessions } from '../auth/session.ts'
 import { createConfig } from '../config.ts'
+import { isForeignKeyViolation } from '../db/errors.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, accountRole, attendance, attendanceHelping, event, eventOption } from '../db/schema.ts'
 import { SESSION_COOKIE } from './auth.ts'
-import { helpingIdsFor, setHelping } from './helping.ts'
+import { helpingIdsFor, writeHelping } from './helping.ts'
+import { writeStay } from './profile.ts'
 
 /**
  * A member maintaining their own record.
@@ -44,11 +46,6 @@ const build = async () => {
     now: () => new Date(NOW),
   })
   return app
-}
-
-const close = () => {
-  handle?.close()
-  handle = undefined
 }
 
 const client = () => {
@@ -651,61 +648,63 @@ describe('what someone will help with', () => {
 })
 
 describe('a helping option that vanishes mid-save', () => {
-  it('answers gone rather than throwing', async () => {
-    // Reachable without concurrency after all: `setHelping` is exported, so the
-    // option can simply be deleted before it is called. The HTTP route cannot
-    // produce the gap under `inject`, which is not the same as the branch being
-    // untestable.
+  // The window `stayProblem` cannot close: an organiser deletes a chore between
+  // the pre-check and the write. `inject` serialises requests, so the HTTP route
+  // cannot open it — `writeStay` is exported and driven directly instead, which
+  // is the same code the route runs.
+  const givenSauna = async (eventId: string) => {
+    const id = randomUUID()
+    await db()
+      .insert(eventOption)
+      .values({ id, event_id: eventId, kind: 'helping', order: 0, label: 'Sauna', capacity: null })
+    return id
+  }
+
+  const stayOf = (eventId: string, accountId: string) =>
+    and(eq(attendance.event_id, eventId), eq(attendance.account_id, accountId))
+
+  it('takes the column write down with it, rather than half-saving the stay', async () => {
     await build()
     const eventId = await givenEvent()
     const member = await givenMember()
     const stay = await givenComing(eventId, member.id)
+    await db().update(attendance).set({ notes: 'before' }).where(eq(attendance.id, stay))
 
-    const sauna = randomUUID()
-    await db()
-      .insert(eventOption)
-      .values({ id: sauna, event_id: eventId, kind: 'helping', order: 0, label: 'Sauna', capacity: null })
+    const sauna = await givenSauna(eventId)
     client().prepare('delete from event_option where id = ?').run(sauna)
 
-    expect(setHelping(db(), stay, [sauna])).toBe('gone')
+    const thrown = (() => {
+      try {
+        writeStay(db(), stayOf(eventId, member.id), { notes: 'after' }, [sauna])
+        return undefined
+      } catch (failure) {
+        return failure
+      }
+    })()
+
+    // The route answers 400 on exactly this predicate, so asserting it is what
+    // ties the rollback to the answer the member gets.
+    expect(isForeignKeyViolation(thrown)).toBe(true)
+
+    const [row] = await db().select().from(attendance).where(eq(attendance.id, stay))
+    expect(row?.notes).toBe('before')
+    expect(await helpingIdsFor(db(), stay)).toEqual([])
   })
 
-  it('writes the ticks when the option is still there', async () => {
-    // The passing sibling: `gone` must mean the option vanished, not that writing
-    // ticks fails generally.
+  it('writes both halves when the option is still there', async () => {
+    // The passing sibling: the rollback must mean the option vanished, not that
+    // saving columns and ticks together fails generally.
     await build()
     const eventId = await givenEvent()
     const member = await givenMember()
     const stay = await givenComing(eventId, member.id)
 
-    const sauna = randomUUID()
-    await db()
-      .insert(eventOption)
-      .values({ id: sauna, event_id: eventId, kind: 'helping', order: 0, label: 'Sauna', capacity: null })
+    const sauna = await givenSauna(eventId)
+    writeStay(db(), stayOf(eventId, member.id), { notes: 'after' }, [sauna])
 
-    expect(setHelping(db(), stay, [sauna])).toBe('ok')
+    const [row] = await db().select().from(attendance).where(eq(attendance.id, stay))
+    expect(row?.notes).toBe('after')
     expect(await helpingIdsFor(db(), stay)).toEqual([sauna])
-  })
-
-  it('rethrows anything that is not the option vanishing', async () => {
-    // `gone` must mean that one thing. Swallowing every failure would turn a real
-    // fault into a 400 telling the member their choice was invalid.
-    await build()
-    const eventId = await givenEvent()
-    const member = await givenMember()
-    const stay = await givenComing(eventId, member.id)
-    const handleNow = db()
-
-    const sauna = randomUUID()
-    await handleNow
-      .insert(eventOption)
-      .values({ id: sauna, event_id: eventId, kind: 'helping', order: 0, label: 'Sauna', capacity: null })
-
-    // A closed database is not a foreign key problem, and must not be reported as
-    // one. Closed here rather than stubbed, so the error is a real driver error.
-    close()
-
-    expect(() => setHelping(handleNow, stay, [sauna])).toThrow()
   })
 
   it('takes the ticks with the stay when someone withdraws', async () => {
@@ -716,11 +715,8 @@ describe('a helping option that vanishes mid-save', () => {
     const member = await givenMember()
     const stay = await givenComing(eventId, member.id)
 
-    const sauna = randomUUID()
-    await db()
-      .insert(eventOption)
-      .values({ id: sauna, event_id: eventId, kind: 'helping', order: 0, label: 'Sauna', capacity: null })
-    setHelping(db(), stay, [sauna])
+    const sauna = await givenSauna(eventId)
+    writeHelping(db(), stay, [sauna])
 
     client().prepare('delete from attendance where id = ?').run(stay)
 
