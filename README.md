@@ -1068,6 +1068,27 @@ never do: nothing runs short of people willing to tend a sauna. Zero spaces is
 refused rather than allowed; an option nobody fits in is a deleted option spelled
 confusingly.
 
+Free text became a reference, and the migration folds whatever was already typed
+into `notes` rather than dropping it — "hammock in the barn" is not an id, so
+there is nothing to map it onto, but an organiser still reads notes. Truncated to
+2000 there, which is what the schema allows.
+
+A member picks one lodging option on **your burn**, and the select disables the
+ones that are full, reading "— full". That is presentation: the API takes what it
+is sent, so `PATCH /api/events/active/attendance` counts the takers and answers
+**409** for a full option.
+
+The count is a plain read-and-compare, not race protection. Two people taking the
+last mattress in the same millisecond can both succeed; at forty-odd people that
+is an organiser moving one of them, not something to build machinery against.
+
+The option a member already holds is never disabled for them, even when it reads
+as full — their own bed counts towards the total, so disabling it would make the
+select fall back to "not decided" and quietly give the bed up on the next save.
+
+The lists carry a `taken` count per option, derived every read. It is the only way
+to tell a member the Temple is full without showing them who is sleeping in it.
+
 `kind` is not editable. The two lists number independently, so changing it would
 leave an entry ordered against the list it came from — moving one is deleting and
 adding.

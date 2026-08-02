@@ -19,6 +19,7 @@ const anEntry = (over: Partial<RosterEntry> = {}): RosterEntry => ({
   joined_at: '2026-07-01T00:00:00.000Z',
   arrival_date: null,
   departure_date: null,
+  lodging_option_id: null,
   lodging: null,
   shift_preference: null,
   notes: null,

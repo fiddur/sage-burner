@@ -234,7 +234,7 @@ describe('the public calendar feed', () => {
       joined_at: NOW,
       payment_status: 'paid',
       payment_date: '2026-07-01',
-      lodging: 'Hammock in the barn',
+      lodging_option_id: null,
       shift_preference: 'Sauna tending',
       notes: 'arriving late',
     })

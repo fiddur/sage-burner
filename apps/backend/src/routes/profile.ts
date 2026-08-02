@@ -2,12 +2,14 @@ import type { AttendanceUpdate, ProfileResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
 import { attendanceUpdateSchema, errorResponse, profileUpdateSchema } from '@sage-burner/shared'
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq, ne, sql } from 'drizzle-orm'
 
 import type { GuardDeps } from '../auth/guards.ts'
+import type { Database } from '../db/index.ts'
 
 import { createGuards } from '../auth/guards.ts'
-import { account, attendance } from '../db/schema.ts'
+import { isForeignKeyViolation } from '../db/errors.ts'
+import { account, attendance, eventOption } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 import { viewerFor } from './auth.ts'
 import { activeEvent, todayIso } from './events.ts'
@@ -41,6 +43,49 @@ const stayOrderCondition = ({ arrival_date, departure_date }: AttendanceUpdate) 
   }
 
   return sql`${attendance.arrival_date} is null or ${attendance.arrival_date} <= ${departure_date}`
+}
+
+/**
+ * Whether this burn's lodging list will take one more person here.
+ *
+ * Scoped to the event **and** the kind, not just the id: the select disables a
+ * full option but the API takes what it is sent, so a direct PATCH could
+ * otherwise name another burn's option, or a `helping` one — which has no
+ * capacity and so could never be full. Both are refused as invalid, the same as
+ * an id that names nothing.
+ *
+ * Their own current choice does not count against them, or re-saving an
+ * unrelated field would refuse the bed they are already in.
+ */
+const lodgingVerdict = async (
+  db: Database,
+  eventId: string,
+  optionId: string,
+  accountId: string,
+): Promise<'ok' | 'invalid' | 'full'> => {
+  const [option] = await db
+    .select({ capacity: eventOption.capacity })
+    .from(eventOption)
+    .where(
+      and(eq(eventOption.id, optionId), eq(eventOption.event_id, eventId), eq(eventOption.kind, 'lodging')),
+    )
+    .limit(1)
+
+  if (option === undefined) return 'invalid'
+  if (option.capacity === null) return 'ok'
+
+  const others = await db
+    .select({ id: attendance.id })
+    .from(attendance)
+    .where(
+      and(
+        eq(attendance.event_id, eventId),
+        eq(attendance.lodging_option_id, optionId),
+        ne(attendance.account_id, accountId),
+      ),
+    )
+
+  return others.length >= option.capacity ? 'full' : 'ok'
 }
 
 /**
@@ -126,13 +171,34 @@ export const registerProfileRoutes = (
       return row === undefined ? reply.code(404).send(errorResponse('not_found')) : { attendance: row }
     }
 
-    const [updated] = await db
-      .update(attendance)
-      .set(parsed.data)
-      .where(and(mine, stayOrderCondition(parsed.data)))
-      .returning()
+    // Counted and compared, not composed into the statement: at forty-odd people
+    // two members taking the last mattress in the same millisecond is not a
+    // failure worth machinery, and an organiser moves one of them in ten seconds.
+    // Refusing is the point — a disabled `<option>` is presentation, and the API
+    // takes whatever it is sent.
+    if (parsed.data.lodging_option_id != null) {
+      const verdict = await lodgingVerdict(db, found.id, parsed.data.lodging_option_id, viewer.account_id)
+      if (verdict === 'invalid') return reply.code(400).send(errorResponse('bad_request'))
+      if (verdict === 'full') return reply.code(409).send(errorResponse('conflict'))
+    }
 
-    if (updated !== undefined) return { attendance: updated }
+    let updated: (typeof attendance.$inferSelect)[]
+    try {
+      updated = await db
+        .update(attendance)
+        .set(parsed.data)
+        .where(and(mine, stayOrderCondition(parsed.data)))
+        .returning()
+    } catch (failure) {
+      // A `lodging_option_id` naming no option. The foreign key is the authority
+      // rather than a pre-read, which would be a second query saying the same.
+      if (isForeignKeyViolation(failure)) return reply.code(400).send(errorResponse('bad_request'))
+      throw failure
+    }
+
+    const [first] = updated
+
+    if (first !== undefined) return { attendance: first }
 
     // Nothing was written, which is either "not coming to this burn" or "that
     // would put the departure before the arrival". Asked rather than inferred.

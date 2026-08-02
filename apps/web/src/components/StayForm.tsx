@@ -1,4 +1,4 @@
-import type { Attendance } from '@sage-burner/shared'
+import type { Attendance, EventOption } from '@sage-burner/shared'
 
 import { useState } from 'preact/hooks'
 
@@ -16,15 +16,21 @@ import { isApiError } from '../api/client.ts'
 export const StayForm = ({
   api,
   attendance,
+  lodgingOptions = [],
+  taken = {},
   onSaved,
 }: {
   api: Pick<ApiClient, 'updateMyStay'>
   attendance: Attendance
+  /** This burn's lodging list, in the organiser's order. */
+  lodgingOptions?: readonly EventOption[]
+  /** How many have already picked each option, by option id. */
+  taken?: Readonly<Record<string, number>>
   onSaved: (saved: Attendance) => void
 }) => {
   const [arrival, setArrival] = useState(attendance.arrival_date ?? '')
   const [departure, setDeparture] = useState(attendance.departure_date ?? '')
-  const [lodging, setLodging] = useState(attendance.lodging ?? '')
+  const [lodging, setLodging] = useState(attendance.lodging_option_id ?? '')
   const [shift, setShift] = useState(attendance.shift_preference ?? '')
   const [notes, setNotes] = useState(attendance.notes ?? '')
   const [saving, setSaving] = useState(false)
@@ -48,7 +54,7 @@ export const StayForm = ({
       const { attendance: updated } = await api.updateMyStay({
         arrival_date: blankToNull(arrival),
         departure_date: blankToNull(departure),
-        lodging: blankToNull(lodging),
+        lodging_option_id: lodging === '' ? null : lodging,
         shift_preference: blankToNull(shift),
         notes: blankToNull(notes),
       })
@@ -107,13 +113,36 @@ export const StayForm = ({
 
       <label class="field">
         <span>Where are you sleeping?</span>
-        <input
-          type="text"
-          name="lodging"
-          maxLength={200}
+        <select
+          name="lodging_option_id"
           value={lodging}
-          onInput={(inputEvent) => setLodging(inputEvent.currentTarget.value)}
-        />
+          onChange={(changeEvent) => setLodging(changeEvent.currentTarget.value)}
+        >
+          <option value="">Not decided yet</option>
+          {lodgingOptions.map((option) => {
+            // Disabled once it is full — unless it is the one they already have,
+            // which would otherwise be unselectable and silently reset to "not
+            // decided" the next time this form is saved.
+            //
+            // Compared against what is *saved*, not what is currently picked:
+            // against the live value, clicking away from a full option and back
+            // would find it disabled, and a native select will not let you choose
+            // a disabled option. You would be stuck until you reloaded.
+            const full = option.capacity !== null && (taken[option.id] ?? 0) >= option.capacity
+            const theirs = option.id === attendance.lodging_option_id
+
+            return (
+              <option key={option.id} value={option.id} disabled={full && !theirs}>
+                {option.label}
+                {option.capacity === null
+                  ? ''
+                  : full
+                    ? ' — full'
+                    : ` — ${option.capacity - (taken[option.id] ?? 0)} left`}
+              </option>
+            )
+          })}
+        </select>
       </label>
 
       <label class="field">

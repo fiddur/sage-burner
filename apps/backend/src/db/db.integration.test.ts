@@ -77,7 +77,7 @@ const seedAttendance = (id: string, account_id: string) =>
       joined_at: NOW,
       arrival_date: null,
       departure_date: null,
-      lodging: null,
+      lodging_option_id: null,
       shift_preference: null,
       notes: null,
       payment_status: 'unpaid',

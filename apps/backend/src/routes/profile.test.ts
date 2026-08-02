@@ -10,7 +10,7 @@ import { createApp } from '../app.ts'
 import { createSessions } from '../auth/session.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, attendance, event } from '../db/schema.ts'
+import { account, accountRole, attendance, event, eventOption } from '../db/schema.ts'
 import { SESSION_COOKIE } from './auth.ts'
 
 /**
@@ -213,12 +213,12 @@ describe('a member editing their stay', () => {
     const response = await patchStay(server, member.cookie, {
       arrival_date: '2026-08-01',
       departure_date: '2026-08-05',
-      lodging: 'Hammock in the barn',
+      lodging_option_id: null,
       shift_preference: 'Sauna tending',
     })
 
     expect(response.statusCode).toBe(200)
-    expect(response.json().attendance.lodging).toBe('Hammock in the barn')
+    expect(response.json().attendance.shift_preference).toBe('Sauna tending')
     expect(response.json().attendance.arrival_date).toBe('2026-08-01')
   })
 
@@ -301,10 +301,10 @@ describe('a member editing their stay', () => {
     await givenComing(eventId, member.id)
     const otherRow = await givenComing(eventId, other.id)
 
-    await patchStay(server, member.cookie, { lodging: 'Mine' })
+    await patchStay(server, member.cookie, { notes: 'Mine' })
 
     const [row] = await db().select().from(attendance).where(eq(attendance.id, otherRow))
-    expect(row?.lodging).toBeNull()
+    expect(row?.notes).toBeNull()
   })
 
   it('answers 404 when they are not coming to this burn', async () => {
@@ -312,14 +312,14 @@ describe('a member editing their stay', () => {
     await givenEvent()
     const member = await givenMember()
 
-    expect((await patchStay(server, member.cookie, { lodging: 'Tent' })).statusCode).toBe(404)
+    expect((await patchStay(server, member.cookie, { notes: 'Tent' })).statusCode).toBe(404)
   })
 
   it('answers 404 when no burn is open', async () => {
     const server = await build()
     const member = await givenMember()
 
-    expect((await patchStay(server, member.cookie, { lodging: 'Tent' })).statusCode).toBe(404)
+    expect((await patchStay(server, member.cookie, { notes: 'Tent' })).statusCode).toBe(404)
   })
 
   it('refuses an anonymous caller', async () => {
@@ -331,11 +331,150 @@ describe('a member editing their stay', () => {
     const response = await server.inject({
       method: 'PATCH',
       url: '/api/events/active/attendance',
-      payload: { lodging: 'Tent' },
+      payload: { notes: 'Tent' },
     })
 
     expect(response.statusCode).toBe(401)
     const [row] = await db().select().from(attendance)
-    expect(row?.lodging).toBeNull()
+    expect(row?.notes).toBeNull()
+  })
+})
+
+describe('picking somewhere to sleep', () => {
+  const givenOption = async (eventId: string, label: string, capacity: number | null) => {
+    const id = randomUUID()
+    await db()
+      .insert(eventOption)
+      .values({ id, event_id: eventId, kind: 'lodging', order: 0, label, capacity })
+    return id
+  }
+
+  const pick = (server: FastifyInstance, cookie: string, optionId: string | null) =>
+    server.inject({
+      method: 'PATCH',
+      url: '/api/events/active/attendance',
+      headers: { cookie },
+      payload: { lodging_option_id: optionId },
+    })
+
+  it('records the option they picked', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const member = await givenMember()
+    await givenComing(eventId, member.id)
+    const temple = await givenOption(eventId, 'Temple mattress', 9)
+
+    const response = await pick(server, member.cookie, temple)
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().attendance.lodging_option_id).toBe(temple)
+  })
+
+  it('refuses one that is already full', async () => {
+    // A disabled `<option>` is presentation; the API takes what it is sent.
+    const server = await build()
+    const eventId = await givenEvent()
+    const first = await givenMember()
+    const second = await givenMember()
+    await givenComing(eventId, first.id)
+    await givenComing(eventId, second.id)
+    const bed = await givenOption(eventId, 'The one bed', 1)
+    await pick(server, first.cookie, bed)
+
+    const response = await pick(server, second.cookie, bed)
+
+    expect(response.statusCode).toBe(409)
+    const [row] = await db().select().from(attendance).where(eq(attendance.account_id, second.id))
+    expect(row?.lodging_option_id).toBeNull()
+  })
+
+  it('lets someone re-save the option they are already in', async () => {
+    // Their own choice must not count against them, or editing an unrelated
+    // field would refuse the bed they are already sleeping in.
+    const server = await build()
+    const eventId = await givenEvent()
+    const member = await givenMember()
+    await givenComing(eventId, member.id)
+    const bed = await givenOption(eventId, 'The one bed', 1)
+    await pick(server, member.cookie, bed)
+
+    expect((await pick(server, member.cookie, bed)).statusCode).toBe(200)
+  })
+
+  it('lets as many in as like when there is no limit', async () => {
+    // The passing sibling: the check must refuse a full option, not every option.
+    const server = await build()
+    const eventId = await givenEvent()
+    const first = await givenMember()
+    const second = await givenMember()
+    await givenComing(eventId, first.id)
+    await givenComing(eventId, second.id)
+    const tent = await givenOption(eventId, 'Own tent', null)
+    await pick(server, first.cookie, tent)
+
+    expect((await pick(server, second.cookie, tent)).statusCode).toBe(200)
+  })
+
+  it('lets them take it back to not decided', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const member = await givenMember()
+    await givenComing(eventId, member.id)
+    const bed = await givenOption(eventId, 'The one bed', 1)
+    await pick(server, member.cookie, bed)
+
+    const response = await pick(server, member.cookie, null)
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().attendance.lodging_option_id).toBeNull()
+  })
+
+  it('refuses an option belonging to another burn', async () => {
+    // The select cannot offer it, but the API takes what it is sent. Without the
+    // event filter the id resolves, has no capacity for this burn, and is quietly
+    // accepted.
+    const server = await build()
+    const eventId = await givenEvent()
+    const member = await givenMember()
+    await givenComing(eventId, member.id)
+
+    const elsewhere = randomUUID()
+    await db()
+      .insert(event)
+      .values({
+        id: elsewhere,
+        name: 'Another burn',
+        slug: `other-${elsewhere.slice(0, 8)}`,
+        start_date: '2027-08-01',
+        end_date: '2027-08-05',
+        member_cap: 42,
+        created_at: NOW,
+      })
+    const theirs = await givenOption(elsewhere, 'Their temple', 9)
+
+    expect((await pick(server, member.cookie, theirs)).statusCode).toBe(400)
+  })
+
+  it('refuses a helping option, which has no capacity to be full of', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const member = await givenMember()
+    await givenComing(eventId, member.id)
+
+    const id = randomUUID()
+    await db()
+      .insert(eventOption)
+      .values({ id, event_id: eventId, kind: 'helping', order: 0, label: 'Sauna', capacity: null })
+
+    expect((await pick(server, member.cookie, id)).statusCode).toBe(400)
+  })
+
+  it('refuses an option that is not a real one', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const member = await givenMember()
+    await givenComing(eventId, member.id)
+
+    expect((await pick(server, member.cookie, randomUUID())).statusCode).toBe(400)
   })
 })

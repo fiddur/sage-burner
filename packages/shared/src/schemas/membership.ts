@@ -80,12 +80,20 @@ export const attendanceFields = z.object({
   arrival_date: dateSchema.nullable(),
   departure_date: dateSchema.nullable(),
   /**
-   * Free text rather than an enum: the options differ per event and per site
-   * (tents, tiny house floor, caravans, ...), so organisers must be able to add
-   * one without a deploy.
+   * Which `event_option` they picked to sleep in, or null for not said.
+   *
+   * A reference rather than the free text this used to be. The options still
+   * differ per event and per site, and organisers still add one without a
+   * deploy — they are rows now — but an id is what lets anyone count who is
+   * sleeping where.
    */
-  lodging: optionalText(200),
-  /** Likewise free text — "Cooking", "Cleaning", "Either/both", or whatever's next. */
+  lodging_option_id: idSchema.nullable(),
+  /**
+   * Still free text — "Cooking", "Cleaning", "Either/both", or whatever is next.
+   *
+   * The helping list in `event_option` exists but nothing consumes it yet; this
+   * becomes a set of references and a write-in when it does.
+   */
   shift_preference: optionalText(200),
   notes: optionalText(2000),
   /** Set by admins only. Members see their own status but cannot change it. */
@@ -166,6 +174,14 @@ export const rosterEntrySchema = attendanceFields.extend({
   name: nonEmptyText(200).nullable(),
   contact: nonEmptyText(500).nullable(),
   allergies_notes: optionalText(2000),
+  /**
+   * The lodging option's label, resolved at read time.
+   *
+   * A projection beside the id, not a second place to store it: the organiser
+   * reading this wants "Temple mattress", and a CSV of UUIDs is no use to
+   * anybody.
+   */
+  lodging: optionalText(200),
   /** Derived from payment and join order every read — never stored. */
   waiting: z.boolean(),
 })

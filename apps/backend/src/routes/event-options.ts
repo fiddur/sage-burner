@@ -1,4 +1,4 @@
-import type { EventOption, EventOptionsResponse } from '@sage-burner/shared'
+import type { EventOption, EventOptionTaken, EventOptionsResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
 import {
@@ -16,15 +16,31 @@ import type { Database } from '../db/index.ts'
 
 import { createGuards } from '../auth/guards.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
-import { eventOption } from '../db/schema.ts'
+import { attendance, eventOption } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 
-const optionsFor = (db: Database, eventId: string): Promise<EventOption[]> =>
-  db
+const optionsFor = async (db: Database, eventId: string): Promise<EventOptionTaken[]> => {
+  const rows = await db
     .select()
     .from(eventOption)
     .where(eq(eventOption.event_id, eventId))
     .orderBy(asc(eventOption.kind), asc(eventOption.order), asc(eventOption.id))
+
+  // One query for every count rather than one per option: at this size the whole
+  // table is a handful of rows, and a loop of selects would be the slower, longer
+  // way to say the same thing.
+  const takers = await db
+    .select({ option: attendance.lodging_option_id })
+    .from(attendance)
+    .where(eq(attendance.event_id, eventId))
+
+  const counts = new Map<string, number>()
+  for (const { option } of takers) {
+    if (option !== null) counts.set(option, (counts.get(option) ?? 0) + 1)
+  }
+
+  return rows.map((row) => ({ ...row, taken: counts.get(row.id) ?? 0 }))
+}
 
 /**
  * The two lists a member picks from for a given burn.
@@ -127,10 +143,20 @@ export const registerEventOptionRoutes = (app: FastifyInstance, { db, sessions }
     async (request, reply) => {
       void noStore(reply)
 
-      const deleted = await db
-        .delete(eventOption)
-        .where(eq(eventOption.id, request.params.id))
-        .returning({ id: eventOption.id })
+      // Somebody sleeping here holds the row: `attendance.lodging_option_id` has
+      // no `onDelete`, so SQLite refuses rather than quietly unbooking them. A
+      // pre-read would be check-then-act — someone can pick it between the read
+      // and the delete — so the constraint is the authority and this translates.
+      let deleted
+      try {
+        deleted = await db
+          .delete(eventOption)
+          .where(eq(eventOption.id, request.params.id))
+          .returning({ id: eventOption.id })
+      } catch (failure) {
+        if (isForeignKeyViolation(failure)) return reply.code(409).send(errorResponse('conflict'))
+        throw failure
+      }
 
       if (deleted.length === 0) return reply.code(404).send(errorResponse('not_found'))
 

@@ -1,4 +1,4 @@
-import type { MyAttendanceResponse, PaymentStatus } from '@sage-burner/shared'
+import type { EventOptionTaken, MyAttendanceResponse, PaymentStatus } from '@sage-burner/shared'
 
 import { useEffect, useState } from 'preact/hooks'
 
@@ -25,12 +25,12 @@ const paymentNote = (status: PaymentStatus) => PAYMENT_NOTES[status]
 
 export type MyBurnApi = Pick<
   ApiClient,
-  'getMyAttendance' | 'joinActiveEvent' | 'leaveActiveEvent' | 'updateMyStay'
+  'getMyAttendance' | 'joinActiveEvent' | 'leaveActiveEvent' | 'updateMyStay' | 'getEventOptions'
 >
 
 type Loaded =
   | { status: 'loading' }
-  | { status: 'ready'; mine: MyAttendanceResponse }
+  | { status: 'ready'; mine: MyAttendanceResponse; lodging: readonly EventOptionTaken[] }
   | { status: 'failed'; message: string }
 
 export const MyBurn = ({ api }: { api: MyBurnApi }) => {
@@ -43,8 +43,12 @@ export const MyBurn = ({ api }: { api: MyBurnApi }) => {
   const load = (signal?: AbortSignal) =>
     api
       .getMyAttendance(signal)
-      .then((mine) => {
-        if (signal?.aborted !== true) setLoaded({ status: 'ready', mine })
+      .then(async (mine) => {
+        // The lodging list belongs to the burn, so it is only worth asking for
+        // once there is one.
+        const lodging = mine.event === null ? [] : (await api.getEventOptions(mine.event.id, signal)).options
+
+        if (signal?.aborted !== true) setLoaded({ status: 'ready', mine, lodging })
       })
       .catch((failure: unknown) => {
         if (signal?.aborted === true) return
@@ -151,9 +155,16 @@ export const MyBurn = ({ api }: { api: MyBurnApi }) => {
               <StayForm
                 api={api}
                 attendance={loaded.mine.attendance}
-                onSaved={(saved) =>
-                  setLoaded({ status: 'ready', mine: { ...loaded.mine, attendance: saved } })
-                }
+                lodgingOptions={loaded.lodging.filter((option) => option.kind === 'lodging')}
+                taken={Object.fromEntries(loaded.lodging.map((option) => [option.id, option.taken]))}
+                onSaved={() => {
+                  // Reloaded rather than spliced: the `taken` counts move when a
+                  // member changes where they are sleeping, and a stale map leaves
+                  // the option they just left reading as full — now disabled,
+                  // since it is no longer theirs — which a native select cannot
+                  // pick back.
+                  void load()
+                }}
               />
 
               <p class="row">
