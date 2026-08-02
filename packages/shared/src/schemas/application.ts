@@ -105,6 +105,15 @@ export const inviteSchema = z.object({
   expires_at: dateTimeSchema,
 })
 
+/**
+ * What `POST /api/admin/invites` answers with.
+ *
+ * Named rather than declared inline at both ends: the route and `client.ts` each
+ * used to write `{ invite: … }` out for themselves, so renaming a key on one side
+ * compiled cleanly against the other.
+ */
+export const inviteResponseSchema = z.object({ invite: inviteSchema })
+
 export const applicationDecisionResponseSchema = z.object({
   application: applicationSchema,
   /** Null on rejection. An approval either mints one or fails. */
@@ -120,4 +129,5 @@ export type ApplicationCreate = z.infer<typeof applicationCreateSchema>
 export type ApplicationResponse = z.infer<typeof applicationResponseSchema>
 export type ApplicationsResponse = z.infer<typeof applicationsResponseSchema>
 export type Invite = z.infer<typeof inviteSchema>
+export type InviteResponse = z.infer<typeof inviteResponseSchema>
 export type ApplicationDecisionResponse = z.infer<typeof applicationDecisionResponseSchema>

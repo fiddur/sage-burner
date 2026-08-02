@@ -109,6 +109,18 @@ describe('direct invites', () => {
     expect(response.json().invite.expires_at).toBe('2026-07-10T00:00:00.000Z')
   })
 
+  it('refuses a misspelt key rather than minting the default behind it', async () => {
+    // What `.strict()` is for here, spelled out because the failure is quiet:
+    // without it `expiers_at` is stripped, the body becomes `{}`, and the route
+    // answers 201 with a 30-day invite while the caller believes it set 8 days.
+    const server = await build()
+    const { cookie } = await givenAdmin()
+
+    const response = await create(server, cookie, { expiers_at: '2026-07-10T00:00:00.000Z' })
+
+    expect(response.statusCode).toBe(400)
+  })
+
   it('refuses an expiry in the past, which would mint something already dead', async () => {
     const server = await build()
     const { cookie } = await givenAdmin()

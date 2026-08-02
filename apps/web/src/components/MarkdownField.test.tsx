@@ -79,6 +79,11 @@ describe('MarkdownField', () => {
     const field = screen.getByLabelText('Help text')
     expect(field.id).not.toBe('')
     expect(document.querySelector(`label[for="${field.id}"]`)?.textContent).toBe('Help text')
+    // The half of the name this test used to leave unpinned: re-adding
+    // `aria-label` beside the id satisfies every line above while quietly
+    // putting the accessible name back in two places, with `aria-label`
+    // winning over the `<label>`.
+    expect(field.getAttribute('aria-label')).toBeNull()
   })
 
   it('drops the label association while previewing, when there is no field to name', async () => {

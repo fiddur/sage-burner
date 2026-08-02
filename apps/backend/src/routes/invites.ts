@@ -1,4 +1,4 @@
-import type { AdminInvitesResponse } from '@sage-burner/shared'
+import type { AdminInvitesResponse, InviteResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
 import { errorResponse, inviteCreateSchema, inviteStatusOf } from '@sage-burner/shared'
@@ -76,7 +76,7 @@ export const registerInviteRoutes = (
       created_by: viewer.account_id,
     })
 
-    return reply.code(201).send({ invite: { token, expires_at } })
+    return reply.code(201).send({ invite: { token, expires_at } } satisfies InviteResponse)
   })
 
   app.delete<{ Params: { id: string } }>(

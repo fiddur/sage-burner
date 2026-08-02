@@ -5,8 +5,8 @@ import type {
   ApplicationDecisionResponse,
   ApplicationResponse,
   ApplicationsResponse,
-  Invite,
   InviteCreate,
+  InviteResponse,
   InviteState,
   AttendanceUpdate,
   MyAttendanceResponse,
@@ -371,7 +371,7 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
      * re-issue path yet (#91). Omit `expires_at` for the default 30 days.
      */
     createInvite: (body: InviteCreate = {}) =>
-      request<{ invite: Invite }>('/admin/invites', { method: 'POST', body }),
+      request<InviteResponse>('/admin/invites', { method: 'POST', body }),
 
     /**
      * Admin only. Answers 204. Throws ApiError(409, 'conflict') for an invite

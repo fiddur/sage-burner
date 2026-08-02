@@ -1257,13 +1257,22 @@ nowhere else — a leaked backup or a stray copy of the volume hands out no
 invites. The organiser copies it into Discord or Messenger themselves; there is
 no email.
 
-**A lost link is lost.** Not merely unrecoverable — there is no way to issue a
-replacement either: re-approving matches nothing on `status = 'pending'` and
-answers `409`, `invite_token_application_idx` refuses a second invite for the
-same application, and no other route mints one. The only way back today is
-editing the database. #91 owns the re-issue path; until it lands, the copy button
-is deliberately silent on failure rather than claiming a copy that did not
-happen.
+**A lost link cannot be re-sent, but the person is not stuck.** Re-approving
+matches nothing on `status = 'pending'` and answers `409`, and
+`invite_token_application_idx` refuses a second invite for the same application
+— so _that_ invite is gone for good. What an organiser does instead is mint a
+direct one with `POST /api/admin/invites` and send that; the applicant gets in
+without anyone touching the database.
+
+What is genuinely unrecoverable is the **link between the member row and their
+application**: the direct invite carries no `application_id`, so the answers they
+wrote stay orphaned from the account they end up with. That is still the reason
+for the `409` — it is just a narrower reason than "there is no way back", which
+is what this paragraph used to say. #91 would restore the link by re-issuing
+against the same application; it is a convenience now rather than the only route.
+
+The copy button is deliberately silent on failure rather than claiming a copy
+that did not happen.
 
 The link is assembled in the browser from `window.location.origin`, so the API
 needs no notion of its own public URL.
