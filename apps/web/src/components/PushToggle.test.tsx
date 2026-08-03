@@ -41,7 +41,9 @@ const rememberingBrowser = (over: Partial<PushBrowser> = {}) => {
         getSubscription,
         subscribe: () => {
           held = aSubscription('https://push.example/mine')
-          return Promise.resolve(held)
+          // The spy on both paths, so releasing a just-made subscription is
+          // observable too — not only releasing one that was found.
+          return Promise.resolve({ ...held, unsubscribe })
         },
       }),
     ...over,
@@ -229,6 +231,28 @@ describe('PushToggle', () => {
 
     expect((await screen.findByRole('alert')).textContent).toContain('No access.')
     expect(screen.getByRole('button', { name: 'Notify me here' })).toBeTruthy()
+  })
+
+  it('releases the browser subscription when the server refuses to store it', async () => {
+    // The mirror of the turn-off defect: `subscribe()` has already succeeded by the
+    // time the API call fails, so leaving it would give a browser subscribed with
+    // no row behind it — and the next mount reads "on" from `getSubscription()`
+    // while nothing can ever arrive.
+    const { browser, unsubscribe } = rememberingBrowser()
+    render(
+      <PushToggle
+        api={stub({ subscribeToPush: () => Promise.reject(apiError(401, 'unauthenticated', 'Sign in.')) })}
+        browser={browser}
+      />,
+    )
+
+    // This fake starts subscribed; turn it off first so the button offers to
+    // subscribe, which is the path under test.
+    fireEvent.click(await screen.findByRole('button', { name: 'Stop notifying me here' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Notify me here' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Sign in.')
+    await waitFor(() => expect(unsubscribe).toHaveBeenCalledTimes(2))
   })
 
   it('unsubscribes by the endpoint the browser still holds', async () => {

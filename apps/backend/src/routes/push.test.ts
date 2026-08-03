@@ -156,13 +156,21 @@ describe('subscribing a browser', () => {
     expect(await db().select().from(pushSubscription)).toEqual([])
   })
 
-  it('refuses an endpoint that is not a URL', async () => {
+  it('refuses an endpoint that is not an https URL', async () => {
+    // The stored value is what the server itself POSTs to on every application, so
+    // a plain-HTTP endpoint would point it at something on its own network. A real
+    // push service is always https.
     const server = await build()
     const admin = await givenAccount(['admin'])
 
-    expect((await subscribe(server, admin.cookie, { ...A_SUBSCRIPTION, endpoint: 'nope' })).statusCode).toBe(
-      400,
-    )
+    for (const endpoint of ['nope', 'http://10.0.0.5/push', 'ftp://example.org/x']) {
+      expect(
+        (await subscribe(server, admin.cookie, { ...A_SUBSCRIPTION, endpoint })).statusCode,
+        endpoint,
+      ).toBe(400)
+    }
+
+    expect(await db().select().from(pushSubscription)).toEqual([])
   })
 
   it('refuses a member and a stranger', async () => {

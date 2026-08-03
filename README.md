@@ -603,6 +603,13 @@ Nothing has to be signed up for or configured: the VAPID pair is minted into the
 that never turns notifications on never acquires one. That keeps `docker compose
 up` sufficient, which is the same argument #59 makes for `SESSION_SECRET`.
 
+The endpoint is **https-only**. It is the one field whose stored value the server
+itself then requests, on every application, so a `http://10.0.0.5/…` there would
+point the container at something on its own network. Only admins can write it and a
+real push service is always https, so requiring the scheme costs nothing. Narrowing
+past that would mean an allowlist of every browser vendor's endpoint, which goes
+stale the moment a new one appears.
+
 **The payload says only that someone applied.** No name, no contact, nothing from
 the application. Push payloads are encrypted to the browser's own key, so the push
 service cannot read them — but a notification is read on a lock screen, and the

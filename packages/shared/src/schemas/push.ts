@@ -10,12 +10,22 @@ import { nonEmptyText } from './common.ts'
  * encrypted to. `.strict()` for the usual reason — a misspelt key here would
  * store a subscription that can never be delivered to, and say 201.
  *
- * The endpoint is a URL and bounded: it is chosen by the browser's push service,
- * not by us, and an unbounded string on a write is a row of any size.
+ * **`https` only, and bounded.** This is the one field in the app whose stored
+ * value the server itself then requests, on every application — so an endpoint of
+ * `http://10.0.0.5/…` would make the container POST to something on its own
+ * network, chosen by whoever wrote the row. Only admins can write it and a real
+ * push service is always `https`, so requiring the scheme costs nothing and takes
+ * away the plain-HTTP path to the inside of the network. The remaining reach is a
+ * `https` host, which is what a push service is; narrowing further would mean an
+ * allowlist of every browser vendor's endpoint, which goes stale as a new one
+ * appears.
  */
 export const pushSubscriptionCreateSchema = z
   .object({
-    endpoint: z.url().max(2000),
+    endpoint: z
+      .url()
+      .max(2000)
+      .refine((value) => value.startsWith('https://'), { message: 'must be an https endpoint' }),
     p256dh: nonEmptyText(200),
     auth: nonEmptyText(200),
   })

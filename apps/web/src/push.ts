@@ -30,10 +30,15 @@ export interface PushBrowser {
       unsubscribe: () => Promise<boolean>
       toJSON: () => unknown
     } | null>
-    // Optional, matching the DOM's own signature: required here, the real
-    // `PushManager` would not be assignable to this.
+    // Typed with the DOM's own `PushSubscriptionOptionsInit` so the real
+    // `PushManager` is assignable — a hand-written `{ userVisibleOnly:
+    // boolean; applicationServerKey: Uint8Array }` is not, because the DOM wants a
+    // `BufferSource`. The `?` mirrors that signature and is not itself load-
+    // bearing: TypeScript lets a function with an optional parameter satisfy one
+    // that requires it.
     subscribe: (options?: PushSubscriptionOptionsInit) => Promise<{
       endpoint: string
+      unsubscribe: () => Promise<boolean>
       toJSON: () => unknown
     }>
   }>

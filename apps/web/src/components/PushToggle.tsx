@@ -54,6 +54,15 @@ export const PushToggle = ({
       .catch(() => setState('unsupported'))
   }, [browser])
 
+  /** Best-effort: a browser that will not let go should not mask the real error. */
+  const release = async (subscription: { unsubscribe: () => Promise<boolean> }) => {
+    try {
+      await subscription.unsubscribe()
+    } catch {
+      // The message the caller is about to show is the more useful one.
+    }
+  }
+
   const turnOn = async () => {
     if (browser === undefined) return
 
@@ -83,11 +92,23 @@ export const PushToggle = ({
       const body = subscriptionBody(subscription)
       if (body === undefined) {
         setError('This browser gave us a subscription we cannot use.')
+        await release(subscription)
         setState('off')
         return
       }
 
-      await api.subscribeToPush(body)
+      try {
+        await api.subscribeToPush(body)
+      } catch (failure) {
+        // `subscribe()` already succeeded, so without this the browser holds a
+        // subscription the server has no row for — and the next mount reads "on"
+        // from `getSubscription()` while nothing can ever arrive. The same
+        // asymmetry as leaving it subscribed on the way out, in the other
+        // direction.
+        await release(subscription)
+        throw failure
+      }
+
       setState('on')
     } catch (failure) {
       setError(isApiError(failure) ? failure.message : 'Could not turn notifications on here.')
