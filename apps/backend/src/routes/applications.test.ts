@@ -96,6 +96,12 @@ const applicant = { applicant_name: 'Fredrik', applicant_contact: 'fredrik@examp
 
 const stored = async () => db().select().from(application)
 
+/** Submit an answer, with the question's wording edited in between. */
+const submitAfter = async (server: FastifyInstance, questionId: string, label: string) => {
+  await db().update(formQuestion).set({ label }).where(eq(formQuestion.id, questionId))
+  return submit(server, { ...applicant, answers: { [questionId]: 'For the fire' }, asked: [questionId] })
+}
+
 describe('submitting an application', () => {
   it('accepts a submission answering every question', async () => {
     const server = await build()
@@ -239,11 +245,23 @@ describe('submitting an application', () => {
     expect((await submit(server, { ...applicant, answers: {} })).statusCode).toBe(201)
   })
 
+  it('stores the wording as it is at submission, not as it was on screen', async () => {
+    // The one thing still read from the current list rather than from `asked`: a
+    // label edited while the form was open is stored as the new text, against an
+    // answer given to the old.
+    const server = await build()
+    const why = await givenQuestion({ type: 'text', label: 'Why?', required: false })
+    await submitAfter(server, why, 'Why do you want to come?')
+
+    const [row] = await stored()
+    expect(row?.answers).toEqual([
+      { question_id: why, label: 'Why do you want to come?', type: 'text', value: 'For the fire' },
+    ])
+  })
+
   it('stores an untouched optional text answer as an empty string', async () => {
-    // The other half of "one entry per question asked, answered or not". The
-    // `false` case below has had a test; this one had none anywhere, so nothing
-    // pinned the `''` the README claims — a change dropping the entry entirely
-    // would have passed.
+    // The other half of "one entry per question asked, answered or not", the
+    // `false` case being the sibling below.
     const server = await build()
     const why = await givenQuestion({ type: 'text', label: 'Why?', required: false })
 

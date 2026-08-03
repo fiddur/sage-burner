@@ -19,8 +19,8 @@ export const MAX_APPLICANT_CONTACT_LENGTH = 500
 /**
  * How many questions one submission may claim it was shown.
  *
- * Every other attacker-controlled field on the public application route carries a
- * ceiling, and this one is a list. Fastify's 1 MB body limit already caps it near
+ * The other attacker-controlled fields on the public application route carry
+ * ceilings, and this one is a list. Fastify's 1 MB body limit already caps it near
  * 26k ids, so this is not availability — it is the ceiling being stated where the
  * others are rather than inherited from a default somewhere else. Far above any
  * form a person would fill in: the admin editor lists them on one page.

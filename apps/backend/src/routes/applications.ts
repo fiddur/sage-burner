@@ -26,12 +26,13 @@ export interface ApplicationRouteDeps {
  *
  * The submitter does name which questions they were shown, and that list decides
  * what gets an entry — so the guarantee is narrower than "nobody can record a
- * question that was never asked". A crafted body can *omit* an optional question
- * it was shown and left blank, which then stores as never-asked rather than as
- * `false` or `""`. Understating your own application is not an attack worth
- * defending against. The other direction is closed: an answer outside `asked` is
- * a 400, so nothing can be recorded as answered that the body does not claim was
- * asked.
+ * question that was never asked", in both directions. A crafted body can *omit*
+ * an optional question it was shown and left blank, storing it as never-asked;
+ * and it can *name* one the page never rendered, storing an "asked, said no"
+ * entry for something nobody was shown. Both are someone misdescribing their own
+ * application, which is not an attack worth machinery — the wording still comes
+ * from the question rows, and validation still runs against the server's list, so
+ * neither buys them anything a reviewer would act on.
  *
  * Not rate-limited here, consistent with login: throttling lives in the reverse
  * proxy where an operator can see it. Nothing here grants access, so the

@@ -1241,6 +1241,15 @@ The distinction is the key, not what the field looked like. `Apply.tsx` writes
 sends `''` — a key, and therefore the 400 — while one never touched sends
 nothing.
 
+**The wording is still read at submission, not sent.** All of the above is about
+which questions get an entry; the label on each one comes from the question row
+as it is when the application lands. So an admin who _edits_ a question's text
+while someone is filling the form in has that answer stored under the new
+wording, against a question they were shown the old one for. That is the trade
+`asked` does not touch and deliberately: taking the wording from the body would
+let a submission record a question in words nobody wrote, which is the worse of
+the two. #85's fix narrows what is stored, not where the words come from.
+
 What this does _not_ claim: a crafted body can omit an optional question it was
 shown and left blank, so it records as never-asked rather than as `false` or
 `""`. Understating your own application is not an attack worth defending against,

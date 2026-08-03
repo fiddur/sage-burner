@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { MAX_ASKED_QUESTIONS } from '../answers.ts'
 import { applicationCreateSchema, applicationSchema } from './application.ts'
 import { slugSchema } from './common.ts'
 import { eventFields, eventSchema, withEventDateOrder } from './event.ts'
@@ -206,6 +207,19 @@ describe('applicationCreateSchema', () => {
     // relates the two — no schema rule could — so that a question shown and left
     // blank is *stored* as asked is `applications.test.ts`'s to prove.
     expect(applicationCreateSchema.safeParse({ ...aSubmission, answers: {} }).success).toBe(true)
+  })
+
+  it('caps how many questions a submission may claim it was shown', () => {
+    // Both boundaries, like `MAX_ANSWER_LENGTH` has: without them a `.max()`
+    // dropped, or written as `.min()`, fails nothing.
+    const ids = (count: number) => Array.from({ length: count }, () => OTHER_ID)
+
+    expect(
+      applicationCreateSchema.safeParse({ ...aSubmission, asked: ids(MAX_ASKED_QUESTIONS) }).success,
+    ).toBe(true)
+    expect(
+      applicationCreateSchema.safeParse({ ...aSubmission, asked: ids(MAX_ASKED_QUESTIONS + 1) }).success,
+    ).toBe(false)
   })
 
   it('rejects answers keyed by something that is not a question id', () => {
