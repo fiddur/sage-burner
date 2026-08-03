@@ -351,8 +351,11 @@ describe('redeeming', () => {
     // `queue-full`'s. Sending a client that already waited the window straight
     // back turns a polite `Retry-After` into a hot loop against the flood the
     // gate exists to damp.
-    const gate = createGate({ slots: 1, queue: 1, timeoutMs: 20 })
-    const server = await build(() => new Date(NOW), slowHash(120), gate)
+    // Over a second, deliberately: `retryAfter` rounds up to whole seconds, so a
+    // shorter window makes `timed-out` and `queue-full` both `'1'` and the
+    // assertion below cannot tell them — or a hardcoded number — apart.
+    const gate = createGate({ slots: 1, queue: 1, timeoutMs: 1200 })
+    const server = await build(() => new Date(NOW), slowHash(1400), gate)
     const first = await givenInvite()
     const second = await givenInvite()
 
@@ -361,9 +364,10 @@ describe('redeeming', () => {
     const waited = await redeem(server, second, { ...applicant, email: 'other@example.org' })
 
     expect(waited.statusCode).toBe(429)
-    // Asked of the gate rather than written out, which is the point: the number
-    // is the window this gate was built with. `gate.test.ts` pins the derivation.
+    // '2' here, against `queue-full`'s '1'. Asked of the gate rather than written
+    // out so the two stay tied to the window; `gate.test.ts` pins the derivation.
     expect(waited.headers['retry-after']).toBe(gate.retryAfter('timed-out'))
+    expect(gate.retryAfter('timed-out')).not.toBe(gate.retryAfter('queue-full'))
     expect((await holding).statusCode).toBe(201)
   })
 
