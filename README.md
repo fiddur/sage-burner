@@ -621,6 +621,12 @@ the other anywhere else.
 Personal details stay the person's own. A member reads the roster and writes only
 their own stay.
 
+One consequence worth knowing rather than discovering: deleting a helping option
+takes every member's ticks for it with it — `attendance_helping` cascades — so a
+member can now remove something other people signed up for. That follows from the
+spreadsheet default rather than being an oversight, and it is the same trust the
+lead-roles register assumes in #27.
+
 The welcome text is edited **on the homepage**, where it is read — whoever spots a
 typo is the one likely to fix it — through `PATCH /api/events/:id/welcome`. That is
 a route of its own rather than a carve-out in the admin `PATCH`, and the reason is
@@ -1210,7 +1216,8 @@ would reject valid input on a schedule nobody could fix without a deploy.
 
 `GET /api/places` is **public**, like `/api/questions`: the ICS feed publishes a
 session's location to anyone holding the link, so the list of places is already
-public by design. Every write is admin-only.
+public by design. Writes are open to any approved member — the lanes are the
+burn's furniture, not admin's.
 
 `order` is the server's to assign, so `POST` refuses a caller that sends one —
 otherwise two places could claim the same lane. New places land after the last,

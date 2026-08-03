@@ -126,7 +126,7 @@ export const Admin = ({ api }: { api: AdminApi }) => {
             </p>
           </>
         ) : (
-          <p>This is for members. If you are one, sign in — otherwise ask someone who is.</p>
+          <p>This is for members. Ask someone who already has a role.</p>
         )}
       </section>
     )

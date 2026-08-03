@@ -1,5 +1,6 @@
 import type { Event } from '@sage-burner/shared'
 
+import { MAX_WELCOME_LENGTH } from '@sage-burner/shared'
 import { useEffect, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -10,8 +11,6 @@ import { MarkdownField } from '../components/MarkdownField.tsx'
 import { useInstallationTitle } from '../installation.tsx'
 import { renderMarkdown } from '../markdown.ts'
 import { isApproved, isMember, useViewer } from '../viewer.tsx'
-
-const MAX_WELCOME = 100_000
 
 type Active = { status: 'loading' } | { status: 'ready'; event: Event | null } | { status: 'failed' }
 
@@ -55,8 +54,7 @@ export const Home = ({ api }: { api: HomeApi }) => {
     }
   }, [api])
 
-  // Bound once so the editor's callbacks do not each re-narrow `active`.
-  const current = active.status === 'ready' ? active.event : null
+  const openEvent = active.status === 'ready' ? active.event : null
 
   const save = async (id: string, welcome_markdown: string) => {
     setSaving(true)
@@ -90,12 +88,12 @@ export const Home = ({ api }: { api: HomeApi }) => {
           <p class="notice">There is no burn scheduled at the moment. Check back later.</p>
         )}
 
-      {active.status === 'ready' && active.event !== null && (
+      {openEvent !== null && (
         <>
-          <h2>{active.event.name}</h2>
+          <h2>{openEvent.name}</h2>
           <p class="event-dates">
-            <time dateTime={active.event.start_date}>{active.event.start_date}</time> –{' '}
-            <time dateTime={active.event.end_date}>{active.event.end_date}</time>
+            <time dateTime={openEvent.start_date}>{openEvent.start_date}</time> –{' '}
+            <time dateTime={openEvent.end_date}>{openEvent.end_date}</time>
           </p>
 
           {/*
@@ -108,7 +106,7 @@ export const Home = ({ api }: { api: HomeApi }) => {
             <>
               <div
                 class="welcome"
-                dangerouslySetInnerHTML={{ __html: renderMarkdown(active.event.welcome_markdown) }}
+                dangerouslySetInnerHTML={{ __html: renderMarkdown(openEvent.welcome_markdown) }}
               />
 
               {/*
@@ -120,7 +118,7 @@ export const Home = ({ api }: { api: HomeApi }) => {
                 <button
                   type="button"
                   class="link-button"
-                  onClick={() => setEditing(current === null ? '' : current.welcome_markdown)}
+                  onClick={() => setEditing(openEvent.welcome_markdown)}
                 >
                   Edit this text
                 </button>
@@ -131,13 +129,13 @@ export const Home = ({ api }: { api: HomeApi }) => {
               class="form"
               onSubmit={(submitEvent) => {
                 submitEvent.preventDefault()
-                if (current !== null) void save(current.id, editing)
+                void save(openEvent.id, editing)
               }}
             >
               <MarkdownField
                 label="Welcome text"
                 value={editing}
-                maxLength={MAX_WELCOME}
+                maxLength={MAX_WELCOME_LENGTH}
                 onInput={setEditing}
               />
 

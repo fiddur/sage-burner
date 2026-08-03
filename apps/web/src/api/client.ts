@@ -271,18 +271,18 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
     /** Public: the ICS feed publishes locations anyway, so the list is not secret. */
     getPlaces: (signal?: AbortSignal) => request<PlacesResponse>('/places', { signal }),
 
-    /** Admin only. `order` is the server's to assign, so it is not offered. */
+    /** Any approved member. `order` is the server's to assign, so it is not offered. */
     addPlace: (body: PlaceCreate) => request<{ place: Place }>('/places', { method: 'POST', body }),
 
-    /** Admin only. Partial — omitted fields are left as they are. */
+    /** Any approved member. Partial — omitted fields are left as they are. */
     updatePlace: (id: string, body: PlaceUpdate) =>
       request<{ place: Place }>(`/places/${encodeURIComponent(id)}`, { method: 'PATCH', body }),
 
-    /** Admin only. */
+    /** Any approved member. Throws ApiError(409, 'conflict') when a dream sits in it. */
     deletePlace: (id: string) =>
       request<undefined>(`/places/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
-    /** Admin only. Every place exactly once, in the order they should appear. */
+    /** Any approved member. Every place exactly once, in the order they should appear. */
     reorderPlaces: (ids: readonly string[]) =>
       request<PlacesResponse>('/places/order', { method: 'PUT', body: { ids } }),
 
@@ -304,7 +304,13 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
         body,
       }),
 
-    /** Admin only. */
+    /**
+     * Any approved member.
+     *
+     * Takes every member's ticks for that option with it — `attendance_helping`
+     * cascades — which is the shared-spreadsheet default applied to something
+     * other people filled in.
+     */
     deleteEventOption: (id: string) =>
       request<undefined>(`/event-options/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 

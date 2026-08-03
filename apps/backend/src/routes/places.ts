@@ -25,7 +25,8 @@ export const placesFor = (db: Database): Promise<Place[]> =>
  *
  * Reads are public. The ICS feed publishes a session's location to anyone with
  * the link, so the list of places is already public by design — see the ICS
- * paragraph in the README's security section. Every write is admin-only.
+ * paragraph in the README's security section. Every write is open to any approved
+ * member, per #155 — this is the burn's furniture, not admin's.
  */
 export const registerPlaceRoutes = (app: FastifyInstance, { db, sessions }: GuardDeps) => {
   const { requireApproved } = createGuards({ db, sessions })

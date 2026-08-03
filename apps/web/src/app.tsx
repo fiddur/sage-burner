@@ -104,7 +104,6 @@ export const Routes = ({
     | 'deleteQuestion'
     | 'getActiveEvent'
     | 'updateWelcome'
-    | 'updateWelcome'
     | 'getAdminAccounts'
     | 'setAccountRoles'
     | 'getEvents'
