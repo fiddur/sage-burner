@@ -1188,10 +1188,12 @@ contiguous.
 point — an applicant has no account yet. Everything in the body is therefore
 attacker-controlled, so two things are true by construction:
 
-- **The submitter names only their answers.** `id`, `status` and the timestamps
-  are the server's. The schema is `.strict()`, so an attempt at any of them is a
-  400 rather than a quietly dropped key — a request that tried to approve itself
-  must not look like it succeeded.
+- **The submitter names their answers and which questions they were shown, and
+  nothing else.** `id`, `status` and the timestamps are the server's. The schema
+  is `.strict()`, so an attempt at any of them is a 400 rather than a quietly
+  dropped key — a request that tried to approve itself must not look like it
+  succeeded. What `asked` is allowed to decide — and what it is not — is set out
+  below.
 - **The questions are re-read from the database on every submission**, never
   taken from the request.
 
@@ -1224,10 +1226,15 @@ An answer naming a question outside `asked` is a **400** rather than a dropped
 key: the body disagrees with itself, and silently discarding it would lose what
 somebody typed.
 
-The other direction is a **201**. An id in `asked` that the server no longer has
-is a question deleted while the form was open, which is the honest reason for the
-two lists to differ — and there is nothing to store for it, since the wording
-comes from the question row and the row is gone.
+An id in `asked` that the server no longer has is a question deleted while the
+form was open, and what happens then depends on whether it was answered:
+
+- **left blank, it is a 201** with no entry. There is nothing to store — the
+  wording comes from the question row, and the row is gone.
+- **answered, it is a 400**, and not by the `asked` rule at all: `answerProblems`
+  sees an answer naming no question it holds and says `unknown`, before the
+  filtering is reached. The form's advice for a 400 — reload and send again — is
+  right for it.
 
 What this does _not_ claim: a crafted body can omit an optional question it was
 shown and left blank, so it records as never-asked rather than as `false` or

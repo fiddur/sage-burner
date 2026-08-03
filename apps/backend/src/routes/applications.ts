@@ -65,9 +65,9 @@ export const registerApplicationRoutes = (
     }
 
     // A question in `asked` that is no longer in `questions` — deleted while the
-    // form was open — is dropped here rather than refused. It is the honest case
-    // for the two lists disagreeing this way, and there is nothing to store: the
-    // wording comes from the row, and the row is gone.
+    // form was open — is dropped here, with nothing to store: the wording comes
+    // from the row, and the row is gone. Only reachable if it was left blank; an
+    // answer naming it is `unknown` to `answerProblems` and 400s above.
     //
     // One entry per question *asked*, answered or not, so a reviewer can tell
     // "said no" from "was never asked" — which is why the form sends what it

@@ -259,10 +259,10 @@ describe('submitting an application', () => {
     expect(JSON.stringify(row?.answers)).not.toContain(late)
   })
 
-  it('drops a question deleted while the form was open, rather than refusing', async () => {
-    // The honest case for `asked` naming something the server does not have. Not
-    // a 400 like the answers-side disagreement: there is nothing to store, since
-    // the wording comes from the row and the row is gone.
+  it('drops a question deleted while the form was open and left blank', async () => {
+    // The honest case for `asked` naming something the server does not have: there
+    // is nothing to store, since the wording comes from the row and the row is
+    // gone. Answered, it is a 400 instead — the test below draws that boundary.
     const server = await build()
     const stays = await givenQuestion({ type: 'text', label: 'Why?', required: false, order: 0 })
     const goes = await givenQuestion({ type: 'text', label: 'Going away', required: false, order: 1 })
@@ -277,6 +277,26 @@ describe('submitting an application', () => {
     expect(response.statusCode).toBe(201)
     const [row] = await stored()
     expect(row?.answers).toEqual([{ question_id: stays, label: 'Why?', type: 'text', value: 'For the fire' }])
+  })
+
+  it('refuses when the deleted question had been answered', async () => {
+    // The boundary of the case above, and it is not the `asked` filter that
+    // decides it: `answerProblems` sees an answer naming no question it holds and
+    // says `unknown`, so this is a 400 before the filter is reached. The 201 is
+    // for a deleted question left *blank*.
+    const server = await build()
+    const stays = await givenQuestion({ type: 'text', label: 'Why?', required: false, order: 0 })
+    const goes = await givenQuestion({ type: 'text', label: 'Going away', required: false, order: 1 })
+    await db().delete(formQuestion).where(eq(formQuestion.id, goes))
+
+    const response = await submit(server, {
+      ...applicant,
+      answers: { [stays]: 'For the fire', [goes]: 'typed before it vanished' },
+      asked: [stays, goes],
+    })
+
+    expect(response.statusCode).toBe(400)
+    expect(await stored()).toEqual([])
   })
 
   it('still checks a required question added while the form was open', async () => {
