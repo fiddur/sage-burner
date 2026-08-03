@@ -1353,7 +1353,9 @@ already have an account, an unknown one is usually a truncated paste.
 `POST /api/invites/:token/redeem` creates the account, fills in the person-level
 fields, grants the `member` role and signs them in. **One transaction**, because
 half a redemption is the worst outcome: a spent token with no account behind it
-leaves the person no way to finish and nobody a way to re-issue (#91).
+leaves the person unable to finish with the link they were sent, and that link
+cannot be re-sent — somebody with admin has to notice and mint a direct invite
+(#91).
 
 Two races are closed, and each has a test that fails without it:
 

@@ -88,7 +88,9 @@ export const registerRedemptionRoutes = (
 
     // One transaction for the account, its role and the stamp. Half a redemption
     // is the worst outcome — a spent token with no account behind it leaves the
-    // person no way to finish and nobody a way to re-issue (#91).
+    // person unable to finish with the link they were sent, and that link cannot
+    // be re-sent. Somebody with admin can mint a direct invite to get them in;
+    // an application's tie to what they wrote is what would be lost (#91).
     //
     // The stamp is conditional on `used_at IS NULL` and requires one affected row,
     // so two concurrent redemptions of one token cannot both proceed: the loser's
