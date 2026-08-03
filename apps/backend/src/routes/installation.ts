@@ -6,7 +6,6 @@ import { eq } from 'drizzle-orm'
 
 import type { GuardDeps } from '../auth/guards.ts'
 
-import { createGuards } from '../auth/guards.ts'
 import { INSTALLATION_ID, installation } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 
@@ -18,9 +17,7 @@ import { noStore } from '../http.ts'
  * configured, because renaming the thing you are part of should not need an
  * operator, a redeploy, or a fork.
  */
-export const registerInstallationRoutes = (app: FastifyInstance, { db, sessions }: GuardDeps) => {
-  const { requireAdmin } = createGuards({ db, sessions })
-
+export const registerInstallationRoutes = (app: FastifyInstance, { db }: GuardDeps) => {
   const current = async () => {
     const [row] = await db
       .select({ title: installation.title })
@@ -44,7 +41,7 @@ export const registerInstallationRoutes = (app: FastifyInstance, { db, sessions 
     return { installation: found } satisfies InstallationResponse
   })
 
-  app.patch('/api/admin/installation', { preHandler: requireAdmin }, async (request, reply) => {
+  app.patch('/api/admin/installation', async (request, reply) => {
     void noStore(reply)
 
     const parsed = installationUpdateSchema.safeParse(request.body)

@@ -14,7 +14,6 @@ import { randomUUID } from 'node:crypto'
 import type { GuardDeps } from '../auth/guards.ts'
 import type { Database } from '../db/index.ts'
 
-import { createGuards } from '../auth/guards.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
 import { attendance, eventOption } from '../db/schema.ts'
 import { noStore } from '../http.ts'
@@ -50,123 +49,106 @@ const optionsFor = async (db: Database, eventId: string): Promise<EventOptionTak
  * the year. Reads are public for the same reason the places are — nothing here
  * is about a person.
  */
-export const registerEventOptionRoutes = (app: FastifyInstance, { db, sessions }: GuardDeps) => {
-  const { requireAdmin } = createGuards({ db, sessions })
-
+export const registerEventOptionRoutes = (app: FastifyInstance, { db }: GuardDeps) => {
   app.get<{ Params: { eventId: string } }>('/api/events/:eventId/options', async (request, reply) => {
     void reply.header('cache-control', 'no-cache')
 
     return { options: await optionsFor(db, request.params.eventId) } satisfies EventOptionsResponse
   })
 
-  app.post<{ Params: { eventId: string } }>(
-    '/api/admin/events/:eventId/options',
-    { preHandler: requireAdmin },
-    async (request, reply) => {
-      void noStore(reply)
+  app.post<{ Params: { eventId: string } }>('/api/admin/events/:eventId/options', async (request, reply) => {
+    void noStore(reply)
 
-      const parsed = eventOptionCreateSchema.safeParse(request.body)
-      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+    const parsed = eventOptionCreateSchema.safeParse(request.body)
+    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
 
-      const { eventId } = request.params
-      const id = randomUUID()
+    const { eventId } = request.params
+    const id = randomUUID()
 
-      // Read and insert together, so "the server assigns `order`" holds rather
-      // than two adds claiming the same position. Per kind: the two lists number
-      // independently.
-      let order: number
-      try {
-        order = db.transaction((tx) => {
-          const [last] = tx
-            .select({ order: eventOption.order })
-            .from(eventOption)
-            .where(and(eq(eventOption.event_id, eventId), eq(eventOption.kind, parsed.data.kind)))
-            .orderBy(desc(eventOption.order))
-            .limit(1)
-            .all()
-
-          const next = last === undefined ? 0 : last.order + 1
-          tx.insert(eventOption)
-            .values({ ...parsed.data, id, event_id: eventId, order: next })
-            .run()
-
-          return next
-        })
-      } catch (failure) {
-        // No pre-read of the event: the foreign key already rejects a missing
-        // one, and asking first would be a second query saying the same thing.
-        if (isForeignKeyViolation(failure)) return reply.code(404).send(errorResponse('not_found'))
-        throw failure
-      }
-
-      return reply.code(201).send({
-        option: { ...parsed.data, id, event_id: eventId, order } satisfies EventOption,
-      })
-    },
-  )
-
-  app.patch<{ Params: { id: string } }>(
-    '/api/admin/event-options/:id',
-    { preHandler: requireAdmin },
-    async (request, reply) => {
-      void noStore(reply)
-
-      const parsed = eventOptionUpdateSchema.safeParse(request.body)
-      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
-
-      // `set({})` is not valid SQL.
-      if (Object.keys(parsed.data).length === 0) {
-        const [existing] = await db
-          .select()
+    // Read and insert together, so "the server assigns `order`" holds rather
+    // than two adds claiming the same position. Per kind: the two lists number
+    // independently.
+    let order: number
+    try {
+      order = db.transaction((tx) => {
+        const [last] = tx
+          .select({ order: eventOption.order })
           .from(eventOption)
-          .where(eq(eventOption.id, request.params.id))
+          .where(and(eq(eventOption.event_id, eventId), eq(eventOption.kind, parsed.data.kind)))
+          .orderBy(desc(eventOption.order))
           .limit(1)
+          .all()
 
-        return existing === undefined
-          ? reply.code(404).send(errorResponse('not_found'))
-          : { option: existing }
-      }
+        const next = last === undefined ? 0 : last.order + 1
+        tx.insert(eventOption)
+          .values({ ...parsed.data, id, event_id: eventId, order: next })
+          .run()
 
-      const [updated] = await db
-        .update(eventOption)
-        .set(parsed.data)
+        return next
+      })
+    } catch (failure) {
+      // No pre-read of the event: the foreign key already rejects a missing
+      // one, and asking first would be a second query saying the same thing.
+      if (isForeignKeyViolation(failure)) return reply.code(404).send(errorResponse('not_found'))
+      throw failure
+    }
+
+    return reply.code(201).send({
+      option: { ...parsed.data, id, event_id: eventId, order } satisfies EventOption,
+    })
+  })
+
+  app.patch<{ Params: { id: string } }>('/api/admin/event-options/:id', async (request, reply) => {
+    void noStore(reply)
+
+    const parsed = eventOptionUpdateSchema.safeParse(request.body)
+    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+
+    // `set({})` is not valid SQL.
+    if (Object.keys(parsed.data).length === 0) {
+      const [existing] = await db
+        .select()
+        .from(eventOption)
         .where(eq(eventOption.id, request.params.id))
-        .returning()
+        .limit(1)
 
-      return updated === undefined ? reply.code(404).send(errorResponse('not_found')) : { option: updated }
-    },
-  )
+      return existing === undefined ? reply.code(404).send(errorResponse('not_found')) : { option: existing }
+    }
 
-  app.delete<{ Params: { id: string } }>(
-    '/api/admin/event-options/:id',
-    { preHandler: requireAdmin },
-    async (request, reply) => {
-      void noStore(reply)
+    const [updated] = await db
+      .update(eventOption)
+      .set(parsed.data)
+      .where(eq(eventOption.id, request.params.id))
+      .returning()
 
-      // Somebody sleeping here holds the row: `attendance.lodging_option_id` has
-      // no `onDelete`, so SQLite refuses rather than quietly unbooking them. A
-      // pre-read would be check-then-act — someone can pick it between the read
-      // and the delete — so the constraint is the authority and this translates.
-      let deleted
-      try {
-        deleted = await db
-          .delete(eventOption)
-          .where(eq(eventOption.id, request.params.id))
-          .returning({ id: eventOption.id })
-      } catch (failure) {
-        if (isForeignKeyViolation(failure)) return reply.code(409).send(errorResponse('conflict'))
-        throw failure
-      }
+    return updated === undefined ? reply.code(404).send(errorResponse('not_found')) : { option: updated }
+  })
 
-      if (deleted.length === 0) return reply.code(404).send(errorResponse('not_found'))
+  app.delete<{ Params: { id: string } }>('/api/admin/event-options/:id', async (request, reply) => {
+    void noStore(reply)
 
-      return reply.code(204).send()
-    },
-  )
+    // Somebody sleeping here holds the row: `attendance.lodging_option_id` has
+    // no `onDelete`, so SQLite refuses rather than quietly unbooking them. A
+    // pre-read would be check-then-act — someone can pick it between the read
+    // and the delete — so the constraint is the authority and this translates.
+    let deleted
+    try {
+      deleted = await db
+        .delete(eventOption)
+        .where(eq(eventOption.id, request.params.id))
+        .returning({ id: eventOption.id })
+    } catch (failure) {
+      if (isForeignKeyViolation(failure)) return reply.code(409).send(errorResponse('conflict'))
+      throw failure
+    }
+
+    if (deleted.length === 0) return reply.code(404).send(errorResponse('not_found'))
+
+    return reply.code(204).send()
+  })
 
   app.put<{ Params: { eventId: string; kind: string } }>(
     '/api/admin/events/:eventId/options/:kind/order',
-    { preHandler: requireAdmin },
     async (request, reply) => {
       void noStore(reply)
 

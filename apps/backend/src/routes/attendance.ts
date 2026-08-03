@@ -43,7 +43,7 @@ export const registerAttendanceRoutes = (
   app: FastifyInstance,
   { db, sessions, now = () => new Date() }: AttendanceDeps,
 ) => {
-  const { requireAdmin, requireMember } = createGuards({ db, sessions })
+  const { requireMember } = createGuards({ db, sessions })
 
   const joinedRow = async (eventId: string, accountId: string) => {
     const [row] = await db
@@ -149,7 +149,6 @@ export const registerAttendanceRoutes = (
 
   app.post<{ Params: { eventId: string } }>(
     '/api/admin/events/:eventId/attendance',
-    { preHandler: requireAdmin },
     async (request, reply) => {
       void noStore(reply)
 
@@ -199,7 +198,6 @@ export const registerAttendanceRoutes = (
 
   app.delete<{ Params: { eventId: string; accountId: string } }>(
     '/api/admin/events/:eventId/attendance/:accountId',
-    { preHandler: requireAdmin },
     async (request, reply) => {
       void noStore(reply)
 
