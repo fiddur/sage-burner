@@ -316,6 +316,24 @@ describe('PushToggle', () => {
     await waitFor(() => expect(subscribeToPush).toHaveBeenCalled())
   })
 
+  it('leaves the row rather than the browser when only one can be released', async () => {
+    // Order matters, and this is which way. A leftover row heals itself — the next
+    // application sends to a released endpoint, the push service answers 410 and
+    // `notifyAdmins` deletes it — whereas a leftover browser subscription shows
+    // "on" with nothing behind it and no way back.
+    const { browser, unsubscribe } = rememberingBrowser()
+    const unsubscribeFromPush = vi.fn<PushApi['unsubscribeFromPush']>(() =>
+      Promise.reject(apiError(500, 'internal', 'Server fell over.')),
+    )
+    render(<PushToggle api={stub({ unsubscribeFromPush })} browser={browser} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Stop notifying me here' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Server fell over.')
+    // The browser was released first, so the half that cannot heal itself is done.
+    await waitFor(() => expect(unsubscribe).toHaveBeenCalled())
+  })
+
   it('treats a browser whose service worker will not register as unsupported', async () => {
     // iOS Safari outside an installed web app, and any plain-HTTP deployment.
     render(

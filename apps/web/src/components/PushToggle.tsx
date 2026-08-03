@@ -126,13 +126,15 @@ export const PushToggle = ({
       const existing = await manager.getSubscription()
 
       if (existing !== null) {
-        // Both halves, and the browser's is the one that is easy to forget. The
-        // server row is what causes notifications, but `getSubscription()` is what
-        // this page reads its own state from on mount — leaving the browser
-        // subscribed would show "on" with nothing subscribed, and the 'on' branch
-        // only offers to turn it off, so there would be no way back.
-        await api.unsubscribeFromPush(existing.endpoint)
+        // Both halves, and the browser's goes first — deliberately. Leaving the
+        // browser subscribed shows "on" with nothing behind it and no way back,
+        // since the 'on' branch only offers to turn it off. Leaving the *row*
+        // heals itself: the next application sends to an endpoint the browser has
+        // released, the push service answers 410, and `notifyAdmins` deletes it.
+        //
+        // So if only one of these can happen, it should be this one.
         await existing.unsubscribe()
+        await api.unsubscribeFromPush(existing.endpoint)
       }
       setState('off')
     } catch (failure) {

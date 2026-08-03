@@ -107,7 +107,14 @@ export const browserPush = (): PushBrowser | undefined => {
     requestPermission: () => Notification.requestPermission(),
     permission: () => Notification.permission,
     register: async () => {
-      const registration = await navigator.serviceWorker.register('/sw.js')
+      await navigator.serviceWorker.register('/sw.js')
+
+      // `register()` resolves before the worker activates, and `subscribe()`
+      // requires an active one — the spec rejects with `InvalidStateError`, Chrome
+      // with "Registration failed - no active Service Worker". That is the very
+      // first turn-on, on the very first visit, which is the worst time for it.
+      // `ready` is what waits for activation.
+      const registration = await navigator.serviceWorker.ready
 
       // `pushManager` is absent on iOS Safari outside an installed web app, which
       // is a real configuration a member will hit rather than an exotic one.
