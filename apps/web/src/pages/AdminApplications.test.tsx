@@ -62,8 +62,9 @@ describe('AdminApplications', () => {
   })
 
   it('does not say "Copied" when the copy failed', async () => {
-    // The token is shown once and there is no re-issue path (#91), so a false
-    // "Copied" is how an organiser loses an applicant's invite.
+    // The token is shown once and cannot be shown again, so a false "Copied" is
+    // how an organiser loses this applicant's invite — recoverable only by
+    // minting a direct one, which drops the tie to their application (#91).
     const writeText = vi.fn(() => Promise.reject(new Error('denied')))
     vi.stubGlobal('navigator', { clipboard: { writeText } })
     renderPage(

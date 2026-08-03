@@ -221,8 +221,9 @@ describe('redeeming', () => {
     // Two invites, one email. Both requests pass the email pre-check before
     // either writes, so the loser's insert meets the UNIQUE and the whole
     // transaction rolls back — including its stamp. Without the transaction its
-    // token is spent with no account behind it, which cannot be recovered: the
-    // person has no link and there is no re-issue path (#91).
+    // token is spent with no account behind it, and the link they were sent
+    // cannot be re-sent — someone with admin has to notice and mint a fresh
+    // invite by hand (#91).
     const server = await build()
     const [tokenA, tokenB] = [await givenInvite(), await givenInvite()]
 

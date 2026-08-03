@@ -109,6 +109,21 @@ describe('direct invites', () => {
     expect(response.json().invite.expires_at).toBe('2026-07-10T00:00:00.000Z')
   })
 
+  it('refuses a misspelt key rather than minting the default behind it', async () => {
+    // What `.strict()` is for here, spelled out because the failure is quiet:
+    // without it `expiers_at` is stripped, the body becomes `{}`, and the route
+    // answers 201 with a 30-day invite while the caller believes it set 8 days.
+    const server = await build()
+    const { cookie } = await givenAdmin()
+
+    const response = await create(server, cookie, { expiers_at: '2026-07-10T00:00:00.000Z' })
+
+    expect(response.statusCode).toBe(400)
+    // The half the status code does not pin: nothing was minted behind the
+    // refusal. The past-expiry sibling below asserts the same thing.
+    expect(await db().select().from(inviteToken)).toHaveLength(0)
+  })
+
   it('refuses an expiry in the past, which would mint something already dead', async () => {
     const server = await build()
     const { cookie } = await givenAdmin()
@@ -261,9 +276,12 @@ describe('revoking an invite', () => {
     expect(await db().select().from(inviteToken)).toHaveLength(1)
   })
 
-  it('refuses to revoke an application invite, which would strand the approval', async () => {
-    // Approved with no invite cannot be recovered through the API — re-approving
-    // matches nothing on `status = 'pending'`. #91 owns the re-issue path.
+  it('refuses to revoke an application invite, which is the only one it will have', async () => {
+    // Deleting it leaves that application with nothing to redeem: re-approving
+    // matches nothing on `status = 'pending'`, and the unique index refuses a
+    // second invite for the same application. A direct invite still gets the
+    // person in; the tie back to what they wrote is what is lost, and #91 owns
+    // re-issuing against the application itself.
     const server = await build()
     const { id: adminId, cookie } = await givenAdmin()
     const applicationId = randomUUID()
