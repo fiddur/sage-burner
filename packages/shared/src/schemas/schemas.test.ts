@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { MAX_ASKED_QUESTIONS } from '../answers.ts'
 import { applicationCreateSchema, applicationSchema } from './application.ts'
 import { slugSchema } from './common.ts'
 import { eventFields, eventSchema, withEventDateOrder } from './event.ts'
@@ -185,10 +186,40 @@ describe('applicationCreateSchema', () => {
     applicant_name: 'Someone',
     applicant_contact: 'someone@example.org',
     answers: { [OTHER_ID]: 'because it sounds wonderful' },
+    asked: [OTHER_ID],
   }
 
   it('accepts answers keyed by question id', () => {
     expect(applicationCreateSchema.safeParse(aSubmission).success).toBe(true)
+  })
+
+  it('requires the list of questions the form showed', () => {
+    // Not optional: absent, the route would have to fall back to the current
+    // question list, which is the assumption that stored a question against
+    // someone who never saw it.
+    const { asked: _omitted, ...without } = aSubmission
+    expect(applicationCreateSchema.safeParse(without).success).toBe(false)
+  })
+
+  it('accepts a form that showed a question nobody answered', () => {
+    // The passing sibling to the case above: `asked` is required, and an empty
+    // `answers` beside a non-empty one is still a valid body. Nothing here
+    // relates the two — no schema rule could — so that a question shown and left
+    // blank is *stored* as asked is `applications.test.ts`'s to prove.
+    expect(applicationCreateSchema.safeParse({ ...aSubmission, answers: {} }).success).toBe(true)
+  })
+
+  it('caps how many questions a submission may claim it was shown', () => {
+    // Both boundaries, like `MAX_ANSWER_LENGTH` has: without them a `.max()`
+    // dropped, or written as `.min()`, fails nothing.
+    const ids = (count: number) => Array.from({ length: count }, () => OTHER_ID)
+
+    expect(
+      applicationCreateSchema.safeParse({ ...aSubmission, asked: ids(MAX_ASKED_QUESTIONS) }).success,
+    ).toBe(true)
+    expect(
+      applicationCreateSchema.safeParse({ ...aSubmission, asked: ids(MAX_ASKED_QUESTIONS + 1) }).success,
+    ).toBe(false)
   })
 
   it('rejects answers keyed by something that is not a question id', () => {

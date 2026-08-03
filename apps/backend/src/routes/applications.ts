@@ -19,11 +19,20 @@ export interface ApplicationRouteDeps {
  * Applying to join — the one write in this app open to the public, since an
  * applicant has no account yet.
  *
- * Everything in the body is attacker-controlled, so the submitter names only
- * their answers: `.strict()` turns an attempt at `status` or `id` into a 400
- * rather than a silently dropped key, and the labels stored beside each answer
- * come from the question rows, so nobody can record a question that was never
- * asked.
+ * Everything in the body is attacker-controlled. `.strict()` turns an attempt at
+ * `status` or `id` into a 400 rather than a silently dropped key, and the labels
+ * stored beside each answer come from the question rows, so nobody can record a
+ * question in wording they chose.
+ *
+ * The submitter does name which questions they were shown, and that list decides
+ * what gets an entry — so the guarantee is narrower than "nobody can record a
+ * question that was never asked", in both directions. A crafted body can *omit*
+ * an optional question it was shown and left blank, storing it as never-asked;
+ * and it can *name* one the page never rendered, storing an "asked, said no"
+ * entry for something nobody was shown. Both are someone misdescribing their own
+ * application, which is not an attack worth machinery — the wording still comes
+ * from the question rows, and validation still runs against the server's list, so
+ * neither buys them anything a reviewer would act on.
  *
  * Not rate-limited here, consistent with login: throttling lives in the reverse
  * proxy where an operator can see it. Nothing here grants access, so the
@@ -49,15 +58,34 @@ export const registerApplicationRoutes = (
       return reply.code(400).send(errorResponse('bad_request'))
     }
 
-    // One entry per question asked, answered or not, so a reviewer can tell "said
-    // no" from "was never asked". `storedAnswerSchema` says why the wording is
-    // snapshotted rather than referenced.
-    const answers: StoredAnswers = questions.map((question) => ({
-      question_id: question.id,
-      label: question.label,
-      type: question.type,
-      value: parsed.data.answers[question.id] ?? (isTickBox(question.type) ? false : ''),
-    }))
+    // An answer to something the form says it never showed is a body disagreeing
+    // with itself, and dropping it silently would lose what someone typed.
+    const asked = new Set(parsed.data.asked)
+    if (Object.keys(parsed.data.answers).some((id) => !asked.has(id))) {
+      return reply.code(400).send(errorResponse('bad_request'))
+    }
+
+    // A question in `asked` that is no longer in `questions` — deleted while the
+    // form was open — is dropped here, with nothing to store: the wording comes
+    // from the row, and the row is gone. Only reachable when the body carries no
+    // *key* for it: any key naming it, `''` included, is `unknown` to
+    // `answerProblems` and 400s above. A text field typed into and then cleared
+    // sends `''`, so "left blank" on screen is not the same thing.
+    //
+    // One entry per question *asked*, answered or not, so a reviewer can tell
+    // "said no" from "was never asked" — which is why the form sends what it
+    // showed rather than this trusting the current list. A question added while
+    // someone was filling the page in would otherwise be stored against them as
+    // an empty answer they never saw. `storedAnswerSchema` says why the wording
+    // is snapshotted rather than referenced.
+    const answers: StoredAnswers = questions
+      .filter((question) => asked.has(question.id))
+      .map((question) => ({
+        question_id: question.id,
+        label: question.label,
+        type: question.type,
+        value: parsed.data.answers[question.id] ?? (isTickBox(question.type) ? false : ''),
+      }))
 
     const row = {
       id: randomUUID(),

@@ -1,6 +1,11 @@
 import { z } from 'zod'
 
-import { MAX_ANSWER_LENGTH, MAX_APPLICANT_CONTACT_LENGTH, MAX_APPLICANT_NAME_LENGTH } from '../answers.ts'
+import {
+  MAX_ANSWER_LENGTH,
+  MAX_APPLICANT_CONTACT_LENGTH,
+  MAX_APPLICANT_NAME_LENGTH,
+  MAX_ASKED_QUESTIONS,
+} from '../answers.ts'
 import { applicationStatuses, formQuestionTypes } from '../enums.ts'
 import { dateTimeSchema, idSchema, nonEmptyText } from './common.ts'
 
@@ -86,6 +91,25 @@ export const applicationCreateSchema = z
     applicant_name: nonEmptyText(MAX_APPLICANT_NAME_LENGTH),
     applicant_contact: nonEmptyText(MAX_APPLICANT_CONTACT_LENGTH),
     answers: submittedAnswersSchema,
+    /**
+     * The questions the form actually put on screen.
+     *
+     * Sent so that a question added while someone was filling the form in is not
+     * stored against them as `""` or `false` — which reads as "asked and
+     * declined" when they never saw it, and that distinction is the whole reason
+     * an entry is kept per question rather than per answer.
+     *
+     * It narrows what is *stored*, never what is *checked*. Validation runs
+     * against the server's list, or "I wasn't shown that" would be a way to skip
+     * a required question or an agreement.
+     *
+     * Required rather than optional, and deliberately so despite the cost: a page
+     * loaded before this deployed sends no `asked` and gets a 400. That is the
+     * right failure — its own handler says to reload, which is the remedy — where
+     * falling back to the current question list would silently reintroduce this
+     * bug for every stale client.
+     */
+    asked: z.array(idSchema).max(MAX_ASKED_QUESTIONS),
   })
   .strict()
 

@@ -66,12 +66,41 @@ const givenQuestion = async (over: Partial<FormQuestion> & Pick<FormQuestion, 't
   return id
 }
 
+/**
+ * The answer keys, or none.
+ *
+ * `payload` is `Record<string, unknown>`, so `payload.answers` is `unknown` and
+ * cannot go to `Object.keys` without narrowing. Guarded rather than cast, and the
+ * `[]` is what a test passing a non-object `answers` would want anyway: casting
+ * would turn a string into `asked: ['0','1',…]` and quietly rewrite the body of a
+ * test that meant to probe something else.
+ */
+const answerKeys = (answers: unknown): string[] =>
+  typeof answers === 'object' && answers !== null ? Object.keys(answers) : []
+
+/**
+ * Submit, defaulting `asked` to whatever the answers name.
+ *
+ * The field is required by the schema, and spelling it out in every test that is
+ * not about it would bury the thing each one is asserting. Tests that care pass
+ * it explicitly.
+ */
 const submit = (server: FastifyInstance, payload: Record<string, unknown>): Promise<LightMyRequestResponse> =>
-  server.inject({ method: 'POST', url: '/api/applications', payload })
+  server.inject({
+    method: 'POST',
+    url: '/api/applications',
+    payload: { asked: answerKeys(payload.answers), ...payload },
+  })
 
 const applicant = { applicant_name: 'Fredrik', applicant_contact: 'fredrik@example.org' }
 
 const stored = async () => db().select().from(application)
+
+/** Submit an answer, with the question's wording edited in between. */
+const submitAfter = async (server: FastifyInstance, questionId: string, label: string) => {
+  await db().update(formQuestion).set({ label }).where(eq(formQuestion.id, questionId))
+  return submit(server, { ...applicant, answers: { [questionId]: 'For the fire' }, asked: [questionId] })
+}
 
 describe('submitting an application', () => {
   it('accepts a submission answering every question', async () => {
@@ -216,14 +245,151 @@ describe('submitting an application', () => {
     expect((await submit(server, { ...applicant, answers: {} })).statusCode).toBe(201)
   })
 
+  it('stores the wording as it is at submission, not as it was on screen', async () => {
+    // The one thing still read from the current list rather than from `asked`: a
+    // label edited while the form was open is stored as the new text, against an
+    // answer given to the old.
+    const server = await build()
+    const why = await givenQuestion({ type: 'text', label: 'Why?', required: false })
+    await submitAfter(server, why, 'Why do you want to come?')
+
+    const [row] = await stored()
+    expect(row?.answers).toEqual([
+      { question_id: why, label: 'Why do you want to come?', type: 'text', value: 'For the fire' },
+    ])
+  })
+
+  it('stores an untouched optional text answer as an empty string', async () => {
+    // The other half of "one entry per question asked, answered or not", the
+    // `false` case being the sibling below.
+    const server = await build()
+    const why = await givenQuestion({ type: 'text', label: 'Why?', required: false })
+
+    await submit(server, { ...applicant, answers: {}, asked: [why] })
+
+    const [row] = await stored()
+    expect(row?.answers).toEqual([{ question_id: why, label: 'Why?', type: 'text', value: '' }])
+  })
+
+  it('refuses a cleared field naming a question that has since gone', async () => {
+    // The boundary the phrase "left blank" hides: `Apply.tsx` writes
+    // `answers[id]` on every keystroke, so a field typed into and then emptied
+    // sends `''` — a key, which `answerProblems` calls `unknown` for a deleted
+    // question. Blank on screen, 400 in the API.
+    const server = await build()
+    const stays = await givenQuestion({ type: 'text', label: 'Why?', required: false, order: 0 })
+    const goes = await givenQuestion({ type: 'text', label: 'Going away', required: false, order: 1 })
+    await db().delete(formQuestion).where(eq(formQuestion.id, goes))
+
+    const response = await submit(server, {
+      ...applicant,
+      answers: { [stays]: 'For the fire', [goes]: '' },
+      asked: [stays, goes],
+    })
+
+    expect(response.statusCode).toBe(400)
+  })
+
   it('stores an unticked checkbox as false rather than dropping it', async () => {
+    // Shown and left alone, which is the distinction the per-question entry
+    // exists for: `false` here means "asked, said no", and no entry at all would
+    // mean "never asked".
     const server = await build()
     const box = await givenQuestion({ type: 'checkbox', label: 'Bring food', required: false })
 
-    await submit(server, { ...applicant, answers: {} })
+    await submit(server, { ...applicant, answers: {}, asked: [box] })
 
     const [row] = await stored()
     expect(row?.answers).toEqual([{ question_id: box, label: 'Bring food', type: 'checkbox', value: false }])
+  })
+
+  it('leaves out a question added while the form was open', async () => {
+    // The bug: an optional question added mid-fill passed validation and was
+    // stored as `""`, which reads as "asked and declined" to whoever reviews it.
+    // The applicant never saw it.
+    const server = await build()
+    const shown = await givenQuestion({ type: 'text', label: 'Why?', required: false, order: 0 })
+    const late = await givenQuestion({ type: 'text', label: 'Added later', required: false, order: 1 })
+
+    await submit(server, { ...applicant, answers: { [shown]: 'For the fire' }, asked: [shown] })
+
+    const [row] = await stored()
+    expect(row?.answers).toEqual([{ question_id: shown, label: 'Why?', type: 'text', value: 'For the fire' }])
+    expect(JSON.stringify(row?.answers)).not.toContain(late)
+  })
+
+  it('drops a question deleted while the form was open and left blank', async () => {
+    // The honest case for `asked` naming something the server does not have: there
+    // is nothing to store, since the wording comes from the row and the row is
+    // gone. Answered, it is a 400 instead — the test below draws that boundary.
+    const server = await build()
+    const stays = await givenQuestion({ type: 'text', label: 'Why?', required: false, order: 0 })
+    const goes = await givenQuestion({ type: 'text', label: 'Going away', required: false, order: 1 })
+    await db().delete(formQuestion).where(eq(formQuestion.id, goes))
+
+    const response = await submit(server, {
+      ...applicant,
+      answers: { [stays]: 'For the fire' },
+      asked: [stays, goes],
+    })
+
+    expect(response.statusCode).toBe(201)
+    const [row] = await stored()
+    expect(row?.answers).toEqual([{ question_id: stays, label: 'Why?', type: 'text', value: 'For the fire' }])
+  })
+
+  it('refuses when the deleted question had been answered', async () => {
+    // The boundary of the case above, and it is not the `asked` filter that
+    // decides it: `answerProblems` sees an answer naming no question it holds and
+    // says `unknown`, so this is a 400 before the filter is reached. The 201 is
+    // for a deleted question left *blank*.
+    const server = await build()
+    const stays = await givenQuestion({ type: 'text', label: 'Why?', required: false, order: 0 })
+    const goes = await givenQuestion({ type: 'text', label: 'Going away', required: false, order: 1 })
+    await db().delete(formQuestion).where(eq(formQuestion.id, goes))
+
+    const response = await submit(server, {
+      ...applicant,
+      answers: { [stays]: 'For the fire', [goes]: 'typed before it vanished' },
+      asked: [stays, goes],
+    })
+
+    expect(response.statusCode).toBe(400)
+    expect(await stored()).toEqual([])
+  })
+
+  it('still checks a required question added while the form was open', async () => {
+    // The half that must not move. Validation runs against the server's list, or
+    // "I wasn't shown that" becomes the way to skip an agreement.
+    const server = await build()
+    const shown = await givenQuestion({ type: 'text', label: 'Why?', required: false, order: 0 })
+    await givenQuestion({ type: 'agreement', label: 'I agree', required: true, order: 1 })
+
+    const response = await submit(server, {
+      ...applicant,
+      answers: { [shown]: 'For the fire' },
+      asked: [shown],
+    })
+
+    expect(response.statusCode).toBe(400)
+    expect(await stored()).toEqual([])
+  })
+
+  it('refuses an answer to a question the form says it never showed', async () => {
+    // A body disagreeing with itself. Dropping the answer silently would lose
+    // what someone typed; storing it would make `asked` a decoration.
+    const server = await build()
+    const one = await givenQuestion({ type: 'text', label: 'Why?', required: false, order: 0 })
+    const two = await givenQuestion({ type: 'text', label: 'Anything else?', required: false, order: 1 })
+
+    const response = await submit(server, {
+      ...applicant,
+      answers: { [one]: 'For the fire', [two]: 'smuggled' },
+      asked: [one],
+    })
+
+    expect(response.statusCode).toBe(400)
+    expect(await stored()).toEqual([])
   })
 
   it('does not let a submitter choose their own id', async () => {
