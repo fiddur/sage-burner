@@ -294,6 +294,18 @@ describe('Invite', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('Check your connection')
   })
 
+  it("does not render the page's own cancellation at someone", async () => {
+    // `aborted` shares status 0 with `network`, and "Request cancelled." is the
+    // page tidying up after itself rather than anything the member did.
+    renderPage(stub({ redeemInvite: () => Promise.reject(apiError(0, 'aborted', 'Request cancelled.')) }))
+
+    await screen.findByRole('button', { name: 'Join' })
+    complete()
+    join()
+
+    expect((await screen.findByRole('alert')).textContent).not.toContain('cancelled')
+  })
+
   it('does not blame the connection for a failure that arrived as a response', async () => {
     // The passing sibling, and the inversion it caught: a 500 is the server
     // answering, so "check your connection" sends them after the wrong thing.

@@ -361,7 +361,9 @@ describe('redeeming', () => {
     const waited = await redeem(server, second, { ...applicant, email: 'other@example.org' })
 
     expect(waited.statusCode).toBe(429)
-    expect(waited.headers['retry-after']).toBe('5')
+    // Asked of the gate rather than written out, which is the point: the number
+    // is the window this gate was built with. `gate.test.ts` pins the derivation.
+    expect(waited.headers['retry-after']).toBe(gate.retryAfter('timed-out'))
     expect((await holding).statusCode).toBe(201)
   })
 
@@ -410,6 +412,27 @@ describe('redeeming', () => {
 
     const [invite] = await db().select().from(inviteToken)
     expect(invite?.used_at).toBeNull()
+  })
+
+  it('takes no slot for a caller holding no live invite', async () => {
+    // Load-bearing ordering: the gate is taken *after* the invite check, so a
+    // caller with any old string is answered 409 without queueing behind the
+    // hashing. Taking the slot first would let anyone, with no invite at all,
+    // hold the same two slots logins need — a denial of service open to the
+    // public rather than to invite holders.
+    //
+    // Asserted on the slot rather than on the hash: a gate entered above the
+    // lookup still would not *hash* for a bad token, so counting hashes cannot
+    // tell the two orderings apart.
+    const gate = createGate({ slots: 1, queue: 0, timeoutMs: 50 })
+    const server = await build(() => new Date(NOW), slowHash(120), gate)
+    const held = redeem(server, await givenInvite())
+    await new Promise((resolve) => setTimeout(resolve, 30))
+
+    const stranger = await redeem(server, 'not-a-real-token')
+
+    expect(stranger.statusCode).toBe(409)
+    expect((await held).statusCode).toBe(201)
   })
 
   it('shares one gate with login, rather than two that spend the pool between them', async () => {

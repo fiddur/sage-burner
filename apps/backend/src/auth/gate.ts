@@ -70,20 +70,6 @@ export const SCRYPT_GATE: GateOptions = { slots: 2, queue: 8, timeoutMs: 5000 }
  */
 export type Refusal = 'queue-full' | 'timed-out'
 
-/**
- * How long to tell a shed caller to wait, by why they were shed.
- *
- * `queue-full` was refused synchronously and waited for nothing, and the work in
- * flight clears shortly, so a second is about right. `timed-out` held on for the
- * whole window against a gate that stayed saturated — sending that caller
- * straight back turns a client politely honouring `Retry-After` into a hot retry
- * loop, adding churn under exactly the flood the gate exists to damp.
- *
- * Here rather than at each route: two callers writing the same two numbers out is
- * two places for a later change to reach only one of.
- */
-export const retryAfterFor = (reason: Refusal): string => (reason === 'timed-out' ? '5' : '1')
-
 export type Admission = { ok: true; release: () => void } | { ok: false; reason: Refusal }
 
 export interface Gate {
@@ -94,6 +80,20 @@ export interface Gate {
    * a leaked slot wedges the gate until the process restarts.
    */
   enter: () => Promise<Admission>
+  /**
+   * How long to tell a shed caller to wait, by why they were shed.
+   *
+   * `queue-full` was refused synchronously and waited for nothing, and the work
+   * in flight clears shortly, so a second is about right. `timed-out` held on for
+   * the whole window against a gate that stayed saturated — sending that caller
+   * straight back turns a client politely honouring `Retry-After` into a hot
+   * retry loop, adding churn under exactly the flood this exists to damp.
+   *
+   * On the gate rather than beside it, so the number is the window this gate was
+   * actually built with: writing `'5'` out again would go quietly wrong the day
+   * `timeoutMs` moved.
+   */
+  retryAfter: (reason: Refusal) => string
   /** For assertions and logging. */
   stats: () => { active: number; waiting: number }
 }
@@ -134,6 +134,8 @@ export const createGate = ({ slots, queue, timeoutMs, setTimer = realTimer }: Ga
 
   return {
     stats: () => ({ active, waiting: waiting.length }),
+
+    retryAfter: (reason) => (reason === 'timed-out' ? String(Math.ceil(timeoutMs / 1000)) : '1'),
 
     enter: async () => {
       if (active < slots) {

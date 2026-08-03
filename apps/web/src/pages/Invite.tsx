@@ -22,11 +22,16 @@ type Loaded = { status: 'loading' } | { status: 'ready'; state: InviteState } | 
  * A 429 is the opposite — the server is spending all the password hashing it will
  * run at once, and waiting a moment is exactly the right advice.
  *
- * Status 0 is the API client's own mapping for a request that never reached a
+ * `network` is the API client's own code for a request that never reached a
  * server, and its message already says to check the connection. Advice about a
  * connection belongs there and nowhere else: every other branch here is answering
  * a response that did arrive, so telling those callers to check their wifi sends
  * them after the wrong thing.
+ *
+ * Matched on the code rather than on status 0, which `aborted` also carries — a
+ * cancellation is the page's own tidying up and has no business being rendered.
+ * Unreachable while this call passes no signal, and the wrong thing to be relying
+ * on either way.
  *
  * The near-duplicate 429 copy here and in `Login.tsx` is intentional rather than
  * drift: this page can say "signing up" where that one says "sign-in attempts".
@@ -38,7 +43,7 @@ const messageForFailure = (failure: unknown): string => {
     return 'That invite has already been used, or there is already an account with that email. Ask someone with admin for a fresh link.'
   }
   if (failure.status === 429) return 'Too many sign-ups just now. Wait a few seconds and try again.'
-  if (failure.status === 0) return failure.message
+  if (failure.code === 'network') return failure.message
 
   return 'Could not finish signing you up. Please try again.'
 }

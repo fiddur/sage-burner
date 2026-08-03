@@ -9,7 +9,6 @@ import type { Sessions } from '../auth/session.ts'
 import type { Config } from '../config.ts'
 import type { Database } from '../db/index.ts'
 
-import { retryAfterFor } from '../auth/gate.ts'
 import { hashPassword, needsRehash, verifyPassword } from '../auth/password.ts'
 import { account, accountRole } from '../db/schema.ts'
 import { noStore } from '../http.ts'
@@ -270,7 +269,7 @@ export const registerAuthRoutes = (app: FastifyInstance, { db, config, sessions,
     const admission = await gate.enter()
 
     if (!admission.ok) {
-      void reply.header('retry-after', retryAfterFor(admission.reason))
+      void reply.header('retry-after', gate.retryAfter(admission.reason))
       request.log.warn({ ...gate.stats(), reason: admission.reason }, 'login shed')
       return reply.code(429).send(errorResponse('rate_limited'))
     }
