@@ -6,7 +6,6 @@ import { count, eq } from 'drizzle-orm'
 
 import type { GuardDeps } from '../auth/guards.ts'
 
-import { createGuards } from '../auth/guards.ts'
 import { account, accountRole } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 
@@ -21,10 +20,8 @@ const LAST_ADMIN = new Error('the last organiser cannot give up the role')
  * `admin:create` grants `admin` alone — so without it the account every
  * installation starts with can organise a burn but not come to one.
  */
-export const registerAdminRoutes = (app: FastifyInstance, { db, sessions }: GuardDeps) => {
-  const { requireAdmin } = createGuards({ db, sessions })
-
-  app.get('/api/admin/accounts', { preHandler: requireAdmin }, async (_request, reply) => {
+export const registerAdminRoutes = (app: FastifyInstance, { db }: GuardDeps) => {
+  app.get('/api/admin/accounts', async (_request, reply) => {
     // Every account's email address. An organiser opening this on a shared
     // laptop would otherwise leave the whole roster in the browser's on-disk
     // cache, which outlives the session — logging out clears the cookie, not
@@ -51,7 +48,6 @@ export const registerAdminRoutes = (app: FastifyInstance, { db, sessions }: Guar
 
   app.put<{ Params: { accountId: string } }>(
     '/api/admin/accounts/:accountId/roles',
-    { preHandler: requireAdmin },
     async (request, reply) => {
       void noStore(reply)
 
