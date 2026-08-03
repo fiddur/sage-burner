@@ -273,14 +273,39 @@ describe('Invite', () => {
     expect(alert.textContent).not.toContain('connection')
   })
 
-  it('says a transport failure is worth retrying, unlike a conflict', async () => {
-    renderPage(stub({ redeemInvite: () => Promise.reject(new TypeError('Failed to fetch')) }))
+  it('passes on the connection advice for a request that never reached a server', async () => {
+    // What the client actually raises for a dead network since it started
+    // mapping them: `ApiError(0, 'network')`, whose message already says what to
+    // do. This is the one branch where advice about a connection is right, and it
+    // was the one branch that did not give it.
+    renderPage(
+      stub({
+        redeemInvite: () =>
+          Promise.reject(
+            apiError(0, 'network', 'Could not reach the server. Check your connection and try again.'),
+          ),
+      }),
+    )
 
     await screen.findByRole('button', { name: 'Join' })
     complete()
     join()
 
-    expect((await screen.findByRole('alert')).textContent).toContain('try again')
+    expect((await screen.findByRole('alert')).textContent).toContain('Check your connection')
+  })
+
+  it('does not blame the connection for a failure that arrived as a response', async () => {
+    // The passing sibling, and the inversion it caught: a 500 is the server
+    // answering, so "check your connection" sends them after the wrong thing.
+    renderPage(stub({ redeemInvite: () => Promise.reject(apiError(500, 'internal', 'nope')) }))
+
+    await screen.findByRole('button', { name: 'Join' })
+    complete()
+    join()
+
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain('try again')
+    expect(alert.textContent).not.toContain('connection')
   })
 
   it('does not offer redemption to someone already signed in', async () => {

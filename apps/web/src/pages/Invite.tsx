@@ -13,15 +13,20 @@ export type InviteApi = Pick<ApiClient, 'getInviteState' | 'redeemInvite'>
 type Loaded = { status: 'loading' } | { status: 'ready'; state: InviteState } | { status: 'failed' }
 
 /**
- * The three failures redeeming can produce, each wanting different behaviour.
+ * The failures redeeming can produce, each wanting different behaviour.
  *
  * A 409 means the invite went while this page was open, or the email is already
  * an account. Either way the answer is not "try again": the same request fails
  * the same way.
  *
- * A 429 is the opposite — the server is spending all the password hashing it
- * will run at once, and waiting a moment is exactly the right advice. The
- * generic line below tells them to check a connection that is fine.
+ * A 429 is the opposite — the server is spending all the password hashing it will
+ * run at once, and waiting a moment is exactly the right advice.
+ *
+ * Status 0 is the API client's own mapping for a request that never reached a
+ * server, and its message already says to check the connection. Advice about a
+ * connection belongs there and nowhere else: every other branch here is answering
+ * a response that did arrive, so telling those callers to check their wifi sends
+ * them after the wrong thing.
  *
  * The near-duplicate 429 copy here and in `Login.tsx` is intentional rather than
  * drift: this page can say "signing up" where that one says "sign-in attempts".
@@ -33,8 +38,9 @@ const messageForFailure = (failure: unknown): string => {
     return 'That invite has already been used, or there is already an account with that email. Ask someone with admin for a fresh link.'
   }
   if (failure.status === 429) return 'Too many sign-ups just now. Wait a few seconds and try again.'
+  if (failure.status === 0) return failure.message
 
-  return 'Could not finish signing you up. Please check your connection and try again.'
+  return 'Could not finish signing you up. Please try again.'
 }
 
 /**

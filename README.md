@@ -479,9 +479,15 @@ and can drop a flood before it costs a scrypt hash. [#57] tracks doing it in
 the app if that ever stops being enough.
 
 There is a bound on concurrent _work_, which is a different thing. At most two
-password verifications run at once, and up to eight further callers wait in a
-FIFO queue; only an eleventh concurrent caller, or one still waiting after five
-seconds, gets a `429` with `Retry-After`.
+**scrypt hashes** run at once, and up to eight further callers wait in a FIFO
+queue; the eleventh concurrent caller, or one still waiting after five seconds,
+gets a `429` with `Retry-After`.
+
+That bound is **shared with invite redemption**, not login's own. One gate covers
+both, because what is being protected is libuv's threadpool rather than either
+route — two gates of two slots would spend all four threads between them. So the
+eleven are eleven of _either_: a flood of redemptions can shed a login and the
+other way round, which is the point.
 
 Queued rather than refused, deliberately. A hard cap would mean two sustained
 anonymous requests denied every member's login for as long as they held them,
@@ -491,10 +497,10 @@ owning them.
 
 Why any of this is needed: every attempt costs ~230ms of CPU and 64 MiB —
 including one for an address with no account, since the decoy derivation
-deliberately spends the same work — and `scrypt` runs on libuv's threadpool,
-four slots by default, shared with the reads that serve static files. Without a
-bound, sustained login traffic would degrade the whole app rather than just that
-route.
+deliberately spends the same work, and including a redemption that is going to be
+refused — and `scrypt` runs on libuv's threadpool, four slots by default, shared
+with the reads that serve static files. Without a bound, sustained traffic to
+either route would degrade the whole app rather than just that route.
 
 What the app does **not** do is bound the number of _attempts_. There is no
 lockout and no backoff, and the gate does not provide one — it bounds concurrent

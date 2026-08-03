@@ -1,10 +1,10 @@
 /**
  * A bounded concurrency gate with a waiting queue.
  *
- * Password verification costs ~230ms of CPU and 64 MiB, and `scrypt` runs on
- * libuv's threadpool — four slots by default, shared with the file reads
- * `@fastify/static` does. So an unbounded login route lets one anonymous client
- * stall the SPA and the ICS feed, not merely login.
+ * `scrypt` costs ~230ms of CPU and 64 MiB and runs on libuv's threadpool — four
+ * slots by default, shared with the file reads `@fastify/static` does. So an
+ * unbounded route that hashes lets one anonymous client stall the SPA and the ICS
+ * feed, not merely that route.
  *
  * The obvious guard is a hard cap that sheds anything over it, and that trades
  * one bad property for another: two sustained requests hold the cap and every
@@ -39,42 +39,23 @@ export interface GateOptions {
 }
 
 /**
- * Bounds on concurrent scrypt, wherever it is spent.
+ * The numbers, for every route that spends scrypt.
  *
- * `scrypt` costs ~230ms and 64 MiB and runs on libuv's threadpool — four slots
- * by default, shared with the file reads `@fastify/static` does. Two leaves
- * half the pool for everything else.
+ * Two slots leaves half the threadpool for everything else. Eight deep and five
+ * seconds are sized for the expensive case rather than the usual one: a
+ * successful login can spend *two* hashes, `verifyPassword` and then the
+ * opportunistic re-hash, both inside the slot — which is exactly the state a
+ * parameter raise puts every account into, so the worst case coincides with the
+ * one time the queue is likely to be full.
  *
- * Queued rather than shed, which matters more than the numbers. A hard cap
- * means two sustained anonymous requests refuse every member's login for as
- * long as they are held, with nothing to wait out — a permanent outage of the
- * only way into the app, triggerable from a laptop. A FIFO queue keeps the same
- * threadpool bound while letting a member arriving mid-flood take their turn.
+ * Measured rather than estimated: that login takes ~389ms against ~223ms in the
+ * steady state, so eight deep at two at a time is ~1556ms, which five seconds
+ * clears by about 3x.
  *
- * The queue is bounded so it cannot become the exhaustion it prevents, and the
- * wait is bounded so a caller is answered rather than held open.
- *
- * The timeout is sized for the expensive case rather than the usual one. A
- * successful login can spend *two* hashes, not one — `verifyPassword` and then
- * `hashPassword` for the opportunistic upgrade — and both are inside the slot,
- * because the release is in the route's `finally`. That is precisely the state
- * a parameter raise puts every account into, so the worst case coincides with
- * the one time the queue is likely to be at full depth.
- *
- * Measured, not estimated: a login verifying against the previous OWASP rung
- * and re-hashing to the current one takes ~389ms, against ~223ms in the steady
- * state. Eight deep at two at a time is four turns, so ~1556ms — which a 2s
- * timeout clears by 22%, and a container slower than this machine does not. At
- * 5s the margin is ~3x. The cost of the longer wait is a held connection, which
- * is cheaper than refusing someone who typed the right password.
- *
- * Login is not the only caller. Redemption hashes before it checks whether the
- * address is already taken, so its refusal costs what a success costs — and that
- * refusal never spends the token, so a held invite can be replayed at it. One
- * gate covers both, because what is bounded is the threadpool, not the route.
- *
- * Still not a rate limiter: this bounds concurrent work, not attempts per
- * caller. #57 is that, and it is what bounds guessing.
+ * One instance, shared. Login is not the only caller — redemption hashes before
+ * it checks whether the address is taken, so its refusal costs what a success
+ * costs, and that refusal never spends the invite. Two gates of two slots would
+ * spend all four threads between them, which is the thing being bounded.
  */
 export const SCRYPT_GATE: GateOptions = { slots: 2, queue: 8, timeoutMs: 5000 }
 
