@@ -185,10 +185,26 @@ describe('applicationCreateSchema', () => {
     applicant_name: 'Someone',
     applicant_contact: 'someone@example.org',
     answers: { [OTHER_ID]: 'because it sounds wonderful' },
+    asked: [OTHER_ID],
   }
 
   it('accepts answers keyed by question id', () => {
     expect(applicationCreateSchema.safeParse(aSubmission).success).toBe(true)
+  })
+
+  it('requires the list of questions the form showed', () => {
+    // Not optional: absent, the route would have to fall back to the current
+    // question list, which is the assumption that stored a question against
+    // someone who never saw it.
+    const { asked: _omitted, ...without } = aSubmission
+    expect(applicationCreateSchema.safeParse(without).success).toBe(false)
+  })
+
+  it('accepts a form that showed a question nobody answered', () => {
+    // The case the whole field exists for: shown, left blank, and still recorded
+    // as asked.
+    const shown = { ...aSubmission, answers: {}, asked: [OTHER_ID] }
+    expect(applicationCreateSchema.safeParse(shown).success).toBe(true)
   })
 
   it('rejects answers keyed by something that is not a question id', () => {

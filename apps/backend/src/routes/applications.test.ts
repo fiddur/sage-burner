@@ -66,8 +66,23 @@ const givenQuestion = async (over: Partial<FormQuestion> & Pick<FormQuestion, 't
   return id
 }
 
+/**
+ * Submit, defaulting `asked` to whatever the answers name.
+ *
+ * The field is required by the schema, and spelling it out in every test that is
+ * not about it would bury the thing each one is asserting. Tests that care pass
+ * it explicitly; `askedNothing` is the shorthand for a form that showed a
+ * question and got no answer.
+ */
 const submit = (server: FastifyInstance, payload: Record<string, unknown>): Promise<LightMyRequestResponse> =>
-  server.inject({ method: 'POST', url: '/api/applications', payload })
+  server.inject({
+    method: 'POST',
+    url: '/api/applications',
+    payload: {
+      asked: Object.keys((payload.answers ?? {}) as Record<string, unknown>),
+      ...payload,
+    },
+  })
 
 const applicant = { applicant_name: 'Fredrik', applicant_contact: 'fredrik@example.org' }
 
@@ -217,13 +232,65 @@ describe('submitting an application', () => {
   })
 
   it('stores an unticked checkbox as false rather than dropping it', async () => {
+    // Shown and left alone, which is the distinction the per-question entry
+    // exists for: `false` here means "asked, said no", and no entry at all would
+    // mean "never asked".
     const server = await build()
     const box = await givenQuestion({ type: 'checkbox', label: 'Bring food', required: false })
 
-    await submit(server, { ...applicant, answers: {} })
+    await submit(server, { ...applicant, answers: {}, asked: [box] })
 
     const [row] = await stored()
     expect(row?.answers).toEqual([{ question_id: box, label: 'Bring food', type: 'checkbox', value: false }])
+  })
+
+  it('leaves out a question added while the form was open', async () => {
+    // The bug: an optional question added mid-fill passed validation and was
+    // stored as `""`, which reads as "asked and declined" to whoever reviews it.
+    // The applicant never saw it.
+    const server = await build()
+    const shown = await givenQuestion({ type: 'text', label: 'Why?', required: false, order: 0 })
+    const late = await givenQuestion({ type: 'text', label: 'Added later', required: false, order: 1 })
+
+    await submit(server, { ...applicant, answers: { [shown]: 'For the fire' }, asked: [shown] })
+
+    const [row] = await stored()
+    expect(row?.answers).toEqual([{ question_id: shown, label: 'Why?', type: 'text', value: 'For the fire' }])
+    expect(JSON.stringify(row?.answers)).not.toContain(late)
+  })
+
+  it('still checks a required question added while the form was open', async () => {
+    // The half that must not move. Validation runs against the server's list, or
+    // "I wasn't shown that" becomes the way to skip an agreement.
+    const server = await build()
+    const shown = await givenQuestion({ type: 'text', label: 'Why?', required: false, order: 0 })
+    await givenQuestion({ type: 'agreement', label: 'I agree', required: true, order: 1 })
+
+    const response = await submit(server, {
+      ...applicant,
+      answers: { [shown]: 'For the fire' },
+      asked: [shown],
+    })
+
+    expect(response.statusCode).toBe(400)
+    expect(await stored()).toEqual([])
+  })
+
+  it('refuses an answer to a question the form says it never showed', async () => {
+    // A body disagreeing with itself. Dropping the answer silently would lose
+    // what someone typed; storing it would make `asked` a decoration.
+    const server = await build()
+    const one = await givenQuestion({ type: 'text', label: 'Why?', required: false, order: 0 })
+    const two = await givenQuestion({ type: 'text', label: 'Anything else?', required: false, order: 1 })
+
+    const response = await submit(server, {
+      ...applicant,
+      answers: { [one]: 'For the fire', [two]: 'smuggled' },
+      asked: [one],
+    })
+
+    expect(response.statusCode).toBe(400)
+    expect(await stored()).toEqual([])
   })
 
   it('does not let a submitter choose their own id', async () => {

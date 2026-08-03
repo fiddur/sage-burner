@@ -49,15 +49,27 @@ export const registerApplicationRoutes = (
       return reply.code(400).send(errorResponse('bad_request'))
     }
 
-    // One entry per question asked, answered or not, so a reviewer can tell "said
-    // no" from "was never asked". `storedAnswerSchema` says why the wording is
-    // snapshotted rather than referenced.
-    const answers: StoredAnswers = questions.map((question) => ({
-      question_id: question.id,
-      label: question.label,
-      type: question.type,
-      value: parsed.data.answers[question.id] ?? (isTickBox(question.type) ? false : ''),
-    }))
+    // An answer to something the form says it never showed is a body disagreeing
+    // with itself, and dropping it silently would lose what someone typed.
+    const asked = new Set(parsed.data.asked)
+    if (Object.keys(parsed.data.answers).some((id) => !asked.has(id))) {
+      return reply.code(400).send(errorResponse('bad_request'))
+    }
+
+    // One entry per question *asked*, answered or not, so a reviewer can tell
+    // "said no" from "was never asked" — which is why the form sends what it
+    // showed rather than this trusting the current list. A question added while
+    // someone was filling the page in would otherwise be stored against them as
+    // an empty answer they never saw. `storedAnswerSchema` says why the wording
+    // is snapshotted rather than referenced.
+    const answers: StoredAnswers = questions
+      .filter((question) => asked.has(question.id))
+      .map((question) => ({
+        question_id: question.id,
+        label: question.label,
+        type: question.type,
+        value: parsed.data.answers[question.id] ?? (isTickBox(question.type) ? false : ''),
+      }))
 
     const row = {
       id: randomUUID(),

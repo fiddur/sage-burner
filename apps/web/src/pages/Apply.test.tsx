@@ -238,7 +238,40 @@ describe('Apply', () => {
         applicant_name: 'Fredrik',
         applicant_contact: 'fredrik@example.org',
         answers: { 'q-1': 'Sage', 'q-2': true },
+        asked: ['q-1', 'q-2'],
       }),
+    )
+  })
+
+  it('names every question it showed, including the ones left blank', async () => {
+    // What the server stores an entry for. An optional question the applicant
+    // skipped was still asked, and has to be told apart from one added after this
+    // page loaded — which they never saw.
+    const submitApplication = vi.fn(() => Promise.resolve({ application: {} as never }))
+    render(
+      <Apply
+        api={stub({
+          submitApplication,
+          getQuestions: () =>
+            Promise.resolve({
+              questions: [
+                question({ id: 'q-1', type: 'text', label: 'Your dust name', required: true }),
+                question({ id: 'q-2', type: 'text', label: 'Allergies?', required: false, order: 1 }),
+              ],
+            }),
+        })}
+      />,
+    )
+
+    await ready()
+    identify()
+    fill('Your dust name', 'Sage')
+    send()
+
+    await waitFor(() =>
+      expect(submitApplication).toHaveBeenCalledWith(
+        expect.objectContaining({ answers: { 'q-1': 'Sage' }, asked: ['q-1', 'q-2'] }),
+      ),
     )
   })
 
@@ -387,6 +420,7 @@ describe('Apply', () => {
         applicant_name: 'Fredrik',
         applicant_contact: 'fredrik@example.org',
         answers: {},
+        asked: [],
       }),
     )
   })

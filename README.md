@@ -1209,25 +1209,20 @@ One entry is stored per question **asked**, answered or not, so a reviewer can
 tell "said no" from "was never asked". An absent tick box stores `false`; an
 absent optional text answer stores `""`.
 
-**A question added while someone is filling the form in is recorded as unanswered
-rather than unasked**, and that is a known gap rather than a claim to the
-contrary. The server stores an entry per question it reads at submission time, so
-if an organiser adds one in that window:
+**"Asked" means the form said so, not that the question exists now.** The
+submission carries `asked` — the ids the page actually rendered — and only those
+get an entry. Without it, a question an organiser added while someone was filling
+the form in was stored against them as `""` or `false`, which reads as "asked and
+declined" about a question they never saw.
 
-- a **required** text question or an `agreement` fails `answerProblems` and the
-  submission is a 400 — which is why the form says to reload rather than to try
-  again;
-- an **optional** text question or a plain `checkbox` passes, and the application
-  is stored with an empty entry for a question the applicant never saw. It reads
-  as "asked and declined" when it was never asked, which is precisely the
-  distinction the per-question entry exists to preserve.
+`asked` narrows what is **stored**, never what is **checked**. Validation runs
+against the server's own list, or "I wasn't shown that" would be the way to skip a
+required question or an agreement — so a required question added in that window
+still answers 400, and the form still says to reload rather than to try again.
 
-Closing it means the submission carrying the ids the form actually rendered, so
-the server can tell the two apart; #85 tracks that. Validation would still run
-against the server's own list, or "I wasn't shown that" becomes a way to skip a
-required question. Left open for now because the window is one organiser editing
-the form while one applicant is inside it, and the cost is a misleading entry
-rather than a lost or wrong answer.
+An answer naming a question outside `asked` is a **400** rather than a dropped
+key: the body disagrees with itself, and silently discarding it would lose what
+somebody typed.
 
 **What makes a submission valid** lives in `answerProblems`, in
 `packages/shared`, and both sides use it: the server refuses on it, and the form

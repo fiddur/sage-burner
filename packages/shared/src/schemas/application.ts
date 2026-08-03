@@ -86,6 +86,19 @@ export const applicationCreateSchema = z
     applicant_name: nonEmptyText(MAX_APPLICANT_NAME_LENGTH),
     applicant_contact: nonEmptyText(MAX_APPLICANT_CONTACT_LENGTH),
     answers: submittedAnswersSchema,
+    /**
+     * The questions the form actually put on screen.
+     *
+     * Sent so that a question added while someone was filling the form in is not
+     * stored against them as `""` or `false` — which reads as "asked and
+     * declined" when they never saw it, and that distinction is the whole reason
+     * an entry is kept per question rather than per answer.
+     *
+     * It narrows what is *stored*, never what is *checked*. Validation runs
+     * against the server's list, or "I wasn't shown that" would be a way to skip
+     * a required question or an agreement.
+     */
+    asked: z.array(idSchema),
   })
   .strict()
 

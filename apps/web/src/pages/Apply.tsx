@@ -134,6 +134,10 @@ export const Apply = ({ api }: ApplyProps) => {
         applicant_name: name.trim(),
         applicant_contact: contact.trim(),
         answers,
+        // What this page put on screen, which is not necessarily what the server
+        // holds now: a question added while it was open is not one the applicant
+        // was asked, and storing an empty answer for it would say otherwise.
+        asked: questions.map((question) => question.id),
       })
       setSent(true)
     } catch (error) {
