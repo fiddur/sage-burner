@@ -51,10 +51,13 @@ export const registerRedemptionRoutes = (
       .where(eq(inviteToken.token_hash, digestOf(request.params.token)))
       .limit(1)
 
-    // 200 with a status either way, and the same shape for all four: a 404 for an
-    // unknown token, or a different body, would let someone probe for live ones.
-    // The page needs to tell an expired invite from a spent one, which is the
-    // whole reason this is not just an error code.
+    // 200 with a status either way, and the same shape for all four. This does
+    // not hide which of the four it is — `unknown` says so plainly, and anyone
+    // holding a string can ask. It could not usefully hide it either: the page
+    // has to tell an expired invite from a spent one to say what to do about it,
+    // and there is nothing to enumerate, the token being 256 bits of CSPRNG.
+    // What the uniform shape buys is one code path for the page rather than a
+    // status the fetch layer turns into an error.
     return {
       status: invite === undefined ? 'unknown' : inviteStatusOf(invite, now()),
     } satisfies InviteState
@@ -69,24 +72,31 @@ export const registerRedemptionRoutes = (
     const digest = digestOf(request.params.token)
     const [invite] = await db.select().from(inviteToken).where(eq(inviteToken.token_hash, digest)).limit(1)
 
-    // One answer for unknown, expired and spent alike. The GET handler hides the
-    // same distinction and says why; a POST that gave it away made the file argue
-    // one way and act the other twenty lines apart.
+    // One answer for unknown, expired and spent alike — not to hide anything (the
+    // GET above says which it is, to anyone who asks), but because the client has
+    // nothing to do with the difference here. The page has already read the
+    // status; by the time it POSTs, every one of the three means the same thing:
+    // this link cannot be spent.
     if (invite === undefined || inviteStatusOf(invite, now()) !== 'outstanding') {
       return reply.code(409).send(errorResponse('conflict'))
     }
 
-    // Before the taken-address check, not after, and this ordering is the whole
-    // point: the 409 for an address that already has an account used to return
-    // without hashing while a success spent ~230ms in scrypt, so the two were
-    // told apart by latency. Anyone holding one unspent invite could then ask
-    // "is this person a member?" for any address, repeatedly — a 409 does not
-    // spend the token — which is the private fact this app exists to hold.
-    // `auth.ts`'s login is deliberately shaped the same way.
+    // Before the taken-address check rather than after it, so the refusal costs
+    // what a success costs. `auth.ts`'s login is shaped the same way.
     //
-    // The cost is real: a redemption that cannot finish still burns a scrypt
-    // slot. Redemption is rare and gated behind holding an invite, so that is a
-    // fair trade rather than an oversight.
+    // This throttles an enumeration channel rather than closing one, and the
+    // difference is worth being exact about. The 409 for an address that already
+    // has an account does not spend the token, so a holder can ask "is this
+    // person a member?" about address after address — and the *status code*
+    // answers that whatever the timing does. Latency was a redundant second copy
+    // of it. What the ordering buys is that each probe now costs a gated scrypt,
+    // which takes enumeration from thousands a second to about two, competing
+    // with logins for the same slots. `#57` is what would bound it properly.
+    //
+    // Spending the token on the taken-address refusal would cap a held invite at
+    // one probe, and is deliberately not done: someone who typos an address that
+    // happens to have an account would lose their invite over it, and getting a
+    // new one needs an admin.
     //
     // Outside the transaction either way: holding a write transaction open
     // across scrypt would block every other writer for that long.

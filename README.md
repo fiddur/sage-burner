@@ -1359,26 +1359,35 @@ The password is hashed _outside_ the transaction. Holding a write transaction op
 across 230ms of scrypt would block every other writer for that long.
 
 It is also hashed **before** the check for an address that already has an
-account, and that ordering is load-bearing. Returning the `409` without hashing
-made the two outcomes tell themselves apart by latency, and a `409` does not
-spend the token — so one unspent invite became an unlimited "is this person a
-member?" oracle for any address the holder chose. That is the private fact this
-app exists to hold. `POST /api/auth/login` is shaped the same way and for the
-same reason. The cost is that a redemption which cannot finish still burns a
-scrypt slot; redemption is rare and gated behind holding an invite.
+account, so the refusal costs what a success costs. `POST /api/auth/login` is
+shaped the same way.
 
-That hash goes through the **same gate as login**, not one of its own. The gate
+**This throttles an enumeration channel; it does not close one, and the
+difference is worth stating plainly.** A `409` does not spend the token, so
+whoever holds one unspent invite can ask "does this address have an account?"
+about address after address — and the _status code_ answers that regardless of
+timing: `409` for a member, `201` for anyone else. Latency was a redundant second
+copy of an answer the status line already gives. What the ordering buys is cost:
+each probe now spends a gated scrypt, which is roughly two a second rather than
+thousands, competing with logins for the same slots. #57 is what would bound it
+properly, and there is a test that pins the residual so this paragraph cannot
+quietly go stale.
+
+Spending the token on the taken-address refusal would cap a held invite at one
+probe. It is deliberately not done: someone who typos an address that happens to
+belong to a member would lose their invite over it, and a new one needs an admin.
+
+That hash goes through the **same gate as login**, not one of its own — the gate
 bounds concurrent scrypt against libuv's four threads, so two gates of two slots
-would spend the whole pool between them. Redemption needs it for a reason login
-does not have: the taken-address refusal never spends the token, so one held
-invite can be replayed at that hash for as long as it lives, and equalising the
-cost is exactly what made every replay expensive. Over the bound it answers `429`
-with `Retry-After`, like login.
+would spend the whole pool between them. There is a test holding the only slot
+from the redemption side and asserting login is shed, which fails if they ever
+drift apart. Over the bound both answer `429` with `Retry-After`.
 
-The `POST` gives **one answer** — `409` — for unknown, expired and spent alike,
-matching what the `GET` above deliberately hides. There is nothing to enumerate
-either way, the token being 256 bits of CSPRNG, but a file that argues one way
-and acts the other twenty lines apart is how the argument gets lost.
+The `POST` gives **one answer** — `409` — for unknown, expired and spent alike.
+Not to hide which it is: the `GET` above says so plainly to anyone who asks, and
+could not usefully do otherwise. It is that the client has nothing to do with the
+difference at this point — the page has already read the status, and by the time
+it POSTs all three mean the same thing, that this link cannot be spent.
 
 **No `attendance` row is created.** Redeeming makes you a member of the community;
 saying which burn you are coming to is a separate act, and #76 owns it.

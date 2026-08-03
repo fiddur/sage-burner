@@ -367,6 +367,50 @@ describe('redeeming', () => {
     expect((await redeem(server, token)).statusCode).toBe(201)
   })
 
+  it('still answers "is this address a member?" for as long as the invite lives', async () => {
+    // The residual, pinned rather than described. The status codes differ — 409
+    // for an address that has an account, 201 for one that does not — and the
+    // 409 does not spend the token, so one holder can ask about as many
+    // addresses as they like. What the equal-cost ordering removed was the
+    // *latency* copy of that answer, which was redundant beside the status line.
+    // What bounds this is cost (a gated scrypt per probe) and #57.
+    //
+    // If someone later spends the token on the taken-address refusal, this test
+    // fails and the paragraph it belongs to has to be rewritten with it.
+    const server = await build()
+    const token = await givenInvite()
+    await db()
+      .insert(account)
+      .values({ id: randomUUID(), email: 'member@example.org', password_hash: null, created_at: NOW })
+
+    const asked = { ...applicant, email: 'member@example.org' }
+    expect((await redeem(server, token, asked)).statusCode).toBe(409)
+    expect((await redeem(server, token, asked)).statusCode).toBe(409)
+
+    const [invite] = await db().select().from(inviteToken)
+    expect(invite?.used_at).toBeNull()
+  })
+
+  it('shares one gate with login, rather than two that spend the pool between them', async () => {
+    // The bound is on libuv's four threads, so two gates of two slots would
+    // spend all four. Held from the redemption side and asserted from the login
+    // side: if they ever drift back to separate gates, the login gets in.
+    const gate = createGate({ slots: 1, queue: 0, timeoutMs: 50 })
+    const server = await build(() => new Date(NOW), slowHash(120), gate)
+    const token = await givenInvite()
+
+    const redeeming = redeem(server, token)
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    const login = await server.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { email: 'someone@example.org', password: 'a good long passphrase' },
+    })
+
+    expect(login.statusCode).toBe(429)
+    expect((await redeeming).statusCode).toBe(201)
+  })
+
   it('refuses an email that already has an account, without spending the token', async () => {
     // Otherwise the token is gone and the person is told a name is taken, with no
     // way to try again.
