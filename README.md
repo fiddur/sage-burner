@@ -1229,12 +1229,17 @@ somebody typed.
 An id in `asked` that the server no longer has is a question deleted while the
 form was open, and what happens then depends on whether it was answered:
 
-- **left blank, it is a 201** with no entry. There is nothing to store — the
-  wording comes from the question row, and the row is gone.
-- **answered, it is a 400**, and not by the `asked` rule at all: `answerProblems`
+- **with no answer key in the body, it is a 201** with no entry. There is nothing
+  to store — the wording comes from the question row, and the row is gone.
+- **with a key, it is a 400**, and not by the `asked` rule at all: `answerProblems`
   sees an answer naming no question it holds and says `unknown`, before the
   filtering is reached. The form's advice for a 400 — reload and send again — is
   right for it.
+
+The distinction is the key, not what the field looked like. `Apply.tsx` writes
+`answers[id]` on every keystroke, so a text question typed into and then cleared
+sends `''` — a key, and therefore the 400 — while one never touched sends
+nothing.
 
 What this does _not_ claim: a crafted body can omit an optional question it was
 shown and left blank, so it records as never-asked rather than as `false` or

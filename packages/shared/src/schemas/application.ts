@@ -1,6 +1,11 @@
 import { z } from 'zod'
 
-import { MAX_ANSWER_LENGTH, MAX_APPLICANT_CONTACT_LENGTH, MAX_APPLICANT_NAME_LENGTH } from '../answers.ts'
+import {
+  MAX_ANSWER_LENGTH,
+  MAX_APPLICANT_CONTACT_LENGTH,
+  MAX_APPLICANT_NAME_LENGTH,
+  MAX_ASKED_QUESTIONS,
+} from '../answers.ts'
 import { applicationStatuses, formQuestionTypes } from '../enums.ts'
 import { dateTimeSchema, idSchema, nonEmptyText } from './common.ts'
 
@@ -98,7 +103,7 @@ export const applicationCreateSchema = z
      * against the server's list, or "I wasn't shown that" would be a way to skip
      * a required question or an agreement.
      */
-    asked: z.array(idSchema),
+    asked: z.array(idSchema).max(MAX_ASKED_QUESTIONS),
   })
   .strict()
 

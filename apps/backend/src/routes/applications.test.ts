@@ -239,6 +239,39 @@ describe('submitting an application', () => {
     expect((await submit(server, { ...applicant, answers: {} })).statusCode).toBe(201)
   })
 
+  it('stores an untouched optional text answer as an empty string', async () => {
+    // The other half of "one entry per question asked, answered or not". The
+    // `false` case below has had a test; this one had none anywhere, so nothing
+    // pinned the `''` the README claims — a change dropping the entry entirely
+    // would have passed.
+    const server = await build()
+    const why = await givenQuestion({ type: 'text', label: 'Why?', required: false })
+
+    await submit(server, { ...applicant, answers: {}, asked: [why] })
+
+    const [row] = await stored()
+    expect(row?.answers).toEqual([{ question_id: why, label: 'Why?', type: 'text', value: '' }])
+  })
+
+  it('refuses a cleared field naming a question that has since gone', async () => {
+    // The boundary the phrase "left blank" hides: `Apply.tsx` writes
+    // `answers[id]` on every keystroke, so a field typed into and then emptied
+    // sends `''` — a key, which `answerProblems` calls `unknown` for a deleted
+    // question. Blank on screen, 400 in the API.
+    const server = await build()
+    const stays = await givenQuestion({ type: 'text', label: 'Why?', required: false, order: 0 })
+    const goes = await givenQuestion({ type: 'text', label: 'Going away', required: false, order: 1 })
+    await db().delete(formQuestion).where(eq(formQuestion.id, goes))
+
+    const response = await submit(server, {
+      ...applicant,
+      answers: { [stays]: 'For the fire', [goes]: '' },
+      asked: [stays, goes],
+    })
+
+    expect(response.statusCode).toBe(400)
+  })
+
   it('stores an unticked checkbox as false rather than dropping it', async () => {
     // Shown and left alone, which is the distinction the per-question entry
     // exists for: `false` here means "asked, said no", and no entry at all would

@@ -66,8 +66,10 @@ export const registerApplicationRoutes = (
 
     // A question in `asked` that is no longer in `questions` — deleted while the
     // form was open — is dropped here, with nothing to store: the wording comes
-    // from the row, and the row is gone. Only reachable if it was left blank; an
-    // answer naming it is `unknown` to `answerProblems` and 400s above.
+    // from the row, and the row is gone. Only reachable when the body carries no
+    // *key* for it: any key naming it, `''` included, is `unknown` to
+    // `answerProblems` and 400s above. A text field typed into and then cleared
+    // sends `''`, so "left blank" on screen is not the same thing.
     //
     // One entry per question *asked*, answered or not, so a reviewer can tell
     // "said no" from "was never asked" — which is why the form sends what it
