@@ -5,8 +5,8 @@ import type {
   ApplicationDecisionResponse,
   ApplicationResponse,
   ApplicationsResponse,
-  Invite,
   InviteCreate,
+  InviteResponse,
   InviteState,
   AttendanceUpdate,
   MyAttendanceResponse,
@@ -403,7 +403,10 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
 
     /**
      * Admin only. Returns the invite token once — it is never stored in the
-     * clear, and there is no re-issue path yet (#91), so a lost link is lost.
+     * clear, and this application will never have another. An applicant who
+     * loses the link is not stuck: `createInvite` mints a direct one, which gets
+     * them in without the tie back to what they wrote. #91 would restore that
+     * tie by re-issuing against the same application.
      *
      * Throws ApiError(409, 'conflict') when the application has already been
      * decided, which is what stops a double click minting two invites.
@@ -423,11 +426,16 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
     getInvites: (signal?: AbortSignal) => request<AdminInvitesResponse>('/admin/invites', { signal }),
 
     /**
-     * Admin only. Returns the token once, like approval does; there is no
-     * re-issue path yet (#91). Omit `expires_at` for the default 30 days.
+     * Admin only. Returns the token once, like approval does.
+     *
+     * Also the way back for an applicant who lost theirs: this mints an invite
+     * with no `application_id`, so they get in but their answers stay orphaned
+     * from the account. #91 is re-issuing against the application instead.
+     *
+     * Omit `expires_at` for the default 30 days.
      */
     createInvite: (body: InviteCreate = {}) =>
-      request<{ invite: Invite }>('/admin/invites', { method: 'POST', body }),
+      request<InviteResponse>('/admin/invites', { method: 'POST', body }),
 
     /**
      * Admin only. Answers 204. Throws ApiError(409, 'conflict') for an invite

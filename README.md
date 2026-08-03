@@ -1290,13 +1290,31 @@ nowhere else — a leaked backup or a stray copy of the volume hands out no
 invites. The organiser copies it into Discord or Messenger themselves; there is
 no email.
 
-**A lost link is lost.** Not merely unrecoverable — there is no way to issue a
-replacement either: re-approving matches nothing on `status = 'pending'` and
-answers `409`, `invite_token_application_idx` refuses a second invite for the
-same application, and no other route mints one. The only way back today is
-editing the database. #91 owns the re-issue path; until it lands, the copy button
-is deliberately silent on failure rather than claiming a copy that did not
-happen.
+**A lost link cannot be re-sent, but the person is not stuck.** Re-approving
+matches nothing on `status = 'pending'` and answers `409`, and
+`invite_token_application_idx` refuses a second invite for the same application —
+so that application will never have another. What an organiser does instead is
+mint a direct one with `POST /api/admin/invites` and send that; the applicant gets
+in without anyone touching the database.
+
+That costs two things, both worth knowing before recommending it:
+
+- **The original link stays live.** It is the token that is lost, not the row: the
+  invite remains `outstanding` until it expires, and `DELETE /api/admin/invites/:id`
+  refuses it precisely because it belongs to an application. If the lost link turns
+  up later it can still be redeemed — with a _different_ email, since the same
+  address answers `409` against the account they now have. An invite is forwardable
+  and whoever holds it is a stranger, so that is the likelier shape anyway: a
+  second, unrelated account off an approval meant for one person. Waiting out the
+  expiry is the only thing that closes it today, and #137 is the decision about
+  which way to close it properly.
+- **The answers stay orphaned.** A direct invite carries no `application_id`, so
+  what they wrote is not tied to the account they end up with. #91 would restore
+  that tie by re-issuing against the same application, which is a convenience now
+  rather than the only route back.
+
+The copy button is deliberately silent on failure rather than claiming a copy
+that did not happen.
 
 The link is assembled in the browser from `window.location.origin`, so the API
 needs no notion of its own public URL.
@@ -1329,8 +1347,9 @@ refused with `409`, for different reasons:
 - a **redeemed** invite is the record of how someone got in, and `account`
   references it — deleting it would rewrite how the group formed;
 - an **application's** invite is the only one that application will ever have, so
-  revoking it would leave the applicant approved with no way in, which is
-  unrecoverable through the API. #91 owns re-issuing.
+  revoking it would leave that applicant with nothing to redeem. A direct invite
+  gets them in; what cannot be recovered is the tie back to what they wrote, and
+  #91 owns re-issuing against the application itself.
 
 The organiser UI offers Revoke on exactly those — every unredeemed direct invite,
 **expired ones included**, since an expired link is still a row worth clearing
@@ -1353,7 +1372,9 @@ already have an account, an unknown one is usually a truncated paste.
 `POST /api/invites/:token/redeem` creates the account, fills in the person-level
 fields, grants the `member` role and signs them in. **One transaction**, because
 half a redemption is the worst outcome: a spent token with no account behind it
-leaves the person no way to finish and nobody a way to re-issue (#91).
+leaves the person unable to finish with the link they were sent, and that link
+cannot be re-sent — somebody with admin has to notice and mint a direct invite
+(#91).
 
 Two races are closed, and each has a test that fails without it:
 

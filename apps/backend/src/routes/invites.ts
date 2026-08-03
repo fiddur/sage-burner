@@ -1,4 +1,4 @@
-import type { AdminInvitesResponse } from '@sage-burner/shared'
+import type { AdminInvitesResponse, InviteResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
 import { errorResponse, inviteCreateSchema, inviteStatusOf } from '@sage-burner/shared'
@@ -73,16 +73,18 @@ export const registerInviteRoutes = (
       created_by: viewer.account_id,
     })
 
-    return reply.code(201).send({ invite: { token, expires_at } })
+    return reply.code(201).send({ invite: { token, expires_at } } satisfies InviteResponse)
   })
 
   app.delete<{ Params: { id: string } }>('/api/admin/invites/:id', async (request, reply) => {
     void noStore(reply)
 
     // Only an unredeemed direct invite. A redeemed one is the record of how
-    // someone got in and `account` references it; an application's invite is
-    // the only one that application will ever have, so deleting it would leave
-    // the applicant approved with no way in — #91 owns re-issuing.
+    // someone got in and `account` references it; an application's invite is the
+    // only one that application will ever have, so deleting it would leave that
+    // applicant with nothing to redeem. A direct invite still gets them in; what
+    // cannot be recovered is the tie back to what they wrote, which is what #91
+    // would restore by re-issuing against the application.
     const deleted = await db
       .delete(inviteToken)
       .where(
