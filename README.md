@@ -1328,8 +1328,9 @@ refused with `409`, for different reasons:
 - a **redeemed** invite is the record of how someone got in, and `account`
   references it — deleting it would rewrite how the group formed;
 - an **application's** invite is the only one that application will ever have, so
-  revoking it would leave the applicant approved with no way in, which is
-  unrecoverable through the API. #91 owns re-issuing.
+  revoking it would leave that applicant with nothing to redeem. A direct invite
+  gets them in; what cannot be recovered is the tie back to what they wrote, and
+  #91 owns re-issuing against the application itself.
 
 The organiser UI offers Revoke on exactly those — every unredeemed direct invite,
 **expired ones included**, since an expired link is still a row worth clearing
