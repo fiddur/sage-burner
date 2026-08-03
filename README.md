@@ -1287,7 +1287,7 @@ so that application will never have another. What an organiser does instead is
 mint a direct one with `POST /api/admin/invites` and send that; the applicant gets
 in without anyone touching the database.
 
-Two things that costs, both worth knowing before recommending it:
+That costs two things, both worth knowing before recommending it:
 
 - **The original link stays live.** It is the token that is lost, not the row: the
   invite remains `outstanding` until it expires, and `DELETE /api/admin/invites/:id`

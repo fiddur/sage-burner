@@ -126,7 +126,7 @@ describe('AdminInvites', () => {
   })
 
   it('does not still say Copied after a second invite is minted', async () => {
-    // The link is shown once and cannot be shown again (#91), so a stale "Copied"
+    // The link is shown once and cannot be shown again, so a stale "Copied"
     // is how an organiser pastes the first token twice and loses the second.
     const writeText = vi.fn(() => Promise.resolve())
     vi.stubGlobal('navigator', { clipboard: { writeText } })
