@@ -598,7 +598,11 @@ the tests written beside it pass. There is a test that registers a route and
 never guards it, and it is refused.
 
 The hook keys on the matched route's own pattern, so an encoded path cannot step
-around it; an unmatched one has no route to guard and 404s first. A Fastify
+around it. It covers the bare `/api/admin` as well as everything beneath it — an
+admin index page is the obvious route to add next, and matching only
+`/api/admin/` would have let exactly that one in unauthenticated. For an
+unmatched path the hook still runs, since the not-found handler inherits the same
+`onRequest` chain; there is simply no route pattern there to match. A Fastify
 plugin scope would be the more idiomatic seam and is weaker here — it covers
 what is registered on it, so a future route declared on the root instance with
 an `/api/admin` path would slip past. The prefix is what the paths already agree

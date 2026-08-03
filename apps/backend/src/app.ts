@@ -241,15 +241,10 @@ const sessionDeps = (config: Config) => ({
   ttlSeconds: config.session_ttl_seconds,
 })
 
+const ADMIN_PREFIX = '/api/admin'
+
 /**
- * Build the application.
- *
- * Takes its dependencies as arguments rather than constructing them, so tests
- * can inject an in-memory database and assert against `app.inject()` without a
- * socket, a file, or a running server.
- */
-/**
- * Everything under `/api/admin/` requires the role, whether or not its route
+ * Everything under `/api/admin` requires the role, whether or not its route
  * asked for it.
  *
  * A per-route `preHandler` is one line a new route has to remember, and
@@ -257,23 +252,41 @@ const sessionDeps = (config: Config) => ({
  * nothing fails, and the tests written beside it pass. The hook makes the
  * guard a property of the path instead of a property of the author.
  *
- * Keyed on the matched route's own pattern rather than the raw URL, so it
- * cannot be stepped around with encoding — an unmatched path has no route to
- * guard and 404s before this runs. A Fastify plugin scope would be the other
- * way, and is weaker here: it covers what is registered on it, so a future
- * route declared on the root instance with an `/api/admin` path would slip
- * past. The prefix is what the paths already agree on.
+ * The bare prefix is matched as well as the prefixed segment. An admin index at
+ * exactly `/api/admin` is the obvious route to add next, and `startsWith` on
+ * `/api/admin/` alone would have let it in unauthenticated — the very failure
+ * this closes everywhere else.
+ *
+ * Keyed on the matched route's own pattern rather than the raw URL, so it cannot
+ * be stepped around with encoding. For an unmatched path the hook still runs —
+ * the not-found handler inherits this instance's `onRequest` chain — but
+ * `routeOptions.url` is `undefined` there, so there is no pattern to match and
+ * nothing to guard.
+ *
+ * A Fastify plugin scope would be the more idiomatic seam and is weaker here: it
+ * covers what is registered on it, so a future route declared on the root
+ * instance with an `/api/admin` path would slip past. The prefix is what the
+ * paths already agree on.
  */
 const registerAdminPrefixGuard = (app: FastifyInstance, deps: GuardDeps) => {
   const { requireAdmin } = createGuards(deps)
 
   app.addHook('onRequest', async (request, reply) => {
-    if (request.routeOptions.url?.startsWith('/api/admin/') !== true) return undefined
+    const pattern = request.routeOptions.url
+    if (pattern === undefined) return undefined
+    if (pattern !== ADMIN_PREFIX && !pattern.startsWith(`${ADMIN_PREFIX}/`)) return undefined
 
     return requireAdmin(request, reply)
   })
 }
 
+/**
+ * Build the application.
+ *
+ * Takes its dependencies as arguments rather than constructing them, so tests
+ * can inject an in-memory database and assert against `app.inject()` without a
+ * socket, a file, or a running server.
+ */
 export const createApp = async ({
   db,
   config,

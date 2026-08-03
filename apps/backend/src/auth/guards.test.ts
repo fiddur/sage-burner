@@ -136,6 +136,15 @@ describe('an admin route nobody remembered to guard', () => {
     expect(response.statusCode).toBe(200)
   })
 
+  it('covers the bare prefix, not only paths with a segment after it', async () => {
+    // `/api/admin` with nothing after it does not start with `/api/admin/`. No
+    // route sits there today; an admin index page is the obvious one to add, and
+    // it would have arrived unauthenticated.
+    const server = await withLateRoute('/api/admin')
+
+    expect((await server.inject({ method: 'GET', url: '/api/admin' })).statusCode).toBe(401)
+  })
+
   it('is not fooled by a path that merely starts with the letters', async () => {
     // `/api/administrivia` is not under `/api/admin/`, and a `startsWith` on the
     // bare prefix would guard it by accident — harmless here, but the same
