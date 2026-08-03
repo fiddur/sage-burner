@@ -119,6 +119,9 @@ describe('direct invites', () => {
     const response = await create(server, cookie, { expiers_at: '2026-07-10T00:00:00.000Z' })
 
     expect(response.statusCode).toBe(400)
+    // The half the status code does not pin: nothing was minted behind the
+    // refusal. The past-expiry sibling below asserts the same thing.
+    expect(await db().select().from(inviteToken)).toHaveLength(0)
   })
 
   it('refuses an expiry in the past, which would mint something already dead', async () => {

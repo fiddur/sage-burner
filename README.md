@@ -1291,10 +1291,13 @@ Two things that costs, both worth knowing before recommending it:
 
 - **The original link stays live.** It is the token that is lost, not the row: the
   invite remains `outstanding` until it expires, and `DELETE /api/admin/invites/:id`
-  refuses it precisely because it belongs to an application. So if the lost link
-  turns up later, redeeming it produces a _second_, unrelated account for the same
-  person. Waiting for the expiry is the only thing that closes it today, and #137
-  is the decision about which way to close it properly.
+  refuses it precisely because it belongs to an application. If the lost link turns
+  up later it can still be redeemed — with a _different_ email, since the same
+  address answers `409` against the account they now have. An invite is forwardable
+  and whoever holds it is a stranger, so that is the likelier shape anyway: a
+  second, unrelated account off an approval meant for one person. Waiting out the
+  expiry is the only thing that closes it today, and #137 is the decision about
+  which way to close it properly.
 - **The answers stay orphaned.** A direct invite carries no `application_id`, so
   what they wrote is not tied to the account they end up with. #91 would restore
   that tie by re-issuing against the same application, which is a convenience now
