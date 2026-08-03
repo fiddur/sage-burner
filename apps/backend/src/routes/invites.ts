@@ -7,7 +7,6 @@ import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
 
-import { createGuards } from '../auth/guards.ts'
 import { application, inviteToken } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 import { defaultExpiry, mintToken } from '../invites.ts'
@@ -28,9 +27,7 @@ export const registerInviteRoutes = (
   app: FastifyInstance,
   { db, sessions, now = () => new Date() }: InviteRouteDeps,
 ) => {
-  const { requireAdmin } = createGuards({ db, sessions })
-
-  app.get('/api/admin/invites', { preHandler: requireAdmin }, async (_request, reply) => {
+  app.get('/api/admin/invites', async (_request, reply) => {
     void noStore(reply)
 
     const rows = await db
@@ -50,7 +47,7 @@ export const registerInviteRoutes = (
     } satisfies AdminInvitesResponse
   })
 
-  app.post('/api/admin/invites', { preHandler: requireAdmin }, async (request, reply) => {
+  app.post('/api/admin/invites', async (request, reply) => {
     void noStore(reply)
 
     const parsed = inviteCreateSchema.safeParse(request.body ?? {})
@@ -79,38 +76,34 @@ export const registerInviteRoutes = (
     return reply.code(201).send({ invite: { token, expires_at } } satisfies InviteResponse)
   })
 
-  app.delete<{ Params: { id: string } }>(
-    '/api/admin/invites/:id',
-    { preHandler: requireAdmin },
-    async (request, reply) => {
-      void noStore(reply)
+  app.delete<{ Params: { id: string } }>('/api/admin/invites/:id', async (request, reply) => {
+    void noStore(reply)
 
-      // Only an unredeemed direct invite. A redeemed one is the record of how
-      // someone got in and `account` references it; an application's invite is
-      // the only one that application will ever have, so deleting it would leave
-      // the applicant approved with no way in — #91 owns re-issuing.
-      const deleted = await db
-        .delete(inviteToken)
-        .where(
-          and(
-            eq(inviteToken.id, request.params.id),
-            isNull(inviteToken.used_at),
-            isNull(inviteToken.application_id),
-          ),
-        )
-        .returning({ id: inviteToken.id })
+    // Only an unredeemed direct invite. A redeemed one is the record of how
+    // someone got in and `account` references it; an application's invite is
+    // the only one that application will ever have, so deleting it would leave
+    // the applicant approved with no way in — #91 owns re-issuing.
+    const deleted = await db
+      .delete(inviteToken)
+      .where(
+        and(
+          eq(inviteToken.id, request.params.id),
+          isNull(inviteToken.used_at),
+          isNull(inviteToken.application_id),
+        ),
+      )
+      .returning({ id: inviteToken.id })
 
-      if (deleted.length > 0) return reply.code(204).send()
+    if (deleted.length > 0) return reply.code(204).send()
 
-      const [existing] = await db
-        .select()
-        .from(inviteToken)
-        .where(eq(inviteToken.id, request.params.id))
-        .limit(1)
+    const [existing] = await db
+      .select()
+      .from(inviteToken)
+      .where(eq(inviteToken.id, request.params.id))
+      .limit(1)
 
-      return existing === undefined
-        ? reply.code(404).send(errorResponse('not_found'))
-        : reply.code(409).send(errorResponse('conflict'))
-    },
-  )
+    return existing === undefined
+      ? reply.code(404).send(errorResponse('not_found'))
+      : reply.code(409).send(errorResponse('conflict'))
+  })
 }

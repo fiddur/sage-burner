@@ -8,7 +8,6 @@ import { randomUUID } from 'node:crypto'
 import type { GuardDeps } from '../auth/guards.ts'
 import type { Database } from '../db/index.ts'
 
-import { createGuards } from '../auth/guards.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
 import { place } from '../db/schema.ts'
 import { noStore } from '../http.ts'
@@ -27,9 +26,7 @@ export const placesFor = (db: Database): Promise<Place[]> =>
  * the link, so the list of places is already public by design — see the ICS
  * paragraph in the README's security section. Every write is admin-only.
  */
-export const registerPlaceRoutes = (app: FastifyInstance, { db, sessions }: GuardDeps) => {
-  const { requireAdmin } = createGuards({ db, sessions })
-
+export const registerPlaceRoutes = (app: FastifyInstance, { db }: GuardDeps) => {
   app.get('/api/places', async (_request, reply) => {
     // Same reasoning as the questions and the active event: public, but an edit
     // has to show up without waiting out a heuristic freshness window.
@@ -38,7 +35,7 @@ export const registerPlaceRoutes = (app: FastifyInstance, { db, sessions }: Guar
     return { places: await placesFor(db) } satisfies PlacesResponse
   })
 
-  app.post('/api/admin/places', { preHandler: requireAdmin }, async (request, reply) => {
+  app.post('/api/admin/places', async (request, reply) => {
     void noStore(reply)
 
     const parsed = placeCreateSchema.safeParse(request.body)
@@ -66,62 +63,54 @@ export const registerPlaceRoutes = (app: FastifyInstance, { db, sessions }: Guar
     return reply.code(201).send({ place: { ...parsed.data, id, order } satisfies Place })
   })
 
-  app.patch<{ Params: { id: string } }>(
-    '/api/admin/places/:id',
-    { preHandler: requireAdmin },
-    async (request, reply) => {
-      void noStore(reply)
+  app.patch<{ Params: { id: string } }>('/api/admin/places/:id', async (request, reply) => {
+    void noStore(reply)
 
-      const parsed = placeUpdateSchema.safeParse(request.body)
-      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+    const parsed = placeUpdateSchema.safeParse(request.body)
+    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
 
-      // `set({})` is not valid SQL, so the one body that never reaches the
-      // UPDATE needs a read of its own.
-      if (Object.keys(parsed.data).length === 0) {
-        const [existing] = await db.select().from(place).where(eq(place.id, request.params.id)).limit(1)
+    // `set({})` is not valid SQL, so the one body that never reaches the
+    // UPDATE needs a read of its own.
+    if (Object.keys(parsed.data).length === 0) {
+      const [existing] = await db.select().from(place).where(eq(place.id, request.params.id)).limit(1)
 
-        return existing === undefined ? reply.code(404).send(errorResponse('not_found')) : { place: existing }
-      }
+      return existing === undefined ? reply.code(404).send(errorResponse('not_found')) : { place: existing }
+    }
 
-      const [updated] = await db
-        .update(place)
-        .set(parsed.data)
-        .where(eq(place.id, request.params.id))
-        .returning()
+    const [updated] = await db
+      .update(place)
+      .set(parsed.data)
+      .where(eq(place.id, request.params.id))
+      .returning()
 
-      return updated === undefined ? reply.code(404).send(errorResponse('not_found')) : { place: updated }
-    },
-  )
+    return updated === undefined ? reply.code(404).send(errorResponse('not_found')) : { place: updated }
+  })
 
-  app.delete<{ Params: { id: string } }>(
-    '/api/admin/places/:id',
-    { preHandler: requireAdmin },
-    async (request, reply) => {
-      void noStore(reply)
+  app.delete<{ Params: { id: string } }>('/api/admin/places/:id', async (request, reply) => {
+    void noStore(reply)
 
-      // A dream sitting in this lane holds the row: `session.place_id` has no
-      // `onDelete`, so SQLite refuses rather than quietly unscheduling it. A
-      // pre-read would be check-then-act — the dream can be created between the
-      // read and the delete — so the constraint is the authority and this only
-      // translates it.
-      let deleted
-      try {
-        deleted = await db.delete(place).where(eq(place.id, request.params.id)).returning({ id: place.id })
-      } catch (failure) {
-        if (isForeignKeyViolation(failure)) return reply.code(409).send(errorResponse('conflict'))
-        throw failure
-      }
+    // A dream sitting in this lane holds the row: `session.place_id` has no
+    // `onDelete`, so SQLite refuses rather than quietly unscheduling it. A
+    // pre-read would be check-then-act — the dream can be created between the
+    // read and the delete — so the constraint is the authority and this only
+    // translates it.
+    let deleted
+    try {
+      deleted = await db.delete(place).where(eq(place.id, request.params.id)).returning({ id: place.id })
+    } catch (failure) {
+      if (isForeignKeyViolation(failure)) return reply.code(409).send(errorResponse('conflict'))
+      throw failure
+    }
 
-      if (deleted.length === 0) return reply.code(404).send(errorResponse('not_found'))
+    if (deleted.length === 0) return reply.code(404).send(errorResponse('not_found'))
 
-      // Deliberately does not renumber the survivors: `order` only has to sort,
-      // not be contiguous, and renumbering here would fight a concurrent
-      // reorder for no visible gain.
-      return reply.code(204).send()
-    },
-  )
+    // Deliberately does not renumber the survivors: `order` only has to sort,
+    // not be contiguous, and renumbering here would fight a concurrent
+    // reorder for no visible gain.
+    return reply.code(204).send()
+  })
 
-  app.put('/api/admin/places/order', { preHandler: requireAdmin }, async (request, reply) => {
+  app.put('/api/admin/places/order', async (request, reply) => {
     void noStore(reply)
 
     const parsed = placeOrderSchema.safeParse(request.body)
