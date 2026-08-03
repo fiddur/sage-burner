@@ -67,8 +67,8 @@ describe('Home', () => {
   })
 
   it('escapes raw HTML in the welcome text', async () => {
-    // Admin-authored, shown to every visitor — and an admin account is one
-    // phished password away from belonging to someone else.
+    // Written by any approved member, shown to every visitor. The escaping is what
+    // makes that safe, so this test is the one holding the control up.
     renderHome({ ...summer, welcome_markdown: 'Hi <script>alert(1)</script>' })
 
     await screen.findByRole('heading', { name: 'Summer Burn 2026', level: 2 })

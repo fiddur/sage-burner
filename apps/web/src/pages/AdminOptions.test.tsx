@@ -251,7 +251,18 @@ describe('AdminOptions', () => {
     renderPage(stub({}, [], null))
 
     expect(await screen.findByText(/no burn open/)).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Events' })).toBeTruthy()
     expect(screen.queryByLabelText('New lodging name')).toBeNull()
+  })
+
+  it('sends a member to a person rather than to a page they cannot use', async () => {
+    // Creating a burn is admin-only, so the link an admin gets here would answer
+    // "This is an admin page." to a member — a dead end reachable only because
+    // this page was opened to them.
+    renderPage(stub({}, [], null), { status: 'signed-in', account: { id: 'a-2', roles: ['member'] } })
+
+    expect(await screen.findByText(/Ask someone with admin/)).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Events' })).toBeNull()
   })
 
   it('surfaces a failure to load', async () => {

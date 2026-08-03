@@ -5,7 +5,7 @@ import { useEffect, useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
-import { isApproved, useViewer } from '../viewer.tsx'
+import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
 
 export type OptionsApi = Pick<
   ApiClient,
@@ -71,6 +71,7 @@ const BLURB: Record<EventOptionKind, string> = {
 export const AdminOptions = ({ api }: { api: OptionsApi }) => {
   const viewer = useViewer()
   const approved = isApproved(viewer)
+  const admin = isAdmin(viewer)
   const [loaded, setLoaded] = useState<Loaded>({ status: 'loading' })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | undefined>(undefined)
@@ -156,8 +157,17 @@ export const AdminOptions = ({ api }: { api: OptionsApi }) => {
 
       {loaded.status === 'ready' && loaded.event === null && (
         <p class="notice">
-          There is no burn open, and these lists belong to one. Make an event under{' '}
-          <a href="/admin/events">Events</a> first.
+          There is no burn open, and these lists belong to one.{' '}
+          {admin ? (
+            <>
+              Make an event under <a href="/admin/events">Events</a> first.
+            </>
+          ) : (
+            // Creating a burn is admin-only, so a member sent to that page would
+            // read "This is an admin page." A dead end is worse than a plain
+            // sentence saying who to ask.
+            <>Ask someone with admin to create one first.</>
+          )}
         </p>
       )}
 

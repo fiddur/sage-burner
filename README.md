@@ -628,7 +628,9 @@ spreadsheet default rather than being an oversight, and it is the same trust the
 lead-roles register assumes in #27.
 
 The welcome text is edited **on the homepage**, where it is read — whoever spots a
-typo is the one likely to fix it — through `PATCH /api/events/:id/welcome`. That is
+typo is the one likely to fix it — through `PATCH /api/events/:id/welcome`. An admin
+can also edit it under Organise → Events, alongside the dates and the cap, which
+goes through the admin `PATCH` with everything else. That is
 a route of its own rather than a carve-out in the admin `PATCH`, and the reason is
 the paragraph below: opening one field of the admin route would move the burn's
 shape out from under the prefix hook and turn its protection back into a branch. A
@@ -1637,9 +1639,12 @@ and a rule applied some of the time is one that gets tested some of the time.
 
 ### Markdown is escaped, not filtered
 
-`welcome_markdown` is admin-authored and rendered to every public visitor, so it
-is treated as untrusted: an admin account is one phished password away from
-belonging to someone else.
+`welcome_markdown` is written by **any approved member** and rendered to every
+public visitor, so it is treated as untrusted. That is the plain reason now rather
+than a hypothetical one: forty-odd people can edit it. It was already treated this
+way when only admins could — an admin account is one phished password away from
+belonging to someone else — which is why opening the field widened who writes it
+without widening what the renderer has to withstand.
 
 **Raw HTML in the welcome text is escaped and shows as visible text.** The usual
 build is `marked` + DOMPurify, and that was the first attempt — but DOMPurify

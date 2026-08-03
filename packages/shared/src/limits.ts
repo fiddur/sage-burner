@@ -1,9 +1,10 @@
 /**
  * Length limits both sides need, with no Zod in reach.
  *
- * The schemas bound the field and the form sets `maxLength` from the same number,
- * so a paste that the API would refuse is refused in the textarea instead. Written
- * twice, they drift into a form that accepts what the API answers 400 for.
+ * The schemas bound the field and every form that edits it sets `maxLength` from
+ * the same number, so a paste the API would refuse is refused in the textarea
+ * instead. Written out separately they drift — the welcome text has two editors,
+ * and one of them carried no limit at all until this was shared.
  *
  * Zod-free on purpose: `apps/web` imports runtime values only from modules that do
  * not pull Zod in, because the barrel is what the homepage's chunk goes through.

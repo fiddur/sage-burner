@@ -1,5 +1,6 @@
 import type { Event } from '@sage-burner/shared'
 
+import { MAX_WELCOME_LENGTH } from '@sage-burner/shared'
 import { useEffect, useRef, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -358,6 +359,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
                     <span>Welcome text (markdown)</span>
                     <textarea
                       rows={12}
+                      maxLength={MAX_WELCOME_LENGTH}
                       value={welcome}
                       onInput={(inputEvent) => {
                         setWelcome(inputEvent.currentTarget.value)
