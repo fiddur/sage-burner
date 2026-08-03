@@ -411,7 +411,8 @@ describe('the lists a member picks from', () => {
   it('lets any approved member write these lists, admin or not', async () => {
     // These replace a spreadsheet everyone could edit, so a member curates the
     // lodging and helping lists. The admin case is not redundant: `admin` does not
-    // imply `member`, and the bootstrapped account holds `admin` alone.
+    // imply `member`, so an organiser who is not attending holds one and not the
+    // other.
     const server = await build()
     const eventId = await givenEvent()
 

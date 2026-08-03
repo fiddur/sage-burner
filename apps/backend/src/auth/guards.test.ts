@@ -219,8 +219,8 @@ describe('the approved guard', () => {
   })
 
   it('lets an admin in who is not also a member', async () => {
-    // The bootstrapped account holds `admin` alone, and is the one that sets the
-    // first burn up. A `member`-only guard would refuse it.
+    // The roles are independent, so an account can hold `admin` without `member` —
+    // an organiser who is not attending. A `member`-only guard would refuse them.
     const server = await withApprovedRoute()
 
     expect((await ask(server, cookieFor(await givenAccount(['admin'])))).statusCode).toBe(200)

@@ -263,8 +263,8 @@ describe('the places a dream can happen at', () => {
 
   it('lets any approved member write the lanes, admin or not', async () => {
     // A shared spreadsheet everyone could edit is what this replaces. The admin
-    // case is not redundant: `admin` does not imply `member`, and the bootstrapped
-    // account — the one that sets the first burn up — holds `admin` alone.
+    // case is not redundant: `admin` does not imply `member`, so an organiser who
+    // is not attending holds one and not the other.
     const server = await build()
 
     for (const roles of [['member'], ['admin'], ['member', 'admin']] as const) {

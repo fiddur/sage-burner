@@ -73,9 +73,10 @@ const rolesOf = async (accountId: string) =>
     .sort()
 
 describe('an organiser editing who holds which role', () => {
-  it('gives themselves the member role, which the bootstrap does not', async () => {
-    // #110: `admin:create` grants `admin` alone, so the account every
-    // installation starts with cannot reach its own profile or say it is coming.
+  it('grants a role an account did not have', async () => {
+    // An account holding `admin` alone — granted here rather than bootstrapped,
+    // since `admin:create` gives both — cannot reach its own profile or say it is
+    // coming until `member` is added.
     const server = await build()
     const admin = await givenAccount(['admin'])
 

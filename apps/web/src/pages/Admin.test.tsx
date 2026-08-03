@@ -62,8 +62,9 @@ describe('Admin', () => {
   })
 
   it('grants a role, sending the whole set rather than a delta', async () => {
-    // #110: the bootstrapped organiser has `admin` alone and cannot reach their
-    // own profile until this adds `member`.
+    // An organiser holding `admin` alone cannot reach their own profile until this
+    // adds `member`. `admin:create` grants both, so that is an account someone was
+    // given `admin` on, not the one the installation starts with.
     const setAccountRoles = vi.fn<AdminApi['setAccountRoles']>(() =>
       Promise.resolve({
         account: {

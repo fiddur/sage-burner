@@ -56,6 +56,30 @@ export const Home = ({ api }: { api: HomeApi }) => {
 
   const openEvent = active.status === 'ready' ? active.event : null
 
+  /**
+   * Open the editor on the text as it is now, not as it was when the page loaded.
+   *
+   * `PATCH …/welcome` overwrites the whole field, so a homepage left open for an
+   * hour and then edited would discard whatever was written in between. Re-reading
+   * here shrinks that window from "since the page loaded" to "since Edit was
+   * pressed", which for a field forty-odd people share is the difference that
+   * matters. It does not close it, and closing it properly means versioning the
+   * field — see the README.
+   *
+   * A failed re-read falls back to what is on screen: refusing to open the editor
+   * because the network hiccuped would be the worse answer.
+   */
+  const openEditor = async (fallback: string) => {
+    setError(undefined)
+    try {
+      const { event } = await api.getActiveEvent()
+      setEditing(event?.welcome_markdown ?? fallback)
+      if (event !== null) setActive({ status: 'ready', event })
+    } catch {
+      setEditing(fallback)
+    }
+  }
+
   const save = async (id: string, welcome_markdown: string) => {
     setSaving(true)
     setError(undefined)
@@ -118,15 +142,7 @@ export const Home = ({ api }: { api: HomeApi }) => {
                 <button
                   type="button"
                   class="link-button"
-                  onClick={() => {
-                    // Cleared here rather than on cancel, which would be the
-                    // same thing said twice: a message from a save that failed
-                    // earlier would otherwise reappear as the editor reopens, and
-                    // `FormError` takes focus when it mounts — so a stale one
-                    // would steal the caret as well as mislead.
-                    setError(undefined)
-                    setEditing(openEvent.welcome_markdown)
-                  }}
+                  onClick={() => void openEditor(openEvent.welcome_markdown)}
                 >
                   Edit this text
                 </button>

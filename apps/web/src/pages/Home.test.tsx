@@ -179,8 +179,8 @@ describe('Home', () => {
 
     for (const roles of [['member'], ['admin'], ['member', 'admin']] as const) {
       it(`offers it to ${roles.join(' + ')}`, async () => {
-        // `admin` counts as well as `member`: the bootstrapped account holds
-        // `admin` alone and is the one writing the first welcome text.
+        // `admin` counts as well as `member`, because the roles are independent:
+        // an organiser who is not attending still writes the welcome text.
         renderHome(summer, asRoles([...roles]))
 
         expect(await screen.findByRole('button', { name: 'Edit this text' })).toBeTruthy()
@@ -196,7 +196,7 @@ describe('Home', () => {
       renderHome(summer, asRoles(['member']), updateWelcome)
 
       fireEvent.click(await screen.findByRole('button', { name: 'Edit this text' }))
-      fireEvent.input(screen.getByLabelText('Welcome text'), { target: { value: 'Bring a cup' } })
+      fireEvent.input(await screen.findByLabelText('Welcome text'), { target: { value: 'Bring a cup' } })
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
       await waitFor(() =>
@@ -211,7 +211,9 @@ describe('Home', () => {
 
       fireEvent.click(await screen.findByRole('button', { name: 'Edit this text' }))
 
-      expect(screen.getByLabelText<HTMLTextAreaElement>('Welcome text').value).toBe(summer.welcome_markdown)
+      expect((await screen.findByLabelText<HTMLTextAreaElement>('Welcome text')).value).toBe(
+        summer.welcome_markdown,
+      )
     })
 
     it('leaves the text alone when the save is refused', async () => {
@@ -221,13 +223,54 @@ describe('Home', () => {
       renderHome(summer, asRoles(['member']), updateWelcome)
 
       fireEvent.click(await screen.findByRole('button', { name: 'Edit this text' }))
-      fireEvent.input(screen.getByLabelText('Welcome text'), { target: { value: 'Nope' } })
+      fireEvent.input(await screen.findByLabelText('Welcome text'), { target: { value: 'Nope' } })
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
       expect((await screen.findByRole('alert')).textContent).toContain('do not have access')
       // Still editing, with the draft intact — losing what they typed over a
       // refusal would be the second failure.
       expect(screen.getByLabelText<HTMLTextAreaElement>('Welcome text').value).toBe('Nope')
+    })
+
+    it('opens on the text as it is now, not as it was when the page loaded', async () => {
+      // The whole field is overwritten on save, so a homepage left open while
+      // somebody else edited would discard their work. Re-reading on open is what
+      // shrinks that window to the moment between pressing Edit and pressing Save.
+      const getActiveEvent = vi
+        .fn<HomeApi['getActiveEvent']>()
+        .mockResolvedValueOnce({ event: summer })
+        .mockResolvedValue({ event: { ...summer, welcome_markdown: 'Written by someone else' } })
+      render(
+        <ViewerProvider viewer={asRoles(['member'])}>
+          <Home api={{ getActiveEvent, updateWelcome: notStubbed }} />
+        </ViewerProvider>,
+      )
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit this text' }))
+
+      expect((await screen.findByLabelText<HTMLTextAreaElement>('Welcome text')).value).toBe(
+        'Written by someone else',
+      )
+    })
+
+    it('opens on what is on screen when the re-read fails', async () => {
+      // Refusing to open the editor because the network hiccuped would be worse
+      // than opening it on a slightly stale draft.
+      const getActiveEvent = vi
+        .fn<HomeApi['getActiveEvent']>()
+        .mockResolvedValueOnce({ event: summer })
+        .mockRejectedValue(new Error('offline'))
+      render(
+        <ViewerProvider viewer={asRoles(['member'])}>
+          <Home api={{ getActiveEvent, updateWelcome: notStubbed }} />
+        </ViewerProvider>,
+      )
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit this text' }))
+
+      expect((await screen.findByLabelText<HTMLTextAreaElement>('Welcome text')).value).toBe(
+        summer.welcome_markdown,
+      )
     })
 
     it('does not show a stale save error when the editor is reopened', async () => {
@@ -240,6 +283,7 @@ describe('Home', () => {
       renderHome(summer, asRoles(['member']), updateWelcome)
 
       fireEvent.click(await screen.findByRole('button', { name: 'Edit this text' }))
+      await screen.findByLabelText('Welcome text')
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
       expect((await screen.findByRole('alert')).textContent).toContain('do not have access')
 
@@ -254,7 +298,7 @@ describe('Home', () => {
       renderHome(summer, asRoles(['member']), updateWelcome)
 
       fireEvent.click(await screen.findByRole('button', { name: 'Edit this text' }))
-      fireEvent.input(screen.getByLabelText('Welcome text'), { target: { value: 'Discard me' } })
+      fireEvent.input(await screen.findByLabelText('Welcome text'), { target: { value: 'Discard me' } })
       fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
 
       expect(screen.queryByLabelText('Welcome text')).toBeNull()

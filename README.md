@@ -612,11 +612,15 @@ member — not admin:
 | The lodging and helping lists | Payment                                                                         |
 | A burn's welcome text         | Applications, invites, role grants, installation settings                       |
 
-"Approved" means **`member` or `admin`**, and the second half is load-bearing: the
-bootstrapped account holds `admin` alone — redemption is what grants `member` — so
-a `member`-only guard would lock the person setting the first burn up out of
-setting it up. That is `requireApproved` in `auth/guards.ts`; neither role implies
-the other anywhere else.
+"Approved" means **`member` or `admin`**, and the second half is load-bearing.
+The roles are independent — the accounts table grants either on its own, and an
+organiser who is not attending is coherent — so an account can hold `admin` and
+not `member`. A `member`-only guard would lock that person out of setting the burn
+up. That is `requireApproved` in `auth/guards.ts`.
+
+(`admin:create` grants both, as the Roles section says, so the account an
+installation starts with is not the example. The example is anyone given `admin`
+afterwards without `member`.)
 
 Personal details stay the person's own: nobody edits somebody else's name, contact
 or allergies.
@@ -628,8 +632,20 @@ whoever cooks needs the allergies. Opening the read while keeping the write to a
 person's own stay is #159; this section describes what the guards do today, not what
 was decided for later.
 
-One consequence worth knowing rather than discovering: deleting a helping option
-takes every member's ticks for it with it — `attendance_helping` cascades — so a
+Two consequences worth knowing rather than discovering.
+
+**The welcome text is last-write-wins, over the whole field.** `PATCH
+…/welcome` overwrites it rather than merging, so two people editing at once means
+one of them loses their paragraph and neither is told. The editor re-reads the
+current text when it opens, which shrinks the window from "since the page loaded"
+to "since Edit was pressed" — that is the difference that matters for a field
+forty-odd people now share, and it does not close it. Closing it properly means
+versioning the field and answering 409, which is more machinery than four burns a
+year justifies. The admin `PATCH` under Organise → Events is partial per field, so
+two organisers touching different fields there do not collide; this one is a single
+field, so they always do.
+
+And deleting a helping option takes every member's ticks for it with it — `attendance_helping` cascades — so a
 member can now remove something other people signed up for. That follows from the
 spreadsheet default rather than being an oversight, and it is the same trust the
 lead-roles register assumes in #27.

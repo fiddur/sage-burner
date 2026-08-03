@@ -16,9 +16,9 @@ const LAST_ADMIN = new Error('the last organiser cannot give up the role')
  * Who exists, and who holds which role.
  *
  * The list is the first thing an organiser needs after bootstrapping themselves
- * in: whether anyone else is here yet. Editing the roles is the second, because
- * `admin:create` grants `admin` alone — so without it the account every
- * installation starts with can organise a burn but not come to one.
+ * in: whether anyone else is here yet. Editing the roles is the second — it is the
+ * only way to grant `admin` to a second person, or to give someone `member`
+ * without an invite.
  */
 export const registerAdminRoutes = (app: FastifyInstance, { db }: GuardDeps) => {
   app.get('/api/admin/accounts', async (_request, reply) => {

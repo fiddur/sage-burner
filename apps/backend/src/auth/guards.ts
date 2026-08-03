@@ -50,11 +50,14 @@ export const createGuards = ({ db, sessions }: GuardDeps) => {
      * Anyone who is in — the gate for what the shared spreadsheet let everyone
      * edit.
      *
-     * `admin` counts, and has to: the bootstrapped account holds `admin` alone
-     * (redemption is what grants `member`), so a `member`-only guard would lock
-     * the person setting the first burn up out of setting it up. Neither role
-     * implies the other anywhere else, which is why this is a third guard rather
-     * than a change to `requireMember`.
+     * `admin` counts, and has to: the two roles are independent, so an account can
+     * hold `admin` without `member` — the accounts table under Organise grants
+     * either on its own, and an organiser who is not attending is coherent. A
+     * `member`-only guard would lock that person out of setting the burn up.
+     *
+     * A third guard rather than a change to `requireMember`, because neither role
+     * implies the other anywhere else and `requireMember` is what keeps a stay a
+     * member's own.
      */
     requireApproved: guard('member', 'admin'),
   }

@@ -174,8 +174,10 @@ These are member records, so treat them as such:
   grants and installation settings. Personal details stay the person's own: nobody
   edits somebody else's name, contact or allergies.
 - `requireApproved` is the guard for that default, and counts `admin` as well as
-  `member` — the bootstrapped account holds `admin` alone and is the one setting
-  the first burn up. Neither role implies the other anywhere else.
+  `member`. The roles are independent — the accounts table grants either on its
+  own, and an organiser who is not attending is coherent — so an account can hold
+  `admin` and not `member`, and a `member`-only guard would lock them out of
+  setting the burn up. Neither role implies the other anywhere else.
 - Everything under `/api/admin/` requires `admin` through one `onRequest` hook,
   with no per-route opt-out. **Opening a route means moving it out from under that
   prefix**, never exempting it there — the hook's whole value is having no
