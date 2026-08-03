@@ -31,8 +31,9 @@ export const InviteLink = ({ invite }: { invite: Invite | undefined }) => {
           // Only on success. `writeText` rejects on a denied permission or an
           // unfocused document, and `navigator.clipboard` is undefined entirely
           // on a non-secure origin. For a token shown once and never shown
-          // again (#91), a false "Copied" is how an organiser loses someone's
-          // invite; the URL above stays selectable by hand.
+          // again — only the digest is stored — a false "Copied" is how an
+          // organiser loses someone's invite; the URL above stays selectable by
+          // hand.
           navigator.clipboard?.writeText(url).then(
             () => setCopied(true),
             () => undefined,
