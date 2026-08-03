@@ -162,9 +162,9 @@ describe('notifying the admins', () => {
     await rememberSubscription(deps, member, aSubscription('https://push.example/member'))
     await rememberSubscription(deps, roleless, aSubscription('https://push.example/roleless'))
 
-    const sent = await notifyAdmins(deps, 'someone applied')
+    const counts = await notifyAdmins(deps, 'someone applied')
 
-    expect(sent).toBe(2)
+    expect(counts.sent).toBe(2)
     expect(deliver.mock.calls.map((call) => call[0].endpoint).sort()).toEqual([
       'https://push.example/laptop',
       'https://push.example/phone',
@@ -180,7 +180,7 @@ describe('notifying the admins', () => {
     const both = await givenAccount(['admin', 'member'])
     await rememberSubscription(deps, both, aSubscription('https://push.example/one'))
 
-    expect(await notifyAdmins(deps, 'x')).toBe(1)
+    expect((await notifyAdmins(deps, 'x')).sent).toBe(1)
     expect(deliver).toHaveBeenCalledTimes(1)
   })
 
@@ -196,8 +196,9 @@ describe('notifying the admins', () => {
     await rememberSubscription(deps, admin, aSubscription('https://push.example/dead'))
     await rememberSubscription(deps, admin, aSubscription('https://push.example/alive'))
 
-    expect(await notifyAdmins(deps, 'x')).toBe(1)
+    const counts = await notifyAdmins(deps, 'x')
 
+    expect(counts).toEqual({ sent: 1, gone: 1, failed: 1 })
     expect((await stored()).map((row) => row.endpoint).sort()).toEqual([
       'https://push.example/alive',
       'https://push.example/throws',
@@ -214,7 +215,7 @@ describe('notifying the admins', () => {
     await rememberSubscription(deps, admin, aSubscription('https://push.example/dead'))
     await rememberSubscription(deps, admin, aSubscription('https://push.example/alive'))
 
-    expect(await notifyAdmins(deps, 'x')).toBe(1)
+    expect((await notifyAdmins(deps, 'x')).sent).toBe(1)
 
     expect((await stored()).map((row) => row.endpoint)).toEqual(['https://push.example/alive'])
   })
@@ -226,7 +227,7 @@ describe('notifying the admins', () => {
     const admin = await givenAccount(['admin'])
     await rememberSubscription(deps, admin, aSubscription('https://push.example/flaky'))
 
-    expect(await notifyAdmins(deps, 'x')).toBe(0)
+    expect((await notifyAdmins(deps, 'x')).sent).toBe(0)
 
     expect(await stored()).toHaveLength(1)
   })
@@ -236,7 +237,7 @@ describe('notifying the admins', () => {
     const deps = await build(deliver)
     await givenAccount(['admin'])
 
-    expect(await notifyAdmins(deps, 'x')).toBe(0)
+    expect((await notifyAdmins(deps, 'x')).sent).toBe(0)
     expect(deliver).not.toHaveBeenCalled()
     // And no key: an installation nobody has opted into should not acquire one
     // because a stranger applied.

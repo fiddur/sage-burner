@@ -33,6 +33,13 @@ export type Delivery = (
   keys: VapidKeys,
 ) => Promise<'sent' | 'gone' | 'failed'>
 
+/** What happened, for a caller that wants to say so in the log. */
+export interface DeliveryCounts {
+  sent: number
+  failed: number
+  gone: number
+}
+
 export interface PushDeps {
   db: Database
   deliver: Delivery
@@ -124,13 +131,16 @@ export const forgetSubscription = async (deps: PushDeps, endpoint: string): Prom
 /**
  * Notify every admin who has opted in, on every browser they opted in from.
  *
- * Failures are swallowed by design. The one caller is the public application
- * route, and an applicant must not be told their application failed because
- * Google was slow — the application is already written by the time this runs.
- * Delivery is reported to the log and nowhere else.
+ * Failures do not reach the caller's caller. The one caller is the public
+ * application route, and an applicant must not be told their application failed
+ * because Google was slow — the application is already written by the time this
+ * runs. What comes back is a count of each outcome, for whoever wants to log it;
+ * `app.ts` does.
  */
-export const notifyAdmins = async (deps: PushDeps, payload: string): Promise<number> => {
+export const notifyAdmins = async (deps: PushDeps, payload: string): Promise<DeliveryCounts> => {
   const { db, deliver } = deps
+
+  const none = { sent: 0, failed: 0, gone: 0 }
 
   const rows = await db
     .select({
@@ -145,10 +155,10 @@ export const notifyAdmins = async (deps: PushDeps, payload: string): Promise<num
 
   // Asked for after the subscriptions, not before: an installation nobody has
   // opted into should not acquire a key as a side effect of someone applying.
-  if (rows.length === 0) return 0
+  if (rows.length === 0) return none
 
   const keys = await vapidKeysFor(deps)
-  if (keys === undefined) return 0
+  if (keys === undefined) return none
 
   // `allSettled`, so one `Delivery` that rejects cannot skip the cleanup for every
   // other row in the batch. `deliverWithWebPush` catches everything and never
@@ -165,5 +175,10 @@ export const notifyAdmins = async (deps: PushDeps, payload: string): Promise<num
     await db.delete(pushSubscription).where(inArray(pushSubscription.endpoint, gone))
   }
 
-  return results.filter((result) => result.status === 'fulfilled' && result.value === 'sent').length
+  const sent = results.filter((result) => result.status === 'fulfilled' && result.value === 'sent').length
+
+  // A rejection counts as failed rather than being dropped: `Delivery` may reject,
+  // and "nothing arrived and nothing said so" is the failure mode this whole
+  // feature is most likely to have.
+  return { sent, gone: gone.length, failed: results.length - sent - gone.length }
 }

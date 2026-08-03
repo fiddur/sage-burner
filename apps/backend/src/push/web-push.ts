@@ -1,7 +1,3 @@
-import webpush from 'web-push'
-
-import type { Delivery, VapidKeys } from './push.ts'
-
 /**
  * The one place that talks to a push service.
  *
@@ -16,6 +12,11 @@ import type { Delivery, VapidKeys } from './push.ts'
  * the hardest possible thing to notice. This is the one dependency where the
  * alternative is worse.
  */
+
+import webpush from 'web-push'
+
+import type { Delivery, VapidKeys } from './push.ts'
+
 /**
  * The `mailto:` VAPID requires, at a TLD reserved to be unresolvable.
  *

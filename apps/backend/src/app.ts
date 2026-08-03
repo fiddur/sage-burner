@@ -402,7 +402,16 @@ export const createApp = async ({
   registerApplicationRoutes(app, {
     db,
     now,
-    notify: (message) => notifyAdmins(push, JSON.stringify({ body: message })),
+    notify: async (message) => {
+      const counts = await notifyAdmins(push, JSON.stringify({ body: message }))
+
+      // Logged here rather than inside `notifyAdmins`, which has no logger and is
+      // the more testable for it. Only when something went wrong: a quiet success
+      // is the ordinary case and does not need a line per application.
+      if (counts.failed > 0 || counts.gone > 0) app.log.warn({ ...counts }, 'notifying admins')
+
+      return counts
+    },
   })
   registerApplicationReviewRoutes(app, { db, sessions, now })
   registerInviteRoutes(app, { db, sessions, now })

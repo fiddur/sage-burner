@@ -30,11 +30,15 @@ const rememberingBrowser = (over: Partial<PushBrowser> = {}) => {
     held = null
     return Promise.resolve(true)
   })
+  // Spied so a test can wait for the mount effect to have consulted it. Asserting
+  // the button's label without that passes on the initial state, before the effect
+  // has said anything.
+  const getSubscription = vi.fn(() => Promise.resolve(held === null ? null : { ...held, unsubscribe }))
 
   const browser = aBrowser({
     register: () =>
       Promise.resolve({
-        getSubscription: () => Promise.resolve(held === null ? null : { ...held, unsubscribe }),
+        getSubscription,
         subscribe: () => {
           held = aSubscription('https://push.example/mine')
           return Promise.resolve(held)
@@ -43,7 +47,7 @@ const rememberingBrowser = (over: Partial<PushBrowser> = {}) => {
     ...over,
   })
 
-  return { browser, unsubscribe }
+  return { browser, unsubscribe, getSubscription }
 }
 
 const aBrowser = (over: Partial<PushBrowser> = {}): PushBrowser => ({
@@ -265,16 +269,24 @@ describe('PushToggle', () => {
   it('can be turned back on after being turned off', async () => {
     // The consequence of the bug above, from the outside: the state the page
     // derives on mount has to agree with what the server was told.
-    const { browser } = rememberingBrowser()
+    const { browser, getSubscription } = rememberingBrowser()
     const subscribeToPush = vi.fn<PushApi['subscribeToPush']>(() => Promise.resolve(undefined))
-    const { rerender } = render(<PushToggle api={stub({ subscribeToPush })} browser={browser} />)
+    render(<PushToggle api={stub({ subscribeToPush })} browser={browser} />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Stop notifying me here' }))
     expect(await screen.findByRole('button', { name: 'Notify me here' })).toBeTruthy()
 
-    // A reload: a fresh mount against the same browser must agree it is off.
-    rerender(<PushToggle api={stub({ subscribeToPush })} browser={browser} />)
-    expect(await screen.findByRole('button', { name: 'Notify me here' })).toBeTruthy()
+    // A reload, which is a fresh mount: `rerender` keeps the instance and its
+    // state, so the effect would not re-run and this would assert nothing.
+    cleanup()
+    const before = getSubscription.mock.calls.length
+    render(<PushToggle api={stub({ subscribeToPush })} browser={browser} />)
+
+    // Waited for, not assumed: the effect settles asynchronously, and the initial
+    // state is 'off' — so checking the label first passes whether or not the
+    // subscription was released.
+    await waitFor(() => expect(getSubscription.mock.calls.length).toBeGreaterThan(before))
+    expect(screen.getByRole('button', { name: 'Notify me here' })).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Notify me here' }))
     await waitFor(() => expect(subscribeToPush).toHaveBeenCalled())
