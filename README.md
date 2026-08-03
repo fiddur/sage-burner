@@ -1282,17 +1282,23 @@ no email.
 
 **A lost link cannot be re-sent, but the person is not stuck.** Re-approving
 matches nothing on `status = 'pending'` and answers `409`, and
-`invite_token_application_idx` refuses a second invite for the same application
-— so _that_ invite is gone for good. What an organiser does instead is mint a
-direct one with `POST /api/admin/invites` and send that; the applicant gets in
-without anyone touching the database.
+`invite_token_application_idx` refuses a second invite for the same application —
+so that application will never have another. What an organiser does instead is
+mint a direct one with `POST /api/admin/invites` and send that; the applicant gets
+in without anyone touching the database.
 
-What is genuinely unrecoverable is the **link between the member row and their
-application**: the direct invite carries no `application_id`, so the answers they
-wrote stay orphaned from the account they end up with. That is still the reason
-for the `409` — it is just a narrower reason than "there is no way back", which
-is what this paragraph used to say. #91 would restore the link by re-issuing
-against the same application; it is a convenience now rather than the only route.
+Two things that costs, both worth knowing before recommending it:
+
+- **The original link stays live.** It is the token that is lost, not the row: the
+  invite remains `outstanding` until it expires, and `DELETE /api/admin/invites/:id`
+  refuses it precisely because it belongs to an application. So if the lost link
+  turns up later, redeeming it produces a _second_, unrelated account for the same
+  person. Waiting for the expiry is the only thing that closes it today, and #137
+  is the decision about which way to close it properly.
+- **The answers stay orphaned.** A direct invite carries no `application_id`, so
+  what they wrote is not tied to the account they end up with. #91 would restore
+  that tie by re-issuing against the same application, which is a convenience now
+  rather than the only route back.
 
 The copy button is deliberately silent on failure rather than claiming a copy
 that did not happen.

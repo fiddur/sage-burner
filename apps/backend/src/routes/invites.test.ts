@@ -273,9 +273,12 @@ describe('revoking an invite', () => {
     expect(await db().select().from(inviteToken)).toHaveLength(1)
   })
 
-  it('refuses to revoke an application invite, which would strand the approval', async () => {
-    // Approved with no invite cannot be recovered through the API — re-approving
-    // matches nothing on `status = 'pending'`. #91 owns the re-issue path.
+  it('refuses to revoke an application invite, which is the only one it will have', async () => {
+    // Deleting it leaves that application with nothing to redeem: re-approving
+    // matches nothing on `status = 'pending'`, and the unique index refuses a
+    // second invite for the same application. A direct invite still gets the
+    // person in; the tie back to what they wrote is what is lost, and #91 owns
+    // re-issuing against the application itself.
     const server = await build()
     const { id: adminId, cookie } = await givenAdmin()
     const applicationId = randomUUID()
