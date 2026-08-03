@@ -258,6 +258,21 @@ describe('Invite', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('fresh link')
   })
 
+  it('says to wait rather than to check the connection when the server is at capacity', async () => {
+    // A 429 is the server bounding how much password hashing it runs at once.
+    // Nothing is wrong with their connection, and waiting a moment does work —
+    // which is the opposite of what the generic message tells them to do.
+    renderPage(stub({ redeemInvite: () => Promise.reject(apiError(429, 'rate_limited', 'nope')) }))
+
+    await screen.findByRole('button', { name: 'Join' })
+    complete()
+    join()
+
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain('Wait a few seconds')
+    expect(alert.textContent).not.toContain('connection')
+  })
+
   it('says a transport failure is worth retrying, unlike a conflict', async () => {
     renderPage(stub({ redeemInvite: () => Promise.reject(new TypeError('Failed to fetch')) }))
 

@@ -9,6 +9,7 @@ import type { DbHandle } from '../db/index.ts'
 
 import { createApp } from '../app.ts'
 import { createGate } from '../auth/gate.ts'
+import { verifyPassword } from '../auth/password.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, attendance, inviteToken } from '../db/schema.ts'
@@ -311,15 +312,18 @@ describe('redeeming', () => {
   })
 
   it('hashes for real when nothing is injected', async () => {
-    // The seam above is only honest if the default is the actual scrypt. A stored
-    // hash that verifies is what says so.
+    // The seam above is only honest if the default is the actual scrypt, so this
+    // verifies the stored hash against the password that was sent rather than
+    // reading its shape. The negative case matters as much: a hash that accepts
+    // anything would pass a prefix check just as well.
     const server = await build()
     const token = await givenInvite()
 
     expect((await redeem(server, token)).statusCode).toBe(201)
 
     const [row] = await db().select().from(account).where(eq(account.email, 'fredrik@example.org'))
-    expect(row?.password_hash).toMatch(/^\$scrypt\$n=/)
+    expect(await verifyPassword(applicant.password, row?.password_hash ?? null)).toBe(true)
+    expect(await verifyPassword('not the passphrase', row?.password_hash ?? null)).toBe(false)
   })
 
   it('sheds rather than queueing unbounded scrypt for one replayed invite', async () => {

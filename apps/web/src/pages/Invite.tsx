@@ -13,6 +13,31 @@ export type InviteApi = Pick<ApiClient, 'getInviteState' | 'redeemInvite'>
 type Loaded = { status: 'loading' } | { status: 'ready'; state: InviteState } | { status: 'failed' }
 
 /**
+ * The three failures redeeming can produce, each wanting different behaviour.
+ *
+ * A 409 means the invite went while this page was open, or the email is already
+ * an account. Either way the answer is not "try again": the same request fails
+ * the same way.
+ *
+ * A 429 is the opposite — the server is spending all the password hashing it
+ * will run at once, and waiting a moment is exactly the right advice. The
+ * generic line below tells them to check a connection that is fine.
+ *
+ * The near-duplicate 429 copy here and in `Login.tsx` is intentional rather than
+ * drift: this page can say "signing up" where that one says "sign-in attempts".
+ * If one is edited, decide about the other rather than assuming they must match.
+ */
+const messageForFailure = (failure: unknown): string => {
+  if (!isApiError(failure)) return 'Could not finish signing you up. Please try again.'
+  if (failure.status === 409) {
+    return 'That invite has already been used, or there is already an account with that email. Ask someone with admin for a fresh link.'
+  }
+  if (failure.status === 429) return 'Too many sign-ups just now. Wait a few seconds and try again.'
+
+  return 'Could not finish signing you up. Please check your connection and try again.'
+}
+
+/**
  * Spending an invitation: the page where someone becomes a member.
  *
  * The controls are `aria-required` rather than natively `required`, and carry no
@@ -78,14 +103,7 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
       if (signedIn !== null) setViewer({ id: signedIn.account_id, roles: signedIn.roles })
       setDone(true)
     } catch (failure) {
-      // A 409 means the invite went while this page was open, or the email is
-      // already an account. Either way the answer is not "try again" — the same
-      // request fails the same way.
-      setError(
-        isApiError(failure) && failure.status === 409
-          ? 'That invite has already been used, or there is already an account with that email. Ask someone with admin for a fresh link.'
-          : 'Could not finish signing you up. Please check your connection and try again.',
-      )
+      setError(messageForFailure(failure))
     } finally {
       setSending(false)
     }
