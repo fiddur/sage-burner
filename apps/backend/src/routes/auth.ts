@@ -189,12 +189,7 @@ export interface AuthRouteDeps {
   db: Database
   config: Config
   sessions: Sessions
-  /**
-   * The scrypt gate, shared with redemption.
-   *
-   * One gate rather than one each: the bound exists to protect libuv's four
-   * threads, and two gates of two slots would spend all four between them.
-   */
+  /** The scrypt gate, shared with redemption. See `SCRYPT_GATE`. */
   gate: Gate
 }
 

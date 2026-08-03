@@ -507,11 +507,15 @@ lockout and no backoff, and the gate does not provide one — it bounds concurre
 work, which is a different thing. Two slots at ~230ms is roughly 8–9 tries a
 second, about 750,000 a day, sustained indefinitely against one address.
 
-**So configure the proxy.** Something that counts requests per client IP against
-`/api/auth/login` — `mod_evasive`, `mod_qos`, or fail2ban watching the access
-log — sized well below that figure. A few attempts a minute is generous for a
-membership of 42 and leaves an attacker nowhere to go. This matters from the
-moment the first account exists, which is the setup step below.
+**So configure the proxy**, and for **both** paths that spend a hash:
+`POST /api/auth/login` and `POST /api/invites/:token/redeem`. Something that counts
+requests per client IP — `mod_evasive`, `mod_qos`, or fail2ban watching the access
+log — sized well below that figure. A rule scoped to login alone leaves half the
+gate's callers unthrottled, and redemption is the worse half: its `409` for an
+address that already has an account never spends the invite, so one held link
+drives it indefinitely. A few attempts a minute is generous for a membership of 42
+and leaves an attacker nowhere to go. This matters from the moment the first
+account exists, which is the setup step below.
 
 `SESSION_SECRET` is required in production and the app refuses to start without
 it. Generating one at boot instead would look like it works and log every member

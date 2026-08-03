@@ -285,6 +285,7 @@ describe('redeeming', () => {
     const used = await redeem(server, spent)
 
     expect(unknown.statusCode).toBe(409)
+    expect(used.statusCode).toBe(unknown.statusCode)
     expect(unknown.json()).toEqual(used.json())
   })
 

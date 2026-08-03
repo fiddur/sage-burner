@@ -81,16 +81,10 @@ export interface Gate {
    */
   enter: () => Promise<Admission>
   /**
-   * How long to tell a shed caller to wait, by why they were shed.
+   * How long to tell a shed caller to wait, per the `Refusal` it was given.
    *
-   * `queue-full` was refused synchronously and waited for nothing, and the work
-   * in flight clears shortly, so a second is about right. `timed-out` held on for
-   * the whole window against a gate that stayed saturated — sending that caller
-   * straight back turns a client politely honouring `Retry-After` into a hot
-   * retry loop, adding churn under exactly the flood this exists to damp.
-   *
-   * On the gate rather than beside it, so the number is the window this gate was
-   * actually built with: writing `'5'` out again would go quietly wrong the day
+   * On the gate rather than beside it so the number is the window this gate was
+   * built with: writing `'5'` out at a route would go quietly wrong the day
    * `timeoutMs` moved.
    */
   retryAfter: (reason: Refusal) => string
