@@ -201,10 +201,11 @@ describe('applicationCreateSchema', () => {
   })
 
   it('accepts a form that showed a question nobody answered', () => {
-    // The case the whole field exists for: shown, left blank, and still recorded
-    // as asked.
-    const shown = { ...aSubmission, answers: {}, asked: [OTHER_ID] }
-    expect(applicationCreateSchema.safeParse(shown).success).toBe(true)
+    // The passing sibling to the case above: `asked` is required, and an empty
+    // `answers` beside a non-empty one is still a valid body. Nothing here
+    // relates the two — no schema rule could — so that a question shown and left
+    // blank is *stored* as asked is `applications.test.ts`'s to prove.
+    expect(applicationCreateSchema.safeParse({ ...aSubmission, answers: {} }).success).toBe(true)
   })
 
   it('rejects answers keyed by something that is not a question id', () => {

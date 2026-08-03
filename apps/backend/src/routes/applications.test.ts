@@ -71,8 +71,7 @@ const givenQuestion = async (over: Partial<FormQuestion> & Pick<FormQuestion, 't
  *
  * The field is required by the schema, and spelling it out in every test that is
  * not about it would bury the thing each one is asserting. Tests that care pass
- * it explicitly; `askedNothing` is the shorthand for a form that showed a
- * question and got no answer.
+ * it explicitly.
  */
 const submit = (server: FastifyInstance, payload: Record<string, unknown>): Promise<LightMyRequestResponse> =>
   server.inject({
