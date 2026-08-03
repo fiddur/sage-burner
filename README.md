@@ -618,8 +618,15 @@ a `member`-only guard would lock the person setting the first burn up out of
 setting it up. That is `requireApproved` in `auth/guards.ts`; neither role implies
 the other anywhere else.
 
-Personal details stay the person's own. A member reads the roster and writes only
-their own stay.
+Personal details stay the person's own: nobody edits somebody else's name, contact
+or allergies.
+
+**The roster is still admin-only**, and that is the code rather than the intent. It
+is served from `/api/admin/events/:eventId/roster`, it carries contact details,
+allergies and payment state, and a member cannot read it — which is a gap, since
+whoever cooks needs the allergies. Opening the read while keeping the write to a
+person's own stay is #159; this section describes what the guards do today, not what
+was decided for later.
 
 One consequence worth knowing rather than discovering: deleting a helping option
 takes every member's ticks for it with it — `attendance_helping` cascades — so a

@@ -118,7 +118,15 @@ export const Home = ({ api }: { api: HomeApi }) => {
                 <button
                   type="button"
                   class="link-button"
-                  onClick={() => setEditing(openEvent.welcome_markdown)}
+                  onClick={() => {
+                    // Cleared here rather than on cancel, which would be the
+                    // same thing said twice: a message from a save that failed
+                    // earlier would otherwise reappear as the editor reopens, and
+                    // `FormError` takes focus when it mounts — so a stale one
+                    // would steal the caret as well as mislead.
+                    setError(undefined)
+                    setEditing(openEvent.welcome_markdown)
+                  }}
                 >
                   Edit this text
                 </button>

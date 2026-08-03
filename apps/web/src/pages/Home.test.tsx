@@ -230,6 +230,25 @@ describe('Home', () => {
       expect(screen.getByLabelText<HTMLTextAreaElement>('Welcome text').value).toBe('Nope')
     })
 
+    it('does not show a stale save error when the editor is reopened', async () => {
+      // `useFormError` lives on the page, so an error survives the editor closing —
+      // and `FormError` takes focus when it mounts, so a stale one would steal the
+      // caret as well as mislead.
+      const updateWelcome = vi.fn<HomeApi['updateWelcome']>(() =>
+        Promise.reject(apiError(403, 'forbidden', 'You do not have access to that.')),
+      )
+      renderHome(summer, asRoles(['member']), updateWelcome)
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit this text' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+      expect((await screen.findByRole('alert')).textContent).toContain('do not have access')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit this text' }))
+
+      expect(screen.queryByRole('alert')).toBeNull()
+    })
+
     it('puts the text back on cancel, without asking the API', async () => {
       const updateWelcome = vi.fn<HomeApi['updateWelcome']>(notStubbed)
       renderHome(summer, asRoles(['member']), updateWelcome)
