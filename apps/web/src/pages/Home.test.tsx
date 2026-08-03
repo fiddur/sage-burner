@@ -253,6 +253,29 @@ describe('Home', () => {
       )
     })
 
+    it('refuses to open when the burn has ended since the page loaded', async () => {
+      // Opening would write to a burn nobody is looking at any more, and the save
+      // would then put it back on screen as though it were still open.
+      const getActiveEvent = vi
+        .fn<HomeApi['getActiveEvent']>()
+        .mockResolvedValueOnce({ event: summer })
+        .mockResolvedValue({ event: null })
+      const updateWelcome = vi.fn<HomeApi['updateWelcome']>(notStubbed)
+      render(
+        <ViewerProvider viewer={asRoles(['member'])}>
+          <Home api={{ getActiveEvent, updateWelcome }} />
+        </ViewerProvider>,
+      )
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit this text' }))
+
+      // The section disappearing is the feedback; there is no editor to put a
+      // message beside, and nothing left on the page to edit.
+      expect(await screen.findByText(/no burn scheduled/)).toBeTruthy()
+      expect(screen.queryByLabelText('Welcome text')).toBeNull()
+      expect(updateWelcome).not.toHaveBeenCalled()
+    })
+
     it('opens on what is on screen when the re-read fails', async () => {
       // Refusing to open the editor because the network hiccuped would be worse
       // than opening it on a slightly stale draft.
@@ -289,6 +312,10 @@ describe('Home', () => {
 
       fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
       fireEvent.click(await screen.findByRole('button', { name: 'Edit this text' }))
+      // Waited for: `openEditor` suspends on the re-read, so without this the form
+      // is not mounted yet and `queryByRole` is null because of the Cancel rather
+      // than because the error was cleared.
+      await screen.findByLabelText('Welcome text')
 
       expect(screen.queryByRole('alert')).toBeNull()
     })

@@ -73,8 +73,19 @@ export const Home = ({ api }: { api: HomeApi }) => {
     setError(undefined)
     try {
       const { event } = await api.getActiveEvent()
-      setEditing(event?.welcome_markdown ?? fallback)
-      if (event !== null) setActive({ status: 'ready', event })
+
+      // No active burn means the last one ended while this page sat open. Opening
+      // the editor would write to a burn nobody is looking at any more — and the
+      // save would put it back on screen as though it were still open. The page
+      // falls into its no-burn state instead, which is the whole section
+      // disappearing and so is its own explanation.
+      if (event === null) {
+        setActive({ status: 'ready', event: null })
+        return
+      }
+
+      setActive({ status: 'ready', event })
+      setEditing(event.welcome_markdown)
     } catch {
       setEditing(fallback)
     }

@@ -34,9 +34,10 @@ type definitions. All layers import from it — never duplicate a schema.
 
 - Backend imports the **schemas** (runtime validation at the HTTP boundary).
 - Web imports **no Zod**. Types always; runtime values only from modules that do
-  not pull Zod in — today `enums.ts` (the vocabularies and `tickBoxRequired`) and
-  `answers.ts` (`answerProblems`, `isTickBox`, the `MAX_*` limits), which imports
-  `enums.ts` and otherwise only types. Nothing under `schemas/`.
+  not pull Zod in — today `enums.ts` (the vocabularies and `tickBoxRequired`),
+  `answers.ts` (`answerProblems`, `isTickBox`, the application form's `MAX_*`
+  limits), and `limits.ts` (bounds the schemas and the forms share). Nothing under
+  `schemas/`.
 - Field names are `snake_case` everywhere: schemas, REST API, DB columns, JSON
   keys, frontend types.
 
