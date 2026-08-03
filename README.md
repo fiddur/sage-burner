@@ -1224,6 +1224,17 @@ An answer naming a question outside `asked` is a **400** rather than a dropped
 key: the body disagrees with itself, and silently discarding it would lose what
 somebody typed.
 
+The other direction is a **201**. An id in `asked` that the server no longer has
+is a question deleted while the form was open, which is the honest reason for the
+two lists to differ — and there is nothing to store for it, since the wording
+comes from the question row and the row is gone.
+
+What this does _not_ claim: a crafted body can omit an optional question it was
+shown and left blank, so it records as never-asked rather than as `false` or
+`""`. Understating your own application is not an attack worth defending against,
+and the direction that matters is closed — nothing can be recorded as answered
+that the body does not claim was asked.
+
 **What makes a submission valid** lives in `answerProblems`, in
 `packages/shared`, and both sides use it: the server refuses on it, and the form
 marks its fields with it. Written twice they drift, and the drift is a form that

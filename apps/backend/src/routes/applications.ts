@@ -19,10 +19,18 @@ export interface ApplicationRouteDeps {
  * Applying to join — the one write in this app open to the public, since an
  * applicant has no account yet.
  *
- * Everything in the body is attacker-controlled, so the submitter names only
- * their answers: `.strict()` turns an attempt at `status` or `id` into a 400
- * rather than a silently dropped key, and the labels stored beside each answer
- * come from the question rows, so nobody can record a question that was never
+ * Everything in the body is attacker-controlled. `.strict()` turns an attempt at
+ * `status` or `id` into a 400 rather than a silently dropped key, and the labels
+ * stored beside each answer come from the question rows, so nobody can record a
+ * question in wording they chose.
+ *
+ * The submitter does name which questions they were shown, and that list decides
+ * what gets an entry — so the guarantee is narrower than "nobody can record a
+ * question that was never asked". A crafted body can *omit* an optional question
+ * it was shown and left blank, which then stores as never-asked rather than as
+ * `false` or `""`. Understating your own application is not an attack worth
+ * defending against. The other direction is closed: an answer outside `asked` is
+ * a 400, so nothing can be recorded as answered that the body does not claim was
  * asked.
  *
  * Not rate-limited here, consistent with login: throttling lives in the reverse
@@ -56,6 +64,11 @@ export const registerApplicationRoutes = (
       return reply.code(400).send(errorResponse('bad_request'))
     }
 
+    // A question in `asked` that is no longer in `questions` — deleted while the
+    // form was open — is dropped here rather than refused. It is the honest case
+    // for the two lists disagreeing this way, and there is nothing to store: the
+    // wording comes from the row, and the row is gone.
+    //
     // One entry per question *asked*, answered or not, so a reviewer can tell
     // "said no" from "was never asked" — which is why the form sends what it
     // showed rather than this trusting the current list. A question added while
