@@ -121,6 +121,13 @@ export const registerRedemptionRoutes = (
     // The stamp is conditional on `used_at IS NULL` and requires one affected row,
     // so two concurrent redemptions of one token cannot both proceed: the loser's
     // UPDATE matches nothing and the whole transaction rolls back.
+    //
+    // `expires_at` is deliberately not re-checked here. The window between the
+    // `outstanding` check above and this write is a queue wait plus a hash — up to
+    // ~5.2s with `SCRYPT_GATE`, against an invite whose life is measured in days —
+    // so an expiry that falls inside it lets the redemption through. Re-checking
+    // would refuse someone whose link was live when they pressed the button, which
+    // is the worse answer.
     // The pre-check above is not enough on its own: two requests can both pass it
     // before either writes. The UNIQUE is the authority, and losing to it is a
     // conflict rather than an internal error — the same distinction `events.ts`
