@@ -9,10 +9,12 @@ import { existsSync, statSync } from 'node:fs'
 import path from 'node:path'
 
 import type { Gate } from './auth/gate.ts'
+import type { GuardDeps } from './auth/guards.ts'
 import type { Config } from './config.ts'
 import type { Database } from './db/index.ts'
 
 import { createGate, SCRYPT_GATE } from './auth/gate.ts'
+import { createGuards } from './auth/guards.ts'
 import { createSessions } from './auth/session.ts'
 import { clientErrorHandler, frameworkErrorHandler, registerErrorHandler } from './errors.ts'
 import { registerAdminRoutes } from './routes/admin.ts'
@@ -251,6 +253,45 @@ const sessionDeps = (config: Config) => ({
   ttlSeconds: config.session_ttl_seconds,
 })
 
+const ADMIN_PREFIX = '/api/admin'
+
+/**
+ * Everything under `/api/admin` requires the role, whether or not its route
+ * asked for it.
+ *
+ * A per-route `preHandler` is one line a new route has to remember, and
+ * forgetting it ships that route world-readable: nothing type-checks it,
+ * nothing fails, and the tests written beside it pass. The hook makes the
+ * guard a property of the path instead of a property of the author.
+ *
+ * The bare prefix is matched as well as the prefixed segment. An admin index at
+ * exactly `/api/admin` is the obvious route to add next, and `startsWith` on
+ * `/api/admin/` alone would have let it in unauthenticated — the very failure
+ * this closes everywhere else.
+ *
+ * Keyed on the matched route's own pattern rather than the raw URL, so it cannot
+ * be stepped around with encoding. For an unmatched path the hook still runs —
+ * the not-found handler inherits this instance's `onRequest` chain — but
+ * `routeOptions.url` is `undefined` there, so there is no pattern to match and
+ * nothing to guard.
+ *
+ * A Fastify plugin scope would be the more idiomatic seam and is weaker here: it
+ * covers what is registered on it, so a future route declared on the root
+ * instance with an `/api/admin` path would slip past. The prefix is what the
+ * paths already agree on.
+ */
+const registerAdminPrefixGuard = (app: FastifyInstance, deps: GuardDeps) => {
+  const { requireAdmin } = createGuards(deps)
+
+  app.addHook('onRequest', async (request, reply) => {
+    const pattern = request.routeOptions.url
+    if (pattern === undefined) return undefined
+    if (pattern !== ADMIN_PREFIX && !pattern.startsWith(`${ADMIN_PREFIX}/`)) return undefined
+
+    return requireAdmin(request, reply)
+  })
+}
+
 /**
  * Build the application.
  *
@@ -327,6 +368,8 @@ export const createApp = async ({
   // One gate for every route that spends scrypt, and per-app rather than
   // module-level so two apps in one test process do not share one.
   const gate = suppliedGate ?? createGate(SCRYPT_GATE)
+
+  registerAdminPrefixGuard(app, { db, sessions })
 
   registerAuthRoutes(app, { db, config, sessions, gate })
   registerAdminRoutes(app, { db, sessions })

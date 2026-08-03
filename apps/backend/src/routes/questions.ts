@@ -15,7 +15,6 @@ import { randomUUID } from 'node:crypto'
 import type { GuardDeps } from '../auth/guards.ts'
 import type { Database } from '../db/index.ts'
 
-import { createGuards } from '../auth/guards.ts'
 import { formQuestion } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 
@@ -76,9 +75,7 @@ const tickBoxCondition = ({ type, required }: { type?: string; required?: boolea
 export const questionsFor = (db: Database): Promise<FormQuestion[]> =>
   db.select().from(formQuestion).orderBy(asc(formQuestion.order), asc(formQuestion.id))
 
-export const registerQuestionRoutes = (app: FastifyInstance, { db, sessions }: GuardDeps) => {
-  const { requireAdmin } = createGuards({ db, sessions })
-
+export const registerQuestionRoutes = (app: FastifyInstance, { db }: GuardDeps) => {
   app.get('/api/questions', async (_request, reply) => {
     // Same reasoning as the active event: public, but an edit has to show up
     // without waiting out a heuristic freshness window.
@@ -87,7 +84,7 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db, sessions }: G
     return { questions: await questionsFor(db) } satisfies FormQuestionsResponse
   })
 
-  app.post('/api/admin/questions', { preHandler: requireAdmin }, async (request, reply) => {
+  app.post('/api/admin/questions', async (request, reply) => {
     void noStore(reply)
 
     const parsed = formQuestionCreateSchema.safeParse(request.body)
@@ -122,109 +119,101 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db, sessions }: G
     return reply.code(201).send({ question: row } satisfies FormQuestionResponse)
   })
 
-  app.patch<{ Params: { id: string } }>(
-    '/api/admin/questions/:id',
-    { preHandler: requireAdmin },
-    async (request, reply) => {
-      void noStore(reply)
+  app.patch<{ Params: { id: string } }>('/api/admin/questions/:id', async (request, reply) => {
+    void noStore(reply)
 
-      const parsed = formQuestionUpdateSchema.safeParse(request.body)
-      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+    const parsed = formQuestionUpdateSchema.safeParse(request.body)
+    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
 
-      // The only body that never reaches the `UPDATE`, and so the only one that
-      // needs a read of its own. An unrecognised key is a 400 from `.strict()`
-      // above, so `{}` is all that is left that changes nothing — and `set({})` is
-      // not valid SQL. A no-op PATCH is idempotent; returning the row unchanged is
-      // the honest answer.
-      //
-      // The read lives inside this branch rather than above it, for the reason
-      // `events.ts` gives: once `.returning()` supplies the response row and the
-      // re-read below answers a vanished one, an unconditional pre-read only spends
-      // a third query to produce a 404 the write path produces anyway — and leaves
-      // the handler holding a pre-write snapshot to be tempted by.
-      if (Object.keys(parsed.data).length === 0) {
-        const [existing] = await db
-          .select()
-          .from(formQuestion)
-          .where(eq(formQuestion.id, request.params.id))
-          .limit(1)
-
-        return existing === undefined
-          ? reply.code(404).send(errorResponse('not_found'))
-          : ({ question: existing } satisfies FormQuestionResponse)
-      }
-
-      // No merged-row check in JS. A PATCH can break the tick-box rule with a
-      // single field from either direction, and the schema cannot decide a lone key
-      // — but a read-then-check here is a race (see `tickBoxCondition`), and a JS
-      // fail-fast would also pre-empt the statement in every non-racing case, so
-      // nothing would exercise the condition that does the real work.
-      const where = and(eq(formQuestion.id, request.params.id), tickBoxCondition(parsed.data))
-      if (where === undefined) throw new Error('refusing an unfiltered UPDATE on form_question')
-
-      // `.returning()` rather than reading `changes`, for the reasons `events.ts`
-      // gives: the row it hands back is the row as written, so the response cannot
-      // report a field from the pre-read snapshot that another write has since
-      // changed — two admins patching the same question, one sending `help_text`
-      // and one `label`, would otherwise each be told their own change landed and
-      // the other's did not.
-      const updated = await db.update(formQuestion).set(parsed.data).where(where).returning()
-
-      const [row] = updated
-      if (row === undefined) {
-        // Nothing is read before the write on this path — the only `select` above
-        // is inside the empty-body branch, which returns — so zero rows has three
-        // causes, not two: the id never existed, the row was deleted a moment ago,
-        // or the tick-box condition refused the change. The first two are the same
-        // answer and the same question to ask.
-        //
-        // Told apart by asking rather than guessed at from whether a condition was
-        // present: guessing answered "Request failed (400)" for a question that is
-        // not there.
-        const [stillThere] = await db
-          .select({ id: formQuestion.id })
-          .from(formQuestion)
-          .where(eq(formQuestion.id, request.params.id))
-          .limit(1)
-
-        return stillThere === undefined
-          ? reply.code(404).send(errorResponse('not_found'))
-          : reply.code(400).send(errorResponse('bad_request'))
-      }
-
-      return { question: row } satisfies FormQuestionResponse
-    },
-  )
-
-  app.delete<{ Params: { id: string } }>(
-    '/api/admin/questions/:id',
-    { preHandler: requireAdmin },
-    async (request, reply) => {
-      void noStore(reply)
-
-      // A hard delete, and safe to keep as one: `application.answers` stores each
-      // question's wording beside the answer rather than a bare reference, so a
-      // submitted application stays fully readable after the question it answered
-      // is gone. That is also why editing a question does not rewrite history —
-      // past applicants keep the wording they were actually shown.
-      //
-      // One statement: `.returning()` gives the 404 from the write itself, and
-      // closes the window where the row disappears between a read and the delete.
-      const deleted = await db
-        .delete(formQuestion)
+    // The only body that never reaches the `UPDATE`, and so the only one that
+    // needs a read of its own. An unrecognised key is a 400 from `.strict()`
+    // above, so `{}` is all that is left that changes nothing — and `set({})` is
+    // not valid SQL. A no-op PATCH is idempotent; returning the row unchanged is
+    // the honest answer.
+    //
+    // The read lives inside this branch rather than above it, for the reason
+    // `events.ts` gives: once `.returning()` supplies the response row and the
+    // re-read below answers a vanished one, an unconditional pre-read only spends
+    // a third query to produce a 404 the write path produces anyway — and leaves
+    // the handler holding a pre-write snapshot to be tempted by.
+    if (Object.keys(parsed.data).length === 0) {
+      const [existing] = await db
+        .select()
+        .from(formQuestion)
         .where(eq(formQuestion.id, request.params.id))
-        .returning({ id: formQuestion.id })
+        .limit(1)
 
-      if (deleted.length === 0) return reply.code(404).send(errorResponse('not_found'))
+      return existing === undefined
+        ? reply.code(404).send(errorResponse('not_found'))
+        : ({ question: existing } satisfies FormQuestionResponse)
+    }
 
-      // Deliberately does not renumber the survivors. `order` only has to sort,
-      // not be contiguous, and renumbering here would fight a concurrent
-      // reorder for no visible gain.
-      return reply.code(204).send()
-    },
-  )
+    // No merged-row check in JS. A PATCH can break the tick-box rule with a
+    // single field from either direction, and the schema cannot decide a lone key
+    // — but a read-then-check here is a race (see `tickBoxCondition`), and a JS
+    // fail-fast would also pre-empt the statement in every non-racing case, so
+    // nothing would exercise the condition that does the real work.
+    const where = and(eq(formQuestion.id, request.params.id), tickBoxCondition(parsed.data))
+    if (where === undefined) throw new Error('refusing an unfiltered UPDATE on form_question')
 
-  app.put('/api/admin/questions/order', { preHandler: requireAdmin }, async (request, reply) => {
+    // `.returning()` rather than reading `changes`, for the reasons `events.ts`
+    // gives: the row it hands back is the row as written, so the response cannot
+    // report a field from the pre-read snapshot that another write has since
+    // changed — two admins patching the same question, one sending `help_text`
+    // and one `label`, would otherwise each be told their own change landed and
+    // the other's did not.
+    const updated = await db.update(formQuestion).set(parsed.data).where(where).returning()
+
+    const [row] = updated
+    if (row === undefined) {
+      // Nothing is read before the write on this path — the only `select` above
+      // is inside the empty-body branch, which returns — so zero rows has three
+      // causes, not two: the id never existed, the row was deleted a moment ago,
+      // or the tick-box condition refused the change. The first two are the same
+      // answer and the same question to ask.
+      //
+      // Told apart by asking rather than guessed at from whether a condition was
+      // present: guessing answered "Request failed (400)" for a question that is
+      // not there.
+      const [stillThere] = await db
+        .select({ id: formQuestion.id })
+        .from(formQuestion)
+        .where(eq(formQuestion.id, request.params.id))
+        .limit(1)
+
+      return stillThere === undefined
+        ? reply.code(404).send(errorResponse('not_found'))
+        : reply.code(400).send(errorResponse('bad_request'))
+    }
+
+    return { question: row } satisfies FormQuestionResponse
+  })
+
+  app.delete<{ Params: { id: string } }>('/api/admin/questions/:id', async (request, reply) => {
+    void noStore(reply)
+
+    // A hard delete, and safe to keep as one: `application.answers` stores each
+    // question's wording beside the answer rather than a bare reference, so a
+    // submitted application stays fully readable after the question it answered
+    // is gone. That is also why editing a question does not rewrite history —
+    // past applicants keep the wording they were actually shown.
+    //
+    // One statement: `.returning()` gives the 404 from the write itself, and
+    // closes the window where the row disappears between a read and the delete.
+    const deleted = await db
+      .delete(formQuestion)
+      .where(eq(formQuestion.id, request.params.id))
+      .returning({ id: formQuestion.id })
+
+    if (deleted.length === 0) return reply.code(404).send(errorResponse('not_found'))
+
+    // Deliberately does not renumber the survivors. `order` only has to sort,
+    // not be contiguous, and renumbering here would fight a concurrent
+    // reorder for no visible gain.
+    return reply.code(204).send()
+  })
+
+  app.put('/api/admin/questions/order', async (request, reply) => {
     void noStore(reply)
 
     const parsed = formQuestionOrderSchema.safeParse(request.body)

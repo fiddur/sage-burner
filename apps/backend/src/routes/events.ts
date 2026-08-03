@@ -8,7 +8,6 @@ import { randomUUID } from 'node:crypto'
 import type { GuardDeps } from '../auth/guards.ts'
 import type { Database } from '../db/index.ts'
 
-import { createGuards } from '../auth/guards.ts'
 import { isCheckViolation } from '../db/errors.ts'
 import { event } from '../db/schema.ts'
 import { noStore } from '../http.ts'
@@ -57,12 +56,7 @@ export const activeEvent = async (db: Database, today: string): Promise<Event | 
 const isSlugConflict = (error: unknown) =>
   error instanceof Error && /UNIQUE constraint failed: event\.slug/i.test(error.message)
 
-export const registerEventRoutes = (
-  app: FastifyInstance,
-  { db, sessions, now = () => new Date() }: EventRouteDeps,
-) => {
-  const { requireAdmin } = createGuards({ db, sessions })
-
+export const registerEventRoutes = (app: FastifyInstance, { db, now = () => new Date() }: EventRouteDeps) => {
   app.get('/api/events/active', async (_request, reply) => {
     // `no-cache`, not `no-store`. This is public content, so there is no reason
     // to forbid storing it — but #13 requires an edit to show up without a
@@ -79,7 +73,7 @@ export const registerEventRoutes = (
     return { event: found ?? null } satisfies ActiveEventResponse
   })
 
-  app.get('/api/admin/events', { preHandler: requireAdmin }, async (_request, reply) => {
+  app.get('/api/admin/events', async (_request, reply) => {
     void noStore(reply)
 
     const events = await db.select().from(event).orderBy(asc(event.start_date))
@@ -87,7 +81,7 @@ export const registerEventRoutes = (
     return { events } satisfies EventsResponse
   })
 
-  app.post('/api/admin/events', { preHandler: requireAdmin }, async (request, reply) => {
+  app.post('/api/admin/events', async (request, reply) => {
     void noStore(reply)
 
     const parsed = eventCreateSchema.safeParse(request.body)
@@ -107,88 +101,84 @@ export const registerEventRoutes = (
     return reply.code(201).send({ event: row } satisfies EventResponse)
   })
 
-  app.patch<{ Params: { id: string } }>(
-    '/api/admin/events/:id',
-    { preHandler: requireAdmin },
-    async (request, reply) => {
-      void noStore(reply)
+  app.patch<{ Params: { id: string } }>('/api/admin/events/:id', async (request, reply) => {
+    void noStore(reply)
 
-      const { id } = request.params
-      const parsed = eventUpdateSchema.safeParse(request.body)
-      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+    const { id } = request.params
+    const parsed = eventUpdateSchema.safeParse(request.body)
+    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
 
-      // The only body that never reaches the `UPDATE`. A body of only unrecognised
-      // keys is a 400 from the schema now, so `{}` is the one case left that
-      // changes nothing — and `set({})` is not valid SQL, so it has to be answered
-      // before the statement. A no-op PATCH is idempotent; returning the row
-      // unchanged is the honest answer.
-      //
-      // The read lives inside this branch rather than above it. It used to be
-      // unconditional, and once `.returning()` landed that bought nothing for any
-      // other body: the row comes back from the write, and a vanished row is
-      // answered by the re-read below. All the pre-read did was spend a third
-      // query to produce a 404 the write path produces anyway — and it left the
-      // handler holding a pre-write snapshot to build the response from.
-      if (Object.keys(parsed.data).length === 0) {
-        const [existing] = await db.select().from(event).where(eq(event.id, id)).limit(1)
+    // The only body that never reaches the `UPDATE`. A body of only unrecognised
+    // keys is a 400 from the schema now, so `{}` is the one case left that
+    // changes nothing — and `set({})` is not valid SQL, so it has to be answered
+    // before the statement. A no-op PATCH is idempotent; returning the row
+    // unchanged is the honest answer.
+    //
+    // The read lives inside this branch rather than above it. It used to be
+    // unconditional, and once `.returning()` landed that bought nothing for any
+    // other body: the row comes back from the write, and a vanished row is
+    // answered by the re-read below. All the pre-read did was spend a third
+    // query to produce a 404 the write path produces anyway — and it left the
+    // handler holding a pre-write snapshot to build the response from.
+    if (Object.keys(parsed.data).length === 0) {
+      const [existing] = await db.select().from(event).where(eq(event.id, id)).limit(1)
 
-        return existing === undefined
-          ? reply.code(404).send(errorResponse('not_found'))
-          : ({ event: existing } satisfies EventResponse)
-      }
-
-      // The rule applied to the row as it would be, because a body carrying one
-      // date — or only a time — cannot be judged on its own. A multi-day burn may
-      // run 22:00 to 10:00; narrowing it to a single day makes that pair invalid,
-      // and nothing in the body says so.
-      //
-      // This replaced a condition composed into the WHERE. That handled one date
-      // against the stored other, but had no way to see the times, so those two
-      // patches reached the database and came back as a 500 from
-      // `event_date_order_check`.
-      const [before] = await db.select().from(event).where(eq(event.id, id)).limit(1)
-      if (before === undefined) return reply.code(404).send(errorResponse('not_found'))
-
-      if (!hasOrderedRange({ ...before, ...parsed.data })) {
-        return reply.code(400).send(errorResponse('bad_request'))
-      }
-
-      // `.returning()` rather than reading `changes`, for two reasons that turn out
-      // to be the same one: the row it hands back is the row as written, so the
-      // response cannot report a field from the pre-read snapshot that another
-      // write has since changed — and an empty array means "no row matched" without
-      // depending on SQLite counting a row whose SET values are identical, which
-      // MySQL does not.
-      const updated = await db
-        .update(event)
-        .set(parsed.data)
-        .where(eq(event.id, id))
-        .returning()
-        .catch((error: unknown) => {
-          if (isSlugConflict(error)) return 'conflict' as const
-          // Only reachable when two patches merged against the same pre-write
-          // row into a combination neither sent. Answered rather than thrown:
-          // the caller can retry, and a 500 tells them nothing.
-          if (isCheckViolation(error, 'event_date_order_check')) return 'unordered' as const
-          throw error
-        })
-
-      if (updated === 'conflict') return reply.code(409).send(errorResponse('conflict'))
-      if (updated === 'unordered') return reply.code(400).send(errorResponse('bad_request'))
-
-      const [row] = updated
-
-      // One cause left. The `WHERE` is the id alone and the ordering was settled
-      // before the write, so no row matching means the row was deleted between
-      // the read above and this statement — the re-read that used to tell that
-      // apart from a refused condition has nothing left to distinguish.
-      //
-      // Not reachable under test: `inject` serialises requests, so nothing can
-      // delete the row in that gap. Kept because the alternative is answering 200
-      // with `{ event: undefined }`, and a 404 is simply what happened.
-      return row === undefined
+      return existing === undefined
         ? reply.code(404).send(errorResponse('not_found'))
-        : ({ event: row } satisfies EventResponse)
-    },
-  )
+        : ({ event: existing } satisfies EventResponse)
+    }
+
+    // The rule applied to the row as it would be, because a body carrying one
+    // date — or only a time — cannot be judged on its own. A multi-day burn may
+    // run 22:00 to 10:00; narrowing it to a single day makes that pair invalid,
+    // and nothing in the body says so.
+    //
+    // This replaced a condition composed into the WHERE. That handled one date
+    // against the stored other, but had no way to see the times, so those two
+    // patches reached the database and came back as a 500 from
+    // `event_date_order_check`.
+    const [before] = await db.select().from(event).where(eq(event.id, id)).limit(1)
+    if (before === undefined) return reply.code(404).send(errorResponse('not_found'))
+
+    if (!hasOrderedRange({ ...before, ...parsed.data })) {
+      return reply.code(400).send(errorResponse('bad_request'))
+    }
+
+    // `.returning()` rather than reading `changes`, for two reasons that turn out
+    // to be the same one: the row it hands back is the row as written, so the
+    // response cannot report a field from the pre-read snapshot that another
+    // write has since changed — and an empty array means "no row matched" without
+    // depending on SQLite counting a row whose SET values are identical, which
+    // MySQL does not.
+    const updated = await db
+      .update(event)
+      .set(parsed.data)
+      .where(eq(event.id, id))
+      .returning()
+      .catch((error: unknown) => {
+        if (isSlugConflict(error)) return 'conflict' as const
+        // Only reachable when two patches merged against the same pre-write
+        // row into a combination neither sent. Answered rather than thrown:
+        // the caller can retry, and a 500 tells them nothing.
+        if (isCheckViolation(error, 'event_date_order_check')) return 'unordered' as const
+        throw error
+      })
+
+    if (updated === 'conflict') return reply.code(409).send(errorResponse('conflict'))
+    if (updated === 'unordered') return reply.code(400).send(errorResponse('bad_request'))
+
+    const [row] = updated
+
+    // One cause left. The `WHERE` is the id alone and the ordering was settled
+    // before the write, so no row matching means the row was deleted between
+    // the read above and this statement — the re-read that used to tell that
+    // apart from a refused condition has nothing left to distinguish.
+    //
+    // Not reachable under test: `inject` serialises requests, so nothing can
+    // delete the row in that gap. Kept because the alternative is answering 200
+    // with `{ event: undefined }`, and a 404 is simply what happened.
+    return row === undefined
+      ? reply.code(404).send(errorResponse('not_found'))
+      : ({ event: row } satisfies EventResponse)
+  })
 }

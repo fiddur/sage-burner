@@ -6,7 +6,6 @@ import { and, eq } from 'drizzle-orm'
 
 import type { GuardDeps } from '../auth/guards.ts'
 
-import { createGuards } from '../auth/guards.ts'
 import { account, attendance, event, eventOption } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 import { activeEvent, todayIso } from './events.ts'
@@ -24,30 +23,21 @@ export interface RosterDeps extends GuardDeps {
  * someone's own profile page is corrected here in the same moment — which is the
  * point of the account/attendance split.
  */
-export const registerRosterRoutes = (
-  app: FastifyInstance,
-  { db, sessions, now = () => new Date() }: RosterDeps,
-) => {
-  const { requireAdmin } = createGuards({ db, sessions })
+export const registerRosterRoutes = (app: FastifyInstance, { db, now = () => new Date() }: RosterDeps) => {
+  app.get<{ Params: { eventId: string } }>('/api/admin/events/:eventId/roster', async (request, reply) => {
+    void noStore(reply)
 
-  app.get<{ Params: { eventId: string } }>(
-    '/api/admin/events/:eventId/roster',
-    { preHandler: requireAdmin },
-    async (request, reply) => {
-      void noStore(reply)
+    const { eventId } = request.params
+    const found = await eventFor(eventId)
+    if (found === undefined) return reply.code(404).send(errorResponse('not_found'))
 
-      const { eventId } = request.params
-      const found = await eventFor(eventId)
-      if (found === undefined) return reply.code(404).send(errorResponse('not_found'))
+    return {
+      event: found,
+      entries: await rosterFor(eventId, found.member_cap),
+    } satisfies RosterResponse
+  })
 
-      return {
-        event: found,
-        entries: await rosterFor(eventId, found.member_cap),
-      } satisfies RosterResponse
-    },
-  )
-
-  app.get('/api/admin/events/active/roster', { preHandler: requireAdmin }, async (_request, reply) => {
+  app.get('/api/admin/events/active/roster', async (_request, reply) => {
     void noStore(reply)
 
     const open = await activeEvent(db, todayIso(now))
@@ -60,7 +50,6 @@ export const registerRosterRoutes = (
 
   app.patch<{ Params: { eventId: string; accountId: string } }>(
     '/api/admin/events/:eventId/attendance/:accountId/payment',
-    { preHandler: requireAdmin },
     async (request, reply) => {
       void noStore(reply)
 
