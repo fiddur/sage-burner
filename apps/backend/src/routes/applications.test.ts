@@ -66,7 +66,15 @@ const givenQuestion = async (over: Partial<FormQuestion> & Pick<FormQuestion, 't
   return id
 }
 
-/** Guarded rather than cast: some tests pass an `answers` that is not an object. */
+/**
+ * The answer keys, or none.
+ *
+ * `payload` is `Record<string, unknown>`, so `payload.answers` is `unknown` and
+ * cannot go to `Object.keys` without narrowing. Guarded rather than cast, and the
+ * `[]` is what a test passing a non-object `answers` would want anyway: casting
+ * would turn a string into `asked: ['0','1',…]` and quietly rewrite the body of a
+ * test that meant to probe something else.
+ */
 const answerKeys = (answers: unknown): string[] =>
   typeof answers === 'object' && answers !== null ? Object.keys(answers) : []
 
