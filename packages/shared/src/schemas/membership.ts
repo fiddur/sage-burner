@@ -207,12 +207,22 @@ export const rosterResponseSchema = z.object({
   entries: z.array(rosterEntrySchema),
 })
 
-/** What an organiser may set on someone's attendance. Payment, and nothing else. */
+/**
+ * What an organiser may set on someone's attendance. The status, and nothing else.
+ *
+ * `payment_date` is derived from the status and the clock rather than taken from
+ * the caller, the way `joined_at` already is. Accepting both let them disagree:
+ * `{ payment_status: 'unpaid' }` alone left yesterday's date standing, and a date
+ * alone recorded a payment that the status said had not happened. The README
+ * stated the invariant as a property of the system when it was in fact a habit of
+ * the single caller.
+ *
+ * Backdating a transfer that landed last week is a real thing an organiser wants,
+ * and this deliberately does not do it. It wants a field of its own with the
+ * status validated against it — not one the server silently overrides.
+ */
 export const paymentUpdateSchema = z
-  .object({
-    payment_status: z.enum(paymentStatuses),
-    payment_date: dateSchema.nullable(),
-  })
+  .object({ payment_status: z.enum(paymentStatuses) })
   .partial()
   .strict()
 
