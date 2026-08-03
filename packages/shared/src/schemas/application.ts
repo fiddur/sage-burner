@@ -102,6 +102,12 @@ export const applicationCreateSchema = z
      * It narrows what is *stored*, never what is *checked*. Validation runs
      * against the server's list, or "I wasn't shown that" would be a way to skip
      * a required question or an agreement.
+     *
+     * Required rather than optional, and deliberately so despite the cost: a page
+     * loaded before this deployed sends no `asked` and gets a 400. That is the
+     * right failure — its own handler says to reload, which is the remedy — where
+     * falling back to the current question list would silently reintroduce this
+     * bug for every stale client.
      */
     asked: z.array(idSchema).max(MAX_ASKED_QUESTIONS),
   })
