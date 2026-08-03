@@ -2,11 +2,14 @@ import type { FastifyInstance, LightMyRequestResponse } from 'fastify'
 
 import { eq } from 'drizzle-orm'
 import { createHash, randomUUID } from 'node:crypto'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import type { Gate } from '../auth/gate.ts'
 import type { DbHandle } from '../db/index.ts'
 
 import { createApp } from '../app.ts'
+import { createGate } from '../auth/gate.ts'
+import { verifyPassword } from '../auth/password.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, attendance, inviteToken } from '../db/schema.ts'
@@ -33,16 +36,29 @@ afterEach(async () => {
   handle = undefined
 })
 
-const build = async (now: () => Date = () => new Date(NOW)) => {
+const build = async (
+  now: () => Date = () => new Date(NOW),
+  hash?: (password: string) => Promise<string>,
+  gate?: Gate,
+) => {
   handle = createDb({ url: ':memory:' })
   runMigrations(handle)
   app = await createApp({
     db: handle.db,
     config: createConfig({ LOG_LEVEL: 'silent', SESSION_SECRET: SECRET }),
     now,
+    hash,
+    gate,
   })
   return app
 }
+
+/** Stands in for scrypt at a known, small cost, so a wait can be asserted. */
+const slowHash = (ms: number) =>
+  vi.fn(async (password: string) => {
+    await new Promise((resolve) => setTimeout(resolve, ms))
+    return `hashed:${password}`
+  })
 
 const db = () => {
   const found = handle?.db
@@ -256,10 +272,192 @@ describe('redeeming', () => {
     expect(await db().select().from(account)).toHaveLength(1)
   })
 
-  it('refuses a token nobody minted', async () => {
+  it('answers a token nobody minted exactly as it answers a spent one', async () => {
+    // Both are 409, not to hide which it is — the GET answers that plainly, and
+    // there is nothing to enumerate anyway with a 256-bit token — but because the
+    // caller has nothing to do with the difference here. By the time the page
+    // POSTs it has read the status, and all three mean the same thing: this link
+    // cannot be spent.
     const server = await build()
+    const spent = await givenInvite({ used_at: NOW })
 
-    expect((await redeem(server, 'not-a-real-token')).statusCode).toBe(404)
+    const unknown = await redeem(server, 'not-a-real-token')
+    const used = await redeem(server, spent)
+
+    expect(unknown.statusCode).toBe(409)
+    expect(used.statusCode).toBe(unknown.statusCode)
+    expect(unknown.json()).toEqual(used.json())
+  })
+
+  it('spends the hash before deciding the address is taken', async () => {
+    // The oracle this closes: the 409 for a taken address used to return before
+    // scrypt ran, while a success spent ~230ms in it. Anyone holding one unspent
+    // invite could then ask "is this person a member?" for any address they
+    // liked, repeatedly — the 409 does not spend the token — and read the answer
+    // off the latency. Membership is the private fact this app holds.
+    //
+    // Asserted as a wait rather than a call count: a hash started and not waited
+    // for would be called and still answer fast.
+    const hash = slowHash(60)
+    const server = await build(() => new Date(NOW), hash)
+    const token = await givenInvite()
+    await db()
+      .insert(account)
+      .values({ id: randomUUID(), email: 'fredrik@example.org', password_hash: null, created_at: NOW })
+
+    const started = Date.now()
+    const response = await redeem(server, token)
+
+    expect(response.statusCode).toBe(409)
+    expect(hash).toHaveBeenCalledWith('a-long-enough-password')
+    expect(Date.now() - started).toBeGreaterThanOrEqual(50)
+  })
+
+  it('hashes for real when nothing is injected', async () => {
+    // The seam above is only honest if the default is the actual scrypt, so this
+    // verifies the stored hash against the password that was sent rather than
+    // reading its shape. The negative case matters as much: a hash that accepts
+    // anything would pass a prefix check just as well.
+    const server = await build()
+    const token = await givenInvite()
+
+    expect((await redeem(server, token)).statusCode).toBe(201)
+
+    const [row] = await db().select().from(account).where(eq(account.email, 'fredrik@example.org'))
+    expect(await verifyPassword(applicant.password, row?.password_hash ?? null)).toBe(true)
+    expect(await verifyPassword('not the passphrase', row?.password_hash ?? null)).toBe(false)
+  })
+
+  it('sheds rather than queueing unbounded scrypt for one replayed invite', async () => {
+    // The cost of making the refusal equal-time: a taken address does not spend
+    // the token, so a held invite can be replayed at this hash for as long as it
+    // lives. One gate covers this and login together, because what is bounded is
+    // libuv's threadpool rather than either route.
+    const gate = createGate({ slots: 1, queue: 0, timeoutMs: 50 })
+    const server = await build(() => new Date(NOW), slowHash(60), gate)
+    const first = await givenInvite()
+    const second = await givenInvite()
+
+    const both = await Promise.all([redeem(server, first), redeem(server, second)])
+    const shed = both.find((response) => response.statusCode === 429)
+
+    expect(shed).toBeDefined()
+    expect(shed?.json()).toEqual({ error: 'rate_limited' })
+    expect(shed?.headers['retry-after']).toBe('1')
+  })
+
+  it('tells a caller who waited the whole window to wait longer', async () => {
+    // The `timed-out` branch, which nothing reached before the gate was
+    // injectable — and the only thing distinguishing its `Retry-After` from
+    // `queue-full`'s. Sending a client that already waited the window straight
+    // back turns a polite `Retry-After` into a hot loop against the flood the
+    // gate exists to damp.
+    // Over a second, deliberately: `retryAfter` rounds up to whole seconds, so a
+    // shorter window makes `timed-out` and `queue-full` both `'1'` and the
+    // assertion below cannot tell them — or a hardcoded number — apart.
+    const gate = createGate({ slots: 1, queue: 1, timeoutMs: 1200 })
+    const server = await build(() => new Date(NOW), slowHash(1400), gate)
+    const first = await givenInvite()
+    const second = await givenInvite()
+
+    const holding = redeem(server, first)
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    const waited = await redeem(server, second, { ...applicant, email: 'other@example.org' })
+
+    expect(waited.statusCode).toBe(429)
+    // '2' here, against `queue-full`'s '1'. Asked of the gate rather than written
+    // out so the two stay tied to the window; `gate.test.ts` pins the derivation.
+    expect(waited.headers['retry-after']).toBe(gate.retryAfter('timed-out'))
+    expect(gate.retryAfter('timed-out')).not.toBe(gate.retryAfter('queue-full'))
+    expect((await holding).statusCode).toBe(201)
+  })
+
+  it('gives the slot back, so one redemption does not wedge the next', async () => {
+    // A leaked slot holds until the process restarts. With one slot, a second
+    // request through the same app is the shortest thing that notices.
+    const gate = createGate({ slots: 1, queue: 4, timeoutMs: 5000 })
+    const server = await build(() => new Date(NOW), slowHash(5), gate)
+    const first = await givenInvite()
+    const second = await givenInvite()
+
+    expect((await redeem(server, first)).statusCode).toBe(201)
+    const after = await redeem(server, second, { ...applicant, email: 'someone.else@example.org' })
+
+    expect(after.statusCode).toBe(201)
+  })
+
+  it('lets a redemption through when the gate is not saturated', async () => {
+    // The passing sibling: shedding everything would satisfy the test above.
+    const gate = createGate({ slots: 1, queue: 4, timeoutMs: 5000 })
+    const server = await build(() => new Date(NOW), undefined, gate)
+    const token = await givenInvite()
+
+    expect((await redeem(server, token)).statusCode).toBe(201)
+  })
+
+  it('still answers "is this address a member?" for as long as the invite lives', async () => {
+    // The residual, pinned rather than described. The status codes differ — 409
+    // for an address that has an account, 201 for one that does not — and the
+    // 409 does not spend the token, so one holder can ask about as many
+    // addresses as they like. What the equal-cost ordering removed was the
+    // *latency* copy of that answer, which was redundant beside the status line.
+    // What bounds this is cost (a gated scrypt per probe) and #57.
+    //
+    // If someone later spends the token on the taken-address refusal, this test
+    // fails and the paragraph it belongs to has to be rewritten with it.
+    const server = await build()
+    const token = await givenInvite()
+    await db()
+      .insert(account)
+      .values({ id: randomUUID(), email: 'member@example.org', password_hash: null, created_at: NOW })
+
+    const asked = { ...applicant, email: 'member@example.org' }
+    expect((await redeem(server, token, asked)).statusCode).toBe(409)
+    expect((await redeem(server, token, asked)).statusCode).toBe(409)
+
+    const [invite] = await db().select().from(inviteToken)
+    expect(invite?.used_at).toBeNull()
+  })
+
+  it('takes no slot for a caller holding no live invite', async () => {
+    // Load-bearing ordering: the gate is taken *after* the invite check, so a
+    // caller with any old string is answered 409 without queueing behind the
+    // hashing. Taking the slot first would let anyone, with no invite at all,
+    // hold the same two slots logins need — a denial of service open to the
+    // public rather than to invite holders.
+    //
+    // Asserted on the slot rather than on the hash: a gate entered above the
+    // lookup still would not *hash* for a bad token, so counting hashes cannot
+    // tell the two orderings apart.
+    const gate = createGate({ slots: 1, queue: 0, timeoutMs: 50 })
+    const server = await build(() => new Date(NOW), slowHash(120), gate)
+    const held = redeem(server, await givenInvite())
+    await new Promise((resolve) => setTimeout(resolve, 30))
+
+    const stranger = await redeem(server, 'not-a-real-token')
+
+    expect(stranger.statusCode).toBe(409)
+    expect((await held).statusCode).toBe(201)
+  })
+
+  it('shares one gate with login, rather than two that spend the pool between them', async () => {
+    // The bound is on libuv's four threads, so two gates of two slots would
+    // spend all four. Held from the redemption side and asserted from the login
+    // side: if they ever drift back to separate gates, the login gets in.
+    const gate = createGate({ slots: 1, queue: 0, timeoutMs: 50 })
+    const server = await build(() => new Date(NOW), slowHash(120), gate)
+    const token = await givenInvite()
+
+    const redeeming = redeem(server, token)
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    const login = await server.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { email: 'someone@example.org', password: 'a good long passphrase' },
+    })
+
+    expect(login.statusCode).toBe(429)
+    expect((await redeeming).statusCode).toBe(201)
   })
 
   it('refuses an email that already has an account, without spending the token', async () => {
