@@ -112,12 +112,15 @@ describe('AdminRoster', () => {
     ;(await screen.findByLabelText('Paid — Ana')).click()
 
     await waitFor(() => expect(setPayment).toHaveBeenCalled())
-    expect(setPayment.mock.calls[0]?.[2]).toMatchObject({ payment_status: 'paid' })
+    expect(setPayment.mock.calls[0]?.[2]).toEqual({ payment_status: 'paid' })
     await waitFor(() => expect(getActiveRoster).toHaveBeenCalledTimes(2))
   })
 
-  it('clears the date when a payment is unmarked', async () => {
-    // Otherwise a date outlives the payment it recorded.
+  it('sends the status alone, leaving the date to the server', async () => {
+    // The page used to send `payment_date: null` to clear it, which made the
+    // invariant a habit of this one caller. The date is derived from the status
+    // and the server's clock now — a browser's idea of today can be a day out —
+    // and the schema refuses the field, so sending it would be a 400.
     const setPayment = vi.fn((_eventId: string, _accountId: string, _body: PaymentUpdate) =>
       Promise.resolve({ attendance: {} as never }),
     )
@@ -132,9 +135,7 @@ describe('AdminRoster', () => {
 
     ;(await screen.findByLabelText('Paid — Ana')).click()
 
-    await waitFor(() =>
-      expect(setPayment.mock.calls[0]?.[2]).toEqual({ payment_status: 'unpaid', payment_date: null }),
-    )
+    await waitFor(() => expect(setPayment.mock.calls[0]?.[2]).toEqual({ payment_status: 'unpaid' }))
   })
 
   it('surfaces a failed payment rather than showing it as recorded', async () => {
