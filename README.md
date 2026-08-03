@@ -1458,10 +1458,24 @@ anyone paid, and the whole rule is that paying re-sorts the list. `withPlaces` i
 someone different things about where they stand is worse than one of them being
 absent.
 
-Recording a payment writes `payment_status` and `payment_date` and **nothing
-else** — an organiser recording money received has no business rewriting an
-arrival date in the same request — and unmarking clears the date, so one never
-outlives the payment it recorded.
+Recording a payment sends **the status and nothing else** — an organiser
+recording money received has no business rewriting an arrival date in the same
+request. `payment_date` is not accepted at all: it is derived from the status and
+the server's clock in the same statement that writes the status, the way
+`joined_at` already is, so unmarking clears the date and one can never outlive the
+payment it recorded.
+
+That is the invariant as a property of the write rather than of the caller. It
+used to be neither: the schema was `.partial()` over both columns, so
+`{ payment_status: 'unpaid' }` alone left yesterday's date standing and a date
+alone recorded a payment the status denied. Nothing enforced it and no `CHECK`
+linked the columns — it held because the one caller always sent both.
+
+**Backdating is deliberately not supported.** An organiser recording a transfer
+that landed last week is a real need, and the answer to it is a field with the
+status validated against it, not one the server silently overrides. Sending
+`payment_date` is a `400` rather than an ignored key, so nobody can believe they
+backdated something that in fact reads as today.
 
 **`partial` is gone from the payment vocabulary.** Two values, not three: a
 half-payment is chased out of band. It was never set by anything, drove a

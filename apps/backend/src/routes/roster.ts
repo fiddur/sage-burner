@@ -82,7 +82,12 @@ export const registerRosterRoutes = (
 
       const [updated] = await db
         .update(attendance)
-        .set(parsed.data)
+        .set({
+          payment_status: parsed.data.payment_status,
+          // Cleared on unmarking, in the same statement that unmarks — so a date
+          // cannot outlive the payment it recorded.
+          payment_date: parsed.data.payment_status === 'paid' ? todayIso(now) : null,
+        })
         .where(and(eq(attendance.event_id, eventId), eq(attendance.account_id, accountId)))
         .returning()
 
