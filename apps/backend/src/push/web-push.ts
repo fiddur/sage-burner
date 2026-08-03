@@ -17,12 +17,13 @@ import type { Delivery, VapidKeys } from './push.ts'
  * alternative is worse.
  */
 /**
- * The `mailto:` a push service complains to before it blocks us.
+ * The `mailto:` VAPID requires, at a TLD reserved to be unresolvable.
  *
- * Required by VAPID and deliberately not configurable: an installation that had to
- * set this would be an installation `docker compose up` is not sufficient for. It
- * points at the project rather than at any member, which is also the right answer
- * for privacy — the alternative is publishing an organiser's address to Google.
+ * A push service is meant to use this before blocking a misbehaving sender, and
+ * this one cannot receive mail — a deliberate trade. Configuring it would make
+ * `docker compose up` insufficient, and defaulting it to a real organiser's
+ * address would publish that address to Google and Mozilla. Nobody has been
+ * blocked yet; if that changes, this is the line to revisit.
  */
 export const DEFAULT_PUSH_CONTACT = 'mailto:noreply@sage-burner.invalid'
 
@@ -40,9 +41,8 @@ export const deliverWithWebPush =
         },
         payload,
         {
-          // A `mailto:` the push service can complain to. Required by VAPID, and
-          // the reason it is the admin contact rather than a made-up address: a
-          // service that decides we are misbehaving will use it before blocking.
+          // Required by VAPID. `DEFAULT_PUSH_CONTACT` above is what this is and
+          // why it is deliberately unreachable.
           vapidDetails: { subject: contact, publicKey: keys.publicKey, privateKey: keys.privateKey },
           // Short, because nobody wants yesterday's application. The push service
           // drops it rather than holding it for a phone that is off.

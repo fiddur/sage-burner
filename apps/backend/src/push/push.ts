@@ -1,4 +1,4 @@
-import { eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, isNull } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { Database } from '../db/index.ts'
@@ -59,13 +59,41 @@ export const vapidKeysFor = async ({ db, mintKeys }: PushDeps): Promise<VapidKey
     return { publicKey: row.publicKey, privateKey: row.privateKey }
   }
 
+  // Conditional on the columns still being null, and the loser re-reads rather
+  // than overwriting. Two admins turning notifications on at the same moment would
+  // otherwise both mint and the second write would win — leaving the first one's
+  // browser subscribed against a key the installation no longer holds, and every
+  // send to it failing forever with nothing to say why.
+  //
+  // Untested, and honestly so: `node:sqlite` is synchronous, so two calls in one
+  // process serialise and the second returns at the read above rather than
+  // reaching this. A test written for it passed with the condition removed, which
+  // is no test. Kept because the failure it prevents is silent and permanent, and
+  // the cost is a `WHERE` clause.
   const minted = mintKeys()
-  await db
+  const [claimed] = await db
     .update(installation)
     .set({ vapid_public_key: minted.publicKey, vapid_private_key: minted.privateKey })
-    .where(eq(installation.id, INSTALLATION_ID))
+    .where(
+      and(
+        eq(installation.id, INSTALLATION_ID),
+        isNull(installation.vapid_public_key),
+        isNull(installation.vapid_private_key),
+      ),
+    )
+    .returning({ publicKey: installation.vapid_public_key })
 
-  return minted
+  if (claimed !== undefined) return minted
+
+  const [existing] = await db
+    .select({ publicKey: installation.vapid_public_key, privateKey: installation.vapid_private_key })
+    .from(installation)
+    .where(eq(installation.id, INSTALLATION_ID))
+    .limit(1)
+
+  return existing?.publicKey != null && existing.privateKey != null
+    ? { publicKey: existing.publicKey, privateKey: existing.privateKey }
+    : undefined
 }
 
 /** Store one browser's permission, or refresh what it already had. */
@@ -122,12 +150,20 @@ export const notifyAdmins = async (deps: PushDeps, payload: string): Promise<num
   const keys = await vapidKeysFor(deps)
   if (keys === undefined) return 0
 
-  const results = await Promise.all(rows.map((row) => deliver(row, payload, keys)))
-  const gone = rows.filter((_row, index) => results[index] === 'gone').map((row) => row.endpoint)
+  // `allSettled`, so one `Delivery` that rejects cannot skip the cleanup for every
+  // other row in the batch. `deliverWithWebPush` catches everything and never
+  // rejects, but the type permits it and a future implementation might.
+  const results = await Promise.allSettled(rows.map((row) => deliver(row, payload, keys)))
+  const gone = rows
+    .filter((_row, index) => {
+      const result = results[index]
+      return result?.status === 'fulfilled' && result.value === 'gone'
+    })
+    .map((row) => row.endpoint)
 
   if (gone.length > 0) {
     await db.delete(pushSubscription).where(inArray(pushSubscription.endpoint, gone))
   }
 
-  return results.filter((result) => result === 'sent').length
+  return results.filter((result) => result.status === 'fulfilled' && result.value === 'sent').length
 }

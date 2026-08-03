@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks'
+import { useEffect, useMemo, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 import type { PushBrowser, PushState } from '../push.ts'
@@ -21,11 +21,16 @@ export type PushApi = Pick<ApiClient, 'getPushKey' | 'subscribeToPush' | 'unsubs
  */
 export const PushToggle = ({
   api,
-  browser = browserPush(),
+  browser: supplied,
 }: {
   api: PushApi
   browser?: PushBrowser | undefined
 }) => {
+  // Memoised, because `browserPush()` builds a fresh object each call. As a
+  // default parameter it would be a new identity every render, so the effect
+  // below would re-register the worker and re-derive state after each one rather
+  // than on mount.
+  const browser = useMemo(() => supplied ?? browserPush(), [supplied])
   const [state, setState] = useState<PushState | 'working'>(browser === undefined ? 'unsupported' : 'off')
   const [error, setError] = useFormError()
 
@@ -99,10 +104,15 @@ export const PushToggle = ({
       const manager = await browser.register()
       const existing = await manager.getSubscription()
 
-      // Told to the server even when the browser has no subscription left to
-      // report: the row is what causes notifications, and a browser that has
-      // already forgotten locally would otherwise leave it behind forever.
-      if (existing !== null) await api.unsubscribeFromPush(existing.endpoint)
+      if (existing !== null) {
+        // Both halves, and the browser's is the one that is easy to forget. The
+        // server row is what causes notifications, but `getSubscription()` is what
+        // this page reads its own state from on mount — leaving the browser
+        // subscribed would show "on" with nothing subscribed, and the 'on' branch
+        // only offers to turn it off, so there would be no way back.
+        await api.unsubscribeFromPush(existing.endpoint)
+        await existing.unsubscribe()
+      }
       setState('off')
     } catch (failure) {
       setError(isApiError(failure) ? failure.message : 'Could not turn notifications off here.')

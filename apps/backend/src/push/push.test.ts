@@ -184,6 +184,26 @@ describe('notifying the admins', () => {
     expect(deliver).toHaveBeenCalledTimes(1)
   })
 
+  it('cleans up the gone ones even when another delivery rejects outright', async () => {
+    // `Delivery` may reject — the type permits it — and with `Promise.all` one
+    // rejection skipped the cleanup for every other row in the batch.
+    const deps = await build((subscription) => {
+      if (subscription.endpoint.endsWith('/throws')) return Promise.reject(new Error('boom'))
+      return Promise.resolve(subscription.endpoint.endsWith('/dead') ? 'gone' : 'sent')
+    })
+    const admin = await givenAccount(['admin'])
+    await rememberSubscription(deps, admin, aSubscription('https://push.example/throws'))
+    await rememberSubscription(deps, admin, aSubscription('https://push.example/dead'))
+    await rememberSubscription(deps, admin, aSubscription('https://push.example/alive'))
+
+    expect(await notifyAdmins(deps, 'x')).toBe(1)
+
+    expect((await stored()).map((row) => row.endpoint).sort()).toEqual([
+      'https://push.example/alive',
+      'https://push.example/throws',
+    ])
+  })
+
   it('deletes a subscription the push service says is gone', async () => {
     // 404 or 410 means the browser threw it away. Keeping it would retry a dead
     // endpoint on every application, forever.

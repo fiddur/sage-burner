@@ -25,7 +25,11 @@ export interface PushBrowser {
   requestPermission: () => Promise<NotificationPermission>
   permission: () => NotificationPermission
   register: () => Promise<{
-    getSubscription: () => Promise<{ endpoint: string; toJSON: () => unknown } | null>
+    getSubscription: () => Promise<{
+      endpoint: string
+      unsubscribe: () => Promise<boolean>
+      toJSON: () => unknown
+    } | null>
     // Optional, matching the DOM's own signature: required here, the real
     // `PushManager` would not be assignable to this.
     subscribe: (options?: PushSubscriptionOptionsInit) => Promise<{

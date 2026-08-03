@@ -13,8 +13,38 @@ afterEach(cleanup)
 /** A subscription shaped the way a real `PushSubscription` serialises. */
 const aSubscription = (endpoint = 'https://push.example/one') => ({
   endpoint,
+  unsubscribe: () => Promise.resolve(true),
   toJSON: () => ({ endpoint, keys: { p256dh: 'a-public-key', auth: 'a-secret' } }),
 })
+
+/**
+ * A browser that remembers, the way a real one does.
+ *
+ * `getSubscription()` keeps answering until the subscription is released, which is
+ * the behaviour that makes forgetting to release it a visible bug rather than a
+ * tidiness point.
+ */
+const rememberingBrowser = (over: Partial<PushBrowser> = {}) => {
+  let held: ReturnType<typeof aSubscription> | null = aSubscription('https://push.example/mine')
+  const unsubscribe = vi.fn(() => {
+    held = null
+    return Promise.resolve(true)
+  })
+
+  const browser = aBrowser({
+    register: () =>
+      Promise.resolve({
+        getSubscription: () => Promise.resolve(held === null ? null : { ...held, unsubscribe }),
+        subscribe: () => {
+          held = aSubscription('https://push.example/mine')
+          return Promise.resolve(held)
+        },
+      }),
+    ...over,
+  })
+
+  return { browser, unsubscribe }
+}
 
 const aBrowser = (over: Partial<PushBrowser> = {}): PushBrowser => ({
   permission: () => 'default',
@@ -216,6 +246,38 @@ describe('PushToggle', () => {
 
     await waitFor(() => expect(unsubscribeFromPush).toHaveBeenCalledWith('https://push.example/mine'))
     expect(await screen.findByRole('button', { name: 'Notify me here' })).toBeTruthy()
+  })
+
+  it('releases the browser subscription as well as the server row', async () => {
+    // Without this the browser keeps a live `PushSubscription`, `getSubscription()`
+    // keeps answering, and the toggle reads "on" with nothing subscribed — and the
+    // 'on' branch only offers to turn it off, so there is no way back.
+    const { browser, unsubscribe } = rememberingBrowser()
+    const unsubscribeFromPush = vi.fn<PushApi['unsubscribeFromPush']>(() => Promise.resolve(undefined))
+    render(<PushToggle api={stub({ unsubscribeFromPush })} browser={browser} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Stop notifying me here' }))
+
+    await waitFor(() => expect(unsubscribeFromPush).toHaveBeenCalledWith('https://push.example/mine'))
+    expect(unsubscribe).toHaveBeenCalled()
+  })
+
+  it('can be turned back on after being turned off', async () => {
+    // The consequence of the bug above, from the outside: the state the page
+    // derives on mount has to agree with what the server was told.
+    const { browser } = rememberingBrowser()
+    const subscribeToPush = vi.fn<PushApi['subscribeToPush']>(() => Promise.resolve(undefined))
+    const { rerender } = render(<PushToggle api={stub({ subscribeToPush })} browser={browser} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Stop notifying me here' }))
+    expect(await screen.findByRole('button', { name: 'Notify me here' })).toBeTruthy()
+
+    // A reload: a fresh mount against the same browser must agree it is off.
+    rerender(<PushToggle api={stub({ subscribeToPush })} browser={browser} />)
+    expect(await screen.findByRole('button', { name: 'Notify me here' })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Notify me here' }))
+    await waitFor(() => expect(subscribeToPush).toHaveBeenCalled())
   })
 
   it('treats a browser whose service worker will not register as unsupported', async () => {

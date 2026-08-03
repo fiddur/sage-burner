@@ -43,8 +43,11 @@ export interface ApplicationRouteDeps {
  * neither buys them anything a reviewer would act on.
  *
  * Not rate-limited here, consistent with login: throttling lives in the reverse
- * proxy where an operator can see it. Nothing here grants access, so the
- * realistic abuse is junk in the review list.
+ * proxy where an operator can see it. Nothing here grants access, so the worst a
+ * flood produces is junk in the review list — and, since #96, a notification on
+ * every subscribed admin's device per submission. `sw.js` gives them one `tag` so
+ * the display collapses rather than piling up, which makes that annoying rather
+ * than a reason to throttle here; #57 is where a bound would go.
  */
 export const registerApplicationRoutes = (
   app: FastifyInstance,

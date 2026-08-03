@@ -647,8 +647,10 @@ export const session = sqliteTable(
  * read — which is the only reason it is acceptable to route member business through
  * Google's or Mozilla's infrastructure at all.
  *
- * Cascades with the account: a role taken away should stop the notifications, and
- * a deleted account must not leave a live subscription behind.
+ * Cascades with the account, so a deleted one leaves no live subscription behind.
+ * Losing the `admin` role stops the notifications too, but by a different
+ * mechanism — `notifyAdmins` joins through `account_role` — and the row itself
+ * survives a demotion, ready if the role comes back.
  */
 export const pushSubscription = sqliteTable(
   'push_subscription',
