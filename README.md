@@ -1344,6 +1344,14 @@ app exists to hold. `POST /api/auth/login` is shaped the same way and for the
 same reason. The cost is that a redemption which cannot finish still burns a
 scrypt slot; redemption is rare and gated behind holding an invite.
 
+That hash goes through the **same gate as login**, not one of its own. The gate
+bounds concurrent scrypt against libuv's four threads, so two gates of two slots
+would spend the whole pool between them. Redemption needs it for a reason login
+does not have: the taken-address refusal never spends the token, so one held
+invite can be replayed at that hash for as long as it lives, and equalising the
+cost is exactly what made every replay expensive. Over the bound it answers `429`
+with `Retry-After`, like login.
+
 The `POST` gives **one answer** — `409` — for unknown, expired and spent alike,
 matching what the `GET` above deliberately hides. There is nothing to enumerate
 either way, the token being 256 bits of CSPRNG, but a file that argues one way

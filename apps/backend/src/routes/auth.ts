@@ -4,11 +4,11 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { errorResponse, loginRequestSchema } from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 
+import type { Gate } from '../auth/gate.ts'
 import type { Sessions } from '../auth/session.ts'
 import type { Config } from '../config.ts'
 import type { Database } from '../db/index.ts'
 
-import { createGate } from '../auth/gate.ts'
 import { hashPassword, needsRehash, verifyPassword } from '../auth/password.ts'
 import { account, accountRole } from '../db/schema.ts'
 import { noStore } from '../http.ts'
@@ -189,47 +189,16 @@ export interface AuthRouteDeps {
   db: Database
   config: Config
   sessions: Sessions
+  /**
+   * The scrypt gate, shared with redemption.
+   *
+   * One gate rather than one each: the bound exists to protect libuv's four
+   * threads, and two gates of two slots would spend all four between them.
+   */
+  gate: Gate
 }
 
-/**
- * Bounds on concurrent password verification.
- *
- * `scrypt` costs ~230ms and 64 MiB and runs on libuv's threadpool — four slots
- * by default, shared with the file reads `@fastify/static` does. Two leaves
- * half the pool for everything else.
- *
- * Queued rather than shed, which matters more than the numbers. A hard cap
- * means two sustained anonymous requests refuse every member's login for as
- * long as they are held, with nothing to wait out — a permanent outage of the
- * only way into the app, triggerable from a laptop. A FIFO queue keeps the same
- * threadpool bound while letting a member arriving mid-flood take their turn.
- *
- * The queue is bounded so it cannot become the exhaustion it prevents, and the
- * wait is bounded so a caller is answered rather than held open.
- *
- * The timeout is sized for the expensive case rather than the usual one. A
- * successful login can spend *two* hashes, not one — `verifyPassword` and then
- * `hashPassword` for the opportunistic upgrade — and both are inside the slot,
- * because the release is in the route's `finally`. That is precisely the state
- * a parameter raise puts every account into, so the worst case coincides with
- * the one time the queue is likely to be at full depth.
- *
- * Measured, not estimated: a login verifying against the previous OWASP rung
- * and re-hashing to the current one takes ~389ms, against ~223ms in the steady
- * state. Eight deep at two at a time is four turns, so ~1556ms — which a 2s
- * timeout clears by 22%, and a container slower than this machine does not. At
- * 5s the margin is ~3x. The cost of the longer wait is a held connection, which
- * is cheaper than refusing someone who typed the right password.
- *
- * Still not a rate limiter: this bounds concurrent work, not attempts per
- * caller. #57 is that, and it is what bounds guessing.
- */
-const LOGIN_GATE = { slots: 2, queue: 8, timeoutMs: 5000 }
-
-export const registerAuthRoutes = (app: FastifyInstance, { db, config, sessions }: AuthRouteDeps) => {
-  // Per-registration rather than module-level, so two apps in one test process
-  // do not share a gate.
-  const gate = createGate(LOGIN_GATE)
+export const registerAuthRoutes = (app: FastifyInstance, { db, config, sessions, gate }: AuthRouteDeps) => {
   const handleLogin = async (request: FastifyRequest, reply: FastifyReply) => {
     const parsed = loginRequestSchema.safeParse(request.body)
 

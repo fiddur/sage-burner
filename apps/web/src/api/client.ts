@@ -345,9 +345,14 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
     /**
      * Public. Creates the account, fills in the person and signs them in.
      *
-     * Throws ApiError(409) for a token that is expired, already spent, or lost a
-     * race, and for an email that already has an account. Throws ApiError(404)
-     * for a token nobody minted.
+     * Throws ApiError(409) for every invite that cannot be spent — unknown,
+     * expired, already used, or one that lost a race — and for an email that
+     * already has an account. One answer on purpose: a different one for an
+     * unknown token would let someone probe for live ones, which is what the
+     * status read at `getInviteState` also refuses to say.
+     *
+     * Throws ApiError(429) when the server is already spending all the password
+     * hashing it will run at once.
      */
     redeemInvite: (token: string, body: RedeemRequestInput) =>
       request<MeResponse>(`/invites/${encodeURIComponent(token)}/redeem`, { method: 'POST', body }),

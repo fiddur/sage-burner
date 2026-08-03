@@ -8,9 +8,11 @@ import Fastify from 'fastify'
 import { existsSync, statSync } from 'node:fs'
 import path from 'node:path'
 
+import type { Gate } from './auth/gate.ts'
 import type { Config } from './config.ts'
 import type { Database } from './db/index.ts'
 
+import { createGate, SCRYPT_GATE } from './auth/gate.ts'
 import { createSessions } from './auth/session.ts'
 import { clientErrorHandler, frameworkErrorHandler, registerErrorHandler } from './errors.ts'
 import { registerAdminRoutes } from './routes/admin.ts'
@@ -44,6 +46,11 @@ export interface AppDeps {
    * asserted as a wait rather than as ~230ms of real scrypt in the suite.
    */
   hash?: (password: string) => Promise<string>
+  /**
+   * The scrypt gate. Injected so a test can shrink it to one slot and assert
+   * shedding without spending the real thing's five-second window.
+   */
+  gate?: Gate
 }
 
 /** The API lives here; everything else is the single-page app. */
@@ -254,6 +261,7 @@ const sessionDeps = (config: Config) => ({
 export const createApp = async ({
   db,
   config,
+  gate: suppliedGate,
   hash,
   now = () => new Date(),
 }: AppDeps): Promise<FastifyInstance> => {
@@ -315,7 +323,12 @@ export const createApp = async ({
 
   // One `Sessions` for both, so the guards verify what the login route signed.
   const sessions = createSessions(sessionDeps(config))
-  registerAuthRoutes(app, { db, config, sessions })
+
+  // One gate for every route that spends scrypt, and per-app rather than
+  // module-level so two apps in one test process do not share one.
+  const gate = suppliedGate ?? createGate(SCRYPT_GATE)
+
+  registerAuthRoutes(app, { db, config, sessions, gate })
   registerAdminRoutes(app, { db, sessions })
   registerInstallationRoutes(app, { db, sessions })
   registerEventRoutes(app, { db, sessions, now })
@@ -325,7 +338,7 @@ export const createApp = async ({
   registerApplicationRoutes(app, { db, now })
   registerApplicationReviewRoutes(app, { db, sessions, now })
   registerInviteRoutes(app, { db, sessions, now })
-  registerRedemptionRoutes(app, { db, config, sessions, now, hash })
+  registerRedemptionRoutes(app, { db, config, sessions, now, hash, gate })
   registerAttendanceRoutes(app, { db, sessions, now })
   registerProfileRoutes(app, { db, sessions, now })
   registerRosterRoutes(app, { db, sessions, now })

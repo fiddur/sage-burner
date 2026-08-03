@@ -5,6 +5,7 @@ import { errorResponse, inviteStatusOf, redeemRequestSchema } from '@sage-burner
 import { and, eq, isNull } from 'drizzle-orm'
 import { createHash, randomUUID } from 'node:crypto'
 
+import type { Gate } from '../auth/gate.ts'
 import type { Sessions } from '../auth/session.ts'
 import type { Config } from '../config.ts'
 import type { Database } from '../db/index.ts'
@@ -20,6 +21,8 @@ export interface RedemptionDeps {
   sessions: Sessions
   now?: () => Date
   hash?: (password: string) => Promise<string>
+  /** The scrypt gate, shared with login. See `SCRYPT_GATE`. */
+  gate: Gate
 }
 
 const digestOf = (token: string) => createHash('sha256').update(token).digest('hex')
@@ -37,7 +40,7 @@ const isEmailConflict = (error: unknown) =>
  */
 export const registerRedemptionRoutes = (
   app: FastifyInstance,
-  { db, config, sessions, now = () => new Date(), hash = hashPassword }: RedemptionDeps,
+  { db, config, sessions, now = () => new Date(), hash = hashPassword, gate }: RedemptionDeps,
 ) => {
   app.get<{ Params: { token: string } }>('/api/invites/:token', async (request, reply) => {
     void noStore(reply)
@@ -87,7 +90,23 @@ export const registerRedemptionRoutes = (
     //
     // Outside the transaction either way: holding a write transaction open
     // across scrypt would block every other writer for that long.
-    const password_hash = await hash(parsed.data.password)
+    // Bounded, because the check below can refuse without spending the token, so
+    // one held invite can be replayed at this hash for as long as it lives. The
+    // equal-cost property above is what makes that worth bounding: the refusal
+    // now costs what a success costs, by design.
+    const admission = await gate.enter()
+    if (!admission.ok) {
+      void reply.header('retry-after', admission.reason === 'timed-out' ? '5' : '1')
+      request.log.warn({ ...gate.stats(), reason: admission.reason }, 'redemption shed')
+      return reply.code(429).send(errorResponse('rate_limited'))
+    }
+
+    let password_hash: string
+    try {
+      password_hash = await hash(parsed.data.password)
+    } finally {
+      admission.release()
+    }
 
     // Checked before the write so the token is not spent on a request that cannot
     // finish: an account whose email is taken has nothing to retry with, and the

@@ -4,9 +4,11 @@ import { eq } from 'drizzle-orm'
 import { createHash, randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import type { Gate } from '../auth/gate.ts'
 import type { DbHandle } from '../db/index.ts'
 
 import { createApp } from '../app.ts'
+import { createGate } from '../auth/gate.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, attendance, inviteToken } from '../db/schema.ts'
@@ -33,7 +35,11 @@ afterEach(async () => {
   handle = undefined
 })
 
-const build = async (now: () => Date = () => new Date(NOW), hash?: (password: string) => Promise<string>) => {
+const build = async (
+  now: () => Date = () => new Date(NOW),
+  hash?: (password: string) => Promise<string>,
+  gate?: Gate,
+) => {
   handle = createDb({ url: ':memory:' })
   runMigrations(handle)
   app = await createApp({
@@ -41,6 +47,7 @@ const build = async (now: () => Date = () => new Date(NOW), hash?: (password: st
     config: createConfig({ LOG_LEVEL: 'silent', SESSION_SECRET: SECRET }),
     now,
     hash,
+    gate,
   })
   return app
 }
@@ -313,6 +320,47 @@ describe('redeeming', () => {
 
     const [row] = await db().select().from(account).where(eq(account.email, 'fredrik@example.org'))
     expect(row?.password_hash).toMatch(/^\$scrypt\$n=/)
+  })
+
+  it('sheds rather than queueing unbounded scrypt for one replayed invite', async () => {
+    // The cost of making the refusal equal-time: a taken address does not spend
+    // the token, so a held invite can be replayed at this hash for as long as it
+    // lives. One gate covers this and login together, because what is bounded is
+    // libuv's threadpool rather than either route.
+    const gate = createGate({ slots: 1, queue: 0, timeoutMs: 50 })
+    const server = await build(() => new Date(NOW), slowHash(60), gate)
+    const first = await givenInvite()
+    const second = await givenInvite()
+
+    const both = await Promise.all([redeem(server, first), redeem(server, second)])
+    const shed = both.find((response) => response.statusCode === 429)
+
+    expect(shed).toBeDefined()
+    expect(shed?.json()).toEqual({ error: 'rate_limited' })
+    expect(shed?.headers['retry-after']).toBe('1')
+  })
+
+  it('gives the slot back, so one redemption does not wedge the next', async () => {
+    // A leaked slot holds until the process restarts. With one slot, a second
+    // request through the same app is the shortest thing that notices.
+    const gate = createGate({ slots: 1, queue: 4, timeoutMs: 5000 })
+    const server = await build(() => new Date(NOW), slowHash(5), gate)
+    const first = await givenInvite()
+    const second = await givenInvite()
+
+    expect((await redeem(server, first)).statusCode).toBe(201)
+    const after = await redeem(server, second, { ...applicant, email: 'someone.else@example.org' })
+
+    expect(after.statusCode).toBe(201)
+  })
+
+  it('lets a redemption through when the gate is not saturated', async () => {
+    // The passing sibling: shedding everything would satisfy the test above.
+    const gate = createGate({ slots: 1, queue: 4, timeoutMs: 5000 })
+    const server = await build(() => new Date(NOW), undefined, gate)
+    const token = await givenInvite()
+
+    expect((await redeem(server, token)).statusCode).toBe(201)
   })
 
   it('refuses an email that already has an account, without spending the token', async () => {
