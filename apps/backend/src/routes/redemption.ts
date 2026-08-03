@@ -10,6 +10,7 @@ import type { Sessions } from '../auth/session.ts'
 import type { Config } from '../config.ts'
 import type { Database } from '../db/index.ts'
 
+import { retryAfterFor } from '../auth/gate.ts'
 import { hashPassword } from '../auth/password.ts'
 import { account, accountRole, inviteToken } from '../db/schema.ts'
 import { noStore } from '../http.ts'
@@ -81,32 +82,16 @@ export const registerRedemptionRoutes = (
       return reply.code(409).send(errorResponse('conflict'))
     }
 
-    // Before the taken-address check rather than after it, so the refusal costs
-    // what a success costs. `auth.ts`'s login is shaped the same way.
+    // Before the taken-address check, and gated, so a refusal costs what a success
+    // costs and neither is free. That throttles member enumeration rather than
+    // closing it — the status codes still answer the question, and the 409 does
+    // not spend the token — which the README argues out under "Redeeming".
     //
-    // This throttles an enumeration channel rather than closing one, and the
-    // difference is worth being exact about. The 409 for an address that already
-    // has an account does not spend the token, so a holder can ask "is this
-    // person a member?" about address after address — and the *status code*
-    // answers that whatever the timing does. Latency was a redundant second copy
-    // of it. What the ordering buys is that each probe now costs a gated scrypt,
-    // which takes enumeration from thousands a second to about two, competing
-    // with logins for the same slots. `#57` is what would bound it properly.
-    //
-    // Spending the token on the taken-address refusal would cap a held invite at
-    // one probe, and is deliberately not done: someone who typos an address that
-    // happens to have an account would lose their invite over it, and getting a
-    // new one needs an admin.
-    //
-    // Outside the transaction either way: holding a write transaction open
-    // across scrypt would block every other writer for that long.
-    // Bounded, because the check below can refuse without spending the token, so
-    // one held invite can be replayed at this hash for as long as it lives. The
-    // equal-cost property above is what makes that worth bounding: the refusal
-    // now costs what a success costs, by design.
+    // Outside the transaction: holding a write transaction open across scrypt
+    // would block every other writer for that long.
     const admission = await gate.enter()
     if (!admission.ok) {
-      void reply.header('retry-after', admission.reason === 'timed-out' ? '5' : '1')
+      void reply.header('retry-after', retryAfterFor(admission.reason))
       request.log.warn({ ...gate.stats(), reason: admission.reason }, 'redemption shed')
       return reply.code(429).send(errorResponse('rate_limited'))
     }

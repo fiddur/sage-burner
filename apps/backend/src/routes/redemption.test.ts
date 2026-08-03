@@ -273,10 +273,11 @@ describe('redeeming', () => {
   })
 
   it('answers a token nobody minted exactly as it answers a spent one', async () => {
-    // The GET handler hides this distinction on purpose, and said so in a comment
-    // twenty lines from a POST that gave it away. Both are 409 now: the token is
-    // 256 bits of CSPRNG so there is nothing to enumerate, but a file that argues
-    // one way and acts the other is how the argument gets lost.
+    // Both are 409, not to hide which it is — the GET answers that plainly, and
+    // there is nothing to enumerate anyway with a 256-bit token — but because the
+    // caller has nothing to do with the difference here. By the time the page
+    // POSTs it has read the status, and all three mean the same thing: this link
+    // cannot be spent.
     const server = await build()
     const spent = await givenInvite({ used_at: NOW })
 
@@ -342,6 +343,26 @@ describe('redeeming', () => {
     expect(shed).toBeDefined()
     expect(shed?.json()).toEqual({ error: 'rate_limited' })
     expect(shed?.headers['retry-after']).toBe('1')
+  })
+
+  it('tells a caller who waited the whole window to wait longer', async () => {
+    // The `timed-out` branch, which nothing reached before the gate was
+    // injectable — and the only thing distinguishing its `Retry-After` from
+    // `queue-full`'s. Sending a client that already waited the window straight
+    // back turns a polite `Retry-After` into a hot loop against the flood the
+    // gate exists to damp.
+    const gate = createGate({ slots: 1, queue: 1, timeoutMs: 20 })
+    const server = await build(() => new Date(NOW), slowHash(120), gate)
+    const first = await givenInvite()
+    const second = await givenInvite()
+
+    const holding = redeem(server, first)
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    const waited = await redeem(server, second, { ...applicant, email: 'other@example.org' })
+
+    expect(waited.statusCode).toBe(429)
+    expect(waited.headers['retry-after']).toBe('5')
+    expect((await holding).statusCode).toBe(201)
   })
 
   it('gives the slot back, so one redemption does not wedge the next', async () => {

@@ -9,6 +9,7 @@ import type { Sessions } from '../auth/session.ts'
 import type { Config } from '../config.ts'
 import type { Database } from '../db/index.ts'
 
+import { retryAfterFor } from '../auth/gate.ts'
 import { hashPassword, needsRehash, verifyPassword } from '../auth/password.ts'
 import { account, accountRole } from '../db/schema.ts'
 import { noStore } from '../http.ts'
@@ -269,14 +270,7 @@ export const registerAuthRoutes = (app: FastifyInstance, { db, config, sessions,
     const admission = await gate.enter()
 
     if (!admission.ok) {
-      // The advice differs by reason, and so does what already happened.
-      // `queue-full` is refused synchronously and waited for nothing, and the
-      // work in flight clears shortly, so a second is about right. `timed-out`
-      // held on for the whole window against a gate that stayed saturated —
-      // sending that caller straight back turns a client politely honouring
-      // `Retry-After` into a hot retry loop, adding churn under exactly the
-      // flood this exists to damp.
-      void reply.header('retry-after', admission.reason === 'timed-out' ? '5' : '1')
+      void reply.header('retry-after', retryAfterFor(admission.reason))
       request.log.warn({ ...gate.stats(), reason: admission.reason }, 'login shed')
       return reply.code(429).send(errorResponse('rate_limited'))
     }

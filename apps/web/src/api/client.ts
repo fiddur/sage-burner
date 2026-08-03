@@ -347,9 +347,9 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
      *
      * Throws ApiError(409) for every invite that cannot be spent — unknown,
      * expired, already used, or one that lost a race — and for an email that
-     * already has an account. One answer on purpose: a different one for an
-     * unknown token would let someone probe for live ones, which is what the
-     * status read at `getInviteState` also refuses to say.
+     * already has an account. One answer because by this point the difference is
+     * not the caller's to act on: the page has already read the status from
+     * `getInviteState`, and all three mean the same thing here.
      *
      * Throws ApiError(429) when the server is already spending all the password
      * hashing it will run at once.

@@ -1368,8 +1368,9 @@ whoever holds one unspent invite can ask "does this address have an account?"
 about address after address — and the _status code_ answers that regardless of
 timing: `409` for a member, `201` for anyone else. Latency was a redundant second
 copy of an answer the status line already gives. What the ordering buys is cost:
-each probe now spends a gated scrypt, which is roughly two a second rather than
-thousands, competing with logins for the same slots. #57 is what would bound it
+each probe now spends a gated scrypt. With `SCRYPT_GATE`'s two slots and scrypt at
+~230ms that is a ceiling of **about nine probes a second**, shared with every
+login — against thousands a second when the refusal was free. #57 is what would bound it
 properly, and there is a test that pins the residual so this paragraph cannot
 quietly go stale.
 

@@ -68,12 +68,10 @@ export interface GateOptions {
  * 5s the margin is ~3x. The cost of the longer wait is a held connection, which
  * is cheaper than refusing someone who typed the right password.
  *
- * Login is not the only caller. Redemption hashes a new password before it
- * checks whether the address is already taken — deliberately, so the refusal
- * costs what a success costs and cannot be told apart by latency — and a held
- * invite can be replayed at that path indefinitely without ever spending the
- * token. One gate covers both, because what is being bounded is the threadpool,
- * not the route.
+ * Login is not the only caller. Redemption hashes before it checks whether the
+ * address is already taken, so its refusal costs what a success costs — and that
+ * refusal never spends the token, so a held invite can be replayed at it. One
+ * gate covers both, because what is bounded is the threadpool, not the route.
  *
  * Still not a rate limiter: this bounds concurrent work, not attempts per
  * caller. #57 is that, and it is what bounds guessing.
@@ -90,6 +88,20 @@ export const SCRYPT_GATE: GateOptions = { slots: 2, queue: 8, timeoutMs: 5000 }
  * into a hot loop against exactly the flood this exists to damp.
  */
 export type Refusal = 'queue-full' | 'timed-out'
+
+/**
+ * How long to tell a shed caller to wait, by why they were shed.
+ *
+ * `queue-full` was refused synchronously and waited for nothing, and the work in
+ * flight clears shortly, so a second is about right. `timed-out` held on for the
+ * whole window against a gate that stayed saturated — sending that caller
+ * straight back turns a client politely honouring `Retry-After` into a hot retry
+ * loop, adding churn under exactly the flood the gate exists to damp.
+ *
+ * Here rather than at each route: two callers writing the same two numbers out is
+ * two places for a later change to reach only one of.
+ */
+export const retryAfterFor = (reason: Refusal): string => (reason === 'timed-out' ? '5' : '1')
 
 export type Admission = { ok: true; release: () => void } | { ok: false; reason: Refusal }
 
