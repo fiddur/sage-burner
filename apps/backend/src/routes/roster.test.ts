@@ -99,6 +99,9 @@ const givenComing = async (eventId: string, accountId: string, joined_at: string
       account_id: accountId,
       joined_at,
       payment_status: paid ? 'paid' : 'unpaid',
+      // A paid row carries a date, or "unmarking clears it" is asserted against a
+      // column that was already null and the test proves nothing.
+      payment_date: paid ? '2026-06-30' : null,
     })
 }
 
@@ -196,10 +199,7 @@ describe('the list of who is coming', () => {
     await givenComing(eventId, second.id, '2026-07-02T00:00:00Z')
     await givenComing(eventId, third.id, '2026-07-03T00:00:00Z')
 
-    await setPayment(server, admin.cookie, eventId, third.id, {
-      payment_status: 'paid',
-      payment_date: '2026-07-04',
-    })
+    await setPayment(server, admin.cookie, eventId, third.id, { payment_status: 'paid' })
 
     expect(names(await roster(server, admin.cookie, eventId))).toEqual(['Third', 'First', 'Second (waiting)'])
   })
@@ -235,7 +235,30 @@ describe('the list of who is coming', () => {
 })
 
 describe('recording a payment', () => {
-  it('sets the status and the date', async () => {
+  it('stamps the date from the clock, which the caller does not get a say in', async () => {
+    // Derived rather than accepted, the way `joined_at` already is. A date the
+    // caller supplies is a date that can disagree with the status it belongs to.
+    const server = await build()
+    const admin = await givenAccount('Org', ['admin'])
+    const eventId = await givenEvent()
+    const who = await givenAccount('Payer')
+    await givenComing(eventId, who.id, '2026-07-01T00:00:00Z')
+
+    const response = await setPayment(server, admin.cookie, eventId, who.id, {
+      payment_status: 'paid',
+    })
+
+    expect(response.statusCode).toBe(200)
+    const [row] = await db().select().from(attendance).where(eq(attendance.account_id, who.id))
+    expect(row?.payment_status).toBe('paid')
+    expect(row?.payment_date).toBe('2026-07-02')
+  })
+
+  it('refuses a date from the caller rather than quietly preferring its own', async () => {
+    // `.strict()` is what makes the field gone rather than ignored: stripped, the
+    // organiser would believe they had backdated a transfer that in fact reads as
+    // today. Backdating is a real need — it wants a deliberate design, not a
+    // field the server silently overrides.
     const server = await build()
     const admin = await givenAccount('Org', ['admin'])
     const eventId = await givenEvent()
@@ -247,10 +270,9 @@ describe('recording a payment', () => {
       payment_date: '2026-07-04',
     })
 
-    expect(response.statusCode).toBe(200)
+    expect(response.statusCode).toBe(400)
     const [row] = await db().select().from(attendance).where(eq(attendance.account_id, who.id))
-    expect(row?.payment_status).toBe('paid')
-    expect(row?.payment_date).toBe('2026-07-04')
+    expect(row?.payment_status).toBe('unpaid')
   })
 
   it('can undo a payment recorded by mistake', async () => {
@@ -260,11 +282,11 @@ describe('recording a payment', () => {
     const who = await givenAccount('Payer')
     await givenComing(eventId, who.id, '2026-07-01T00:00:00Z', true)
 
-    await setPayment(server, admin.cookie, eventId, who.id, {
-      payment_status: 'unpaid',
-      payment_date: null,
-    })
+    await setPayment(server, admin.cookie, eventId, who.id, { payment_status: 'unpaid' })
 
+    // The invariant the README states: unmarking clears the date, so one never
+    // outlives the payment it recorded. Now a property of the write rather than
+    // of the one caller that remembered to send `null`.
     const [row] = await db().select().from(attendance).where(eq(attendance.account_id, who.id))
     expect(row?.payment_status).toBe('unpaid')
     expect(row?.payment_date).toBeNull()

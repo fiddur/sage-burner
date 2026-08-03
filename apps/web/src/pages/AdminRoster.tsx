@@ -69,11 +69,10 @@ export const AdminRoster = ({ api }: { api: RosterApi }) => {
     setBusy(entry.account_id)
     setError(undefined)
     try {
-      await api.setPayment(eventId, entry.account_id, {
-        payment_status: paid ? 'paid' : 'unpaid',
-        // Cleared when unmarking, so a date never outlives the payment it recorded.
-        payment_date: paid ? new Date().toISOString().slice(0, 10) : null,
-      })
+      // The date is the server's to stamp, from its own clock: a browser's idea of
+      // today can differ by a day, and the two fields could disagree at all only
+      // because this was the one caller keeping them in step.
+      await api.setPayment(eventId, entry.account_id, { payment_status: paid ? 'paid' : 'unpaid' })
       // Reloaded rather than patched in place: paying re-sorts the whole list and
       // can move someone else across the waiting line.
       await load()
