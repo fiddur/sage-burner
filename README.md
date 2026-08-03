@@ -479,9 +479,15 @@ and can drop a flood before it costs a scrypt hash. [#57] tracks doing it in
 the app if that ever stops being enough.
 
 There is a bound on concurrent _work_, which is a different thing. At most two
-password verifications run at once, and up to eight further callers wait in a
-FIFO queue; only an eleventh concurrent caller, or one still waiting after five
-seconds, gets a `429` with `Retry-After`.
+**scrypt hashes** run at once, and up to eight further callers wait in a FIFO
+queue; the eleventh concurrent caller, or one still waiting after five seconds,
+gets a `429` with `Retry-After`.
+
+That bound is **shared with invite redemption**, not login's own. One gate covers
+both, because what is being protected is libuv's threadpool rather than either
+route — two gates of two slots would spend all four threads between them. So the
+eleven are eleven of _either_: a flood of redemptions can shed a login and the
+other way round, which is the point.
 
 Queued rather than refused, deliberately. A hard cap would mean two sustained
 anonymous requests denied every member's login for as long as they held them,
@@ -491,21 +497,25 @@ owning them.
 
 Why any of this is needed: every attempt costs ~230ms of CPU and 64 MiB —
 including one for an address with no account, since the decoy derivation
-deliberately spends the same work — and `scrypt` runs on libuv's threadpool,
-four slots by default, shared with the reads that serve static files. Without a
-bound, sustained login traffic would degrade the whole app rather than just that
-route.
+deliberately spends the same work, and including a redemption that is going to be
+refused — and `scrypt` runs on libuv's threadpool, four slots by default, shared
+with the reads that serve static files. Without a bound, sustained traffic to
+either route would degrade the whole app rather than just that route.
 
 What the app does **not** do is bound the number of _attempts_. There is no
 lockout and no backoff, and the gate does not provide one — it bounds concurrent
 work, which is a different thing. Two slots at ~230ms is roughly 8–9 tries a
 second, about 750,000 a day, sustained indefinitely against one address.
 
-**So configure the proxy.** Something that counts requests per client IP against
-`/api/auth/login` — `mod_evasive`, `mod_qos`, or fail2ban watching the access
-log — sized well below that figure. A few attempts a minute is generous for a
-membership of 42 and leaves an attacker nowhere to go. This matters from the
-moment the first account exists, which is the setup step below.
+**So configure the proxy**, and for **both** paths that spend a hash:
+`POST /api/auth/login` and `POST /api/invites/:token/redeem`. Something that counts
+requests per client IP — `mod_evasive`, `mod_qos`, or fail2ban watching the access
+log — sized well below that figure. A rule scoped to login alone leaves half the
+gate's callers unthrottled, and redemption is the worse half: its `409` for an
+address that already has an account never spends the invite, so one held link
+drives it indefinitely. A few attempts a minute is generous for a membership of 42
+and leaves an attacker nowhere to go. This matters from the moment the first
+account exists, which is the setup step below.
 
 `SESSION_SECRET` is required in production and the app refuses to start without
 it. Generating one at boot instead would look like it works and log every member
@@ -1378,6 +1388,38 @@ Two races are closed, and each has a test that fails without it:
 
 The password is hashed _outside_ the transaction. Holding a write transaction open
 across 230ms of scrypt would block every other writer for that long.
+
+It is also hashed **before** the check for an address that already has an
+account, so the refusal costs what a success costs. `POST /api/auth/login` is
+shaped the same way.
+
+**This throttles an enumeration channel; it does not close one, and the
+difference is worth stating plainly.** A `409` does not spend the token, so
+whoever holds one unspent invite can ask "does this address have an account?"
+about address after address — and the _status code_ answers that regardless of
+timing: `409` for a member, `201` for anyone else. Latency was a redundant second
+copy of an answer the status line already gives. What the ordering buys is cost:
+each probe now spends a gated scrypt. With `SCRYPT_GATE`'s two slots and scrypt at
+~230ms that is a ceiling of **about nine probes a second**, shared with every
+login — against thousands a second when the refusal was free. #57 is what would bound it
+properly, and there is a test that pins the residual so this paragraph cannot
+quietly go stale.
+
+Spending the token on the taken-address refusal would cap a held invite at one
+probe. It is deliberately not done: someone who typos an address that happens to
+belong to a member would lose their invite over it, and a new one needs an admin.
+
+That hash goes through the **same gate as login**, not one of its own — the gate
+bounds concurrent scrypt against libuv's four threads, so two gates of two slots
+would spend the whole pool between them. There is a test holding the only slot
+from the redemption side and asserting login is shed, which fails if they ever
+drift apart. Over the bound both answer `429` with `Retry-After`.
+
+The `POST` gives **one answer** — `409` — for unknown, expired and spent alike.
+Not to hide which it is: the `GET` above says so plainly to anyone who asks, and
+could not usefully do otherwise. It is that the client has nothing to do with the
+difference at this point — the page has already read the status, and by the time
+it POSTs all three mean the same thing, that this link cannot be spent.
 
 **No `attendance` row is created.** Redeeming makes you a member of the community;
 saying which burn you are coming to is a separate act, and #76 owns it.

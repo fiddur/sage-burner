@@ -138,4 +138,20 @@ describe('createGate', () => {
 
     expect(gate.stats()).toEqual({ active: 0, waiting: 0 })
   })
+
+  describe('what it tells a shed caller to wait', () => {
+    it('derives the timed-out advice from its own window', () => {
+      // Written out as `'5'`, this went quietly wrong the day `timeoutMs` moved:
+      // a caller who waited eight seconds told to come back in five is the hot
+      // retry loop the number exists to prevent.
+      expect(createGate({ slots: 1, queue: 1, timeoutMs: 8000 }).retryAfter('timed-out')).toBe('8')
+      expect(createGate({ slots: 1, queue: 1, timeoutMs: 2500 }).retryAfter('timed-out')).toBe('3')
+    })
+
+    it('tells a queue-full caller one second, whatever the window is', () => {
+      // They waited for nothing — the work in flight is what clears, and that is
+      // a slot's worth away rather than a window's.
+      expect(createGate({ slots: 1, queue: 1, timeoutMs: 8000 }).retryAfter('queue-full')).toBe('1')
+    })
+  })
 })

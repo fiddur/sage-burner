@@ -5,6 +5,7 @@ import { errorResponse, inviteStatusOf, redeemRequestSchema } from '@sage-burner
 import { and, eq, isNull } from 'drizzle-orm'
 import { createHash, randomUUID } from 'node:crypto'
 
+import type { Gate } from '../auth/gate.ts'
 import type { Sessions } from '../auth/session.ts'
 import type { Config } from '../config.ts'
 import type { Database } from '../db/index.ts'
@@ -19,6 +20,9 @@ export interface RedemptionDeps {
   config: Config
   sessions: Sessions
   now?: () => Date
+  hash?: (password: string) => Promise<string>
+  /** The scrypt gate, shared with login. See `SCRYPT_GATE`. */
+  gate: Gate
 }
 
 const digestOf = (token: string) => createHash('sha256').update(token).digest('hex')
@@ -36,7 +40,7 @@ const isEmailConflict = (error: unknown) =>
  */
 export const registerRedemptionRoutes = (
   app: FastifyInstance,
-  { db, config, sessions, now = () => new Date() }: RedemptionDeps,
+  { db, config, sessions, now = () => new Date(), hash = hashPassword, gate }: RedemptionDeps,
 ) => {
   app.get<{ Params: { token: string } }>('/api/invites/:token', async (request, reply) => {
     void noStore(reply)
@@ -47,10 +51,13 @@ export const registerRedemptionRoutes = (
       .where(eq(inviteToken.token_hash, digestOf(request.params.token)))
       .limit(1)
 
-    // 200 with a status either way, and the same shape for all four: a 404 for an
-    // unknown token, or a different body, would let someone probe for live ones.
-    // The page needs to tell an expired invite from a spent one, which is the
-    // whole reason this is not just an error code.
+    // 200 with a status either way, and the same shape for all four. This does
+    // not hide which of the four it is — `unknown` says so plainly, and anyone
+    // holding a string can ask. It could not usefully hide it either: the page
+    // has to tell an expired invite from a spent one to say what to do about it,
+    // and there is nothing to enumerate, the token being 256 bits of CSPRNG.
+    // What the uniform shape buys is one code path for the page rather than a
+    // status the fetch layer turns into an error.
     return {
       status: invite === undefined ? 'unknown' : inviteStatusOf(invite, now()),
     } satisfies InviteState
@@ -65,9 +72,34 @@ export const registerRedemptionRoutes = (
     const digest = digestOf(request.params.token)
     const [invite] = await db.select().from(inviteToken).where(eq(inviteToken.token_hash, digest)).limit(1)
 
-    if (invite === undefined) return reply.code(404).send(errorResponse('not_found'))
-    if (inviteStatusOf(invite, now()) !== 'outstanding') {
+    // One answer for unknown, expired and spent alike — not to hide anything (the
+    // GET above says which it is, to anyone who asks), but because the client has
+    // nothing to do with the difference here. The page has already read the
+    // status; by the time it POSTs, every one of the three means the same thing:
+    // this link cannot be spent.
+    if (invite === undefined || inviteStatusOf(invite, now()) !== 'outstanding') {
       return reply.code(409).send(errorResponse('conflict'))
+    }
+
+    // Before the taken-address check, and gated, so a refusal costs what a success
+    // costs and neither is free. That throttles member enumeration rather than
+    // closing it — the status codes still answer the question, and the 409 does
+    // not spend the token — which the README argues out under "Redeeming".
+    //
+    // Outside the transaction: holding a write transaction open across scrypt
+    // would block every other writer for that long.
+    const admission = await gate.enter()
+    if (!admission.ok) {
+      void reply.header('retry-after', gate.retryAfter(admission.reason))
+      request.log.warn({ ...gate.stats(), reason: admission.reason }, 'redemption shed')
+      return reply.code(429).send(errorResponse('rate_limited'))
+    }
+
+    let password_hash: string
+    try {
+      password_hash = await hash(parsed.data.password)
+    } finally {
+      admission.release()
     }
 
     // Checked before the write so the token is not spent on a request that cannot
@@ -80,10 +112,6 @@ export const registerRedemptionRoutes = (
       .where(eq(account.email, parsed.data.email))
       .limit(1)
     if (taken !== undefined) return reply.code(409).send(errorResponse('conflict'))
-
-    // Hashed outside the transaction: scrypt costs ~230ms, and holding a write
-    // transaction open across it would block every other writer for that long.
-    const password_hash = await hashPassword(parsed.data.password)
     const accountId = randomUUID()
 
     // One transaction for the account, its role and the stamp. Half a redemption
@@ -95,6 +123,13 @@ export const registerRedemptionRoutes = (
     // The stamp is conditional on `used_at IS NULL` and requires one affected row,
     // so two concurrent redemptions of one token cannot both proceed: the loser's
     // UPDATE matches nothing and the whole transaction rolls back.
+    //
+    // `expires_at` is deliberately not re-checked here. The window between the
+    // `outstanding` check above and this write is a queue wait plus a hash — up to
+    // ~5.2s with `SCRYPT_GATE`, against an invite whose life is measured in days —
+    // so an expiry that falls inside it lets the redemption through. Re-checking
+    // would refuse someone whose link was live when they pressed the button, which
+    // is the worse answer.
     // The pre-check above is not enough on its own: two requests can both pass it
     // before either writes. The UNIQUE is the authority, and losing to it is a
     // conflict rather than an internal error — the same distinction `events.ts`

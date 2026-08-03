@@ -258,14 +258,66 @@ describe('Invite', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('fresh link')
   })
 
-  it('says a transport failure is worth retrying, unlike a conflict', async () => {
-    renderPage(stub({ redeemInvite: () => Promise.reject(new TypeError('Failed to fetch')) }))
+  it('says to wait rather than to check the connection when the server is at capacity', async () => {
+    // A 429 is the server bounding how much password hashing it runs at once.
+    // Nothing is wrong with their connection, and waiting a moment does work —
+    // which is the opposite of what the generic message tells them to do.
+    renderPage(stub({ redeemInvite: () => Promise.reject(apiError(429, 'rate_limited', 'nope')) }))
 
     await screen.findByRole('button', { name: 'Join' })
     complete()
     join()
 
-    expect((await screen.findByRole('alert')).textContent).toContain('try again')
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain('Wait a few seconds')
+    expect(alert.textContent).not.toContain('connection')
+  })
+
+  it('passes on the connection advice for a request that never reached a server', async () => {
+    // What the client actually raises for a dead network since it started
+    // mapping them: `ApiError(0, 'network')`, whose message already says what to
+    // do. This is the one branch where advice about a connection is right, and it
+    // was the one branch that did not give it.
+    renderPage(
+      stub({
+        redeemInvite: () =>
+          Promise.reject(
+            apiError(0, 'network', 'Could not reach the server. Check your connection and try again.'),
+          ),
+      }),
+    )
+
+    await screen.findByRole('button', { name: 'Join' })
+    complete()
+    join()
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Check your connection')
+  })
+
+  it("does not render the page's own cancellation at someone", async () => {
+    // `aborted` shares status 0 with `network`, and "Request cancelled." is the
+    // page tidying up after itself rather than anything the member did.
+    renderPage(stub({ redeemInvite: () => Promise.reject(apiError(0, 'aborted', 'Request cancelled.')) }))
+
+    await screen.findByRole('button', { name: 'Join' })
+    complete()
+    join()
+
+    expect((await screen.findByRole('alert')).textContent).not.toContain('cancelled')
+  })
+
+  it('does not blame the connection for a failure that arrived as a response', async () => {
+    // The passing sibling, and the inversion it caught: a 500 is the server
+    // answering, so "check your connection" sends them after the wrong thing.
+    renderPage(stub({ redeemInvite: () => Promise.reject(apiError(500, 'internal', 'nope')) }))
+
+    await screen.findByRole('button', { name: 'Join' })
+    complete()
+    join()
+
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain('try again')
+    expect(alert.textContent).not.toContain('connection')
   })
 
   it('does not offer redemption to someone already signed in', async () => {
