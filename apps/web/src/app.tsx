@@ -37,6 +37,7 @@ export type AppApi = Pick<
   ApiClient,
   | 'createEvent'
   | 'getActiveEvent'
+  | 'updateWelcome'
   | 'getAdminAccounts'
   | 'setAccountRoles'
   | 'getEvents'
@@ -102,6 +103,8 @@ export const Routes = ({
     | 'createEvent'
     | 'deleteQuestion'
     | 'getActiveEvent'
+    | 'updateWelcome'
+    | 'updateWelcome'
     | 'getAdminAccounts'
     | 'setAccountRoles'
     | 'getEvents'

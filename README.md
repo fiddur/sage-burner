@@ -600,6 +600,34 @@ coming to a burn. An organiser who is not attending is coherent, so `admin`
 deliberately does not confer `member` — but the ordinary case is both, which is
 why `admin:create` grants both.
 
+### What a member may change
+
+This replaces a shared spreadsheet where everyone could edit everything except
+paid status, so the default for the burn's **shared furniture** is any approved
+member — not admin:
+
+| Open to any approved member   | Still admin                                                                     |
+| ----------------------------- | ------------------------------------------------------------------------------- |
+| Schedule places (lanes)       | The burn's shape: name, slug, dates, gate times, `member_cap`, and creating one |
+| The lodging and helping lists | Payment                                                                         |
+| A burn's welcome text         | Applications, invites, role grants, installation settings                       |
+
+"Approved" means **`member` or `admin`**, and the second half is load-bearing: the
+bootstrapped account holds `admin` alone — redemption is what grants `member` — so
+a `member`-only guard would lock the person setting the first burn up out of
+setting it up. That is `requireApproved` in `auth/guards.ts`; neither role implies
+the other anywhere else.
+
+Personal details stay the person's own. A member reads the roster and writes only
+their own stay.
+
+The welcome text is edited **on the homepage**, where it is read — whoever spots a
+typo is the one likely to fix it — through `PATCH /api/events/:id/welcome`. That is
+a route of its own rather than a carve-out in the admin `PATCH`, and the reason is
+the paragraph below: opening one field of the admin route would move the burn's
+shape out from under the prefix hook and turn its protection back into a branch. A
+`.strict()` body means a `member_cap` sent there is a `400`, not a dropped key.
+
 **Every route under `/api/admin/` requires `admin`, whether or not the route
 asked.** One `onRequest` hook on the prefix, rather than a `preHandler` per
 route: opt-in protection is a line a new route has to remember, and forgetting
@@ -1187,7 +1215,7 @@ public by design. Every write is admin-only.
 `order` is the server's to assign, so `POST` refuses a caller that sends one —
 otherwise two places could claim the same lane. New places land after the last,
 assigned inside a transaction so two simultaneous adds cannot both read the same
-last row. `PUT /api/admin/places/order` takes **every** place exactly once; a
+last row. `PUT /api/places/order` takes **every** place exactly once; a
 partial list would renumber some rows and leave the rest on stale positions.
 Deleting does not renumber the survivors: `order` only has to sort, not be
 contiguous.

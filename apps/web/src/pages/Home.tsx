@@ -4,13 +4,18 @@ import { useEffect, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
+import { isApiError } from '../api/client.ts'
+import { FormError, useFormError } from '../components/FormError.tsx'
+import { MarkdownField } from '../components/MarkdownField.tsx'
 import { useInstallationTitle } from '../installation.tsx'
 import { renderMarkdown } from '../markdown.ts'
-import { isMember, useViewer } from '../viewer.tsx'
+import { isApproved, isMember, useViewer } from '../viewer.tsx'
+
+const MAX_WELCOME = 100_000
 
 type Active = { status: 'loading' } | { status: 'ready'; event: Event | null } | { status: 'failed' }
 
-export type HomeApi = Pick<ApiClient, 'getActiveEvent'>
+export type HomeApi = Pick<ApiClient, 'getActiveEvent' | 'updateWelcome'>
 
 /**
  * The public landing page.
@@ -26,6 +31,9 @@ export const Home = ({ api }: { api: HomeApi }) => {
   const viewer = useViewer()
   const title = useInstallationTitle()
   const [active, setActive] = useState<Active>({ status: 'loading' })
+  const [editing, setEditing] = useState<string | undefined>(undefined)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useFormError()
 
   useEffect(() => {
     const controller = new AbortController()
@@ -46,6 +54,23 @@ export const Home = ({ api }: { api: HomeApi }) => {
       controller.abort()
     }
   }, [api])
+
+  // Bound once so the editor's callbacks do not each re-narrow `active`.
+  const current = active.status === 'ready' ? active.event : null
+
+  const save = async (id: string, welcome_markdown: string) => {
+    setSaving(true)
+    setError(undefined)
+    try {
+      const { event } = await api.updateWelcome(id, { welcome_markdown })
+      setActive({ status: 'ready', event })
+      setEditing(undefined)
+    } catch (failure) {
+      setError(isApiError(failure) ? failure.message : 'Could not save that. Please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <article class="prose">
@@ -74,15 +99,63 @@ export const Home = ({ api }: { api: HomeApi }) => {
           </p>
 
           {/*
-            Admin-authored and rendered to everyone. `renderMarkdown` escapes
-            raw HTML rather than filtering it, and checks link and image URLs
-            against a scheme allowlist — `markdown.ts` says why escaping is the
-            safer of the two.
+            Rendered to everyone, and written by any approved member. `renderMarkdown`
+            escapes raw HTML rather than filtering it, and checks link and image URLs
+            against a scheme allowlist — `markdown.ts` says why escaping is the safer
+            of the two, and why that holds for an author who is not an admin.
           */}
-          <div
-            class="welcome"
-            dangerouslySetInnerHTML={{ __html: renderMarkdown(active.event.welcome_markdown) }}
-          />
+          {editing === undefined ? (
+            <>
+              <div
+                class="welcome"
+                dangerouslySetInnerHTML={{ __html: renderMarkdown(active.event.welcome_markdown) }}
+              />
+
+              {/*
+                Edited where it is read: whoever spots a typo on the homepage is the
+                one likely to fix it. The burn's dates and cap stay admin-only and
+                are edited under Organise, which is why this is not a link to there.
+              */}
+              {isApproved(viewer) && (
+                <button
+                  type="button"
+                  class="link-button"
+                  onClick={() => setEditing(current === null ? '' : current.welcome_markdown)}
+                >
+                  Edit this text
+                </button>
+              )}
+            </>
+          ) : (
+            <form
+              class="form"
+              onSubmit={(submitEvent) => {
+                submitEvent.preventDefault()
+                if (current !== null) void save(current.id, editing)
+              }}
+            >
+              <MarkdownField
+                label="Welcome text"
+                value={editing}
+                maxLength={MAX_WELCOME}
+                onInput={setEditing}
+              />
+
+              <FormError error={error} />
+
+              <button type="submit" disabled={saving}>
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+              <button
+                type="button"
+                class="link-button"
+                disabled={saving}
+                onClick={() => setEditing(undefined)}
+              >
+                Cancel
+              </button>
+            </form>
+          )}
         </>
       )}
 

@@ -27,17 +27,35 @@ export interface GuardDeps {
  * there yet.
  */
 export const createGuards = ({ db, sessions }: GuardDeps) => {
-  // `role` is required, so there is no role-less branch to leave untested. An
-  // admin is not automatically a member: the two roles are separate rows in
-  // `account_role`, and redemption grants only `member`.
-  const guard = (role: AccountRole) => async (request: FastifyRequest, reply: FastifyReply) => {
-    const viewer = await viewerFor(request, { db, sessions })
+  // At least one role is required, so there is no role-less branch to leave
+  // untested. An admin is not automatically a member: the two roles are separate
+  // rows in `account_role`, and redemption grants only `member`.
+  const guard =
+    (...roles: [AccountRole, ...AccountRole[]]) =>
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const viewer = await viewerFor(request, { db, sessions })
 
-    if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
-    if (!viewer.roles.includes(role)) return reply.code(403).send(errorResponse('forbidden'))
+      if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
+      if (!roles.some((role) => viewer.roles.includes(role))) {
+        return reply.code(403).send(errorResponse('forbidden'))
+      }
 
-    return undefined
+      return undefined
+    }
+
+  return {
+    requireAdmin: guard('admin'),
+    requireMember: guard('member'),
+    /**
+     * Anyone who is in — the gate for what the shared spreadsheet let everyone
+     * edit.
+     *
+     * `admin` counts, and has to: the bootstrapped account holds `admin` alone
+     * (redemption is what grants `member`), so a `member`-only guard would lock
+     * the person setting the first burn up out of setting it up. Neither role
+     * implies the other anywhere else, which is why this is a third guard rather
+     * than a change to `requireMember`.
+     */
+    requireApproved: guard('member', 'admin'),
   }
-
-  return { requireAdmin: guard('admin'), requireMember: guard('member') }
 }

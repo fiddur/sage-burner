@@ -1,10 +1,12 @@
 import type { Event } from '@sage-burner/shared'
 
-import { cleanup, render, screen } from '@testing-library/preact'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Viewer } from '../viewer.tsx'
+import type { HomeApi } from './Home.tsx'
 
+import { apiError } from '../api/client.ts'
 import { ViewerProvider } from '../viewer.tsx'
 import { Home } from './Home.tsx'
 
@@ -23,14 +25,26 @@ const summer: Event = {
   created_at: '2026-01-01T00:00:00.000Z',
 }
 
+/** These cases are about rendering, not saving; a call here is a test bug. */
+const notStubbed = () => Promise.reject(new Error('updateWelcome is not stubbed here'))
+
 const SIGNED_OUT: Viewer = { status: 'signed-out' }
 
-const renderHome = (event: Event | null, viewer: Viewer = SIGNED_OUT) =>
+const renderHome = (
+  event: Event | null,
+  viewer: Viewer = SIGNED_OUT,
+  updateWelcome: HomeApi['updateWelcome'] = notStubbed,
+) =>
   render(
     <ViewerProvider viewer={viewer}>
-      <Home api={{ getActiveEvent: () => Promise.resolve({ event }) }} />
+      <Home api={{ getActiveEvent: () => Promise.resolve({ event }), updateWelcome }} />
     </ViewerProvider>,
   )
+
+const asRoles = (roles: ('admin' | 'member')[]): Viewer => ({
+  status: 'signed-in',
+  account: { id: 'a-1', roles },
+})
 
 describe('Home', () => {
   it('renders the active event name and dates', async () => {
@@ -83,7 +97,9 @@ describe('Home', () => {
     // render a code or a stack.
     render(
       <ViewerProvider viewer={SIGNED_OUT}>
-        <Home api={{ getActiveEvent: () => Promise.reject(new Error('offline')) }} />
+        <Home
+          api={{ getActiveEvent: () => Promise.reject(new Error('offline')), updateWelcome: notStubbed }}
+        />
       </ViewerProvider>,
     )
 
@@ -106,7 +122,7 @@ describe('Home', () => {
     })
     render(
       <ViewerProvider viewer={SIGNED_OUT}>
-        <Home api={{ getActiveEvent: () => pending }} />
+        <Home api={{ getActiveEvent: () => pending, updateWelcome: notStubbed }} />
       </ViewerProvider>,
     )
 
@@ -128,7 +144,7 @@ describe('Home', () => {
     // `api` identity and legitimately refetches — which is why `App` memoises
     // the client. This pins the half that lives here: given a stable client,
     // re-rendering must not refetch.
-    const api = { getActiveEvent }
+    const api = { getActiveEvent, updateWelcome: notStubbed }
 
     const { rerender } = render(
       <ViewerProvider viewer={SIGNED_OUT}>
@@ -144,5 +160,87 @@ describe('Home', () => {
     )
 
     expect(getActiveEvent).toHaveBeenCalledTimes(1)
+  })
+
+  describe('editing the welcome text', () => {
+    it('offers no editor to someone signed out', async () => {
+      renderHome(summer)
+      await screen.findByRole('heading', { name: 'Summer Burn 2026', level: 2 })
+
+      expect(screen.queryByRole('button', { name: 'Edit this text' })).toBeNull()
+    })
+
+    it('offers no editor to a signed-in account with no roles', async () => {
+      renderHome(summer, asRoles([]))
+      await screen.findByRole('heading', { name: 'Summer Burn 2026', level: 2 })
+
+      expect(screen.queryByRole('button', { name: 'Edit this text' })).toBeNull()
+    })
+
+    for (const roles of [['member'], ['admin'], ['member', 'admin']] as const) {
+      it(`offers it to ${roles.join(' + ')}`, async () => {
+        // `admin` counts as well as `member`: the bootstrapped account holds
+        // `admin` alone and is the one writing the first welcome text.
+        renderHome(summer, asRoles([...roles]))
+
+        expect(await screen.findByRole('button', { name: 'Edit this text' })).toBeTruthy()
+      })
+    }
+
+    it('saves the text and shows what came back, not what was typed', async () => {
+      // The response is the row as written, so rendering it rather than the local
+      // draft is what stops the page claiming a save that landed differently.
+      const updateWelcome = vi.fn<HomeApi['updateWelcome']>(() =>
+        Promise.resolve({ event: { ...summer, welcome_markdown: 'Saved server-side' } }),
+      )
+      renderHome(summer, asRoles(['member']), updateWelcome)
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit this text' }))
+      fireEvent.input(screen.getByLabelText('Welcome text'), { target: { value: 'Bring a cup' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+      await waitFor(() =>
+        expect(updateWelcome).toHaveBeenCalledWith('e-1', { welcome_markdown: 'Bring a cup' }),
+      )
+      expect(await screen.findByText('Saved server-side')).toBeTruthy()
+      expect(screen.queryByLabelText('Welcome text')).toBeNull()
+    })
+
+    it('starts the editor from the text that is there', async () => {
+      renderHome(summer, asRoles(['member']))
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit this text' }))
+
+      expect(screen.getByLabelText<HTMLTextAreaElement>('Welcome text').value).toBe(summer.welcome_markdown)
+    })
+
+    it('leaves the text alone when the save is refused', async () => {
+      const updateWelcome = vi.fn<HomeApi['updateWelcome']>(() =>
+        Promise.reject(apiError(403, 'forbidden', 'You do not have access to that.')),
+      )
+      renderHome(summer, asRoles(['member']), updateWelcome)
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit this text' }))
+      fireEvent.input(screen.getByLabelText('Welcome text'), { target: { value: 'Nope' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+      expect((await screen.findByRole('alert')).textContent).toContain('do not have access')
+      // Still editing, with the draft intact — losing what they typed over a
+      // refusal would be the second failure.
+      expect(screen.getByLabelText<HTMLTextAreaElement>('Welcome text').value).toBe('Nope')
+    })
+
+    it('puts the text back on cancel, without asking the API', async () => {
+      const updateWelcome = vi.fn<HomeApi['updateWelcome']>(notStubbed)
+      renderHome(summer, asRoles(['member']), updateWelcome)
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit this text' }))
+      fireEvent.input(screen.getByLabelText('Welcome text'), { target: { value: 'Discard me' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+      expect(screen.queryByLabelText('Welcome text')).toBeNull()
+      expect(await screen.findByRole('button', { name: 'Edit this text' })).toBeTruthy()
+      expect(updateWelcome).not.toHaveBeenCalled()
+    })
   })
 })

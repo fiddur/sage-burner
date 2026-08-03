@@ -3,7 +3,7 @@ import type { ComponentChildren } from 'preact'
 import type { ApiClient } from '../api/client.ts'
 
 import { useInstallationTitle } from '../installation.tsx'
-import { isAdmin, isMember, useSetViewer, useViewer } from '../viewer.tsx'
+import { isApproved, isMember, useSetViewer, useViewer } from '../viewer.tsx'
 
 /**
  * The frame every page sits in.
@@ -69,7 +69,7 @@ export const Layout = ({
             </>
           )}
 
-          {isAdmin(viewer) && <a href="/admin">Organise</a>}
+          {isApproved(viewer) && <a href="/admin">Organise</a>}
 
           {viewer.status === 'signed-in' && (
             <button type="button" class="link-button" onClick={() => void logOut()}>

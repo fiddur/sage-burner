@@ -163,6 +163,18 @@ export const eventUpdateSchema = withEventDateOrder(
 )
 export type EventUpdate = z.infer<typeof eventUpdateSchema>
 
+/**
+ * The one field of a burn any approved member may write.
+ *
+ * A route of its own rather than a carve-out inside `eventUpdateSchema`. The
+ * burn's shape — its dates, times and cap — stays admin-only, and `.strict()`
+ * here is what makes an attempt to smuggle `member_cap` through the member route
+ * a 400 rather than a dropped key. Field-level checks inside the partial handler
+ * would put that rule in a branch a later field could fall the wrong side of.
+ */
+export const eventWelcomeUpdateSchema = eventFields.pick({ welcome_markdown: true }).strict()
+export type EventWelcomeUpdate = z.infer<typeof eventWelcomeUpdateSchema>
+
 export const eventResponseSchema = z.object({ event: eventFields })
 export type EventResponse = z.infer<typeof eventResponseSchema>
 

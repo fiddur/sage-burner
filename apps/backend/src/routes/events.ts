@@ -1,13 +1,20 @@
 import type { ActiveEventResponse, Event, EventResponse, EventsResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { errorResponse, eventCreateSchema, eventUpdateSchema, hasOrderedRange } from '@sage-burner/shared'
+import {
+  errorResponse,
+  eventCreateSchema,
+  eventUpdateSchema,
+  eventWelcomeUpdateSchema,
+  hasOrderedRange,
+} from '@sage-burner/shared'
 import { asc, eq, gte } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
 import type { Database } from '../db/index.ts'
 
+import { createGuards } from '../auth/guards.ts'
 import { isCheckViolation } from '../db/errors.ts'
 import { event } from '../db/schema.ts'
 import { noStore } from '../http.ts'
@@ -56,7 +63,12 @@ export const activeEvent = async (db: Database, today: string): Promise<Event | 
 const isSlugConflict = (error: unknown) =>
   error instanceof Error && /UNIQUE constraint failed: event\.slug/i.test(error.message)
 
-export const registerEventRoutes = (app: FastifyInstance, { db, now = () => new Date() }: EventRouteDeps) => {
+export const registerEventRoutes = (
+  app: FastifyInstance,
+  { db, sessions, now = () => new Date() }: EventRouteDeps,
+) => {
+  const { requireApproved } = createGuards({ db, sessions })
+
   app.get('/api/events/active', async (_request, reply) => {
     // `no-cache`, not `no-store`. This is public content, so there is no reason
     // to forbid storing it — but #13 requires an edit to show up without a
@@ -100,6 +112,38 @@ export const registerEventRoutes = (app: FastifyInstance, { db, now = () => new 
 
     return reply.code(201).send({ event: row } satisfies EventResponse)
   })
+
+  /**
+   * The welcome text, which any approved member may rewrite.
+   *
+   * Its own route rather than a carve-out in the admin PATCH below. That handler
+   * writes the burn's shape — dates, times, cap, slug — and is under
+   * `/api/admin/`, where the prefix hook guards it structurally with no per-route
+   * opt-out. Opening one field of it would move that write out from under the
+   * hook and turn its protection back into a line of code inside a branch, which
+   * is the thing #64 removed. Ten duplicated lines are the cheaper half of that
+   * trade.
+   */
+  app.patch<{ Params: { id: string } }>(
+    '/api/events/:id/welcome',
+    { preHandler: requireApproved },
+    async (request, reply) => {
+      void noStore(reply)
+
+      const parsed = eventWelcomeUpdateSchema.safeParse(request.body)
+      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+
+      const [updated] = await db
+        .update(event)
+        .set(parsed.data)
+        .where(eq(event.id, request.params.id))
+        .returning()
+
+      return updated === undefined
+        ? reply.code(404).send(errorResponse('not_found'))
+        : ({ event: updated } satisfies EventResponse)
+    },
+  )
 
   app.patch<{ Params: { id: string } }>('/api/admin/events/:id', async (request, reply) => {
     void noStore(reply)

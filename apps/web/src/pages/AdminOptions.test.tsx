@@ -275,8 +275,23 @@ describe('AdminOptions', () => {
     const getEventOptions = vi.fn<OptionsApi['getEventOptions']>(() => Promise.resolve({ options: [] }))
     renderPage(stub({ getActiveEvent, getEventOptions }), { status: 'signed-out' })
 
-    expect(screen.getByText(/admin page/)).toBeTruthy()
+    expect(screen.getByText(/for members/)).toBeTruthy()
     await waitFor(() => expect(getActiveEvent).not.toHaveBeenCalled())
     expect(getEventOptions).not.toHaveBeenCalled()
+  })
+
+  it('offers the lists to a member who is not an admin', async () => {
+    // The point of #155: a member curates the lodging and helping lists.
+    renderPage(stub(), { status: 'signed-in', account: { id: 'a-2', roles: ['member'] } })
+
+    expect(await screen.findByText('Temple mattress')).toBeTruthy()
+  })
+
+  it('offers nothing to a signed-in account with no roles', async () => {
+    const getEventOptions = vi.fn<OptionsApi['getEventOptions']>(() => Promise.resolve({ options: [] }))
+    renderPage(stub({ getEventOptions }), { status: 'signed-in', account: { id: 'a-9', roles: [] } })
+
+    expect(screen.getByText(/for members/)).toBeTruthy()
+    await waitFor(() => expect(getEventOptions).not.toHaveBeenCalled())
   })
 })

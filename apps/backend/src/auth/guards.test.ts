@@ -187,6 +187,63 @@ describe('an admin route asked for by a stranger', () => {
   })
 })
 
+describe('the approved guard', () => {
+  // Registered late for the same reason the prefix-hook cases are: the property is
+  // about a route the application does not have, so it cannot be asserted through
+  // one that exists.
+  const withApprovedRoute = async () => {
+    const server = await build()
+    const db = handle?.db
+    if (db === undefined) throw new Error('build() first')
+
+    const { requireApproved } = createGuards({
+      db,
+      sessions: createSessions({ secret: SECRET, now: () => new Date(), ttlSeconds: 3600 }),
+    })
+    server.get('/api/open-to-members', { preHandler: requireApproved }, async () => ({ ok: true }))
+
+    return server
+  }
+
+  const ask = (server: FastifyInstance, cookie?: string) =>
+    server.inject({
+      method: 'GET',
+      url: '/api/open-to-members',
+      headers: cookie === undefined ? {} : { cookie },
+    })
+
+  it('lets a member in', async () => {
+    const server = await withApprovedRoute()
+
+    expect((await ask(server, cookieFor(await givenAccount(['member'])))).statusCode).toBe(200)
+  })
+
+  it('lets an admin in who is not also a member', async () => {
+    // The bootstrapped account holds `admin` alone, and is the one that sets the
+    // first burn up. A `member`-only guard would refuse it.
+    const server = await withApprovedRoute()
+
+    expect((await ask(server, cookieFor(await givenAccount(['admin'])))).statusCode).toBe(200)
+  })
+
+  it('refuses an account with no roles', async () => {
+    // Invited but not yet redeemed, or a role taken away. 403 rather than 401:
+    // they are signed in, so sending them back to login would loop.
+    const server = await withApprovedRoute()
+
+    const response = await ask(server, cookieFor(await givenAccount([])))
+
+    expect(response.statusCode).toBe(403)
+    expect(response.json()).toEqual({ error: 'forbidden' })
+  })
+
+  it('refuses nobody at all with 401', async () => {
+    const server = await withApprovedRoute()
+
+    expect((await ask(server)).statusCode).toBe(401)
+  })
+})
+
 describe('the admin guard', () => {
   it('answers 401 when nobody is signed in', async () => {
     const server = await build()

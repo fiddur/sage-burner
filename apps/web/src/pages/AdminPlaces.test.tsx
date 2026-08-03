@@ -206,11 +206,27 @@ describe('AdminPlaces', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('Could not load')
   })
 
-  it('offers nothing to someone who does not have admin', async () => {
+  it('offers nothing to someone signed out', async () => {
     const getPlaces = vi.fn<PlacesApi['getPlaces']>(() => Promise.resolve({ places: THREE }))
     renderPage(stub({ getPlaces }), { status: 'signed-out' })
 
-    expect(screen.getByText(/admin page/)).toBeTruthy()
+    expect(screen.getByText(/for members/)).toBeTruthy()
     expect(getPlaces).not.toHaveBeenCalled()
+  })
+
+  it('offers nothing to a signed-in account with no roles', async () => {
+    // An applicant checking on their application has an account and no roles.
+    const getPlaces = vi.fn<PlacesApi['getPlaces']>(() => Promise.resolve({ places: THREE }))
+    renderPage(stub({ getPlaces }), { status: 'signed-in', account: { id: 'a-9', roles: [] } })
+
+    expect(screen.getByText(/for members/)).toBeTruthy()
+    expect(getPlaces).not.toHaveBeenCalled()
+  })
+
+  it('offers the lanes to a member who is not an admin', async () => {
+    // The point of #155: this is not an admin page any more.
+    renderPage(stub(), { status: 'signed-in', account: { id: 'a-2', roles: ['member'] } })
+
+    expect(await screen.findByText('Temple')).toBeTruthy()
   })
 })

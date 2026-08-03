@@ -443,7 +443,7 @@ describe('dreams', () => {
 
 describe('a place a dream is standing in', () => {
   const removePlace = (server: FastifyInstance, cookie: string, id: string) =>
-    server.inject({ method: 'DELETE', url: `/api/admin/places/${id}`, headers: { cookie } })
+    server.inject({ method: 'DELETE', url: `/api/places/${id}`, headers: { cookie } })
 
   it('cannot be deleted out from under it', async () => {
     const server = await build()

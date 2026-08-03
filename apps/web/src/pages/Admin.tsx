@@ -6,7 +6,7 @@ import { useEffect, useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
-import { isAdmin, useViewer } from '../viewer.tsx'
+import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
 
 export type AdminApi = Pick<ApiClient, 'getAdminAccounts' | 'setAccountRoles'>
 
@@ -27,6 +27,7 @@ const withRole = (roles: readonly AccountRole[], role: AccountRole, held: boolea
 export const Admin = ({ api }: { api: AdminApi }) => {
   const viewer = useViewer()
   const admin = isAdmin(viewer)
+  const approved = isApproved(viewer)
   const [roster, setRoster] = useState<Roster>({ status: 'loading' })
   const [saving, setSaving] = useState<string | undefined>(undefined)
   const [error, setError] = useState<string | undefined>(undefined)
@@ -105,11 +106,28 @@ export const Admin = ({ api }: { api: AdminApi }) => {
     )
   }
 
+  // A member curates the burn's shared furniture without holding admin, so this
+  // page offers what the viewer can actually use rather than all or nothing. The
+  // links are not the access control — each page and route checks for itself —
+  // they are what stops someone being sent to a 403.
   if (!admin) {
     return (
       <section class="page">
         <h1>Organise</h1>
-        <p>This is an admin page. If it should be open to you, ask someone who already has admin.</p>
+
+        {approved ? (
+          <>
+            <p class="form-note">What you can set up for the burn. The rest needs admin.</p>
+            <p>
+              <a href="/admin/places">Places</a>
+            </p>
+            <p>
+              <a href="/admin/options">Lodging and helping</a>
+            </p>
+          </>
+        ) : (
+          <p>This is for members. If you are one, sign in — otherwise ask someone who is.</p>
+        )}
       </section>
     )
   }

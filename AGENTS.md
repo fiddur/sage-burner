@@ -166,9 +166,25 @@ These are member records, so treat them as such:
 
 - Authorization is enforced **server-side** on every route. Hiding a button is
   not access control.
-- A member can read and write only their own record.
+- **A member may write their own record, and the burn's shared furniture.** This
+  app replaces a spreadsheet everyone could edit, so the default for something the
+  community shares — the schedule lanes, the lodging and helping lists, a burn's
+  welcome text — is any approved member, not admin. What stays admin is the burn's
+  shape (dates, times, cap, creating one), payment, applications, invites, role
+  grants and installation settings. Personal details stay the person's own: nobody
+  edits somebody else's name, contact or allergies.
+- `requireApproved` is the guard for that default, and counts `admin` as well as
+  `member` — the bootstrapped account holds `admin` alone and is the one setting
+  the first burn up. Neither role implies the other anywhere else.
+- Everything under `/api/admin/` requires `admin` through one `onRequest` hook,
+  with no per-route opt-out. **Opening a route means moving it out from under that
+  prefix**, never exempting it there — the hook's whole value is having no
+  exception to forget.
 - Invite tokens are CSPRNG-random and unguessable, single-use, and expiring.
-- Admin-authored markdown is sanitized before rendering.
+- Markdown is sanitized before rendering, and members author it too — any longer
+  field shown to other people is markdown. `markdown.ts` escapes raw HTML rather
+  than filtering it and allowlists link schemes, so untrusted authors are inside
+  what it defends against; that is why it was chosen over `marked` + DOMPurify.
 - The public ICS feed exposes session title, description, time and location —
   never member names beyond the host's display name, contact details,
   allergies, or payment state.

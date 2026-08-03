@@ -145,3 +145,12 @@ export const isAdmin = (viewer: Viewer) => hasRole(viewer, 'admin')
  * 403 server-side would be worse than not offering them.
  */
 export const isMember = (viewer: Viewer) => hasRole(viewer, 'member')
+
+/**
+ * Anyone who is in — the mirror of the server's `requireApproved`.
+ *
+ * `admin` counts, and has to: the bootstrapped account holds `admin` alone, and
+ * it is the one setting the first burn up. Hiding the page from it would hide the
+ * setup from the only person who can do the setup.
+ */
+export const isApproved = (viewer: Viewer) => isMember(viewer) || isAdmin(viewer)
