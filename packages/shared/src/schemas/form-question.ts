@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { formQuestionTypes, tickBoxRequired } from '../enums.ts'
+import { MAX_NOTES, MAX_OPTION_LABEL, MAX_QUESTION_LABEL } from '../limits.ts'
 import { idSchema, optionalText, nonEmptyText } from './common.ts'
 
 /**
@@ -17,15 +18,15 @@ export const formQuestionSchema = z.object({
   /** Display position, ascending. */
   order: z.int().nonnegative(),
   type: z.enum(formQuestionTypes),
-  label: nonEmptyText(500),
-  help_text: optionalText(2000),
+  label: nonEmptyText(MAX_QUESTION_LABEL),
+  help_text: optionalText(MAX_NOTES),
   /** Enforced server-side on submission, not merely in the browser. */
   required: z.boolean(),
   /**
    * Reserved for future select/radio types. Defined now so the column exists,
    * but no question type consumes it yet.
    */
-  options: z.array(nonEmptyText(200)).nullable(),
+  options: z.array(nonEmptyText(MAX_OPTION_LABEL)).nullable(),
 })
 
 export type FormQuestion = z.infer<typeof formQuestionSchema>

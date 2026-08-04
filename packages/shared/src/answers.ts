@@ -2,7 +2,6 @@ import type { SubmittedAnswers } from './schemas/application.ts'
 import type { FormQuestion } from './schemas/form-question.ts'
 
 import { tickBoxRequired } from './enums.ts'
-
 /**
  * Whether a set of answers satisfies the questions asked.
  *
@@ -11,10 +10,16 @@ import { tickBoxRequired } from './enums.ts'
  * form marks its fields with it — and written twice they drift into a form that
  * says everything is fine against an API that answers 400.
  */
+import { MAX_CONTACT, MAX_PERSON_NAME } from './limits.ts'
 
 export const MAX_ANSWER_LENGTH = 10_000
-export const MAX_APPLICANT_NAME_LENGTH = 200
-export const MAX_APPLICANT_CONTACT_LENGTH = 500
+/**
+ * An applicant is a person, so these are the same facts as `limits.ts` holds — kept
+ * under their own names because `answerProblems` reports on them and the form's
+ * copy reads better for it.
+ */
+export const MAX_APPLICANT_NAME_LENGTH = MAX_PERSON_NAME
+export const MAX_APPLICANT_CONTACT_LENGTH = MAX_CONTACT
 
 /**
  * How many questions one submission may claim it was shown.

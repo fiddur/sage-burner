@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { MAX_WELCOME_LENGTH } from '../limits.ts'
+import { MAX_TITLE, MAX_WELCOME_LENGTH } from '../limits.ts'
 import { dateSchema, dateTimeSchema, idSchema, slugSchema, nonEmptyText, timeSchema } from './common.ts'
 
 /** Tolerates missing keys so `.partial()` and `.omit()` derivations still typecheck. */
@@ -60,7 +60,7 @@ export const hasOrderedRange = (range: Required<DateRange>) => hasOrderedDates(r
  */
 export const eventFields = z.object({
   id: idSchema,
-  name: nonEmptyText(200),
+  name: nonEmptyText(MAX_TITLE),
   slug: slugSchema,
   start_date: dateSchema,
   end_date: dateSchema,

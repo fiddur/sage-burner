@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { paymentStatuses } from '../enums.ts'
+import { MAX_CONTACT, MAX_NOTES, MAX_OPTION_LABEL, MAX_PERSON_NAME, MAX_SLUG, MAX_TITLE } from '../limits.ts'
 import { emailSchema } from './auth.ts'
 import { dateSchema, dateTimeSchema, idSchema, nonEmptyText, optionalText } from './common.ts'
 
@@ -29,10 +30,10 @@ export const withStayOrder = <T extends z.ZodType<Stay>>(schema: T) =>
  * one account, one set of details.
  */
 export const profileFields = z.object({
-  name: nonEmptyText(200),
-  contact: nonEmptyText(500),
+  name: nonEmptyText(MAX_PERSON_NAME),
+  contact: nonEmptyText(MAX_CONTACT),
   /** Free text — "gluten", "sensitive to red lentils". Never a fixed list. */
-  allergies_notes: optionalText(2000),
+  allergies_notes: optionalText(MAX_NOTES),
 })
 
 /**
@@ -102,8 +103,8 @@ export const attendanceFields = z.object({
    * Beside the ticks rather than instead of them. The point of the list is
    * counting; the point of this is that a list is never complete.
    */
-  helping_other: optionalText(200),
-  notes: optionalText(2000),
+  helping_other: optionalText(MAX_OPTION_LABEL),
+  notes: optionalText(MAX_NOTES),
   /** Set by admins only. Members see their own status but cannot change it. */
   payment_status: z.enum(paymentStatuses),
   payment_date: dateSchema.nullable(),
@@ -161,7 +162,7 @@ export type AttendanceUpdate = z.infer<typeof attendanceUpdateSchema>
  * coming" from "coming and nothing filled in yet", and both are ordinary states.
  */
 export const myAttendanceResponseSchema = z.object({
-  event: z.object({ id: idSchema, name: nonEmptyText(200), slug: nonEmptyText(120) }).nullable(),
+  event: z.object({ id: idSchema, name: nonEmptyText(MAX_TITLE), slug: nonEmptyText(MAX_SLUG) }).nullable(),
   attendance: attendanceSchema.nullable(),
 })
 
@@ -179,9 +180,9 @@ export type AttendanceCreate = z.infer<typeof attendanceCreateSchema>
  */
 export const rosterEntrySchema = attendanceFields.extend({
   email: emailSchema,
-  name: nonEmptyText(200).nullable(),
-  contact: nonEmptyText(500).nullable(),
-  allergies_notes: optionalText(2000),
+  name: nonEmptyText(MAX_PERSON_NAME).nullable(),
+  contact: nonEmptyText(MAX_CONTACT).nullable(),
+  allergies_notes: optionalText(MAX_NOTES),
   /**
    * The lodging option's label, resolved at read time.
    *
@@ -189,7 +190,7 @@ export const rosterEntrySchema = attendanceFields.extend({
    * reading this wants "Temple mattress", and a CSV of UUIDs is no use to
    * anybody.
    */
-  lodging: optionalText(200),
+  lodging: optionalText(MAX_OPTION_LABEL),
   /**
    * The ticked helping options' labels, resolved at read time and joined.
    *
@@ -197,13 +198,13 @@ export const rosterEntrySchema = attendanceFields.extend({
    * organiser reading the roster or its CSV wants "Sauna, Kitchen", and a column
    * of UUIDs is no use to anybody.
    */
-  helping: optionalText(2000),
+  helping: optionalText(MAX_NOTES),
   /** Derived from payment and join order every read — never stored. */
   waiting: z.boolean(),
 })
 
 export const rosterResponseSchema = z.object({
-  event: z.object({ id: idSchema, name: nonEmptyText(200), member_cap: z.int().positive() }).nullable(),
+  event: z.object({ id: idSchema, name: nonEmptyText(MAX_TITLE), member_cap: z.int().positive() }).nullable(),
   entries: z.array(rosterEntrySchema),
 })
 

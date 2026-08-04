@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { eventOptionKinds } from '../enums.ts'
+import { MAX_OPTION_LABEL } from '../limits.ts'
 import { idSchema, nonEmptyText } from './common.ts'
 
 /**
@@ -16,7 +17,7 @@ export const eventOptionSchema = z.object({
   kind: z.enum(eventOptionKinds),
   /** Display position within its kind, ascending. */
   order: z.int().nonnegative(),
-  label: nonEmptyText(200),
+  label: nonEmptyText(MAX_OPTION_LABEL),
   /**
    * How many people fit, or null for no limit.
    *

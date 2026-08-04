@@ -1,6 +1,12 @@
 import type { FormQuestion, FormQuestionType } from '@sage-burner/shared'
 
-import { formQuestionTypes, isFormQuestionType, tickBoxRequired } from '@sage-burner/shared'
+import {
+  MAX_NOTES,
+  MAX_QUESTION_LABEL,
+  formQuestionTypes,
+  isFormQuestionType,
+  tickBoxRequired,
+} from '@sage-burner/shared'
 import { useEffect, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -252,7 +258,7 @@ export const QuestionEditor = ({ api }: { api: QuestionsApi }) => {
           <span>New question</span>
           <input
             required
-            maxLength={500}
+            maxLength={MAX_QUESTION_LABEL}
             value={draft.label}
             onInput={(inputEvent) => setDraft({ ...draft, label: inputEvent.currentTarget.value })}
           />
@@ -277,7 +283,7 @@ export const QuestionEditor = ({ api }: { api: QuestionsApi }) => {
         <MarkdownField
           label="Help text (optional, markdown)"
           value={draft.help_text}
-          maxLength={2000}
+          maxLength={MAX_NOTES}
           onInput={(help_text) => setDraft({ ...draft, help_text })}
         />
 
@@ -346,7 +352,7 @@ const QuestionFields = ({
           the add form, which is a real form and blocks the same input.
         */}
         <input
-          maxLength={500}
+          maxLength={MAX_QUESTION_LABEL}
           value={label}
           onInput={(inputEvent) => setLabel(inputEvent.currentTarget.value)}
         />
@@ -366,7 +372,12 @@ const QuestionFields = ({
         </select>
       </label>
 
-      <MarkdownField label="Help text (markdown)" value={helpText} maxLength={2000} onInput={setHelpText} />
+      <MarkdownField
+        label="Help text (markdown)"
+        value={helpText}
+        maxLength={MAX_NOTES}
+        onInput={setHelpText}
+      />
 
       <label class="field-inline">
         <input

@@ -1,5 +1,6 @@
 import type { Profile } from '@sage-burner/shared'
 
+import { MAX_CONTACT, MAX_NOTES, MAX_PERSON_NAME } from '@sage-burner/shared'
 import { useEffect, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -118,7 +119,7 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
             <input
               type="text"
               name="name"
-              maxLength={200}
+              maxLength={MAX_PERSON_NAME}
               aria-required
               value={name}
               onInput={(inputEvent) => setName(inputEvent.currentTarget.value)}
@@ -130,7 +131,7 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
             <input
               type="text"
               name="contact"
-              maxLength={500}
+              maxLength={MAX_CONTACT}
               aria-required
               value={contact}
               onInput={(inputEvent) => setContact(inputEvent.currentTarget.value)}
@@ -141,7 +142,7 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
             <span>Allergies or food you cannot eat</span>
             <textarea
               name="allergies_notes"
-              maxLength={2000}
+              maxLength={MAX_NOTES}
               value={allergies}
               onInput={(inputEvent) => setAllergies(inputEvent.currentTarget.value)}
             />

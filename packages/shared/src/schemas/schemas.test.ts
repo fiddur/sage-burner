@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
 
 import { MAX_ASKED_QUESTIONS } from '../answers.ts'
+import {
+  MAX_CONTACT,
+  MAX_NOTES,
+  MAX_PERSON_NAME,
+  MAX_QUESTION_LABEL,
+  MAX_SLUG,
+  MAX_TITLE,
+  MAX_WELCOME_LENGTH,
+} from '../limits.ts'
 import { applicationCreateSchema, applicationSchema } from './application.ts'
 import { slugSchema } from './common.ts'
 import { eventFields, eventSchema, withEventDateOrder } from './event.ts'
@@ -555,5 +564,73 @@ describe('publicSessionSchema', () => {
     })
     expect(parsed).not.toHaveProperty('host_account_id')
     expect(parsed).not.toHaveProperty('allergies_notes')
+  })
+})
+
+describe('the named length limits', () => {
+  /**
+   * Each bound, at the limit and one past it.
+   *
+   * The point of `limits.ts` is that the schema and the form share one number, and
+   * the failure it prevents is silent: tighten a bound and a form still carrying the
+   * old literal lets people type past it, so a friendly stop at the keyboard becomes
+   * a blank 400 on submit.
+   *
+   * What these catch is a **schema drifting off the constant** — someone writing
+   * `nonEmptyText(150)` again. They deliberately do not catch a change to the
+   * constant itself: the schema and the assertion read the same number, so moving
+   * it moves both. That half is not testable from here and does not need to be —
+   * moving the constant is the intended way to change a bound, and every form
+   * follows it because they read it too.
+   */
+  // Local fixtures: the ones above are scoped to their own describes, and a bound
+  // is worth checking against a minimal valid row rather than a shared one that
+  // might be edited for another reason.
+  const aProfile = {
+    account_id: ID,
+    email: 'someone@example.org',
+    name: 'Someone',
+    contact: 'a phone number',
+    allergies_notes: null,
+  }
+  const aQuestion = {
+    id: ID,
+    order: 0,
+    type: 'text',
+    label: 'Why do you want to come?',
+    help_text: null,
+    required: false,
+    options: null,
+  }
+
+  const bounded: [string, (value: string) => boolean, number][] = [
+    ['a person’s name', (v) => profileSchema.safeParse({ ...aProfile, name: v }).success, MAX_PERSON_NAME],
+    ['a contact', (v) => profileSchema.safeParse({ ...aProfile, contact: v }).success, MAX_CONTACT],
+    ['allergies', (v) => profileSchema.safeParse({ ...aProfile, allergies_notes: v }).success, MAX_NOTES],
+    ['an event name', (v) => eventSchema.safeParse({ ...anEvent, name: v }).success, MAX_TITLE],
+    [
+      'a welcome text',
+      (v) => eventSchema.safeParse({ ...anEvent, welcome_markdown: v }).success,
+      MAX_WELCOME_LENGTH,
+    ],
+    [
+      'a question label',
+      (v) => formQuestionSchema.safeParse({ ...aQuestion, label: v }).success,
+      MAX_QUESTION_LABEL,
+    ],
+  ]
+
+  for (const [what, accepts, limit] of bounded) {
+    it(`accepts ${what} of exactly its limit and refuses one more`, () => {
+      expect(accepts('x'.repeat(limit)), `${limit}`).toBe(true)
+      expect(accepts('x'.repeat(limit + 1)), `${limit + 1}`).toBe(false)
+    })
+  }
+
+  it('keeps a slug bounded where `slugSchema` says, not where a projection guesses', () => {
+    // `rosterResponseSchema`'s event projection used to bound this at 120 while
+    // `slugSchema` bounded it at 64 — one fact spelled two ways.
+    expect(slugSchema.safeParse('a'.repeat(MAX_SLUG)).success).toBe(true)
+    expect(slugSchema.safeParse('a'.repeat(MAX_SLUG + 1)).success).toBe(false)
   })
 })

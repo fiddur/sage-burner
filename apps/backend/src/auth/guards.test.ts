@@ -188,9 +188,12 @@ describe('an admin route asked for by a stranger', () => {
 })
 
 describe('the approved guard', () => {
-  // Registered late for the same reason the prefix-hook cases are: the property is
-  // about a route the application does not have, so it cannot be asserted through
-  // one that exists.
+  // Registered late so the guard is exercised in isolation. Real routes behind
+  // `requireApproved` do exist — the places and event-option writes, and
+  // `PATCH /api/events/:id/welcome` — and `places.test.ts` and `events.test.ts`
+  // assert it through them. What those cannot show is the guard's own answer for a
+  // role-less account and a stranger without a route's own 400s and 404s in the
+  // way.
   const withApprovedRoute = async () => {
     const server = await build()
     const db = handle?.db

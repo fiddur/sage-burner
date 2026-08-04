@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { placeColors } from '../enums.ts'
+import { MAX_EMOJI, MAX_PLACE_NAME } from '../limits.ts'
 import { idSchema, nonEmptyText } from './common.ts'
 
 /**
@@ -18,13 +19,13 @@ export const placeSchema = z.object({
   id: idSchema,
   /** Display position, ascending. */
   order: z.int().nonnegative(),
-  name: nonEmptyText(100),
+  name: nonEmptyText(MAX_PLACE_NAME),
   /**
    * Bounded rather than validated as an emoji. A ZWJ sequence is several code
    * points and the set grows with every Unicode release, so a regex here would
    * reject valid input on a schedule nobody can fix without a deploy.
    */
-  emoji: nonEmptyText(16),
+  emoji: nonEmptyText(MAX_EMOJI),
   color: z.enum(placeColors),
 })
 

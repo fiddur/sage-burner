@@ -1,3 +1,4 @@
+import { MAX_TITLE } from '@sage-burner/shared'
 import { useEffect, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -116,7 +117,7 @@ export const AdminSettings = ({ api }: { api: AdminSettingsApi }) => {
             <input
               type="text"
               name="title"
-              maxLength={200}
+              maxLength={MAX_TITLE}
               aria-required
               value={title}
               onInput={(inputEvent) => setTitle(inputEvent.currentTarget.value)}

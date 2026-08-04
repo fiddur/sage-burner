@@ -1,5 +1,6 @@
 import type { InviteState } from '@sage-burner/shared'
 
+import { MAX_NOTES, MAX_PERSON_NAME } from '@sage-burner/shared'
 import { useEffect, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -238,7 +239,7 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
           <input
             type="text"
             name="name"
-            maxLength={200}
+            maxLength={MAX_PERSON_NAME}
             aria-required
             value={name}
             onInput={(event) => setName(event.currentTarget.value)}
@@ -249,7 +250,7 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
           <span>Allergies or food you cannot eat (optional)</span>
           <textarea
             name="allergies_notes"
-            maxLength={2000}
+            maxLength={MAX_NOTES}
             value={allergies}
             onInput={(event) => setAllergies(event.currentTarget.value)}
           />

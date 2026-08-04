@@ -1,6 +1,6 @@
 import type { Place, PlaceColor } from '@sage-burner/shared'
 
-import { placeColors } from '@sage-burner/shared'
+import { MAX_EMOJI, MAX_PLACE_NAME, placeColors } from '@sage-burner/shared'
 import { useEffect, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -290,7 +290,7 @@ export const AdminPlaces = ({ api }: { api: PlacesApi }) => {
           <input
             type="text"
             name="name"
-            maxLength={100}
+            maxLength={MAX_PLACE_NAME}
             aria-required
             value={draft.name}
             onInput={(inputEvent) => setDraft({ ...draft, name: inputEvent.currentTarget.value })}
@@ -302,7 +302,7 @@ export const AdminPlaces = ({ api }: { api: PlacesApi }) => {
           <input
             type="text"
             name="emoji"
-            maxLength={16}
+            maxLength={MAX_EMOJI}
             aria-required
             value={draft.emoji}
             onInput={(inputEvent) => setDraft({ ...draft, emoji: inputEvent.currentTarget.value })}
@@ -368,7 +368,7 @@ const PlaceFields = ({
         <span>Name</span>
         <input
           type="text"
-          maxLength={100}
+          maxLength={MAX_PLACE_NAME}
           aria-label={`Name of ${place.name}`}
           value={name}
           onInput={(inputEvent) => setName(inputEvent.currentTarget.value)}
@@ -379,7 +379,7 @@ const PlaceFields = ({
         <span>Emoji</span>
         <input
           type="text"
-          maxLength={16}
+          maxLength={MAX_EMOJI}
           aria-label={`Emoji for ${place.name}`}
           value={emoji}
           onInput={(inputEvent) => setEmoji(inputEvent.currentTarget.value)}

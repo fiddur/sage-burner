@@ -1,5 +1,6 @@
 import type { Place, Session, SessionUpdate } from '@sage-burner/shared'
 
+import { MAX_DESCRIPTION, MAX_TITLE } from '@sage-burner/shared'
 import { useEffect, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -208,7 +209,7 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
           <input
             type="text"
             name="title"
-            maxLength={200}
+            maxLength={MAX_TITLE}
             aria-required
             value={title}
             onInput={(inputEvent) => setTitle(inputEvent.currentTarget.value)}
@@ -265,7 +266,7 @@ const DreamFields = ({
         <span>What is it?</span>
         <input
           type="text"
-          maxLength={200}
+          maxLength={MAX_TITLE}
           aria-label={`Title of ${dream.title}`}
           value={title}
           onInput={(inputEvent) => setTitle(inputEvent.currentTarget.value)}
@@ -275,7 +276,7 @@ const DreamFields = ({
       <label class="field">
         <span>Tell people about it</span>
         <textarea
-          maxLength={20_000}
+          maxLength={MAX_DESCRIPTION}
           aria-label={`Description of ${dream.title}`}
           value={description}
           onInput={(inputEvent) => setDescription(inputEvent.currentTarget.value)}

@@ -1,5 +1,6 @@
 import type { Event, EventOption, EventOptionKind } from '@sage-burner/shared'
 
+import { MAX_OPTION_LABEL } from '@sage-burner/shared'
 import { useEffect, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -342,7 +343,7 @@ const OptionList = ({
           <span>Add to this list</span>
           <input
             type="text"
-            maxLength={200}
+            maxLength={MAX_OPTION_LABEL}
             aria-required
             aria-label={`New ${kind} name`}
             value={label}
@@ -400,7 +401,7 @@ const OptionFields = ({
         <span>Name</span>
         <input
           type="text"
-          maxLength={200}
+          maxLength={MAX_OPTION_LABEL}
           aria-label={`Name of ${option.label}`}
           value={label}
           onInput={(inputEvent) => setLabel(inputEvent.currentTarget.value)}
