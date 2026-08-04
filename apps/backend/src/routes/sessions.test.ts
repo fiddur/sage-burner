@@ -55,8 +55,15 @@ const givenAccount = async (roles: ('admin' | 'member')[]) => {
   return { id, cookie: `${SESSION_COOKIE}=${sessions.issue(id)}` }
 }
 
-const givenEvent = async (over: { start_date?: string; end_date?: string } = {}) => {
-  const id = randomUUID()
+/**
+ * A fixed id, so the helpers below can name the burn without every test threading
+ * one through. The routes take an event id since #184's selector — "the active
+ * burn" is a rule the client no longer applies.
+ */
+const OPEN_BURN = '9f1c2f2a-6f1a-4a2e-9c6d-2f0a1b3c4d5e'
+
+const givenEvent = async (over: { id?: string; start_date?: string; end_date?: string } = {}) => {
+  const id = over.id ?? OPEN_BURN
   await db()
     .insert(event)
     .values({
@@ -77,17 +84,22 @@ const givenPlace = async (eventId: string, name = 'Temple') => {
   return id
 }
 
-const list = (server: FastifyInstance, cookie: string | undefined) =>
+const list = (server: FastifyInstance, cookie: string | undefined, eventId = OPEN_BURN) =>
   server.inject({
     method: 'GET',
-    url: '/api/events/active/sessions',
+    url: `/api/events/${eventId}/sessions`,
     headers: cookie === undefined ? {} : { cookie },
   })
 
-const offer = (server: FastifyInstance, cookie: string | undefined, payload: Record<string, unknown>) =>
+const offer = (
+  server: FastifyInstance,
+  cookie: string | undefined,
+  payload: Record<string, unknown>,
+  eventId = OPEN_BURN,
+) =>
   server.inject({
     method: 'POST',
-    url: '/api/events/active/sessions',
+    url: `/api/events/${eventId}/sessions`,
     headers: cookie === undefined ? {} : { cookie },
     payload,
   })
@@ -203,7 +215,11 @@ describe('dreams', () => {
     // holding a row.
     const server = await build()
     const eventId = await givenEvent()
-    const later = await givenEvent({ start_date: '2026-12-01', end_date: '2026-12-05' })
+    const later = await givenEvent({
+      id: '2b7d9e40-1c3f-4d5a-8b6c-7e8f9a0b1c2d',
+      start_date: '2026-12-01',
+      end_date: '2026-12-05',
+    })
     const member = await givenAccount(['member'])
     const elsewhere = await givenPlace(later, 'Barn')
 
@@ -492,5 +508,75 @@ describe('a place a dream is standing in', () => {
     await editDream(server, admin.cookie, id, { place_id: null })
 
     expect((await removePlace(server, admin.cookie, temple)).statusCode).toBe(204)
+  })
+})
+
+describe('a dream belongs to the burn it names', () => {
+  const LATER = '2b7d9e40-1c3f-4d5a-8b6c-7e8f9a0b1c2d'
+  const ENDED = '3c8e0f51-2d4a-4e6b-9c7d-8f9a0b1c2d3e'
+
+  it('is offered at the burn asked for, not whichever one is next', async () => {
+    // The selector offers every burn still to come, so a dream can be offered for
+    // the one after next. That could not be said at all while these routes were
+    // scoped to the soonest-ending burn.
+    const server = await build()
+    await givenEvent()
+    await givenEvent({ id: LATER, start_date: '2026-12-01', end_date: '2026-12-05' })
+    const member = await givenAccount(['member'])
+
+    const offered = await offer(server, member.cookie, { title: 'Winter sauna' }, LATER)
+
+    expect(offered.statusCode).toBe(201)
+    expect(offered.json().session.event_id).toBe(LATER)
+    expect((await list(server, member.cookie, LATER)).json().sessions).toHaveLength(1)
+    expect((await list(server, member.cookie)).json().sessions).toEqual([])
+  })
+
+  it('can still be edited and withdrawn at a burn that is not the next one', async () => {
+    // The passing sibling for the refusal below: what the guard rejects is a burn
+    // that has *ended*, not every burn other than the soonest.
+    const server = await build()
+    await givenEvent()
+    await givenEvent({ id: LATER, start_date: '2026-12-01', end_date: '2026-12-05' })
+    const member = await givenAccount(['member'])
+    const id = (await offer(server, member.cookie, { title: 'Winter sauna' }, LATER)).json().session.id
+
+    expect((await editDream(server, member.cookie, id, { title: 'Renamed' })).statusCode).toBe(200)
+    expect((await drop(server, member.cookie, id)).statusCode).toBe(204)
+  })
+
+  it('refuses to be offered at, edited at, or withdrawn from a burn that has ended', async () => {
+    const server = await build()
+    await givenEvent({ id: ENDED, start_date: '2025-08-01', end_date: '2025-08-05' })
+    const member = await givenAccount(['member'])
+    const id = randomUUID()
+    await db().insert(session).values({
+      id,
+      event_id: ENDED,
+      title: 'Last summer',
+      host_account_id: member.id,
+    })
+
+    expect((await offer(server, member.cookie, { title: 'x' }, ENDED)).statusCode).toBe(404)
+    expect((await editDream(server, member.cookie, id, { title: 'Rewritten' })).statusCode).toBe(404)
+    expect((await drop(server, member.cookie, id)).statusCode).toBe(404)
+    expect((await db().select().from(session))[0]?.title).toBe('Last summer')
+  })
+
+  it('still reads a finished burn’s dreams, which are its record', async () => {
+    const server = await build()
+    await givenEvent({ id: ENDED, start_date: '2025-08-01', end_date: '2025-08-05' })
+    const member = await givenAccount(['member'])
+    await db().insert(session).values({
+      id: randomUUID(),
+      event_id: ENDED,
+      title: 'Last summer',
+      host_account_id: member.id,
+    })
+
+    const response = await list(server, member.cookie, ENDED)
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().sessions.map((dream: { title: string }) => dream.title)).toEqual(['Last summer'])
   })
 })

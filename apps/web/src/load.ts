@@ -36,6 +36,11 @@ export const errorMessage = (failure: unknown, fallback: string) =>
  * sign-in copy instead. It re-runs when it flips, so a viewer that resolves to a
  * member loads without the page having to say so.
  *
+ * `key` is for what the fetcher is *about*, which the fetcher itself cannot say —
+ * it lives in a ref precisely so that a new closure does not refetch. Every
+ * burn-scoped page passes the selected burn's id, so changing the selector reloads
+ * the page rather than leaving one burn's grid on screen under another's name.
+ *
  * The fetcher is called with an `AbortSignal` and its result is dropped if that
  * signal fired — a page navigated away from mid-request must not write to state it
  * no longer owns, and a cancellation is housekeeping rather than a failure to
@@ -47,7 +52,7 @@ export const errorMessage = (failure: unknown, fallback: string) =>
  */
 export const useLoad = <T>(
   fetcher: (signal: AbortSignal) => Promise<T>,
-  { enabled = true, fallback }: { enabled?: boolean; fallback: string },
+  { enabled = true, key = '', fallback }: { enabled?: boolean; key?: string; fallback: string },
 ): { loaded: Loaded<T>; reload: () => void } => {
   const [loaded, setLoaded] = useState<Loaded<T>>({ status: 'loading' })
   const [attempt, setAttempt] = useState(0)
@@ -79,7 +84,7 @@ export const useLoad = <T>(
     return () => {
       controller.abort()
     }
-  }, [enabled, attempt, fallback])
+  }, [enabled, attempt, key, fallback])
 
   return { loaded, reload: useCallback(() => setAttempt((count) => count + 1), []) }
 }

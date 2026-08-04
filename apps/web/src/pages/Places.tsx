@@ -6,6 +6,7 @@ import { useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 import type { Loaded } from '../load.ts'
 
+import { useSelectedBurn } from '../burn.tsx'
 import { CopyFrom } from '../components/CopyFrom.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { useAction, useLoad } from '../load.ts'
@@ -14,7 +15,6 @@ import { isApproved, useViewer } from '../viewer.tsx'
 
 export type PlacesApi = Pick<
   ApiClient,
-  | 'getActiveEvent'
   | 'getPlaces'
   | 'addPlace'
   | 'updatePlace'
@@ -59,12 +59,12 @@ export const Places = ({ api }: { api: PlacesApi }) => {
   const [editing, setEditing] = useState<string | undefined>(undefined)
   const [dragging, setDragging] = useState<number | undefined>(undefined)
 
+  const burn = useSelectedBurn()
   const { loaded, reload } = useLoad<Grid>(
     async (signal) => {
-      const active = await api.getActiveEvent(signal)
-      if (active.event === null) return null
+      if (burn === undefined) return null
 
-      const eventId = active.event.id
+      const eventId = burn.event.id
       const [places, sources] = await Promise.all([
         api.getPlaces(eventId, signal),
         api.getPlaceSources(eventId, signal),
@@ -72,7 +72,7 @@ export const Places = ({ api }: { api: PlacesApi }) => {
 
       return { eventId, places: places.places, sources: sources.sources }
     },
-    { enabled: approved, fallback: 'Could not load the places.' },
+    { enabled: approved, key: burn?.event.id ?? '', fallback: 'Could not load the places.' },
   )
 
   const { busy, error, setError, run } = useAction(reload)

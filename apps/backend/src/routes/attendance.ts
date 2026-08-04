@@ -100,12 +100,17 @@ export const registerAttendanceRoutes = (
     )
 
     const asMine = (row: (typeof rows)[number]): MyBurn => ({
+      // Named field by field rather than spread, for the reason `rolesFor` gives:
+      // an object spread is exempt from excess-property checking, so a column added
+      // to `event` would reach the client without anybody deciding it should.
       event: {
         id: row.event.id,
         name: row.event.name,
         slug: row.event.slug,
         start_date: row.event.start_date,
         end_date: row.event.end_date,
+        start_time: row.event.start_time,
+        end_time: row.event.end_time,
       },
       attendance:
         row.attendance === null

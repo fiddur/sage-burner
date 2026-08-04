@@ -494,9 +494,6 @@ describe('the same list as a member sees it', () => {
       headers: cookie === undefined ? {} : { cookie },
     })
 
-  const activeMembers = (server: FastifyInstance, cookie: string): Promise<LightMyRequestResponse> =>
-    server.inject({ method: 'GET', url: '/api/events/active/members', headers: { cookie } })
-
   it('gives a member the details whoever is cooking needs', async () => {
     // The reason allergies live on the account at all: somebody has to read them,
     // and that somebody is not necessarily an organiser.
@@ -583,18 +580,18 @@ describe('the same list as a member sees it', () => {
     expect((await members(server, reader.cookie, randomUUID())).statusCode).toBe(404)
   })
 
-  it('follows the burn that is open, and says so when there is none', async () => {
+  it('is empty for a burn nobody has joined, rather than 404', async () => {
+    // A burn exists before anybody says they are coming to it, and the page for it
+    // should say so rather than look broken. There is no `active` variant: the
+    // selector names the burn, so the route never has to guess which one.
     const server = await build()
+    const eventId = await givenEvent()
     const reader = await givenAccount('Reader')
 
-    const empty = await activeMembers(server, reader.cookie)
-    expect(empty.json()).toEqual({ event: null, entries: [] })
+    const response = await members(server, reader.cookie, eventId)
 
-    const eventId = await givenEvent()
-    await givenComing(eventId, reader.id, '2026-07-01T00:00:00Z')
-
-    const found = await activeMembers(server, reader.cookie)
-    expect(found.json().event.name).toBe('Summer burn')
-    expect(names(found)).toEqual(['Reader'])
+    expect(response.statusCode).toBe(200)
+    expect(response.json().event.name).toBe('Summer burn')
+    expect(response.json().entries).toEqual([])
   })
 })

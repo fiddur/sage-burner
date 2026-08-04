@@ -1,10 +1,11 @@
 import type { ApiClient } from '../api/client.ts'
 
+import { useSelectedBurn } from '../burn.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { useLoad } from '../load.ts'
 import { isApproved, useViewer } from '../viewer.tsx'
 
-export type MembersApi = Pick<ApiClient, 'getActiveMembers'>
+export type MembersApi = Pick<ApiClient, 'getMembers'>
 
 /**
  * Who else is coming, for the people coming with them.
@@ -19,10 +20,16 @@ export type MembersApi = Pick<ApiClient, 'getActiveMembers'>
  */
 export const Members = ({ api }: { api: MembersApi }) => {
   const viewer = useViewer()
-  const { loaded } = useLoad((signal) => api.getActiveMembers(signal), {
-    enabled: isApproved(viewer),
-    fallback: 'Could not load the list. Please reload the page.',
-  })
+  const burn = useSelectedBurn()
+  const { loaded } = useLoad(
+    async (signal) =>
+      burn === undefined ? { event: null, entries: [] } : await api.getMembers(burn.event.id, signal),
+    {
+      enabled: isApproved(viewer),
+      key: burn?.event.id ?? '',
+      fallback: 'Could not load the list. Please reload the page.',
+    },
+  )
 
   const roster = loaded.status === 'ready' ? loaded.data : undefined
   const confirmed = roster?.entries.filter((entry) => !entry.waiting).length ?? 0

@@ -2,6 +2,7 @@ import type { ComponentChildren } from 'preact'
 
 import type { ApiClient } from '../api/client.ts'
 
+import { useBurns } from '../burn.tsx'
 import { useInstallationTitle } from '../installation.tsx'
 import { isAdmin, isApproved, isMember, useSetViewer, useViewer } from '../viewer.tsx'
 
@@ -52,6 +53,7 @@ export const Layout = ({
   api: Pick<ApiClient, 'logout'>
 }) => {
   const viewer = useViewer()
+  const { burns, selected, select } = useBurns()
   const setViewer = useSetViewer()
   const title = useInstallationTitle()
 
@@ -82,6 +84,24 @@ export const Layout = ({
           </span>
           <span class="brand-name">{title}</span>
         </a>
+
+        {/* Leftmost, because everything to the right of it is about the burn it
+            names. Hidden when there is nothing to choose between: one burn is the
+            ordinary case and a select with a single option is furniture. */}
+        {burns.length > 1 && selected !== undefined && (
+          <select
+            class="burn-selector"
+            aria-label="Which burn"
+            value={selected.event.id}
+            onChange={(changeEvent) => select(changeEvent.currentTarget.value)}
+          >
+            {burns.map((burn) => (
+              <option key={burn.event.id} value={burn.event.id}>
+                {burn.event.name}
+              </option>
+            ))}
+          </select>
+        )}
 
         <nav aria-label="Main">
           {viewer.status === 'signed-out' && (

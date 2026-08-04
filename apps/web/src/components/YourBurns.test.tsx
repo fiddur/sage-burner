@@ -27,7 +27,15 @@ const anAttendance = (over: Partial<Attendance> = {}): Attendance => ({
 })
 
 const aBurn = (id: string, name: string, attendance: Attendance | null = null): MyBurn => ({
-  event: { id, name, slug: name.toLowerCase(), start_date: '2026-08-01', end_date: '2026-08-05' },
+  event: {
+    id,
+    name,
+    slug: name.toLowerCase(),
+    start_date: '2026-08-01',
+    end_date: '2026-08-05',
+    start_time: '16:00',
+    end_time: '12:00',
+  },
   attendance,
 })
 

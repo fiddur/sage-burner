@@ -18,7 +18,7 @@ import { isForeignKeyViolation } from '../db/errors.ts'
 import { place, session } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 import { viewerFor } from './auth.ts'
-import { activeEvent, todayIso } from './events.ts'
+import { openEvent, todayIso } from './events.ts'
 
 export interface SessionDeps extends GuardDeps {
   now?: () => Date
@@ -73,52 +73,60 @@ export const registerSessionRoutes = (
 ) => {
   const { requireMember } = createGuards({ db, sessions })
 
-  app.get('/api/events/active/sessions', { preHandler: requireMember }, async (_request, reply) => {
-    void noStore(reply)
+  app.get<{ Params: { eventId: string } }>(
+    '/api/events/:eventId/sessions',
+    { preHandler: requireMember },
+    async (request, reply) => {
+      void noStore(reply)
 
-    const open = await activeEvent(db, todayIso(now))
-    if (open === undefined) return { sessions: [] } satisfies SessionsResponse
+      // Reading a finished burn's dreams is reading its record, so this is not
+      // scoped the way the writes below are. An empty list for an id that names
+      // nothing is the same answer as for a burn nobody offered anything at.
+      return { sessions: await sessionsFor(db, request.params.eventId) } satisfies SessionsResponse
+    },
+  )
 
-    return { sessions: await sessionsFor(db, open.id) } satisfies SessionsResponse
-  })
+  app.post<{ Params: { eventId: string } }>(
+    '/api/events/:eventId/sessions',
+    { preHandler: requireMember },
+    async (request, reply) => {
+      void noStore(reply)
 
-  app.post('/api/events/active/sessions', { preHandler: requireMember }, async (request, reply) => {
-    void noStore(reply)
+      const parsed = sessionCreateSchema.safeParse(request.body)
+      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
 
-    const parsed = sessionCreateSchema.safeParse(request.body)
-    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+      const viewer = await viewerFor(request, { db, sessions })
+      if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
 
-    const viewer = await viewerFor(request, { db, sessions })
-    if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
+      const open = await openEvent(db, todayIso(now), request.params.eventId)
+      if (open === undefined) return reply.code(404).send(errorResponse('not_found'))
 
-    const open = await activeEvent(db, todayIso(now))
-    if (open === undefined) return reply.code(404).send(errorResponse('not_found'))
+      if (!(await placeIsOnThisBurn(db, open.id, parsed.data.place_id))) {
+        return reply.code(400).send(errorResponse('bad_request'))
+      }
 
-    if (!(await placeIsOnThisBurn(db, open.id, parsed.data.place_id))) {
-      return reply.code(400).send(errorResponse('bad_request'))
-    }
+      const row: Session = {
+        ...parsed.data,
+        id: randomUUID(),
+        event_id: open.id,
+        host_account_id: viewer.account_id,
+      }
 
-    const row: Session = {
-      ...parsed.data,
-      id: randomUUID(),
-      event_id: open.id,
-      host_account_id: viewer.account_id,
-    }
+      // Split deliberately. The foreign key is the authority on the place *existing*,
+      // including a concurrent delete a pre-read would miss; `placeIsOnThisBurn` above
+      // decides the pairing, which the key cannot see. That check cannot go stale in
+      // the direction that matters — no route moves a place between burns, since
+      // `placeUpdateSchema` omits `event_id`.
+      try {
+        await db.insert(session).values(row)
+      } catch (failure) {
+        if (isForeignKeyViolation(failure)) return reply.code(400).send(errorResponse('bad_request'))
+        throw failure
+      }
 
-    // Split deliberately. The foreign key is the authority on the place *existing*,
-    // including a concurrent delete a pre-read would miss; `placeIsOnThisBurn` above
-    // decides the pairing, which the key cannot see. That check cannot go stale in
-    // the direction that matters — no route moves a place between burns, since
-    // `placeUpdateSchema` omits `event_id`.
-    try {
-      await db.insert(session).values(row)
-    } catch (failure) {
-      if (isForeignKeyViolation(failure)) return reply.code(400).send(errorResponse('bad_request'))
-      throw failure
-    }
-
-    return reply.code(201).send({ session: row } satisfies SessionResponse)
-  })
+      return reply.code(201).send({ session: row } satisfies SessionResponse)
+    },
+  )
 
   app.patch<{ Params: { id: string } }>(
     '/api/sessions/:id',
@@ -129,13 +137,15 @@ export const registerSessionRoutes = (
       const parsed = sessionUpdateSchema.safeParse(request.body)
       if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
 
-      const open = await activeEvent(db, todayIso(now))
       const [existing] = await db.select().from(session).where(eq(session.id, request.params.id)).limit(1)
 
-      // Scoped to the burn that is open, like every other member-facing route:
+      // Scoped to a burn that has not ended, like every other member-facing write:
       // a dream from a finished burn is history, and an id noted while it was
-      // current should not still be a way to rewrite it.
-      if (existing === undefined || open === undefined || existing.event_id !== open.id) {
+      // current should not still be a way to rewrite it. Not the *active* burn —
+      // the selector offers every burn still to come, and a dream can be offered
+      // for the one after next.
+      const open = existing === undefined ? undefined : await openEvent(db, todayIso(now), existing.event_id)
+      if (existing === undefined || open === undefined) {
         return reply.code(404).send(errorResponse('not_found'))
       }
 
@@ -178,7 +188,13 @@ export const registerSessionRoutes = (
     async (request, reply) => {
       void noStore(reply)
 
-      const open = await activeEvent(db, todayIso(now))
+      const [existing] = await db
+        .select({ event_id: session.event_id })
+        .from(session)
+        .where(eq(session.id, request.params.id))
+        .limit(1)
+
+      const open = existing === undefined ? undefined : await openEvent(db, todayIso(now), existing.event_id)
       if (open === undefined) return reply.code(404).send(errorResponse('not_found'))
 
       const deleted = await db

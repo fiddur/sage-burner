@@ -17,7 +17,7 @@ import { formQuestionSchema } from './form-question.ts'
 import {
   attendanceFields,
   attendanceSchema,
-  myAttendanceResponseSchema,
+  myBurnSchema,
   profileSchema,
   rosterResponseSchema,
   withStayOrder,
@@ -661,10 +661,20 @@ describe('the summaries derived from `eventFields`', () => {
   it('holds a summarised slug to the same rule as a real one', () => {
     // The divergence this replaced: written out by hand, the summary bounded `slug`
     // as plain text, so it accepted `Not A Slug!` where `slugSchema` — the thing it
-    // claims to summarise — accepts only lowercase hyphenated words.
+    // claims to summarise — accepts only lowercase hyphenated words. The summary
+    // moved to `myBurnSchema` when the routes stopped being scoped to "active"; the
+    // rule it has to keep did not.
     const withSlug = (slug: string) =>
-      myAttendanceResponseSchema.safeParse({
-        event: { id: ID, name: 'Summer burn', slug },
+      myBurnSchema.safeParse({
+        event: {
+          id: ID,
+          name: 'Summer burn',
+          slug,
+          start_date: '2026-08-01',
+          end_date: '2026-08-05',
+          start_time: '16:00',
+          end_time: '12:00',
+        },
         attendance: anAttendance,
       }).success
 

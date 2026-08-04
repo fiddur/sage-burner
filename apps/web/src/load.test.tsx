@@ -19,11 +19,17 @@ afterEach(cleanup)
 const Loader = ({
   fetcher,
   enabled,
+  loadKey,
 }: {
   fetcher: (signal: AbortSignal) => Promise<string>
   enabled?: boolean
+  loadKey?: string
 }) => {
-  const { loaded, reload } = useLoad(fetcher, { enabled, fallback: 'Could not load it.' })
+  const { loaded, reload } = useLoad(fetcher, {
+    enabled,
+    key: loadKey,
+    fallback: 'Could not load it.',
+  })
 
   return (
     <div>
@@ -117,6 +123,42 @@ describe('useLoad', () => {
     })
     rerender(<Loader fetcher={() => fetcher()} />)
     rerender(<Loader fetcher={() => fetcher()} />)
+
+    expect(fetcher).toHaveBeenCalledTimes(1)
+  })
+
+  it('refetches when the key changes, which the fetcher itself cannot say', async () => {
+    // Every burn-scoped page passes the selected burn's id. Without this the ref
+    // that stops a rebuilt fetcher from refetching would also stop the *selector*
+    // from doing anything: one burn's grid would stay on screen under another's
+    // name. Verified by removing `key` from the dependency list — nothing else in
+    // the suite noticed.
+    const fetcher = vi.fn(() => Promise.resolve('a burn'))
+    const { rerender } = render(<Loader fetcher={() => fetcher()} loadKey="e-1" />)
+
+    await waitFor(() => {
+      expect(fetcher).toHaveBeenCalledTimes(1)
+    })
+
+    rerender(<Loader fetcher={() => fetcher()} loadKey="e-2" />)
+
+    await waitFor(() => {
+      expect(fetcher).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  it('does not refetch when the key stays the same', async () => {
+    // The passing sibling: what re-runs the effect is the key *changing*, not the
+    // option being present.
+    const fetcher = vi.fn(() => Promise.resolve('a burn'))
+    const { rerender } = render(<Loader fetcher={() => fetcher()} loadKey="e-1" />)
+
+    await waitFor(() => {
+      expect(fetcher).toHaveBeenCalledTimes(1)
+    })
+
+    rerender(<Loader fetcher={() => fetcher()} loadKey="e-1" />)
+    rerender(<Loader fetcher={() => fetcher()} loadKey="e-1" />)
 
     expect(fetcher).toHaveBeenCalledTimes(1)
   })

@@ -5,6 +5,7 @@ import type { ApiClient } from './api/client.ts'
 import type { Viewer } from './viewer.tsx'
 
 import { createApiClient } from './api/client.ts'
+import { FetchedBurnProvider } from './burn.tsx'
 import { Layout } from './components/Layout.tsx'
 import { FetchedInstallationProvider, InstallationProvider } from './installation.tsx'
 import { Admin } from './pages/Admin.tsx'
@@ -57,7 +58,7 @@ export type RoutesApi = Pick<
   | 'joinEvent'
   | 'leaveEvent'
   | 'getActiveRoster'
-  | 'getActiveMembers'
+  | 'getMembers'
   | 'setPayment'
   | 'getPlaces'
   | 'addPlace'
@@ -208,10 +209,15 @@ export const App = ({ viewer, title, api }: { viewer?: Viewer; title?: string; a
   // written to survive that changing; this would have stopped it.
   const client = useMemo(() => api ?? createApiClient(), [api])
 
+  // Inside the viewer provider, since which burns can be chosen between depends on
+  // who is looking, and outside `Layout`, since the selector is in the bar and every
+  // burn-scoped page below it reads the same choice.
   const framed = (
-    <Layout api={client}>
-      <Routes api={client} />
-    </Layout>
+    <FetchedBurnProvider api={client}>
+      <Layout api={client}>
+        <Routes api={client} />
+      </Layout>
+    </FetchedBurnProvider>
   )
 
   const content =

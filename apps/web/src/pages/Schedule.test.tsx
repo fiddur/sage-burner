@@ -1,4 +1,4 @@
-import type { Event, Place, Session } from '@sage-burner/shared'
+import type { Event, MyBurn, Place, Session } from '@sage-burner/shared'
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -7,6 +7,7 @@ import type { Viewer } from '../viewer.tsx'
 import type { ScheduleApi } from './Schedule.tsx'
 
 import { apiError } from '../api/client.ts'
+import { BurnProvider } from '../burn.tsx'
 import { ViewerProvider } from '../viewer.tsx'
 import { Schedule } from './Schedule.tsx'
 
@@ -44,19 +45,26 @@ const stub = (
   over: Partial<ScheduleApi> = {},
   sessions: Session[] = [],
   places: Place[] = [TEMPLE, SAUNA],
-  event: Event | null = BURN,
 ): ScheduleApi => ({
-  getActiveEvent: () => Promise.resolve({ event }),
   getPlaces: () => Promise.resolve({ places }),
   getSessions: () => Promise.resolve({ sessions }),
   updateSession: () => Promise.reject(new Error('updateSession is not stubbed here')),
   ...over,
 })
 
-const renderPage = (api: ScheduleApi, viewer: Viewer = MEMBER) =>
+/** The selector's view of the same burn, so the two cannot describe different ones. */
+const CHOSEN: MyBurn = { event: BURN, attendance: null }
+
+// `null`, not `undefined`: passing `undefined` to a parameter with a default gets
+// the default, so "no burn" written that way silently rendered the usual one.
+const renderPage = (api: ScheduleApi, viewer: Viewer = MEMBER, burn: MyBurn | null = CHOSEN) =>
   render(
     <ViewerProvider viewer={viewer}>
-      <Schedule api={api} />
+      <BurnProvider
+        value={{ status: 'ready', burns: burn === null ? [] : [burn], selected: burn ?? undefined }}
+      >
+        <Schedule api={api} />
+      </BurnProvider>
     </ViewerProvider>,
   )
 
@@ -343,7 +351,7 @@ describe('Schedule', () => {
   })
 
   it('says so when no burn is open, rather than drawing an empty grid', async () => {
-    renderPage(stub({}, [], [TEMPLE], null))
+    renderPage(stub({}, [], [TEMPLE]), MEMBER, null)
 
     expect(await screen.findByText(/no burn scheduled/)).toBeTruthy()
     expect(document.querySelector('.schedule-grid')).toBeNull()

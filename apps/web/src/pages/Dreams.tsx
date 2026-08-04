@@ -5,6 +5,7 @@ import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
+import { useSelectedBurn } from '../burn.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { fromLocalInput, toLocalInput } from '../datetime.ts'
 import { useAction, useLoad } from '../load.ts'
@@ -12,7 +13,7 @@ import { isMember, useViewer } from '../viewer.tsx'
 
 export type DreamsApi = Pick<
   ApiClient,
-  'getSessions' | 'offerSession' | 'updateSession' | 'withdrawSession' | 'getPlaces' | 'getActiveEvent'
+  'getSessions' | 'offerSession' | 'updateSession' | 'withdrawSession' | 'getPlaces'
 >
 
 const placeLabel = (places: readonly Place[], id: string | null) => {
@@ -45,17 +46,19 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
 
   // The burn comes first: since #156 the lanes belong to one. With no burn open
   // there is nothing to offer a dream to either, and `getSessions` says so anyway.
+  const burn = useSelectedBurn()
   const { loaded, reload } = useLoad(
     async (signal) => {
-      const active = await api.getActiveEvent(signal)
+      if (burn === undefined) return { sessions: [], places: [] }
+
       const [dreams, places] = await Promise.all([
-        api.getSessions(signal),
-        active.event === null ? { places: [] } : api.getPlaces(active.event.id, signal),
+        api.getSessions(burn.event.id, signal),
+        api.getPlaces(burn.event.id, signal),
       ])
 
       return { sessions: dreams.sessions, places: places.places }
     },
-    { enabled: member, fallback: 'Could not load the dreams.' },
+    { enabled: member, key: burn?.event.id ?? '', fallback: 'Could not load the dreams.' },
   )
 
   const { busy, error, setError, run } = useAction(reload)
@@ -67,7 +70,8 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
     }
 
     run(async () => {
-      await api.offerSession({ title: title.trim(), description: '' })
+      if (burn === undefined) return
+      await api.offerSession(burn.event.id, { title: title.trim(), description: '' })
       setTitle('')
     }, 'Could not offer that.')
   }

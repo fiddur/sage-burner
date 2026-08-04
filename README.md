@@ -825,6 +825,22 @@ The bar carries **one entry per thing, not one per page** (#184). Everything els
 is reached from the page it belongs to, which is where somebody is standing when
 they want it.
 
+Leftmost is the **burn selector**, because everything to the right of it is about
+the burn it names. It lists the burns a member has said they are coming to, and
+defaults to the soonest — the list arrives soonest-first, so that is the first
+entry rather than a rule applied twice. **An organiser holding `admin` sees every
+burn still to come**: one without `member` has no attendance anywhere and would
+otherwise face an empty selector on the burn they are setting up. Somebody coming
+to none gets no selector and no burn-scoped content; their details page is where
+they join one.
+
+It is hidden when there is nothing to choose between — one burn is the ordinary
+case and a select with a single option is furniture.
+
+The choice is **not persisted**. A reload landing on the soonest burn is the right
+default every time, and a remembered choice would leave somebody looking at last
+month's grid with nothing on screen to say why.
+
 | Viewer                   | Bar                                               |
 | ------------------------ | ------------------------------------------------- |
 | Signed out               | Apply, Log in                                     |
@@ -910,6 +926,19 @@ An invite's single use is enforced by a **partial unique index on
 every CLI-created account has none. Deleting the account would stop the index
 objecting, so redemption stamps `used_at` in the same transaction; neither
 mechanism is sufficient alone.
+
+### Every burn-scoped route takes an event id
+
+`activeEvent` decides one thing now: what the **public** homepage and the ICS feed
+are about. Everything a signed-in member looks at names its burn in the path —
+`/api/events/:eventId/{places,sessions,members,roles,options,attendance/me}` — and
+the selector in the bar is what supplies the id.
+
+The routes that take a bare id instead (`/api/places/:id`, `/api/sessions/:id`,
+`/api/roles/:id`) resolve the burn from the row and refuse one that has **ended**,
+through `openEvent`. Not `activeEvent`: the selector offers every burn still to
+come, so a dream can be offered for the one after next and a grid laid out months
+ahead. What is closed is the archive.
 
 ### Which event is active
 

@@ -110,18 +110,6 @@ export const registerRosterRoutes = (
     },
   )
 
-  app.get('/api/events/active/members', { preHandler: requireApproved }, async (_request, reply) => {
-    void noStore(reply)
-
-    const open = await activeEvent(db, todayIso(now))
-    if (open === undefined) return { event: null, entries: [] } satisfies MemberRosterResponse
-
-    return {
-      event: { id: open.id, name: open.name, member_cap: open.member_cap },
-      entries: (await rosterFor(open.id, open.member_cap)).map(asMemberEntry),
-    } satisfies MemberRosterResponse
-  })
-
   app.patch<{ Params: { eventId: string; accountId: string } }>(
     '/api/admin/events/:eventId/attendance/:accountId/payment',
     async (request, reply) => {

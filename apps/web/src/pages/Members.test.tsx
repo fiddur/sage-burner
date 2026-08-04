@@ -1,4 +1,4 @@
-import type { MemberRosterEntry, MemberRosterResponse } from '@sage-burner/shared'
+import type { MemberRosterEntry, MemberRosterResponse, MyBurn } from '@sage-burner/shared'
 
 import { cleanup, render, screen } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Viewer } from '../viewer.tsx'
 import type { MembersApi } from './Members.tsx'
 
+import { BurnProvider } from '../burn.tsx'
 import { ViewerProvider } from '../viewer.tsx'
 import { Members } from './Members.tsx'
 
@@ -37,14 +38,34 @@ const aRoster = (over: Partial<MemberRosterResponse> = {}): MemberRosterResponse
   ...over,
 })
 
-const stub = (roster = aRoster()): MembersApi => ({ getActiveMembers: () => Promise.resolve(roster) })
+const stub = (roster = aRoster()): MembersApi => ({ getMembers: () => Promise.resolve(roster) })
+
+/** The selector's view of the same burn, so the two cannot describe different ones. */
+const CHOSEN: MyBurn = {
+  event: {
+    id: 'e-1',
+    name: 'Summer burn',
+    slug: 'summer-burn',
+    start_date: '2026-08-01',
+    end_date: '2026-08-05',
+    start_time: '16:00',
+    end_time: '12:00',
+  },
+  attendance: null,
+}
 
 const MEMBER: Viewer = { status: 'signed-in', account: { id: 'a-1', name: null, roles: ['member'] } }
 
-const renderPage = (api: MembersApi, viewer: Viewer = MEMBER) =>
+// `null`, not `undefined`: passing `undefined` to a parameter with a default gets
+// the default, so "no burn" written that way silently rendered the usual one.
+const renderPage = (api: MembersApi, viewer: Viewer = MEMBER, burn: MyBurn | null = CHOSEN) =>
   render(
     <ViewerProvider viewer={viewer}>
-      <Members api={api} />
+      <BurnProvider
+        value={{ status: 'ready', burns: burn === null ? [] : [burn], selected: burn ?? undefined }}
+      >
+        <Members api={api} />
+      </BurnProvider>
     </ViewerProvider>,
   )
 
@@ -95,11 +116,11 @@ describe('Members', () => {
   it('asks the API nothing for somebody still waiting on a decision', async () => {
     // An applicant with an account and no roles. Asking anyway renders a failure
     // where the explanation belongs, and spends a round trip on a certain 403.
-    const getActiveMembers = vi.fn(() => Promise.reject(new Error('should not be called')))
-    renderPage({ getActiveMembers }, { status: 'signed-in', account: { id: 'a-9', name: null, roles: [] } })
+    const getMembers = vi.fn(() => Promise.reject(new Error('should not be called')))
+    renderPage({ getMembers }, { status: 'signed-in', account: { id: 'a-9', name: null, roles: [] } })
 
     expect(await screen.findByText(/for members/)).toBeTruthy()
-    expect(getActiveMembers).not.toHaveBeenCalled()
+    expect(getMembers).not.toHaveBeenCalled()
   })
 
   it('opens to an organiser holding admin without member', async () => {
@@ -112,7 +133,7 @@ describe('Members', () => {
   })
 
   it('says so when no burn is open, rather than showing an empty table', async () => {
-    renderPage(stub(aRoster({ event: null })))
+    renderPage(stub(aRoster({ event: null })), MEMBER, null)
 
     expect(await screen.findByText(/no burn open/)).toBeTruthy()
     expect(screen.queryByRole('table')).toBeNull()

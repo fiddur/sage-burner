@@ -59,6 +59,11 @@ by reading Rollup's docs.
 
 - **Never hardcode a single event.** `event` exists from day one; the whole
   point is that this recurs up to 4x/year.
+- **Every burn-scoped route takes an event id** (#184). `activeEvent` decides only
+  what the public homepage and the ICS feed are about; the selector in the bar
+  supplies the id for everything a signed-in member looks at. Routes keyed by a bare
+  id resolve the burn from the row and refuse one that has **ended** — `openEvent`,
+  not `activeEvent`, because a grid is laid out and a dream offered months ahead.
 - **Payment is per `attendance`** — one row per `(event, account)` — not a
   global "has this person paid" flag. The same human may attend several burns and
   pays separately for each.

@@ -1,4 +1,4 @@
-import type { Place, Session } from '@sage-burner/shared'
+import type { MyBurn, Place, Session } from '@sage-burner/shared'
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -7,6 +7,7 @@ import type { Viewer } from '../viewer.tsx'
 import type { DreamsApi } from './Dreams.tsx'
 
 import { apiError } from '../api/client.ts'
+import { BurnProvider } from '../burn.tsx'
 import { ViewerProvider } from '../viewer.tsx'
 import { Dreams } from './Dreams.tsx'
 
@@ -40,7 +41,6 @@ const aDream = (over: Partial<Session> & Pick<Session, 'id' | 'title'>): Session
 })
 
 const stub = (over: Partial<DreamsApi> = {}, sessions: Session[] = []): DreamsApi => ({
-  getActiveEvent: () => Promise.resolve({ event: BURN }),
   getSessions: () => Promise.resolve({ sessions }),
   getPlaces: () => Promise.resolve({ places: [TEMPLE] }),
   offerSession: () => Promise.reject(new Error('offerSession is not stubbed here')),
@@ -49,10 +49,19 @@ const stub = (over: Partial<DreamsApi> = {}, sessions: Session[] = []): DreamsAp
   ...over,
 })
 
-const renderPage = (api: DreamsApi, viewer: Viewer = MEMBER) =>
+/** The selector's view of the same burn, so the two cannot describe different ones. */
+const CHOSEN: MyBurn = { event: BURN, attendance: null }
+
+// `null`, not `undefined`: passing `undefined` to a parameter with a default gets
+// the default, so "no burn" written that way silently rendered the usual one.
+const renderPage = (api: DreamsApi, viewer: Viewer = MEMBER, burn: MyBurn | null = CHOSEN) =>
   render(
     <ViewerProvider viewer={viewer}>
-      <Dreams api={api} />
+      <BurnProvider
+        value={{ status: 'ready', burns: burn === null ? [] : [burn], selected: burn ?? undefined }}
+      >
+        <Dreams api={api} />
+      </BurnProvider>
     </ViewerProvider>,
   )
 
@@ -99,7 +108,9 @@ describe('Dreams', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: 'Offer it' }))
 
-    await waitFor(() => expect(offerSession).toHaveBeenCalledWith({ title: 'Sunrise yoga', description: '' }))
+    await waitFor(() =>
+      expect(offerSession).toHaveBeenCalledWith('e-1', { title: 'Sunrise yoga', description: '' }),
+    )
   })
 
   it('refuses a nameless dream here rather than letting the server say no', async () => {

@@ -1,10 +1,11 @@
-import type { AccountRole } from '@sage-burner/shared'
+import type { AccountRole, MyBurn } from '@sage-burner/shared'
 
-import { cleanup, render, screen } from '@testing-library/preact'
-import { afterEach, describe, expect, it } from 'vitest'
+import { cleanup, fireEvent, render, screen } from '@testing-library/preact'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Viewer } from '../viewer.tsx'
 
+import { BurnProvider } from '../burn.tsx'
 import { InstallationProvider } from '../installation.tsx'
 import { ViewerProvider } from '../viewer.tsx'
 import { Layout, initials } from './Layout.tsx'
@@ -135,5 +136,65 @@ describe('initials', () => {
 
   it('uppercases what it finds, since a lowercased name is still a name', () => {
     expect(initials('ada lovelace')).toBe('AL')
+  })
+})
+
+describe('the burn selector', () => {
+  const aBurn = (id: string, name: string): MyBurn => ({
+    event: {
+      id,
+      name,
+      slug: name.toLowerCase(),
+      start_date: '2026-08-01',
+      end_date: '2026-08-05',
+      start_time: '16:00',
+      end_time: '12:00',
+    },
+    attendance: null,
+  })
+
+  const renderWithBurns = (burns: MyBurn[], select = () => undefined) =>
+    render(
+      <InstallationProvider title="Sage Burner">
+        <ViewerProvider viewer={signedInAs('member')}>
+          <BurnProvider value={{ status: 'ready', burns, selected: burns[0], select }}>
+            <Layout api={{ logout: never }}>
+              <p>the page</p>
+            </Layout>
+          </BurnProvider>
+        </ViewerProvider>
+      </InstallationProvider>,
+    )
+
+  it('offers each burn, and says which one the rest of the bar is about', () => {
+    renderWithBurns([aBurn('e-1', 'Summer'), aBurn('e-2', 'Winter')])
+
+    const selector = screen.getByRole('combobox', { name: 'Which burn' })
+    expect(selector).toHaveProperty('value', 'e-1')
+    expect([...screen.getAllByRole('option')].map((option) => option.textContent)).toEqual([
+      'Summer',
+      'Winter',
+    ])
+  })
+
+  it('reports the choice rather than navigating', () => {
+    const select = vi.fn()
+    renderWithBurns([aBurn('e-1', 'Summer'), aBurn('e-2', 'Winter')], select)
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Which burn' }), { target: { value: 'e-2' } })
+
+    expect(select).toHaveBeenCalledWith('e-2')
+  })
+
+  it('is absent with one burn to choose from, since a one-option select is furniture', () => {
+    renderWithBurns([aBurn('e-1', 'Summer')])
+
+    expect(screen.queryByRole('combobox', { name: 'Which burn' })).toBeNull()
+  })
+
+  it('is absent with none, rather than an empty control', () => {
+    renderWithBurns([])
+
+    expect(screen.queryByRole('combobox', { name: 'Which burn' })).toBeNull()
   })
 })

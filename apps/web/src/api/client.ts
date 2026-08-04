@@ -280,11 +280,15 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
       }),
 
     /** Members only. Scheduled dreams first, then the ones only offered. */
-    getSessions: (signal?: AbortSignal) => request<SessionsResponse>('/events/active/sessions', { signal }),
+    getSessions: (eventId: string, signal?: AbortSignal) =>
+      request<SessionsResponse>(`/events/${encodeURIComponent(eventId)}/sessions`, { signal }),
 
-    /** Members only. The host is the caller, and the burn is whichever is open. */
-    offerSession: (body: SessionCreateInput) =>
-      request<SessionResponse>('/events/active/sessions', { method: 'POST', body }),
+    /** Members only. The host is the caller; the burn is the one named. */
+    offerSession: (eventId: string, body: SessionCreateInput) =>
+      request<SessionResponse>(`/events/${encodeURIComponent(eventId)}/sessions`, {
+        method: 'POST',
+        body,
+      }),
 
     /** Members only — any member may arrange the schedule, not just the host. */
     updateSession: (id: string, body: SessionUpdate) =>
@@ -527,8 +531,8 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
       request<RosterResponse>('/admin/events/active/roster', { signal }),
 
     /** The same list without payment or email, for any approved member. */
-    getActiveMembers: (signal?: AbortSignal) =>
-      request<MemberRosterResponse>('/events/active/members', { signal }),
+    getMembers: (eventId: string, signal?: AbortSignal) =>
+      request<MemberRosterResponse>(`/events/${encodeURIComponent(eventId)}/members`, { signal }),
 
     /** Admin only. Payment and payment date; nothing else on the row. */
     setPayment: (eventId: string, accountId: string, body: PaymentUpdate) =>

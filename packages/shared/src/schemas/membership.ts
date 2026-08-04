@@ -156,32 +156,28 @@ export type Attendance = z.infer<typeof attendanceSchema>
 export type ProfileUpdate = z.infer<typeof profileUpdateSchema>
 export type AttendanceUpdate = z.infer<typeof attendanceUpdateSchema>
 
-/**
- * Someone's attendance at the active burn, as they see it.
- *
- * `null` when they have not said they are coming — the page needs to tell "not
- * coming" from "coming and nothing filled in yet", and both are ordinary states.
- */
-export const myAttendanceResponseSchema = z.object({
-  // Derived rather than re-declared. Written out, this had `slug` as plain bounded
-  // text — so it accepted any 120 characters where `slugSchema` accepts 64 of
-  // lowercase-hyphenated words. A summary of a thing should not be a second, looser
-  // opinion about what that thing is.
-  event: eventFields.pick({ id: true, name: true, slug: true }).nullable(),
-  attendance: attendanceSchema.nullable(),
-})
-
 /** Who an organiser is adding to a burn on someone else's behalf. */
 export const attendanceCreateSchema = z.object({ account_id: idSchema }).strict()
 
 /** One burn on someone's own page, with their stay at it or nothing yet. */
 export const myBurnSchema = z.object({
+  /**
+   * Enough of the burn for the pages the selector points at.
+   *
+   * The gate times are here because the schedule grid draws its rows from them; the
+   * cap is not, because nothing outside the roster counts places. A summary is a
+   * projection of the row, never a second opinion about it — `eventFields.pick`
+   * rather than a hand-written shape, so a bound stated once cannot be restated
+   * more loosely here.
+   */
   event: eventFields.pick({
     id: true,
     name: true,
     slug: true,
     start_date: true,
     end_date: true,
+    start_time: true,
+    end_time: true,
   }),
   attendance: attendanceSchema.nullable(),
 })
@@ -218,7 +214,6 @@ export const eventAttendeesResponseSchema = z.object({
   attendees: z.array(z.object({ account_id: idSchema, name: z.string().nullable() })),
 })
 
-export type MyAttendanceResponse = z.infer<typeof myAttendanceResponseSchema>
 export type AttendanceCreate = z.infer<typeof attendanceCreateSchema>
 export type MyBurn = z.infer<typeof myBurnSchema>
 export type MyBurnsResponse = z.infer<typeof myBurnsResponseSchema>

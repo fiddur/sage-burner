@@ -1,4 +1,4 @@
-import type { Place } from '@sage-burner/shared'
+import type { MyBurn, Place } from '@sage-burner/shared'
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -7,6 +7,7 @@ import type { Viewer } from '../viewer.tsx'
 import type { PlacesApi } from './Places.tsx'
 
 import { apiError } from '../api/client.ts'
+import { BurnProvider } from '../burn.tsx'
 import { ViewerProvider } from '../viewer.tsx'
 import { Places } from './Places.tsx'
 
@@ -42,7 +43,6 @@ const THREE: Place[] = [
 ]
 
 const stub = (over: Partial<PlacesApi> = {}, places: Place[] = THREE): PlacesApi => ({
-  getActiveEvent: () => Promise.resolve({ event: BURN }),
   getPlaces: () => Promise.resolve({ places }),
   getPlaceSources: () => Promise.resolve({ sources: [] }),
   addPlace: () => Promise.reject(new Error('addPlace is not stubbed here')),
@@ -53,10 +53,19 @@ const stub = (over: Partial<PlacesApi> = {}, places: Place[] = THREE): PlacesApi
   ...over,
 })
 
-const renderPage = (api: PlacesApi, viewer: Viewer = ADMIN) =>
+/** The selector's view of the same burn, so the two cannot describe different ones. */
+const CHOSEN: MyBurn = { event: BURN, attendance: null }
+
+// `null`, not `undefined`: passing `undefined` to a parameter with a default gets
+// the default, so "no burn" written that way silently rendered the usual one.
+const renderPage = (api: PlacesApi, viewer: Viewer = ADMIN, burn: MyBurn | null = CHOSEN) =>
   render(
     <ViewerProvider viewer={viewer}>
-      <Places api={api} />
+      <BurnProvider
+        value={{ status: 'ready', burns: burn === null ? [] : [burn], selected: burn ?? undefined }}
+      >
+        <Places api={api} />
+      </BurnProvider>
     </ViewerProvider>,
   )
 
@@ -258,7 +267,7 @@ describe('Places', () => {
 
   it('says there is no grid to lay out when no burn is coming up', async () => {
     const getPlaces = vi.fn<PlacesApi['getPlaces']>(() => Promise.resolve({ places: [] }))
-    renderPage(stub({ getActiveEvent: () => Promise.resolve({ event: null }), getPlaces }))
+    renderPage(stub({ getPlaces }), ADMIN, null)
 
     expect(await screen.findByText(/no burn coming up yet/)).toBeTruthy()
     expect(getPlaces).not.toHaveBeenCalled()
