@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { MAX_APPLICANT_NAME_LENGTH } from '../answers.ts'
 import { inviteStatuses } from '../enums.ts'
 import { dateTimeSchema, idSchema } from './common.ts'
 
@@ -14,7 +15,9 @@ export const adminInviteSchema = z.object({
   id: idSchema,
   /** Null for a direct invite, which is what makes it revocable. */
   application_id: idSchema.nullable(),
-  applicant_name: z.string().nullable(),
+  // Bounded like the column it comes from. The one unbounded string in the schema
+  // set until now, and it is copied straight out of `application.applicant_name`.
+  applicant_name: z.string().max(MAX_APPLICANT_NAME_LENGTH).nullable(),
   expires_at: dateTimeSchema,
   used_at: dateTimeSchema.nullable(),
   status: z.enum(inviteStatuses),

@@ -1,29 +1,20 @@
 import type {
+  AccountRolesUpdate,
+  ActiveEventResponse,
+  AdminAccountResponse,
+  AdminAccountsResponse,
   AdminInvitesResponse,
-  Attendance,
   ApplicationCreate,
   ApplicationDecisionResponse,
   ApplicationResponse,
   ApplicationsResponse,
-  InviteCreate,
-  InviteResponse,
-  InviteState,
+  Attendance,
   AttendanceUpdate,
-  MyAttendanceResponse,
-  PaymentUpdate,
-  ProfileResponse,
-  ProfileUpdate,
-  PushKeyResponse,
-  PushSubscriptionCreate,
-  RedeemRequestInput,
-  RosterResponse,
-  ActiveEventResponse,
-  AccountRolesUpdate,
-  AdminAccountResponse,
-  AdminAccountsResponse,
   EventCreateInput,
   EventOption,
   EventOptionCreateInput,
+  EventOptionKind,
+  EventOptionOrder,
   EventOptionUpdate,
   EventOptionsResponse,
   EventResponse,
@@ -31,17 +22,30 @@ import type {
   EventWelcomeUpdate,
   EventsResponse,
   FormQuestionCreateInput,
+  FormQuestionOrder,
   FormQuestionResponse,
   FormQuestionUpdate,
   FormQuestionsResponse,
   InstallationResponse,
   InstallationUpdate,
+  InviteCreate,
+  InviteResponse,
+  InviteState,
   LoginRequest,
   MeResponse,
+  MyAttendanceResponse,
+  PaymentUpdate,
   Place,
   PlaceCreate,
+  PlaceOrder,
   PlaceUpdate,
   PlacesResponse,
+  ProfileResponse,
+  ProfileUpdate,
+  PushKeyResponse,
+  PushSubscriptionCreate,
+  RedeemRequestInput,
+  RosterResponse,
   SessionCreateInput,
   SessionResponse,
   SessionUpdate,
@@ -79,6 +83,16 @@ export interface ApiError extends Error {
  */
 export const apiError = (status: number, code: string, message: string): ApiError =>
   Object.assign(new Error(message), { name: 'ApiError', status, code })
+
+/**
+ * The body every reorder route takes.
+ *
+ * One helper and a `satisfies` at each call site, so a client drifting from the
+ * schema is a type error rather than a 400 at runtime. The three schemas are
+ * separate — one per collection — and identical, which is why this is a shape
+ * rather than a shared type.
+ */
+const orderBody = (ids: readonly string[]) => ({ ids: [...ids] })
 
 export const isApiError = (value: unknown): value is ApiError =>
   value instanceof Error && 'status' in value && 'code' in value
@@ -286,7 +300,7 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
 
     /** Any approved member. Every place exactly once, in the order they should appear. */
     reorderPlaces: (ids: readonly string[]) =>
-      request<PlacesResponse>('/places/order', { method: 'PUT', body: { ids } }),
+      request<PlacesResponse>('/places/order', { method: 'PUT', body: orderBody(ids) satisfies PlaceOrder }),
 
     /** Public, like the places: nothing in either list is about a person. */
     getEventOptions: (eventId: string, signal?: AbortSignal) =>
@@ -321,10 +335,10 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
       request<undefined>(`/event-options/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
     /** Any approved member. Every option of that kind exactly once. */
-    reorderEventOptions: (eventId: string, kind: string, ids: readonly string[]) =>
+    reorderEventOptions: (eventId: string, kind: EventOptionKind, ids: readonly string[]) =>
       request<EventOptionsResponse>(
         `/events/${encodeURIComponent(eventId)}/options/${encodeURIComponent(kind)}/order`,
-        { method: 'PUT', body: { ids } },
+        { method: 'PUT', body: orderBody(ids) satisfies EventOptionOrder },
       ),
 
     /** Admin only. */
@@ -510,7 +524,10 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
      * list is rejected, since it would renumber some rows and leave others.
      */
     reorderQuestions: (ids: string[]) =>
-      request<FormQuestionsResponse>('/admin/questions/order', { method: 'PUT', body: { ids } }),
+      request<FormQuestionsResponse>('/admin/questions/order', {
+        method: 'PUT',
+        body: orderBody(ids) satisfies FormQuestionOrder,
+      }),
   }
 }
 
