@@ -288,7 +288,7 @@ describe('Roles', () => {
 
   it('offers a previous burn only while the register is empty', async () => {
     const copyLeadRoles = vi.fn(() => Promise.resolve({ roles: [] }))
-    const sources = { sources: [{ event_id: 'e-0', name: 'Last summer', roles: 3 }] }
+    const sources = { sources: [{ event_id: 'e-0', name: 'Last summer', count: 3 }] }
     const { unmount } = renderPage(
       stub({ copyLeadRoles, getLeadRoleSources: () => Promise.resolve(sources) }),
     )

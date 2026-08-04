@@ -661,7 +661,7 @@ member — not admin:
 
 | Open to any approved member   | Still admin                                                                     |
 | ----------------------------- | ------------------------------------------------------------------------------- |
-| Schedule places (lanes)       | The burn's shape: name, slug, dates, gate times, `member_cap`, and creating one |
+| Schedule places, per burn     | The burn's shape: name, slug, dates, gate times, `member_cap`, and creating one |
 | The lodging and helping lists | Payment                                                                         |
 | A burn's welcome text         | Applications, invites, role grants, installation settings                       |
 | The lead-roles register       |                                                                                 |
@@ -1329,10 +1329,18 @@ which is what proves the guard would have been dead.
 
 Somewhere a dream can happen — the Temple, the Sauna, the Front Lawn. Rows
 rather than code, the same as the application questions: the site changes
-between burns and adding a place must never need a redeploy. **One central set,
-not one per event** — the venue outlives the burn.
+between burns and adding a place must never need a redeploy. **One grid per
+event**, seeded from a previous burn.
 
-Organise → **Places**. A pencil edits, a trashcan removes, and the ⠿ handle
+That was one central list until #156, on the reasoning that the venue outlives the
+burn. Half right: the venue does, the set in use does not. Some spots are
+summer-only and a large event tent is there some years and not others, so a global
+list meant every schedule grid carried lanes that do not exist at this burn — and
+the grid is the thing the list exists to build. The same shape `event_option`
+already had for lodging and helping: definitions per burn, seeded rather than
+retyped.
+
+Organise → **Places**, which follows the burn that is open. A pencil edits, a trashcan removes, and the ⠿ handle
 reorders — by dragging, and by ArrowUp/ArrowDown while it has focus. The handle
 takes keys as well as drags because a reorder only a pointer can do is one some
 people cannot do at all.
@@ -1352,18 +1360,70 @@ The emoji is bounded but not pattern-matched. A ZWJ sequence such as 👩‍🚀
 several code points and the set grows with every Unicode release, so a regex
 would reject valid input on a schedule nobody could fix without a deploy.
 
-`GET /api/places` is **public**, like `/api/questions`: the ICS feed publishes a
-session's location to anyone holding the link, so the list of places is already
-public by design. Writes are open to any approved member — the lanes are the
-burn's furniture, not admin's.
+`GET /api/events/:eventId/places` is **public**, like `/api/questions`: the ICS
+feed publishes a session's location to anyone holding the link, so the list of
+places is already public by design. Writes are open to any approved member — the
+lanes are the burn's furniture, not admin's. Editing and deleting stay on
+`/api/places/:id`, since an id already names one burn's lane.
 
 `order` is the server's to assign, so `POST` refuses a caller that sends one —
-otherwise two places could claim the same lane. New places land after the last,
-assigned inside a transaction so two simultaneous adds cannot both read the same
-last row. `PUT /api/places/order` takes **every** place exactly once; a
-partial list would renumber some rows and leave the rest on stale positions.
-Deleting does not renumber the survivors: `order` only has to sort, not be
-contiguous.
+otherwise two places could claim the same lane. `event_id` is refused for the same
+kind of reason: the path already says which burn, and a body naming another would
+be a second, disagreeing opinion. New places land after **this burn's** last row,
+assigned inside a transaction so two simultaneous adds cannot both read it; each
+burn therefore numbers from zero rather than continuing wherever the previous one
+stopped. `PUT /api/events/:eventId/places/order` takes **every** place of that
+burn exactly once; a partial list would renumber some rows and leave the rest on
+stale positions, and an id from another burn is refused rather than allowed to
+reach into a grid the request is not about. Deleting does not renumber the
+survivors: `order` only has to sort, not be contiguous.
+
+**A dream can only stand in its own burn's lane.** The foreign key cannot say
+that — it only knows the place exists — so `sessions.ts` checks the pairing and
+answers 400. Without it a dream could hold a lane the grid does not draw, and it
+would vanish from the page while still holding a row.
+
+### Seeding a grid from a previous burn
+
+`POST /api/events/:eventId/places/copy` takes a `from_event_id` and brings the
+lanes, **carrying their order** so the copied grid reads left to right the way the
+burn it came from did. Never the dreams standing in them: which burn's Temple a
+dream was in is a fact about that burn. It answers **409** into a grid that already
+has lanes, and the page offers the control only while the grid is empty — merging
+two grids is a decision nobody asked for.
+
+`GET /api/events/:eventId/places/sources` fills that picker, and
+`GET /api/events/:eventId/roles/sources` is the same query for the roles register;
+both go through `copySourcesFor`. It exists because `GET /api/admin/events` is
+admin-only, so a member choosing a burn to copy from would otherwise have nothing
+to choose between. Only burns that already hold something appear, and only their
+name and count — a burn's dates and cap stay admin's.
+
+### The migration
+
+`place` gained `event_id NOT NULL`, and existing rows went to **the last created
+event**, ordered by `created_at` — there was one event, and every row belonged to
+it. `created_at` rather than `start_date` because "last created" is what was
+decided, and it does not change meaning when somebody edits a burn's dates.
+
+The SQL is hand-written, which is unusual here. drizzle-kit emits
+`ALTER TABLE place ADD event_id text NOT NULL REFERENCES event(id)`, and SQLite
+refuses that outright — _Cannot add a NOT NULL column with default value NULL_ —
+with nowhere to put the backfill even if it did not. So it is the
+create-copy-drop-rename rebuild, which is also what lets the foreign key carry
+`on delete cascade`.
+
+**With no event, the places are dropped.** The join selects nothing. That is the
+right answer rather than a loss: no event means no `session` rows either, since
+they reference one, so the places are unreferenced decoration — but it is worth
+saying out loud, because "the migration deleted my lanes" is otherwise a surprise
+on a fresh install that happened to seed places.
+
+A data migration is only tested by running it over the old shape with rows in it,
+so `db.integration.test.ts` stages a migrations folder holding everything up to but
+excluding the rebuild, seeds through the old table, and then runs the full set. It
+asserts the staged set does not contain the rebuild — a mistyped tag would stage
+every migration and every one of those tests would pass while proving nothing.
 
 ### Applying
 

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { effortLevels } from '../enums.ts'
 import { MAX_NOTES, MAX_TITLE } from '../limits.ts'
 import { idSchema, nonEmptyText } from './common.ts'
+import { copyFromSchema } from './copy.ts'
 
 /**
  * A lead role for one burn — the spreadsheet's roles tab.
@@ -95,19 +96,10 @@ export const leadRoleTeamSchema = z.object({ account_id: idSchema }).strict()
  * Definitions only — titles, purpose, tasks, effort, team sizes — and never people:
  * who led the sauna last summer is a fact about last summer. Fifteen roles retyped
  * four times a year is the friction this removes.
- */
-export const leadRoleCopySchema = z.object({ from_event_id: idSchema }).strict()
-
-/**
- * Which burns this register could be seeded from.
  *
- * Its own response rather than the admin event list, which a member cannot read:
- * only burns that already have a register appear, and only their name. A burn's
- * shape stays admin's.
+ * The body and the source list are `copy.ts`'s, shared with the schedule's places.
  */
-export const leadRoleSourcesResponseSchema = z.object({
-  sources: z.array(z.object({ event_id: idSchema, name: z.string(), roles: z.int() })),
-})
+export const leadRoleCopySchema = copyFromSchema
 
 export type LeadRole = z.infer<typeof leadRoleSchema>
 export type LeadRolesResponse = z.infer<typeof leadRolesResponseSchema>
@@ -118,4 +110,3 @@ export type LeadRoleUpdate = z.infer<typeof leadRoleUpdateSchema>
 export type LeadRoleLead = z.infer<typeof leadRoleLeadSchema>
 export type LeadRoleTeam = z.infer<typeof leadRoleTeamSchema>
 export type LeadRoleCopy = z.infer<typeof leadRoleCopySchema>
-export type LeadRoleSourcesResponse = z.infer<typeof leadRoleSourcesResponseSchema>

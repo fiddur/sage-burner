@@ -27,8 +27,8 @@ const BURN: Event = {
   created_at: '2026-07-02T00:00:00.000Z',
 }
 
-const TEMPLE: Place = { id: 'p-1', order: 0, name: 'Temple', emoji: '🛕', color: 'yellow' }
-const SAUNA: Place = { id: 'p-2', order: 1, name: 'Sauna', emoji: '🥵', color: 'red' }
+const TEMPLE: Place = { id: 'p-1', event_id: 'e-1', order: 0, name: 'Temple', emoji: '🛕', color: 'yellow' }
+const SAUNA: Place = { id: 'p-2', event_id: 'e-1', order: 1, name: 'Sauna', emoji: '🥵', color: 'red' }
 
 const aDream = (over: Partial<Session> & Pick<Session, 'id' | 'title'>): Session => ({
   event_id: 'e-1',

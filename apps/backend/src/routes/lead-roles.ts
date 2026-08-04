@@ -1,9 +1,4 @@
-import type {
-  LeadRole,
-  LeadRoleResponse,
-  LeadRolesResponse,
-  LeadRoleSourcesResponse,
-} from '@sage-burner/shared'
+import type { CopySourcesResponse, LeadRole, LeadRoleResponse, LeadRolesResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
 import {
@@ -14,7 +9,7 @@ import {
   leadRoleTeamSchema,
   leadRoleUpdateSchema,
 } from '@sage-burner/shared'
-import { and, asc, count, desc, eq, inArray, ne } from 'drizzle-orm'
+import { and, asc, eq, inArray } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -22,8 +17,9 @@ import type { Database } from '../db/index.ts'
 
 import { createGuards } from '../auth/guards.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
-import { account, attendance, event, leadRole, leadRoleMember } from '../db/schema.ts'
+import { account, attendance, leadRole, leadRoleMember } from '../db/schema.ts'
 import { noStore } from '../http.ts'
+import { copySourcesFor } from './copy-sources.ts'
 
 export interface LeadRoleDeps extends GuardDeps {
   now?: () => Date
@@ -310,15 +306,13 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
     async (request, reply) => {
       void noStore(reply)
 
-      const sources = await db
-        .select({ event_id: event.id, name: event.name, roles: count(leadRole.id) })
-        .from(event)
-        .innerJoin(leadRole, eq(leadRole.event_id, event.id))
-        .where(ne(event.id, request.params.eventId))
-        .groupBy(event.id)
-        .orderBy(desc(event.start_date), asc(event.slug))
+      const sources = await copySourcesFor(
+        db,
+        { table: leadRole, eventColumn: leadRole.event_id, idColumn: leadRole.id },
+        request.params.eventId,
+      )
 
-      return { sources } satisfies LeadRoleSourcesResponse
+      return { sources } satisfies CopySourcesResponse
     },
   )
 

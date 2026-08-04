@@ -11,7 +11,7 @@ import { isMember, useViewer } from '../viewer.tsx'
 
 export type DreamsApi = Pick<
   ApiClient,
-  'getSessions' | 'offerSession' | 'updateSession' | 'withdrawSession' | 'getPlaces'
+  'getSessions' | 'offerSession' | 'updateSession' | 'withdrawSession' | 'getPlaces' | 'getActiveEvent'
 >
 
 type Loaded =
@@ -56,10 +56,19 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
 
     const controller = new AbortController()
 
-    Promise.all([api.getSessions(controller.signal), api.getPlaces(controller.signal)])
-      .then(([dreams, places]) => {
-        if (controller.signal.aborted) return
-        setLoaded({ status: 'ready', sessions: dreams.sessions, places: places.places })
+    // The burn comes first: since #156 the lanes belong to one. With no burn open
+    // there is nothing to offer a dream to either, and `getSessions` says so anyway.
+    api
+      .getActiveEvent(controller.signal)
+      .then(async (active) => {
+        const dreams = await api.getSessions(controller.signal)
+        const places =
+          active.event === null ? { places: [] } : await api.getPlaces(active.event.id, controller.signal)
+
+        return { status: 'ready', sessions: dreams.sessions, places: places.places } as const
+      })
+      .then((next) => {
+        if (!controller.signal.aborted) setLoaded(next)
       })
       .catch((failure: unknown) => {
         if (controller.signal.aborted) return

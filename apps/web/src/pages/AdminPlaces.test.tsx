@@ -14,7 +14,21 @@ afterEach(cleanup)
 
 const ADMIN: Viewer = { status: 'signed-in', account: { id: 'a-1', roles: ['admin'] } }
 
+const BURN = {
+  id: 'e-1',
+  name: 'Summer burn',
+  slug: 'summer-burn',
+  start_date: '2026-08-01',
+  end_date: '2026-08-05',
+  start_time: '16:00',
+  end_time: '12:00',
+  welcome_markdown: '',
+  member_cap: 42,
+  created_at: '2026-07-02T00:00:00.000Z',
+}
+
 const aPlace = (over: Partial<Place> & Pick<Place, 'id' | 'name'>): Place => ({
+  event_id: 'e-1',
   order: 0,
   emoji: '🛕',
   color: 'yellow',
@@ -28,11 +42,14 @@ const THREE: Place[] = [
 ]
 
 const stub = (over: Partial<PlacesApi> = {}, places: Place[] = THREE): PlacesApi => ({
+  getActiveEvent: () => Promise.resolve({ event: BURN }),
   getPlaces: () => Promise.resolve({ places }),
+  getPlaceSources: () => Promise.resolve({ sources: [] }),
   addPlace: () => Promise.reject(new Error('addPlace is not stubbed here')),
   updatePlace: () => Promise.reject(new Error('updatePlace is not stubbed here')),
   deletePlace: () => Promise.reject(new Error('deletePlace is not stubbed here')),
   reorderPlaces: () => Promise.reject(new Error('reorderPlaces is not stubbed here')),
+  copyPlaces: () => Promise.reject(new Error('copyPlaces is not stubbed here')),
   ...over,
 })
 
@@ -74,7 +91,7 @@ describe('AdminPlaces', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add' }))
 
     await waitFor(() =>
-      expect(addPlace).toHaveBeenCalledWith({ name: 'Sexy Field', emoji: '🌸', color: 'purple' }),
+      expect(addPlace).toHaveBeenCalledWith('e-1', { name: 'Sexy Field', emoji: '🌸', color: 'purple' }),
     )
   })
 
@@ -148,7 +165,7 @@ describe('AdminPlaces', () => {
     fireEvent.dragOver(rows[0]!)
     fireEvent.drop(rows[0]!)
 
-    await waitFor(() => expect(reorderPlaces).toHaveBeenCalledWith(['p-3', 'p-1', 'p-2']))
+    await waitFor(() => expect(reorderPlaces).toHaveBeenCalledWith('e-1', ['p-3', 'p-1', 'p-2']))
   })
 
   it('writes to the drag data store, which Firefox needs to start a drag at all', async () => {
@@ -170,7 +187,7 @@ describe('AdminPlaces', () => {
 
     fireEvent.keyDown(await screen.findByRole('button', { name: 'Move Sauna' }), { key: 'ArrowUp' })
 
-    await waitFor(() => expect(reorderPlaces).toHaveBeenCalledWith(['p-2', 'p-1', 'p-3']))
+    await waitFor(() => expect(reorderPlaces).toHaveBeenCalledWith('e-1', ['p-2', 'p-1', 'p-3']))
   })
 
   it('does nothing at the ends rather than sending an unchanged order', async () => {
@@ -228,5 +245,41 @@ describe('AdminPlaces', () => {
     renderPage(stub(), { status: 'signed-in', account: { id: 'a-2', roles: ['member'] } })
 
     expect(await screen.findByText('Temple')).toBeTruthy()
+  })
+
+  it('asks the open burn for its own lanes, not for a global list', async () => {
+    // The point of #156.
+    const getPlaces = vi.fn<PlacesApi['getPlaces']>(() => Promise.resolve({ places: THREE }))
+    renderPage(stub({ getPlaces }))
+
+    expect(await screen.findByText('Temple')).toBeTruthy()
+    expect(getPlaces).toHaveBeenCalledWith('e-1', expect.anything())
+  })
+
+  it('says there is no grid to lay out when no burn is coming up', async () => {
+    const getPlaces = vi.fn<PlacesApi['getPlaces']>(() => Promise.resolve({ places: [] }))
+    renderPage(stub({ getActiveEvent: () => Promise.resolve({ event: null }), getPlaces }))
+
+    expect(await screen.findByText(/no burn coming up yet/)).toBeTruthy()
+    expect(getPlaces).not.toHaveBeenCalled()
+    // No form either: it would take a name and have nowhere to put it.
+    expect(screen.queryByRole('textbox', { name: 'Name' })).toBeNull()
+  })
+
+  it('offers a previous burn only while this grid is empty', async () => {
+    const copyPlaces = vi.fn<PlacesApi['copyPlaces']>(() => Promise.resolve({ places: THREE }))
+    const sources = { sources: [{ event_id: 'e-0', name: 'Last summer', count: 3 }] }
+    const { unmount } = renderPage(stub({ copyPlaces, getPlaceSources: () => Promise.resolve(sources) }, []))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy those places' }))
+    await waitFor(() => {
+      expect(copyPlaces).toHaveBeenCalledWith('e-1', 'e-0')
+    })
+    unmount()
+
+    renderPage(stub({ getPlaceSources: () => Promise.resolve(sources) }, THREE))
+
+    expect(await screen.findByText('Temple')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Copy those places' })).toBeNull()
   })
 })

@@ -15,7 +15,7 @@ import type { Database } from '../db/index.ts'
 
 import { createGuards } from '../auth/guards.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
-import { session } from '../db/schema.ts'
+import { place, session } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 import { viewerFor } from './auth.ts'
 import { activeEvent, todayIso } from './events.ts'
@@ -32,6 +32,29 @@ const sessionsFor = (db: Database, eventId: string): Promise<Session[]> =>
     // Unscheduled dreams last, then by when they happen. `asc` puts nulls first
     // in SQLite, so the null-ness is sorted on explicitly rather than relied on.
     .orderBy(asc(isNull(session.time_slot_start)), asc(session.time_slot_start), asc(session.title))
+
+/**
+ * Whether a place belongs to the burn a dream is on.
+ *
+ * The foreign key cannot say this: it only knows the place exists, and since #156
+ * a place belongs to one burn. Without the check a body could put a dream in
+ * another burn's lane — a lane the grid does not draw, so the dream would vanish
+ * from the page while still holding a row.
+ *
+ * `null` is always fine: that is "not scheduled anywhere yet", which is where most
+ * dreams sit until close to the burn.
+ */
+const placeIsOnThisBurn = async (db: Database, eventId: string, placeId: string | null | undefined) => {
+  if (placeId == null) return true
+
+  const [found] = await db
+    .select({ id: place.id })
+    .from(place)
+    .where(and(eq(place.id, placeId), eq(place.event_id, eventId)))
+    .limit(1)
+
+  return found !== undefined
+}
 
 /**
  * Dreams — the member-offered workshops, ceremonies and happenings.
@@ -70,6 +93,10 @@ export const registerSessionRoutes = (
 
     const open = await activeEvent(db, todayIso(now))
     if (open === undefined) return reply.code(404).send(errorResponse('not_found'))
+
+    if (!(await placeIsOnThisBurn(db, open.id, parsed.data.place_id))) {
+      return reply.code(400).send(errorResponse('bad_request'))
+    }
 
     const row: Session = {
       ...parsed.data,
@@ -118,6 +145,10 @@ export const registerSessionRoutes = (
       // into the WHERE: these are ISO instants, and comparing them as SQL
       // strings is wrong when the ends differ in fractional-second precision.
       if (!hasValidTimeSlot({ ...existing, ...parsed.data })) {
+        return reply.code(400).send(errorResponse('bad_request'))
+      }
+
+      if (!(await placeIsOnThisBurn(db, existing.event_id, parsed.data.place_id))) {
         return reply.code(400).send(errorResponse('bad_request'))
       }
 

@@ -55,7 +55,7 @@ const givenAccount = async (roles: ('admin' | 'member')[]) => {
   return { id, cookie: `${SESSION_COOKIE}=${sessions.issue(id)}` }
 }
 
-const givenEvent = async () => {
+const givenEvent = async (over: { start_date?: string; end_date?: string } = {}) => {
   const id = randomUUID()
   await db()
     .insert(event)
@@ -63,17 +63,17 @@ const givenEvent = async () => {
       id,
       name: 'Summer burn',
       slug: `burn-${id.slice(0, 8)}`,
-      start_date: '2026-08-01',
-      end_date: '2026-08-05',
+      start_date: over.start_date ?? '2026-08-01',
+      end_date: over.end_date ?? '2026-08-05',
       member_cap: 42,
       created_at: NOW,
     })
   return id
 }
 
-const givenPlace = async (name = 'Temple') => {
+const givenPlace = async (eventId: string, name = 'Temple') => {
   const id = randomUUID()
-  await db().insert(place).values({ id, order: 0, name, emoji: '🛕', color: 'yellow' })
+  await db().insert(place).values({ id, event_id: eventId, order: 0, name, emoji: '🛕', color: 'yellow' })
   return id
 }
 
@@ -185,15 +185,37 @@ describe('dreams', () => {
 
   it('schedules one into a place and a slot', async () => {
     const server = await build()
-    await givenEvent()
+    const eventId = await givenEvent()
     const member = await givenAccount(['member'])
-    const temple = await givenPlace()
+    const temple = await givenPlace(eventId)
     const id = (await offer(server, member.cookie, { title: 'Sunrise yoga' })).json().session.id
 
     const response = await editDream(server, member.cookie, id, { ...SLOT, place_id: temple })
 
     expect(response.statusCode).toBe(200)
     expect(response.json().session).toMatchObject({ ...SLOT, place_id: temple })
+  })
+
+  it('refuses a lane belonging to another burn', async () => {
+    // Since #156 a place belongs to one burn, and the foreign key cannot say which:
+    // it only knows the row exists. Without the check a dream could stand in a lane
+    // this burn's grid does not draw, so it would vanish from the page while still
+    // holding a row.
+    const server = await build()
+    const eventId = await givenEvent()
+    const later = await givenEvent({ start_date: '2026-12-01', end_date: '2026-12-05' })
+    const member = await givenAccount(['member'])
+    const elsewhere = await givenPlace(later, 'Barn')
+
+    expect((await offer(server, member.cookie, { title: 'x', place_id: elsewhere })).statusCode).toBe(400)
+
+    const id = (await offer(server, member.cookie, { title: 'y' })).json().session.id
+    expect((await editDream(server, member.cookie, id, { place_id: elsewhere })).statusCode).toBe(400)
+
+    // The passing sibling: this burn's own lane is accepted, so the check refuses
+    // the pairing rather than every place.
+    const ours = await givenPlace(eventId, 'Temple')
+    expect((await editDream(server, member.cookie, id, { place_id: ours })).statusCode).toBe(200)
   })
 
   it('refuses a place that does not exist', async () => {
@@ -295,9 +317,9 @@ describe('dreams', () => {
 
   it('unschedules by clearing the place without touching the time', async () => {
     const server = await build()
-    await givenEvent()
+    const eventId = await givenEvent()
     const member = await givenAccount(['member'])
-    const temple = await givenPlace()
+    const temple = await givenPlace(eventId)
     const id = (await offer(server, member.cookie, { title: 'x', ...SLOT, place_id: temple })).json().session
       .id
 
@@ -350,10 +372,10 @@ describe('dreams', () => {
   it('lets any member arrange the schedule, not only whoever offered it', async () => {
     // #20: the schedule belongs to the members, not to the dream's host.
     const server = await build()
-    await givenEvent()
+    const eventId = await givenEvent()
     const host = await givenAccount(['member'])
     const someone = await givenAccount(['member'])
-    const temple = await givenPlace()
+    const temple = await givenPlace(eventId)
     const id = (await offer(server, host.cookie, { title: 'Sunrise yoga' })).json().session.id
 
     const response = await editDream(server, someone.cookie, id, { ...SLOT, place_id: temple })
@@ -447,9 +469,9 @@ describe('a place a dream is standing in', () => {
 
   it('cannot be deleted out from under it', async () => {
     const server = await build()
-    await givenEvent()
+    const eventId = await givenEvent()
     const admin = await givenAccount(['admin', 'member'])
-    const temple = await givenPlace()
+    const temple = await givenPlace(eventId)
     await offer(server, admin.cookie, { title: 'Sunrise yoga', ...SLOT, place_id: temple })
 
     const response = await removePlace(server, admin.cookie, temple)
@@ -462,9 +484,9 @@ describe('a place a dream is standing in', () => {
     // The passing sibling: the refusal must be about the dream, not about
     // deleting places at all.
     const server = await build()
-    await givenEvent()
+    const eventId = await givenEvent()
     const admin = await givenAccount(['admin', 'member'])
-    const temple = await givenPlace()
+    const temple = await givenPlace(eventId)
     const id = (await offer(server, admin.cookie, { title: 'x', ...SLOT, place_id: temple })).json().session
       .id
     await editDream(server, admin.cookie, id, { place_id: null })

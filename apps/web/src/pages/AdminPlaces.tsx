@@ -1,4 +1,4 @@
-import type { Place, PlaceColor } from '@sage-burner/shared'
+import type { CopySourcesResponse, Place, PlaceColor } from '@sage-burner/shared'
 
 import { MAX_EMOJI, MAX_PLACE_NAME, placeColors } from '@sage-burner/shared'
 import { useEffect, useState } from 'preact/hooks'
@@ -10,12 +10,22 @@ import { isApproved, useViewer } from '../viewer.tsx'
 
 export type PlacesApi = Pick<
   ApiClient,
-  'getPlaces' | 'addPlace' | 'updatePlace' | 'deletePlace' | 'reorderPlaces'
+  | 'getActiveEvent'
+  | 'getPlaces'
+  | 'addPlace'
+  | 'updatePlace'
+  | 'deletePlace'
+  | 'reorderPlaces'
+  | 'getPlaceSources'
+  | 'copyPlaces'
 >
+
+type Source = CopySourcesResponse['sources'][number]
 
 type Loaded =
   | { status: 'loading' }
-  | { status: 'ready'; places: readonly Place[] }
+  | { status: 'no-burn' }
+  | { status: 'ready'; eventId: string; places: readonly Place[]; sources: readonly Source[] }
   | { status: 'failed'; message: string }
 
 interface Draft {
@@ -57,10 +67,14 @@ const moveTo = (ids: readonly string[], from: number, to: number): string[] | un
 }
 
 /**
- * Where a dream can happen.
+ * Where a dream can happen — one grid per burn, following the burn that is open.
  *
- * The role check decides what to render, not what is allowed:
- * `/api/places` refuses anyone without a role whatever this does.
+ * The role check decides what to render, not what is allowed: the API refuses
+ * anyone without a role whatever this does.
+ *
+ * Per burn since #156, so a summer-only spot is not a lane in the winter grid. The
+ * overlap between burns is large, which is why an empty grid offers to copy a
+ * previous one rather than only an empty form.
  */
 export const AdminPlaces = ({ api }: { api: PlacesApi }) => {
   const viewer = useViewer()
@@ -79,9 +93,20 @@ export const AdminPlaces = ({ api }: { api: PlacesApi }) => {
     const controller = new AbortController()
 
     api
-      .getPlaces(controller.signal)
-      .then((response) => {
-        if (!controller.signal.aborted) setLoaded({ status: 'ready', places: response.places })
+      .getActiveEvent(controller.signal)
+      .then(async (active) => {
+        if (active.event === null) return { status: 'no-burn' } as const
+
+        const eventId = active.event.id
+        const [places, sources] = await Promise.all([
+          api.getPlaces(eventId, controller.signal),
+          api.getPlaceSources(eventId, controller.signal),
+        ])
+
+        return { status: 'ready', eventId, places: places.places, sources: sources.sources } as const
+      })
+      .then((next) => {
+        if (!controller.signal.aborted) setLoaded(next)
       })
       .catch((failure: unknown) => {
         if (controller.signal.aborted) return
@@ -109,19 +134,26 @@ export const AdminPlaces = ({ api }: { api: PlacesApi }) => {
     }
   }
 
+  const ready = loaded.status === 'ready' ? loaded : undefined
+
   const reorderTo = (ids: string[] | undefined) => {
-    if (ids === undefined) return
-    void run(() => api.reorderPlaces(ids), 'Could not reorder the places.')
+    if (ids === undefined || ready === undefined) return
+    void run(() => api.reorderPlaces(ready.eventId, ids), 'Could not reorder the places.')
   }
 
   const add = () => {
+    if (ready === undefined) return
     if (isBlank(draft)) {
       setError(NEEDS_BOTH)
       return
     }
 
     void run(async () => {
-      await api.addPlace({ name: draft.name.trim(), emoji: draft.emoji.trim(), color: draft.color })
+      await api.addPlace(ready.eventId, {
+        name: draft.name.trim(),
+        emoji: draft.emoji.trim(),
+        color: draft.color,
+      })
       setDraft(BLANK)
     }, 'Could not add the place.')
   }
@@ -150,7 +182,7 @@ export const AdminPlaces = ({ api }: { api: PlacesApi }) => {
     )
   }
 
-  const places = loaded.status === 'ready' ? loaded.places : []
+  const places = ready?.places ?? []
   const ids = places.map((row) => row.id)
 
   return (
@@ -168,18 +200,16 @@ export const AdminPlaces = ({ api }: { api: PlacesApi }) => {
         </p>
       )}
 
-      {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
+      <Notice loaded={loaded} />
 
-      {loaded.status === 'failed' && (
-        <p class="form-error" role="alert">
-          {loaded.message}
-        </p>
-      )}
-
-      {loaded.status === 'ready' && places.length === 0 && (
-        <p class="form-note">
-          No places yet. A dream cannot be scheduled until there is somewhere to put it.
-        </p>
+      {ready !== undefined && places.length === 0 && ready.sources.length > 0 && (
+        <CopyFrom
+          sources={ready.sources}
+          busy={busy}
+          onCopy={(fromEventId) =>
+            void run(() => api.copyPlaces(ready.eventId, fromEventId), 'Could not copy those places.')
+          }
+        />
       )}
 
       <ol class="place-list">
@@ -276,45 +306,53 @@ export const AdminPlaces = ({ api }: { api: PlacesApi }) => {
         ))}
       </ol>
 
-      <form
-        class="form"
-        onSubmit={(submitEvent) => {
-          submitEvent.preventDefault()
-          add()
-        }}
-      >
-        <h2>Add a place</h2>
+      {/* Only once the burn is known: the lane belongs to one, so a form rendered
+          before then would take a name and have nowhere to put it. */}
+      {ready !== undefined && (
+        <form
+          class="form"
+          onSubmit={(submitEvent) => {
+            submitEvent.preventDefault()
+            add()
+          }}
+        >
+          <h2>Add a place</h2>
 
-        <label class="field">
-          <span>Name</span>
-          <input
-            type="text"
-            name="name"
-            maxLength={MAX_PLACE_NAME}
-            aria-required
-            value={draft.name}
-            onInput={(inputEvent) => setDraft({ ...draft, name: inputEvent.currentTarget.value })}
+          <label class="field">
+            <span>Name</span>
+            <input
+              type="text"
+              name="name"
+              maxLength={MAX_PLACE_NAME}
+              aria-required
+              value={draft.name}
+              onInput={(inputEvent) => setDraft({ ...draft, name: inputEvent.currentTarget.value })}
+            />
+          </label>
+
+          <label class="field">
+            <span>Emoji</span>
+            <input
+              type="text"
+              name="emoji"
+              maxLength={MAX_EMOJI}
+              aria-required
+              value={draft.emoji}
+              onInput={(inputEvent) => setDraft({ ...draft, emoji: inputEvent.currentTarget.value })}
+            />
+          </label>
+
+          <ColorField
+            value={draft.color}
+            onChange={(color) => setDraft({ ...draft, color })}
+            label="Colour"
           />
-        </label>
 
-        <label class="field">
-          <span>Emoji</span>
-          <input
-            type="text"
-            name="emoji"
-            maxLength={MAX_EMOJI}
-            aria-required
-            value={draft.emoji}
-            onInput={(inputEvent) => setDraft({ ...draft, emoji: inputEvent.currentTarget.value })}
-          />
-        </label>
-
-        <ColorField value={draft.color} onChange={(color) => setDraft({ ...draft, color })} label="Colour" />
-
-        <button type="submit" disabled={busy}>
-          Add
-        </button>
-      </form>
+          <button type="submit" disabled={busy}>
+            Add
+          </button>
+        </form>
+      )}
     </section>
   )
 }
@@ -398,6 +436,68 @@ const PlaceFields = ({
       <button type="button" class="link-button" disabled={busy} onClick={onCancel}>
         Cancel
       </button>
+    </div>
+  )
+}
+
+const Notice = ({ loaded }: { loaded: Loaded }) => {
+  if (loaded.status === 'loading') return <p class="form-note">Loading…</p>
+  if (loaded.status === 'no-burn') {
+    return <p class="form-note">There is no burn coming up yet, so there is no grid to lay out.</p>
+  }
+  if (loaded.status === 'failed') {
+    return (
+      <p class="form-error" role="alert">
+        {loaded.message}
+      </p>
+    )
+  }
+
+  return loaded.places.length === 0 ? (
+    <p class="form-note">No places yet. A dream cannot be scheduled until there is somewhere to put it.</p>
+  ) : null
+}
+
+/**
+ * Seed this burn's grid from a previous burn's.
+ *
+ * Offered only while the grid is empty, because the API refuses a copy into a grid
+ * that has lanes — merging two grids is a decision nobody asked for.
+ */
+const CopyFrom = ({
+  sources,
+  busy,
+  onCopy,
+}: {
+  sources: readonly Source[]
+  busy: boolean
+  onCopy: (fromEventId: string) => void
+}) => {
+  const [chosen, setChosen] = useState(sources[0]?.event_id ?? '')
+
+  return (
+    <div class="copy-from">
+      <label class="field">
+        <span>Or start from a previous burn</span>
+        <select
+          aria-label="Burn to copy places from"
+          disabled={busy}
+          value={chosen}
+          onChange={(changeEvent) => setChosen(changeEvent.currentTarget.value)}
+        >
+          {sources.map((source) => (
+            <option key={source.event_id} value={source.event_id}>
+              {source.name} ({source.count})
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <button type="button" disabled={busy || chosen === ''} onClick={() => onCopy(chosen)}>
+        Copy those places
+      </button>
+
+      <p class="form-note">The lanes, not the dreams standing in them.</p>
     </div>
   )
 }
