@@ -1,12 +1,13 @@
 import type { CopySourcesResponse, EffortLevel, LeadRole, LeadRoleUpdate } from '@sage-burner/shared'
 
 import { effortLevels, MAX_NOTES, MAX_TITLE } from '@sage-burner/shared'
-import { useEffect, useState } from 'preact/hooks'
+import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
+import type { Loaded } from '../load.ts'
 
-import { isApiError } from '../api/client.ts'
 import { MarkdownField } from '../components/MarkdownField.tsx'
+import { useAction, useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
 import { isApproved, useViewer } from '../viewer.tsx'
 
@@ -28,17 +29,13 @@ export type RolesApi = Pick<
 type Person = { account_id: string; name: string | null }
 type Source = CopySourcesResponse['sources'][number]
 
-type Loaded =
-  | { status: 'loading' }
-  | { status: 'no-burn' }
-  | {
-      status: 'ready'
-      eventId: string
-      roles: readonly LeadRole[]
-      attendees: readonly Person[]
-      sources: readonly Source[]
-    }
-  | { status: 'failed'; message: string }
+/** Null rather than a fourth status: "no burn is open" is data, not a load outcome. */
+type Register = {
+  eventId: string
+  roles: readonly LeadRole[]
+  attendees: readonly Person[]
+  sources: readonly Source[]
+} | null
 
 const EFFORT_LABEL: Record<EffortLevel, string> = {
   none: 'none',
@@ -70,66 +67,32 @@ const teamCount = (role: LeadRole) =>
 export const Roles = ({ api }: { api: RolesApi }) => {
   const viewer = useViewer()
   const approved = isApproved(viewer)
-  const [loaded, setLoaded] = useState<Loaded>({ status: 'loading' })
   const [title, setTitle] = useState('')
   const [editing, setEditing] = useState<string | undefined>(undefined)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | undefined>(undefined)
-  const [reload, setReload] = useState(0)
 
-  useEffect(() => {
-    if (!approved) return undefined
+  const { loaded, reload } = useLoad<Register>(
+    async (signal) => {
+      const active = await api.getActiveEvent(signal)
+      if (active.event === null) return null
 
-    const controller = new AbortController()
+      const eventId = active.event.id
+      const [roles, attendees, sources] = await Promise.all([
+        api.getLeadRoles(eventId, signal),
+        api.getEventAttendees(eventId, signal),
+        api.getLeadRoleSources(eventId, signal),
+      ])
 
-    api
-      .getActiveEvent(controller.signal)
-      .then(async (active) => {
-        if (active.event === null) return { status: 'no-burn' } as const
+      return {
+        eventId,
+        roles: roles.roles,
+        attendees: attendees.attendees,
+        sources: sources.sources,
+      }
+    },
+    { enabled: approved, fallback: 'Could not load the roles.' },
+  )
 
-        const eventId = active.event.id
-        const [roles, attendees, sources] = await Promise.all([
-          api.getLeadRoles(eventId, controller.signal),
-          api.getEventAttendees(eventId, controller.signal),
-          api.getLeadRoleSources(eventId, controller.signal),
-        ])
-
-        return {
-          status: 'ready',
-          eventId,
-          roles: roles.roles,
-          attendees: attendees.attendees,
-          sources: sources.sources,
-        } as const
-      })
-      .then((next) => {
-        if (!controller.signal.aborted) setLoaded(next)
-      })
-      .catch((failure: unknown) => {
-        if (controller.signal.aborted) return
-        setLoaded({
-          status: 'failed',
-          message: isApiError(failure) ? failure.message : 'Could not load the roles.',
-        })
-      })
-
-    return () => {
-      controller.abort()
-    }
-  }, [api, approved, reload])
-
-  const run = async (action: () => Promise<unknown>, fallback: string) => {
-    setError(undefined)
-    setBusy(true)
-    try {
-      await action()
-      setReload((count) => count + 1)
-    } catch (failure) {
-      setError(isApiError(failure) ? failure.message : fallback)
-    } finally {
-      setBusy(false)
-    }
-  }
+  const { busy, error, setError, run } = useAction(reload)
 
   if (viewer.status === 'loading') {
     return (
@@ -151,7 +114,7 @@ export const Roles = ({ api }: { api: RolesApi }) => {
     )
   }
 
-  const ready = loaded.status === 'ready' ? loaded : undefined
+  const ready = loaded.status === 'ready' ? (loaded.data ?? undefined) : undefined
 
   return (
     <section class="page">
@@ -175,7 +138,7 @@ export const Roles = ({ api }: { api: RolesApi }) => {
           sources={ready.sources}
           busy={busy}
           onCopy={(fromEventId) =>
-            void run(() => api.copyLeadRoles(ready.eventId, fromEventId), 'Could not copy those roles.')
+            run(() => api.copyLeadRoles(ready.eventId, fromEventId), 'Could not copy those roles.')
           }
         />
       )}
@@ -189,7 +152,7 @@ export const Roles = ({ api }: { api: RolesApi }) => {
                 busy={busy}
                 onCancel={() => setEditing(undefined)}
                 onSave={(changes) =>
-                  void run(async () => {
+                  run(async () => {
                     await api.updateLeadRole(role.id, changes)
                     setEditing(undefined)
                   }, 'Could not save that.')
@@ -202,18 +165,15 @@ export const Roles = ({ api }: { api: RolesApi }) => {
                 viewerId={viewer.account?.id}
                 busy={busy}
                 onEdit={() => setEditing(role.id)}
-                onRemove={() => void run(() => api.deleteLeadRole(role.id), 'Could not remove that role.')}
+                onRemove={() => run(() => api.deleteLeadRole(role.id), 'Could not remove that role.')}
                 onLead={(accountId) =>
-                  void run(() => api.setLeadRoleLead(role.id, accountId), 'Could not change the lead.')
+                  run(() => api.setLeadRoleLead(role.id, accountId), 'Could not change the lead.')
                 }
                 onJoin={(accountId) =>
-                  void run(() => api.joinLeadRoleTeam(role.id, accountId), 'Could not add them to the team.')
+                  run(() => api.joinLeadRoleTeam(role.id, accountId), 'Could not add them to the team.')
                 }
                 onLeave={(accountId) =>
-                  void run(
-                    () => api.leaveLeadRoleTeam(role.id, accountId),
-                    'Could not take them off the team.',
-                  )
+                  run(() => api.leaveLeadRoleTeam(role.id, accountId), 'Could not take them off the team.')
                 }
               />
             )}
@@ -232,7 +192,7 @@ export const Roles = ({ api }: { api: RolesApi }) => {
               return
             }
 
-            void run(async () => {
+            run(async () => {
               await api.addLeadRole(ready.eventId, { title: title.trim() })
               setTitle('')
             }, 'Could not add that role.')
@@ -243,11 +203,8 @@ export const Roles = ({ api }: { api: RolesApi }) => {
   )
 }
 
-const Notice = ({ loaded }: { loaded: Loaded }) => {
+const Notice = ({ loaded }: { loaded: Loaded<Register> }) => {
   if (loaded.status === 'loading') return <p class="form-note">Loading…</p>
-  if (loaded.status === 'no-burn') {
-    return <p class="form-note">There is no burn coming up yet, so there is nothing to look after.</p>
-  }
   if (loaded.status === 'failed') {
     return (
       <p class="form-error" role="alert">
@@ -255,8 +212,13 @@ const Notice = ({ loaded }: { loaded: Loaded }) => {
       </p>
     )
   }
+  if (loaded.data === null) {
+    return <p class="form-note">There is no burn coming up yet, so there is nothing to look after.</p>
+  }
 
-  return loaded.roles.length === 0 ? <p class="form-note">No roles yet. Add the first one below.</p> : null
+  return loaded.data.roles.length === 0 ? (
+    <p class="form-note">No roles yet. Add the first one below.</p>
+  ) : null
 }
 
 const AddRole = ({

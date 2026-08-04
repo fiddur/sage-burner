@@ -1,11 +1,12 @@
 import type { CopySourcesResponse, Place, PlaceColor } from '@sage-burner/shared'
 
 import { MAX_EMOJI, MAX_PLACE_NAME, placeColors } from '@sage-burner/shared'
-import { useEffect, useState } from 'preact/hooks'
+import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
+import type { Loaded } from '../load.ts'
 
-import { isApiError } from '../api/client.ts'
+import { useAction, useLoad } from '../load.ts'
 import { isApproved, useViewer } from '../viewer.tsx'
 
 export type PlacesApi = Pick<
@@ -22,11 +23,8 @@ export type PlacesApi = Pick<
 
 type Source = CopySourcesResponse['sources'][number]
 
-type Loaded =
-  | { status: 'loading' }
-  | { status: 'no-burn' }
-  | { status: 'ready'; eventId: string; places: readonly Place[]; sources: readonly Source[] }
-  | { status: 'failed'; message: string }
+/** Null rather than a fourth status: "no burn is open" is data, not a load outcome. */
+type Grid = { eventId: string; places: readonly Place[]; sources: readonly Source[] } | null
 
 interface Draft {
   name: string
@@ -79,66 +77,33 @@ const moveTo = (ids: readonly string[], from: number, to: number): string[] | un
 export const AdminPlaces = ({ api }: { api: PlacesApi }) => {
   const viewer = useViewer()
   const approved = isApproved(viewer)
-  const [loaded, setLoaded] = useState<Loaded>({ status: 'loading' })
   const [draft, setDraft] = useState<Draft>(BLANK)
   const [editing, setEditing] = useState<string | undefined>(undefined)
   const [dragging, setDragging] = useState<number | undefined>(undefined)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | undefined>(undefined)
-  const [reload, setReload] = useState(0)
 
-  useEffect(() => {
-    if (!approved) return undefined
+  const { loaded, reload } = useLoad<Grid>(
+    async (signal) => {
+      const active = await api.getActiveEvent(signal)
+      if (active.event === null) return null
 
-    const controller = new AbortController()
+      const eventId = active.event.id
+      const [places, sources] = await Promise.all([
+        api.getPlaces(eventId, signal),
+        api.getPlaceSources(eventId, signal),
+      ])
 
-    api
-      .getActiveEvent(controller.signal)
-      .then(async (active) => {
-        if (active.event === null) return { status: 'no-burn' } as const
+      return { eventId, places: places.places, sources: sources.sources }
+    },
+    { enabled: approved, fallback: 'Could not load the places.' },
+  )
 
-        const eventId = active.event.id
-        const [places, sources] = await Promise.all([
-          api.getPlaces(eventId, controller.signal),
-          api.getPlaceSources(eventId, controller.signal),
-        ])
+  const { busy, error, setError, run } = useAction(reload)
 
-        return { status: 'ready', eventId, places: places.places, sources: sources.sources } as const
-      })
-      .then((next) => {
-        if (!controller.signal.aborted) setLoaded(next)
-      })
-      .catch((failure: unknown) => {
-        if (controller.signal.aborted) return
-        setLoaded({
-          status: 'failed',
-          message: isApiError(failure) ? failure.message : 'Could not load the places.',
-        })
-      })
-
-    return () => {
-      controller.abort()
-    }
-  }, [api, approved, reload])
-
-  const run = async (action: () => Promise<unknown>, fallback: string) => {
-    setError(undefined)
-    setBusy(true)
-    try {
-      await action()
-      setReload((count) => count + 1)
-    } catch (failure) {
-      setError(isApiError(failure) ? failure.message : fallback)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const ready = loaded.status === 'ready' ? loaded : undefined
+  const ready = loaded.status === 'ready' ? (loaded.data ?? undefined) : undefined
 
   const reorderTo = (ids: string[] | undefined) => {
     if (ids === undefined || ready === undefined) return
-    void run(() => api.reorderPlaces(ready.eventId, ids), 'Could not reorder the places.')
+    run(() => api.reorderPlaces(ready.eventId, ids), 'Could not reorder the places.')
   }
 
   const add = () => {
@@ -148,7 +113,7 @@ export const AdminPlaces = ({ api }: { api: PlacesApi }) => {
       return
     }
 
-    void run(async () => {
+    run(async () => {
       await api.addPlace(ready.eventId, {
         name: draft.name.trim(),
         emoji: draft.emoji.trim(),
@@ -207,7 +172,7 @@ export const AdminPlaces = ({ api }: { api: PlacesApi }) => {
           sources={ready.sources}
           busy={busy}
           onCopy={(fromEventId) =>
-            void run(() => api.copyPlaces(ready.eventId, fromEventId), 'Could not copy those places.')
+            run(() => api.copyPlaces(ready.eventId, fromEventId), 'Could not copy those places.')
           }
         />
       )}
@@ -267,7 +232,7 @@ export const AdminPlaces = ({ api }: { api: PlacesApi }) => {
                     return
                   }
 
-                  void run(async () => {
+                  run(async () => {
                     await api.updatePlace(row.id, changes)
                     setEditing(undefined)
                   }, 'Could not save the place.')
@@ -296,7 +261,7 @@ export const AdminPlaces = ({ api }: { api: PlacesApi }) => {
                   class="link-button"
                   disabled={busy}
                   aria-label={`Remove ${row.name}`}
-                  onClick={() => void run(() => api.deletePlace(row.id), 'Could not remove the place.')}
+                  onClick={() => run(() => api.deletePlace(row.id), 'Could not remove the place.')}
                 >
                   🗑️
                 </button>
@@ -440,11 +405,8 @@ const PlaceFields = ({
   )
 }
 
-const Notice = ({ loaded }: { loaded: Loaded }) => {
+const Notice = ({ loaded }: { loaded: Loaded<Grid> }) => {
   if (loaded.status === 'loading') return <p class="form-note">Loading…</p>
-  if (loaded.status === 'no-burn') {
-    return <p class="form-note">There is no burn coming up yet, so there is no grid to lay out.</p>
-  }
   if (loaded.status === 'failed') {
     return (
       <p class="form-error" role="alert">
@@ -452,8 +414,11 @@ const Notice = ({ loaded }: { loaded: Loaded }) => {
       </p>
     )
   }
+  if (loaded.data === null) {
+    return <p class="form-note">There is no burn coming up yet, so there is no grid to lay out.</p>
+  }
 
-  return loaded.places.length === 0 ? (
+  return loaded.data.places.length === 0 ? (
     <p class="form-note">No places yet. A dream cannot be scheduled until there is somewhere to put it.</p>
   ) : null
 }

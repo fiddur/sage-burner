@@ -106,13 +106,26 @@ describe('AdminApplications', () => {
   })
 
   it('stops offering a decision once one is made', async () => {
+    // The stub tracks the decision because the page re-reads rather than patching
+    // what is on screen: the server is what knows the status afterwards, and a stub
+    // that kept answering `pending` would be asserting the client-side patch this
+    // page deliberately does not do.
+    let decided = false
     renderPage(
       stub({
-        approveApplication: () =>
+        getApplications: () =>
           Promise.resolve({
+            applications: [
+              anApplication(decided ? { status: 'approved', decided_at: '2026-07-03T00:00:00Z' } : {}),
+            ],
+          }),
+        approveApplication: () => {
+          decided = true
+          return Promise.resolve({
             application: anApplication({ status: 'approved', decided_at: '2026-07-03T00:00:00Z' }),
             invite: { token: 't', expires_at: '2026-08-02T00:00:00Z' },
-          }),
+          })
+        },
       }),
     )
 

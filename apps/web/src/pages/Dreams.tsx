@@ -1,23 +1,18 @@
 import type { Place, Session, SessionUpdate } from '@sage-burner/shared'
 
 import { MAX_DESCRIPTION, MAX_TITLE } from '@sage-burner/shared'
-import { useEffect, useState } from 'preact/hooks'
+import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
-import { isApiError } from '../api/client.ts'
 import { fromLocalInput, toLocalInput } from '../datetime.ts'
+import { useAction, useLoad } from '../load.ts'
 import { isMember, useViewer } from '../viewer.tsx'
 
 export type DreamsApi = Pick<
   ApiClient,
   'getSessions' | 'offerSession' | 'updateSession' | 'withdrawSession' | 'getPlaces' | 'getActiveEvent'
 >
-
-type Loaded =
-  | { status: 'loading' }
-  | { status: 'ready'; sessions: readonly Session[]; places: readonly Place[] }
-  | { status: 'failed'; message: string }
 
 const placeLabel = (places: readonly Place[], id: string | null) => {
   const found = places.find((row) => row.id === id)
@@ -44,57 +39,25 @@ const when = (dream: Session) =>
 export const Dreams = ({ api }: { api: DreamsApi }) => {
   const viewer = useViewer()
   const member = isMember(viewer)
-  const [loaded, setLoaded] = useState<Loaded>({ status: 'loading' })
   const [title, setTitle] = useState('')
   const [editing, setEditing] = useState<string | undefined>(undefined)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | undefined>(undefined)
-  const [reload, setReload] = useState(0)
 
-  useEffect(() => {
-    if (!member) return undefined
+  // The burn comes first: since #156 the lanes belong to one. With no burn open
+  // there is nothing to offer a dream to either, and `getSessions` says so anyway.
+  const { loaded, reload } = useLoad(
+    async (signal) => {
+      const active = await api.getActiveEvent(signal)
+      const [dreams, places] = await Promise.all([
+        api.getSessions(signal),
+        active.event === null ? { places: [] } : api.getPlaces(active.event.id, signal),
+      ])
 
-    const controller = new AbortController()
+      return { sessions: dreams.sessions, places: places.places }
+    },
+    { enabled: member, fallback: 'Could not load the dreams.' },
+  )
 
-    // The burn comes first: since #156 the lanes belong to one. With no burn open
-    // there is nothing to offer a dream to either, and `getSessions` says so anyway.
-    api
-      .getActiveEvent(controller.signal)
-      .then(async (active) => {
-        const dreams = await api.getSessions(controller.signal)
-        const places =
-          active.event === null ? { places: [] } : await api.getPlaces(active.event.id, controller.signal)
-
-        return { status: 'ready', sessions: dreams.sessions, places: places.places } as const
-      })
-      .then((next) => {
-        if (!controller.signal.aborted) setLoaded(next)
-      })
-      .catch((failure: unknown) => {
-        if (controller.signal.aborted) return
-        setLoaded({
-          status: 'failed',
-          message: isApiError(failure) ? failure.message : 'Could not load the dreams.',
-        })
-      })
-
-    return () => {
-      controller.abort()
-    }
-  }, [api, member, reload])
-
-  const run = async (action: () => Promise<unknown>, fallback: string) => {
-    setError(undefined)
-    setBusy(true)
-    try {
-      await action()
-      setReload((count) => count + 1)
-    } catch (failure) {
-      setError(isApiError(failure) ? failure.message : fallback)
-    } finally {
-      setBusy(false)
-    }
-  }
+  const { busy, error, setError, run } = useAction(reload)
 
   const offer = () => {
     if (title.trim() === '') {
@@ -102,7 +65,7 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
       return
     }
 
-    void run(async () => {
+    run(async () => {
       await api.offerSession({ title: title.trim(), description: '' })
       setTitle('')
     }, 'Could not offer that.')
@@ -128,8 +91,8 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
     )
   }
 
-  const dreams = loaded.status === 'ready' ? loaded.sessions : []
-  const places = loaded.status === 'ready' ? loaded.places : []
+  const dreams = loaded.status === 'ready' ? loaded.data.sessions : []
+  const places = loaded.status === 'ready' ? loaded.data.places : []
 
   return (
     <section class="page">
@@ -168,7 +131,7 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
                 busy={busy}
                 onCancel={() => setEditing(undefined)}
                 onSave={(changes) =>
-                  void run(async () => {
+                  run(async () => {
                     await api.updateSession(dream.id, changes)
                     setEditing(undefined)
                   }, 'Could not save that.')
@@ -194,7 +157,7 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
                   class="link-button"
                   disabled={busy}
                   aria-label={`Withdraw ${dream.title}`}
-                  onClick={() => void run(() => api.withdrawSession(dream.id), 'Could not withdraw that.')}
+                  onClick={() => run(() => api.withdrawSession(dream.id), 'Could not withdraw that.')}
                 >
                   🗑️
                 </button>

@@ -1,19 +1,15 @@
-import type { Application, Invite } from '@sage-burner/shared'
+import type { Invite } from '@sage-burner/shared'
 
-import { useEffect, useState } from 'preact/hooks'
+import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
 import { InviteLink } from '../components/InviteLink.tsx'
+import { useAction, useLoad } from '../load.ts'
 import { isAdmin, useViewer } from '../viewer.tsx'
 
 export type ApplicationsApi = Pick<ApiClient, 'getApplications' | 'approveApplication' | 'rejectApplication'>
-
-type Loaded =
-  | { status: 'loading' }
-  | { status: 'ready'; applications: readonly Application[] }
-  | { status: 'failed'; message: string }
 
 const answerText = (value: string | boolean) => {
   if (value === true) return 'Yes'
@@ -25,66 +21,40 @@ const answerText = (value: string | boolean) => {
 export const AdminApplications = ({ api }: { api: ApplicationsApi }) => {
   const viewer = useViewer()
   const admin = isAdmin(viewer)
-  const [loaded, setLoaded] = useState<Loaded>({ status: 'loading' })
   const [invites, setInvites] = useState<Record<string, Invite>>({})
-  const [busy, setBusy] = useState<string | undefined>(undefined)
-  const [error, setError] = useState<string | undefined>(undefined)
+  // Which row, not a boolean: two applications can be decided one after the other,
+  // and only the one being decided should show it.
+  const [deciding, setDeciding] = useState<string | undefined>(undefined)
 
-  useEffect(() => {
-    if (!admin) return undefined
+  const { loaded, reload } = useLoad((signal) => api.getApplications(signal), {
+    enabled: admin,
+    fallback: 'Could not load the applications.',
+  })
 
-    const controller = new AbortController()
+  const { error, run } = useAction(reload)
 
-    api
-      .getApplications(controller.signal)
-      .then((response) => {
-        if (!controller.signal.aborted) {
-          setLoaded({ status: 'ready', applications: response.applications })
-        }
-      })
-      .catch((failure: unknown) => {
-        if (controller.signal.aborted) return
-        setLoaded({
-          status: 'failed',
-          message: isApiError(failure) ? failure.message : 'Could not load the applications.',
-        })
-      })
+  const decide = (id: string, decision: 'approve' | 'reject') => {
+    setDeciding(id)
+    run(
+      async () => {
+        const response =
+          decision === 'approve' ? await api.approveApplication(id) : await api.rejectApplication(id)
 
-    return () => {
-      controller.abort()
-    }
-  }, [api, admin])
-
-  const decide = async (id: string, decision: 'approve' | 'reject') => {
-    setBusy(id)
-    setError(undefined)
-    try {
-      const response =
-        decision === 'approve' ? await api.approveApplication(id) : await api.rejectApplication(id)
-
-      setLoaded((current) =>
-        current.status === 'ready'
-          ? {
-              status: 'ready',
-              applications: current.applications.map((entry) =>
-                entry.id === id ? response.application : entry,
-              ),
-            }
-          : current,
-      )
-      const { invite } = response
-      if (invite !== null) setInvites((current) => ({ ...current, [id]: invite }))
-    } catch (failure) {
-      // A 409 means someone else decided it first, so the list on screen is
-      // stale — saying "try again" would send them round the same loop.
-      setError(
-        isApiError(failure) && failure.status === 409
+        // Kept rather than re-read: the token is shown once, and the reload that
+        // follows returns the application without it.
+        const { invite } = response
+        if (invite !== null) setInvites((current) => ({ ...current, [id]: invite }))
+        setDeciding(undefined)
+      },
+      // A 409 means someone else decided it first, so the list on screen is stale —
+      // saying "try again" would send them round the same loop.
+      (failure: unknown) => {
+        setDeciding(undefined)
+        return isApiError(failure) && failure.status === 409
           ? 'That application was already decided. Reload to see where it stands.'
-          : 'Could not save that. Please try again.',
-      )
-    } finally {
-      setBusy(undefined)
-    }
+          : 'Could not save that. Please try again.'
+      },
+    )
   }
 
   if (viewer.status === 'loading') {
@@ -134,12 +104,12 @@ export const AdminApplications = ({ api }: { api: ApplicationsApi }) => {
         </p>
       )}
 
-      {loaded.status === 'ready' && loaded.applications.length === 0 && (
+      {loaded.status === 'ready' && loaded.data.applications.length === 0 && (
         <p class="form-note">Nobody has applied yet.</p>
       )}
 
       {loaded.status === 'ready' &&
-        loaded.applications.map((entry) => (
+        loaded.data.applications.map((entry) => (
           <article key={entry.id} class="application">
             <h2>{entry.applicant_name}</h2>
             <p class="form-note">
@@ -159,7 +129,7 @@ export const AdminApplications = ({ api }: { api: ApplicationsApi }) => {
               <p class="row">
                 <button
                   type="button"
-                  disabled={busy === entry.id}
+                  disabled={deciding === entry.id}
                   onClick={() => void decide(entry.id, 'approve')}
                 >
                   Approve
@@ -167,7 +137,7 @@ export const AdminApplications = ({ api }: { api: ApplicationsApi }) => {
                 <button
                   type="button"
                   class="link-button"
-                  disabled={busy === entry.id}
+                  disabled={deciding === entry.id}
                   onClick={() => void decide(entry.id, 'reject')}
                 >
                   Reject

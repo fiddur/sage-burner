@@ -1,19 +1,15 @@
 import type { AccountRole, AdminAccount } from '@sage-burner/shared'
 
 import { accountRoles } from '@sage-burner/shared'
-import { useEffect, useState } from 'preact/hooks'
+import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
+import { errorMessage, useAction, useLoad } from '../load.ts'
 import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
 
 export type AdminApi = Pick<ApiClient, 'getAdminAccounts' | 'setAccountRoles'>
-
-type Roster =
-  | { status: 'loading' }
-  | { status: 'ready'; accounts: readonly AdminAccount[] }
-  | { status: 'failed'; message: string }
 
 const withRole = (roles: readonly AccountRole[], role: AccountRole, held: boolean): AccountRole[] =>
   held ? [...new Set([...roles, role])] : roles.filter((entry) => entry !== role)
@@ -28,59 +24,32 @@ export const Admin = ({ api }: { api: AdminApi }) => {
   const viewer = useViewer()
   const admin = isAdmin(viewer)
   const approved = isApproved(viewer)
-  const [roster, setRoster] = useState<Roster>({ status: 'loading' })
+  // Which row, not a boolean: only the account being changed should show it.
   const [saving, setSaving] = useState<string | undefined>(undefined)
-  const [error, setError] = useState<string | undefined>(undefined)
 
-  useEffect(() => {
-    if (!admin) return undefined
+  // `enabled: admin` rather than a dependency on the viewer: the provider hands out
+  // a new object on every render, so depending on it would refetch continuously.
+  const { loaded: roster, reload } = useLoad((signal) => api.getAdminAccounts(signal), {
+    enabled: admin,
+    fallback: 'Could not load the roster.',
+  })
 
-    const controller = new AbortController()
+  const { error, run } = useAction(reload)
 
-    api
-      .getAdminAccounts(controller.signal)
-      .then((response) => {
-        if (!controller.signal.aborted) setRoster({ status: 'ready', accounts: response.accounts })
-      })
-      .catch((failure: unknown) => {
-        if (controller.signal.aborted) return
-        setRoster({
-          status: 'failed',
-          message: isApiError(failure) ? failure.message : 'Could not load the roster.',
-        })
-      })
-
-    return () => {
-      controller.abort()
-    }
-    // `admin` rather than `viewer`: the provider hands out a new object on every
-    // render, so depending on the viewer itself would refetch continuously.
-  }, [api, admin])
-
-  const toggle = async (entry: AdminAccount, role: AccountRole, held: boolean) => {
-    setError(undefined)
+  const toggle = (entry: AdminAccount, role: AccountRole, held: boolean) => {
     setSaving(entry.id)
-    try {
-      const { account } = await api.setAccountRoles(entry.id, { roles: withRole(entry.roles, role, held) })
-      setRoster((current) =>
-        current.status === 'ready'
-          ? {
-              status: 'ready',
-              accounts: current.accounts.map((row) => (row.id === account.id ? account : row)),
-            }
-          : current,
-      )
-    } catch (failure) {
-      setError(
-        isApiError(failure) && failure.status === 409
+    run(
+      async () => {
+        await api.setAccountRoles(entry.id, { roles: withRole(entry.roles, role, held) })
+        setSaving(undefined)
+      },
+      (failure: unknown) => {
+        setSaving(undefined)
+        return isApiError(failure) && failure.status === 409
           ? 'Someone has to keep admin. Give it to another account first.'
-          : isApiError(failure)
-            ? failure.message
-            : 'Could not change that. Please try again.',
-      )
-    } finally {
-      setSaving(undefined)
-    }
+          : errorMessage(failure, 'Could not change that. Please try again.')
+      },
+    )
   }
 
   if (viewer.status === 'loading') {
@@ -190,7 +159,7 @@ export const Admin = ({ api }: { api: AdminApi }) => {
             </tr>
           </thead>
           <tbody>
-            {roster.accounts.map((entry) => (
+            {roster.data.accounts.map((entry) => (
               <tr key={entry.id}>
                 <td>{entry.email}</td>
                 {accountRoles.map((role) => (

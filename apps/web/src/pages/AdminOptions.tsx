@@ -1,11 +1,11 @@
 import type { Event, EventOption, EventOptionKind } from '@sage-burner/shared'
 
 import { MAX_OPTION_LABEL } from '@sage-burner/shared'
-import { useEffect, useState } from 'preact/hooks'
+import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
-import { isApiError } from '../api/client.ts'
+import { useAction, useLoad } from '../load.ts'
 import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
 
 export type OptionsApi = Pick<
@@ -18,10 +18,7 @@ export type OptionsApi = Pick<
   | 'reorderEventOptions'
 >
 
-type Loaded =
-  | { status: 'loading' }
-  | { status: 'ready'; event: Event | null; options: readonly EventOption[] }
-  | { status: 'failed'; message: string }
+type Lists = { event: Event | null; options: readonly EventOption[] }
 
 const swap = (ids: readonly string[], index: number, by: -1 | 1): string[] | undefined => {
   const target = index + by
@@ -73,52 +70,18 @@ export const AdminOptions = ({ api }: { api: OptionsApi }) => {
   const viewer = useViewer()
   const approved = isApproved(viewer)
   const admin = isAdmin(viewer)
-  const [loaded, setLoaded] = useState<Loaded>({ status: 'loading' })
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | undefined>(undefined)
-  const [reload, setReload] = useState(0)
+  const { loaded, reload } = useLoad<Lists>(
+    async (signal) => {
+      const active = await api.getActiveEvent(signal)
+      if (active.event === null) return { event: null, options: [] }
+      const { options } = await api.getEventOptions(active.event.id, signal)
 
-  useEffect(() => {
-    if (!approved) return undefined
+      return { event: active.event, options }
+    },
+    { enabled: approved, fallback: 'Could not load the lists.' },
+  )
 
-    const controller = new AbortController()
-
-    api
-      .getActiveEvent(controller.signal)
-      .then(async (active) => {
-        if (active.event === null) return { event: null, options: [] as EventOption[] }
-        const { options } = await api.getEventOptions(active.event.id, controller.signal)
-
-        return { event: active.event, options }
-      })
-      .then((next) => {
-        if (!controller.signal.aborted) setLoaded({ status: 'ready', ...next })
-      })
-      .catch((failure: unknown) => {
-        if (controller.signal.aborted) return
-        setLoaded({
-          status: 'failed',
-          message: isApiError(failure) ? failure.message : 'Could not load the lists.',
-        })
-      })
-
-    return () => {
-      controller.abort()
-    }
-  }, [api, approved, reload])
-
-  const run = async (action: () => Promise<unknown>, fallback: string) => {
-    setError(undefined)
-    setBusy(true)
-    try {
-      await action()
-      setReload((count) => count + 1)
-    } catch (failure) {
-      setError(isApiError(failure) ? failure.message : fallback)
-    } finally {
-      setBusy(false)
-    }
-  }
+  const { busy, error, setError, run } = useAction(reload)
 
   if (viewer.status === 'loading') {
     return (
@@ -162,7 +125,7 @@ export const AdminOptions = ({ api }: { api: OptionsApi }) => {
         </p>
       )}
 
-      {loaded.status === 'ready' && loaded.event === null && (
+      {loaded.status === 'ready' && loaded.data.event === null && (
         <p class="notice">
           There is no burn open, and these lists belong to one.{' '}
           {admin ? (
@@ -178,16 +141,16 @@ export const AdminOptions = ({ api }: { api: OptionsApi }) => {
         </p>
       )}
 
-      {loaded.status === 'ready' && loaded.event !== null && (
+      {loaded.status === 'ready' && loaded.data.event !== null && (
         <>
-          <p class="form-note">For {loaded.event.name}.</p>
+          <p class="form-note">For {loaded.data.event.name}.</p>
 
           {(['lodging', 'helping'] as const).map((kind) => (
             <OptionList
               key={kind}
               kind={kind}
-              eventId={loaded.event === null ? '' : loaded.event.id}
-              options={loaded.options.filter((row) => row.kind === kind)}
+              eventId={loaded.data.event === null ? '' : loaded.data.event.id}
+              options={loaded.data.options.filter((row) => row.kind === kind)}
               busy={busy}
               api={api}
               run={run}
@@ -214,7 +177,7 @@ const OptionList = ({
   options: readonly EventOption[]
   busy: boolean
   api: OptionsApi
-  run: (action: () => Promise<unknown>, fallback: string) => Promise<void>
+  run: ReturnType<typeof useAction>['run']
   setError: (message: string) => void
 }) => {
   const [label, setLabel] = useState('')
@@ -225,7 +188,7 @@ const OptionList = ({
 
   const reorderTo = (next: string[] | undefined) => {
     if (next === undefined) return
-    void run(() => api.reorderEventOptions(eventId, kind, next), 'Could not reorder that list.')
+    run(() => api.reorderEventOptions(eventId, kind, next), 'Could not reorder that list.')
   }
 
   const add = () => {
@@ -236,7 +199,7 @@ const OptionList = ({
 
     const spaces = capacity.trim() === '' ? null : Number(capacity)
 
-    void run(async () => {
+    run(async () => {
       await api.addEventOption(eventId, { kind, label: label.trim(), capacity: spaces })
       setLabel('')
       setCapacity('')
@@ -295,7 +258,7 @@ const OptionList = ({
                     return
                   }
 
-                  void run(async () => {
+                  run(async () => {
                     await api.updateEventOption(row.id, changes)
                     setEditing(undefined)
                   }, 'Could not save that.')
@@ -322,7 +285,7 @@ const OptionList = ({
                   class="link-button"
                   disabled={busy}
                   aria-label={`Remove ${row.label}`}
-                  onClick={() => void run(() => api.deleteEventOption(row.id), 'Could not remove that.')}
+                  onClick={() => run(() => api.deleteEventOption(row.id), 'Could not remove that.')}
                 >
                   🗑️
                 </button>
