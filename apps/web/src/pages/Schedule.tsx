@@ -1,21 +1,18 @@
 import type { Event, Place, Session } from '@sage-burner/shared'
 import type { ComponentChildren } from 'preact'
 
-import { useEffect, useState } from 'preact/hooks'
+import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
-import { isApiError } from '../api/client.ts'
 import { fromLocalInput, toLocalInput } from '../datetime.ts'
+import { useAction, useLoad } from '../load.ts'
 import { endFor, hourOf, hoursOf, laneCells } from '../schedule.ts'
 import { isMember, useViewer } from '../viewer.tsx'
 
 export type ScheduleApi = Pick<ApiClient, 'getSessions' | 'getPlaces' | 'getActiveEvent' | 'updateSession'>
 
-type Loaded =
-  | { status: 'loading' }
-  | { status: 'ready'; event: Event | null; places: readonly Place[]; sessions: readonly Session[] }
-  | { status: 'failed'; message: string }
+type Timetable = { event: Event | null; places: readonly Place[]; sessions: readonly Session[] }
 
 const label = (row: string) => row.slice(11)
 
@@ -40,62 +37,29 @@ const dayOf = (row: string) => row.slice(0, 10)
 export const Schedule = ({ api }: { api: ScheduleApi }) => {
   const viewer = useViewer()
   const member = isMember(viewer)
-  const [loaded, setLoaded] = useState<Loaded>({ status: 'loading' })
   const [dragged, setDragged] = useState<string | undefined>(undefined)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | undefined>(undefined)
-  const [reload, setReload] = useState(0)
 
-  useEffect(() => {
-    if (!member) return undefined
+  // The burn comes first: since #156 the lanes belong to one, so there is no grid to
+  // ask for until we know which.
+  const { loaded, reload } = useLoad<Timetable>(
+    async (signal) => {
+      const active = await api.getActiveEvent(signal)
+      if (active.event === null) return { event: null, places: [], sessions: [] }
 
-    const controller = new AbortController()
+      const [places, dreams] = await Promise.all([
+        api.getPlaces(active.event.id, signal),
+        api.getSessions(signal),
+      ])
 
-    // The burn comes first: since #156 the lanes belong to one, so there is no
-    // grid to ask for until we know which.
-    api
-      .getActiveEvent(controller.signal)
-      .then(async (active) => {
-        if (active.event === null) return { status: 'ready', event: null, places: [], sessions: [] } as const
+      return { event: active.event, places: places.places, sessions: dreams.sessions }
+    },
+    { enabled: member, fallback: 'Could not load the schedule.' },
+  )
 
-        const [places, dreams] = await Promise.all([
-          api.getPlaces(active.event.id, controller.signal),
-          api.getSessions(controller.signal),
-        ])
-
-        return {
-          status: 'ready',
-          event: active.event,
-          places: places.places,
-          sessions: dreams.sessions,
-        } as const
-      })
-      .then((next) => {
-        if (!controller.signal.aborted) setLoaded(next)
-      })
-      .catch((failure: unknown) => {
-        if (controller.signal.aborted) return
-        setLoaded({
-          status: 'failed',
-          message: isApiError(failure) ? failure.message : 'Could not load the schedule.',
-        })
-      })
-
-    return () => {
-      controller.abort()
-    }
-  }, [api, member, reload])
+  const { busy, error, run } = useAction(reload)
 
   const move = (id: string, changes: Parameters<ScheduleApi['updateSession']>[1]) => {
-    setError(undefined)
-    setBusy(true)
-    api
-      .updateSession(id, changes)
-      .then(() => setReload((count) => count + 1))
-      .catch((failure: unknown) => {
-        setError(isApiError(failure) ? failure.message : 'Could not move that dream.')
-      })
-      .finally(() => setBusy(false))
+    run(() => api.updateSession(id, changes), 'Could not move that dream.')
   }
 
   if (viewer.status === 'loading') return <Framed>{<p class="form-note">One moment…</p>}</Framed>
@@ -122,7 +86,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
     )
   }
 
-  const { event, places, sessions } = loaded
+  const { event, places, sessions } = loaded.data
 
   if (event === null) {
     return (

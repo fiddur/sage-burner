@@ -29,6 +29,23 @@ const renderAdmin = (
 
 const roster = (accounts: AdminAccountsResponse['accounts']) => () => Promise.resolve({ accounts })
 
+/**
+ * A roster that answers with whatever the last write set, the way the server does.
+ *
+ * The page re-reads after a change rather than patching what is on screen, so a stub
+ * that kept answering the original roles would be asserting a client-side patch this
+ * page deliberately does not do.
+ */
+const livingRoster = (accounts: AdminAccountsResponse['accounts']) => {
+  let current = accounts
+  return {
+    getAdminAccounts: () => Promise.resolve({ accounts: current }),
+    apply: (account: AdminAccountsResponse['accounts'][number]) => {
+      current = current.map((row) => (row.id === account.id ? account : row))
+    },
+  }
+}
+
 const never = () => Promise.reject(new Error('should not have been called'))
 
 describe('Admin', () => {
@@ -65,53 +82,54 @@ describe('Admin', () => {
     // An organiser holding `admin` alone cannot reach their own profile until this
     // adds `member`. `admin:create` grants both, so that is an account someone was
     // given `admin` on, not the one the installation starts with.
-    const setAccountRoles = vi.fn<AdminApi['setAccountRoles']>(() =>
-      Promise.resolve({
-        account: {
-          id: 'a-1',
-          email: 'ada@example.org',
-          roles: ['admin', 'member'],
-          created_at: '2026-01-01T00:00:00.000Z',
-        },
-      }),
-    )
-    renderAdmin(
-      roster([
-        { id: 'a-1', email: 'ada@example.org', roles: ['admin'], created_at: '2026-01-01T00:00:00.000Z' },
-      ]),
-      ADMIN,
-      setAccountRoles,
-    )
+    const accounts = livingRoster([
+      { id: 'a-1', email: 'ada@example.org', roles: ['admin'], created_at: '2026-01-01T00:00:00.000Z' },
+    ])
+    const setAccountRoles = vi.fn<AdminApi['setAccountRoles']>(() => {
+      const account = {
+        id: 'a-1',
+        email: 'ada@example.org',
+        roles: ['admin', 'member'] as const,
+        created_at: '2026-01-01T00:00:00.000Z',
+      }
+      accounts.apply({ ...account, roles: [...account.roles] })
+      return Promise.resolve({ account: { ...account, roles: [...account.roles] } })
+    })
+    renderAdmin(accounts.getAdminAccounts, ADMIN, setAccountRoles)
 
     fireEvent.click(await screen.findByRole('checkbox', { name: 'member — ada@example.org' }))
 
     await waitFor(() => expect(setAccountRoles).toHaveBeenCalledWith('a-1', { roles: ['admin', 'member'] }))
-    expect(screen.getByRole('checkbox', { name: 'member — ada@example.org' })).toHaveProperty('checked', true)
+    // Waited for, not read once: the page re-reads after the write, so the box
+    // reflects the server a tick later rather than the moment the call was made.
+    await waitFor(() =>
+      expect(screen.getByRole('checkbox', { name: 'member — ada@example.org' })).toHaveProperty(
+        'checked',
+        true,
+      ),
+    )
   })
 
   it('takes one away without disturbing the other', async () => {
-    const setAccountRoles = vi.fn<AdminApi['setAccountRoles']>(() =>
-      Promise.resolve({
-        account: {
-          id: 'a-1',
-          email: 'ada@example.org',
-          roles: ['member'],
-          created_at: '2026-01-01T00:00:00.000Z',
-        },
-      }),
-    )
-    renderAdmin(
-      roster([
-        {
-          id: 'a-1',
-          email: 'ada@example.org',
-          roles: ['admin', 'member'],
-          created_at: '2026-01-01T00:00:00.000Z',
-        },
-      ]),
-      ADMIN,
-      setAccountRoles,
-    )
+    const accounts = livingRoster([
+      {
+        id: 'a-1',
+        email: 'ada@example.org',
+        roles: ['admin', 'member'],
+        created_at: '2026-01-01T00:00:00.000Z',
+      },
+    ])
+    const setAccountRoles = vi.fn<AdminApi['setAccountRoles']>(() => {
+      const account = {
+        id: 'a-1',
+        email: 'ada@example.org',
+        roles: ['member' as const],
+        created_at: '2026-01-01T00:00:00.000Z',
+      }
+      accounts.apply(account)
+      return Promise.resolve({ account })
+    })
+    renderAdmin(accounts.getAdminAccounts, ADMIN, setAccountRoles)
 
     fireEvent.click(await screen.findByRole('checkbox', { name: 'admin — ada@example.org' }))
 

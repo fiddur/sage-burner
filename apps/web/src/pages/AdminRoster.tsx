@@ -1,16 +1,14 @@
-import type { RosterEntry, RosterResponse } from '@sage-burner/shared'
+import type { RosterEntry } from '@sage-burner/shared'
 
-import { useEffect, useState } from 'preact/hooks'
+import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
-import { isApiError } from '../api/client.ts'
 import { toCsv } from '../csv.ts'
+import { useAction, useLoad } from '../load.ts'
 import { isAdmin, useViewer } from '../viewer.tsx'
 
 export type RosterApi = Pick<ApiClient, 'getActiveRoster' | 'setPayment'>
-
-type Loaded = { status: 'loading' } | { status: 'ready'; roster: RosterResponse } | { status: 'failed' }
 
 const COLUMNS = [
   'name',
@@ -40,47 +38,27 @@ const download = (name: string, csv: string) => {
 export const AdminRoster = ({ api }: { api: RosterApi }) => {
   const viewer = useViewer()
   const admin = isAdmin(viewer)
-  const [loaded, setLoaded] = useState<Loaded>({ status: 'loading' })
-  const [busy, setBusy] = useState<string | undefined>(undefined)
-  const [error, setError] = useState<string | undefined>(undefined)
+  // Which row, not a boolean: only the person being recorded should show it.
+  const [recording, setRecording] = useState<string | undefined>(undefined)
 
-  const load = (signal?: AbortSignal) =>
-    api
-      .getActiveRoster(signal)
-      .then((roster) => {
-        if (signal?.aborted !== true) setLoaded({ status: 'ready', roster })
-      })
-      .catch(() => {
-        if (signal?.aborted !== true) setLoaded({ status: 'failed' })
-      })
+  const { loaded, reload } = useLoad((signal) => api.getActiveRoster(signal), {
+    enabled: admin,
+    fallback: 'Could not load the list. Please reload the page.',
+  })
 
-  useEffect(() => {
-    if (!admin) return undefined
+  // Reloaded rather than patched in place: paying re-sorts the whole list and can
+  // move someone else across the waiting line.
+  const { error, run } = useAction(reload)
 
-    const controller = new AbortController()
-    void load(controller.signal)
-
-    return () => {
-      controller.abort()
-    }
-  }, [api, admin])
-
-  const record = async (eventId: string, entry: RosterEntry, paid: boolean) => {
-    setBusy(entry.account_id)
-    setError(undefined)
-    try {
-      // The date is the server's to stamp, from its own clock: a browser's idea of
-      // today can differ by a day, and the two fields could disagree at all only
-      // because this was the one caller keeping them in step.
+  const record = (eventId: string, entry: RosterEntry, paid: boolean) => {
+    setRecording(entry.account_id)
+    // The date is the server's to stamp, from its own clock: a browser's idea of
+    // today can differ by a day, and the two fields could disagree at all only
+    // because this was the one caller keeping them in step.
+    run(async () => {
       await api.setPayment(eventId, entry.account_id, { payment_status: paid ? 'paid' : 'unpaid' })
-      // Reloaded rather than patched in place: paying re-sorts the whole list and
-      // can move someone else across the waiting line.
-      await load()
-    } catch (failure) {
-      setError(isApiError(failure) ? failure.message : 'Could not record that. Please try again.')
-    } finally {
-      setBusy(undefined)
-    }
+      setRecording(undefined)
+    }, 'Could not record that. Please try again.')
   }
 
   if (viewer.status === 'loading') {
@@ -101,7 +79,7 @@ export const AdminRoster = ({ api }: { api: RosterApi }) => {
     )
   }
 
-  const roster = loaded.status === 'ready' ? loaded.roster : undefined
+  const roster = loaded.status === 'ready' ? loaded.data : undefined
   const confirmed = roster?.entries.filter((entry) => !entry.waiting).length ?? 0
 
   return (
@@ -112,7 +90,7 @@ export const AdminRoster = ({ api }: { api: RosterApi }) => {
 
       {loaded.status === 'failed' && (
         <p class="form-error" role="alert">
-          Could not load the list. Please reload the page.
+          {loaded.message}
         </p>
       )}
 
@@ -179,7 +157,7 @@ export const AdminRoster = ({ api }: { api: RosterApi }) => {
                         <input
                           type="checkbox"
                           checked={entry.payment_status === 'paid'}
-                          disabled={busy === entry.account_id}
+                          disabled={recording === entry.account_id}
                           aria-label={`Paid — ${entry.name ?? entry.email}`}
                           onChange={(changeEvent) =>
                             void record(roster.event?.id ?? '', entry, changeEvent.currentTarget.checked)

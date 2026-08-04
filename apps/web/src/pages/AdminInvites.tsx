@@ -1,19 +1,15 @@
 import type { AdminInvite, Invite } from '@sage-burner/shared'
 
-import { useEffect, useState } from 'preact/hooks'
+import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
 import { InviteLink } from '../components/InviteLink.tsx'
+import { useAction, useLoad } from '../load.ts'
 import { isAdmin, useViewer } from '../viewer.tsx'
 
 export type InvitesApi = Pick<ApiClient, 'getInvites' | 'createInvite' | 'revokeInvite'>
-
-type Loaded =
-  | { status: 'loading' }
-  | { status: 'ready'; invites: readonly AdminInvite[] }
-  | { status: 'failed'; message: string }
 
 const describe = (invite: AdminInvite) => {
   if (invite.applicant_name !== null) return `Application from ${invite.applicant_name}`
@@ -24,68 +20,33 @@ const describe = (invite: AdminInvite) => {
 export const AdminInvites = ({ api }: { api: InvitesApi }) => {
   const viewer = useViewer()
   const admin = isAdmin(viewer)
-  const [loaded, setLoaded] = useState<Loaded>({ status: 'loading' })
   const [minted, setMinted] = useState<Invite | undefined>(undefined)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | undefined>(undefined)
 
-  const load = (signal?: AbortSignal) =>
-    api
-      .getInvites(signal)
-      .then((response) => {
-        if (signal?.aborted !== true) setLoaded({ status: 'ready', invites: response.invites })
-      })
-      .catch((failure: unknown) => {
-        if (signal?.aborted === true) return
-        setLoaded({
-          status: 'failed',
-          message: isApiError(failure) ? failure.message : 'Could not load the invites.',
-        })
-      })
+  const { loaded, reload } = useLoad((signal) => api.getInvites(signal), {
+    enabled: admin,
+    fallback: 'Could not load the invites.',
+  })
 
-  useEffect(() => {
-    if (!admin) return undefined
+  const { busy, error, run } = useAction(reload)
 
-    const controller = new AbortController()
-    void load(controller.signal)
-
-    return () => {
-      controller.abort()
-    }
-  }, [api, admin])
-
-  const mint = async () => {
-    setBusy(true)
-    setError(undefined)
+  const mint = () => {
     // Cleared before the call, so a failure cannot leave the previous link on
     // screen beside the error and read as one invite.
     setMinted(undefined)
-    try {
+    run(async () => {
       const response = await api.createInvite()
       setMinted(response.invite)
-      await load()
-    } catch {
-      setError('Could not create an invite. Please try again.')
-    } finally {
-      setBusy(false)
-    }
+    }, 'Could not create an invite. Please try again.')
   }
 
-  const revoke = async (id: string) => {
-    setBusy(true)
-    setError(undefined)
-    try {
-      await api.revokeInvite(id)
-      await load()
-    } catch (failure) {
-      setError(
+  const revoke = (id: string) => {
+    run(
+      () => api.revokeInvite(id),
+      (failure: unknown) =>
         isApiError(failure) && failure.status === 409
           ? 'That invite cannot be revoked — it has been used, or it belongs to an approved application.'
           : 'Could not revoke that. Please try again.',
-      )
-    } finally {
-      setBusy(false)
-    }
+    )
   }
 
   if (viewer.status === 'loading') {
@@ -152,9 +113,11 @@ export const AdminInvites = ({ api }: { api: InvitesApi }) => {
         </p>
       )}
 
-      {loaded.status === 'ready' && loaded.invites.length === 0 && <p class="form-note">No invites yet.</p>}
+      {loaded.status === 'ready' && loaded.data.invites.length === 0 && (
+        <p class="form-note">No invites yet.</p>
+      )}
 
-      {loaded.status === 'ready' && loaded.invites.length > 0 && (
+      {loaded.status === 'ready' && loaded.data.invites.length > 0 && (
         <table class="table">
           <thead>
             <tr>
@@ -165,7 +128,7 @@ export const AdminInvites = ({ api }: { api: InvitesApi }) => {
             </tr>
           </thead>
           <tbody>
-            {loaded.invites.map((invite) => (
+            {loaded.data.invites.map((invite) => (
               <tr key={invite.id}>
                 <td>{describe(invite)}</td>
                 <td>{invite.status}</td>

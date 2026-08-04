@@ -1,11 +1,10 @@
-import type { EventOptionTaken, MyAttendanceResponse, PaymentStatus } from '@sage-burner/shared'
-
-import { useEffect, useState } from 'preact/hooks'
+import type { PaymentStatus } from '@sage-burner/shared'
 
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
 import { StayForm } from '../components/StayForm.tsx'
+import { useAction, useLoad } from '../load.ts'
 import { isMember, useViewer } from '../viewer.tsx'
 
 /**
@@ -28,60 +27,29 @@ export type MyBurnApi = Pick<
   'getMyAttendance' | 'joinActiveEvent' | 'leaveActiveEvent' | 'updateMyStay' | 'getEventOptions'
 >
 
-type Loaded =
-  | { status: 'loading' }
-  | { status: 'ready'; mine: MyAttendanceResponse; lodging: readonly EventOptionTaken[] }
-  | { status: 'failed'; message: string }
-
 export const MyBurn = ({ api }: { api: MyBurnApi }) => {
   const viewer = useViewer()
   const member = isMember(viewer)
-  const [loaded, setLoaded] = useState<Loaded>({ status: 'loading' })
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | undefined>(undefined)
+  const { loaded, reload } = useLoad(
+    async (signal) => {
+      const mine = await api.getMyAttendance(signal)
+      // The lodging list belongs to the burn, so it is only worth asking for once
+      // there is one.
+      const lodging = mine.event === null ? [] : (await api.getEventOptions(mine.event.id, signal)).options
 
-  const load = (signal?: AbortSignal) =>
-    api
-      .getMyAttendance(signal)
-      .then(async (mine) => {
-        // The lodging list belongs to the burn, so it is only worth asking for
-        // once there is one.
-        const lodging = mine.event === null ? [] : (await api.getEventOptions(mine.event.id, signal)).options
+      return { mine, lodging }
+    },
+    { enabled: member, fallback: 'Could not load the burn.' },
+  )
 
-        if (signal?.aborted !== true) setLoaded({ status: 'ready', mine, lodging })
-      })
-      .catch((failure: unknown) => {
-        if (signal?.aborted === true) return
-        setLoaded({
-          status: 'failed',
-          message: isApiError(failure) ? failure.message : 'Could not load the burn.',
-        })
-      })
+  const { busy, error, run } = useAction(reload)
 
-  useEffect(() => {
-    if (!member) return undefined
-
-    const controller = new AbortController()
-    void load(controller.signal)
-
-    return () => {
-      controller.abort()
-    }
-  }, [api, member])
-
-  const act = async (change: () => Promise<unknown>, whenRefused: string) => {
-    setBusy(true)
-    setError(undefined)
-    try {
-      await change()
-      await load()
-    } catch (failure) {
-      setError(
-        isApiError(failure) && failure.status === 409 ? whenRefused : 'That did not work. Please try again.',
-      )
-    } finally {
-      setBusy(false)
-    }
+  // A 409 here always means the same class of thing — the burn moved on — but what
+  // exactly moved differs per action, so the caller supplies the words.
+  const act = (change: () => Promise<unknown>, whenRefused: string) => {
+    run(change, (failure: unknown) =>
+      isApiError(failure) && failure.status === 409 ? whenRefused : 'That did not work. Please try again.',
+    )
   }
 
   if (viewer.status === 'loading') {
@@ -123,24 +91,24 @@ export const MyBurn = ({ api }: { api: MyBurnApi }) => {
         </p>
       )}
 
-      {loaded.status === 'ready' && loaded.mine.event === null && (
+      {loaded.status === 'ready' && loaded.data.mine.event === null && (
         <p class="form-note">
           There is no burn open at the moment. When the next one is announced it will show up here.
         </p>
       )}
 
-      {loaded.status === 'ready' && loaded.mine.event !== null && (
+      {loaded.status === 'ready' && loaded.data.mine.event !== null && (
         <>
-          <h2>{loaded.mine.event.name}</h2>
+          <h2>{loaded.data.mine.event.name}</h2>
 
-          {loaded.mine.attendance === null ? (
+          {loaded.data.mine.attendance === null ? (
             <>
               <p>You have not said whether you are coming.</p>
               <p class="row">
                 <button
                   type="button"
                   disabled={busy}
-                  onClick={() => void act(api.joinActiveEvent, 'That burn is no longer open.')}
+                  onClick={() => act(api.joinActiveEvent, 'That burn is no longer open.')}
                 >
                   I am coming
                 </button>
@@ -149,23 +117,20 @@ export const MyBurn = ({ api }: { api: MyBurnApi }) => {
           ) : (
             <>
               <p role="status">
-                You are on the list for {loaded.mine.event.name}
-                {paymentNote(loaded.mine.attendance.payment_status)}
+                You are on the list for {loaded.data.mine.event.name}
+                {paymentNote(loaded.data.mine.attendance.payment_status)}
               </p>
               <StayForm
                 api={api}
-                attendance={loaded.mine.attendance}
-                lodgingOptions={loaded.lodging.filter((option) => option.kind === 'lodging')}
-                helpingOptions={loaded.lodging.filter((option) => option.kind === 'helping')}
-                taken={Object.fromEntries(loaded.lodging.map((option) => [option.id, option.taken]))}
-                onSaved={() => {
-                  // Reloaded rather than spliced: the `taken` counts move when a
-                  // member changes where they are sleeping, and a stale map leaves
-                  // the option they just left reading as full — now disabled,
-                  // since it is no longer theirs — which a native select cannot
-                  // pick back.
-                  void load()
-                }}
+                attendance={loaded.data.mine.attendance}
+                lodgingOptions={loaded.data.lodging.filter((option) => option.kind === 'lodging')}
+                helpingOptions={loaded.data.lodging.filter((option) => option.kind === 'helping')}
+                taken={Object.fromEntries(loaded.data.lodging.map((option) => [option.id, option.taken]))}
+                // Reloaded rather than spliced: the `taken` counts move when a member
+                // changes where they are sleeping, and a stale map leaves the option
+                // they just left reading as full — now disabled, since it is no longer
+                // theirs — which a native select cannot pick back.
+                onSaved={reload}
               />
 
               <p class="row">
@@ -174,7 +139,7 @@ export const MyBurn = ({ api }: { api: MyBurnApi }) => {
                   class="link-button"
                   disabled={busy}
                   onClick={() =>
-                    void act(
+                    act(
                       api.leaveActiveEvent,
                       'You have already paid for this burn, so someone with admin needs to sort this one out with you.',
                     )
