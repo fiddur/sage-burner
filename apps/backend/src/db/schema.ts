@@ -681,7 +681,7 @@ export const pushSubscription = sqliteTable(
  * about the community. A new burn copies the definitions from a previous one, the
  * way `event_option` is set up fresh each time and #156 will do for places.
  *
- * **Any attending member may add, change or remove one**, staffed or not. That is
+ * **Any approved member may add, change or remove one**, staffed or not. That is
  * a deliberate divergence from every other structural edit being admin-only: these
  * are co-created events, and at 42 people trust is the mechanism. There is no undo,
  * which is the accepted cost.

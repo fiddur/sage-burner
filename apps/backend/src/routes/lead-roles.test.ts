@@ -17,7 +17,7 @@ import { SESSION_COOKIE } from './auth.ts'
  * The lead-roles register — the spreadsheet's roles tab.
  *
  * The properties worth proving are the ones that diverge from everything else here:
- * **any attending member** may add, edit and remove a role, including one somebody
+ * **any approved member** may add, edit and remove a role, including one somebody
  * else staffed; the team size is advisory rather than a cap; and a role can only be
  * held by somebody actually coming to that burn, which is why the lead and the team
  * are `attendance` references rather than `account` ones.
@@ -263,6 +263,38 @@ describe('a role', () => {
     const { cookie } = await givenAccount(['member'])
 
     expect((await add(server, cookie, randomUUID())).statusCode).toBe(404)
+  })
+
+  it('leaves the fields a one-field edit did not name alone', async () => {
+    // The web form deliberately sends only what changed, so this is the ordinary
+    // request. Built from the create schema, the update schema reinstated every
+    // default — changing one effort level wiped the purpose, the tasks and the
+    // wanted team size, and no test noticed because they asserted on the title.
+    const server = await build()
+    const eventId = await givenEvent()
+    const { cookie } = await givenAccount(['member'])
+    const id = (
+      await add(server, cookie, eventId, {
+        title: 'Sauna',
+        purpose: 'Keep it hot',
+        tasks: '- fetch wood',
+        effort_before: 'low',
+        effort_after: 'medium',
+        team_size_wanted: 3,
+      })
+    ).json().role.id
+
+    const response = await edit(server, cookie, id, { effort_during: 'high' })
+
+    expect(response.json().role).toMatchObject({
+      title: 'Sauna',
+      purpose: 'Keep it hot',
+      tasks: '- fetch wood',
+      effort_before: 'low',
+      effort_during: 'high',
+      effort_after: 'medium',
+      team_size_wanted: 3,
+    })
   })
 
   it('treats an empty edit as a read rather than a 500', async () => {

@@ -40,26 +40,42 @@ export const leadRolesResponseSchema = z.object({ roles: z.array(leadRoleSchema)
 export const leadRoleResponseSchema = z.object({ role: leadRoleSchema })
 
 /**
+ * What a member may set on a role, carrying **no defaults**.
+ *
+ * Derived from `leadRoleFields` so each bound has one home, and defaults-free so
+ * `.partial()` below actually produces a partial. Zod 4's `.partial()` does not
+ * suppress a default: an optional wrapping a default still produces the default and
+ * the object parser keeps the key. Built from the create schema, `{ effort_during:
+ * 'high' }` parsed to all six other fields as well, so changing one effort level
+ * wiped the purpose, the tasks and the wanted team size — and `{}` parsed to six
+ * keys, so the handler's no-op branch was unreachable. `formQuestionUpdateSchema`
+ * documents the same trap.
+ */
+const leadRoleEditableFields = leadRoleFields.omit({ id: true, event_id: true, created_at: true })
+
+/**
  * Adding a role.
  *
  * The effort answers and the team size default, so somebody adding a title and a
  * purpose is not stopped by three selects they have no opinion on yet. `.strict()`
  * so a misspelt field is a 400 rather than a silently defaulted one.
+ *
+ * The defaults live here and nowhere else. On a PATCH "absent" means "leave it
+ * alone"; only on a create does it mean "use this".
  */
-export const leadRoleCreateSchema = z
-  .object({
-    title: nonEmptyText(MAX_TITLE),
-    purpose: z.string().max(MAX_NOTES).default(''),
-    tasks: z.string().max(MAX_NOTES).default(''),
-    effort_before: z.enum(effortLevels).default('none'),
-    effort_during: z.enum(effortLevels).default('none'),
-    effort_after: z.enum(effortLevels).default('none'),
-    team_size_wanted: z.int().min(0).default(0),
+export const leadRoleCreateSchema = leadRoleEditableFields
+  .extend({
+    purpose: leadRoleEditableFields.shape.purpose.default(''),
+    tasks: leadRoleEditableFields.shape.tasks.default(''),
+    effort_before: leadRoleEditableFields.shape.effort_before.default('none'),
+    effort_during: leadRoleEditableFields.shape.effort_during.default('none'),
+    effort_after: leadRoleEditableFields.shape.effort_after.default('none'),
+    team_size_wanted: leadRoleEditableFields.shape.team_size_wanted.default(0),
   })
   .strict()
 
 /** Editing one. Partial — omitted fields are left as they are. */
-export const leadRoleUpdateSchema = leadRoleCreateSchema.partial().strict()
+export const leadRoleUpdateSchema = leadRoleEditableFields.partial().strict()
 
 /**
  * Taking a role, handing it to somebody, or vacating it.

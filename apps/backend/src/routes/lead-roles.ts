@@ -335,11 +335,10 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
    * register and both seed it, so it holds every role twice. `places.ts` wraps its
    * order assignment for the same reason.
    *
-   * **No test covers that window, and none here can.** `inject` runs the two
-   * requests to completion in turn, so the second's pre-read already sees the
-   * first's inserts — a version reading outside the transaction answers
-   * `[201, 409]` under `Promise.all` exactly as this one does, which was measured
-   * rather than assumed. The 409 test proves the sequential case only.
+   * **Do not expect a test to hold this.** `inject` runs requests to completion in
+   * turn, so a version reading outside the transaction answers `[201, 409]` under
+   * `Promise.all` exactly as this one does; the 409 test covers the sequential case
+   * and nothing covers the window.
    */
   app.post<{ Params: { eventId: string } }>(
     '/api/events/:eventId/roles/copy',
