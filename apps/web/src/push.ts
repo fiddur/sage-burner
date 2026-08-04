@@ -17,9 +17,11 @@ export type PushState = 'unsupported' | 'blocked' | 'off' | 'on'
 /**
  * Enough of the browser to turn notifications on, so a test can supply one.
  *
- * Narrower than the real objects on purpose: this is every capability used, and
- * anything absent from a browser fails the `supportsPush` check rather than
- * throwing halfway through.
+ * Narrower than the real objects on purpose: this is every capability used. What
+ * happens when one is missing is split across two places — `browserPush()` returns
+ * `undefined` when `Notification` or `navigator.serviceWorker` is absent, and
+ * `register()` throws when `pushManager` is, since that is only knowable after
+ * registering. Both surface as the toggle saying push is unavailable.
  */
 export interface PushBrowser {
   requestPermission: () => Promise<NotificationPermission>

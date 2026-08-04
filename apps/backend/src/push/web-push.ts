@@ -28,6 +28,23 @@ import type { Delivery, VapidKeys } from './push.ts'
  */
 export const DEFAULT_PUSH_CONTACT = 'mailto:noreply@sage-burner.invalid'
 
+/**
+ * What a thrown delivery means for the row.
+ *
+ * Exported because it is the one piece of this module that is pure, and it decides
+ * whether a subscription is **deleted** — `404` alone, forgetting `410`, would mean
+ * dead endpoints retried on every application forever, and treating any failure as
+ * `gone` would drop a phone over one bad night from Google.
+ */
+export const outcomeFor = (failure: unknown): 'gone' | 'failed' => {
+  // 404 and 410 are the push service saying the browser threw this subscription
+  // away. Anything else — a 500, a timeout, a DNS failure — is theirs and might
+  // work next time, so the row stays.
+  const status = failure instanceof webpush.WebPushError ? failure.statusCode : undefined
+
+  return status === 404 || status === 410 ? 'gone' : 'failed'
+}
+
 /** `web-push`'s own generator, wrapped so `app.ts` need not import the library. */
 export const generateVAPIDKeys = (): VapidKeys => webpush.generateVAPIDKeys()
 
@@ -53,11 +70,6 @@ export const deliverWithWebPush =
 
       return 'sent'
     } catch (failure) {
-      // 404 and 410 are the push service saying the browser threw this
-      // subscription away. Anything else — a 500, a timeout, a DNS failure — is
-      // theirs and might work next time, so the row stays.
-      const status = failure instanceof webpush.WebPushError ? failure.statusCode : undefined
-
-      return status === 404 || status === 410 ? 'gone' : 'failed'
+      return outcomeFor(failure)
     }
   }
