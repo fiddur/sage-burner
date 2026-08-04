@@ -28,25 +28,25 @@ import { Schedule } from './pages/Schedule.tsx'
 import { FetchedViewerProvider, ViewerProvider } from './viewer.tsx'
 
 /**
- * Only what the app reaches for, not the whole client.
+ * What the route table reaches for.
  *
  * Narrow on purpose: a test supplying a stub then has to satisfy exactly these,
  * which is what lets it be a plain object rather than a cast.
+ *
+ * One list, consumed twice. It was written out again as `Routes`' prop type, in a
+ * different key order — two ~50-key lists nobody would diff by eye, which is how
+ * they drift.
  */
-export type AppApi = Pick<
+export type RoutesApi = Pick<
   ApiClient,
+  | 'addQuestion'
   | 'createEvent'
+  | 'deleteQuestion'
   | 'getActiveEvent'
   | 'updateWelcome'
   | 'getAdminAccounts'
   | 'setAccountRoles'
   | 'getEvents'
-  | 'getMe'
-  | 'login'
-  | 'logout'
-  | 'updateEvent'
-  | 'addQuestion'
-  | 'deleteQuestion'
   | 'getInviteState'
   | 'redeemInvite'
   | 'getMyProfile'
@@ -83,10 +83,18 @@ export type AppApi = Pick<
   | 'approveApplication'
   | 'rejectApplication'
   | 'getQuestions'
+  | 'login'
   | 'reorderQuestions'
   | 'submitApplication'
+  | 'updateEvent'
   | 'updateQuestion'
 >
+
+/**
+ * What the whole app reaches for: the route table, plus what the providers and
+ * the layout need — the viewer they resolve on mount, and signing out.
+ */
+export type AppApi = RoutesApi & Pick<ApiClient, 'getMe' | 'logout'>
 
 /**
  * The route table.
@@ -97,62 +105,7 @@ export type AppApi = Pick<
  * path, and invite tokens must be dot-free. A path with an extension gets a 404
  * from the server and never reaches this router.
  */
-export const Routes = ({
-  api,
-}: {
-  api: Pick<
-    ApiClient,
-    | 'addQuestion'
-    | 'createEvent'
-    | 'deleteQuestion'
-    | 'getActiveEvent'
-    | 'updateWelcome'
-    | 'getAdminAccounts'
-    | 'setAccountRoles'
-    | 'getEvents'
-    | 'getInviteState'
-    | 'redeemInvite'
-    | 'getMyProfile'
-    | 'updateMyProfile'
-    | 'updateMyStay'
-    | 'getMyAttendance'
-    | 'joinActiveEvent'
-    | 'leaveActiveEvent'
-    | 'getActiveRoster'
-    | 'setPayment'
-    | 'getPlaces'
-    | 'addPlace'
-    | 'updatePlace'
-    | 'deletePlace'
-    | 'reorderPlaces'
-    | 'getEventOptions'
-    | 'addEventOption'
-    | 'updateEventOption'
-    | 'deleteEventOption'
-    | 'reorderEventOptions'
-    | 'getSessions'
-    | 'offerSession'
-    | 'updateSession'
-    | 'withdrawSession'
-    | 'getInstallation'
-    | 'updateInstallation'
-    | 'getPushKey'
-    | 'subscribeToPush'
-    | 'unsubscribeFromPush'
-    | 'getApplications'
-    | 'getInvites'
-    | 'createInvite'
-    | 'revokeInvite'
-    | 'approveApplication'
-    | 'rejectApplication'
-    | 'getQuestions'
-    | 'login'
-    | 'reorderQuestions'
-    | 'submitApplication'
-    | 'updateEvent'
-    | 'updateQuestion'
-  >
-}) => {
+export const Routes = ({ api }: { api: RoutesApi }) => {
   // Memoised because `component` is compared by identity: a fresh arrow each
   // render is a *different component type*, so a re-rendered `Routes` would
   // unmount and remount `Login` — and its `useState` — rather than diff it.
