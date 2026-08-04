@@ -49,7 +49,7 @@ const stub = (over: Partial<RosterApi> = {}, roster = aRoster()): RosterApi => (
 
 const renderPage = (
   api: RosterApi,
-  viewer: Viewer = { status: 'signed-in', account: { id: 'a-1', roles: ['admin'] } },
+  viewer: Viewer = { status: 'signed-in', account: { id: 'a-1', name: null, roles: ['admin'] } },
 ) =>
   render(
     <ViewerProvider viewer={viewer}>
@@ -181,7 +181,7 @@ describe('AdminRoster', () => {
     const getActiveRoster = vi.fn(() => Promise.resolve(aRoster()))
     renderPage(stub({ getActiveRoster }), {
       status: 'signed-in',
-      account: { id: 'a-1', roles: ['member'] },
+      account: { id: 'a-1', name: null, roles: ['member'] },
     })
 
     expect(screen.getByText(/for organisers/)).toBeTruthy()

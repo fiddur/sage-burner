@@ -1,0 +1,127 @@
+import type { Attendance, MyBurn, MyBurnsResponse } from '@sage-burner/shared'
+
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+import type { YourBurnsApi } from './YourBurns.tsx'
+
+import { apiError } from '../api/client.ts'
+import { YourBurns } from './YourBurns.tsx'
+
+afterEach(cleanup)
+
+const anAttendance = (over: Partial<Attendance> = {}): Attendance => ({
+  id: 'att-1',
+  event_id: 'e-1',
+  account_id: 'a-1',
+  joined_at: '2026-07-01T00:00:00.000Z',
+  arrival_date: null,
+  departure_date: null,
+  lodging_option_id: null,
+  helping_option_ids: [],
+  helping_other: null,
+  notes: null,
+  payment_status: 'unpaid',
+  payment_date: null,
+  ...over,
+})
+
+const aBurn = (id: string, name: string, attendance: Attendance | null = null): MyBurn => ({
+  event: { id, name, slug: name.toLowerCase(), start_date: '2026-08-01', end_date: '2026-08-05' },
+  attendance,
+})
+
+const stub = (over: Partial<YourBurnsApi> = {}, burns: MyBurnsResponse = { coming: [], past: [] }) => ({
+  getMyBurns: () => Promise.resolve(burns),
+  getEventOptions: () => Promise.resolve({ options: [] }),
+  joinEvent: () => Promise.reject(new Error('joinEvent is not stubbed here')),
+  leaveEvent: () => Promise.reject(new Error('leaveEvent is not stubbed here')),
+  updateMyStay: () => Promise.reject(new Error('updateMyStay is not stubbed here')),
+  ...over,
+})
+
+describe('YourBurns', () => {
+  it('offers to join a burn they have not said anything about', async () => {
+    const joinEvent = vi.fn(() => Promise.resolve({ attendance: anAttendance() }))
+    render(<YourBurns api={stub({ joinEvent }, { coming: [aBurn('e-1', 'Summer')], past: [] })} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'I am coming' }))
+
+    await waitFor(() => expect(joinEvent).toHaveBeenCalledWith('e-1'))
+  })
+
+  it('names the burn each button belongs to, since there is more than one', async () => {
+    // The reason join and leave stopped being scoped to the active burn: pressing
+    // the second burn's button must not join the first.
+    const joinEvent = vi.fn(() => Promise.resolve({ attendance: anAttendance() }))
+    render(
+      <YourBurns
+        api={stub({ joinEvent }, { coming: [aBurn('e-1', 'Summer'), aBurn('e-2', 'Winter')], past: [] })}
+      />,
+    )
+
+    const buttons = await screen.findAllByRole('button', { name: 'I am coming' })
+    fireEvent.click(buttons[1] ?? buttons[0]!)
+
+    await waitFor(() => expect(joinEvent).toHaveBeenCalledWith('e-2'))
+  })
+
+  it('shows the stay form once they are coming, and asks for that burn’s lists', async () => {
+    const getEventOptions = vi.fn(() => Promise.resolve({ options: [] }))
+    render(
+      <YourBurns
+        api={stub({ getEventOptions }, { coming: [aBurn('e-1', 'Summer', anAttendance())], past: [] })}
+      />,
+    )
+
+    expect(await screen.findByLabelText('Arriving')).toBeTruthy()
+    expect(getEventOptions).toHaveBeenCalledWith('e-1', expect.anything())
+  })
+
+  it('asks for no lists at all for a burn they have not joined', async () => {
+    // There is no form until they are coming, and the lists are the form's data.
+    const getEventOptions = vi.fn(() => Promise.resolve({ options: [] }))
+    render(<YourBurns api={stub({ getEventOptions }, { coming: [aBurn('e-1', 'Summer')], past: [] })} />)
+
+    await screen.findByRole('button', { name: 'I am coming' })
+    expect(getEventOptions).not.toHaveBeenCalled()
+  })
+
+  it('explains a refused withdrawal rather than saying try again', async () => {
+    // A 409 means they have paid, and retrying cannot change that.
+    const leaveEvent = vi.fn(() => Promise.reject(apiError(409, 'conflict', 'nope')))
+    render(
+      <YourBurns
+        api={stub({ leaveEvent }, { coming: [aBurn('e-1', 'Summer', anAttendance())], past: [] })}
+      />,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'I cannot come after all' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('already paid')
+  })
+
+  it('keeps past burns behind a disclosure', async () => {
+    render(<YourBurns api={stub({}, { coming: [], past: [aBurn('e-0', 'Last summer', anAttendance())] })} />)
+
+    const toggle = await screen.findByRole('button', { name: '…show past burns' })
+    expect(screen.queryByText(/Last summer/)).toBeNull()
+
+    fireEvent.click(toggle)
+
+    expect(screen.getByText(/Last summer/)).toBeTruthy()
+  })
+
+  it('offers no disclosure when there is no history to hide', async () => {
+    render(<YourBurns api={stub({}, { coming: [aBurn('e-1', 'Summer')], past: [] })} />)
+
+    await screen.findByRole('button', { name: 'I am coming' })
+    expect(screen.queryByRole('button', { name: '…show past burns' })).toBeNull()
+  })
+
+  it('says so when nothing is planned, rather than showing an empty page', async () => {
+    render(<YourBurns api={stub()} />)
+
+    expect(await screen.findByText(/no burn planned/)).toBeTruthy()
+  })
+})

@@ -12,8 +12,8 @@ import { Roles } from './Roles.tsx'
 
 afterEach(cleanup)
 
-const ADA: Viewer = { status: 'signed-in', account: { id: 'a-1', roles: ['member'] } }
-const ORGANISER: Viewer = { status: 'signed-in', account: { id: 'a-9', roles: ['admin'] } }
+const ADA: Viewer = { status: 'signed-in', account: { id: 'a-1', name: null, roles: ['member'] } }
+const ORGANISER: Viewer = { status: 'signed-in', account: { id: 'a-9', name: null, roles: ['admin'] } }
 
 const BURN: Event = {
   id: 'e-1',

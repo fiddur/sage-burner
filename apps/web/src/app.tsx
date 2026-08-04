@@ -20,7 +20,6 @@ import { Home } from './pages/Home.tsx'
 import { Invite } from './pages/Invite.tsx'
 import { Login } from './pages/Login.tsx'
 import { Members } from './pages/Members.tsx'
-import { MyBurn } from './pages/MyBurn.tsx'
 import { NotFound } from './pages/NotFound.tsx'
 import { Options } from './pages/Options.tsx'
 import { Places } from './pages/Places.tsx'
@@ -54,9 +53,9 @@ export type RoutesApi = Pick<
   | 'getMyProfile'
   | 'updateMyProfile'
   | 'updateMyStay'
-  | 'getMyAttendance'
-  | 'joinActiveEvent'
-  | 'leaveActiveEvent'
+  | 'getMyBurns'
+  | 'joinEvent'
+  | 'leaveEvent'
   | 'getActiveRoster'
   | 'getActiveMembers'
   | 'setPayment'
@@ -147,7 +146,6 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
   const AdminSettingsRoute = useMemo(() => () => <AdminSettings api={api} />, [api])
   const HomeRoute = useMemo(() => () => <Home api={api} />, [api])
   const MembersRoute = useMemo(() => () => <Members api={api} />, [api])
-  const MyBurnRoute = useMemo(() => () => <MyBurn api={api} />, [api])
   const DreamsRoute = useMemo(() => () => <Dreams api={api} />, [api])
   const ScheduleRoute = useMemo(() => () => <Schedule api={api} />, [api])
   const RolesRoute = useMemo(() => () => <Roles api={api} />, [api])
@@ -166,7 +164,6 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
       <Route path="/" component={HomeRoute} />
       <Route path="/apply" component={ApplyRoute} />
       <Route path="/members" component={MembersRoute} />
-      <Route path="/my-burn" component={MyBurnRoute} />
       <Route path="/dreams" component={DreamsRoute} />
       <Route path="/schedule" component={ScheduleRoute} />
       <Route path="/roles" component={RolesRoute} />

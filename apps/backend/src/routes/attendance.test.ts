@@ -68,7 +68,7 @@ const givenAccount = async (roles: ('admin' | 'member')[], name: string | null =
   return { id, cookie: cookieFor(id) }
 }
 
-const givenEvent = async (over: { end_date?: string; slug?: string } = {}) => {
+const givenEvent = async (over: { start_date?: string; end_date?: string; slug?: string } = {}) => {
   const id = randomUUID()
   await db()
     .insert(event)
@@ -76,7 +76,7 @@ const givenEvent = async (over: { end_date?: string; slug?: string } = {}) => {
       id,
       name: 'Summer burn',
       slug: over.slug ?? `burn-${id.slice(0, 8)}`,
-      start_date: '2026-08-01',
+      start_date: over.start_date ?? '2026-08-01',
       end_date: over.end_date ?? '2026-08-05',
       member_cap: 42,
       created_at: NOW,
@@ -84,26 +84,44 @@ const givenEvent = async (over: { end_date?: string; slug?: string } = {}) => {
   return id
 }
 
-const mine = (server: FastifyInstance, cookie: string): Promise<LightMyRequestResponse> =>
-  server.inject({ method: 'GET', url: '/api/events/active/attendance', headers: { cookie } })
+const myBurns = (server: FastifyInstance, cookie: string): Promise<LightMyRequestResponse> =>
+  server.inject({ method: 'GET', url: '/api/events/mine', headers: { cookie } })
 
-const join = (server: FastifyInstance, cookie: string): Promise<LightMyRequestResponse> =>
-  server.inject({ method: 'POST', url: '/api/events/active/attendance', headers: { cookie } })
+const join = (server: FastifyInstance, cookie: string, eventId: string): Promise<LightMyRequestResponse> =>
+  server.inject({ method: 'POST', url: `/api/events/${eventId}/attendance/me`, headers: { cookie } })
 
-const withdraw = (server: FastifyInstance, cookie: string): Promise<LightMyRequestResponse> =>
-  server.inject({ method: 'DELETE', url: '/api/events/active/attendance', headers: { cookie } })
+const withdraw = (
+  server: FastifyInstance,
+  cookie: string,
+  eventId: string,
+): Promise<LightMyRequestResponse> =>
+  server.inject({ method: 'DELETE', url: `/api/events/${eventId}/attendance/me`, headers: { cookie } })
+
+/** This account's stay at one burn, read back the way their own page reads it. */
+const stayAt = async (server: FastifyInstance, cookie: string, eventId: string) => {
+  const body = (await myBurns(server, cookie)).json()
+  const found = [...body.coming, ...body.past].find(
+    (burn: { event: { id: string } }) => burn.event.id === eventId,
+  )
+
+  return found?.attendance ?? null
+}
 
 describe('a member saying they are coming', () => {
-  it('starts out not coming, but knows which burn is open', async () => {
+  it('lists a burn they have not joined, with no stay against it', async () => {
     const server = await build()
-    await givenEvent()
+    const eventId = await givenEvent()
     const member = await givenAccount(['member'])
 
-    const response = await mine(server, member.cookie)
+    const response = await myBurns(server, member.cookie)
 
     expect(response.statusCode).toBe(200)
-    expect(response.json().event.name).toBe('Summer burn')
-    expect(response.json().attendance).toBeNull()
+    const { coming, past } = response.json()
+    expect(coming).toHaveLength(1)
+    expect(coming[0].event.id).toBe(eventId)
+    expect(coming[0].event.name).toBe('Summer burn')
+    expect(coming[0].attendance).toBeNull()
+    expect(past).toEqual([])
   })
 
   it('creates the row, unpaid, when they say so', async () => {
@@ -111,7 +129,7 @@ describe('a member saying they are coming', () => {
     const eventId = await givenEvent()
     const member = await givenAccount(['member'])
 
-    const response = await join(server, member.cookie)
+    const response = await join(server, member.cookie, eventId)
 
     expect(response.statusCode).toBe(201)
     expect(response.json().attendance.payment_status).toBe('unpaid')
@@ -121,11 +139,11 @@ describe('a member saying they are coming', () => {
 
   it('is a no-op said twice, rather than an error or a second row', async () => {
     const server = await build()
-    await givenEvent()
+    const eventId = await givenEvent()
     const member = await givenAccount(['member'])
 
-    const first = await join(server, member.cookie)
-    const second = await join(server, member.cookie)
+    const first = await join(server, member.cookie, eventId)
+    const second = await join(server, member.cookie, eventId)
 
     expect(first.statusCode).toBe(201)
     expect(second.statusCode).toBe(200)
@@ -139,10 +157,13 @@ describe('a member saying they are coming', () => {
     // case the comment in the route actually describes — a double click — and it
     // is the one that reached the insert twice and answered 500.
     const server = await build()
-    await givenEvent()
+    const eventId = await givenEvent()
     const member = await givenAccount(['member'])
 
-    const [first, second] = await Promise.all([join(server, member.cookie), join(server, member.cookie)])
+    const [first, second] = await Promise.all([
+      join(server, member.cookie, eventId),
+      join(server, member.cookie, eventId),
+    ])
 
     expect([first.statusCode, second.statusCode].toSorted()).toEqual([200, 201])
     expect(await db().select().from(attendance)).toHaveLength(1)
@@ -173,21 +194,21 @@ describe('a member saying they are coming', () => {
 
   it('shows up afterwards', async () => {
     const server = await build()
-    await givenEvent()
+    const eventId = await givenEvent()
     const member = await givenAccount(['member'])
 
-    await join(server, member.cookie)
+    await join(server, member.cookie, eventId)
 
-    expect((await mine(server, member.cookie)).json().attendance).not.toBeNull()
+    expect(await stayAt(server, member.cookie, eventId)).not.toBeNull()
   })
 
   it('lets them withdraw while they have paid nothing', async () => {
     const server = await build()
-    await givenEvent()
+    const eventId = await givenEvent()
     const member = await givenAccount(['member'])
-    await join(server, member.cookie)
+    await join(server, member.cookie, eventId)
 
-    expect((await withdraw(server, member.cookie)).statusCode).toBe(204)
+    expect((await withdraw(server, member.cookie, eventId)).statusCode).toBe(204)
     expect(await db().select().from(attendance)).toHaveLength(0)
   })
 
@@ -195,54 +216,92 @@ describe('a member saying they are coming', () => {
     // What a refund means is a real decision, and #31 owns it. Deleting the row
     // here would discard the record that money changed hands.
     const server = await build()
-    await givenEvent()
+    const eventId = await givenEvent()
     const member = await givenAccount(['member'])
-    await join(server, member.cookie)
+    await join(server, member.cookie, eventId)
     await db().update(attendance).set({ payment_status: 'paid' })
 
-    expect((await withdraw(server, member.cookie)).statusCode).toBe(409)
+    expect((await withdraw(server, member.cookie, eventId)).statusCode).toBe(409)
     expect(await db().select().from(attendance)).toHaveLength(1)
   })
 
   it('answers 404 when they were never coming', async () => {
     const server = await build()
-    await givenEvent()
+    const eventId = await givenEvent()
     const member = await givenAccount(['member'])
 
-    expect((await withdraw(server, member.cookie)).statusCode).toBe(404)
+    expect((await withdraw(server, member.cookie, eventId)).statusCode).toBe(404)
   })
 
-  it('says there is no burn open rather than inventing one', async () => {
+  it('offers nothing when there are no burns at all', async () => {
     const server = await build()
     const member = await givenAccount(['member'])
 
-    const response = await mine(server, member.cookie)
-
-    expect(response.json().event).toBeNull()
-    expect((await join(server, member.cookie)).statusCode).toBe(409)
+    expect((await myBurns(server, member.cookie)).json()).toEqual({ coming: [], past: [] })
   })
 
-  it('picks the soonest-ending burn that has not ended', async () => {
+  it('joins the burn it was told to, not whichever one is next', async () => {
+    // The whole reason these routes stopped being scoped to the active burn: the
+    // details page lists every burn still to come, and the second one on it is by
+    // definition not the soonest-ending.
     const server = await build()
-    await givenEvent({ end_date: '2027-01-05', slug: 'later' })
+    const sooner = await givenEvent({ end_date: '2026-08-05', slug: 'sooner' })
+    const later = await givenEvent({ end_date: '2027-01-05', slug: 'later' })
+    const member = await givenAccount(['member'])
+
+    expect((await join(server, member.cookie, later)).statusCode).toBe(201)
+    expect((await db().select().from(attendance)).map((row) => row.event_id)).toEqual([later])
+    expect(await stayAt(server, member.cookie, sooner)).toBeNull()
+  })
+
+  it('refuses a burn that has ended, and one that never existed, alike', async () => {
+    // The same answer for both on purpose: telling them apart would confirm to an
+    // unrelated caller that an id is real.
+    const server = await build()
+    const gone = await givenEvent({ start_date: '2025-08-01', end_date: '2025-08-05', slug: 'gone' })
+    const member = await givenAccount(['member'])
+
+    expect((await join(server, member.cookie, gone)).statusCode).toBe(404)
+    expect((await join(server, member.cookie, randomUUID())).statusCode).toBe(404)
+    expect((await withdraw(server, member.cookie, gone)).statusCode).toBe(404)
+    expect(await db().select().from(attendance)).toHaveLength(0)
+  })
+
+  it('lists the coming burns soonest first, and past ones only if they came', async () => {
+    const server = await build()
+    const gone = await givenEvent({ start_date: '2025-08-01', end_date: '2025-08-05', slug: 'gone' })
+    const missed = await givenEvent({ start_date: '2024-08-01', end_date: '2024-08-05', slug: 'missed' })
+    const later = await givenEvent({ start_date: '2027-01-01', end_date: '2027-01-05', slug: 'later' })
     const sooner = await givenEvent({ end_date: '2026-08-05', slug: 'sooner' })
     const member = await givenAccount(['member'])
+    await db().insert(attendance).values({
+      id: randomUUID(),
+      event_id: gone,
+      account_id: member.id,
+      joined_at: '2025-07-01T00:00:00.000Z',
+      payment_status: 'paid',
+    })
 
-    await join(server, member.cookie)
+    const { coming, past } = (await myBurns(server, member.cookie)).json()
 
-    expect((await db().select().from(attendance))[0]?.event_id).toBe(sooner)
+    expect(coming.map((burn: { event: { id: string } }) => burn.event.id)).toEqual([sooner, later])
+    // `missed` is a real burn and not on this list: nobody's history includes a
+    // burn they did not come to.
+    expect(past.map((burn: { event: { id: string } }) => burn.event.id)).toEqual([gone])
+    expect(missed).not.toBe(gone)
   })
 })
 
 describe('who may say it', () => {
   it('refuses an anonymous caller on every route', async () => {
     const server = await build()
-    await givenEvent()
+    const eventId = await givenEvent()
 
     for (const [method, url] of [
-      ['GET', '/api/events/active/attendance'],
-      ['POST', '/api/events/active/attendance'],
-      ['DELETE', '/api/events/active/attendance'],
+      ['GET', '/api/events/mine'],
+      ['POST', `/api/events/${eventId}/attendance/me`],
+      ['DELETE', `/api/events/${eventId}/attendance/me`],
+      ['PATCH', `/api/events/${eventId}/attendance/me`],
     ] as const) {
       expect((await server.inject({ method, url })).statusCode, url).toBe(401)
     }
@@ -252,10 +311,10 @@ describe('who may say it', () => {
     // An account with no roles exists — someone invited but not yet redeemed, or
     // an admin-only bootstrap account. Being able to sign in is not being a member.
     const server = await build()
-    await givenEvent()
+    const eventId = await givenEvent()
     const stranger = await givenAccount([])
 
-    expect((await join(server, stranger.cookie)).statusCode).toBe(403)
+    expect((await join(server, stranger.cookie, eventId)).statusCode).toBe(403)
     expect(await db().select().from(attendance)).toHaveLength(0)
   })
 
@@ -263,10 +322,10 @@ describe('who may say it', () => {
     // The two roles are separate rows, and redemption grants only `member`, so an
     // admin is not automatically one.
     const server = await build()
-    await givenEvent()
+    const eventId = await givenEvent()
     const admin = await givenAccount(['admin'])
 
-    expect((await join(server, admin.cookie)).statusCode).toBe(403)
+    expect((await join(server, admin.cookie, eventId)).statusCode).toBe(403)
   })
 })
 
@@ -305,7 +364,7 @@ describe('an organiser saying it for someone', () => {
     const eventId = await givenEvent()
     const admin = await givenAccount(['admin'])
     const member = await givenAccount(['member'])
-    await join(server, member.cookie)
+    await join(server, member.cookie, eventId)
 
     expect((await add(server, admin.cookie, eventId, member.id)).statusCode).toBe(200)
     expect(await db().select().from(attendance)).toHaveLength(1)
@@ -318,7 +377,7 @@ describe('an organiser saying it for someone', () => {
     const eventId = await givenEvent()
     const admin = await givenAccount(['admin'])
     const member = await givenAccount(['member'])
-    await join(server, member.cookie)
+    await join(server, member.cookie, eventId)
     await db().update(attendance).set({ payment_status: 'paid' })
 
     expect((await remove(server, admin.cookie, eventId, member.id)).statusCode).toBe(204)
@@ -383,7 +442,7 @@ describe('one row per person per burn', () => {
     const first = await givenEvent({ end_date: '2026-08-05', slug: 'first' })
     const admin = await givenAccount(['admin'])
     const member = await givenAccount(['member'])
-    await join(server, member.cookie)
+    await join(server, member.cookie, first)
 
     const second = await givenEvent({ end_date: '2027-01-05', slug: 'second' })
     const response = await server.inject({
@@ -438,10 +497,10 @@ describe('isAlreadyJoined', () => {
 describe('the dates a stay starts with', () => {
   it('is the whole burn, so nobody types what the event already knows', async () => {
     const server = await build()
-    await givenEvent()
+    const eventId = await givenEvent()
     const member = await givenAccount(['member'])
 
-    const response = await join(server, member.cookie)
+    const response = await join(server, member.cookie, eventId)
 
     expect(response.statusCode).toBe(201)
     expect(response.json().attendance).toMatchObject({
@@ -474,13 +533,13 @@ describe('the dates a stay starts with', () => {
     // A default, not a decision. Someone arriving a day late must be able to say
     // so, and the ordering rule still applies to what they say.
     const server = await build()
-    await givenEvent()
+    const eventId = await givenEvent()
     const member = await givenAccount(['member'])
-    await join(server, member.cookie)
+    await join(server, member.cookie, eventId)
 
     const response = await server.inject({
       method: 'PATCH',
-      url: '/api/events/active/attendance',
+      url: `/api/events/${eventId}/attendance/me`,
       headers: { cookie: member.cookie },
       payload: { arrival_date: '2026-08-02' },
     })
@@ -505,8 +564,8 @@ describe('who is coming, by name', () => {
     const bea = await givenAccount(['member'], 'Bea')
     const ada = await givenAccount(['member'], 'Ada')
     const elsewhere = await givenAccount(['member'], 'Elsewhere')
-    await join(server, bea.cookie)
-    await join(server, ada.cookie)
+    await join(server, bea.cookie, eventId)
+    await join(server, ada.cookie, eventId)
     await db().insert(attendance).values({
       id: randomUUID(),
       event_id: other,
@@ -525,12 +584,12 @@ describe('who is coming, by name', () => {
   })
 
   it('carries no contact details, allergies or payment state', async () => {
-    // The roster is what carries those, and it stays admin's. Opening a names list
-    // must not open the rest by returning whole rows.
+    // The member roster carries those; this list is two columns on purpose, so
+    // that widening one cannot widen the other.
     const server = await build()
     const eventId = await givenEvent()
     const member = await givenAccount(['member'], 'Ada')
-    await join(server, member.cookie)
+    await join(server, member.cookie, eventId)
     const stored = await db()
       .update(account)
       .set({ contact: 'ada#1234', allergies_notes: 'peanuts' })

@@ -109,11 +109,13 @@ const breakUpdates = () => {
 const givenAccount = async ({
   email,
   password,
+  name = null,
   roles = [],
   params = cheap,
 }: {
   email: string
   password?: string
+  name?: string | null
   roles?: ('admin' | 'member')[]
   params?: typeof cheap
 }) => {
@@ -124,6 +126,7 @@ const givenAccount = async ({
   await db.insert(account).values({
     id,
     email,
+    name,
     password_hash: password === undefined ? null : await hashPassword(password, params),
     created_at: new Date().toISOString(),
   })
@@ -407,6 +410,7 @@ describe('GET /api/auth/me', () => {
     const id = await givenAccount({
       email: 'ada@example.org',
       password: 'a good long passphrase',
+      name: 'Ada',
       roles: ['member'],
     })
     const cookie = cookieFrom(await login(server, 'ada@example.org', 'a good long passphrase'))
@@ -417,7 +421,42 @@ describe('GET /api/auth/me', () => {
       headers: { cookie: `${SESSION_COOKIE}=${readSessionCookie(cookie) ?? ''}` },
     })
 
-    expect(response.json()).toEqual({ viewer: { account_id: id, roles: ['member'] } })
+    // The whole body, not a subset: the point of this viewer is what it does *not*
+    // carry. `name` is here for the initials in the corner; the address is not.
+    expect(response.json()).toEqual({ viewer: { account_id: id, name: 'Ada', roles: ['member'] } })
+  })
+
+  it('carries the name from the login itself, not only from the next request', async () => {
+    // The login response populates the viewer directly — `Login.tsx` sets it from
+    // there rather than refetching — so a name resolved only by `me` would leave the
+    // corner showing the fallback glyph until a reload.
+    const server = await build()
+    await givenAccount({
+      email: 'ada@example.org',
+      password: 'a good long passphrase',
+      name: 'Ada Lovelace',
+      roles: ['member'],
+    })
+
+    const response = await login(server, 'ada@example.org', 'a good long passphrase')
+
+    expect(response.json().viewer.name).toBe('Ada Lovelace')
+  })
+
+  it('says the name is missing rather than omitting it, for an account never filled in', async () => {
+    // The bootstrap admin, which `admin:create` makes with an address and nothing
+    // else. A missing key would fail `viewerSchema`, which requires it as nullable.
+    const server = await build()
+    const id = await givenAccount({ email: 'boot@example.org', password: 'a good long passphrase' })
+    const cookie = cookieFrom(await login(server, 'boot@example.org', 'a good long passphrase'))
+
+    const response = await server.inject({
+      method: 'GET',
+      url: '/api/auth/me',
+      headers: { cookie: `${SESSION_COOKIE}=${readSessionCookie(cookie) ?? ''}` },
+    })
+
+    expect(response.json()).toEqual({ viewer: { account_id: id, name: null, roles: [] } })
   })
 
   it('ignores a tampered cookie rather than trusting it', async () => {

@@ -17,6 +17,7 @@ import { FormError, useFormError } from './FormError.tsx'
  */
 export const StayForm = ({
   api,
+  eventId,
   attendance,
   lodgingOptions = [],
   helpingOptions = [],
@@ -24,6 +25,8 @@ export const StayForm = ({
   onSaved,
 }: {
   api: Pick<ApiClient, 'updateMyStay'>
+  /** Which burn this stay is at. The page shows more than one. */
+  eventId: string
   attendance: Attendance
   /** This burn's lodging list, in the organiser's order. */
   lodgingOptions?: readonly EventOption[]
@@ -57,7 +60,7 @@ export const StayForm = ({
 
     setSaving(true)
     try {
-      const { attendance: updated } = await api.updateMyStay({
+      const { attendance: updated } = await api.updateMyStay(eventId, {
         arrival_date: blankToNull(arrival),
         departure_date: blankToNull(departure),
         lodging_option_id: lodging === '' ? null : lodging,

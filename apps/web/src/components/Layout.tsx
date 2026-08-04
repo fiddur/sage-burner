@@ -6,6 +6,33 @@ import { useInstallationTitle } from '../installation.tsx'
 import { isAdmin, isApproved, isMember, useSetViewer, useViewer } from '../viewer.tsx'
 
 /**
+ * The initials for the corner — "Fredrik Liljegren" is FL, "Ada" is A.
+ *
+ * First and last word rather than every word, so a middle name does not produce a
+ * circle of five letters. Falls back to a glyph rather than to an empty circle: an
+ * account whose name nobody has filled in is ordinary, and that is exactly the
+ * account whose owner most needs the link to the page that fixes it.
+ *
+ * `Intl.Segmenter` rather than `[0]`, because a string index takes half a surrogate
+ * pair — a name starting with an emoji or an astral-plane character would render a
+ * replacement glyph. Measured, not assumed.
+ */
+export const initials = (name: string | null | undefined): string => {
+  const words = (name ?? '').trim().split(/\s+/).filter(Boolean)
+  if (words.length === 0) return '👤'
+
+  const first = words[0] ?? ''
+  const last = words.length > 1 ? (words[words.length - 1] ?? '') : ''
+  const letters = new Intl.Segmenter()
+
+  return [first, last]
+    .filter((word) => word !== '')
+    .map((word) => [...letters.segment(word)][0]?.segment ?? '')
+    .join('')
+    .toLocaleUpperCase()
+}
+
+/**
  * The frame every page sits in.
  *
  * The nav reflects who is looking: signed-out visitors get the public entry points,
@@ -64,13 +91,6 @@ export const Layout = ({
             </>
           )}
 
-          {isMember(viewer) && (
-            <>
-              <a href="/my-burn">Your burn</a>
-              <a href="/profile">Your details</a>
-            </>
-          )}
-
           {/* Open to `approved`, so an organiser holding `admin` alone reaches them
               from the nav rather than by typing the URL — which is what the pages
               themselves allow. */}
@@ -85,6 +105,12 @@ export const Layout = ({
           {isAdmin(viewer) && (
             <a href="/admin" aria-label="Organise" title="Organise">
               ⚙️
+            </a>
+          )}
+
+          {isMember(viewer) && (
+            <a class="avatar" href="/profile" aria-label="Your details" title="Your details">
+              <span aria-hidden="true">{initials(viewer.account?.name)}</span>
             </a>
           )}
 

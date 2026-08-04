@@ -81,16 +81,16 @@ const givenMember = async (over: { name?: string; roles?: ('admin' | 'member')[]
   return { id, cookie: `${SESSION_COOKIE}=${sessions.issue(id)}` }
 }
 
-const givenEvent = async () => {
+const givenEvent = async (over: { start_date?: string; end_date?: string; slug?: string } = {}) => {
   const id = randomUUID()
   await db()
     .insert(event)
     .values({
       id,
       name: 'Summer burn',
-      slug: `burn-${id.slice(0, 8)}`,
-      start_date: '2026-08-01',
-      end_date: '2026-08-05',
+      slug: over.slug ?? `burn-${id.slice(0, 8)}`,
+      start_date: over.start_date ?? '2026-08-01',
+      end_date: over.end_date ?? '2026-08-05',
       member_cap: 42,
       created_at: NOW,
     })
@@ -118,11 +118,12 @@ const patchProfile = (
 const patchStay = (
   server: FastifyInstance,
   cookie: string,
+  eventId: string,
   payload: Record<string, unknown>,
 ): Promise<LightMyRequestResponse> =>
   server.inject({
     method: 'PATCH',
-    url: '/api/events/active/attendance',
+    url: `/api/events/${eventId}/attendance/me`,
     headers: { cookie },
     payload,
   })
@@ -219,7 +220,7 @@ describe('a member editing their stay', () => {
     const member = await givenMember()
     await givenComing(eventId, member.id)
 
-    const response = await patchStay(server, member.cookie, {
+    const response = await patchStay(server, member.cookie, eventId, {
       arrival_date: '2026-08-01',
       departure_date: '2026-08-05',
       lodging_option_id: null,
@@ -237,7 +238,7 @@ describe('a member editing their stay', () => {
     const member = await givenMember()
     await givenComing(eventId, member.id)
 
-    const response = await patchStay(server, member.cookie, {
+    const response = await patchStay(server, member.cookie, eventId, {
       arrival_date: '2026-08-05',
       departure_date: '2026-08-01',
     })
@@ -253,9 +254,12 @@ describe('a member editing their stay', () => {
     const eventId = await givenEvent()
     const member = await givenMember()
     await givenComing(eventId, member.id)
-    await patchStay(server, member.cookie, { arrival_date: '2026-08-01', departure_date: '2026-08-03' })
+    await patchStay(server, member.cookie, eventId, {
+      arrival_date: '2026-08-01',
+      departure_date: '2026-08-03',
+    })
 
-    const response = await patchStay(server, member.cookie, { departure_date: '2026-07-30' })
+    const response = await patchStay(server, member.cookie, eventId, { departure_date: '2026-07-30' })
 
     expect(response.statusCode).toBe(400)
     const [row] = await db().select().from(attendance)
@@ -268,9 +272,12 @@ describe('a member editing their stay', () => {
     const eventId = await givenEvent()
     const member = await givenMember()
     await givenComing(eventId, member.id)
-    await patchStay(server, member.cookie, { arrival_date: '2026-08-01', departure_date: '2026-08-03' })
+    await patchStay(server, member.cookie, eventId, {
+      arrival_date: '2026-08-01',
+      departure_date: '2026-08-03',
+    })
 
-    const response = await patchStay(server, member.cookie, { departure_date: '2026-08-04' })
+    const response = await patchStay(server, member.cookie, eventId, { departure_date: '2026-08-04' })
 
     expect(response.statusCode).toBe(200)
     expect(response.json().attendance.departure_date).toBe('2026-08-04')
@@ -281,9 +288,12 @@ describe('a member editing their stay', () => {
     const eventId = await givenEvent()
     const member = await givenMember()
     await givenComing(eventId, member.id)
-    await patchStay(server, member.cookie, { arrival_date: '2026-08-01', departure_date: '2026-08-03' })
+    await patchStay(server, member.cookie, eventId, {
+      arrival_date: '2026-08-01',
+      departure_date: '2026-08-03',
+    })
 
-    const response = await patchStay(server, member.cookie, { departure_date: null })
+    const response = await patchStay(server, member.cookie, eventId, { departure_date: null })
 
     expect(response.statusCode).toBe(200)
     expect(response.json().attendance.departure_date).toBeNull()
@@ -295,7 +305,7 @@ describe('a member editing their stay', () => {
     const member = await givenMember()
     await givenComing(eventId, member.id)
 
-    const response = await patchStay(server, member.cookie, { payment_status: 'paid' })
+    const response = await patchStay(server, member.cookie, eventId, { payment_status: 'paid' })
 
     expect(response.statusCode).toBe(400)
     const [row] = await db().select().from(attendance)
@@ -310,7 +320,7 @@ describe('a member editing their stay', () => {
     await givenComing(eventId, member.id)
     const otherRow = await givenComing(eventId, other.id)
 
-    await patchStay(server, member.cookie, { notes: 'Mine' })
+    await patchStay(server, member.cookie, eventId, { notes: 'Mine' })
 
     const [row] = await db().select().from(attendance).where(eq(attendance.id, otherRow))
     expect(row?.notes).toBeNull()
@@ -318,17 +328,24 @@ describe('a member editing their stay', () => {
 
   it('answers 404 when they are not coming to this burn', async () => {
     const server = await build()
-    await givenEvent()
+    const eventId = await givenEvent()
     const member = await givenMember()
 
-    expect((await patchStay(server, member.cookie, { notes: 'Tent' })).statusCode).toBe(404)
+    expect((await patchStay(server, member.cookie, eventId, { notes: 'Tent' })).statusCode).toBe(404)
   })
 
-  it('answers 404 when no burn is open', async () => {
+  it('answers 404 for a burn that has ended, and for one that never existed', async () => {
+    // A stay at a finished burn is the record of it, not a form. Both get the same
+    // answer, so that an id cannot be probed for existence.
     const server = await build()
+    const gone = await givenEvent({ start_date: '2025-08-01', end_date: '2025-08-05', slug: 'gone' })
     const member = await givenMember()
+    await givenComing(gone, member.id)
 
-    expect((await patchStay(server, member.cookie, { notes: 'Tent' })).statusCode).toBe(404)
+    expect((await patchStay(server, member.cookie, gone, { notes: 'Tent' })).statusCode).toBe(404)
+    expect((await patchStay(server, member.cookie, randomUUID(), { notes: 'x' })).statusCode).toBe(404)
+    const [row] = await db().select().from(attendance)
+    expect(row?.notes).toBeNull()
   })
 
   it('refuses an anonymous caller', async () => {
@@ -339,7 +356,7 @@ describe('a member editing their stay', () => {
 
     const response = await server.inject({
       method: 'PATCH',
-      url: '/api/events/active/attendance',
+      url: `/api/events/${eventId}/attendance/me`,
       payload: { notes: 'Tent' },
     })
 
@@ -358,10 +375,10 @@ describe('picking somewhere to sleep', () => {
     return id
   }
 
-  const pick = (server: FastifyInstance, cookie: string, optionId: string | null) =>
+  const pick = (server: FastifyInstance, cookie: string, eventId: string, optionId: string | null) =>
     server.inject({
       method: 'PATCH',
-      url: '/api/events/active/attendance',
+      url: `/api/events/${eventId}/attendance/me`,
       headers: { cookie },
       payload: { lodging_option_id: optionId },
     })
@@ -373,7 +390,7 @@ describe('picking somewhere to sleep', () => {
     await givenComing(eventId, member.id)
     const temple = await givenOption(eventId, 'Temple mattress', 9)
 
-    const response = await pick(server, member.cookie, temple)
+    const response = await pick(server, member.cookie, eventId, temple)
 
     expect(response.statusCode).toBe(200)
     expect(response.json().attendance.lodging_option_id).toBe(temple)
@@ -388,9 +405,9 @@ describe('picking somewhere to sleep', () => {
     await givenComing(eventId, first.id)
     await givenComing(eventId, second.id)
     const bed = await givenOption(eventId, 'The one bed', 1)
-    await pick(server, first.cookie, bed)
+    await pick(server, first.cookie, eventId, bed)
 
-    const response = await pick(server, second.cookie, bed)
+    const response = await pick(server, second.cookie, eventId, bed)
 
     expect(response.statusCode).toBe(409)
     // The code and the slug travel together; a 409 carrying `bad_request` would
@@ -408,9 +425,9 @@ describe('picking somewhere to sleep', () => {
     const member = await givenMember()
     await givenComing(eventId, member.id)
     const bed = await givenOption(eventId, 'The one bed', 1)
-    await pick(server, member.cookie, bed)
+    await pick(server, member.cookie, eventId, bed)
 
-    expect((await pick(server, member.cookie, bed)).statusCode).toBe(200)
+    expect((await pick(server, member.cookie, eventId, bed)).statusCode).toBe(200)
   })
 
   it('lets as many in as like when there is no limit', async () => {
@@ -422,9 +439,9 @@ describe('picking somewhere to sleep', () => {
     await givenComing(eventId, first.id)
     await givenComing(eventId, second.id)
     const tent = await givenOption(eventId, 'Own tent', null)
-    await pick(server, first.cookie, tent)
+    await pick(server, first.cookie, eventId, tent)
 
-    expect((await pick(server, second.cookie, tent)).statusCode).toBe(200)
+    expect((await pick(server, second.cookie, eventId, tent)).statusCode).toBe(200)
   })
 
   it('lets them take it back to not decided', async () => {
@@ -433,9 +450,9 @@ describe('picking somewhere to sleep', () => {
     const member = await givenMember()
     await givenComing(eventId, member.id)
     const bed = await givenOption(eventId, 'The one bed', 1)
-    await pick(server, member.cookie, bed)
+    await pick(server, member.cookie, eventId, bed)
 
-    const response = await pick(server, member.cookie, null)
+    const response = await pick(server, member.cookie, eventId, null)
 
     expect(response.statusCode).toBe(200)
     expect(response.json().attendance.lodging_option_id).toBeNull()
@@ -464,7 +481,7 @@ describe('picking somewhere to sleep', () => {
       })
     const theirs = await givenOption(elsewhere, 'Their temple', 9)
 
-    expect((await pick(server, member.cookie, theirs)).statusCode).toBe(400)
+    expect((await pick(server, member.cookie, eventId, theirs)).statusCode).toBe(400)
   })
 
   it('refuses a helping option, which has no capacity to be full of', async () => {
@@ -478,7 +495,7 @@ describe('picking somewhere to sleep', () => {
       .insert(eventOption)
       .values({ id, event_id: eventId, kind: 'helping', order: 0, label: 'Sauna', capacity: null })
 
-    expect((await pick(server, member.cookie, id)).statusCode).toBe(400)
+    expect((await pick(server, member.cookie, eventId, id)).statusCode).toBe(400)
   })
 
   it('refuses an option that is not a real one', async () => {
@@ -487,7 +504,7 @@ describe('picking somewhere to sleep', () => {
     const member = await givenMember()
     await givenComing(eventId, member.id)
 
-    const response = await pick(server, member.cookie, randomUUID())
+    const response = await pick(server, member.cookie, eventId, randomUUID())
 
     expect(response.statusCode).toBe(400)
     expect(response.json()).toEqual({ error: 'bad_request' })
@@ -503,10 +520,10 @@ describe('what someone will help with', () => {
     return id
   }
 
-  const tick = (server: FastifyInstance, cookie: string, ids: string[]) =>
+  const tick = (server: FastifyInstance, cookie: string, eventId: string, ids: string[]) =>
     server.inject({
       method: 'PATCH',
-      url: '/api/events/active/attendance',
+      url: `/api/events/${eventId}/attendance/me`,
       headers: { cookie },
       payload: { helping_option_ids: ids },
     })
@@ -519,7 +536,7 @@ describe('what someone will help with', () => {
     const sauna = await givenHelping(eventId, 'Sauna')
     const kitchen = await givenHelping(eventId, 'Kitchen')
 
-    const response = await tick(server, member.cookie, [sauna, kitchen])
+    const response = await tick(server, member.cookie, eventId, [sauna, kitchen])
 
     expect(response.statusCode).toBe(200)
     expect([...response.json().attendance.helping_option_ids].sort()).toEqual([sauna, kitchen].sort())
@@ -532,9 +549,9 @@ describe('what someone will help with', () => {
     await givenComing(eventId, member.id)
     const sauna = await givenHelping(eventId, 'Sauna')
     const kitchen = await givenHelping(eventId, 'Kitchen')
-    await tick(server, member.cookie, [sauna, kitchen])
+    await tick(server, member.cookie, eventId, [sauna, kitchen])
 
-    const response = await tick(server, member.cookie, [kitchen])
+    const response = await tick(server, member.cookie, eventId, [kitchen])
 
     expect(response.json().attendance.helping_option_ids).toEqual([kitchen])
   })
@@ -545,9 +562,9 @@ describe('what someone will help with', () => {
     const member = await givenMember()
     await givenComing(eventId, member.id)
     const sauna = await givenHelping(eventId, 'Sauna')
-    await tick(server, member.cookie, [sauna])
+    await tick(server, member.cookie, eventId, [sauna])
 
-    expect((await tick(server, member.cookie, [])).json().attendance.helping_option_ids).toEqual([])
+    expect((await tick(server, member.cookie, eventId, [])).json().attendance.helping_option_ids).toEqual([])
   })
 
   it('refuses a lodging option ticked as a thing to help with', async () => {
@@ -562,7 +579,7 @@ describe('what someone will help with', () => {
       .insert(eventOption)
       .values({ id: bed, event_id: eventId, kind: 'lodging', order: 0, label: 'Temple', capacity: 9 })
 
-    expect((await tick(server, member.cookie, [bed])).statusCode).toBe(400)
+    expect((await tick(server, member.cookie, eventId, [bed])).statusCode).toBe(400)
   })
 
   it('refuses another burn\u2019s helping option', async () => {
@@ -585,7 +602,7 @@ describe('what someone will help with', () => {
       })
     const theirs = await givenHelping(elsewhere, 'Their sauna')
 
-    expect((await tick(server, member.cookie, [theirs])).statusCode).toBe(400)
+    expect((await tick(server, member.cookie, eventId, [theirs])).statusCode).toBe(400)
   })
 
   it('writes nothing at all when a tick is refused', async () => {
@@ -598,7 +615,7 @@ describe('what someone will help with', () => {
 
     const response = await server.inject({
       method: 'PATCH',
-      url: '/api/events/active/attendance',
+      url: `/api/events/${eventId}/attendance/me`,
       headers: { cookie: member.cookie },
       payload: { notes: 'Should not be saved', helping_option_ids: [randomUUID()] },
     })
@@ -617,7 +634,7 @@ describe('what someone will help with', () => {
 
     const response = await server.inject({
       method: 'PATCH',
-      url: '/api/events/active/attendance',
+      url: `/api/events/${eventId}/attendance/me`,
       headers: { cookie: member.cookie },
       payload: { helping_option_ids: [sauna], helping_other: 'Chopping wood' },
     })
@@ -634,16 +651,16 @@ describe('what someone will help with', () => {
     const member = await givenMember()
     await givenComing(eventId, member.id)
     const sauna = await givenHelping(eventId, 'Sauna')
-    await tick(server, member.cookie, [sauna])
+    await tick(server, member.cookie, eventId, [sauna])
 
     client().prepare('delete from event_option where id = ?').run(sauna)
 
     const after = await server.inject({
       method: 'GET',
-      url: '/api/events/active/attendance',
+      url: '/api/events/mine',
       headers: { cookie: member.cookie },
     })
-    expect(after.json().attendance.helping_option_ids).toEqual([])
+    expect(after.json().coming[0].attendance.helping_option_ids).toEqual([])
   })
 })
 

@@ -12,7 +12,7 @@ import { Options } from './Options.tsx'
 
 afterEach(cleanup)
 
-const ADMIN: Viewer = { status: 'signed-in', account: { id: 'a-1', roles: ['admin'] } }
+const ADMIN: Viewer = { status: 'signed-in', account: { id: 'a-1', name: null, roles: ['admin'] } }
 
 const BURN: Event = {
   id: 'e-1',
@@ -259,7 +259,10 @@ describe('Options', () => {
     // Creating a burn is admin-only, so the link an admin gets here would answer
     // "This is an admin page." to a member — a dead end reachable only because
     // this page was opened to them.
-    renderPage(stub({}, [], null), { status: 'signed-in', account: { id: 'a-2', roles: ['member'] } })
+    renderPage(stub({}, [], null), {
+      status: 'signed-in',
+      account: { id: 'a-2', name: null, roles: ['member'] },
+    })
 
     expect(await screen.findByText(/Ask someone with admin/)).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'Events' })).toBeNull()
@@ -293,14 +296,17 @@ describe('Options', () => {
 
   it('offers the lists to a member who is not an admin', async () => {
     // The point of #155: a member curates the lodging and helping lists.
-    renderPage(stub(), { status: 'signed-in', account: { id: 'a-2', roles: ['member'] } })
+    renderPage(stub(), { status: 'signed-in', account: { id: 'a-2', name: null, roles: ['member'] } })
 
     expect(await screen.findByText('Temple mattress')).toBeTruthy()
   })
 
   it('offers nothing to a signed-in account with no roles', async () => {
     const getEventOptions = vi.fn<OptionsApi['getEventOptions']>(() => Promise.resolve({ options: [] }))
-    renderPage(stub({ getEventOptions }), { status: 'signed-in', account: { id: 'a-9', roles: [] } })
+    renderPage(stub({ getEventOptions }), {
+      status: 'signed-in',
+      account: { id: 'a-9', name: null, roles: [] },
+    })
 
     expect(screen.getByText(/for members/)).toBeTruthy()
     await waitFor(() => expect(getEventOptions).not.toHaveBeenCalled())

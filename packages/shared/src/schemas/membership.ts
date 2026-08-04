@@ -174,6 +174,38 @@ export const myAttendanceResponseSchema = z.object({
 /** Who an organiser is adding to a burn on someone else's behalf. */
 export const attendanceCreateSchema = z.object({ account_id: idSchema }).strict()
 
+/** One burn on someone's own page, with their stay at it or nothing yet. */
+export const myBurnSchema = z.object({
+  event: eventFields.pick({
+    id: true,
+    name: true,
+    slug: true,
+    start_date: true,
+    end_date: true,
+  }),
+  attendance: attendanceSchema.nullable(),
+})
+
+/**
+ * Every burn someone's details page shows them.
+ *
+ * Two arrays rather than one with a flag, because the split is the server's to
+ * make: "has this ended" is a comparison against *its* clock, and a browser
+ * deciding it from `end_date` would answer differently either side of midnight
+ * depending on the reader's timezone. `apps/web` pins `TZ` in its Vite config for
+ * exactly the class of bug this avoids having at all.
+ *
+ * `coming` is every burn that has not ended — joined or not, since joining is what
+ * the page is for. `past` is only the ones they actually came to; a burn somebody
+ * never joined is not their history.
+ */
+export const myBurnsResponseSchema = z.object({
+  /** Soonest first, so the one being planned is at the top. */
+  coming: z.array(myBurnSchema),
+  /** Most recent first. */
+  past: z.array(myBurnSchema),
+})
+
 /**
  * Who is coming to a burn, by name, for the lists members fill in together.
  *
@@ -188,6 +220,8 @@ export const eventAttendeesResponseSchema = z.object({
 
 export type MyAttendanceResponse = z.infer<typeof myAttendanceResponseSchema>
 export type AttendanceCreate = z.infer<typeof attendanceCreateSchema>
+export type MyBurn = z.infer<typeof myBurnSchema>
+export type MyBurnsResponse = z.infer<typeof myBurnsResponseSchema>
 export type EventAttendeesResponse = z.infer<typeof eventAttendeesResponseSchema>
 
 /**

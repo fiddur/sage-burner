@@ -7,7 +7,7 @@ import type { Viewer } from '../viewer.tsx'
 
 import { InstallationProvider } from '../installation.tsx'
 import { ViewerProvider } from '../viewer.tsx'
-import { Layout } from './Layout.tsx'
+import { Layout, initials } from './Layout.tsx'
 
 afterEach(cleanup)
 
@@ -26,7 +26,7 @@ const renderNav = (viewer: Viewer) =>
 
 const signedInAs = (...roles: AccountRole[]): Viewer => ({
   status: 'signed-in',
-  account: { id: 'a-1', roles },
+  account: { id: 'a-1', name: 'Ada Lovelace', roles },
 })
 
 // The gear is a glyph, so its name comes from `aria-label` rather than its text.
@@ -50,22 +50,22 @@ describe('the nav', () => {
   it('offers a signed-out visitor the way in, and none of the pages behind it', () => {
     renderNav({ status: 'signed-out' })
 
-    expectLinks(
-      ['Apply', 'Log in'],
-      ['Your burn', 'Members', 'Schedule', 'Roles', 'Your details', 'Organise'],
-    )
+    expectLinks(['Apply', 'Log in'], ['Members', 'Schedule', 'Roles', 'Your details', 'Organise'])
   })
 
   it('gives a member their own pages and the shared ones', () => {
     renderNav(signedInAs('member'))
 
-    expectLinks(['Your burn', 'Members', 'Schedule', 'Roles', 'Your details'], [])
+    // "Your burn" is not among them: the burns are sections of the details page
+    // now, since more than one is planned at a time and the singular was from when
+    // there was only ever the next one (#184).
+    expectLinks(['Members', 'Schedule', 'Roles', 'Your details'], ['Your burn'])
   })
 
   it('keeps Organise from a member who is not an organiser', () => {
     // The ⚙️ split: the page behind it is admin's alone now, so offering it to a
     // member sends them to a refusal. The burn's shared furniture, which a member
-    // does curate, is reached from Schedule and from Your burn instead.
+    // does curate, is reached from Schedule and from their own details instead.
     renderNav(signedInAs('member'))
 
     expectLinks([], ['Organise'])
@@ -89,11 +89,51 @@ describe('the nav', () => {
     expectLinks(['Schedule'], ['Dreams'])
   })
 
+  it('puts the details behind initials, and falls back to a glyph without a name', () => {
+    // The corner is an avatar image later; initials are the placeholder. A name
+    // nobody has filled in is ordinary — the bootstrap admin has none — and that is
+    // exactly the account whose owner most needs the link to the page that fixes it.
+    renderNav(signedInAs('member'))
+    expect(screen.getByRole('link', { name: 'Your details' }).textContent).toBe('AL')
+
+    cleanup()
+    renderNav({ status: 'signed-in', account: { id: 'a-2', name: null, roles: ['member'] } })
+    expect(screen.getByRole('link', { name: 'Your details' }).textContent).toBe('👤')
+  })
+
   it('offers an account with no roles none of them', () => {
     // An applicant with an account, waiting on a decision. Every link named, because
     // this is the case where a leak would matter.
     renderNav(signedInAs())
 
     expectLinks([], ['Your burn', 'Members', 'Dreams', 'Schedule', 'Roles', 'Your details', 'Organise'])
+  })
+})
+
+describe('initials', () => {
+  it('takes the first and last word, so a middle name does not make five letters', () => {
+    expect(initials('Ada Lovelace')).toBe('AL')
+    expect(initials('Fredrik Erik Anders Liljegren')).toBe('FL')
+  })
+
+  it('takes one letter from a single name', () => {
+    expect(initials('Ada')).toBe('A')
+  })
+
+  it('falls back to a glyph rather than an empty circle', () => {
+    expect(initials(null)).toBe('👤')
+    expect(initials(undefined)).toBe('👤')
+    expect(initials('   ')).toBe('👤')
+  })
+
+  it('takes a whole character, not half a surrogate pair', () => {
+    // `'🌟ada'[0]` is a lone high surrogate, which renders as �. Measured, not
+    // assumed: this is what a name starting outside the basic plane produces.
+    expect(initials('🌟ada')).toBe('🌟')
+    expect(initials('Ægir Ödegård')).toBe('ÆÖ')
+  })
+
+  it('uppercases what it finds, since a lowercased name is still a name', () => {
+    expect(initials('ada lovelace')).toBe('AL')
   })
 })

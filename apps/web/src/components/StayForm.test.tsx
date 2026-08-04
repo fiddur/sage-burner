@@ -54,6 +54,7 @@ describe('StayForm', () => {
     // this removes is the ordinary way to produce one.
     render(
       <StayForm
+        eventId="e-1"
         api={{ updateMyStay: vi.fn() }}
         attendance={anAttendance({ arrival_date: '2026-08-02', departure_date: '2026-08-04' })}
         onSaved={vi.fn()}
@@ -67,7 +68,14 @@ describe('StayForm', () => {
   it('leaves the other end unbounded while it is empty', () => {
     // `max=""` on a date input is not reliably "no maximum", so an unset partner
     // has to mean the attribute is absent.
-    render(<StayForm api={{ updateMyStay: vi.fn() }} attendance={anAttendance()} onSaved={vi.fn()} />)
+    render(
+      <StayForm
+        eventId="e-1"
+        api={{ updateMyStay: vi.fn() }}
+        attendance={anAttendance()}
+        onSaved={vi.fn()}
+      />,
+    )
 
     expect(screen.getByLabelText('Arriving').hasAttribute('max')).toBe(false)
     expect(screen.getByLabelText('Leaving').hasAttribute('min')).toBe(false)
@@ -76,6 +84,7 @@ describe('StayForm', () => {
   it('offers the burn\u2019s lodging list, with how many are left', () => {
     render(
       <StayForm
+        eventId="e-1"
         api={{ updateMyStay: vi.fn() }}
         attendance={anAttendance()}
         lodgingOptions={LODGING}
@@ -92,6 +101,7 @@ describe('StayForm', () => {
   it('disables an option that is full, and says so', async () => {
     render(
       <StayForm
+        eventId="e-1"
         api={{ updateMyStay: vi.fn() }}
         attendance={anAttendance()}
         lodgingOptions={LODGING}
@@ -112,6 +122,7 @@ describe('StayForm', () => {
     // quietly give up their bed on the next save.
     render(
       <StayForm
+        eventId="e-1"
         api={{ updateMyStay: vi.fn() }}
         attendance={anAttendance({ lodging_option_id: 'o-1' })}
         lodgingOptions={LODGING}
@@ -130,6 +141,7 @@ describe('StayForm', () => {
     // option — so they could not go back without reloading.
     render(
       <StayForm
+        eventId="e-1"
         api={{ updateMyStay: vi.fn() }}
         attendance={anAttendance({ lodging_option_id: 'o-1' })}
         lodgingOptions={LODGING}
@@ -147,6 +159,7 @@ describe('StayForm', () => {
     const updateMyStay = vi.fn(() => Promise.resolve({ attendance: anAttendance() }))
     render(
       <StayForm
+        eventId="e-1"
         api={{ updateMyStay }}
         attendance={anAttendance()}
         lodgingOptions={LODGING}
@@ -158,7 +171,7 @@ describe('StayForm', () => {
     saveIt()
 
     await waitFor(() =>
-      expect(updateMyStay).toHaveBeenCalledWith(expect.objectContaining({ lodging_option_id: 'o-2' })),
+      expect(updateMyStay).toHaveBeenCalledWith('e-1', expect.objectContaining({ lodging_option_id: 'o-2' })),
     )
   })
 
@@ -166,6 +179,7 @@ describe('StayForm', () => {
     const updateMyStay = vi.fn(() => Promise.resolve({ attendance: anAttendance() }))
     render(
       <StayForm
+        eventId="e-1"
         api={{ updateMyStay }}
         attendance={anAttendance()}
         helpingOptions={HELPING}
@@ -180,6 +194,7 @@ describe('StayForm', () => {
 
     await waitFor(() =>
       expect(updateMyStay).toHaveBeenCalledWith(
+        'e-1',
         expect.objectContaining({
           helping_option_ids: ['h-1', 'h-2'],
           helping_other: 'Chopping wood',
@@ -192,6 +207,7 @@ describe('StayForm', () => {
     const updateMyStay = vi.fn(() => Promise.resolve({ attendance: anAttendance() }))
     render(
       <StayForm
+        eventId="e-1"
         api={{ updateMyStay }}
         attendance={anAttendance({ helping_option_ids: ['h-1', 'h-2'] })}
         helpingOptions={HELPING}
@@ -203,13 +219,17 @@ describe('StayForm', () => {
     saveIt()
 
     await waitFor(() =>
-      expect(updateMyStay).toHaveBeenCalledWith(expect.objectContaining({ helping_option_ids: ['h-2'] })),
+      expect(updateMyStay).toHaveBeenCalledWith(
+        'e-1',
+        expect.objectContaining({ helping_option_ids: ['h-2'] }),
+      ),
     )
   })
 
   it('shows which are already ticked', () => {
     render(
       <StayForm
+        eventId="e-1"
         api={{ updateMyStay: vi.fn() }}
         attendance={anAttendance({ helping_option_ids: ['h-2'] })}
         helpingOptions={HELPING}
@@ -224,7 +244,14 @@ describe('StayForm', () => {
   it('still offers the write-in when the list is empty', () => {
     // A burn whose organiser has not set the list up yet still lets someone say
     // what they are up for.
-    render(<StayForm api={{ updateMyStay: vi.fn() }} attendance={anAttendance()} onSaved={vi.fn()} />)
+    render(
+      <StayForm
+        eventId="e-1"
+        api={{ updateMyStay: vi.fn() }}
+        attendance={anAttendance()}
+        onSaved={vi.fn()}
+      />,
+    )
 
     expect(screen.getByLabelText('Something else')).toBeTruthy()
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
@@ -233,6 +260,7 @@ describe('StayForm', () => {
   it('shows what is already recorded', () => {
     render(
       <StayForm
+        eventId="e-1"
         api={{ updateMyStay: vi.fn() }}
         attendance={anAttendance({ lodging_option_id: 'o-1', arrival_date: '2026-08-01' })}
         lodgingOptions={LODGING}
@@ -247,12 +275,12 @@ describe('StayForm', () => {
   it('sends nulls for the fields left blank', async () => {
     // "Not said" has one representation; an empty string would read as an answer.
     const updateMyStay = vi.fn(() => Promise.resolve({ attendance: anAttendance() }))
-    render(<StayForm api={{ updateMyStay }} attendance={anAttendance()} onSaved={vi.fn()} />)
+    render(<StayForm eventId="e-1" api={{ updateMyStay }} attendance={anAttendance()} onSaved={vi.fn()} />)
 
     saveIt()
 
     await waitFor(() =>
-      expect(updateMyStay).toHaveBeenCalledWith({
+      expect(updateMyStay).toHaveBeenCalledWith('e-1', {
         arrival_date: null,
         departure_date: null,
         lodging_option_id: null,
@@ -267,7 +295,7 @@ describe('StayForm', () => {
     // The API refuses it too; catching it here means the message says what is
     // wrong rather than arriving as a bare 400.
     const updateMyStay = vi.fn(() => Promise.resolve({ attendance: anAttendance() }))
-    render(<StayForm api={{ updateMyStay }} attendance={anAttendance()} onSaved={vi.fn()} />)
+    render(<StayForm eventId="e-1" api={{ updateMyStay }} attendance={anAttendance()} onSaved={vi.fn()} />)
 
     fill('Arriving', '2026-08-05')
     fill('Leaving', '2026-08-01')
@@ -282,6 +310,7 @@ describe('StayForm', () => {
     const onSaved = vi.fn()
     render(
       <StayForm
+        eventId="e-1"
         api={{ updateMyStay: () => Promise.resolve({ attendance: saved }) }}
         attendance={anAttendance()}
         onSaved={onSaved}
@@ -297,6 +326,7 @@ describe('StayForm', () => {
   it('explains a rejected date pair from the server rather than saying try again', async () => {
     render(
       <StayForm
+        eventId="e-1"
         api={{ updateMyStay: () => Promise.reject(apiError(400, 'bad_request', 'nope')) }}
         attendance={anAttendance()}
         onSaved={vi.fn()}
@@ -312,6 +342,7 @@ describe('StayForm', () => {
     // It is the organiser's to set; a control here would always fail.
     render(
       <StayForm
+        eventId="e-1"
         api={{ updateMyStay: vi.fn() }}
         attendance={anAttendance({ payment_status: 'unpaid' })}
         onSaved={vi.fn()}

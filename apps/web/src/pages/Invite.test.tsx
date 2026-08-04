@@ -105,7 +105,8 @@ describe('Invite', () => {
     // start page and is still offered "Log in".
     renderPage(
       stub({
-        redeemInvite: () => Promise.resolve({ viewer: { account_id: 'a-1', roles: ['member' as const] } }),
+        redeemInvite: () =>
+          Promise.resolve({ viewer: { account_id: 'a-1', name: null, roles: ['member' as const] } }),
       }),
     )
 
@@ -326,7 +327,7 @@ describe('Invite', () => {
     const getInviteState = vi.fn(() => Promise.resolve({ status: 'outstanding' as const }))
     renderPage(stub({ getInviteState }), {
       status: 'signed-in',
-      account: { id: 'a-1', roles: ['member'] },
+      account: { id: 'a-1', name: null, roles: ['member'] },
     })
 
     expect(screen.getByText(/already signed in/)).toBeTruthy()

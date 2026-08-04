@@ -4,13 +4,15 @@ import { MAX_CONTACT, MAX_NOTES, MAX_PERSON_NAME } from '@sage-burner/shared'
 import { useEffect, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
+import type { YourBurnsApi } from '../components/YourBurns.tsx'
 
 import { isApiError } from '../api/client.ts'
 import { FormError, useFormError } from '../components/FormError.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
+import { YourBurns } from '../components/YourBurns.tsx'
 import { isMember, useViewer } from '../viewer.tsx'
 
-export type ProfileApi = Pick<ApiClient, 'getMyProfile' | 'updateMyProfile'>
+export type ProfileApi = Pick<ApiClient, 'getMyProfile' | 'updateMyProfile'> & YourBurnsApi
 
 type Loaded = { status: 'loading' } | { status: 'ready'; profile: Profile } | { status: 'failed' }
 
@@ -75,8 +77,8 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
       <h1>Your details</h1>
 
       <p class="form-note">
-        These follow you from burn to burn. What you fill in for one particular burn — when you arrive, where
-        you sleep — lives on <a href="/my-burn">your burn</a>.
+        These follow you from burn to burn. Below them is each burn on its own, for what does not: when you
+        arrive, where you sleep, what you will help with.
       </p>
 
       {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
@@ -152,6 +154,8 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
         Signed in as {loaded.status === 'ready' ? loaded.profile.email : 'you'}. Changing that address is not
         possible yet — ask someone with admin.
       </p>
+
+      <YourBurns api={api} />
     </GuardedPage>
   )
 }

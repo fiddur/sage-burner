@@ -39,7 +39,7 @@ const aRoster = (over: Partial<MemberRosterResponse> = {}): MemberRosterResponse
 
 const stub = (roster = aRoster()): MembersApi => ({ getActiveMembers: () => Promise.resolve(roster) })
 
-const MEMBER: Viewer = { status: 'signed-in', account: { id: 'a-1', roles: ['member'] } }
+const MEMBER: Viewer = { status: 'signed-in', account: { id: 'a-1', name: null, roles: ['member'] } }
 
 const renderPage = (api: MembersApi, viewer: Viewer = MEMBER) =>
   render(
@@ -96,7 +96,7 @@ describe('Members', () => {
     // An applicant with an account and no roles. Asking anyway renders a failure
     // where the explanation belongs, and spends a round trip on a certain 403.
     const getActiveMembers = vi.fn(() => Promise.reject(new Error('should not be called')))
-    renderPage({ getActiveMembers }, { status: 'signed-in', account: { id: 'a-9', roles: [] } })
+    renderPage({ getActiveMembers }, { status: 'signed-in', account: { id: 'a-9', name: null, roles: [] } })
 
     expect(await screen.findByText(/for members/)).toBeTruthy()
     expect(getActiveMembers).not.toHaveBeenCalled()
@@ -105,7 +105,7 @@ describe('Members', () => {
   it('opens to an organiser holding admin without member', async () => {
     renderPage(stub(aRoster({ entries: [anEntry({ name: 'Ana' })] })), {
       status: 'signed-in',
-      account: { id: 'a-2', roles: ['admin'] },
+      account: { id: 'a-2', name: null, roles: ['admin'] },
     })
 
     expect(await screen.findByText('Ana')).toBeTruthy()

@@ -554,9 +554,10 @@ ADMIN_EMAIL=you@example.org ADMIN_PASSWORD="$ADMIN_PASSWORD" \
   pnpm --filter sage-burner-backend admin:create
 ```
 
-Then log in at `/login`; the nav gains the **⚙️** link, plus **Your burn**
-and **Your details** — it grants `member` alongside `admin`, because an
-organiser is almost always also coming.
+Then log in at `/login`; the nav gains the **⚙️** link and the initials circle in
+the corner — `admin:create` grants `member` alongside `admin`, because an organiser
+is almost always also coming. The circle shows a 👤 until a name is filled in, which
+is the state that account starts in.
 
 Both values come from the environment, never from arguments. `read -rs` keeps
 the password out of the shell history, and `-e ADMIN_PASSWORD` with no `=`
@@ -684,7 +685,7 @@ or allergies.
 **A member reads the roster, minus payment and email** (#159). Whoever cooks needs
 the allergies, and that is why allergies live on the account rather than per burn.
 The write does not open with it: somebody else's stay stays theirs, through the
-`PATCH /api/events/active/attendance` they already have, and adding or removing
+`PATCH /api/events/:eventId/attendance/me` they already have, and adding or removing
 someone else is still admin's.
 
 `GET /api/events/:eventId/members` and `GET /api/events/active/members` serve it,
@@ -806,20 +807,24 @@ they want it.
 | ------------------------ | ------------------------------------------------- |
 | Signed out               | Apply, Log in                                     |
 | An account, neither role | nothing — an applicant waiting on a decision      |
-| `member`                 | Your burn, Members, Schedule, Roles, Your details |
+| `member`                 | Members, Schedule, Roles, and the initials circle |
 | `admin` without `member` | Members, Schedule, Roles, ⚙️                      |
 
 - **Members** is the roster a member may now read — see "What a member may change".
 - **Dreams** is reached from Schedule. Offering a dream and placing one are the
   same activity, and two entries for it is what the restructure undid.
 - **Places** is reached from Schedule too: the lanes are what the grid draws.
-- **The lodging and helping lists** are reached from Your burn, from
+- **The initials circle** is the details page: who you are, then a section per burn
+  still to come — join it, or fill in your stay at it — then past burns behind
+  _…show past burns_. It absorbed the page called "Your burn", singular, which was
+  from when there was one burn worth showing and it was whichever came next.
+- **The lodging and helping lists** are reached from that page, from
   _(edit lodging alternatives)_ beside the question they answer.
 - **⚙️** is admin's alone. It used to be `Organise` and open to any approved member,
   because it was the only way to reach the two lists above; now those have their own
   way in, and what is left behind ⚙️ — the burn's shape, who gets in, payment, the
   installation — is admin's. It still links to both lists, since an organiser
-  holding `admin` without `member` has no Your burn to reach the lodging list from.
+  holding `admin` without `member` has no details page to reach the lodging list from.
 
 Hiding a link is presentation. Every page behind these is guarded again server-side,
 and `Layout.test.tsx` asserts each absence by name — a negated `arrayContaining`
@@ -1322,9 +1327,9 @@ doing depends on the year.
 
 `/options` — **Lodging and helping**, which follows the burn that is open. Setting
 them up before it starts works, since "active" is the soonest-ending burn that has
-not finished. Reached from **(edit lodging alternatives)** on Your burn, beside the
-question the list answers, and from ⚙️ as well — an organiser holding `admin`
-without `member` has no Your burn to reach it from.
+not finished. Reached from **(edit lodging alternatives)** on the details page,
+beside the question the list answers, and from ⚙️ as well — an organiser holding
+`admin` without `member` has no details page to reach it from.
 
 A lodging entry can carry a number of spaces — "Temple mattress: 9" — or leave it
 blank for the ones that do not run out, like a tent of one's own. Helping entries
@@ -1339,7 +1344,7 @@ there is nothing to map it onto, but an organiser still reads notes. Truncated t
 
 A member picks one lodging option on **your burn**, and the select disables the
 ones that are full, reading "— full". That is presentation: the API takes what it
-is sent, so `PATCH /api/events/active/attendance` counts the takers and answers
+is sent, so `PATCH /api/events/:eventId/attendance/me` counts the takers and answers
 **409** for a full option.
 
 The count is a plain read-and-compare, not race protection. Two people taking the
@@ -1775,16 +1780,29 @@ Approval admits you once; then you decide, burn by burn. `attendance` is that
 second decision, keyed `(event, account)`, and it is what arrival dates, dreams
 and shifts hang off later.
 
-A member says it for themselves at `/my-burn`:
+A member says it for themselves on their own details page, one section per burn:
 
-- `GET /api/events/active/attendance` — the open burn and their row, either of
-  which may be null. "No burn open" and "open, not coming" are different states
-  and the page says so rather than showing a dead button.
-- `POST` — **idempotent**. Saying it twice is the same statement, not an error: a
-  double click, a retried request and a second tab all land there.
-- `DELETE` — withdrawing, but **only while nothing has been paid**. What a refund
-  means is a real decision and #31 owns it; deleting the row here would quietly
-  discard the record that money changed hands.
+- `GET /api/events/mine` — `{ coming, past }`. `coming` is every burn that has not
+  ended, joined or not, since joining is what the page is for; `past` is only the
+  ones they actually came to, because a burn somebody never joined is not their
+  history. The **server** splits them: that is a comparison against a clock, and a
+  browser deciding it from `end_date` would answer differently either side of
+  midnight depending on the reader's timezone.
+- `POST /api/events/:eventId/attendance/me` — **idempotent**. Saying it twice is the
+  same statement, not an error: a double click, a retried request and a second tab
+  all land there.
+- `DELETE /api/events/:eventId/attendance/me` — withdrawing, but **only while nothing
+  has been paid**. What a refund means is a real decision and #31 owns it; deleting
+  the row here would quietly discard the record that money changed hands.
+- `PATCH /api/events/:eventId/attendance/me` — the stay itself.
+
+**Named by event id, not by "active"** (#184). These were `…/events/active/attendance`
+while there was one place to see a burn and it was whichever came next. The details
+page lists every burn still to come and offers to join any of them, and the second
+one on that list is by definition not the soonest-ending — so an active-scoped join
+could not say yes to it. All three refuse a burn that has **ended**, and answer 404
+for that and for an id that never existed alike, so an id cannot be probed for
+existence.
 
 An organiser can do it for someone, because people ask over Discord and an
 organiser should not have to talk them through a UI:
@@ -1837,8 +1855,8 @@ Two pages, because the record has two lifetimes.
 burn to burn, so correcting an allergy corrects it everywhere — which is the
 whole reason they live on `account` rather than per stay.
 
-`/my-burn` edits the **stay**: arrival, departure, lodging, shift preference,
-notes, for the burn you have said you are coming to.
+The same page edits the **stay**, in a section per burn: arrival, departure,
+lodging, shift preference, notes, for each burn you have said you are coming to.
 
 **Whose row is written comes from the session, never from the body.** There is no
 id in either request to guess at or tamper with, and `account_id` in a profile

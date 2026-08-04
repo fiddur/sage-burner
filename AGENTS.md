@@ -184,6 +184,11 @@ These are member records, so treat them as such:
   prefix**, never exempting it there — the hook's whole value is having no
   exception to forget.
 - Invite tokens are CSPRNG-random and unguessable, single-use, and expiring.
+- **The viewer carries `name`, and nothing else personal.** `/api/auth/me` returns
+  `{ account_id, name, roles }` — the name for the initials in the corner, which
+  every page renders, and which every other member already sees on the Members
+  page. The email stays out: it is the login identity, and a member's own record is
+  a separate authorised read.
 - **A member may read who else is coming, by name.**
   `GET /api/events/:eventId/attendees` returns account ids and display names and
   nothing else — the register has to offer somebody to hand a role to. It is a

@@ -43,7 +43,7 @@ import type {
   LoginRequest,
   MeResponse,
   MemberRosterResponse,
-  MyAttendanceResponse,
+  MyBurnsResponse,
   PaymentUpdate,
   Place,
   PlaceCreate,
@@ -483,19 +483,26 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
     redeemInvite: (token: string, body: RedeemRequestInput) =>
       request<MeResponse>(`/invites/${encodeURIComponent(token)}/redeem`, { method: 'POST', body }),
 
-    /** Signed-in members only. `event` is null when no burn is open. */
-    getMyAttendance: (signal?: AbortSignal) =>
-      request<MyAttendanceResponse>('/events/active/attendance', { signal }),
+    /**
+     * Members only. Every burn their own page shows them, and their stay at each.
+     *
+     * Split into `coming` and `past` by the server, because that is a comparison
+     * against a clock and a browser would answer it differently across midnight.
+     */
+    getMyBurns: (signal?: AbortSignal) => request<MyBurnsResponse>('/events/mine', { signal }),
 
     /** Members only. Idempotent — saying it twice is the same statement. */
-    joinActiveEvent: () =>
-      request<{ attendance: Attendance }>('/events/active/attendance', { method: 'POST' }),
+    joinEvent: (eventId: string) =>
+      request<{ attendance: Attendance }>(`/events/${encodeURIComponent(eventId)}/attendance/me`, {
+        method: 'POST',
+      }),
 
     /**
      * Members only. Answers 204. Throws ApiError(409, 'conflict') once anything
      * has been paid — what a refund means is #31's decision.
      */
-    leaveActiveEvent: () => request<undefined>('/events/active/attendance', { method: 'DELETE' }),
+    leaveEvent: (eventId: string) =>
+      request<undefined>(`/events/${encodeURIComponent(eventId)}/attendance/me`, { method: 'DELETE' }),
 
     /** Members only. `name` and `contact` may be null on an account never filled in. */
     getMyProfile: (signal?: AbortSignal) => request<ProfileResponse>('/me/profile', { signal }),
@@ -509,8 +516,11 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
      * Throws ApiError(404) when they are not, ApiError(400) when the dates would
      * put the departure before the arrival.
      */
-    updateMyStay: (body: AttendanceUpdate) =>
-      request<{ attendance: Attendance }>('/events/active/attendance', { method: 'PATCH', body }),
+    updateMyStay: (eventId: string, body: AttendanceUpdate) =>
+      request<{ attendance: Attendance }>(`/events/${encodeURIComponent(eventId)}/attendance/me`, {
+        method: 'PATCH',
+        body,
+      }),
 
     /** Admin only. The open burn's roster; `event` is null when none is open. */
     getActiveRoster: (signal?: AbortSignal) =>

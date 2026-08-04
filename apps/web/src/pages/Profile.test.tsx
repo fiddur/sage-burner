@@ -21,15 +21,22 @@ const aProfile = (over: Partial<Profile> = {}): Profile => ({
   ...over,
 })
 
+// The burns half of the page has its own file; here it resolves to nothing so the
+// details form is what these tests are looking at.
 const stub = (over: Partial<ProfileApi> = {}, profile = aProfile()): ProfileApi => ({
   getMyProfile: () => Promise.resolve({ profile }),
   updateMyProfile: () => Promise.reject(new Error('updateMyProfile is not stubbed here')),
+  getMyBurns: () => Promise.resolve({ coming: [], past: [] }),
+  getEventOptions: () => Promise.reject(new Error('getEventOptions is not stubbed here')),
+  joinEvent: () => Promise.reject(new Error('joinEvent is not stubbed here')),
+  leaveEvent: () => Promise.reject(new Error('leaveEvent is not stubbed here')),
+  updateMyStay: () => Promise.reject(new Error('updateMyStay is not stubbed here')),
   ...over,
 })
 
 const renderPage = (
   api: ProfileApi,
-  viewer: Viewer = { status: 'signed-in', account: { id: 'a-1', roles: ['member'] } },
+  viewer: Viewer = { status: 'signed-in', account: { id: 'a-1', name: null, roles: ['member'] } },
 ) =>
   render(
     <ViewerProvider viewer={viewer}>

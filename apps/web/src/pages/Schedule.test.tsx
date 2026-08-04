@@ -12,7 +12,7 @@ import { Schedule } from './Schedule.tsx'
 
 afterEach(cleanup)
 
-const MEMBER: Viewer = { status: 'signed-in', account: { id: 'a-1', roles: ['member'] } }
+const MEMBER: Viewer = { status: 'signed-in', account: { id: 'a-1', name: null, roles: ['member'] } }
 
 const BURN: Event = {
   id: 'e-1',

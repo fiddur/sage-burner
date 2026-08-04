@@ -13,7 +13,7 @@ import { isForeignKeyViolation } from '../db/errors.ts'
 import { account, attendance, eventOption } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 import { viewerFor } from './auth.ts'
-import { activeEvent, todayIso } from './events.ts'
+import { openEvent, todayIso } from './events.ts'
 import { areHelpingOptions, helpingIdsFor, writeHelping } from './helping.ts'
 
 export interface ProfileDeps extends GuardDeps {
@@ -220,50 +220,57 @@ export const registerProfileRoutes = (
     return { profile } satisfies ProfileResponse
   })
 
-  app.patch('/api/events/active/attendance', { preHandler: requireMember }, async (request, reply) => {
-    void noStore(reply)
+  app.patch<{ Params: { eventId: string } }>(
+    '/api/events/:eventId/attendance/me',
+    { preHandler: requireMember },
+    async (request, reply) => {
+      void noStore(reply)
 
-    const parsed = attendanceUpdateSchema.safeParse(request.body)
-    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+      const parsed = attendanceUpdateSchema.safeParse(request.body)
+      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
 
-    const viewer = await viewerFor(request, { db, sessions })
-    if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
+      const viewer = await viewerFor(request, { db, sessions })
+      if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
 
-    const found = await activeEvent(db, todayIso(now))
-    if (found === undefined) return reply.code(404).send(errorResponse('not_found'))
+      // Named by id rather than scoped to the active burn, so a stay at the second
+      // burn on the details page can be filled in — and still refused once that
+      // burn has ended, which is what `openEvent` decides.
+      const found = await openEvent(db, todayIso(now), request.params.eventId)
+      if (found === undefined) return reply.code(404).send(errorResponse('not_found'))
 
-    const mine = and(eq(attendance.event_id, found.id), eq(attendance.account_id, viewer.account_id))
+      const mine = and(eq(attendance.event_id, found.id), eq(attendance.account_id, viewer.account_id))
 
-    // `helping_option_ids` lives in its own table, so it never reaches `set()`.
-    const { helping_option_ids: helping, ...columns } = parsed.data
+      // `helping_option_ids` lives in its own table, so it never reaches `set()`.
+      const { helping_option_ids: helping, ...columns } = parsed.data
 
-    const problem = await stayProblem(db, found.id, viewer.account_id, parsed.data)
-    if (problem !== undefined) return reply.code(problem).send(errorResponse(problemBody(problem)))
+      const problem = await stayProblem(db, found.id, viewer.account_id, parsed.data)
+      if (problem !== undefined) return reply.code(problem).send(errorResponse(problemBody(problem)))
 
-    let updated: (typeof attendance.$inferSelect)[]
-    try {
-      updated = writeStay(db, mine, columns, helping)
-    } catch (failure) {
-      // A `lodging_option_id` naming no option, or a tick naming an option that
-      // has just been deleted. The foreign key is the authority rather than a
-      // pre-read, which would be a second query saying the same — and because
-      // both writes are one transaction, neither half survives being told no.
-      if (isForeignKeyViolation(failure)) return reply.code(400).send(errorResponse('bad_request'))
-      throw failure
-    }
+      let updated: (typeof attendance.$inferSelect)[]
+      try {
+        updated = writeStay(db, mine, columns, helping)
+      } catch (failure) {
+        // A `lodging_option_id` naming no option, or a tick naming an option that
+        // has just been deleted. The foreign key is the authority rather than a
+        // pre-read, which would be a second query saying the same — and because
+        // both writes are one transaction, neither half survives being told no.
+        if (isForeignKeyViolation(failure)) return reply.code(400).send(errorResponse('bad_request'))
+        throw failure
+      }
 
-    const [first] = updated
+      const [first] = updated
 
-    if (first !== undefined) {
-      return { attendance: { ...first, helping_option_ids: await helpingIdsFor(db, first.id) } }
-    }
+      if (first !== undefined) {
+        return { attendance: { ...first, helping_option_ids: await helpingIdsFor(db, first.id) } }
+      }
 
-    // Nothing was written, which is either "not coming to this burn" or "that
-    // would put the departure before the arrival". Asked rather than inferred.
-    const [existing] = await db.select().from(attendance).where(mine).limit(1)
+      // Nothing was written, which is either "not coming to this burn" or "that
+      // would put the departure before the arrival". Asked rather than inferred.
+      const [existing] = await db.select().from(attendance).where(mine).limit(1)
 
-    return existing === undefined
-      ? reply.code(404).send(errorResponse('not_found'))
-      : reply.code(400).send(errorResponse('bad_request'))
-  })
+      return existing === undefined
+        ? reply.code(404).send(errorResponse('not_found'))
+        : reply.code(400).send(errorResponse('bad_request'))
+    },
+  )
 }

@@ -14,14 +14,19 @@ import type { ApiClient } from './api/client.ts'
  * the same file once the schedule pages exist. Same reasoning as
  * `nonEmptyText`: avoid the collision rather than alias around it later.
  *
- * `account` carries no email, because `/api/auth/me` deliberately does not
- * return one: the nav renders from `roles` and nothing else, and every extra
- * field here is one more thing already fetched for an XSS to find. A member's
- * own record is a separate authorised read.
+ * `account` carries no email, because `/api/auth/me` deliberately does not return
+ * one: it is the login identity, and every extra field here is one more thing
+ * already fetched for an XSS to find. A member's own record is a separate
+ * authorised read.
+ *
+ * `name` is the exception, and only since the corner started showing initials
+ * (#184). It is the mildest of the personal fields — what every other member
+ * already sees on the Members page — and it is needed on every page, which is
+ * what separates it from the rest of the profile.
  */
 export interface Viewer {
   status: 'loading' | 'signed-out' | 'signed-in'
-  account?: { id: string; roles: readonly AccountRole[] }
+  account?: { id: string; name: string | null; roles: readonly AccountRole[] }
 }
 
 export type ViewerAccount = NonNullable<Viewer['account']>
@@ -100,7 +105,11 @@ export const FetchedViewerProvider = ({
             ? SIGNED_OUT
             : {
                 status: 'signed-in',
-                account: { id: response.viewer.account_id, roles: response.viewer.roles },
+                account: {
+                  id: response.viewer.account_id,
+                  name: response.viewer.name,
+                  roles: response.viewer.roles,
+                },
               },
         )
       })
