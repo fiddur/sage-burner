@@ -10,10 +10,10 @@ import { FormError, useFormError } from './FormError.tsx'
 export type PushApi = Pick<ApiClient, 'getPushKey' | 'subscribeToPush' | 'unsubscribeFromPush'>
 
 /**
- * Being told when someone applies, per browser rather than per person.
+ * Being told when something happens to you, per browser rather than per person.
  *
  * A subscription belongs to the browser it was made in, so this reads as "notify me
- * on this device" and an admin with a laptop and a phone turns it on twice. Saying
+ * on this device" and somebody with a laptop and a phone turns it on twice. Saying
  * "notify me" would be a promise the browser cannot keep.
  *
  * `browser` is injected so the suite can supply a fake: every API here is absent or
@@ -146,8 +146,8 @@ export const PushToggle = ({
         // Both halves, and the browser's goes first — deliberately. Leaving the
         // browser subscribed shows "on" with nothing behind it and no way back,
         // since the 'on' branch only offers to turn it off. Leaving the *row*
-        // heals itself: the next application sends to an endpoint the browser has
-        // released, the push service answers 410, and `notifyAdmins` deletes it.
+        // heals itself: the next notification goes to an endpoint the browser has
+        // released, the push service answers 410, and the delivery loop deletes it.
         //
         // So if only one of these can happen, it should be this one.
         await existing.unsubscribe()
@@ -186,8 +186,8 @@ export const PushToggle = ({
       {(state === 'off' || state === 'on' || state === 'working') && (
         <>
           <p class="form-note">
-            Tells you when someone applies to join. Per browser, so turn it on anywhere you want to hear about
-            it.
+            Tells you when somebody hands you a lead role or takes you off one — and, if you organise, when
+            someone applies to join. Per browser, so turn it on anywhere you want to hear about it.
           </p>
 
           <FormError error={error} />

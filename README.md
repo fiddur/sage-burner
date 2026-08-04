@@ -592,9 +592,31 @@ one later cannot lock out an existing member.
 
 ### Notifications
 
-Admins can be told when someone applies, per **browser** rather than per person:
-a subscription belongs to the browser it was made in, so an admin with a laptop
-and a phone turns it on in both. Organise → Settings.
+Any approved member can be told when something happens to them, per **browser**
+rather than per person: a subscription belongs to the browser it was made in, so
+somebody with a laptop and a phone turns it on in both. The toggle is on the
+details page behind the initials circle.
+
+Two things notify today:
+
+- **Being handed a lead role, or taken off one** — the lead column and the team
+  both, and only the person it happened _to_. Not when they did it themselves:
+  taking a role you want is the common case, and a notification for your own click
+  is noise that teaches people to ignore the channel.
+- **Someone applying**, which goes to every admin, since only an admin can act on
+  one.
+
+The lead-role routes take `notify` as a dependency rather than importing the push
+module. Handing somebody a role is the point and the notification is a courtesy, so
+delivery failing must not fail the write — there is a test that hands the role over
+with the push service rejecting every call. The team removal is idempotent, so it
+notifies only when a row actually went: telling somebody they have been taken off
+something they were never on is worse than silence.
+
+These routes **moved out from under `/api/admin/`** rather than being exempted
+inside it (#184), which is the rule — the prefix hook's whole value is having no
+exception to forget. They are `requireApproved`, so an account with neither role is
+still refused: nothing would notify them.
 
 Browser push is the one thing in this app that reaches outward at runtime. The
 notification travels via whichever push service the browser chose — Google's for
@@ -605,9 +627,9 @@ that never turns notifications on never acquires one. That keeps `docker compose
 up` sufficient, which is the same argument #59 makes for `SESSION_SECRET`.
 
 The endpoint is **https-only**. It is the one field whose stored value the server
-itself then requests, on every application, so a `http://10.0.0.5/…` there would
-point the container at something on its own network. Only admins can write it and a
-real push service is always https, so requiring the scheme costs nothing. Narrowing
+itself then requests, so a `http://10.0.0.5/…` there would point the container at
+something on its own network. Only an approved member can write it and a real push
+service is always https, so requiring the scheme costs nothing. Narrowing
 past that would mean an allowlist of every browser vendor's endpoint, which goes
 stale the moment a new one appears.
 
@@ -622,8 +644,8 @@ server wait, and a push outage would turn a successful application into an error
 for the person applying. Failures go to the log and nowhere else.
 
 A subscription the push service answers `404` or `410` for is **deleted**: the
-browser has thrown it away, and keeping the row would retry a dead endpoint on
-every application forever. Any other failure keeps it — a 500 from Google is not a
+browser has thrown it away, and keeping the row would retry a dead endpoint
+forever. Any other failure keeps it — a 500 from Google is not a
 reason to forget someone's phone. Subscriptions also cascade with the account, so
 a deleted account leaves none behind.
 

@@ -4,15 +4,17 @@ import { MAX_CONTACT, MAX_NOTES, MAX_PERSON_NAME } from '@sage-burner/shared'
 import { useEffect, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
+import type { PushApi } from '../components/PushToggle.tsx'
 import type { YourBurnsApi } from '../components/YourBurns.tsx'
 
 import { isApiError } from '../api/client.ts'
 import { FormError, useFormError } from '../components/FormError.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
+import { PushToggle } from '../components/PushToggle.tsx'
 import { YourBurns } from '../components/YourBurns.tsx'
 import { isMember, useViewer } from '../viewer.tsx'
 
-export type ProfileApi = Pick<ApiClient, 'getMyProfile' | 'updateMyProfile'> & YourBurnsApi
+export type ProfileApi = Pick<ApiClient, 'getMyProfile' | 'updateMyProfile'> & PushApi & YourBurnsApi
 
 type Loaded = { status: 'loading' } | { status: 'ready'; profile: Profile } | { status: 'failed' }
 
@@ -154,6 +156,8 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
         Signed in as {loaded.status === 'ready' ? loaded.profile.email : 'you'}. Changing that address is not
         possible yet — ask someone with admin.
       </p>
+
+      <PushToggle api={api} />
 
       <YourBurns api={api} />
     </GuardedPage>

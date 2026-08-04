@@ -18,7 +18,7 @@ import { createGate, SCRYPT_GATE } from './auth/gate.ts'
 import { createGuards } from './auth/guards.ts'
 import { createSessions } from './auth/session.ts'
 import { clientErrorHandler, frameworkErrorHandler, registerErrorHandler } from './errors.ts'
-import { notifyAdmins } from './push/push.ts'
+import { notifyAccount, notifyAdmins } from './push/push.ts'
 import { deliverWithWebPush, DEFAULT_PUSH_CONTACT, generateVAPIDKeys } from './push/web-push.ts'
 import { registerAdminRoutes } from './routes/admin.ts'
 import { registerApplicationReviewRoutes } from './routes/application-review.ts'
@@ -421,7 +421,18 @@ export const createApp = async ({
   registerAttendanceRoutes(app, { db, sessions, now })
   registerProfileRoutes(app, { db, sessions, now })
   registerRosterRoutes(app, { db, sessions, now })
-  registerLeadRoleRoutes(app, { db, sessions, now })
+  registerLeadRoleRoutes(app, {
+    db,
+    sessions,
+    now,
+    notify: async (accountId, message) => {
+      const counts = await notifyAccount(push, accountId, JSON.stringify({ body: message }))
+
+      if (counts.failed > 0 || counts.gone > 0) app.log.warn({ ...counts }, 'notifying a member')
+
+      return counts
+    },
+  })
   registerSessionRoutes(app, { db, sessions, now })
   registerScheduleRoutes(app, { db, now })
 

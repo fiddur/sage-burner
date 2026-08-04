@@ -184,6 +184,11 @@ These are member records, so treat them as such:
   prefix**, never exempting it there — the hook's whole value is having no
   exception to forget.
 - Invite tokens are CSPRNG-random and unguessable, single-use, and expiring.
+- **Push is any approved member's**, not admin's (#184). The routes are
+  `/api/push/…`, moved out from under the admin prefix rather than exempted inside
+  it. `notifyAdmins` and `notifyAccount` share one delivery loop; the lead-roles
+  routes take `notify` as a dependency so the write cannot fail because a push
+  service did, and never notify somebody about their own click.
 - **The viewer carries `name`, and nothing else personal.** `/api/auth/me` returns
   `{ account_id, name, roles }` — the name for the initials in the corner, which
   every page renders, and which every other member already sees on the Members

@@ -5,7 +5,6 @@ import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
 import { GuardedPage } from '../components/GuardedPage.tsx'
-import { PushToggle } from '../components/PushToggle.tsx'
 import { useSetInstallationTitle } from '../installation.tsx'
 import { isAdmin, useViewer } from '../viewer.tsx'
 
@@ -123,8 +122,6 @@ export const AdminSettings = ({ api }: { api: AdminSettingsApi }) => {
           </button>
         </form>
       )}
-
-      <PushToggle api={api} />
     </GuardedPage>
   )
 }

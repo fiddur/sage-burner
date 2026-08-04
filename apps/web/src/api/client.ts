@@ -580,15 +580,15 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
      * the pair, so a null means the installation could not, not that it has not
      * been asked yet.
      */
-    getPushKey: (signal?: AbortSignal) => request<PushKeyResponse>('/admin/push/key', { signal }),
+    getPushKey: (signal?: AbortSignal) => request<PushKeyResponse>('/push/key', { signal }),
 
     /** Admin only. Idempotent per browser: the endpoint is the key. */
     subscribeToPush: (body: PushSubscriptionCreate) =>
-      request<undefined>('/admin/push/subscriptions', { method: 'POST', body }),
+      request<undefined>('/push/subscriptions', { method: 'POST', body }),
 
     /** Admin only. Answers 204 whether or not the endpoint was known. */
     unsubscribeFromPush: (endpoint: string) =>
-      request<undefined>('/admin/push/subscriptions', { method: 'DELETE', body: { endpoint } }),
+      request<undefined>('/push/subscriptions', { method: 'DELETE', body: { endpoint } }),
 
     /** Admin only. Never carries the token — only the digest is stored. */
     getInvites: (signal?: AbortSignal) => request<AdminInvitesResponse>('/admin/invites', { signal }),

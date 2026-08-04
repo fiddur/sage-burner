@@ -78,18 +78,18 @@ const subscribe = (
 ): Promise<LightMyRequestResponse> =>
   server.inject({
     method: 'POST',
-    url: '/api/admin/push/subscriptions',
+    url: '/api/push/subscriptions',
     headers: cookie === undefined ? {} : { cookie },
     payload,
   })
 
 const unsubscribe = (server: FastifyInstance, cookie: string, payload: Record<string, unknown>) =>
-  server.inject({ method: 'DELETE', url: '/api/admin/push/subscriptions', headers: { cookie }, payload })
+  server.inject({ method: 'DELETE', url: '/api/push/subscriptions', headers: { cookie }, payload })
 
 const key = (server: FastifyInstance, cookie?: string) =>
   server.inject({
     method: 'GET',
-    url: '/api/admin/push/key',
+    url: '/api/push/key',
     headers: cookie === undefined ? {} : { cookie },
   })
 
@@ -129,13 +129,16 @@ describe('the VAPID key a browser subscribes with', () => {
     expect(response.json()).toEqual({ public_key: 'pub-key' })
   })
 
-  it('is refused to a member and to a stranger', async () => {
-    // Only admins act on an application, so only admins subscribe. Under
-    // `/api/admin/`, so the prefix hook decides it rather than this route.
+  it('is offered to any approved member, and refused to a stranger', async () => {
+    // These moved out from under `/api/admin/` when being handed a lead role
+    // started notifying the person it was handed to (#184). An account with
+    // neither role is still refused: nothing would notify them.
     const server = await build()
     const member = await givenAccount(['member'])
+    const applicant = await givenAccount([])
 
-    expect((await key(server, member.cookie)).statusCode).toBe(403)
+    expect((await key(server, member.cookie)).statusCode).toBe(200)
+    expect((await key(server, applicant.cookie)).statusCode).toBe(403)
     expect((await key(server)).statusCode).toBe(401)
   })
 })
@@ -186,13 +189,15 @@ describe('subscribing a browser', () => {
     expect(await db().select().from(pushSubscription)).toEqual([])
   })
 
-  it('refuses a member and a stranger', async () => {
+  it('takes a member, and refuses an account still waiting on a decision', async () => {
     const server = await build()
     const member = await givenAccount(['member'])
+    const applicant = await givenAccount([])
 
-    expect((await subscribe(server, member.cookie)).statusCode).toBe(403)
+    expect((await subscribe(server, member.cookie)).statusCode).toBe(204)
+    expect((await subscribe(server, applicant.cookie)).statusCode).toBe(403)
     expect((await subscribe(server, undefined)).statusCode).toBe(401)
-    expect(await db().select().from(pushSubscription)).toEqual([])
+    expect((await db().select().from(pushSubscription)).map((row) => row.account_id)).toEqual([member.id])
   })
 
   it('unsubscribes by endpoint, and is quiet about one it never had', async () => {
