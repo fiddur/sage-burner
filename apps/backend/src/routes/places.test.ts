@@ -64,7 +64,7 @@ const list = (server: FastifyInstance) => server.inject({ method: 'GET', url: '/
 const add = (server: FastifyInstance, cookie: string | undefined, payload: Record<string, unknown>) =>
   server.inject({
     method: 'POST',
-    url: '/api/admin/places',
+    url: '/api/places',
     headers: cookie === undefined ? {} : { cookie },
     payload,
   })
@@ -77,7 +77,7 @@ const edit = (
 ) =>
   server.inject({
     method: 'PATCH',
-    url: `/api/admin/places/${id}`,
+    url: `/api/places/${id}`,
     headers: cookie === undefined ? {} : { cookie },
     payload,
   })
@@ -85,14 +85,14 @@ const edit = (
 const remove = (server: FastifyInstance, cookie: string | undefined, id: string) =>
   server.inject({
     method: 'DELETE',
-    url: `/api/admin/places/${id}`,
+    url: `/api/places/${id}`,
     headers: cookie === undefined ? {} : { cookie },
   })
 
 const reorder = (server: FastifyInstance, cookie: string | undefined, payload: Record<string, unknown>) =>
   server.inject({
     method: 'PUT',
-    url: '/api/admin/places/order',
+    url: '/api/places/order',
     headers: cookie === undefined ? {} : { cookie },
     payload,
   })
@@ -261,13 +261,31 @@ describe('the places a dream can happen at', () => {
     expect(await names(server)).toEqual(['Temple', 'Sauna', 'Front Lawn'])
   })
 
-  it('refuses every write to anyone who is not an organiser', async () => {
+  it('lets any approved member write the lanes, admin or not', async () => {
+    // A shared spreadsheet everyone could edit is what this replaces. The admin
+    // case is not redundant: `admin` does not imply `member`, so an organiser who
+    // is not attending holds one and not the other.
+    const server = await build()
+
+    for (const roles of [['member'], ['admin'], ['member', 'admin']] as const) {
+      const { cookie } = await givenAccount([...roles])
+      const added = await add(server, cookie, { ...SAUNA, name: `By ${roles.join('+')}` })
+
+      expect(added.statusCode, roles.join('+')).toBe(201)
+      const id = added.json().place.id
+      expect((await edit(server, cookie, id, { name: `Edited by ${roles.join('+')}` })).statusCode).toBe(200)
+      expect((await reorder(server, cookie, { ids: [id] })).statusCode).toBe(200)
+      expect((await remove(server, cookie, id)).statusCode).toBe(204)
+    }
+  })
+
+  it('refuses every write to a stranger, and to an account with no roles', async () => {
     const server = await build()
     const admin = await givenAccount(['admin'])
-    const member = await givenAccount(['member'])
+    const roleless = await givenAccount([])
     const id = (await add(server, admin.cookie, TEMPLE)).json().place.id
 
-    for (const cookie of [undefined, member.cookie]) {
+    for (const cookie of [undefined, roleless.cookie]) {
       const expected = cookie === undefined ? 401 : 403
       expect((await add(server, cookie, SAUNA)).statusCode).toBe(expected)
       expect((await edit(server, cookie, id, { name: 'Theirs' })).statusCode).toBe(expected)

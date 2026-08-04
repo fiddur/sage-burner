@@ -1,10 +1,12 @@
 import type { Event } from '@sage-burner/shared'
 
-import { cleanup, render, screen } from '@testing-library/preact'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Viewer } from '../viewer.tsx'
+import type { HomeApi } from './Home.tsx'
 
+import { apiError } from '../api/client.ts'
 import { ViewerProvider } from '../viewer.tsx'
 import { Home } from './Home.tsx'
 
@@ -23,14 +25,26 @@ const summer: Event = {
   created_at: '2026-01-01T00:00:00.000Z',
 }
 
+/** These cases are about rendering, not saving; a call here is a test bug. */
+const notStubbed = () => Promise.reject(new Error('updateWelcome is not stubbed here'))
+
 const SIGNED_OUT: Viewer = { status: 'signed-out' }
 
-const renderHome = (event: Event | null, viewer: Viewer = SIGNED_OUT) =>
+const renderHome = (
+  event: Event | null,
+  viewer: Viewer = SIGNED_OUT,
+  updateWelcome: HomeApi['updateWelcome'] = notStubbed,
+) =>
   render(
     <ViewerProvider viewer={viewer}>
-      <Home api={{ getActiveEvent: () => Promise.resolve({ event }) }} />
+      <Home api={{ getActiveEvent: () => Promise.resolve({ event }), updateWelcome }} />
     </ViewerProvider>,
   )
+
+const asRoles = (roles: ('admin' | 'member')[]): Viewer => ({
+  status: 'signed-in',
+  account: { id: 'a-1', roles },
+})
 
 describe('Home', () => {
   it('renders the active event name and dates', async () => {
@@ -53,8 +67,8 @@ describe('Home', () => {
   })
 
   it('escapes raw HTML in the welcome text', async () => {
-    // Admin-authored, shown to every visitor — and an admin account is one
-    // phished password away from belonging to someone else.
+    // Written by any approved member, shown to every visitor. The escaping is what
+    // makes that safe, so this test is the one holding the control up.
     renderHome({ ...summer, welcome_markdown: 'Hi <script>alert(1)</script>' })
 
     await screen.findByRole('heading', { name: 'Summer Burn 2026', level: 2 })
@@ -83,7 +97,9 @@ describe('Home', () => {
     // render a code or a stack.
     render(
       <ViewerProvider viewer={SIGNED_OUT}>
-        <Home api={{ getActiveEvent: () => Promise.reject(new Error('offline')) }} />
+        <Home
+          api={{ getActiveEvent: () => Promise.reject(new Error('offline')), updateWelcome: notStubbed }}
+        />
       </ViewerProvider>,
     )
 
@@ -106,7 +122,7 @@ describe('Home', () => {
     })
     render(
       <ViewerProvider viewer={SIGNED_OUT}>
-        <Home api={{ getActiveEvent: () => pending }} />
+        <Home api={{ getActiveEvent: () => pending, updateWelcome: notStubbed }} />
       </ViewerProvider>,
     )
 
@@ -128,7 +144,7 @@ describe('Home', () => {
     // `api` identity and legitimately refetches — which is why `App` memoises
     // the client. This pins the half that lives here: given a stable client,
     // re-rendering must not refetch.
-    const api = { getActiveEvent }
+    const api = { getActiveEvent, updateWelcome: notStubbed }
 
     const { rerender } = render(
       <ViewerProvider viewer={SIGNED_OUT}>
@@ -144,5 +160,205 @@ describe('Home', () => {
     )
 
     expect(getActiveEvent).toHaveBeenCalledTimes(1)
+  })
+
+  describe('editing the welcome text', () => {
+    it('offers no editor to someone signed out', async () => {
+      renderHome(summer)
+      await screen.findByRole('heading', { name: 'Summer Burn 2026', level: 2 })
+
+      expect(screen.queryByRole('button', { name: 'Edit this text' })).toBeNull()
+    })
+
+    it('offers no editor to a signed-in account with no roles', async () => {
+      renderHome(summer, asRoles([]))
+      await screen.findByRole('heading', { name: 'Summer Burn 2026', level: 2 })
+
+      expect(screen.queryByRole('button', { name: 'Edit this text' })).toBeNull()
+    })
+
+    for (const roles of [['member'], ['admin'], ['member', 'admin']] as const) {
+      it(`offers it to ${roles.join(' + ')}`, async () => {
+        // `admin` counts as well as `member`, because the roles are independent:
+        // an organiser who is not attending still writes the welcome text.
+        renderHome(summer, asRoles([...roles]))
+
+        expect(await screen.findByRole('button', { name: 'Edit this text' })).toBeTruthy()
+      })
+    }
+
+    it('saves the text and shows what came back, not what was typed', async () => {
+      // The response is the row as written, so rendering it rather than the local
+      // draft is what stops the page claiming a save that landed differently.
+      const updateWelcome = vi.fn<HomeApi['updateWelcome']>(() =>
+        Promise.resolve({ event: { ...summer, welcome_markdown: 'Saved server-side' } }),
+      )
+      renderHome(summer, asRoles(['member']), updateWelcome)
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit this text' }))
+      fireEvent.input(await screen.findByLabelText('Welcome text'), { target: { value: 'Bring a cup' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+      await waitFor(() =>
+        expect(updateWelcome).toHaveBeenCalledWith('e-1', { welcome_markdown: 'Bring a cup' }),
+      )
+      expect(await screen.findByText('Saved server-side')).toBeTruthy()
+      expect(screen.queryByLabelText('Welcome text')).toBeNull()
+    })
+
+    it('starts the editor from the text that is there', async () => {
+      renderHome(summer, asRoles(['member']))
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit this text' }))
+
+      expect((await screen.findByLabelText<HTMLTextAreaElement>('Welcome text')).value).toBe(
+        summer.welcome_markdown,
+      )
+    })
+
+    it('leaves the text alone when the save is refused', async () => {
+      const updateWelcome = vi.fn<HomeApi['updateWelcome']>(() =>
+        Promise.reject(apiError(403, 'forbidden', 'You do not have access to that.')),
+      )
+      renderHome(summer, asRoles(['member']), updateWelcome)
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit this text' }))
+      fireEvent.input(await screen.findByLabelText('Welcome text'), { target: { value: 'Nope' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+      expect((await screen.findByRole('alert')).textContent).toContain('do not have access')
+      // Still editing, with the draft intact — losing what they typed over a
+      // refusal would be the second failure.
+      expect(screen.getByLabelText<HTMLTextAreaElement>('Welcome text').value).toBe('Nope')
+    })
+
+    it('opens on the text as it is now, not as it was when the page loaded', async () => {
+      // The whole field is overwritten on save, so a homepage left open while
+      // somebody else edited would discard their work. Re-reading on open is what
+      // shrinks that window to the moment between pressing Edit and pressing Save.
+      const getActiveEvent = vi
+        .fn<HomeApi['getActiveEvent']>()
+        .mockResolvedValueOnce({ event: summer })
+        .mockResolvedValue({ event: { ...summer, welcome_markdown: 'Written by someone else' } })
+      render(
+        <ViewerProvider viewer={asRoles(['member'])}>
+          <Home api={{ getActiveEvent, updateWelcome: notStubbed }} />
+        </ViewerProvider>,
+      )
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit this text' }))
+
+      expect((await screen.findByLabelText<HTMLTextAreaElement>('Welcome text')).value).toBe(
+        'Written by someone else',
+      )
+    })
+
+    it('refuses to open when the burn has ended since the page loaded', async () => {
+      // Opening would write to a burn nobody is looking at any more, and the save
+      // would then put it back on screen as though it were still open.
+      const getActiveEvent = vi
+        .fn<HomeApi['getActiveEvent']>()
+        .mockResolvedValueOnce({ event: summer })
+        .mockResolvedValue({ event: null })
+      const updateWelcome = vi.fn<HomeApi['updateWelcome']>(notStubbed)
+      render(
+        <ViewerProvider viewer={asRoles(['member'])}>
+          <Home api={{ getActiveEvent, updateWelcome }} />
+        </ViewerProvider>,
+      )
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit this text' }))
+
+      // The section disappearing is the feedback; there is no editor to put a
+      // message beside, and nothing left on the page to edit.
+      expect(await screen.findByText(/no burn scheduled/)).toBeTruthy()
+      expect(screen.queryByLabelText('Welcome text')).toBeNull()
+      expect(updateWelcome).not.toHaveBeenCalled()
+    })
+
+    it('says it is opening while the re-read is in flight', async () => {
+      // The re-read is a round trip with nothing else changing on screen, so
+      // without this the button appears to do nothing for as long as it takes —
+      // the symptom `FormError` exists for, reintroduced by the fix for the stale
+      // draft.
+      let release = (_value: { event: Event | null }) => {}
+      const held = new Promise<{ event: Event | null }>((resolve) => {
+        release = resolve
+      })
+      const getActiveEvent = vi
+        .fn<HomeApi['getActiveEvent']>()
+        .mockResolvedValueOnce({ event: summer })
+        .mockReturnValue(held)
+      render(
+        <ViewerProvider viewer={asRoles(['member'])}>
+          <Home api={{ getActiveEvent, updateWelcome: notStubbed }} />
+        </ViewerProvider>,
+      )
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit this text' }))
+
+      const opening = await screen.findByRole('button', { name: 'Opening…' })
+      expect(opening.hasAttribute('disabled')).toBe(true)
+
+      release({ event: summer })
+      expect(await screen.findByLabelText('Welcome text')).toBeTruthy()
+    })
+
+    it('opens on what is on screen when the re-read fails', async () => {
+      // Refusing to open the editor because the network hiccuped would be worse
+      // than opening it on a slightly stale draft.
+      const getActiveEvent = vi
+        .fn<HomeApi['getActiveEvent']>()
+        .mockResolvedValueOnce({ event: summer })
+        .mockRejectedValue(new Error('offline'))
+      render(
+        <ViewerProvider viewer={asRoles(['member'])}>
+          <Home api={{ getActiveEvent, updateWelcome: notStubbed }} />
+        </ViewerProvider>,
+      )
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit this text' }))
+
+      expect((await screen.findByLabelText<HTMLTextAreaElement>('Welcome text')).value).toBe(
+        summer.welcome_markdown,
+      )
+    })
+
+    it('does not show a stale save error when the editor is reopened', async () => {
+      // `useFormError` lives on the page, so an error survives the editor closing —
+      // and `FormError` takes focus when it mounts, so a stale one would steal the
+      // caret as well as mislead.
+      const updateWelcome = vi.fn<HomeApi['updateWelcome']>(() =>
+        Promise.reject(apiError(403, 'forbidden', 'You do not have access to that.')),
+      )
+      renderHome(summer, asRoles(['member']), updateWelcome)
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit this text' }))
+      await screen.findByLabelText('Welcome text')
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+      expect((await screen.findByRole('alert')).textContent).toContain('do not have access')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit this text' }))
+      // Waited for: `openEditor` suspends on the re-read, so without this the form
+      // is not mounted yet and `queryByRole` is null because of the Cancel rather
+      // than because the error was cleared.
+      await screen.findByLabelText('Welcome text')
+
+      expect(screen.queryByRole('alert')).toBeNull()
+    })
+
+    it('puts the text back on cancel, without asking the API', async () => {
+      const updateWelcome = vi.fn<HomeApi['updateWelcome']>(notStubbed)
+      renderHome(summer, asRoles(['member']), updateWelcome)
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit this text' }))
+      fireEvent.input(await screen.findByLabelText('Welcome text'), { target: { value: 'Discard me' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+      expect(screen.queryByLabelText('Welcome text')).toBeNull()
+      expect(await screen.findByRole('button', { name: 'Edit this text' })).toBeTruthy()
+      expect(updateWelcome).not.toHaveBeenCalled()
+    })
   })
 })

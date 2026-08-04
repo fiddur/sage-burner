@@ -51,7 +51,7 @@ const db = () => {
   return found
 }
 
-const givenAdmin = async () => {
+const givenAccount = async (roles: ('admin' | 'member')[]) => {
   const id = randomUUID()
   await db()
     .insert(account)
@@ -61,11 +61,13 @@ const givenAdmin = async () => {
       password_hash: null,
       created_at: '2026-01-01T00:00:00.000Z',
     })
-  await db().insert(accountRole).values({ account_id: id, role: 'admin' })
+  for (const role of roles) await db().insert(accountRole).values({ account_id: id, role })
 
   const sessions = createSessions({ secret: SECRET, now: () => new Date(), ttlSeconds: 3600 })
   return `${SESSION_COOKIE}=${sessions.issue(id)}`
 }
+
+const givenAdmin = () => givenAccount(['admin'])
 
 const givenEvent = async (fields: { slug: string; start_date: string; end_date: string; name?: string }) => {
   const id = randomUUID()
@@ -92,6 +94,19 @@ const create = (server: FastifyInstance, cookie: string, payload: Record<string,
 const patch = (server: FastifyInstance, cookie: string, id: string, payload: Record<string, unknown>) =>
   server.inject({ method: 'PATCH', url: `/api/admin/events/${id}`, headers: { cookie }, payload })
 
+const setWelcome = (
+  server: FastifyInstance,
+  cookie: string | undefined,
+  id: string,
+  payload: Record<string, unknown>,
+) =>
+  server.inject({
+    method: 'PATCH',
+    url: `/api/events/${id}/welcome`,
+    headers: cookie === undefined ? {} : { cookie },
+    payload,
+  })
+
 const valid = {
   name: 'Summer Burn 2026',
   slug: 'summer-2026',
@@ -99,6 +114,77 @@ const valid = {
   end_date: '2026-08-05',
   member_cap: 42,
 }
+
+describe('PATCH /api/events/:id/welcome', () => {
+  it('lets any approved member rewrite the welcome text, admin or not', async () => {
+    const server = await build()
+    const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
+
+    for (const roles of [['member'], ['admin'], ['member', 'admin']] as const) {
+      const cookie = await givenAccount([...roles])
+      const response = await setWelcome(server, cookie, id, { welcome_markdown: `By ${roles.join('+')}` })
+
+      expect(response.statusCode, roles.join('+')).toBe(200)
+      expect(response.json().event.welcome_markdown).toBe(`By ${roles.join('+')}`)
+    }
+  })
+
+  it('refuses a stranger and an account with no roles', async () => {
+    const server = await build()
+    const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
+    const roleless = await givenAccount([])
+
+    expect((await setWelcome(server, undefined, id, { welcome_markdown: 'x' })).statusCode).toBe(401)
+    expect((await setWelcome(server, roleless, id, { welcome_markdown: 'x' })).statusCode).toBe(403)
+
+    const [row] = await db().select().from(event).where(eq(event.id, id))
+    expect(row?.welcome_markdown).toBe('')
+  })
+
+  it("refuses the burn's shape smuggled in beside the welcome text", async () => {
+    // The whole reason this is its own route. `.strict()` makes a `member_cap`
+    // here a 400 rather than a dropped key, so nobody can believe they raised the
+    // cap — and a member cannot raise it at all, which is the point.
+    const server = await build()
+    const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
+    const member = await givenAccount(['member'])
+
+    const response = await setWelcome(server, member, id, { welcome_markdown: 'Hello', member_cap: 500 })
+
+    expect(response.statusCode).toBe(400)
+    const [row] = await db().select().from(event).where(eq(event.id, id))
+    expect(row?.member_cap).toBe(42)
+    expect(row?.welcome_markdown).toBe('')
+  })
+
+  it('still refuses a member at the admin route that writes the shape', async () => {
+    // The sibling that proves the split did its job: opening the welcome text did
+    // not open the dates or the cap.
+    const server = await build()
+    const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
+    const member = await givenAccount(['member'])
+
+    expect((await patch(server, member, id, { member_cap: 500 })).statusCode).toBe(403)
+    expect((await patch(server, member, id, { welcome_markdown: 'Hello' })).statusCode).toBe(403)
+  })
+
+  it('answers 404 for a burn that does not exist', async () => {
+    const server = await build()
+    const member = await givenAccount(['member'])
+
+    expect((await setWelcome(server, member, randomUUID(), { welcome_markdown: 'x' })).statusCode).toBe(404)
+  })
+
+  it('requires the field rather than treating an empty body as a no-op', async () => {
+    // Unlike the admin PATCH, which is `.partial()` and answers `{}` with the row
+    // unchanged. There is one field here, so an empty body is a malformed request.
+    const server = await build()
+    const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
+    const member = await givenAccount(['member'])
+
+    expect((await setWelcome(server, member, id, {})).statusCode).toBe(400)
+  })
+})
 
 describe('GET /api/events/active', () => {
   it('is null before any event exists', async () => {

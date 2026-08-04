@@ -76,6 +76,7 @@ const clientWith = (
   withdrawSession: () => Promise.reject(new Error('withdrawSession is not stubbed in this file')),
   getInstallation: () => Promise.reject(new Error('getInstallation is not stubbed in this file')),
   updateInstallation: () => Promise.reject(new Error('updateInstallation is not stubbed in this file')),
+  updateWelcome: () => Promise.reject(new Error('updateWelcome is not stubbed in this file')),
   getPushKey: () => Promise.reject(new Error('getPushKey is not stubbed in this file')),
   subscribeToPush: () => Promise.reject(new Error('subscribeToPush is not stubbed in this file')),
   unsubscribeFromPush: () => Promise.reject(new Error('unsubscribeFromPush is not stubbed in this file')),
@@ -282,6 +283,16 @@ describe('navigation', () => {
 
     expect(linkNames()).toContain('Your burn')
     expect(linkNames()).not.toContain('Log in')
+    // Organise is offered: a member curates the places and the lodging and
+    // helping lists there, per #155. The page itself shows them only those.
+    expect(linkNames()).toContain('Organise')
+  })
+
+  it('offers Organise to nobody without a role', () => {
+    // An applicant checking on their application has an account and no roles, and
+    // there is nothing behind the link for them.
+    renderAt('/', { status: 'signed-in', account: { id: 'a1', roles: [] } })
+
     expect(linkNames()).not.toContain('Organise')
   })
 

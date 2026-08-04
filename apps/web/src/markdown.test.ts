@@ -15,8 +15,8 @@ describe('renderMarkdown', () => {
   })
 
   it('neutralises a script tag', () => {
-    // Admin-authored, but an admin account is one phished password away from
-    // being someone else — and this text is shown to every public visitor.
+    // Written by any approved member and shown to every public visitor, so the
+    // author is untrusted as a matter of course rather than by hypothesis.
     //
     // The assertion is that no `<script` reaches the document, not that the
     // characters "alert(1)" are absent: escaped, they are visible text on the

@@ -6,7 +6,7 @@ import { useEffect, useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
-import { isAdmin, useViewer } from '../viewer.tsx'
+import { isApproved, useViewer } from '../viewer.tsx'
 
 export type PlacesApi = Pick<
   ApiClient,
@@ -60,11 +60,11 @@ const moveTo = (ids: readonly string[], from: number, to: number): string[] | un
  * Where a dream can happen.
  *
  * The role check decides what to render, not what is allowed:
- * `/api/admin/places` refuses a non-admin whatever this does.
+ * `/api/places` refuses anyone without a role whatever this does.
  */
 export const AdminPlaces = ({ api }: { api: PlacesApi }) => {
   const viewer = useViewer()
-  const admin = isAdmin(viewer)
+  const approved = isApproved(viewer)
   const [loaded, setLoaded] = useState<Loaded>({ status: 'loading' })
   const [draft, setDraft] = useState<Draft>(BLANK)
   const [editing, setEditing] = useState<string | undefined>(undefined)
@@ -74,7 +74,7 @@ export const AdminPlaces = ({ api }: { api: PlacesApi }) => {
   const [reload, setReload] = useState(0)
 
   useEffect(() => {
-    if (!admin) return undefined
+    if (!approved) return undefined
 
     const controller = new AbortController()
 
@@ -94,7 +94,7 @@ export const AdminPlaces = ({ api }: { api: PlacesApi }) => {
     return () => {
       controller.abort()
     }
-  }, [api, admin, reload])
+  }, [api, approved, reload])
 
   const run = async (action: () => Promise<unknown>, fallback: string) => {
     setError(undefined)
@@ -135,11 +135,17 @@ export const AdminPlaces = ({ api }: { api: PlacesApi }) => {
     )
   }
 
-  if (!admin) {
+  if (!approved) {
     return (
       <section class="page">
         <h1>Places</h1>
-        <p>This is an admin page. If it should be open to you, ask someone who already has admin.</p>
+        {viewer.status === 'signed-out' ? (
+          <p>This is for members. Sign in and it will be here.</p>
+        ) : (
+          // Signed in without a role — an applicant checking on their application.
+          // Telling them to sign in would be advice they have already taken.
+          <p>This is for members. Ask someone who already has a role.</p>
+        )}
       </section>
     )
   }

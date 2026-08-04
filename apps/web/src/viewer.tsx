@@ -145,3 +145,12 @@ export const isAdmin = (viewer: Viewer) => hasRole(viewer, 'admin')
  * 403 server-side would be worse than not offering them.
  */
 export const isMember = (viewer: Viewer) => hasRole(viewer, 'member')
+
+/**
+ * Anyone who is in — the mirror of the server's `requireApproved`.
+ *
+ * `admin` counts, and has to: the roles are independent, so an account can hold
+ * `admin` without `member` — an organiser who is not attending. Hiding the page
+ * from them would hide the setup from someone allowed to do it.
+ */
+export const isApproved = (viewer: Viewer) => isMember(viewer) || isAdmin(viewer)

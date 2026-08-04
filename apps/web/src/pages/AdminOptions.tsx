@@ -5,7 +5,7 @@ import { useEffect, useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
-import { isAdmin, useViewer } from '../viewer.tsx'
+import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
 
 export type OptionsApi = Pick<
   ApiClient,
@@ -70,6 +70,7 @@ const BLURB: Record<EventOptionKind, string> = {
  */
 export const AdminOptions = ({ api }: { api: OptionsApi }) => {
   const viewer = useViewer()
+  const approved = isApproved(viewer)
   const admin = isAdmin(viewer)
   const [loaded, setLoaded] = useState<Loaded>({ status: 'loading' })
   const [busy, setBusy] = useState(false)
@@ -77,7 +78,7 @@ export const AdminOptions = ({ api }: { api: OptionsApi }) => {
   const [reload, setReload] = useState(0)
 
   useEffect(() => {
-    if (!admin) return undefined
+    if (!approved) return undefined
 
     const controller = new AbortController()
 
@@ -103,7 +104,7 @@ export const AdminOptions = ({ api }: { api: OptionsApi }) => {
     return () => {
       controller.abort()
     }
-  }, [api, admin, reload])
+  }, [api, approved, reload])
 
   const run = async (action: () => Promise<unknown>, fallback: string) => {
     setError(undefined)
@@ -127,11 +128,17 @@ export const AdminOptions = ({ api }: { api: OptionsApi }) => {
     )
   }
 
-  if (!admin) {
+  if (!approved) {
     return (
       <section class="page">
         <h1>Lodging and helping</h1>
-        <p>This is an admin page. If it should be open to you, ask someone who already has admin.</p>
+        {viewer.status === 'signed-out' ? (
+          <p>This is for members. Sign in and it will be here.</p>
+        ) : (
+          // Signed in without a role — an applicant checking on their application.
+          // Telling them to sign in would be advice they have already taken.
+          <p>This is for members. Ask someone who already has a role.</p>
+        )}
       </section>
     )
   }
@@ -156,8 +163,17 @@ export const AdminOptions = ({ api }: { api: OptionsApi }) => {
 
       {loaded.status === 'ready' && loaded.event === null && (
         <p class="notice">
-          There is no burn open, and these lists belong to one. Make an event under{' '}
-          <a href="/admin/events">Events</a> first.
+          There is no burn open, and these lists belong to one.{' '}
+          {admin ? (
+            <>
+              Make an event under <a href="/admin/events">Events</a> first.
+            </>
+          ) : (
+            // Creating a burn is admin-only, so a member sent to that page would
+            // read "This is an admin page." A dead end is worse than a plain
+            // sentence saying who to ask.
+            <>Ask someone with admin to create one first.</>
+          )}
         </p>
       )}
 

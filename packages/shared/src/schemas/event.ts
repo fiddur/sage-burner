@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { MAX_WELCOME_LENGTH } from '../limits.ts'
 import { dateSchema, dateTimeSchema, idSchema, slugSchema, nonEmptyText, timeSchema } from './common.ts'
 
 /** Tolerates missing keys so `.partial()` and `.omit()` derivations still typecheck. */
@@ -66,8 +67,11 @@ export const eventFields = z.object({
   /** When the gates open and close, local time. The schedule grid runs between. */
   start_time: timeSchema,
   end_time: timeSchema,
-  /** Rendered on the public homepage. Admin-authored, sanitized before display. */
-  welcome_markdown: z.string().max(100_000),
+  /**
+   * Rendered on the public homepage, written by any approved member, sanitized
+   * before display. `MAX_WELCOME_LENGTH` is the limit the form shares.
+   */
+  welcome_markdown: z.string().max(MAX_WELCOME_LENGTH),
   /** Membership cap, e.g. 42. Approvals past this go to the waiting list. */
   member_cap: z.int().positive(),
   created_at: dateTimeSchema,
@@ -162,6 +166,18 @@ export const eventUpdateSchema = withEventDateOrder(
   eventFields.omit({ id: true, created_at: true }).partial().strict(),
 )
 export type EventUpdate = z.infer<typeof eventUpdateSchema>
+
+/**
+ * The one field of a burn any approved member may write.
+ *
+ * A route of its own rather than a carve-out inside `eventUpdateSchema`. The
+ * burn's shape — its dates, times and cap — stays admin-only, and `.strict()`
+ * here is what makes an attempt to smuggle `member_cap` through the member route
+ * a 400 rather than a dropped key. Field-level checks inside the partial handler
+ * would put that rule in a branch a later field could fall the wrong side of.
+ */
+export const eventWelcomeUpdateSchema = eventFields.pick({ welcome_markdown: true }).strict()
+export type EventWelcomeUpdate = z.infer<typeof eventWelcomeUpdateSchema>
 
 export const eventResponseSchema = z.object({ event: eventFields })
 export type EventResponse = z.infer<typeof eventResponseSchema>

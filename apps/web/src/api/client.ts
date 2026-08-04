@@ -28,6 +28,7 @@ import type {
   EventOptionsResponse,
   EventResponse,
   EventUpdate,
+  EventWelcomeUpdate,
   EventsResponse,
   FormQuestionCreateInput,
   FormQuestionResponse,
@@ -272,47 +273,53 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
     /** Public: the ICS feed publishes locations anyway, so the list is not secret. */
     getPlaces: (signal?: AbortSignal) => request<PlacesResponse>('/places', { signal }),
 
-    /** Admin only. `order` is the server's to assign, so it is not offered. */
-    addPlace: (body: PlaceCreate) => request<{ place: Place }>('/admin/places', { method: 'POST', body }),
+    /** Any approved member. `order` is the server's to assign, so it is not offered. */
+    addPlace: (body: PlaceCreate) => request<{ place: Place }>('/places', { method: 'POST', body }),
 
-    /** Admin only. Partial — omitted fields are left as they are. */
+    /** Any approved member. Partial — omitted fields are left as they are. */
     updatePlace: (id: string, body: PlaceUpdate) =>
-      request<{ place: Place }>(`/admin/places/${encodeURIComponent(id)}`, { method: 'PATCH', body }),
+      request<{ place: Place }>(`/places/${encodeURIComponent(id)}`, { method: 'PATCH', body }),
 
-    /** Admin only. */
+    /** Any approved member. Throws ApiError(409, 'conflict') when a dream sits in it. */
     deletePlace: (id: string) =>
-      request<undefined>(`/admin/places/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+      request<undefined>(`/places/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
-    /** Admin only. Every place exactly once, in the order they should appear. */
+    /** Any approved member. Every place exactly once, in the order they should appear. */
     reorderPlaces: (ids: readonly string[]) =>
-      request<PlacesResponse>('/admin/places/order', { method: 'PUT', body: { ids } }),
+      request<PlacesResponse>('/places/order', { method: 'PUT', body: { ids } }),
 
     /** Public, like the places: nothing in either list is about a person. */
     getEventOptions: (eventId: string, signal?: AbortSignal) =>
       request<EventOptionsResponse>(`/events/${encodeURIComponent(eventId)}/options`, { signal }),
 
-    /** Admin only. `order` is the server's to assign, per kind. */
+    /** Any approved member. `order` is the server's to assign, per kind. */
     addEventOption: (eventId: string, body: EventOptionCreateInput) =>
-      request<{ option: EventOption }>(`/admin/events/${encodeURIComponent(eventId)}/options`, {
+      request<{ option: EventOption }>(`/events/${encodeURIComponent(eventId)}/options`, {
         method: 'POST',
         body,
       }),
 
-    /** Admin only. `kind` is not editable — moving one is deleting and adding. */
+    /** Any approved member. `kind` is not editable — moving one is deleting and adding. */
     updateEventOption: (id: string, body: EventOptionUpdate) =>
-      request<{ option: EventOption }>(`/admin/event-options/${encodeURIComponent(id)}`, {
+      request<{ option: EventOption }>(`/event-options/${encodeURIComponent(id)}`, {
         method: 'PATCH',
         body,
       }),
 
-    /** Admin only. */
+    /**
+     * Any approved member.
+     *
+     * Takes every member's ticks for that option with it — `attendance_helping`
+     * cascades — which is the shared-spreadsheet default applied to something
+     * other people filled in.
+     */
     deleteEventOption: (id: string) =>
-      request<undefined>(`/admin/event-options/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+      request<undefined>(`/event-options/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
-    /** Admin only. Every option of that kind exactly once. */
+    /** Any approved member. Every option of that kind exactly once. */
     reorderEventOptions: (eventId: string, kind: string, ids: readonly string[]) =>
       request<EventOptionsResponse>(
-        `/admin/events/${encodeURIComponent(eventId)}/options/${encodeURIComponent(kind)}/order`,
+        `/events/${encodeURIComponent(eventId)}/options/${encodeURIComponent(kind)}/order`,
         { method: 'PUT', body: { ids } },
       ),
 
@@ -323,9 +330,24 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
     createEvent: (body: EventCreateInput) =>
       request<EventResponse>('/admin/events', { method: 'POST', body }),
 
-    /** Admin only. Partial — omitted fields are left as they are. */
+    /**
+     * Admin only. Partial — omitted fields are left as they are.
+     *
+     * Carries the burn's shape, including `welcome_markdown`. A member wanting to
+     * rewrite the welcome text uses `updateWelcome`; sending it here needs admin
+     * like every other field.
+     */
     updateEvent: (id: string, body: EventUpdate) =>
       request<EventResponse>(`/admin/events/${encodeURIComponent(id)}`, { method: 'PATCH', body }),
+
+    /**
+     * Any approved member. The welcome text and nothing else.
+     *
+     * Throws ApiError(400) for any other key — the route is `.strict()`, so an
+     * attempt to set the cap or the dates here fails rather than being dropped.
+     */
+    updateWelcome: (id: string, body: EventWelcomeUpdate) =>
+      request<EventResponse>(`/events/${encodeURIComponent(id)}/welcome`, { method: 'PATCH', body }),
 
     /** Public. The application form's questions, in display order. One central set. */
     getQuestions: (signal?: AbortSignal) => request<FormQuestionsResponse>('/questions', { signal }),

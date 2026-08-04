@@ -653,6 +653,65 @@ coming to a burn. An organiser who is not attending is coherent, so `admin`
 deliberately does not confer `member` — but the ordinary case is both, which is
 why `admin:create` grants both.
 
+### What a member may change
+
+This replaces a shared spreadsheet where everyone could edit everything except
+paid status, so the default for the burn's **shared furniture** is any approved
+member — not admin:
+
+| Open to any approved member   | Still admin                                                                     |
+| ----------------------------- | ------------------------------------------------------------------------------- |
+| Schedule places (lanes)       | The burn's shape: name, slug, dates, gate times, `member_cap`, and creating one |
+| The lodging and helping lists | Payment                                                                         |
+| A burn's welcome text         | Applications, invites, role grants, installation settings                       |
+
+"Approved" means **`member` or `admin`**, and the second half is load-bearing.
+The roles are independent — the accounts table grants either on its own, and an
+organiser who is not attending is coherent — so an account can hold `admin` and
+not `member`. A `member`-only guard would lock that person out of setting the burn
+up. That is `requireApproved` in `auth/guards.ts`.
+
+(`admin:create` grants both, as the Roles section says, so the account an
+installation starts with is not the example. The example is anyone given `admin`
+afterwards without `member`.)
+
+Personal details stay the person's own: nobody edits somebody else's name, contact
+or allergies.
+
+**The roster is still admin-only**, and that is the code rather than the intent. It
+is served from `/api/admin/events/:eventId/roster`, it carries contact details,
+allergies and payment state, and a member cannot read it — which is a gap, since
+whoever cooks needs the allergies. Opening the read while keeping the write to a
+person's own stay is #159; this section describes what the guards do today, not what
+was decided for later.
+
+Two consequences worth knowing rather than discovering.
+
+**The welcome text is last-write-wins, over the whole field.** `PATCH
+…/welcome` overwrites it rather than merging, so two people editing at once means
+one of them loses their paragraph and neither is told. The editor re-reads the
+current text when it opens, which shrinks the window from "since the page loaded"
+to "since Edit was pressed" — that is the difference that matters for a field
+forty-odd people now share, and it does not close it. Closing it properly means
+versioning the field and answering 409, which is more machinery than four burns a
+year justifies. The admin `PATCH` under Organise → Events is partial per field, so
+two organisers touching different fields there do not collide; this one is a single
+field, so they always do.
+
+And deleting a helping option takes every member's ticks for it with it — `attendance_helping` cascades — so a
+member can now remove something other people signed up for. That follows from the
+spreadsheet default rather than being an oversight, and it is the same trust the
+lead-roles register assumes in #27.
+
+The welcome text is edited **on the homepage**, where it is read — whoever spots a
+typo is the one likely to fix it — through `PATCH /api/events/:id/welcome`. An admin
+can also edit it under Organise → Events, alongside the dates and the cap, which
+goes through the admin `PATCH` with everything else. That is
+a route of its own rather than a carve-out in the admin `PATCH`, and the reason is
+the paragraph below: opening one field of the admin route would move the burn's
+shape out from under the prefix hook and turn its protection back into a branch. A
+`.strict()` body means a `member_cap` sent there is a `400`, not a dropped key.
+
 **Every route under `/api/admin/` requires `admin`, whether or not the route
 asked.** One `onRequest` hook on the prefix, rather than a `preHandler` per
 route: opt-in protection is a line a new route has to remember, and forgetting
@@ -1235,12 +1294,13 @@ would reject valid input on a schedule nobody could fix without a deploy.
 
 `GET /api/places` is **public**, like `/api/questions`: the ICS feed publishes a
 session's location to anyone holding the link, so the list of places is already
-public by design. Every write is admin-only.
+public by design. Writes are open to any approved member — the lanes are the
+burn's furniture, not admin's.
 
 `order` is the server's to assign, so `POST` refuses a caller that sends one —
 otherwise two places could claim the same lane. New places land after the last,
 assigned inside a transaction so two simultaneous adds cannot both read the same
-last row. `PUT /api/admin/places/order` takes **every** place exactly once; a
+last row. `PUT /api/places/order` takes **every** place exactly once; a
 partial list would renumber some rows and leave the rest on stale positions.
 Deleting does not renumber the survivors: `order` only has to sort, not be
 contiguous.
@@ -1655,9 +1715,12 @@ and a rule applied some of the time is one that gets tested some of the time.
 
 ### Markdown is escaped, not filtered
 
-`welcome_markdown` is admin-authored and rendered to every public visitor, so it
-is treated as untrusted: an admin account is one phished password away from
-belonging to someone else.
+`welcome_markdown` is written by **any approved member** and rendered to every
+public visitor, so it is treated as untrusted. That is the plain reason now rather
+than a hypothetical one: forty-odd people can edit it. It was already treated this
+way when only admins could — an admin account is one phished password away from
+belonging to someone else — which is why opening the field widened who writes it
+without widening what the renderer has to withstand.
 
 **Raw HTML in the welcome text is escaped and shows as visible text.** The usual
 build is `marked` + DOMPurify, and that was the first attempt — but DOMPurify

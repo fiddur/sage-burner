@@ -1,16 +1,20 @@
 import type { Event } from '@sage-burner/shared'
 
+import { MAX_WELCOME_LENGTH } from '@sage-burner/shared'
 import { useEffect, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
+import { isApiError } from '../api/client.ts'
+import { FormError, useFormError } from '../components/FormError.tsx'
+import { MarkdownField } from '../components/MarkdownField.tsx'
 import { useInstallationTitle } from '../installation.tsx'
 import { renderMarkdown } from '../markdown.ts'
-import { isMember, useViewer } from '../viewer.tsx'
+import { isApproved, isMember, useViewer } from '../viewer.tsx'
 
 type Active = { status: 'loading' } | { status: 'ready'; event: Event | null } | { status: 'failed' }
 
-export type HomeApi = Pick<ApiClient, 'getActiveEvent'>
+export type HomeApi = Pick<ApiClient, 'getActiveEvent' | 'updateWelcome'>
 
 /**
  * The public landing page.
@@ -26,6 +30,10 @@ export const Home = ({ api }: { api: HomeApi }) => {
   const viewer = useViewer()
   const title = useInstallationTitle()
   const [active, setActive] = useState<Active>({ status: 'loading' })
+  const [editing, setEditing] = useState<string | undefined>(undefined)
+  const [saving, setSaving] = useState(false)
+  const [opening, setOpening] = useState(false)
+  const [error, setError] = useFormError()
 
   useEffect(() => {
     const controller = new AbortController()
@@ -47,6 +55,64 @@ export const Home = ({ api }: { api: HomeApi }) => {
     }
   }, [api])
 
+  const openEvent = active.status === 'ready' ? active.event : null
+
+  /**
+   * Open the editor on the text as it is now, not as it was when the page loaded.
+   *
+   * `PATCH …/welcome` overwrites the whole field, so a homepage left open for an
+   * hour and then edited would discard whatever was written in between. Re-reading
+   * here shrinks that window from "since the page loaded" to "since Edit was
+   * pressed", which for a field forty-odd people share is the difference that
+   * matters. It does not close it, and closing it properly means versioning the
+   * field — see the README.
+   *
+   * A failed re-read falls back to what is on screen: refusing to open the editor
+   * because the network hiccuped would be the worse answer.
+   */
+  const openEditor = async (fallback: string) => {
+    setError(undefined)
+    // Said out loud, because the re-read is a round trip with nothing else
+    // changing on screen. Without it this is a button that appears to do nothing
+    // for as long as the network takes — the symptom `FormError` exists for,
+    // reintroduced by the fix for the stale draft.
+    setOpening(true)
+    try {
+      const { event } = await api.getActiveEvent()
+
+      // No active burn means the last one ended while this page sat open. Opening
+      // the editor would write to a burn nobody is looking at any more — and the
+      // save would put it back on screen as though it were still open. The page
+      // falls into its no-burn state instead, which is the whole section
+      // disappearing and so is its own explanation.
+      if (event === null) {
+        setActive({ status: 'ready', event: null })
+        return
+      }
+
+      setActive({ status: 'ready', event })
+      setEditing(event.welcome_markdown)
+    } catch {
+      setEditing(fallback)
+    } finally {
+      setOpening(false)
+    }
+  }
+
+  const save = async (id: string, welcome_markdown: string) => {
+    setSaving(true)
+    setError(undefined)
+    try {
+      const { event } = await api.updateWelcome(id, { welcome_markdown })
+      setActive({ status: 'ready', event })
+      setEditing(undefined)
+    } catch (failure) {
+      setError(isApiError(failure) ? failure.message : 'Could not save that. Please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <article class="prose">
       <h1>{title}</h1>
@@ -65,24 +131,73 @@ export const Home = ({ api }: { api: HomeApi }) => {
           <p class="notice">There is no burn scheduled at the moment. Check back later.</p>
         )}
 
-      {active.status === 'ready' && active.event !== null && (
+      {openEvent !== null && (
         <>
-          <h2>{active.event.name}</h2>
+          <h2>{openEvent.name}</h2>
           <p class="event-dates">
-            <time dateTime={active.event.start_date}>{active.event.start_date}</time> –{' '}
-            <time dateTime={active.event.end_date}>{active.event.end_date}</time>
+            <time dateTime={openEvent.start_date}>{openEvent.start_date}</time> –{' '}
+            <time dateTime={openEvent.end_date}>{openEvent.end_date}</time>
           </p>
 
           {/*
-            Admin-authored and rendered to everyone. `renderMarkdown` escapes
-            raw HTML rather than filtering it, and checks link and image URLs
-            against a scheme allowlist — `markdown.ts` says why escaping is the
-            safer of the two.
+            Rendered to everyone, and written by any approved member. `renderMarkdown`
+            escapes raw HTML rather than filtering it, and checks link and image URLs
+            against a scheme allowlist — `markdown.ts` says why escaping is the safer
+            of the two, and why that holds for an author who is not an admin.
           */}
-          <div
-            class="welcome"
-            dangerouslySetInnerHTML={{ __html: renderMarkdown(active.event.welcome_markdown) }}
-          />
+          {editing === undefined ? (
+            <>
+              <div
+                class="welcome"
+                dangerouslySetInnerHTML={{ __html: renderMarkdown(openEvent.welcome_markdown) }}
+              />
+
+              {/*
+                Edited where it is read: whoever spots a typo on the homepage is the
+                one likely to fix it. The burn's dates and cap stay admin-only and
+                are edited under Organise, which is why this is not a link to there.
+              */}
+              {isApproved(viewer) && (
+                <button
+                  type="button"
+                  class="link-button"
+                  disabled={opening}
+                  onClick={() => void openEditor(openEvent.welcome_markdown)}
+                >
+                  {opening ? 'Opening…' : 'Edit this text'}
+                </button>
+              )}
+            </>
+          ) : (
+            <form
+              class="form"
+              onSubmit={(submitEvent) => {
+                submitEvent.preventDefault()
+                void save(openEvent.id, editing)
+              }}
+            >
+              <MarkdownField
+                label="Welcome text"
+                value={editing}
+                maxLength={MAX_WELCOME_LENGTH}
+                onInput={setEditing}
+              />
+
+              <FormError error={error} />
+
+              <button type="submit" disabled={saving}>
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+              <button
+                type="button"
+                class="link-button"
+                disabled={saving}
+                onClick={() => setEditing(undefined)}
+              >
+                Cancel
+              </button>
+            </form>
+          )}
         </>
       )}
 

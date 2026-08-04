@@ -3,15 +3,16 @@ import type { ComponentChildren } from 'preact'
 import type { ApiClient } from '../api/client.ts'
 
 import { useInstallationTitle } from '../installation.tsx'
-import { isAdmin, isMember, useSetViewer, useViewer } from '../viewer.tsx'
+import { isApproved, isMember, useSetViewer, useViewer } from '../viewer.tsx'
 
 /**
  * The frame every page sits in.
  *
  * The nav reflects who is looking: signed-out visitors get the public entry
- * points, members get their own pages, admins additionally get the organising
- * ones. Hiding a link is presentation only — every one of these routes is
- * guarded server-side as well.
+ * points, and anyone with a role gets their own pages and `Organise` — which
+ * offers a member the burn's shared furniture and an admin everything. Hiding a
+ * link is presentation only — every one of these routes is guarded server-side as
+ * well.
  */
 export const Layout = ({
   children,
@@ -69,7 +70,7 @@ export const Layout = ({
             </>
           )}
 
-          {isAdmin(viewer) && <a href="/admin">Organise</a>}
+          {isApproved(viewer) && <a href="/admin">Organise</a>}
 
           {viewer.status === 'signed-in' && (
             <button type="button" class="link-button" onClick={() => void logOut()}>

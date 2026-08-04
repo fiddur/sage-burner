@@ -1,7 +1,10 @@
 import { Marked } from 'marked'
 
 /**
- * Admin-authored markdown, rendered to HTML that is safe to insert.
+ * Markdown rendered to HTML that is safe to insert, whoever wrote it.
+ *
+ * Members author it as well as admins — any longer field shown to other people is
+ * markdown — so the input here is untrusted.
  *
  * **Raw HTML is escaped rather than filtered.** The obvious build here is
  * `marked` + DOMPurify, and it was the first one — but DOMPurify needs a real
@@ -16,10 +19,10 @@ import { Marked } from 'marked'
  * also a stricter rule than filtering: there is no allowlist to get wrong, and
  * no gap between how a sanitiser parses the input and how the browser does.
  *
- * The cost is that literal `<br>` or `<em>` in the welcome text renders as
- * visible text rather than markup. That is a fair trade for a field edited in a
- * textarea by an organiser — markdown already has emphasis, lists, headings and
- * links, which is the whole vocabulary this text needs.
+ * The cost is that literal `<br>` or `<em>` renders as visible text rather than
+ * markup. That is a fair trade for a field edited in a textarea — markdown already
+ * has emphasis, lists, headings and links, which is the whole vocabulary these
+ * fields need.
  *
  * Link and image URLs are checked separately, because escaping does nothing
  * about `[click](javascript:…)` — that is markdown, not HTML.

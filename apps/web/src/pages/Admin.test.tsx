@@ -62,8 +62,9 @@ describe('Admin', () => {
   })
 
   it('grants a role, sending the whole set rather than a delta', async () => {
-    // #110: the bootstrapped organiser has `admin` alone and cannot reach their
-    // own profile until this adds `member`.
+    // An organiser holding `admin` alone cannot reach their own profile until this
+    // adds `member`. `admin:create` grants both, so that is an account someone was
+    // given `admin` on, not the one the installation starts with.
     const setAccountRoles = vi.fn<AdminApi['setAccountRoles']>(() =>
       Promise.resolve({
         account: {
@@ -132,13 +133,26 @@ describe('Admin', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('has to keep admin')
   })
 
-  it('does not fetch for someone without the role', async () => {
-    // The server would refuse anyway; asking would just render an error where
+  it('offers a member what they can set up, and asks the API nothing', async () => {
+    // The accounts table is admin-only, so a member gets the two lists they may
+    // curate rather than all or nothing. Asking anyway would render an error where
     // an explanation belongs.
     const getAdminAccounts = vi.fn(never)
     renderAdmin(getAdminAccounts, MEMBER)
 
-    expect(await screen.findByText(/admin page/)).toBeTruthy()
+    expect(await screen.findByRole('link', { name: 'Places' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Lodging and helping' })).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Invites' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Who is coming' })).toBeNull()
+    expect(getAdminAccounts).not.toHaveBeenCalled()
+  })
+
+  it('offers an account with no roles nothing at all', async () => {
+    const getAdminAccounts = vi.fn(never)
+    renderAdmin(getAdminAccounts, { status: 'signed-in', account: { id: 'a-9', roles: [] } })
+
+    expect(await screen.findByText(/for members/)).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Places' })).toBeNull()
     expect(getAdminAccounts).not.toHaveBeenCalled()
   })
 
