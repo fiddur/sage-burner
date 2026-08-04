@@ -170,10 +170,10 @@ These are member records, so treat them as such:
 - **A member may write their own record, and the burn's shared furniture.** This
   app replaces a spreadsheet everyone could edit, so the default for something the
   community shares — the schedule lanes, the lodging and helping lists, a burn's
-  welcome text — is any approved member, not admin. What stays admin is the burn's
-  shape (dates, times, cap, creating one), payment, applications, invites, role
-  grants and installation settings. Personal details stay the person's own: nobody
-  edits somebody else's name, contact or allergies.
+  welcome text, the lead-roles register — is any approved member, not admin. What
+  stays admin is the burn's shape (dates, times, cap, creating one), payment,
+  applications, invites, role grants and installation settings. Personal details
+  stay the person's own: nobody edits somebody else's name, contact or allergies.
 - `requireApproved` is the guard for that default, and counts `admin` as well as
   `member`. The roles are independent — the accounts table grants either on its
   own, and an organiser who is not attending is coherent — so an account can hold
@@ -184,6 +184,12 @@ These are member records, so treat them as such:
   prefix**, never exempting it there — the hook's whole value is having no
   exception to forget.
 - Invite tokens are CSPRNG-random and unguessable, single-use, and expiring.
+- **A member may read who else is coming, by name.**
+  `GET /api/events/:eventId/attendees` returns account ids and display names and
+  nothing else — the register has to offer somebody to hand a role to. It is a
+  separate route rather than a relaxed roster because a route selecting two columns
+  cannot leak a third; the roster carries contact details, allergies and payment
+  state and stays admin's (#159).
 - Markdown is sanitized before rendering, and members author it too — any longer
   field shown to other people is markdown. `markdown.ts` escapes raw HTML rather
   than filtering it and allowlists link schemes, so untrusted authors are inside

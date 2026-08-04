@@ -115,6 +115,18 @@ export const inviteStatusOf = (
 }
 
 /**
+ * How much a lead role asks of someone, in each phase of a burn.
+ *
+ * Three independent answers per role — before, during, after — because a role can
+ * be all planning and no presence, or the other way round. Advisory: nothing sorts
+ * or warns on them, they are there so somebody choosing a role knows what they are
+ * agreeing to.
+ */
+export const effortLevels = ['none', 'low', 'medium', 'high'] as const
+export type EffortLevel = (typeof effortLevels)[number]
+export const isEffortLevel = (value: unknown): value is EffortLevel => isOneOf(effortLevels, value)
+
+/**
  * Membership fee state, tracked per `attendance` — never globally per person.
  *
  * Two values, not three. A half-payment is chased out of band rather than

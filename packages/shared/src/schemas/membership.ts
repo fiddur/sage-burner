@@ -174,8 +174,21 @@ export const myAttendanceResponseSchema = z.object({
 /** Who an organiser is adding to a burn on someone else's behalf. */
 export const attendanceCreateSchema = z.object({ account_id: idSchema }).strict()
 
+/**
+ * Who is coming to a burn, by name, for the lists members fill in together.
+ *
+ * Names and ids only. The roster carries contact details, allergies and payment
+ * state and stays admin's; this is the far narrower thing a member needs to hand
+ * somebody a lead role — and a name is already visible to members on any dream
+ * its host offered.
+ */
+export const eventAttendeesResponseSchema = z.object({
+  attendees: z.array(z.object({ account_id: idSchema, name: z.string().nullable() })),
+})
+
 export type MyAttendanceResponse = z.infer<typeof myAttendanceResponseSchema>
 export type AttendanceCreate = z.infer<typeof attendanceCreateSchema>
+export type EventAttendeesResponse = z.infer<typeof eventAttendeesResponseSchema>
 
 /**
  * One person on a burn's list, as an organiser sees them.
