@@ -63,6 +63,8 @@ export type RoutesApi = Pick<
   | 'updatePlace'
   | 'deletePlace'
   | 'reorderPlaces'
+  | 'getPlaceSources'
+  | 'copyPlaces'
   | 'getEventOptions'
   | 'addEventOption'
   | 'updateEventOption'

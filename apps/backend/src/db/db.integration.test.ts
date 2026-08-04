@@ -1,10 +1,13 @@
 import { eq } from 'drizzle-orm'
+import { cpSync, mkdtempSync, readdirSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import type { DbHandle } from './client.ts'
 
 import { createDb } from './client.ts'
-import { runMigrations } from './migrate.ts'
+import { migrationsFolder, runMigrations } from './migrate.ts'
 import {
   account,
   accountRole,
@@ -718,5 +721,153 @@ describe('json columns', () => {
       .run()
 
     expect(handle.db.select().from(application).all()[0]?.answers).toEqual(answers)
+  })
+})
+
+describe('the places-per-burn migration', () => {
+  /**
+   * A data migration is only tested by running it over the old shape with rows in
+   * it. So these stage a folder holding every migration up to but excluding the
+   * rebuild, seed through the old table, and then run the full set.
+   *
+   * `runMigrations` on a fresh database would apply the rebuild before anything
+   * could be inserted, which is why the two-step staging is not ceremony.
+   */
+  const REBUILD = '20260804105125_places_per_burn'
+
+  // This drizzle version discovers migrations by listing the folder, and throws
+  // outright if it finds a `meta/_journal.json` — so staging is a copy of the
+  // directories whose timestamped names sort before the one under test.
+  const stagedThrough = (exclude: string) => {
+    const staged = mkdtempSync(path.join(tmpdir(), 'sage-migrations-'))
+    const kept = readdirSync(migrationsFolder)
+      .filter((name) => name < exclude)
+      .toSorted()
+
+    for (const tag of kept) {
+      cpSync(path.join(migrationsFolder, tag), path.join(staged, tag), { recursive: true })
+    }
+
+    return { staged, kept }
+  }
+
+  const beforeTheRebuild = () => {
+    const fresh = createDb({ url: ':memory:' })
+    const { staged, kept } = stagedThrough(REBUILD)
+
+    // Asserted: a mistyped tag would stage every migration, the rebuild included,
+    // and every test below would then pass while proving nothing about it.
+    expect(kept).not.toContain(REBUILD)
+    expect(kept.length).toBeGreaterThan(0)
+
+    runMigrations(fresh, staged)
+    expect(columnsOf(fresh, 'place')).not.toContain('event_id')
+
+    return fresh
+  }
+
+  const columnsOf = (db: DbHandle, table: string) =>
+    db.client
+      .prepare(`PRAGMA table_info(${table})`)
+      .all()
+      .map((row) => row.name)
+
+  const oldPlace = (db: DbHandle, id: string, order: number, name: string) =>
+    db.client
+      .prepare('insert into place (id, "order", name, emoji, color) values (?, ?, ?, ?, ?)')
+      .run(id, order, name, '🛕', 'yellow')
+
+  const anEvent = (db: DbHandle, id: string, slug: string, created_at: string) =>
+    db.client
+      .prepare(
+        'insert into event (id, name, slug, start_date, end_date, member_cap, created_at) values (?, ?, ?, ?, ?, ?, ?)',
+      )
+      .run(id, slug, slug, '2026-10-02', '2026-10-04', 42, created_at)
+
+  it('gives existing places to the last created event', () => {
+    const fresh = beforeTheRebuild()
+    try {
+      anEvent(fresh, 'e-first', 'first-burn', '2025-01-01T00:00:00Z')
+      anEvent(fresh, 'e-last', 'last-burn', '2026-01-01T00:00:00Z')
+      // Deliberately not the last by start date, nor the last inserted: the rule is
+      // `created_at`, and a test where all three agree would not say which won.
+      anEvent(fresh, 'e-middle', 'middle-burn', '2025-06-01T00:00:00Z')
+      oldPlace(fresh, 'p-1', 0, 'Temple')
+      oldPlace(fresh, 'p-2', 1, 'Sauna')
+
+      runMigrations(fresh)
+
+      const rows = fresh.client
+        .prepare('select id, event_id, "order", name from place order by "order"')
+        .all()
+      expect(rows).toEqual([
+        { id: 'p-1', event_id: 'e-last', order: 0, name: 'Temple' },
+        { id: 'p-2', event_id: 'e-last', order: 1, name: 'Sauna' },
+      ])
+    } finally {
+      fresh.close()
+    }
+  })
+
+  it('drops the places when there is no event to give them to', () => {
+    // No event means no `session` rows either — they reference one — so the places
+    // are unreferenced decoration rather than a loss.
+    const fresh = beforeTheRebuild()
+    try {
+      oldPlace(fresh, 'p-1', 0, 'Temple')
+
+      runMigrations(fresh)
+
+      expect(fresh.client.prepare('select count(*) as n from place').get()?.n).toBe(0)
+      expect(columnsOf(fresh, 'place')).toContain('event_id')
+    } finally {
+      fresh.close()
+    }
+  })
+
+  it('keeps a dream standing in a place it carried over', () => {
+    const fresh = beforeTheRebuild()
+    try {
+      anEvent(fresh, 'e-last', 'last-burn', '2026-01-01T00:00:00Z')
+      fresh.client
+        .prepare('insert into account (id, email, created_at) values (?, ?, ?)')
+        .run('a-1', 'host@example.org', NOW)
+      oldPlace(fresh, 'p-1', 0, 'Temple')
+      fresh.client
+        .prepare(
+          'insert into session (id, event_id, host_account_id, title, description, place_id) values (?, ?, ?, ?, ?, ?)',
+        )
+        .run('s-1', 'e-last', 'a-1', 'Sunrise yoga', '', 'p-1')
+
+      runMigrations(fresh)
+
+      expect(fresh.client.prepare('select place_id from session where id = ?').get('s-1')?.place_id).toBe(
+        'p-1',
+      )
+      // The runner refuses on a dangling child, so reaching here is itself the
+      // assertion that the rebuild did not orphan the reference.
+      expect(fresh.client.prepare('PRAGMA foreign_key_check').all()).toEqual([])
+    } finally {
+      fresh.close()
+    }
+  })
+
+  it('takes a burn’s places with it when the burn is deleted', () => {
+    // The rebuild is what gives the foreign key `on delete cascade`; the generated
+    // `ALTER TABLE` could not have.
+    const fresh = createDb({ url: ':memory:' })
+    try {
+      runMigrations(fresh)
+      anEvent(fresh, 'e-1', 'a-burn', '2026-01-01T00:00:00Z')
+      fresh.client
+        .prepare('insert into place (id, event_id, "order", name, emoji, color) values (?, ?, ?, ?, ?, ?)')
+        .run('p-1', 'e-1', 0, 'Temple', '🛕', 'yellow')
+
+      fresh.client.prepare('delete from event where id = ?').run('e-1')
+
+      expect(fresh.client.prepare('select count(*) as n from place').get()?.n).toBe(0)
+    } finally {
+      fresh.close()
+    }
   })
 })

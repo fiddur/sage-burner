@@ -14,7 +14,20 @@ afterEach(cleanup)
 
 const MEMBER: Viewer = { status: 'signed-in', account: { id: 'a-1', roles: ['member'] } }
 
-const TEMPLE: Place = { id: 'p-1', order: 0, name: 'Temple', emoji: '🛕', color: 'yellow' }
+const BURN = {
+  id: 'e-1',
+  name: 'Summer burn',
+  slug: 'summer-burn',
+  start_date: '2026-08-01',
+  end_date: '2026-08-05',
+  start_time: '16:00',
+  end_time: '12:00',
+  welcome_markdown: '',
+  member_cap: 42,
+  created_at: '2026-07-02T00:00:00.000Z',
+}
+
+const TEMPLE: Place = { id: 'p-1', event_id: 'e-1', order: 0, name: 'Temple', emoji: '🛕', color: 'yellow' }
 
 const aDream = (over: Partial<Session> & Pick<Session, 'id' | 'title'>): Session => ({
   event_id: 'e-1',
@@ -27,6 +40,7 @@ const aDream = (over: Partial<Session> & Pick<Session, 'id' | 'title'>): Session
 })
 
 const stub = (over: Partial<DreamsApi> = {}, sessions: Session[] = []): DreamsApi => ({
+  getActiveEvent: () => Promise.resolve({ event: BURN }),
   getSessions: () => Promise.resolve({ sessions }),
   getPlaces: () => Promise.resolve({ places: [TEMPLE] }),
   offerSession: () => Promise.reject(new Error('offerSession is not stubbed here')),

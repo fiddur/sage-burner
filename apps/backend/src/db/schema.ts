@@ -175,9 +175,9 @@ export const event = sqliteTable(
 /**
  * The per-event lists a member picks from: where to sleep, what to help with.
  *
- * Per event, unlike `form_question` and `place`, because these are the answers
- * that change with the site and the year — what is available at this burn, not
- * what the community asks once.
+ * Per event, unlike `form_question`, because these are the answers that change with
+ * the site and the year — what is available at this burn, not what the community
+ * asks once. `place` joined them in #156, for the same reason.
  */
 export const eventOption = sqliteTable(
   'event_option',
@@ -249,13 +249,20 @@ export const formQuestion = sqliteTable(
 )
 
 /**
- * Somewhere a dream can happen. One central set, not one per event — the venue
- * outlives the burn.
+ * Somewhere a dream can happen — **per event**, seeded from a previous burn.
+ *
+ * The venue outlives the burn but the set in use does not: some spots are
+ * summer-only, and a large event tent is there some years and not others. One
+ * central list meant every schedule grid carried lanes that do not exist at this
+ * burn, and the grid is the thing the list exists to build (#156).
  */
 export const place = sqliteTable(
   'place',
   {
     id: text('id').notNull(),
+    event_id: text('event_id')
+      .notNull()
+      .references(() => event.id, { onDelete: 'cascade' }),
     // Not unique, for the same reason as `form_question.order`: reordering swaps
     // positions, and a transient collision mid-swap must not be rejected.
     order: integer('order').notNull(),
@@ -265,7 +272,7 @@ export const place = sqliteTable(
   },
   (table) => [
     primaryKey({ columns: [table.id] }),
-    index('place_order_idx').on(table.order),
+    index('place_event_order_idx').on(table.event_id, table.order),
     check('place_color_check', oneOf(table.color, placeColors)),
     check('place_order_check', sql`${table.order} >= 0`),
     check('place_name_check', sql`length(trim(${table.name})) > 0`),

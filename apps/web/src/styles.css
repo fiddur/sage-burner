@@ -625,3 +625,14 @@ a:hover {
   align-items: center;
   gap: 0.25rem;
 }
+
+/* The "seed this burn from a previous one" control, on the places grid and the
+   roles register both. One class rather than one per list: it is the same control. */
+.copy-from {
+  display: grid;
+  gap: 0.5rem;
+  margin: 1rem 0;
+  padding: 0.75rem 1rem;
+  border: 1px dashed var(--line);
+  border-radius: 0.5rem;
+}

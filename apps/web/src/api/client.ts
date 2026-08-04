@@ -10,6 +10,8 @@ import type {
   ApplicationsResponse,
   Attendance,
   AttendanceUpdate,
+  CopyFrom,
+  CopySourcesResponse,
   EventAttendeesResponse,
   EventCreateInput,
   EventOption,
@@ -32,11 +34,9 @@ import type {
   InviteCreate,
   InviteResponse,
   InviteState,
-  LeadRoleCopy,
   LeadRoleCreateInput,
   LeadRoleLead,
   LeadRoleResponse,
-  LeadRoleSourcesResponse,
   LeadRoleTeam,
   LeadRoleUpdate,
   LeadRolesResponse,
@@ -338,20 +338,26 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
 
     /** The burns this register could be seeded from, newest first. */
     getLeadRoleSources: (eventId: string, signal?: AbortSignal) =>
-      request<LeadRoleSourcesResponse>(`/events/${encodeURIComponent(eventId)}/roles/sources`, { signal }),
+      request<CopySourcesResponse>(`/events/${encodeURIComponent(eventId)}/roles/sources`, { signal }),
 
     /** Definitions only, never people. Throws ApiError(409) if this register is not empty. */
     copyLeadRoles: (eventId: string, fromEventId: string) =>
       request<LeadRolesResponse>(`/events/${encodeURIComponent(eventId)}/roles/copy`, {
         method: 'POST',
-        body: { from_event_id: fromEventId } satisfies LeadRoleCopy,
+        body: { from_event_id: fromEventId } satisfies CopyFrom,
       }),
 
-    /** Public: the ICS feed publishes locations anyway, so the list is not secret. */
-    getPlaces: (signal?: AbortSignal) => request<PlacesResponse>('/places', { signal }),
+    /**
+     * One burn's lanes. Public: the ICS feed publishes locations anyway, so the list
+     * is not secret. Per burn since #156 — a summer-only spot is not a lane in the
+     * winter grid.
+     */
+    getPlaces: (eventId: string, signal?: AbortSignal) =>
+      request<PlacesResponse>(`/events/${encodeURIComponent(eventId)}/places`, { signal }),
 
-    /** Any approved member. `order` is the server's to assign, so it is not offered. */
-    addPlace: (body: PlaceCreate) => request<{ place: Place }>('/places', { method: 'POST', body }),
+    /** Any approved member. `order` and the burn are the server's, so neither is offered. */
+    addPlace: (eventId: string, body: PlaceCreate) =>
+      request<{ place: Place }>(`/events/${encodeURIComponent(eventId)}/places`, { method: 'POST', body }),
 
     /** Any approved member. Partial — omitted fields are left as they are. */
     updatePlace: (id: string, body: PlaceUpdate) =>
@@ -361,9 +367,23 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
     deletePlace: (id: string) =>
       request<undefined>(`/places/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
-    /** Any approved member. Every place exactly once, in the order they should appear. */
-    reorderPlaces: (ids: readonly string[]) =>
-      request<PlacesResponse>('/places/order', { method: 'PUT', body: orderBody(ids) satisfies PlaceOrder }),
+    /** Any approved member. This burn's places exactly once, in the order they should appear. */
+    reorderPlaces: (eventId: string, ids: readonly string[]) =>
+      request<PlacesResponse>(`/events/${encodeURIComponent(eventId)}/places/order`, {
+        method: 'PUT',
+        body: orderBody(ids) satisfies PlaceOrder,
+      }),
+
+    /** The burns whose grid this one's could be seeded from, newest first. */
+    getPlaceSources: (eventId: string, signal?: AbortSignal) =>
+      request<CopySourcesResponse>(`/events/${encodeURIComponent(eventId)}/places/sources`, { signal }),
+
+    /** The lanes, never the dreams in them. Throws ApiError(409) if this grid is not empty. */
+    copyPlaces: (eventId: string, fromEventId: string) =>
+      request<PlacesResponse>(`/events/${encodeURIComponent(eventId)}/places/copy`, {
+        method: 'POST',
+        body: { from_event_id: fromEventId } satisfies CopyFrom,
+      }),
 
     /** Public, like the places: nothing in either list is about a person. */
     getEventOptions: (eventId: string, signal?: AbortSignal) =>

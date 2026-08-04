@@ -1,4 +1,4 @@
-import type { EffortLevel, LeadRole, LeadRoleSourcesResponse, LeadRoleUpdate } from '@sage-burner/shared'
+import type { CopySourcesResponse, EffortLevel, LeadRole, LeadRoleUpdate } from '@sage-burner/shared'
 
 import { effortLevels, MAX_NOTES, MAX_TITLE } from '@sage-burner/shared'
 import { useEffect, useState } from 'preact/hooks'
@@ -26,7 +26,7 @@ export type RolesApi = Pick<
 >
 
 type Person = { account_id: string; name: string | null }
-type Source = LeadRoleSourcesResponse['sources'][number]
+type Source = CopySourcesResponse['sources'][number]
 
 type Loaded =
   | { status: 'loading' }
@@ -488,7 +488,7 @@ const CopyFrom = ({
   const [chosen, setChosen] = useState(sources[0]?.event_id ?? '')
 
   return (
-    <div class="role-copy">
+    <div class="copy-from">
       <label class="field">
         <span>Or start from a previous burn</span>
         <select
@@ -499,7 +499,7 @@ const CopyFrom = ({
         >
           {sources.map((source) => (
             <option key={source.event_id} value={source.event_id}>
-              {source.name} ({source.roles})
+              {source.name} ({source.count})
             </option>
           ))}
         </select>

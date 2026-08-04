@@ -496,8 +496,8 @@ describe('seeding a new burn from a previous one', () => {
     const offered = (await sources(server, cookie, next)).json().sources
 
     expect(offered).toEqual([
-      { event_id: newer, name: 'Last summer', roles: 2 },
-      { event_id: older, name: 'Two summers ago', roles: 1 },
+      { event_id: newer, name: 'Last summer', count: 2 },
+      { event_id: older, name: 'Two summers ago', count: 1 },
     ])
     expect(offered.map((row: { event_id: string }) => row.event_id)).not.toContain(bare)
   })

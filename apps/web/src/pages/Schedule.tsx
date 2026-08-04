@@ -51,19 +51,27 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
 
     const controller = new AbortController()
 
-    Promise.all([
-      api.getActiveEvent(controller.signal),
-      api.getPlaces(controller.signal),
-      api.getSessions(controller.signal),
-    ])
-      .then(([active, places, dreams]) => {
-        if (controller.signal.aborted) return
-        setLoaded({
+    // The burn comes first: since #156 the lanes belong to one, so there is no
+    // grid to ask for until we know which.
+    api
+      .getActiveEvent(controller.signal)
+      .then(async (active) => {
+        if (active.event === null) return { status: 'ready', event: null, places: [], sessions: [] } as const
+
+        const [places, dreams] = await Promise.all([
+          api.getPlaces(active.event.id, controller.signal),
+          api.getSessions(controller.signal),
+        ])
+
+        return {
           status: 'ready',
           event: active.event,
           places: places.places,
           sessions: dreams.sessions,
-        })
+        } as const
+      })
+      .then((next) => {
+        if (!controller.signal.aborted) setLoaded(next)
       })
       .catch((failure: unknown) => {
         if (controller.signal.aborted) return

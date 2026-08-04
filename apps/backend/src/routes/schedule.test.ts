@@ -57,9 +57,9 @@ const givenEvent = async (name = 'Summer burn') => {
   return id
 }
 
-const givenPlace = async (name = 'Temple', color: 'yellow' | 'grey' = 'yellow') => {
+const givenPlace = async (eventId: string, name = 'Temple', color: 'yellow' | 'grey' = 'yellow') => {
   const id = randomUUID()
-  await db().insert(place).values({ id, order: 0, name, emoji: '🛕', color })
+  await db().insert(place).values({ id, event_id: eventId, order: 0, name, emoji: '🛕', color })
   return id
 }
 
@@ -128,7 +128,7 @@ describe('the public calendar feed', () => {
     const server = await build()
     const eventId = await givenEvent()
     const host = await givenHost()
-    const temple = await givenPlace()
+    const temple = await givenPlace(eventId)
     const id = await givenDream(eventId, host, { place_id: temple })
 
     const body = (await feed(server, eventId)).body
@@ -145,7 +145,7 @@ describe('the public calendar feed', () => {
     const server = await build()
     const eventId = await givenEvent()
     const host = await givenHost()
-    const shed = await givenPlace('Shed', 'grey')
+    const shed = await givenPlace(eventId, 'Shed', 'grey')
     await givenDream(eventId, host, { place_id: shed })
 
     expect((await feed(server, eventId)).body).toContain('COLOR:gray')
@@ -225,7 +225,7 @@ describe('the public calendar feed', () => {
     const server = await build()
     const eventId = await givenEvent()
     const host = await givenHost()
-    const temple = await givenPlace()
+    const temple = await givenPlace(eventId)
     await givenDream(eventId, host, { place_id: temple })
     await db().insert(attendance).values({
       id: randomUUID(),
