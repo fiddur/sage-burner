@@ -28,6 +28,7 @@ const anEntry = (over: Partial<MemberRosterEntry> = {}): MemberRosterEntry => ({
   name: 'Ana',
   contact: 'ana on discord',
   allergies_notes: null,
+  payment_status: 'unpaid',
   waiting: false,
   ...over,
 })
@@ -90,6 +91,28 @@ describe('Members', () => {
 
     expect(rows[0]).toContain('Second')
     expect(rows[1]).toContain('First')
+  })
+
+  it('says who has paid, since that is what makes joining definite', async () => {
+    renderPage(
+      stub(
+        aRoster({
+          entries: [
+            anEntry({ name: 'Ada', payment_status: 'paid' }),
+            anEntry({ name: 'Bea', payment_status: 'unpaid' }),
+          ],
+        }),
+      ),
+    )
+
+    await screen.findByText('Ada')
+    const rows = screen
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) => row.textContent ?? '')
+
+    expect(rows[0]).toContain('yes')
+    expect(rows[1]).toContain('not yet')
   })
 
   it('marks who is waiting and counts the places taken', async () => {

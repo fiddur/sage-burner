@@ -267,6 +267,31 @@ describe('a member saying they are coming', () => {
     expect(await db().select().from(attendance)).toHaveLength(0)
   })
 
+  it('offers the burns to an organiser holding admin without member', async () => {
+    // What fills the selector. That account has no attendance anywhere, so under
+    // `requireMember` it got a 403 and faced an empty selector on the burn it was
+    // setting up — the one case `choosableBurns(true, …)` exists for.
+    const server = await build()
+    const eventId = await givenEvent()
+    const organiser = await givenAccount(['admin'])
+
+    const response = await myBurns(server, organiser.cookie)
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().coming).toHaveLength(1)
+    expect(response.json().coming[0].event.id).toBe(eventId)
+    expect(response.json().coming[0].attendance).toBeNull()
+    expect(response.json().past).toEqual([])
+  })
+
+  it('still refuses an account with neither role, which has nothing to choose', async () => {
+    const server = await build()
+    await givenEvent()
+    const applicant = await givenAccount([])
+
+    expect((await myBurns(server, applicant.cookie)).statusCode).toBe(403)
+  })
+
   it('lists the coming burns soonest first, and past ones only if they came', async () => {
     const server = await build()
     const gone = await givenEvent({ start_date: '2025-08-01', end_date: '2025-08-05', slug: 'gone' })

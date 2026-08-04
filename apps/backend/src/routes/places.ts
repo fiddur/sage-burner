@@ -186,9 +186,16 @@ export const registerPlaceRoutes = (
 
       // A dream sitting in this lane holds the row: `session.place_id` has no
       // `onDelete`, so SQLite refuses rather than quietly unscheduling it. Left to
-      // the constraint rather than pre-read, because the dream can be created
-      // between a read and the delete — unlike the burn's end date, which no route
-      // moves.
+      // the constraint rather than pre-read, because a constraint cannot go stale
+      // and a read can.
+      //
+      // The `openLane` read above can, and that window is accepted rather than
+      // closed: `PATCH /api/admin/events/:id` moves `end_date`, so an admin
+      // shortening a burn between that read and this delete would let a lane go from
+      // a burn that just closed. The same shape as the burn vanishing between the
+      // check and the insert on POST, and left open for the same reason: two people
+      // doing those two things in the same second, at forty-odd members and four
+      // burns a year, is not worth a transaction to prevent.
       let deleted
       try {
         deleted = await db.delete(place).where(eq(place.id, request.params.id)).returning({ id: place.id })

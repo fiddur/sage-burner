@@ -15,8 +15,9 @@ export type MembersApi = Pick<ApiClient, 'getMembers'>
  * account precisely so somebody can read them — which was not true while the only
  * route serving them sat under `/api/admin/`.
  *
- * Read-only, all of it. Somebody else's stay is theirs to edit, and payment is not
- * on the page because it is not in the response.
+ * Read-only, all of it. Somebody else's stay is theirs to edit, and *recording* a
+ * payment stays admin's — but whether somebody has paid is shown to everyone, being
+ * the definite mark of actually joining.
  */
 export const Members = ({ api }: { api: MembersApi }) => {
   const viewer = useViewer()
@@ -68,6 +69,7 @@ export const Members = ({ api }: { api: MembersApi }) => {
                   <th scope="col">Allergies</th>
                   <th scope="col">Staying</th>
                   <th scope="col">Helping with</th>
+                  <th scope="col">Paid</th>
                 </tr>
               </thead>
               <tbody>
@@ -96,6 +98,9 @@ export const Members = ({ api }: { api: MembersApi }) => {
                         </>
                       )}
                     </td>
+                    {/* A word, not a tick: a checkbox reads as something to click,
+                        and this is the one column here nobody may change. */}
+                    <td>{entry.payment_status === 'paid' ? 'yes' : 'not yet'}</td>
                   </tr>
                 ))}
               </tbody>

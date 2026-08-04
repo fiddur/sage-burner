@@ -594,8 +594,10 @@ one later cannot lock out an existing member.
 
 Any approved member can be told when something happens to them, per **browser**
 rather than per person: a subscription belongs to the browser it was made in, so
-somebody with a laptop and a phone turns it on in both. The toggle is on the
-details page behind the initials circle.
+somebody with a laptop and a phone turns it on in both. The toggle is on the details
+page behind the initials circle, **and on ⚙️ → Settings** — an organiser holding
+`admin` without `member` is refused from the details page, and application
+notifications go precisely to admins.
 
 Two things notify today:
 
@@ -682,14 +684,14 @@ This replaces a shared spreadsheet where everyone could edit everything except
 paid status, so the default for the burn's **shared furniture** is any approved
 member — not admin:
 
-| Open to any approved member                 | Still admin                                                                     |
-| ------------------------------------------- | ------------------------------------------------------------------------------- |
-| Schedule places, per burn                   | The burn's shape: name, slug, dates, gate times, `member_cap`, and creating one |
-| The lodging and helping lists               | Payment                                                                         |
-| A burn's welcome text                       | Applications, invites, role grants, installation settings                       |
-| The lead-roles register                     |                                                                                 |
-| Who is coming, by name                      |                                                                                 |
-| Reading the roster, minus payment and email |                                                                                 |
+| Open to any approved member                        | Still admin                                                                     |
+| -------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Schedule places, per burn                          | The burn's shape: name, slug, dates, gate times, `member_cap`, and creating one |
+| The lodging and helping lists                      | Payment                                                                         |
+| A burn's welcome text                              | Applications, invites, role grants, installation settings                       |
+| The lead-roles register                            |                                                                                 |
+| Who is coming, by name                             |                                                                                 |
+| Reading the roster, bar the payment date and email |                                                                                 |
 
 "Approved" means **`member` or `admin`**, and the second half is load-bearing.
 The roles are independent — the accounts table grants either on its own, and an
@@ -704,28 +706,34 @@ afterwards without `member`.)
 Personal details stay the person's own: nobody edits somebody else's name, contact
 or allergies.
 
-**A member reads the roster, minus payment and email** (#159). Whoever cooks needs
+**A member reads the roster, minus the payment date and the email** (#159). Whoever cooks needs
 the allergies, and that is why allergies live on the account rather than per burn.
 The write does not open with it: somebody else's stay stays theirs, through the
 `PATCH /api/events/:eventId/attendance/me` they already have, and adding or removing
 someone else is still admin's.
 
-`GET /api/events/:eventId/members` and `GET /api/events/active/members` serve it,
-**outside the admin prefix rather than exempted inside it** — the hook's whole value
-is having no exception to forget. Three columns come off the organiser's row:
+`GET /api/events/:eventId/members` serves it, **outside the admin prefix rather than
+exempted inside it** — the hook's whole value is having no exception to forget. There
+is no `active` variant: the burn selector names the burn, so the route never has to
+guess which one.
 
-- **`payment_status` and `payment_date`.** Who has paid was the one column of the
-  spreadsheet this replaces that everyone could see and nobody but the organiser
-  could edit, and the reason to show it was the editing.
+**`payment_status` is shown to everyone.** Having paid is the definite mark of
+somebody actually joining, and it was a column everyone could read in the spreadsheet
+this replaces. What stays admin's is _recording_ it, which is the `PATCH` and not this
+read. The page prints a word rather than a tick, since a checkbox reads as something
+to click and this is the one column here nobody may change.
+
+Two columns come off the organiser's row:
+
+- **`payment_date`**, because when a transfer landed is bookkeeping. The status
+  answers "are they in"; the date answers a question only whoever reconciles the
+  account is asking.
 - **`email`**, which is the login identity rather than a way of reaching somebody.
   `profileUpdateSchema` refuses to change it for that reason, and `contact` is the
   field a person fills in to be contacted. The member page has no fallback to it,
   where the organiser's shows it when a name is missing.
 
-`waiting` stays, because a waiting list is only any use to the people on it. The
-ordering it comes from puts paid before unpaid, so somebody at the bottom of a full
-list can be guessed not to have paid — that is the waiting list working rather than
-the column leaking.
+`waiting` stays, because a waiting list is only any use to the people on it.
 
 The projection is `asMemberEntry` in `roster.ts`, written out field by field. That
 is the safety property, not tidiness: it is an object literal against

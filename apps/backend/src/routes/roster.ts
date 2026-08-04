@@ -46,6 +46,7 @@ const asMemberEntry = (entry: RosterEntry): MemberRosterEntry => ({
   name: entry.name,
   contact: entry.contact,
   allergies_notes: entry.allergies_notes,
+  payment_status: entry.payment_status,
   waiting: entry.waiting,
 })
 

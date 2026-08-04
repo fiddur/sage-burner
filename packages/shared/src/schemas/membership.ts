@@ -261,23 +261,21 @@ export const rosterResponseSchema = z.object({
  * The same list as a member sees it (#159).
  *
  * Derived by subtraction from the organiser's entry so the two cannot drift into
- * describing different people. Three fields come off:
+ * describing different people. Two fields come off, and **`payment_status` is not
+ * one of them**: having paid is the definite mark of somebody actually joining, and
+ * it was a column everyone could read in the spreadsheet this replaces. What stays
+ * admin's is *recording* it, which is the `PATCH` and not this read.
  *
- * - **`payment_status` and `payment_date`**, because who has paid is admin's — it
- *   was the one column of the spreadsheet this replaces that everyone could see and
- *   nobody but the organiser could edit, and the reason to show it was the editing.
- * - **`email`**, which is the login identity, not a way of reaching somebody.
- *   `profileUpdateSchema` refuses to change it for that reason, and `contact` is the
- *   field a person fills in to be contacted. Nothing here falls back to it.
- *
- * `waiting` stays, derived from payment as it is for anyone: a waiting list is only
- * any use to the people on it. The ordering it comes from puts paid before unpaid,
- * so a member can infer that whoever is at the bottom of a full list has not paid.
- * That is the waiting list working, not a leak of the column.
+ * - **`payment_date`** goes, because when a transfer landed is bookkeeping. The
+ *   status answers "are they in"; the date answers a question only whoever
+ *   reconciles the account is asking.
+ * - **`email`** goes, being the login identity rather than a way of reaching
+ *   somebody. `profileUpdateSchema` refuses to change it for that reason, and
+ *   `contact` is the field a person fills in to be contacted. Nothing here falls
+ *   back to it.
  */
 export const memberRosterEntrySchema = rosterEntrySchema.omit({
   email: true,
-  payment_status: true,
   payment_date: true,
 })
 

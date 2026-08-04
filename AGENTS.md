@@ -204,12 +204,15 @@ These are member records, so treat them as such:
   nothing else — the register has to offer somebody to hand a role to. It is a
   separate route rather than a relaxed roster because a route selecting two columns
   cannot leak a third.
-- **A member may read the roster itself, minus payment and email** (#159).
-  `GET /api/events/:eventId/members` and `/api/events/active/members`, outside the
-  admin prefix rather than exempted inside it. Whoever cooks needs the allergies,
-  which is why those live on the account. Payment stays admin's, and `email` is the
-  login identity rather than a way of reaching somebody — `contact` is that. The
-  projection is `asMemberEntry` in `roster.ts`, an object literal against
+- **A member may read the roster itself, minus the payment date and the email**
+  (#159). `GET /api/events/:eventId/members`, outside the admin prefix rather than
+  exempted inside it. Whoever cooks needs the allergies, which is why those live on
+  the account. **`payment_status` is shown to everyone** — having paid is the
+  definite mark of actually joining, and it was a column everyone could read in the
+  spreadsheet this replaces; what stays admin's is _recording_ it. `payment_date` is
+  bookkeeping, and `email` is the login identity rather than a way of reaching
+  somebody — `contact` is that. The projection is `asMemberEntry` in `roster.ts`,
+  an object literal against
   `MemberRosterEntry`, so a column added to the organiser's row reaches members only
   when somebody names it there; spreading the row and deleting keys would not have
   that property. The two views share one query, so the order — which decides who has

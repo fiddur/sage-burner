@@ -512,9 +512,28 @@ describe('the same list as a member sees it', () => {
     expect(entry.contact).toBe('Ana on discord')
   })
 
-  it('keeps payment and the login identity out of it', async () => {
+  it('says who has paid, which is the mark of somebody actually joining', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const paid = await givenAccount('Paid')
+    const owing = await givenAccount('Owing')
+    const reader = await givenAccount('Reader')
+    await givenComing(eventId, paid.id, '2026-07-01T00:00:00Z', true)
+    await givenComing(eventId, owing.id, '2026-07-02T00:00:00Z')
+
+    const { entries } = (await members(server, reader.cookie, eventId)).json()
+
+    expect(
+      entries.map((entry: { name: string; payment_status: string }) => [entry.name, entry.payment_status]),
+    ).toEqual([
+      ['Paid', 'paid'],
+      ['Owing', 'unpaid'],
+    ])
+  })
+
+  it('keeps the date it landed and the login identity out of it', async () => {
     // Named one at a time. A single `expect(entry).not.toMatchObject({…})` passes
-    // when any one of the three is absent, which is not the question being asked.
+    // when any one of the two is absent, which is not the question being asked.
     const server = await build()
     const eventId = await givenEvent()
     const ana = await givenAccount('Ana')
@@ -523,10 +542,10 @@ describe('the same list as a member sees it', () => {
 
     const [entry] = (await members(server, reader.cookie, eventId)).json().entries
 
-    expect(Object.keys(entry)).not.toContain('payment_status')
     expect(Object.keys(entry)).not.toContain('payment_date')
     expect(Object.keys(entry)).not.toContain('email')
     expect(JSON.stringify(entry)).not.toContain('@example.org')
+    expect(JSON.stringify(entry)).not.toContain('2026-06-30')
   })
 
   it('still says who has a place and who is waiting', async () => {

@@ -74,8 +74,15 @@ export const registerAttendanceRoutes = (
    * `coming` is every burn that has not ended, joined or not — joining is what the
    * page is for. `past` is only the ones with a stay, since a burn somebody never
    * came to is not their history.
+   *
+   * `requireApproved`, unlike the writes below. This is what fills the burn selector,
+   * and an organiser holding `admin` without `member` has to be able to choose the
+   * burn they are setting up — they get every coming burn with `attendance: null` on
+   * each and an empty `past`, which is exactly what `choosableBurns` expects. Under
+   * `requireMember` that account got a 403, the provider swallowed it, and they faced
+   * the empty selector this whole design exists to prevent.
    */
-  app.get('/api/events/mine', { preHandler: requireMember }, async (request, reply) => {
+  app.get('/api/events/mine', { preHandler: requireApproved }, async (request, reply) => {
     void noStore(reply)
 
     const viewer = await viewerFor(request, { db, sessions })
