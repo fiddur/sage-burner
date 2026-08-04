@@ -162,6 +162,22 @@ const directPlace = (eventId: string, name = 'Nowhere', emoji = '🛕', color = 
     .prepare('insert into place (id, event_id, "order", name, emoji, color) values (?, ?, ?, ?, ?, ?)')
     .run(randomUUID(), eventId, 0, name, emoji, color)
 
+/**
+ * A finished burn's grid, written straight to the database.
+ *
+ * The API refuses every write to a burn that has ended, so the copy tests — which
+ * need a *previous* burn to copy from — arrange their source this way. `order` is
+ * the argument order, which is also what a copy should preserve.
+ */
+const givenLanes = (eventId: string, ...lanes: { name: string; emoji: string; color: string }[]) =>
+  lanes.map((lane, index) => {
+    const id = randomUUID()
+    client()
+      .prepare('insert into place (id, event_id, "order", name, emoji, color) values (?, ?, ?, ?, ?, ?)')
+      .run(id, eventId, index, lane.name, lane.emoji, lane.color)
+    return id
+  })
+
 describe('the places a dream can happen at', () => {
   it('is empty before an organiser adds any', async () => {
     const server = await build()
@@ -454,14 +470,99 @@ describe('one grid per burn', () => {
   })
 })
 
+// `NOW` is 2026-07-02, so a burn ending 2025-08-01 is history and one ending
+// 2026-12-01 is still ahead — and, being later than the 2026-08-01 burn the rest of
+// this file uses, is *not* the active one. That difference is the whole point of the
+// last test here.
+describe('a burn that has ended', () => {
+  it('refuses to rename or remove one of its lanes', async () => {
+    const server = await build()
+    const gone = await givenEvent('Last summer', '2025-08-01')
+    const admin = await givenAccount(['admin'])
+    const [temple] = givenLanes(gone, TEMPLE)
+
+    expect((await edit(server, admin.cookie, temple ?? '', { name: 'Rewritten' })).statusCode).toBe(404)
+    expect((await remove(server, admin.cookie, temple ?? '')).statusCode).toBe(404)
+    expect(await names(server, gone)).toEqual(['Temple'])
+  })
+
+  it('refuses an empty edit of one too, which takes its own path through the route', async () => {
+    const server = await build()
+    const gone = await givenEvent('Last summer', '2025-08-01')
+    const admin = await givenAccount(['admin'])
+    const [temple] = givenLanes(gone, TEMPLE)
+
+    expect((await edit(server, admin.cookie, temple ?? '', {})).statusCode).toBe(404)
+  })
+
+  it('refuses to add a lane, reorder its grid, or copy one in', async () => {
+    const server = await build()
+    const gone = await givenEvent('Last summer', '2025-08-01')
+    const source = await givenEvent('Two summers ago', '2024-08-01')
+    const admin = await givenAccount(['admin'])
+    const [temple] = givenLanes(gone, TEMPLE)
+    givenLanes(source, SAUNA)
+
+    expect((await add(server, admin.cookie, gone, LAWN)).statusCode).toBe(404)
+    expect((await reorder(server, admin.cookie, gone, { ids: [temple ?? ''] })).statusCode).toBe(404)
+    expect((await copyFrom(server, admin.cookie, gone, source)).statusCode).toBe(404)
+    expect(await names(server, gone)).toEqual(['Temple'])
+  })
+
+  it('is still readable, and still worth copying from', async () => {
+    // Closing the archive to writes is not closing it: reading a finished grid is
+    // public, and seeding the next burn from it is what #156 built the copy for.
+    const server = await build()
+    const gone = await givenEvent('Last summer', '2025-08-01')
+    const next = await givenEvent('Next summer', '2026-08-01')
+    const admin = await givenAccount(['admin'])
+    givenLanes(gone, TEMPLE, SAUNA)
+
+    expect(await names(server, gone)).toEqual(['Temple', 'Sauna'])
+    expect((await copyFrom(server, admin.cookie, next, gone)).statusCode).toBe(201)
+    expect(await names(server, next)).toEqual(['Temple', 'Sauna'])
+  })
+
+  it('counts a burn ending today as still open, so the last day is not too late', async () => {
+    const server = await build()
+    const today = await givenEvent('Ends today', '2026-07-02')
+    const admin = await givenAccount(['admin'])
+    const temple = (await add(server, admin.cookie, today, TEMPLE)).json().place.id
+
+    expect((await edit(server, admin.cookie, temple, { name: 'Steam Room' })).statusCode).toBe(200)
+    expect((await remove(server, admin.cookie, temple)).statusCode).toBe(204)
+  })
+
+  it('leaves a burn that has not started alone, even when it is not the next one', async () => {
+    // The reason this is scoped on "has ended" rather than on the active burn:
+    // laying out a grid months ahead is exactly what the copy exists for, and
+    // `activeEvent` would name only the soonest-ending burn, so the winter grid
+    // could be created and then never corrected.
+    const server = await build()
+    await givenEvent('Next summer', '2026-08-01')
+    const winter = await givenEvent('Next winter', '2026-12-01')
+    const admin = await givenAccount(['admin'])
+
+    const added = await add(server, admin.cookie, winter, TEMPLE)
+    expect(added.statusCode).toBe(201)
+
+    const temple = added.json().place.id
+    const sauna = (await add(server, admin.cookie, winter, SAUNA)).json().place.id
+
+    expect((await edit(server, admin.cookie, temple, { name: 'Steam Room' })).statusCode).toBe(200)
+    expect((await reorder(server, admin.cookie, winter, { ids: [sauna, temple] })).statusCode).toBe(200)
+    expect((await remove(server, admin.cookie, temple)).statusCode).toBe(204)
+    expect(await names(server, winter)).toEqual(['Sauna'])
+  })
+})
+
 describe('seeding a burn’s grid from a previous one', () => {
   it('copies the lanes in the order they were in', async () => {
     const server = await build()
     const last = await givenEvent('Last summer', '2025-08-01')
     const next = await givenEvent('Next summer', '2026-08-01')
     const admin = await givenAccount(['admin'])
-    const [temple, sauna, lawn] = await givenPlaces(server, admin.cookie, last)
-    await reorder(server, admin.cookie, last, { ids: [lawn, temple, sauna] })
+    const [lawn] = givenLanes(last, LAWN, TEMPLE, SAUNA)
 
     const copied = await copyFrom(server, admin.cookie, next, last)
 
@@ -472,7 +573,7 @@ describe('seeding a burn’s grid from a previous one', () => {
       'Sauna',
     ])
     // New rows, not the same ones moved across.
-    expect(copied.json().places.map((entry: { id: string }) => entry.id)).not.toContain(temple)
+    expect(copied.json().places.map((entry: { id: string }) => entry.id)).not.toContain(lawn)
     expect(await names(server, last)).toEqual(['Front Lawn', 'Temple', 'Sauna'])
   })
 
@@ -481,7 +582,7 @@ describe('seeding a burn’s grid from a previous one', () => {
     const last = await givenEvent('Last', '2025-08-01')
     const next = await givenEvent('Next', '2026-08-01')
     const admin = await givenAccount(['admin'])
-    await add(server, admin.cookie, last, TEMPLE)
+    givenLanes(last, TEMPLE)
 
     await copyFrom(server, admin.cookie, next, last)
 
@@ -495,7 +596,7 @@ describe('seeding a burn’s grid from a previous one', () => {
     const last = await givenEvent('Last', '2025-08-01')
     const next = await givenEvent('Next', '2026-08-01')
     const admin = await givenAccount(['admin'])
-    await add(server, admin.cookie, last, TEMPLE)
+    givenLanes(last, TEMPLE)
     await add(server, admin.cookie, next, SAUNA)
 
     expect((await copyFrom(server, admin.cookie, next, last)).statusCode).toBe(409)
@@ -514,7 +615,7 @@ describe('seeding a burn’s grid from a previous one', () => {
     const server = await build()
     const last = await givenEvent('Last', '2025-08-01')
     const admin = await givenAccount(['admin'])
-    await add(server, admin.cookie, last, TEMPLE)
+    givenLanes(last, TEMPLE)
 
     expect((await copyFrom(server, admin.cookie, randomUUID(), last)).statusCode).toBe(404)
   })
@@ -544,9 +645,8 @@ describe('seeding a burn’s grid from a previous one', () => {
     const bare = await givenEvent('A burn with no lanes', '2025-09-01')
     const next = await givenEvent('Next summer', '2026-08-01')
     const admin = await givenAccount(['admin'])
-    await add(server, admin.cookie, older, TEMPLE)
-    await add(server, admin.cookie, newer, TEMPLE)
-    await add(server, admin.cookie, newer, SAUNA)
+    givenLanes(older, TEMPLE)
+    givenLanes(newer, TEMPLE, SAUNA)
     await add(server, admin.cookie, next, LAWN)
 
     const offered = (await sources(server, admin.cookie, next)).json().sources

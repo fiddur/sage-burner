@@ -1366,6 +1366,17 @@ places is already public by design. Writes are open to any approved member — t
 lanes are the burn's furniture, not admin's. Editing and deleting stay on
 `/api/places/:id`, since an id already names one burn's lane.
 
+**Every write needs the burn to be open — to have not ended yet** (#171). A
+finished burn's grid is the record of what happened there, and an id noted while
+that burn was current should not still be a way to rewrite it. The rule is "has
+not ended" rather than "is the active burn", which is what the dreams routes use:
+a lane is laid down per burn, and that is how a burn still months off gets its
+grid set up, so scoping to the single soonest-ending burn would refuse the setup
+the copy exists for. A burn ending _today_ is still open, so the last day is not
+too late. All five writes are scoped the same way — closing only the two that
+take a bare id would be an archive half shut. Reading is untouched, including
+reading a finished grid in order to copy it forward.
+
 `order` is the server's to assign, so `POST` refuses a caller that sends one —
 otherwise two places could claim the same lane. `event_id` is refused for the same
 kind of reason: the path already says which burn, and a body naming another would
@@ -1390,7 +1401,9 @@ lanes, **carrying their order** so the copied grid reads left to right the way t
 burn it came from did. Never the dreams standing in them: which burn's Temple a
 dream was in is a fact about that burn. It answers **409** into a grid that already
 has lanes, and the page offers the control only while the grid is empty — merging
-two grids is a decision nobody asked for.
+two grids is a decision nobody asked for. The _target_ has to be open; the source
+does not, since copying forward out of a finished burn is the case it was built
+for.
 
 `GET /api/events/:eventId/places/sources` fills that picker, and
 `GET /api/events/:eventId/roles/sources` is the same query for the roles register;

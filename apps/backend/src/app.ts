@@ -394,7 +394,7 @@ export const createApp = async ({
   registerEventRoutes(app, { db, sessions, now })
   registerEventOptionRoutes(app, { db, sessions })
   registerQuestionRoutes(app, { db, sessions })
-  registerPlaceRoutes(app, { db, sessions })
+  registerPlaceRoutes(app, { db, sessions, now })
   // One `PushDeps` for the routes that manage subscriptions and the route that
   // sends. `deliver` is the only part that talks to a push service, and it is
   // injectable so the suite never does.
