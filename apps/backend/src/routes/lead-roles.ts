@@ -329,6 +329,17 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
    * last summer. Refuses when this burn already has roles — merging two registers
    * is a decision nobody asked for, and "copy into empty" is the case that removes
    * the retyping.
+   *
+   * The emptiness check and the inserts are one transaction, or that refusal is not
+   * true: two members clicking the button between separate awaits both read an empty
+   * register and both seed it, so it holds every role twice. `places.ts` wraps its
+   * order assignment for the same reason.
+   *
+   * **No test covers that window, and none here can.** `inject` runs the two
+   * requests to completion in turn, so the second's pre-read already sees the
+   * first's inserts — a version reading outside the transaction answers
+   * `[201, 409]` under `Promise.all` exactly as this one does, which was measured
+   * rather than assumed. The 409 test proves the sequential case only.
    */
   app.post<{ Params: { eventId: string } }>(
     '/api/events/:eventId/roles/copy',
@@ -342,39 +353,52 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
         return reply.code(400).send(errorResponse('bad_request'))
       }
 
-      const already = await rolesFor(db, request.params.eventId)
-      if (already.length > 0) return reply.code(409).send(errorResponse('conflict'))
-
-      const source = await db
-        .select()
-        .from(leadRole)
-        .where(eq(leadRole.event_id, parsed.data.from_event_id))
-        .orderBy(asc(leadRole.created_at), asc(leadRole.id))
-
       const stamp = now().toISOString()
+      let seeded: 'conflict' | 'copied'
       try {
-        for (const row of source) {
-          await db
-            .insert(leadRole)
-            .values({
-              id: randomUUID(),
-              event_id: request.params.eventId,
-              title: row.title,
-              purpose: row.purpose,
-              tasks: row.tasks,
-              effort_before: row.effort_before,
-              effort_during: row.effort_during,
-              effort_after: row.effort_after,
-              team_size_wanted: row.team_size_wanted,
-              lead_attendance_id: null,
-              created_at: stamp,
-            })
-            .run()
-        }
+        seeded = db.transaction((tx) => {
+          const [already] = tx
+            .select({ id: leadRole.id })
+            .from(leadRole)
+            .where(eq(leadRole.event_id, request.params.eventId))
+            .limit(1)
+            .all()
+
+          if (already !== undefined) return 'conflict' as const
+
+          const source = tx
+            .select()
+            .from(leadRole)
+            .where(eq(leadRole.event_id, parsed.data.from_event_id))
+            .orderBy(asc(leadRole.created_at), asc(leadRole.id))
+            .all()
+
+          for (const row of source) {
+            tx.insert(leadRole)
+              .values({
+                id: randomUUID(),
+                event_id: request.params.eventId,
+                title: row.title,
+                purpose: row.purpose,
+                tasks: row.tasks,
+                effort_before: row.effort_before,
+                effort_during: row.effort_during,
+                effort_after: row.effort_after,
+                team_size_wanted: row.team_size_wanted,
+                lead_attendance_id: null,
+                created_at: stamp,
+              })
+              .run()
+          }
+
+          return 'copied' as const
+        })
       } catch (failure) {
         if (isForeignKeyViolation(failure)) return reply.code(404).send(errorResponse('not_found'))
         throw failure
       }
+
+      if (seeded === 'conflict') return reply.code(409).send(errorResponse('conflict'))
 
       return reply
         .code(201)

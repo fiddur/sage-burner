@@ -115,14 +115,6 @@ export const inviteStatusOf = (
 }
 
 /**
- * Membership fee state, tracked per `attendance` — never globally per person.
- *
- * Two values, not three. A half-payment is chased out of band rather than
- * modelled: `partial` was never set by anything, drove a database CHECK and a
- * branch in the member's page, and an unreachable value that every consumer has
- * to handle is the trap the error-code vocabulary already argues against.
- */
-/**
  * How much a lead role asks of someone, in each phase of a burn.
  *
  * Three independent answers per role — before, during, after — because a role can
@@ -134,6 +126,14 @@ export const effortLevels = ['none', 'low', 'medium', 'high'] as const
 export type EffortLevel = (typeof effortLevels)[number]
 export const isEffortLevel = (value: unknown): value is EffortLevel => isOneOf(effortLevels, value)
 
+/**
+ * Membership fee state, tracked per `attendance` — never globally per person.
+ *
+ * Two values, not three. A half-payment is chased out of band rather than
+ * modelled: `partial` was never set by anything, drove a database CHECK and a
+ * branch in the member's page, and an unreachable value that every consumer has
+ * to handle is the trap the error-code vocabulary already argues against.
+ */
 export const paymentStatuses = ['unpaid', 'paid'] as const
 export type PaymentStatus = (typeof paymentStatuses)[number]
 export const isPaymentStatus = (value: unknown): value is PaymentStatus => isOneOf(paymentStatuses, value)
