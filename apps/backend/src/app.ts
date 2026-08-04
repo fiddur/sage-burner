@@ -12,11 +12,14 @@ import type { Gate } from './auth/gate.ts'
 import type { GuardDeps } from './auth/guards.ts'
 import type { Config } from './config.ts'
 import type { Database } from './db/index.ts'
+import type { Delivery, VapidKeys } from './push/push.ts'
 
 import { createGate, SCRYPT_GATE } from './auth/gate.ts'
 import { createGuards } from './auth/guards.ts'
 import { createSessions } from './auth/session.ts'
 import { clientErrorHandler, frameworkErrorHandler, registerErrorHandler } from './errors.ts'
+import { notifyAdmins } from './push/push.ts'
+import { deliverWithWebPush, DEFAULT_PUSH_CONTACT, generateVAPIDKeys } from './push/web-push.ts'
 import { registerAdminRoutes } from './routes/admin.ts'
 import { registerApplicationReviewRoutes } from './routes/application-review.ts'
 import { registerApplicationRoutes } from './routes/applications.ts'
@@ -28,6 +31,7 @@ import { registerInstallationRoutes } from './routes/installation.ts'
 import { registerInviteRoutes } from './routes/invites.ts'
 import { registerPlaceRoutes } from './routes/places.ts'
 import { registerProfileRoutes } from './routes/profile.ts'
+import { registerPushRoutes } from './routes/push.ts'
 import { registerQuestionRoutes } from './routes/questions.ts'
 import { registerRedemptionRoutes } from './routes/redemption.ts'
 import { registerRosterRoutes } from './routes/roster.ts'
@@ -48,6 +52,15 @@ export interface AppDeps {
    * asserted as a wait rather than as ~230ms of real scrypt in the suite.
    */
   hash?: (password: string) => Promise<string>
+  /**
+   * How a notification reaches a browser, and how a VAPID pair is minted.
+   *
+   * Both injected so the suite never reaches a push service and never spends real
+   * elliptic-curve keygen. Production passes `deliverWithWebPush` and
+   * `web-push`'s own generator.
+   */
+  deliver?: Delivery
+  mintKeys?: () => VapidKeys
   /**
    * The scrypt gate. Injected so a test can shrink it to one slot and assert
    * shedding without spending the real thing's five-second window.
@@ -226,10 +239,11 @@ const helmetOptions = (): FastifyHelmetOptions => ({
       // image cannot downgrade the page, and images cannot execute — `script-src`
       // stays `'self'`.
       //
-      // The honest cost: an image host an organiser links to sees the IP of
-      // every visitor to the homepage. That is the organiser's choice to make in
-      // a field only they can write, and it is the only external request this
-      // app can produce. An upload feature would remove the need for it, and
+      // The honest cost: an image host a member links to sees the IP of every
+      // visitor to the homepage. That is the author's choice to make in a field
+      // they can write, and it is the only external request a *visitor's browser*
+      // makes — the server makes one of its own when it sends a push notification
+      // (#96). An upload feature would remove the need for it, and
       // narrowing this back to `'self' data:` is the change to make if one
       // arrives.
       'img-src': ["'self'", 'data:', 'https:'],
@@ -303,6 +317,8 @@ export const createApp = async ({
   db,
   config,
   gate: suppliedGate,
+  deliver = deliverWithWebPush(DEFAULT_PUSH_CONTACT),
+  mintKeys = generateVAPIDKeys,
   hash,
   now = () => new Date(),
 }: AppDeps): Promise<FastifyInstance> => {
@@ -378,7 +394,26 @@ export const createApp = async ({
   registerEventOptionRoutes(app, { db, sessions })
   registerQuestionRoutes(app, { db, sessions })
   registerPlaceRoutes(app, { db, sessions })
-  registerApplicationRoutes(app, { db, now })
+  // One `PushDeps` for the routes that manage subscriptions and the route that
+  // sends. `deliver` is the only part that talks to a push service, and it is
+  // injectable so the suite never does.
+  const push = { db, deliver, now, mintKeys }
+
+  registerPushRoutes(app, { db, sessions, push })
+  registerApplicationRoutes(app, {
+    db,
+    now,
+    notify: async (message) => {
+      const counts = await notifyAdmins(push, JSON.stringify({ body: message }))
+
+      // Logged here rather than inside `notifyAdmins`, which has no logger and is
+      // the more testable for it. Only when something went wrong: a quiet success
+      // is the ordinary case and does not need a line per application.
+      if (counts.failed > 0 || counts.gone > 0) app.log.warn({ ...counts }, 'notifying admins')
+
+      return counts
+    },
+  })
   registerApplicationReviewRoutes(app, { db, sessions, now })
   registerInviteRoutes(app, { db, sessions, now })
   registerRedemptionRoutes(app, { db, config, sessions, now, hash, gate })

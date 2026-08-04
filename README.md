@@ -589,6 +589,59 @@ they push people towards the one they already reuse everywhere. A rule here woul
 also have to apply to a password being _set_ and never at login, so that adding
 one later cannot lock out an existing member.
 
+### Notifications
+
+Admins can be told when someone applies, per **browser** rather than per person:
+a subscription belongs to the browser it was made in, so an admin with a laptop
+and a phone turns it on in both. Organise → Settings.
+
+Browser push is the one thing in this app that reaches outward at runtime. The
+notification travels via whichever push service the browser chose — Google's for
+Chrome, Mozilla's for Firefox — and the container therefore needs outbound HTTPS.
+Nothing has to be signed up for or configured: the VAPID pair is minted into the
+`installation` row the first time an admin asks for the key, so an installation
+that never turns notifications on never acquires one. That keeps `docker compose
+up` sufficient, which is the same argument #59 makes for `SESSION_SECRET`.
+
+The endpoint is **https-only**. It is the one field whose stored value the server
+itself then requests, on every application, so a `http://10.0.0.5/…` there would
+point the container at something on its own network. Only admins can write it and a
+real push service is always https, so requiring the scheme costs nothing. Narrowing
+past that would mean an allowlist of every browser vendor's endpoint, which goes
+stale the moment a new one appears.
+
+**The payload says only that someone applied.** No name, no contact, nothing from
+the application. Push payloads are encrypted to the browser's own key, so the push
+service cannot read them — but a notification is read on a lock screen, and the
+applicant's details are theirs until an admin opens the page.
+
+Sending is **fire-and-forget**. `POST /api/applications` is public and
+unauthenticated, so awaiting a push service there would let a stranger make the
+server wait, and a push outage would turn a successful application into an error
+for the person applying. Failures go to the log and nowhere else.
+
+A subscription the push service answers `404` or `410` for is **deleted**: the
+browser has thrown it away, and keeping the row would retry a dead endpoint on
+every application forever. Any other failure keeps it — a 500 from Google is not a
+reason to forget someone's phone. Subscriptions also cascade with the account, so
+a deleted account leaves none behind.
+
+The service worker is `apps/web/public/sw.js`, deliberately plain JavaScript and
+deliberately tiny: it is copied verbatim to the site root, which is where a worker
+has to live to claim `/` as its scope, and that puts it outside the type-check and
+the suite. It handles `push` and `notificationclick` and nothing else — no fetch
+handler, no caching — so there is nothing in it worth testing. `@fastify/static`
+serves everything outside `assets/` as `no-cache`, which is what lets a redeploy
+replace it.
+
+**Delivery itself has no test**, and cannot have one here: it needs a real browser
+to produce a subscription and a real push service to accept it. What is tested is
+everything around it — who may subscribe, that the payload carries no personal
+detail, that an application still answers 201 when the push service is down, and
+that a gone subscription is deleted while a failed one is kept. `deliver` is
+injected for exactly that reason, and `web-push` sits behind it as the one place
+that does RFC 8291 encryption.
+
 ### Roles
 
 Two roles, `admin` and `member`, in `account_role`. No finer-grained
@@ -1713,9 +1766,11 @@ a bug rather than a policy. Images therefore have a _stricter_ allowlist than
 links: `https://` or site-relative only, since a plain `http://` image would hit
 that same mismatch. Links still accept `http://` — `img-src` does not govern
 navigation. There is no upload feature, so the alternative is
-that images do not work at all. The cost: an image host an organiser links to
-sees the IP of every homepage visitor, and this is the only external request the
-app can produce. Narrow it back to `'self' data:` if uploads ever land.
+that images do not work at all. The cost: an image host a member links to sees the
+IP of every homepage visitor. It is the only external request a _visitor's browser_
+makes; the server makes one of its own when it sends a push notification, which is
+under Notifications above. Narrow this back to `'self' data:` if uploads ever
+land.
 
 ## Security headers
 

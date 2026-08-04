@@ -114,6 +114,17 @@ export const installation = sqliteTable(
   {
     id: text('id').notNull(),
     title: text('title').notNull(),
+    /**
+     * The VAPID keypair browser push is signed with, minted on first use.
+     *
+     * In the database rather than the environment so `docker compose up` stays
+     * sufficient — the same argument #59 makes for `SESSION_SECRET`, and it applies
+     * more easily here because push is optional: an installation that never turns
+     * it on never mints a key. Rotating the pair invalidates every existing
+     * subscription, which is why it is minted once and kept rather than derived.
+     */
+    vapid_public_key: text('vapid_public_key'),
+    vapid_private_key: text('vapid_private_key'),
   },
   (table) => [
     primaryKey({ columns: [table.id] }),
@@ -621,6 +632,44 @@ export const session = sqliteTable(
       'session_slot_whole_check',
       sql`(${table.time_slot_start} is null) = (${table.time_slot_end} is null)`,
     ),
+  ],
+)
+
+/**
+ * One browser's permission to be notified — a device, not a person.
+ *
+ * An admin with a laptop and a phone has two rows, so a notification reaches
+ * whichever they are looking at. Keyed by `endpoint`, which is the push service's
+ * own URL for that browser instance and is what makes re-subscribing idempotent.
+ *
+ * `p256dh` and `auth` are the browser's public key and shared secret. They are what
+ * the payload is encrypted to, so a push service relays a notification it cannot
+ * read — which is the only reason it is acceptable to route member business through
+ * Google's or Mozilla's infrastructure at all.
+ *
+ * Cascades with the account, so a deleted one leaves no live subscription behind.
+ * Losing the `admin` role stops the notifications too, but by a different
+ * mechanism — `notifyAdmins` joins through `account_role` — and the row itself
+ * survives a demotion, ready if the role comes back.
+ */
+export const pushSubscription = sqliteTable(
+  'push_subscription',
+  {
+    id: text('id').notNull(),
+    account_id: text('account_id')
+      .notNull()
+      .references(() => account.id, { onDelete: 'cascade' }),
+    endpoint: text('endpoint').notNull(),
+    p256dh: text('p256dh').notNull(),
+    auth: text('auth').notNull(),
+    created_at: text('created_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    // One row per browser. Subscribing twice from the same browser is the ordinary
+    // case — a page reload does it — and has to update rather than accumulate.
+    uniqueIndex('push_subscription_endpoint_idx').on(table.endpoint),
+    index('push_subscription_account_idx').on(table.account_id),
   ],
 )
 

@@ -16,6 +16,11 @@ const ADMIN: Viewer = { status: 'signed-in', account: { id: 'a-1', roles: ['admi
 const stub = (over: Partial<AdminSettingsApi> = {}): AdminSettingsApi => ({
   getInstallation: () => Promise.resolve({ installation: { title: 'Sage Burner' } }),
   updateInstallation: () => Promise.reject(new Error('updateInstallation is not stubbed here')),
+  // The toggle mounted here has its own tests; these keep it from reaching the API
+  // when the page under test is about the title.
+  getPushKey: () => Promise.resolve({ public_key: null }),
+  subscribeToPush: () => Promise.reject(new Error('subscribeToPush is not stubbed here')),
+  unsubscribeFromPush: () => Promise.reject(new Error('unsubscribeFromPush is not stubbed here')),
   ...over,
 })
 

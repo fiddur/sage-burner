@@ -297,7 +297,12 @@ them.)
 - The app is served at a **domain root** — there is no sub-path/`BASE_PATH`
   handling, deliberately.
 - No external services are required to run it: no SMTP, no payment gateway, no
-  external database.
+  external database — and nothing to sign up for or configure. Browser push
+  (#96) is the one feature that reaches outward at runtime: a notification goes
+  to the push service the _browser_ chose, so the container needs outbound
+  HTTPS. There is still no account and no key to set — the VAPID pair is minted
+  into the database the first time an admin turns notifications on, and an
+  installation that never does never acquires one.
 - `docker compose up` must be sufficient — with one current exception: the app
   refuses to start without `SESSION_SECRET`, so a bare clone needs it generated
   first (the README's Deploying section is one `sed` line). Failing loudly beats
