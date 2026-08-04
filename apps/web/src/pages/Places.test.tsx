@@ -4,11 +4,11 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/pr
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Viewer } from '../viewer.tsx'
-import type { PlacesApi } from './AdminPlaces.tsx'
+import type { PlacesApi } from './Places.tsx'
 
 import { apiError } from '../api/client.ts'
 import { ViewerProvider } from '../viewer.tsx'
-import { AdminPlaces } from './AdminPlaces.tsx'
+import { Places } from './Places.tsx'
 
 afterEach(cleanup)
 
@@ -56,13 +56,13 @@ const stub = (over: Partial<PlacesApi> = {}, places: Place[] = THREE): PlacesApi
 const renderPage = (api: PlacesApi, viewer: Viewer = ADMIN) =>
   render(
     <ViewerProvider viewer={viewer}>
-      <AdminPlaces api={api} />
+      <Places api={api} />
     </ViewerProvider>,
   )
 
 const rowNames = () => [...document.querySelectorAll('.place-name')].map((node) => node.textContent)
 
-describe('AdminPlaces', () => {
+describe('Places', () => {
   it('lists the places in order, with their emoji and colour', async () => {
     renderPage(stub())
 

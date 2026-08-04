@@ -554,7 +554,7 @@ ADMIN_EMAIL=you@example.org ADMIN_PASSWORD="$ADMIN_PASSWORD" \
   pnpm --filter sage-burner-backend admin:create
 ```
 
-Then log in at `/login`; the nav gains an **Organise** link, plus **Your burn**
+Then log in at `/login`; the nav gains the **⚙️** link, plus **Your burn**
 and **Your details** — it grants `member` alongside `admin`, because an
 organiser is almost always also coming.
 
@@ -769,6 +769,34 @@ redirecting.
 
 The web app hides what a viewer cannot use, but that is presentation. Every
 admin route refuses server-side regardless of what the nav rendered.
+
+## Getting around
+
+The bar carries **one entry per thing, not one per page** (#184). Everything else
+is reached from the page it belongs to, which is where somebody is standing when
+they want it.
+
+| Viewer                     | Bar                                          |
+| -------------------------- | -------------------------------------------- |
+| Signed out                 | Apply, Log in                                |
+| A role, not yet either one | nothing — an applicant waiting on a decision |
+| `member`                   | Your burn, Schedule, Roles, Your details     |
+| `admin` without `member`   | Schedule, Roles, ⚙️                          |
+
+- **Dreams** is reached from Schedule. Offering a dream and placing one are the
+  same activity, and two entries for it is what the restructure undid.
+- **Places** is reached from Schedule too: the lanes are what the grid draws.
+- **The lodging and helping lists** are reached from Your burn, from
+  _(edit lodging alternatives)_ beside the question they answer.
+- **⚙️** is admin's alone. It used to be `Organise` and open to any approved member,
+  because it was the only way to reach the two lists above; now those have their own
+  way in, and what is left behind ⚙️ — the burn's shape, who gets in, payment, the
+  installation — is admin's. It still links to both lists, since an organiser
+  holding `admin` without `member` has no Your burn to reach the lodging list from.
+
+Hiding a link is presentation. Every page behind these is guarded again server-side,
+and `Layout.test.tsx` asserts each absence by name — a negated `arrayContaining`
+passes when any _one_ of the named links is missing, which is not the question.
 
 ## What this installation is called
 
@@ -1265,9 +1293,11 @@ both lists as rows — **per event**, unlike the application questions and the
 places, because what there is to sleep in depends on the site and what wants
 doing depends on the year.
 
-Organise → **Lodging and helping**, which follows the burn that is open. Setting
+`/options` — **Lodging and helping**, which follows the burn that is open. Setting
 them up before it starts works, since "active" is the soonest-ending burn that has
-not finished.
+not finished. Reached from **(edit lodging alternatives)** on Your burn, beside the
+question the list answers, and from ⚙️ as well — an organiser holding `admin`
+without `member` has no Your burn to reach it from.
 
 A lodging entry can carry a number of spaces — "Temple mattress: 9" — or leave it
 blank for the ones that do not run out, like a tent of one's own. Helping entries
@@ -1340,7 +1370,9 @@ the grid is the thing the list exists to build. The same shape `event_option`
 already had for lodging and helping: definitions per burn, seeded rather than
 retyped.
 
-Organise → **Places**, which follows the burn that is open. A pencil edits, a trashcan removes, and the ⠿ handle
+`/places`, which follows the burn that is open — reached from Schedule, since the
+lanes are what the grid draws, and from ⚙️.
+A pencil edits, a trashcan removes, and the ⠿ handle
 reorders — by dragging, and by ArrowUp/ArrowDown while it has focus. The handle
 takes keys as well as drags because a reorder only a pointer can do is one some
 people cannot do at all.

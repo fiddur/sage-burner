@@ -273,11 +273,12 @@ describe('signing out', () => {
 })
 
 describe('navigation', () => {
+  // ⚙️ is a glyph, so its name comes from `aria-label` rather than its text.
   const linkNames = () =>
     screen
       .getAllByRole('link')
-      .map((link) => link.textContent?.trim())
-      .filter((text): text is string => text !== undefined)
+      .map((link) => link.getAttribute('aria-label') ?? link.textContent?.trim())
+      .filter((text): text is string => text !== undefined && text !== null)
 
   it('offers the public entry points when signed out', () => {
     renderAt('/')
@@ -296,9 +297,9 @@ describe('navigation', () => {
 
     expect(linkNames()).toContain('Your burn')
     expect(linkNames()).not.toContain('Log in')
-    // Organise is offered: a member curates the places and the lodging and
-    // helping lists there, per #155. The page itself shows them only those.
-    expect(linkNames()).toContain('Organise')
+    // ⚙️ is admin's alone since #184. What a member curates is reached from the
+    // page it belongs to — Places from Schedule, the lodging list from Your burn.
+    expect(linkNames()).not.toContain('Organise')
   })
 
   it('offers Organise to nobody without a role', () => {

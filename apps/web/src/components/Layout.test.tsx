@@ -29,7 +29,9 @@ const signedInAs = (...roles: AccountRole[]): Viewer => ({
   account: { id: 'a-1', roles },
 })
 
-const links = () => screen.getAllByRole('link').map((link) => link.textContent)
+// The gear is a glyph, so its name comes from `aria-label` rather than its text.
+const links = () =>
+  screen.getAllByRole('link').map((link) => link.getAttribute('aria-label') ?? link.textContent)
 
 /**
  * Asserted one at a time, never as a negated `arrayContaining`.
@@ -48,13 +50,22 @@ describe('the nav', () => {
   it('offers a signed-out visitor the way in, and none of the pages behind it', () => {
     renderNav({ status: 'signed-out' })
 
-    expectLinks(['Apply', 'Log in'], ['Your burn', 'Dreams', 'Schedule', 'Roles', 'Your details'])
+    expectLinks(['Apply', 'Log in'], ['Your burn', 'Schedule', 'Roles', 'Your details', 'Organise'])
   })
 
   it('gives a member their own pages and the shared ones', () => {
     renderNav(signedInAs('member'))
 
-    expectLinks(['Your burn', 'Dreams', 'Schedule', 'Roles', 'Your details'], [])
+    expectLinks(['Your burn', 'Schedule', 'Roles', 'Your details'], [])
+  })
+
+  it('keeps Organise from a member who is not an organiser', () => {
+    // The ⚙️ split: the page behind it is admin's alone now, so offering it to a
+    // member sends them to a refusal. The burn's shared furniture, which a member
+    // does curate, is reached from Schedule and from Your burn instead.
+    renderNav(signedInAs('member'))
+
+    expectLinks([], ['Organise'])
   })
 
   it('reaches the shared pages for an organiser who holds admin alone', () => {
@@ -65,6 +76,14 @@ describe('the nav', () => {
     renderNav(signedInAs('admin'))
 
     expectLinks(['Schedule', 'Roles', 'Organise'], ['Your burn', 'Your details'])
+  })
+
+  it('offers Dreams from the Schedule rather than from the bar', () => {
+    // Merged in #184: the schedule is where a dream is placed, and two entries for
+    // one thing is what the restructure is undoing.
+    renderNav(signedInAs('member', 'admin'))
+
+    expectLinks(['Schedule'], ['Dreams'])
   })
 
   it('offers an account with no roles none of them', () => {

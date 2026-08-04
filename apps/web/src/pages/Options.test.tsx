@@ -4,11 +4,11 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/pr
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Viewer } from '../viewer.tsx'
-import type { OptionsApi } from './AdminOptions.tsx'
+import type { OptionsApi } from './Options.tsx'
 
 import { apiError } from '../api/client.ts'
 import { ViewerProvider } from '../viewer.tsx'
-import { AdminOptions } from './AdminOptions.tsx'
+import { Options } from './Options.tsx'
 
 afterEach(cleanup)
 
@@ -64,11 +64,11 @@ const stub = (
 const renderPage = (api: OptionsApi, viewer: Viewer = ADMIN) =>
   render(
     <ViewerProvider viewer={viewer}>
-      <AdminOptions api={api} />
+      <Options api={api} />
     </ViewerProvider>,
   )
 
-describe('AdminOptions', () => {
+describe('Options', () => {
   it('shows both lists, with the spaces on the ones that have them', async () => {
     renderPage(stub())
 

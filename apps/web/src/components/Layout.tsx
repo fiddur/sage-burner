@@ -3,16 +3,19 @@ import type { ComponentChildren } from 'preact'
 import type { ApiClient } from '../api/client.ts'
 
 import { useInstallationTitle } from '../installation.tsx'
-import { isApproved, isMember, useSetViewer, useViewer } from '../viewer.tsx'
+import { isAdmin, isApproved, isMember, useSetViewer, useViewer } from '../viewer.tsx'
 
 /**
  * The frame every page sits in.
  *
- * The nav reflects who is looking: signed-out visitors get the public entry
- * points, and anyone with a role gets their own pages and `Organise` — which
- * offers a member the burn's shared furniture and an admin everything. Hiding a
- * link is presentation only — every one of these routes is guarded server-side as
- * well.
+ * The nav reflects who is looking: signed-out visitors get the public entry points,
+ * anyone with a role gets their own pages, and ⚙️ goes to admin alone. Hiding a link
+ * is presentation only — every one of these routes is guarded server-side as well.
+ *
+ * The bar carries one entry per thing rather than one per page. Dreams is reached
+ * from Schedule, which is where a dream is placed; Places from Schedule too, since
+ * the lanes are what the grid draws; the lodging list from Your burn, beside the
+ * question it answers. An organiser who is not attending reaches both from ⚙️.
  */
 export const Layout = ({
   children,
@@ -64,7 +67,6 @@ export const Layout = ({
           {isMember(viewer) && (
             <>
               <a href="/my-burn">Your burn</a>
-              <a href="/dreams">Dreams</a>
               <a href="/profile">Your details</a>
             </>
           )}
@@ -79,7 +81,11 @@ export const Layout = ({
             </>
           )}
 
-          {isApproved(viewer) && <a href="/admin">Organise</a>}
+          {isAdmin(viewer) && (
+            <a href="/admin" aria-label="Organise" title="Organise">
+              ⚙️
+            </a>
+          )}
 
           {viewer.status === 'signed-in' && (
             <button type="button" class="link-button" onClick={() => void logOut()}>

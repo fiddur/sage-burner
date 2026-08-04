@@ -6,8 +6,9 @@ import { useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
+import { GuardedPage } from '../components/GuardedPage.tsx'
 import { errorMessage, useAction, useLoad } from '../load.ts'
-import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
+import { isAdmin, useViewer } from '../viewer.tsx'
 
 export type AdminApi = Pick<ApiClient, 'getAdminAccounts' | 'setAccountRoles'>
 
@@ -15,15 +16,21 @@ const withRole = (roles: readonly AccountRole[], role: AccountRole, held: boolea
   held ? [...new Set([...roles, role])] : roles.filter((entry) => entry !== role)
 
 /**
- * The organiser's landing page.
+ * ⚙️ — the organiser's landing page, and admin's alone.
  *
- * The role check below decides what to *render*. It is not the access control:
+ * It used to offer a member the two lists they curate, because it was the only way
+ * to reach them. #184 gave those their own way in — Places from Schedule, the
+ * lodging list from Your burn — so what is left here is the burn's shape, who gets
+ * in, and the installation, none of which a member may touch. The links to those two
+ * stay, since an organiser holding `admin` without `member` has no Your burn to
+ * reach the lodging list from.
+ *
+ * The role check decides what to *render*. It is not the access control:
  * `/api/admin/accounts` refuses a non-admin with a 403 whatever this does.
  */
 export const Admin = ({ api }: { api: AdminApi }) => {
   const viewer = useViewer()
   const admin = isAdmin(viewer)
-  const approved = isApproved(viewer)
   // Which row, not a boolean: only the account being changed should show it.
   const [saving, setSaving] = useState<string | undefined>(undefined)
 
@@ -52,57 +59,8 @@ export const Admin = ({ api }: { api: AdminApi }) => {
     )
   }
 
-  if (viewer.status === 'loading') {
-    return (
-      <section class="page">
-        <h1>Organise</h1>
-        <p class="form-note">One moment…</p>
-      </section>
-    )
-  }
-
-  if (viewer.status === 'signed-out') {
-    // Distinct from the signed-in-without-the-role case below: telling someone
-    // to "ask an organiser" when they simply have not signed in yet sends them
-    // to a person instead of to the form that would fix it.
-    return (
-      <section class="page">
-        <h1>Organise</h1>
-        <p>
-          <a href="/login">Log in</a> to see this.
-        </p>
-      </section>
-    )
-  }
-
-  // A member curates the burn's shared furniture without holding admin, so this
-  // page offers what the viewer can actually use rather than all or nothing. The
-  // links are not the access control — each page and route checks for itself —
-  // they are what stops someone being sent to a 403.
-  if (!admin) {
-    return (
-      <section class="page">
-        <h1>Organise</h1>
-
-        {approved ? (
-          <>
-            <p class="form-note">What you can set up for the burn. The rest needs admin.</p>
-            <p>
-              <a href="/admin/places">Places</a>
-            </p>
-            <p>
-              <a href="/admin/options">Lodging and helping</a>
-            </p>
-          </>
-        ) : (
-          <p>This is for members. Ask someone who already has a role.</p>
-        )}
-      </section>
-    )
-  }
-
   return (
-    <section class="page">
+    <GuardedPage title="Organise" require="admin">
       <h1>Organise</h1>
 
       <p>
@@ -121,10 +79,10 @@ export const Admin = ({ api }: { api: AdminApi }) => {
         <a href="/admin/roster">Who is coming</a>
       </p>
       <p>
-        <a href="/admin/places">Places</a>
+        <a href="/places">Places</a>
       </p>
       <p>
-        <a href="/admin/options">Lodging and helping</a>
+        <a href="/options">Lodging and helping</a>
       </p>
       <p>
         <a href="/admin/settings">Settings</a>
@@ -186,6 +144,6 @@ export const Admin = ({ api }: { api: AdminApi }) => {
         opens someone&rsquo;s own details and saying they are coming; admin opens this page. Most people here
         want both.
       </p>
-    </section>
+    </GuardedPage>
   )
 }

@@ -52,7 +52,7 @@ const isBlank = (fields: { name: string; emoji: string }) =>
  * overlap between burns is large, which is why an empty grid offers to copy a
  * previous one rather than only an empty form.
  */
-export const AdminPlaces = ({ api }: { api: PlacesApi }) => {
+export const Places = ({ api }: { api: PlacesApi }) => {
   const viewer = useViewer()
   const approved = isApproved(viewer)
   const [draft, setDraft] = useState<Draft>(BLANK)

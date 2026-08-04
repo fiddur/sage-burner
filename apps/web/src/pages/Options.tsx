@@ -43,7 +43,7 @@ const BLURB: Record<EventOptionKind, string> = {
  * way the roster does. Setting them up before the burn works because "active" is
  * the soonest-ending burn that has not finished.
  */
-export const AdminOptions = ({ api }: { api: OptionsApi }) => {
+export const Options = ({ api }: { api: OptionsApi }) => {
   const viewer = useViewer()
   const approved = isApproved(viewer)
   const admin = isAdmin(viewer)

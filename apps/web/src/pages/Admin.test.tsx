@@ -151,17 +151,17 @@ describe('Admin', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('has to keep admin')
   })
 
-  it('offers a member what they can set up, and asks the API nothing', async () => {
-    // The accounts table is admin-only, so a member gets the two lists they may
-    // curate rather than all or nothing. Asking anyway would render an error where
-    // an explanation belongs.
+  it('refuses a member, whose two lists are reached from their own pages now', async () => {
+    // This page used to offer a member the places and lodging lists, because it was
+    // the only way to reach them. #184 gave each one a way in beside what it is for,
+    // so what is left here is admin's. Asking the API anyway would render an error
+    // where an explanation belongs.
     const getAdminAccounts = vi.fn(never)
     renderAdmin(getAdminAccounts, MEMBER)
 
-    expect(await screen.findByRole('link', { name: 'Places' })).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Lodging and helping' })).toBeTruthy()
-    expect(screen.queryByRole('link', { name: 'Invites' })).toBeNull()
-    expect(screen.queryByRole('link', { name: 'Who is coming' })).toBeNull()
+    expect(await screen.findByText(/for organisers/)).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Places' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Lodging and helping' })).toBeNull()
     expect(getAdminAccounts).not.toHaveBeenCalled()
   })
 
@@ -169,7 +169,7 @@ describe('Admin', () => {
     const getAdminAccounts = vi.fn(never)
     renderAdmin(getAdminAccounts, { status: 'signed-in', account: { id: 'a-9', roles: [] } })
 
-    expect(await screen.findByText(/for members/)).toBeTruthy()
+    expect(await screen.findByText(/for organisers/)).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'Places' })).toBeNull()
     expect(getAdminAccounts).not.toHaveBeenCalled()
   })

@@ -146,6 +146,14 @@ export const StayForm = ({
         </select>
       </label>
 
+      {/* The list itself is the burn's shared furniture, so the way to change it sits
+          beside the question it answers rather than on a page of its own. Offered to
+          everyone here, because everyone here may edit it — the page refuses anyone
+          who may not, and so does the API. */}
+      <p class="form-note">
+        <a href="/options">(edit lodging alternatives)</a>
+      </p>
+
       <fieldset class="field">
         <legend>What would you like to help with?</legend>
 
