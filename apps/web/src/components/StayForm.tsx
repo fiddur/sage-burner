@@ -1,5 +1,6 @@
 import type { Attendance, EventOption } from '@sage-burner/shared'
 
+import { MAX_NOTES, MAX_OPTION_LABEL } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -174,7 +175,7 @@ export const StayForm = ({
           <input
             type="text"
             name="helping_other"
-            maxLength={200}
+            maxLength={MAX_OPTION_LABEL}
             value={helpingOther}
             onInput={(inputEvent) => setHelpingOther(inputEvent.currentTarget.value)}
           />
@@ -185,7 +186,7 @@ export const StayForm = ({
         <span>Anything else we should know?</span>
         <textarea
           name="notes"
-          maxLength={2000}
+          maxLength={MAX_NOTES}
           value={notes}
           onInput={(inputEvent) => setNotes(inputEvent.currentTarget.value)}
         />

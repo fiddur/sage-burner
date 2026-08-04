@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { MAX_TITLE } from '../limits.ts'
 import { nonEmptyText } from './common.ts'
 
 /**
@@ -10,7 +11,7 @@ import { nonEmptyText } from './common.ts'
  * exactly one of these — it is the deployment, not a record within it.
  */
 export const installationSchema = z.object({
-  title: nonEmptyText(200),
+  title: nonEmptyText(MAX_TITLE),
 })
 
 export const installationResponseSchema = z.object({

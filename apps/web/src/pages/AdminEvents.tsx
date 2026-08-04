@@ -1,6 +1,6 @@
 import type { Event } from '@sage-burner/shared'
 
-import { MAX_WELCOME_LENGTH } from '@sage-burner/shared'
+import { MAX_SLUG, MAX_TITLE, MAX_WELCOME_LENGTH } from '@sage-burner/shared'
 import { useEffect, useRef, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -283,7 +283,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
                     <span>Name</span>
                     <input
                       type="text"
-                      maxLength={200}
+                      maxLength={MAX_TITLE}
                       aria-label={`Name of ${row.slug}`}
                       value={details.name}
                       onInput={(inputEvent) =>
@@ -419,7 +419,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
           <span>Name</span>
           <input
             required
-            maxLength={200}
+            maxLength={MAX_TITLE}
             value={draft.name}
             onInput={(inputEvent) => setDraft({ ...draft, name: inputEvent.currentTarget.value })}
           />
@@ -429,7 +429,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
           <span>Slug</span>
           <input
             required
-            maxLength={64}
+            maxLength={MAX_SLUG}
             pattern="[a-z0-9]+(-[a-z0-9]+)*"
             value={draft.slug}
             onInput={(inputEvent) => setDraft({ ...draft, slug: inputEvent.currentTarget.value })}

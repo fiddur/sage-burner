@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { inviteStatuses } from '../enums.ts'
+import { MAX_CONTACT, MAX_NOTES, MAX_PERSON_NAME } from '../limits.ts'
 import { emailSchema, newPasswordSchema } from './auth.ts'
 import { nonEmptyText, optionalText } from './common.ts'
 
@@ -34,7 +35,7 @@ export const redeemRequestSchema = z
   .object({
     email: emailSchema,
     password: newPasswordSchema,
-    name: nonEmptyText(200),
+    name: nonEmptyText(MAX_PERSON_NAME),
     /**
      * How to reach them beyond the email they just gave.
      *
@@ -45,8 +46,8 @@ export const redeemRequestSchema = z
      */
     // `.optional()` as well as nullable: `optionalText` allows an explicit null
     // but still requires the key, and the point here is a form that never asks.
-    contact: optionalText(500).optional(),
-    allergies_notes: optionalText(2000),
+    contact: optionalText(MAX_CONTACT).optional(),
+    allergies_notes: optionalText(MAX_NOTES),
   })
   .strict()
 

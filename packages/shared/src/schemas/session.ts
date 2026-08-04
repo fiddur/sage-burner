@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { placeColors } from '../enums.ts'
+import { MAX_DESCRIPTION, MAX_OPTION_LABEL, MAX_TITLE } from '../limits.ts'
 import { dateTimeSchema, idSchema, optionalText, nonEmptyText } from './common.ts'
 
 /** Tolerates missing keys so `.partial()` and `.omit()` derivations still typecheck. */
@@ -70,9 +71,9 @@ export const withValidTimeSlot = <T extends z.ZodType<TimeSlot>>(schema: T) =>
 export const sessionFields = z.object({
   id: idSchema,
   event_id: idSchema,
-  title: nonEmptyText(200),
+  title: nonEmptyText(MAX_TITLE),
   host_account_id: idSchema,
-  description: z.string().max(20_000),
+  description: z.string().max(MAX_DESCRIPTION),
   time_slot_start: dateTimeSchema.nullable(),
   time_slot_end: dateTimeSchema.nullable(),
   /**
@@ -113,7 +114,7 @@ export const publicSessionFields = sessionFields.pick({ id: true, title: true, d
   // Resolved from the place rather than carried as an id — a calendar client
   // has nothing to do with a UUID. A projection, not a `pick`, which is why
   // these two are spelled out instead of derived.
-  location: optionalText(200),
+  location: optionalText(MAX_OPTION_LABEL),
   color: z.enum(placeColors).nullable(),
 })
 

@@ -228,7 +228,7 @@ describe('PushToggle', () => {
     // types, and asserting the bytes is the whole point of the test.
     const key = options?.applicationServerKey
     expect(key instanceof Uint8Array).toBe(true)
-    expect(key instanceof Uint8Array ? [...key] : []).toEqual([65, 66, 67])
+    expect(key instanceof Uint8Array ? Array.from(key) : []).toEqual([65, 66, 67])
   })
 
   it('does not subscribe when permission is refused at the prompt', async () => {

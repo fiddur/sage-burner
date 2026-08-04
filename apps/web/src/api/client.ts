@@ -307,11 +307,15 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
       }),
 
     /**
-     * Any approved member.
+     * Any approved member. Throws ApiError(409, 'conflict') for a lodging option
+     * somebody is sleeping in.
      *
-     * Takes every member's ticks for that option with it — `attendance_helping`
-     * cascades — which is the shared-spreadsheet default applied to something
-     * other people filled in.
+     * The two kinds part company here. A **helping** option goes, and takes every
+     * member's ticks with it — `attendance_helping` cascades, which is the
+     * shared-spreadsheet default applied to something other people filled in. A
+     * **lodging** option does not: `attendance.lodging_option_id` has no
+     * `onDelete`, so the foreign key refuses and the route answers 409 rather than
+     * unbooking anyone.
      */
     deleteEventOption: (id: string) =>
       request<undefined>(`/event-options/${encodeURIComponent(id)}`, { method: 'DELETE' }),

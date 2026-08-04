@@ -7,6 +7,7 @@ import {
   MAX_ASKED_QUESTIONS,
 } from '../answers.ts'
 import { applicationStatuses, formQuestionTypes } from '../enums.ts'
+import { MAX_QUESTION_LABEL } from '../limits.ts'
 import { dateTimeSchema, idSchema, nonEmptyText } from './common.ts'
 
 /**
@@ -46,7 +47,7 @@ export const submittedAnswersSchema = z.partialRecord(idSchema, answerValueSchem
 export const storedAnswerSchema = z.object({
   question_id: idSchema,
   /** The label exactly as shown to this applicant. */
-  label: nonEmptyText(500),
+  label: nonEmptyText(MAX_QUESTION_LABEL),
   type: z.enum(formQuestionTypes),
   value: answerValueSchema,
 })

@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { MAX_SLUG } from '../limits.ts'
+
 /**
  * Every entity id is a UUID rather than a sequential integer, so an id in a URL
  * leaks neither how many records exist nor whether a neighbouring one does.
@@ -24,7 +26,7 @@ export const dateTimeSchema = z.iso.datetime()
 /** URL-safe event identifier, e.g. `summer-2026`. */
 export const slugSchema = z
   .string()
-  .max(64)
+  .max(MAX_SLUG)
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'must be lowercase words separated by single hyphens')
 
 /**
