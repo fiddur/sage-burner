@@ -139,7 +139,13 @@ export const AdminPlaces = ({ api }: { api: PlacesApi }) => {
     return (
       <section class="page">
         <h1>Places</h1>
-        <p>This is for members. If you are one, sign in — otherwise ask someone who is.</p>
+        {viewer.status === 'signed-out' ? (
+          <p>This is for members. Sign in and it will be here.</p>
+        ) : (
+          // Signed in without a role — an applicant checking on their application.
+          // Telling them to sign in would be advice they have already taken.
+          <p>This is for members. Ask someone who already has a role.</p>
+        )}
       </section>
     )
   }

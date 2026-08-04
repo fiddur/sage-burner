@@ -9,9 +9,10 @@ import { isApproved, isMember, useSetViewer, useViewer } from '../viewer.tsx'
  * The frame every page sits in.
  *
  * The nav reflects who is looking: signed-out visitors get the public entry
- * points, members get their own pages, admins additionally get the organising
- * ones. Hiding a link is presentation only — every one of these routes is
- * guarded server-side as well.
+ * points, and anyone with a role gets their own pages and `Organise` — which
+ * offers a member the burn's shared furniture and an admin everything. Hiding a
+ * link is presentation only — every one of these routes is guarded server-side as
+ * well.
  */
 export const Layout = ({
   children,

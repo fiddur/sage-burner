@@ -32,6 +32,7 @@ export const Home = ({ api }: { api: HomeApi }) => {
   const [active, setActive] = useState<Active>({ status: 'loading' })
   const [editing, setEditing] = useState<string | undefined>(undefined)
   const [saving, setSaving] = useState(false)
+  const [opening, setOpening] = useState(false)
   const [error, setError] = useFormError()
 
   useEffect(() => {
@@ -71,6 +72,11 @@ export const Home = ({ api }: { api: HomeApi }) => {
    */
   const openEditor = async (fallback: string) => {
     setError(undefined)
+    // Said out loud, because the re-read is a round trip with nothing else
+    // changing on screen. Without it this is a button that appears to do nothing
+    // for as long as the network takes — the symptom `FormError` exists for,
+    // reintroduced by the fix for the stale draft.
+    setOpening(true)
     try {
       const { event } = await api.getActiveEvent()
 
@@ -88,6 +94,8 @@ export const Home = ({ api }: { api: HomeApi }) => {
       setEditing(event.welcome_markdown)
     } catch {
       setEditing(fallback)
+    } finally {
+      setOpening(false)
     }
   }
 
@@ -153,9 +161,10 @@ export const Home = ({ api }: { api: HomeApi }) => {
                 <button
                   type="button"
                   class="link-button"
+                  disabled={opening}
                   onClick={() => void openEditor(openEvent.welcome_markdown)}
                 >
-                  Edit this text
+                  {opening ? 'Opening…' : 'Edit this text'}
                 </button>
               )}
             </>

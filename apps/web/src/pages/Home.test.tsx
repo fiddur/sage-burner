@@ -276,6 +276,34 @@ describe('Home', () => {
       expect(updateWelcome).not.toHaveBeenCalled()
     })
 
+    it('says it is opening while the re-read is in flight', async () => {
+      // The re-read is a round trip with nothing else changing on screen, so
+      // without this the button appears to do nothing for as long as it takes —
+      // the symptom `FormError` exists for, reintroduced by the fix for the stale
+      // draft.
+      let release = (_value: { event: Event | null }) => {}
+      const held = new Promise<{ event: Event | null }>((resolve) => {
+        release = resolve
+      })
+      const getActiveEvent = vi
+        .fn<HomeApi['getActiveEvent']>()
+        .mockResolvedValueOnce({ event: summer })
+        .mockReturnValue(held)
+      render(
+        <ViewerProvider viewer={asRoles(['member'])}>
+          <Home api={{ getActiveEvent, updateWelcome: notStubbed }} />
+        </ViewerProvider>,
+      )
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit this text' }))
+
+      const opening = await screen.findByRole('button', { name: 'Opening…' })
+      expect(opening.hasAttribute('disabled')).toBe(true)
+
+      release({ event: summer })
+      expect(await screen.findByLabelText('Welcome text')).toBeTruthy()
+    })
+
     it('opens on what is on screen when the re-read fails', async () => {
       // Refusing to open the editor because the network hiccuped would be worse
       // than opening it on a slightly stale draft.
