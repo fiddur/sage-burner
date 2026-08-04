@@ -124,14 +124,28 @@ describe('AdminSettings', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('Could not load')
   })
 
-  it('offers nothing to someone who does not have admin', async () => {
+  it('sends a signed-out visitor to log in, rather than telling them to ask an admin', async () => {
+    // This page was one of the five that showed a signed-out visitor "ask someone
+    // who already has admin" — advice for somebody already signed in. #145 fixed it
+    // once, in `GuardedPage`, rather than five times.
     const getInstallation = vi.fn<AdminSettingsApi['getInstallation']>(() =>
       Promise.resolve({ installation: { title: 'Sage Burner' } }),
     )
     renderPage(stub({ getInstallation }), { status: 'signed-out' })
 
-    expect(screen.getByText(/admin page/)).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Log in' })).toBeTruthy()
     expect(screen.queryByRole('textbox')).toBeNull()
+    expect(getInstallation).not.toHaveBeenCalled()
+  })
+
+  it('tells somebody signed in without the role to ask, not to log in again', async () => {
+    const getInstallation = vi.fn<AdminSettingsApi['getInstallation']>(() =>
+      Promise.resolve({ installation: { title: 'Sage Burner' } }),
+    )
+    renderPage(stub({ getInstallation }), { status: 'signed-in', account: { id: 'a-9', roles: ['member'] } })
+
+    expect(screen.getByText(/for organisers/)).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Log in' })).toBeNull()
     expect(getInstallation).not.toHaveBeenCalled()
   })
 })

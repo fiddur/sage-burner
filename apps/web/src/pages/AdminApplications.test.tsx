@@ -234,7 +234,7 @@ describe('AdminApplications', () => {
     const getApplications = vi.fn(() => Promise.resolve({ applications: [] }))
     renderPage(stub({ getApplications }), ['member'])
 
-    expect(screen.getByText(/admin page/)).toBeTruthy()
+    expect(screen.getByText(/for organisers/)).toBeTruthy()
     expect(getApplications).not.toHaveBeenCalled()
   })
 

@@ -6,6 +6,7 @@ import { useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 import type { Loaded } from '../load.ts'
 
+import { GuardedPage } from '../components/GuardedPage.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
 import { useAction, useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
@@ -94,30 +95,10 @@ export const Roles = ({ api }: { api: RolesApi }) => {
 
   const { busy, error, setError, run } = useAction(reload)
 
-  if (viewer.status === 'loading') {
-    return (
-      <section class="page">
-        <h1>Roles</h1>
-        <p class="form-note">One moment…</p>
-      </section>
-    )
-  }
-
-  if (!approved) {
-    return (
-      <section class="page">
-        <h1>Roles</h1>
-        <p>
-          This is for members. <a href="/login">Log in</a> to see it.
-        </p>
-      </section>
-    )
-  }
-
   const ready = loaded.status === 'ready' ? (loaded.data ?? undefined) : undefined
 
   return (
-    <section class="page">
+    <GuardedPage title="Roles" require="approved">
       <h1>Roles</h1>
 
       <p class="form-note">
@@ -199,7 +180,7 @@ export const Roles = ({ api }: { api: RolesApi }) => {
           }}
         />
       )}
-    </section>
+    </GuardedPage>
   )
 }
 

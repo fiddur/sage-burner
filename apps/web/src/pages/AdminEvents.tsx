@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
+import { GuardedPage } from '../components/GuardedPage.tsx'
 import { renderMarkdown } from '../markdown.ts'
 import { isAdmin, useViewer } from '../viewer.tsx'
 
@@ -115,24 +116,6 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
       controller.abort()
     }
   }, [api, admin])
-
-  if (viewer.status === 'loading') {
-    return (
-      <section class="page">
-        <h1>Events</h1>
-        <p class="form-note">One moment…</p>
-      </section>
-    )
-  }
-
-  if (!admin) {
-    return (
-      <section class="page">
-        <h1>Events</h1>
-        <p>This is an admin page.</p>
-      </section>
-    )
-  }
 
   const submitNew = async (submitEvent: SubmitEvent) => {
     submitEvent.preventDefault()
@@ -254,7 +237,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
   }
 
   return (
-    <section class="page">
+    <GuardedPage title="Events" require="admin">
       <h1>Events</h1>
 
       {events.status === 'loading' && <p class="form-note">Loading…</p>}
@@ -502,6 +485,6 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
           {creating ? 'Creating…' : 'Create event'}
         </button>
       </form>
-    </section>
+    </GuardedPage>
   )
 }

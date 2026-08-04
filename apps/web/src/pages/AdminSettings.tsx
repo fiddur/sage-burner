@@ -4,6 +4,7 @@ import { useEffect, useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
+import { GuardedPage } from '../components/GuardedPage.tsx'
 import { PushToggle } from '../components/PushToggle.tsx'
 import { useSetInstallationTitle } from '../installation.tsx'
 import { isAdmin, useViewer } from '../viewer.tsx'
@@ -68,26 +69,8 @@ export const AdminSettings = ({ api }: { api: AdminSettingsApi }) => {
     }
   }
 
-  if (viewer.status === 'loading') {
-    return (
-      <section class="page">
-        <h1>Settings</h1>
-        <p class="form-note">One moment…</p>
-      </section>
-    )
-  }
-
-  if (!admin) {
-    return (
-      <section class="page">
-        <h1>Settings</h1>
-        <p>This is an admin page. If it should be open to you, ask someone who already has admin.</p>
-      </section>
-    )
-  }
-
   return (
-    <section class="page">
+    <GuardedPage title="Settings" require="admin">
       <h1>Settings</h1>
 
       {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
@@ -142,6 +125,6 @@ export const AdminSettings = ({ api }: { api: AdminSettingsApi }) => {
       )}
 
       <PushToggle api={api} />
-    </section>
+    </GuardedPage>
   )
 }
