@@ -66,6 +66,7 @@ export const Layout = ({
               <a href="/my-burn">Your burn</a>
               <a href="/dreams">Dreams</a>
               <a href="/schedule">Schedule</a>
+              <a href="/roles">Roles</a>
               <a href="/profile">Your details</a>
             </>
           )}

@@ -122,6 +122,18 @@ export const inviteStatusOf = (
  * branch in the member's page, and an unreachable value that every consumer has
  * to handle is the trap the error-code vocabulary already argues against.
  */
+/**
+ * How much a lead role asks of someone, in each phase of a burn.
+ *
+ * Three independent answers per role — before, during, after — because a role can
+ * be all planning and no presence, or the other way round. Advisory: nothing sorts
+ * or warns on them, they are there so somebody choosing a role knows what they are
+ * agreeing to.
+ */
+export const effortLevels = ['none', 'low', 'medium', 'high'] as const
+export type EffortLevel = (typeof effortLevels)[number]
+export const isEffortLevel = (value: unknown): value is EffortLevel => isOneOf(effortLevels, value)
+
 export const paymentStatuses = ['unpaid', 'paid'] as const
 export type PaymentStatus = (typeof paymentStatuses)[number]
 export const isPaymentStatus = (value: unknown): value is PaymentStatus => isOneOf(paymentStatuses, value)

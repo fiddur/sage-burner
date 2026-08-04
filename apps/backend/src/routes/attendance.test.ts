@@ -58,11 +58,11 @@ const cookieFor = (id: string) => {
   return `${SESSION_COOKIE}=${sessions.issue(id)}`
 }
 
-const givenAccount = async (roles: ('admin' | 'member')[]) => {
+const givenAccount = async (roles: ('admin' | 'member')[], name: string | null = null) => {
   const id = randomUUID()
   await db()
     .insert(account)
-    .values({ id, email: `${id}@example.org`, password_hash: null, created_at: NOW })
+    .values({ id, email: `${id}@example.org`, password_hash: null, name, created_at: NOW })
   for (const role of roles) await db().insert(accountRole).values({ account_id: id, role })
 
   return { id, cookie: cookieFor(id) }
@@ -487,5 +487,85 @@ describe('the dates a stay starts with', () => {
 
     expect(response.statusCode).toBe(200)
     expect(response.json().attendance.arrival_date).toBe('2026-08-02')
+  })
+})
+
+describe('who is coming, by name', () => {
+  const attendees = (server: FastifyInstance, cookie: string | undefined, eventId: string) =>
+    server.inject({
+      method: 'GET',
+      url: `/api/events/${eventId}/attendees`,
+      headers: cookie === undefined ? {} : { cookie },
+    })
+
+  it('names everyone on this burn and nobody from another', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const other = await givenEvent({ slug: 'other-burn' })
+    const bea = await givenAccount(['member'], 'Bea')
+    const ada = await givenAccount(['member'], 'Ada')
+    const elsewhere = await givenAccount(['member'], 'Elsewhere')
+    await join(server, bea.cookie)
+    await join(server, ada.cookie)
+    await db().insert(attendance).values({
+      id: randomUUID(),
+      event_id: other,
+      account_id: elsewhere.id,
+      joined_at: NOW,
+      payment_status: 'unpaid',
+    })
+
+    const response = await attendees(server, ada.cookie, eventId)
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().attendees).toEqual([
+      { account_id: ada.id, name: 'Ada' },
+      { account_id: bea.id, name: 'Bea' },
+    ])
+  })
+
+  it('carries no contact details, allergies or payment state', async () => {
+    // The roster is what carries those, and it stays admin's. Opening a names list
+    // must not open the rest by returning whole rows.
+    const server = await build()
+    const eventId = await givenEvent()
+    const member = await givenAccount(['member'], 'Ada')
+    await join(server, member.cookie)
+    const stored = await db()
+      .update(account)
+      .set({ contact: 'ada#1234', allergies_notes: 'peanuts' })
+      .where(eq(account.id, member.id))
+      .returning({ contact: account.contact, allergies: account.allergies_notes })
+
+    // Asserted, because a `set` naming a column that does not exist is a typecheck
+    // error and nothing else — the rest of this test would then look for strings
+    // that were never written and pass against any implementation.
+    expect(stored).toEqual([{ contact: 'ada#1234', allergies: 'peanuts' }])
+
+    const body = (await attendees(server, member.cookie, eventId)).body
+
+    expect(body).not.toContain('ada#1234')
+    expect(body).not.toContain('peanuts')
+    expect(body).not.toContain('unpaid')
+  })
+
+  it('is for approved accounts, and an admin who is not attending is one', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const roleless = await givenAccount([])
+    const organiser = await givenAccount(['admin'], 'Organiser')
+
+    expect((await attendees(server, undefined, eventId)).statusCode).toBe(401)
+    expect((await attendees(server, roleless.cookie, eventId)).statusCode).toBe(403)
+    expect((await attendees(server, organiser.cookie, eventId)).statusCode).toBe(200)
+  })
+
+  it('is empty for a burn nobody has joined, and for one that does not exist', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const member = await givenAccount(['member'], 'Ada')
+
+    expect((await attendees(server, member.cookie, eventId)).json().attendees).toEqual([])
+    expect((await attendees(server, member.cookie, randomUUID())).json().attendees).toEqual([])
   })
 })

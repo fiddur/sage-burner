@@ -29,6 +29,7 @@ import { registerEventOptionRoutes } from './routes/event-options.ts'
 import { registerEventRoutes } from './routes/events.ts'
 import { registerInstallationRoutes } from './routes/installation.ts'
 import { registerInviteRoutes } from './routes/invites.ts'
+import { registerLeadRoleRoutes } from './routes/lead-roles.ts'
 import { registerPlaceRoutes } from './routes/places.ts'
 import { registerProfileRoutes } from './routes/profile.ts'
 import { registerPushRoutes } from './routes/push.ts'
@@ -420,6 +421,7 @@ export const createApp = async ({
   registerAttendanceRoutes(app, { db, sessions, now })
   registerProfileRoutes(app, { db, sessions, now })
   registerRosterRoutes(app, { db, sessions, now })
+  registerLeadRoleRoutes(app, { db, sessions, now })
   registerSessionRoutes(app, { db, sessions, now })
   registerScheduleRoutes(app, { db, now })
 

@@ -10,6 +10,7 @@ import type {
   ApplicationsResponse,
   Attendance,
   AttendanceUpdate,
+  EventAttendeesResponse,
   EventCreateInput,
   EventOption,
   EventOptionCreateInput,
@@ -31,6 +32,14 @@ import type {
   InviteCreate,
   InviteResponse,
   InviteState,
+  LeadRoleCopy,
+  LeadRoleCreateInput,
+  LeadRoleLead,
+  LeadRoleResponse,
+  LeadRoleSourcesResponse,
+  LeadRoleTeam,
+  LeadRoleUpdate,
+  LeadRolesResponse,
   LoginRequest,
   MeResponse,
   MyAttendanceResponse,
@@ -283,6 +292,60 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
     /** Members only. */
     withdrawSession: (id: string) =>
       request<undefined>(`/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+    /**
+     * Who is coming to a burn, by name. Any approved member — names and ids only,
+     * unlike `getRoster`, which carries contact details and stays admin's.
+     */
+    getEventAttendees: (eventId: string, signal?: AbortSignal) =>
+      request<EventAttendeesResponse>(`/events/${encodeURIComponent(eventId)}/attendees`, { signal }),
+
+    /**
+     * The lead-roles register for one burn. Any approved member — for every verb
+     * below too, including removing a role somebody else staffed.
+     */
+    getLeadRoles: (eventId: string, signal?: AbortSignal) =>
+      request<LeadRolesResponse>(`/events/${encodeURIComponent(eventId)}/roles`, { signal }),
+
+    addLeadRole: (eventId: string, body: LeadRoleCreateInput) =>
+      request<LeadRoleResponse>(`/events/${encodeURIComponent(eventId)}/roles`, { method: 'POST', body }),
+
+    /** Partial — omitted fields are left as they are. */
+    updateLeadRole: (id: string, body: LeadRoleUpdate) =>
+      request<LeadRoleResponse>(`/roles/${encodeURIComponent(id)}`, { method: 'PATCH', body }),
+
+    deleteLeadRole: (id: string) =>
+      request<undefined>(`/roles/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+    /** Taking it, handing it on, or vacating it — `account_id: null` vacates. */
+    setLeadRoleLead: (id: string, accountId: string | null) =>
+      request<LeadRoleResponse>(`/roles/${encodeURIComponent(id)}/lead`, {
+        method: 'PUT',
+        body: { account_id: accountId } satisfies LeadRoleLead,
+      }),
+
+    /** Joining twice is the same as joining once. The wanted size never refuses. */
+    joinLeadRoleTeam: (id: string, accountId: string) =>
+      request<LeadRoleResponse>(`/roles/${encodeURIComponent(id)}/team`, {
+        method: 'POST',
+        body: { account_id: accountId } satisfies LeadRoleTeam,
+      }),
+
+    leaveLeadRoleTeam: (id: string, accountId: string) =>
+      request<undefined>(`/roles/${encodeURIComponent(id)}/team/${encodeURIComponent(accountId)}`, {
+        method: 'DELETE',
+      }),
+
+    /** The burns this register could be seeded from, newest first. */
+    getLeadRoleSources: (eventId: string, signal?: AbortSignal) =>
+      request<LeadRoleSourcesResponse>(`/events/${encodeURIComponent(eventId)}/roles/sources`, { signal }),
+
+    /** Definitions only, never people. Throws ApiError(409) if this register is not empty. */
+    copyLeadRoles: (eventId: string, fromEventId: string) =>
+      request<LeadRolesResponse>(`/events/${encodeURIComponent(eventId)}/roles/copy`, {
+        method: 'POST',
+        body: { from_event_id: fromEventId } satisfies LeadRoleCopy,
+      }),
 
     /** Public: the ICS feed publishes locations anyway, so the list is not secret. */
     getPlaces: (signal?: AbortSignal) => request<PlacesResponse>('/places', { signal }),

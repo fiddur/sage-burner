@@ -5,6 +5,7 @@ import type { AnySQLiteColumn, SQLiteColumn } from 'drizzle-orm/sqlite-core'
 import {
   accountRoles,
   applicationStatuses,
+  effortLevels,
   eventOptionKinds,
   formQuestionTypes,
   paymentStatuses,
@@ -671,6 +672,84 @@ export const pushSubscription = sqliteTable(
     uniqueIndex('push_subscription_endpoint_idx').on(table.endpoint),
     index('push_subscription_account_idx').on(table.account_id),
   ],
+)
+
+/**
+ * A lead role for one burn — the spreadsheet's roles tab.
+ *
+ * Per event, because who leads the sauna is a fact about this burn rather than
+ * about the community. A new burn copies the definitions from a previous one, the
+ * way `event_option` is set up fresh each time and #156 will do for places.
+ *
+ * **Any attending member may add, change or remove one**, staffed or not. That is
+ * a deliberate divergence from every other structural edit being admin-only: these
+ * are co-created events, and at 42 people trust is the mechanism. There is no undo,
+ * which is the accepted cost.
+ *
+ * The lead is an `attendance`, not an `account`. That says two things at once: only
+ * someone coming to this burn can lead something at it, and withdrawing vacates
+ * whatever they held rather than leaving a name on a role nobody can reach.
+ */
+export const leadRole = sqliteTable(
+  'lead_role',
+  {
+    id: text('id').notNull(),
+    event_id: text('event_id')
+      .notNull()
+      .references(() => event.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    /** Why the role exists. Markdown, like every longer field a member writes. */
+    purpose: text('purpose').notNull(),
+    /** What doing it involves. Markdown. */
+    tasks: text('tasks').notNull(),
+    effort_before: text('effort_before', { enum: effortLevels }).notNull(),
+    effort_during: text('effort_during', { enum: effortLevels }).notNull(),
+    effort_after: text('effort_after', { enum: effortLevels }).notNull(),
+    /**
+     * How many people are wanted *besides* the lead. Zero means lead-only.
+     *
+     * Advisory, not a cap: the page shows "2 of 4 wanted" and never refuses
+     * somebody who offers. A bed is finite; a pair of hands is not.
+     */
+    team_size_wanted: integer('team_size_wanted').notNull(),
+    /** Vacant until somebody takes it. Cleared if they withdraw from the burn. */
+    lead_attendance_id: text('lead_attendance_id').references(() => attendance.id, {
+      onDelete: 'set null',
+    }),
+    created_at: text('created_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    index('lead_role_event_idx').on(table.event_id),
+    check('lead_role_title_check', sql`length(trim(${table.title})) > 0`),
+    check('lead_role_team_size_check', sql`${table.team_size_wanted} >= 0`),
+    // Generated from the shared vocabulary, so the database is not holding its own
+    // copy of the rule — the same argument `place.color` and `form_question.type`
+    // make.
+    check('lead_role_effort_before_check', oneOf(table.effort_before, effortLevels)),
+    check('lead_role_effort_during_check', oneOf(table.effort_during, effortLevels)),
+    check('lead_role_effort_after_check', oneOf(table.effort_after, effortLevels)),
+  ],
+)
+
+/**
+ * Somebody on a role's team, besides its lead.
+ *
+ * An `attendance` for the same reason the lead is one: only someone coming can be
+ * on a team, and withdrawing takes them off it. A person may be on several teams
+ * and may lead one while helping on another.
+ */
+export const leadRoleMember = sqliteTable(
+  'lead_role_member',
+  {
+    role_id: text('role_id')
+      .notNull()
+      .references(() => leadRole.id, { onDelete: 'cascade' }),
+    attendance_id: text('attendance_id')
+      .notNull()
+      .references(() => attendance.id, { onDelete: 'cascade' }),
+  },
+  (table) => [primaryKey({ columns: [table.role_id, table.attendance_id] })],
 )
 
 // Deliberately no relations() / defineRelations() block.

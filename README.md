@@ -664,6 +664,8 @@ member — not admin:
 | Schedule places (lanes)       | The burn's shape: name, slug, dates, gate times, `member_cap`, and creating one |
 | The lodging and helping lists | Payment                                                                         |
 | A burn's welcome text         | Applications, invites, role grants, installation settings                       |
+| The lead-roles register       |                                                                                 |
+| Who is coming, by name        |                                                                                 |
 
 "Approved" means **`member` or `admin`**, and the second half is load-bearing.
 The roles are independent — the accounts table grants either on its own, and an
@@ -684,6 +686,14 @@ allergies and payment state, and a member cannot read it — which is a gap, sin
 whoever cooks needs the allergies. Opening the read while keeping the write to a
 person's own stay is #159; this section describes what the guards do today, not what
 was decided for later.
+
+What a member _can_ read is **who is coming, by name**:
+`GET /api/events/:eventId/attendees` returns account ids and display names and
+nothing else. The lead-roles register has to offer somebody to hand a role to, and
+that is the whole of what it needs. It is a separate route rather than a relaxed
+roster on purpose — a route that selects two columns cannot leak a third by
+someone later returning whole rows, and `attendance.test.ts` asserts the body
+carries no contact, allergies or payment state.
 
 Two consequences worth knowing rather than discovering.
 
@@ -1042,8 +1052,9 @@ next burn's programme before they have said they are coming.
 The host is **the member who offered it**, taken from the session and never from
 the body — `sessionCreateSchema` omits `host_account_id` entirely, so a dream in
 someone else's name is a 400 rather than an edit anyone can make by hand.
-Reassigning one needs a member-visible list of members to pick from, which does
-not exist yet.
+Reassigning one is still not offered; the list to pick from now exists
+(`GET /api/events/:eventId/attendees`, added for the roles register), so what is
+missing is the route and the control, not the names.
 
 `session.location` was free text; it is now `place_id`, referencing #78's places.
 The scheduling grid draws one column per place, and a column cannot be spelled
@@ -1196,6 +1207,55 @@ The web suite is pinned to `Europe/Stockholm` in `vite.config.ts` for exactly th
 reason: **in UTC every wrong implementation of that conversion looks right**, so
 running the suite in UTC would silently stop testing it. Verified — with the pin,
 the slicing shortcut fails whatever the ambient `TZ`; without it, it passes in CI.
+
+## Roles
+
+The spreadsheet's roles tab: who is looking after what at this burn. `/roles`,
+open to any approved member.
+
+A role carries a title, a **purpose** and a **tasks include** — both markdown,
+like every longer field shown to other people — three independent effort answers
+for before, during and after, and a **wanted team size**. It has one lead and may
+be vacant, and one person may lead several roles and be on several teams.
+
+**Any approved member may add, edit and remove any role, staffed or not.** This is
+a deliberate divergence from every other structural edit here, which is admin's:
+the events are co-created, and at forty-odd people trust is the mechanism rather
+than a permission table. There is no undo, which is the accepted cost — the page
+asks before removing, and the removal takes the team's sign-ups with it.
+
+**The wanted team size is advisory and the API never enforces it.** The page shows
+"2 of 4 wanted" and still offers "join the team" at 4 of 4. That is the opposite of
+the lodging list, which disables a full option, and the difference is the point: a
+bed is finite and a pair of hands is not.
+
+The lead and the team reference **`attendance`, not `account`**, so only somebody
+coming to that burn can hold something in its register, and withdrawing vacates
+the role and drops the team membership through the foreign keys rather than through
+a cleanup somebody has to remember. The role itself stays, vacant. Handing a role
+to an account with no attendance on that burn is a **400** rather than a 404 — the
+account exists, it is the pairing that is wrong.
+
+Names are resolved at read time from `account`, never copied into the register: a
+name corrected on the profile page is corrected here too.
+
+### Seeding a new burn from a previous one
+
+Fifteen roles retyped four times a year is the friction worth removing.
+`POST /api/events/:eventId/roles/copy` takes a `from_event_id` and brings the
+definitions — titles, purpose, tasks, effort, team sizes — and **none of the
+people**: who led the sauna last summer is a fact about last summer.
+
+It answers **409** when this register already has roles. Merging two registers is a
+decision nobody asked for, and "copy into empty" is the case that removes the
+retyping. The page offers the control only while the register is empty, for the
+same reason.
+
+`GET /api/events/:eventId/roles/sources` is what fills that picker: the other burns
+that already have a register, newest first, with their name and how many roles they
+hold. It exists because `GET /api/admin/events` is admin-only and a member picking
+a burn to copy from would otherwise have nothing to choose between. Only burns with
+a register appear, and only their name — a burn's dates and cap stay admin's.
 
 ## Lodging, and helping out
 

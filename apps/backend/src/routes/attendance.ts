@@ -1,15 +1,15 @@
-import type { MyAttendanceResponse } from '@sage-burner/shared'
+import type { EventAttendeesResponse, MyAttendanceResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
 import { attendanceCreateSchema, errorResponse } from '@sage-burner/shared'
-import { and, eq } from 'drizzle-orm'
+import { and, asc, eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
 
 import { createGuards } from '../auth/guards.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
-import { attendance, event } from '../db/schema.ts'
+import { account, attendance, event } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 import { viewerFor } from './auth.ts'
 import { activeEvent, todayIso } from './events.ts'
@@ -43,7 +43,7 @@ export const registerAttendanceRoutes = (
   app: FastifyInstance,
   { db, sessions, now = () => new Date() }: AttendanceDeps,
 ) => {
-  const { requireMember } = createGuards({ db, sessions })
+  const { requireApproved, requireMember } = createGuards({ db, sessions })
 
   const joinedRow = async (eventId: string, accountId: string) => {
     const [row] = await db
@@ -146,6 +146,30 @@ export const registerAttendanceRoutes = (
       ? reply.code(404).send(errorResponse('not_found'))
       : reply.code(409).send(errorResponse('conflict'))
   })
+
+  /**
+   * Who is coming, by name, so members can fill in the lists they share.
+   *
+   * Deliberately not the roster: that carries contact details, allergies and
+   * payment state and stays admin's. Names are what the lead-roles register needs
+   * to offer, and members already see each other's on the dreams they host.
+   */
+  app.get<{ Params: { eventId: string } }>(
+    '/api/events/:eventId/attendees',
+    { preHandler: requireApproved },
+    async (request, reply) => {
+      void noStore(reply)
+
+      const attendees = await db
+        .select({ account_id: account.id, name: account.name })
+        .from(attendance)
+        .innerJoin(account, eq(account.id, attendance.account_id))
+        .where(eq(attendance.event_id, request.params.eventId))
+        .orderBy(asc(account.name), asc(account.id))
+
+      return { attendees } satisfies EventAttendeesResponse
+    },
+  )
 
   app.post<{ Params: { eventId: string } }>(
     '/api/admin/events/:eventId/attendance',
