@@ -13,6 +13,14 @@ import { questionsFor } from './questions.ts'
 export interface ApplicationRouteDeps {
   db: Database
   now?: () => Date
+  /**
+   * Tell the admins, if anything is listening.
+   *
+   * Optional so the route stands alone: a test about applications should not have
+   * to know that notifications exist, and an installation with nobody subscribed
+   * does nothing here either way.
+   */
+  notify?: (message: string) => Promise<unknown>
 }
 
 /**
@@ -35,12 +43,15 @@ export interface ApplicationRouteDeps {
  * neither buys them anything a reviewer would act on.
  *
  * Not rate-limited here, consistent with login: throttling lives in the reverse
- * proxy where an operator can see it. Nothing here grants access, so the
- * realistic abuse is junk in the review list.
+ * proxy where an operator can see it. Nothing here grants access, so the worst a
+ * flood produces is junk in the review list — and, since #96, a notification on
+ * every subscribed admin's device per submission. `sw.js` gives them one `tag` so
+ * the display collapses rather than piling up, which makes that annoying rather
+ * than a reason to throttle here; #57 is where a bound would go.
  */
 export const registerApplicationRoutes = (
   app: FastifyInstance,
-  { db, now = () => new Date() }: ApplicationRouteDeps,
+  { db, now = () => new Date(), notify }: ApplicationRouteDeps,
 ) => {
   app.post('/api/applications', async (request, reply) => {
     void noStore(reply)
@@ -98,6 +109,22 @@ export const registerApplicationRoutes = (
     } satisfies Application
 
     await db.insert(application).values(row)
+
+    // Not awaited, and its failures never reach the applicant. The application is
+    // written by now, so a slow or broken push service must not turn a successful
+    // application into an error — and an unauthenticated route must not be a place
+    // where a stranger can make the server wait on Google. Reported to the log,
+    // which is the only place a delivery problem is actionable.
+    //
+    // Deliberately says nothing about who applied: a notification is read on a
+    // lock screen, and the applicant's name is theirs until an admin opens the
+    // page. `notifyAdmins` sends the same payload to every subscriber for the
+    // same reason — there is nothing in it worth personalising.
+    if (notify !== undefined) {
+      void notify('Someone has applied to join.').catch((failure: unknown) => {
+        request.log.error({ err: failure }, 'notifying admins of an application failed')
+      })
+    }
 
     return reply.code(201).send({ application: row } satisfies ApplicationResponse)
   })

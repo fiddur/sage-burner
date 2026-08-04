@@ -76,6 +76,9 @@ const clientWith = (
   withdrawSession: () => Promise.reject(new Error('withdrawSession is not stubbed in this file')),
   getInstallation: () => Promise.reject(new Error('getInstallation is not stubbed in this file')),
   updateInstallation: () => Promise.reject(new Error('updateInstallation is not stubbed in this file')),
+  getPushKey: () => Promise.reject(new Error('getPushKey is not stubbed in this file')),
+  subscribeToPush: () => Promise.reject(new Error('subscribeToPush is not stubbed in this file')),
+  unsubscribeFromPush: () => Promise.reject(new Error('unsubscribeFromPush is not stubbed in this file')),
 })
 
 /**

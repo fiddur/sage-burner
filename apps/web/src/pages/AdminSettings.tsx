@@ -3,10 +3,14 @@ import { useEffect, useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
+import { PushToggle } from '../components/PushToggle.tsx'
 import { useSetInstallationTitle } from '../installation.tsx'
 import { isAdmin, useViewer } from '../viewer.tsx'
 
-export type AdminSettingsApi = Pick<ApiClient, 'getInstallation' | 'updateInstallation'>
+export type AdminSettingsApi = Pick<
+  ApiClient,
+  'getInstallation' | 'updateInstallation' | 'getPushKey' | 'subscribeToPush' | 'unsubscribeFromPush'
+>
 
 type Loaded = { status: 'loading' } | { status: 'ready' } | { status: 'failed' }
 
@@ -135,6 +139,8 @@ export const AdminSettings = ({ api }: { api: AdminSettingsApi }) => {
           </button>
         </form>
       )}
+
+      <PushToggle api={api} />
     </section>
   )
 }

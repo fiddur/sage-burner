@@ -13,6 +13,8 @@ import type {
   PaymentUpdate,
   ProfileResponse,
   ProfileUpdate,
+  PushKeyResponse,
+  PushSubscriptionCreate,
   RedeemRequestInput,
   RosterResponse,
   ActiveEventResponse,
@@ -421,6 +423,23 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
       request<ApplicationDecisionResponse>(`/admin/applications/${encodeURIComponent(id)}/reject`, {
         method: 'POST',
       }),
+
+    /**
+     * Admin only. The key a browser needs before it can subscribe.
+     *
+     * `public_key` is null when push has not been set up — asking is what mints
+     * the pair, so a null means the installation could not, not that it has not
+     * been asked yet.
+     */
+    getPushKey: (signal?: AbortSignal) => request<PushKeyResponse>('/admin/push/key', { signal }),
+
+    /** Admin only. Idempotent per browser: the endpoint is the key. */
+    subscribeToPush: (body: PushSubscriptionCreate) =>
+      request<undefined>('/admin/push/subscriptions', { method: 'POST', body }),
+
+    /** Admin only. Answers 204 whether or not the endpoint was known. */
+    unsubscribeFromPush: (endpoint: string) =>
+      request<undefined>('/admin/push/subscriptions', { method: 'DELETE', body: { endpoint } }),
 
     /** Admin only. Never carries the token — only the digest is stored. */
     getInvites: (signal?: AbortSignal) => request<AdminInvitesResponse>('/admin/invites', { signal }),
