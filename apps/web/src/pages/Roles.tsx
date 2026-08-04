@@ -6,6 +6,7 @@ import { useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 import type { Loaded } from '../load.ts'
 
+import { useSelectedBurn } from '../burn.tsx'
 import { CopyFrom } from '../components/CopyFrom.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
@@ -15,7 +16,6 @@ import { isApproved, useViewer } from '../viewer.tsx'
 
 export type RolesApi = Pick<
   ApiClient,
-  | 'getActiveEvent'
   | 'getEventAttendees'
   | 'getLeadRoles'
   | 'getLeadRoleSources'
@@ -67,12 +67,12 @@ export const Roles = ({ api }: { api: RolesApi }) => {
   const [title, setTitle] = useState('')
   const [editing, setEditing] = useState<string | undefined>(undefined)
 
+  const burn = useSelectedBurn()
   const { loaded, reload } = useLoad<Register>(
     async (signal) => {
-      const active = await api.getActiveEvent(signal)
-      if (active.event === null) return null
+      if (burn === undefined) return null
 
-      const eventId = active.event.id
+      const eventId = burn.event.id
       const [roles, attendees, sources] = await Promise.all([
         api.getLeadRoles(eventId, signal),
         api.getEventAttendees(eventId, signal),
@@ -86,7 +86,7 @@ export const Roles = ({ api }: { api: RolesApi }) => {
         sources: sources.sources,
       }
     },
-    { enabled: approved, fallback: 'Could not load the roles.' },
+    { enabled: approved, key: burn?.event.id ?? '', fallback: 'Could not load the roles.' },
   )
 
   const { busy, error, setError, run } = useAction(reload)

@@ -173,7 +173,7 @@ export const viewerFor = async (
   // to a viewer, since "signed in with no role" is an ordinary state (an
   // applicant checking on their application).
   const rows = await deps.db
-    .select({ id: account.id, role: accountRole.role })
+    .select({ id: account.id, name: account.name, role: accountRole.role })
     .from(account)
     .leftJoin(accountRole, eq(accountRole.account_id, account.id))
     .where(eq(account.id, payload.account_id))
@@ -182,7 +182,11 @@ export const viewerFor = async (
   if (first === undefined) return undefined
 
   // `role` is null on the no-roles row the left join produces, and only there.
-  return { account_id: first.id, roles: rows.map((row) => row.role).filter((role) => role !== null) }
+  return {
+    account_id: first.id,
+    name: first.name,
+    roles: rows.map((row) => row.role).filter((role) => role !== null),
+  }
 }
 
 export interface AuthRouteDeps {
@@ -205,7 +209,7 @@ export const registerAuthRoutes = (app: FastifyInstance, { db, config, sessions,
     }
 
     const [row] = await db
-      .select({ id: account.id, password_hash: account.password_hash })
+      .select({ id: account.id, name: account.name, password_hash: account.password_hash })
       .from(account)
       .where(eq(account.email, parsed.data.email))
       .limit(1)
@@ -253,7 +257,7 @@ export const registerAuthRoutes = (app: FastifyInstance, { db, config, sessions,
 
     return reply
       .code(200)
-      .send({ viewer: { account_id: row.id, roles } satisfies Viewer } satisfies MeResponse)
+      .send({ viewer: { account_id: row.id, name: row.name, roles } satisfies Viewer } satisfies MeResponse)
   }
 
   app.post('/api/auth/login', async (request, reply) => {

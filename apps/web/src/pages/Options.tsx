@@ -1,10 +1,11 @@
-import type { Event, EventOption, EventOptionKind } from '@sage-burner/shared'
+import type { EventOption, EventOptionKind, MyBurn } from '@sage-burner/shared'
 
 import { MAX_OPTION_LABEL } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
+import { useSelectedBurn } from '../burn.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { useAction, useLoad } from '../load.ts'
 import { moveTo, swap } from '../reorder.ts'
@@ -12,15 +13,10 @@ import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
 
 export type OptionsApi = Pick<
   ApiClient,
-  | 'getActiveEvent'
-  | 'getEventOptions'
-  | 'addEventOption'
-  | 'updateEventOption'
-  | 'deleteEventOption'
-  | 'reorderEventOptions'
+  'getEventOptions' | 'addEventOption' | 'updateEventOption' | 'deleteEventOption' | 'reorderEventOptions'
 >
 
-type Lists = { event: Event | null; options: readonly EventOption[] }
+type Lists = { event: MyBurn['event'] | null; options: readonly EventOption[] }
 
 /** Only lodging runs out; nothing runs short of people willing to tend a sauna. */
 const takesCapacity = (kind: EventOptionKind) => kind === 'lodging'
@@ -37,25 +33,26 @@ const BLURB: Record<EventOptionKind, string> = {
 }
 
 /**
- * The two lists for the burn that is open.
+ * The two lists for the burn the bar is pointing at.
  *
- * Per event rather than per community, so this page follows the active event the
- * way the roster does. Setting them up before the burn works because "active" is
- * the soonest-ending burn that has not finished.
+ * Per event rather than per community, so the page has to be told which — it reads
+ * `useSelectedBurn()`, and setting a burn up before it is the next one works because
+ * the selector offers every burn still to come, not because of any rule about which
+ * is active.
  */
-export const AdminOptions = ({ api }: { api: OptionsApi }) => {
+export const Options = ({ api }: { api: OptionsApi }) => {
   const viewer = useViewer()
   const approved = isApproved(viewer)
   const admin = isAdmin(viewer)
+  const burn = useSelectedBurn()
   const { loaded, reload } = useLoad<Lists>(
     async (signal) => {
-      const active = await api.getActiveEvent(signal)
-      if (active.event === null) return { event: null, options: [] }
-      const { options } = await api.getEventOptions(active.event.id, signal)
+      if (burn === undefined) return { event: null, options: [] }
+      const { options } = await api.getEventOptions(burn.event.id, signal)
 
-      return { event: active.event, options }
+      return { event: burn.event, options }
     },
-    { enabled: approved, fallback: 'Could not load the lists.' },
+    { enabled: approved, key: burn?.event.id ?? '', fallback: 'Could not load the lists.' },
   )
 
   const { busy, error, setError, run } = useAction(reload)

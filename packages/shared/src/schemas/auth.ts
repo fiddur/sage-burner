@@ -61,6 +61,15 @@ export type LoginRequest = z.infer<typeof loginRequestSchema>
 export const viewerSchema = z.object({
   account_id: idSchema,
   roles: z.array(z.enum(accountRoles)),
+  /**
+   * The display name, for the initials in the corner — null on an account nobody
+   * has filled in yet, including the bootstrap admin.
+   *
+   * The one personal field here, and deliberately the mildest: it is what every
+   * other member already sees on the Members page and on any dream this person
+   * hosts. The email stays out; that is the login identity.
+   */
+  name: z.string().nullable(),
 })
 export type Viewer = z.infer<typeof viewerSchema>
 

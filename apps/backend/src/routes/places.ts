@@ -8,7 +8,7 @@ import {
   placeOrderSchema,
   placeUpdateSchema,
 } from '@sage-burner/shared'
-import { and, asc, desc, eq } from 'drizzle-orm'
+import { and, asc, desc, eq, gte } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -19,9 +19,50 @@ import { isForeignKeyViolation } from '../db/errors.ts'
 import { event, place } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 import { copySourcesFor } from './copy-sources.ts'
+import { todayIso } from './events.ts'
+
+export interface PlaceDeps extends GuardDeps {
+  now?: () => Date
+}
 
 export const placesFor = (db: Database, eventId: string): Promise<Place[]> =>
   db.select().from(place).where(eq(place.event_id, eventId)).orderBy(asc(place.order), asc(place.id))
+
+/**
+ * Whether a burn is still open to changes to its grid: it has not ended.
+ *
+ * A finished burn's grid is the record of what happened there, and an id noted while
+ * it was current should not still be a way to rewrite it. **Not `activeEvent`**,
+ * which the dreams routes scope to: a lane is laid down per burn, and that is how a
+ * burn still months off gets its grid set up, so scoping to the single soonest-ending
+ * burn would refuse the setup the copy exists for. Every write here is scoped the
+ * same way — closing the two that take a bare id and leaving the rest would be an
+ * archive only half shut.
+ *
+ * Reading stays open, including reading a finished grid to copy it into the next
+ * burn.
+ */
+const burnIsOpen = async (db: Database, today: string, eventId: string): Promise<boolean> => {
+  const [row] = await db
+    .select({ id: event.id })
+    .from(event)
+    .where(and(eq(event.id, eventId), gte(event.end_date, today)))
+    .limit(1)
+
+  return row !== undefined
+}
+
+/** The lane, when the burn it belongs to is open — the id alone does not say which burn. */
+const openLane = async (db: Database, today: string, placeId: string): Promise<Place | undefined> => {
+  const [row] = await db
+    .select()
+    .from(place)
+    .innerJoin(event, eq(place.event_id, event.id))
+    .where(and(eq(place.id, placeId), gte(event.end_date, today)))
+    .limit(1)
+
+  return row?.place
+}
 
 /**
  * Where a dream can happen, one grid per burn.
@@ -35,9 +76,13 @@ export const placesFor = (db: Database, eventId: string): Promise<Place[]> =>
  * Reads are public. The ICS feed publishes a session's location to anyone with the
  * link, so the list of places is already public by design — see the ICS paragraph
  * in the README's security section. Every write is open to any approved member: this
- * is the burn's furniture, not admin's.
+ * is the burn's furniture, not admin's. Every write also needs the burn to be open;
+ * see `burnIsOpen`.
  */
-export const registerPlaceRoutes = (app: FastifyInstance, { db, sessions }: GuardDeps) => {
+export const registerPlaceRoutes = (
+  app: FastifyInstance,
+  { db, sessions, now = () => new Date() }: PlaceDeps,
+) => {
   const { requireApproved } = createGuards({ db, sessions })
 
   app.get<{ Params: { eventId: string } }>('/api/events/:eventId/places', async (request, reply) => {
@@ -59,6 +104,10 @@ export const registerPlaceRoutes = (app: FastifyInstance, { db, sessions }: Guar
 
       const id = randomUUID()
       const event_id = request.params.eventId
+
+      if (!(await burnIsOpen(db, todayIso(now), event_id))) {
+        return reply.code(404).send(errorResponse('not_found'))
+      }
 
       // Read and insert in one transaction, or "the server assigns `order`" is not
       // true: two requests can observe the same last row between separate awaits
@@ -88,8 +137,9 @@ export const registerPlaceRoutes = (app: FastifyInstance, { db, sessions }: Guar
           return next
         })
       } catch (failure) {
-        // A burn that does not exist. The foreign key is the authority rather than
-        // a pre-read, which would be a second query saying the same thing.
+        // A burn deleted between the check above and this insert. The check reads
+        // `end_date`, which the foreign key cannot see; the key covers existence,
+        // which the check can only report as of a moment ago.
         if (isForeignKeyViolation(failure)) return reply.code(404).send(errorResponse('not_found'))
         throw failure
       }
@@ -107,13 +157,12 @@ export const registerPlaceRoutes = (app: FastifyInstance, { db, sessions }: Guar
       const parsed = placeUpdateSchema.safeParse(request.body)
       if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
 
-      // `set({})` is not valid SQL, so the one body that never reaches the
-      // UPDATE needs a read of its own.
-      if (Object.keys(parsed.data).length === 0) {
-        const [existing] = await db.select().from(place).where(eq(place.id, request.params.id)).limit(1)
-
-        return existing === undefined ? reply.code(404).send(errorResponse('not_found')) : { place: existing }
-      }
+      // One read answering both "is it there" and "is its burn still open", so the
+      // two cases cannot answer differently. `set({})` is not valid SQL, so the one
+      // body that never reaches the UPDATE returns this row instead.
+      const existing = await openLane(db, todayIso(now), request.params.id)
+      if (existing === undefined) return reply.code(404).send(errorResponse('not_found'))
+      if (Object.keys(parsed.data).length === 0) return { place: existing }
 
       const [updated] = await db
         .update(place)
@@ -131,12 +180,22 @@ export const registerPlaceRoutes = (app: FastifyInstance, { db, sessions }: Guar
     async (request, reply) => {
       void noStore(reply)
 
+      if ((await openLane(db, todayIso(now), request.params.id)) === undefined) {
+        return reply.code(404).send(errorResponse('not_found'))
+      }
+
       // A dream sitting in this lane holds the row: `session.place_id` has no
-      // `onDelete`, so SQLite refuses rather than quietly unscheduling it. A
-      // pre-read would be check-then-act — the dream can be created between the
-      // read and the delete — so the constraint is the authority and this only
-      // translates it. It is also what keeps a finished burn's grid standing under
-      // the record of what happened there.
+      // `onDelete`, so SQLite refuses rather than quietly unscheduling it. Left to
+      // the constraint rather than pre-read, because a constraint cannot go stale
+      // and a read can.
+      //
+      // The `openLane` read above can, and that window is accepted rather than
+      // closed: `PATCH /api/admin/events/:id` moves `end_date`, so an admin
+      // shortening a burn between that read and this delete would let a lane go from
+      // a burn that just closed. The same shape as the burn vanishing between the
+      // check and the insert on POST, and left open for the same reason: two people
+      // doing those two things in the same second, at forty-odd members and four
+      // burns a year, is not worth a transaction to prevent.
       let deleted
       try {
         deleted = await db.delete(place).where(eq(place.id, request.params.id)).returning({ id: place.id })
@@ -162,6 +221,10 @@ export const registerPlaceRoutes = (app: FastifyInstance, { db, sessions }: Guar
 
       const parsed = placeOrderSchema.safeParse(request.body)
       if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+
+      if (!(await burnIsOpen(db, todayIso(now), request.params.eventId))) {
+        return reply.code(404).send(errorResponse('not_found'))
+      }
 
       const existing = await placesFor(db, request.params.eventId)
       const wanted = parsed.data.ids
@@ -233,15 +296,19 @@ export const registerPlaceRoutes = (app: FastifyInstance, { db, sessions }: Guar
         return reply.code(400).send(errorResponse('bad_request'))
       }
 
+      const today = todayIso(now)
+
       const seeded = db.transaction((tx) => {
         // Checked rather than left to the foreign key. The FK only fires when there
         // is a row to insert, so copying from an empty source into a burn that does
         // not exist answered 201 with an empty list — the one combination the other
-        // 404 test cannot reach.
+        // 404 test cannot reach. It also carries the `end_date` half, which the key
+        // cannot see: a grid is seeded into a burn still to come, never back into a
+        // finished one.
         const [burn] = tx
           .select({ id: event.id })
           .from(event)
-          .where(eq(event.id, request.params.eventId))
+          .where(and(eq(event.id, request.params.eventId), gte(event.end_date, today)))
           .limit(1)
           .all()
 
@@ -249,7 +316,8 @@ export const registerPlaceRoutes = (app: FastifyInstance, { db, sessions }: Guar
 
         // The source too, and for the same reason. Without it, copying *from* a burn
         // that does not exist answered 201 with nothing copied — no different from a
-        // real burn that simply has none.
+        // real burn that simply has none. Existence only: copying forward out of a
+        // finished burn is the case the whole action was built for.
         const [from] = tx
           .select({ id: event.id })
           .from(event)

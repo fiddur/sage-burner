@@ -1,18 +1,19 @@
-import type { Event, Place, Session } from '@sage-burner/shared'
+import type { MyBurn, Place, Session } from '@sage-burner/shared'
 import type { ComponentChildren } from 'preact'
 
 import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
+import { useSelectedBurn } from '../burn.tsx'
 import { fromLocalInput, toLocalInput } from '../datetime.ts'
 import { useAction, useLoad } from '../load.ts'
 import { endFor, hourOf, hoursOf, laneCells } from '../schedule.ts'
 import { isMember, useViewer } from '../viewer.tsx'
 
-export type ScheduleApi = Pick<ApiClient, 'getSessions' | 'getPlaces' | 'getActiveEvent' | 'updateSession'>
+export type ScheduleApi = Pick<ApiClient, 'getSessions' | 'getPlaces' | 'updateSession'>
 
-type Timetable = { event: Event | null; places: readonly Place[]; sessions: readonly Session[] }
+type Timetable = { event: MyBurn['event'] | null; places: readonly Place[]; sessions: readonly Session[] }
 
 const label = (row: string) => row.slice(11)
 
@@ -41,19 +42,19 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
 
   // The burn comes first: since #156 the lanes belong to one, so there is no grid to
   // ask for until we know which.
+  const burn = useSelectedBurn()
   const { loaded, reload } = useLoad<Timetable>(
     async (signal) => {
-      const active = await api.getActiveEvent(signal)
-      if (active.event === null) return { event: null, places: [], sessions: [] }
+      if (burn === undefined) return { event: null, places: [], sessions: [] }
 
       const [places, dreams] = await Promise.all([
-        api.getPlaces(active.event.id, signal),
-        api.getSessions(signal),
+        api.getPlaces(burn.event.id, signal),
+        api.getSessions(burn.event.id, signal),
       ])
 
-      return { event: active.event, places: places.places, sessions: dreams.sessions }
+      return { event: burn.event, places: places.places, sessions: dreams.sessions }
     },
-    { enabled: member, fallback: 'Could not load the schedule.' },
+    { enabled: member, key: burn?.event.id ?? '', fallback: 'Could not load the schedule.' },
   )
 
   const { busy, error, run } = useAction(reload)
@@ -101,7 +102,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
       <Framed>
         <p class="notice">
           No places yet, so there are no lanes to put anything in. They are added under{' '}
-          <a href="/admin/places">Places</a>.
+          <a href="/places">Places</a>.
         </p>
       </Framed>
     )

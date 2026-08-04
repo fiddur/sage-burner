@@ -156,23 +156,51 @@ export type Attendance = z.infer<typeof attendanceSchema>
 export type ProfileUpdate = z.infer<typeof profileUpdateSchema>
 export type AttendanceUpdate = z.infer<typeof attendanceUpdateSchema>
 
-/**
- * Someone's attendance at the active burn, as they see it.
- *
- * `null` when they have not said they are coming — the page needs to tell "not
- * coming" from "coming and nothing filled in yet", and both are ordinary states.
- */
-export const myAttendanceResponseSchema = z.object({
-  // Derived rather than re-declared. Written out, this had `slug` as plain bounded
-  // text — so it accepted any 120 characters where `slugSchema` accepts 64 of
-  // lowercase-hyphenated words. A summary of a thing should not be a second, looser
-  // opinion about what that thing is.
-  event: eventFields.pick({ id: true, name: true, slug: true }).nullable(),
+/** Who an organiser is adding to a burn on someone else's behalf. */
+export const attendanceCreateSchema = z.object({ account_id: idSchema }).strict()
+
+/** One burn on someone's own page, with their stay at it or nothing yet. */
+export const myBurnSchema = z.object({
+  /**
+   * Enough of the burn for the pages the selector points at.
+   *
+   * The gate times are here because the schedule grid draws its rows from them; the
+   * cap is not, because nothing outside the roster counts places. A summary is a
+   * projection of the row, never a second opinion about it — `eventFields.pick`
+   * rather than a hand-written shape, so a bound stated once cannot be restated
+   * more loosely here.
+   */
+  event: eventFields.pick({
+    id: true,
+    name: true,
+    slug: true,
+    start_date: true,
+    end_date: true,
+    start_time: true,
+    end_time: true,
+  }),
   attendance: attendanceSchema.nullable(),
 })
 
-/** Who an organiser is adding to a burn on someone else's behalf. */
-export const attendanceCreateSchema = z.object({ account_id: idSchema }).strict()
+/**
+ * Every burn someone's details page shows them.
+ *
+ * Two arrays rather than one with a flag, because the split is the server's to
+ * make: "has this ended" is a comparison against *its* clock, and a browser
+ * deciding it from `end_date` would answer differently either side of midnight
+ * depending on the reader's timezone. `apps/web` pins `TZ` in its Vite config for
+ * exactly the class of bug this avoids having at all.
+ *
+ * `coming` is every burn that has not ended — joined or not, since joining is what
+ * the page is for. `past` is only the ones they actually came to; a burn somebody
+ * never joined is not their history.
+ */
+export const myBurnsResponseSchema = z.object({
+  /** Soonest first, so the one being planned is at the top. */
+  coming: z.array(myBurnSchema),
+  /** Most recent first. */
+  past: z.array(myBurnSchema),
+})
 
 /**
  * Who is coming to a burn, by name, for the lists members fill in together.
@@ -186,8 +214,9 @@ export const eventAttendeesResponseSchema = z.object({
   attendees: z.array(z.object({ account_id: idSchema, name: z.string().nullable() })),
 })
 
-export type MyAttendanceResponse = z.infer<typeof myAttendanceResponseSchema>
 export type AttendanceCreate = z.infer<typeof attendanceCreateSchema>
+export type MyBurn = z.infer<typeof myBurnSchema>
+export type MyBurnsResponse = z.infer<typeof myBurnsResponseSchema>
 export type EventAttendeesResponse = z.infer<typeof eventAttendeesResponseSchema>
 
 /**
@@ -229,6 +258,33 @@ export const rosterResponseSchema = z.object({
 })
 
 /**
+ * The same list as a member sees it (#159).
+ *
+ * Derived by subtraction from the organiser's entry so the two cannot drift into
+ * describing different people. Two fields come off, and **`payment_status` is not
+ * one of them**: having paid is the definite mark of somebody actually joining, and
+ * it was a column everyone could read in the spreadsheet this replaces. What stays
+ * admin's is *recording* it, which is the `PATCH` and not this read.
+ *
+ * - **`payment_date`** goes, because when a transfer landed is bookkeeping. The
+ *   status answers "are they in"; the date answers a question only whoever
+ *   reconciles the account is asking.
+ * - **`email`** goes, being the login identity rather than a way of reaching
+ *   somebody. `profileUpdateSchema` refuses to change it for that reason, and
+ *   `contact` is the field a person fills in to be contacted. Nothing here falls
+ *   back to it.
+ */
+export const memberRosterEntrySchema = rosterEntrySchema.omit({
+  email: true,
+  payment_date: true,
+})
+
+export const memberRosterResponseSchema = z.object({
+  event: eventFields.pick({ id: true, name: true, member_cap: true }).nullable(),
+  entries: z.array(memberRosterEntrySchema),
+})
+
+/**
  * What an organiser may set on someone's attendance. The status, and nothing else.
  *
  * `payment_date` is derived from the status and the clock rather than taken from
@@ -249,4 +305,6 @@ export const paymentUpdateSchema = z
 
 export type RosterEntry = z.infer<typeof rosterEntrySchema>
 export type RosterResponse = z.infer<typeof rosterResponseSchema>
+export type MemberRosterEntry = z.infer<typeof memberRosterEntrySchema>
+export type MemberRosterResponse = z.infer<typeof memberRosterResponseSchema>
 export type PaymentUpdate = z.infer<typeof paymentUpdateSchema>

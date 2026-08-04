@@ -8,7 +8,7 @@ import {
   eventWelcomeUpdateSchema,
   hasOrderedRange,
 } from '@sage-burner/shared'
-import { asc, eq, gte } from 'drizzle-orm'
+import { and, asc, eq, gte } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -54,6 +54,24 @@ export const activeEvent = async (db: Database, today: string): Promise<Event | 
     .from(event)
     .where(gte(event.end_date, today))
     .orderBy(asc(event.end_date), asc(event.start_date), asc(event.slug))
+    .limit(1)
+
+  return row
+}
+
+/**
+ * A burn by id, if it has not ended.
+ *
+ * The rule every member-facing write is scoped by, in one place: a finished burn is
+ * the record of what happened, and an id noted while it was current should not still
+ * be a way to change it. Wider than `activeEvent` on purpose — a burn months off is
+ * open, which is how one gets set up and joined before it is the next one.
+ */
+export const openEvent = async (db: Database, today: string, eventId: string): Promise<Event | undefined> => {
+  const [row] = await db
+    .select()
+    .from(event)
+    .where(and(eq(event.id, eventId), gte(event.end_date, today)))
     .limit(1)
 
   return row

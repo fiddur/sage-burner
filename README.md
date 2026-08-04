@@ -554,9 +554,10 @@ ADMIN_EMAIL=you@example.org ADMIN_PASSWORD="$ADMIN_PASSWORD" \
   pnpm --filter sage-burner-backend admin:create
 ```
 
-Then log in at `/login`; the nav gains an **Organise** link, plus **Your burn**
-and **Your details** — it grants `member` alongside `admin`, because an
-organiser is almost always also coming.
+Then log in at `/login`; the nav gains the **⚙️** link and the initials circle in
+the corner — `admin:create` grants `member` alongside `admin`, because an organiser
+is almost always also coming. The circle shows a 👤 until a name is filled in, which
+is the state that account starts in.
 
 Both values come from the environment, never from arguments. `read -rs` keeps
 the password out of the shell history, and `-e ADMIN_PASSWORD` with no `=`
@@ -591,9 +592,33 @@ one later cannot lock out an existing member.
 
 ### Notifications
 
-Admins can be told when someone applies, per **browser** rather than per person:
-a subscription belongs to the browser it was made in, so an admin with a laptop
-and a phone turns it on in both. Organise → Settings.
+Any approved member can be told when something happens to them, per **browser**
+rather than per person: a subscription belongs to the browser it was made in, so
+somebody with a laptop and a phone turns it on in both. The toggle is on the details
+page behind the initials circle, **and on ⚙️ → Settings** — an organiser holding
+`admin` without `member` is refused from the details page, and application
+notifications go precisely to admins.
+
+Two things notify today:
+
+- **Being handed a lead role, or taken off one** — the lead column and the team
+  both, and only the person it happened _to_. Not when they did it themselves:
+  taking a role you want is the common case, and a notification for your own click
+  is noise that teaches people to ignore the channel.
+- **Someone applying**, which goes to every admin, since only an admin can act on
+  one.
+
+The lead-role routes take `notify` as a dependency rather than importing the push
+module. Handing somebody a role is the point and the notification is a courtesy, so
+delivery failing must not fail the write — there is a test that hands the role over
+with the push service rejecting every call. The team removal is idempotent, so it
+notifies only when a row actually went: telling somebody they have been taken off
+something they were never on is worse than silence.
+
+These routes **moved out from under `/api/admin/`** rather than being exempted
+inside it (#184), which is the rule — the prefix hook's whole value is having no
+exception to forget. They are `requireApproved`, so an account with neither role is
+still refused: nothing would notify them.
 
 Browser push is the one thing in this app that reaches outward at runtime. The
 notification travels via whichever push service the browser chose — Google's for
@@ -604,9 +629,9 @@ that never turns notifications on never acquires one. That keeps `docker compose
 up` sufficient, which is the same argument #59 makes for `SESSION_SECRET`.
 
 The endpoint is **https-only**. It is the one field whose stored value the server
-itself then requests, on every application, so a `http://10.0.0.5/…` there would
-point the container at something on its own network. Only admins can write it and a
-real push service is always https, so requiring the scheme costs nothing. Narrowing
+itself then requests, so a `http://10.0.0.5/…` there would point the container at
+something on its own network. Only an approved member can write it and a real push
+service is always https, so requiring the scheme costs nothing. Narrowing
 past that would mean an allowlist of every browser vendor's endpoint, which goes
 stale the moment a new one appears.
 
@@ -621,8 +646,8 @@ server wait, and a push outage would turn a successful application into an error
 for the person applying. Failures go to the log and nowhere else.
 
 A subscription the push service answers `404` or `410` for is **deleted**: the
-browser has thrown it away, and keeping the row would retry a dead endpoint on
-every application forever. Any other failure keeps it — a 500 from Google is not a
+browser has thrown it away, and keeping the row would retry a dead endpoint
+forever. Any other failure keeps it — a 500 from Google is not a
 reason to forget someone's phone. Subscriptions also cascade with the account, so
 a deleted account leaves none behind.
 
@@ -659,13 +684,14 @@ This replaces a shared spreadsheet where everyone could edit everything except
 paid status, so the default for the burn's **shared furniture** is any approved
 member — not admin:
 
-| Open to any approved member   | Still admin                                                                     |
-| ----------------------------- | ------------------------------------------------------------------------------- |
-| Schedule places, per burn     | The burn's shape: name, slug, dates, gate times, `member_cap`, and creating one |
-| The lodging and helping lists | Payment                                                                         |
-| A burn's welcome text         | Applications, invites, role grants, installation settings                       |
-| The lead-roles register       |                                                                                 |
-| Who is coming, by name        |                                                                                 |
+| Open to any approved member                        | Still admin                                                                     |
+| -------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Schedule places, per burn                          | The burn's shape: name, slug, dates, gate times, `member_cap`, and creating one |
+| The lodging and helping lists                      | Payment                                                                         |
+| A burn's welcome text                              | Applications, invites, role grants, installation settings                       |
+| The lead-roles register                            |                                                                                 |
+| Who is coming, by name                             |                                                                                 |
+| Reading the roster, bar the payment date and email |                                                                                 |
 
 "Approved" means **`member` or `admin`**, and the second half is load-bearing.
 The roles are independent — the accounts table grants either on its own, and an
@@ -680,14 +706,45 @@ afterwards without `member`.)
 Personal details stay the person's own: nobody edits somebody else's name, contact
 or allergies.
 
-**The roster is still admin-only**, and that is the code rather than the intent. It
-is served from `/api/admin/events/:eventId/roster`, it carries contact details,
-allergies and payment state, and a member cannot read it — which is a gap, since
-whoever cooks needs the allergies. Opening the read while keeping the write to a
-person's own stay is #159; this section describes what the guards do today, not what
-was decided for later.
+**A member reads the roster, minus the payment date and the email** (#159). Whoever cooks needs
+the allergies, and that is why allergies live on the account rather than per burn.
+The write does not open with it: somebody else's stay stays theirs, through the
+`PATCH /api/events/:eventId/attendance/me` they already have, and adding or removing
+someone else is still admin's.
 
-What a member _can_ read is **who is coming, by name**:
+`GET /api/events/:eventId/members` serves it, **outside the admin prefix rather than
+exempted inside it** — the hook's whole value is having no exception to forget. There
+is no `active` variant: the burn selector names the burn, so the route never has to
+guess which one.
+
+**`payment_status` is shown to everyone.** Having paid is the definite mark of
+somebody actually joining, and it was a column everyone could read in the spreadsheet
+this replaces. What stays admin's is _recording_ it, which is the `PATCH` and not this
+read. The page prints a word rather than a tick, since a checkbox reads as something
+to click and this is the one column here nobody may change.
+
+Two columns come off the organiser's row:
+
+- **`payment_date`**, because when a transfer landed is bookkeeping. The status
+  answers "are they in"; the date answers a question only whoever reconciles the
+  account is asking.
+- **`email`**, which is the login identity rather than a way of reaching somebody.
+  `profileUpdateSchema` refuses to change it for that reason, and `contact` is the
+  field a person fills in to be contacted. The member page has no fallback to it,
+  where the organiser's shows it when a name is missing.
+
+`waiting` stays, because a waiting list is only any use to the people on it.
+
+The projection is `asMemberEntry` in `roster.ts`, written out field by field. That
+is the safety property, not tidiness: it is an object literal against
+`MemberRosterEntry`, so a column added to the organiser's row reaches members only
+when somebody names it there, and one removed from the member schema stops compiling
+rather than quietly still being sent. Both views run the same `rosterFor`, so the
+order — which decides who has a place — cannot come out differently on the two pages.
+
+The organiser's roster keeps its own route, its payment control and its CSV.
+
+What a member reads elsewhere, more narrowly, is **who is coming, by name**:
 `GET /api/events/:eventId/attendees` returns account ids and display names and
 nothing else. The lead-roles register has to offer somebody to hand a role to, and
 that is the whole of what it needs. It is a separate route rather than a relaxed
@@ -770,6 +827,55 @@ redirecting.
 The web app hides what a viewer cannot use, but that is presentation. Every
 admin route refuses server-side regardless of what the nav rendered.
 
+## Getting around
+
+The bar carries **one entry per thing, not one per page** (#184). Everything else
+is reached from the page it belongs to, which is where somebody is standing when
+they want it.
+
+Leftmost is the **burn selector**, because everything to the right of it is about
+the burn it names. It lists the burns a member has said they are coming to, and
+defaults to the soonest — the list arrives soonest-first, so that is the first
+entry rather than a rule applied twice. **An organiser holding `admin` sees every
+burn still to come**: one without `member` has no attendance anywhere and would
+otherwise face an empty selector on the burn they are setting up. Somebody coming
+to none gets no selector and no burn-scoped content; their details page is where
+they join one.
+
+It is hidden when there is nothing to choose between — one burn is the ordinary
+case and a select with a single option is furniture.
+
+The choice is **not persisted**. A reload landing on the soonest burn is the right
+default every time, and a remembered choice would leave somebody looking at last
+month's grid with nothing on screen to say why.
+
+| Viewer                   | Bar                                               |
+| ------------------------ | ------------------------------------------------- |
+| Signed out               | Apply, Log in                                     |
+| An account, neither role | nothing — an applicant waiting on a decision      |
+| `member`                 | Members, Schedule, Roles, and the initials circle |
+| `admin` without `member` | Members, Schedule, Roles, ⚙️                      |
+
+- **Members** is the roster a member may now read — see "What a member may change".
+- **Dreams** is reached from Schedule. Offering a dream and placing one are the
+  same activity, and two entries for it is what the restructure undid.
+- **Places** is reached from Schedule too: the lanes are what the grid draws.
+- **The initials circle** is the details page: who you are, then a section per burn
+  still to come — join it, or fill in your stay at it — then past burns behind
+  _…show past burns_. It absorbed the page called "Your burn", singular, which was
+  from when there was one burn worth showing and it was whichever came next.
+- **The lodging and helping lists** are reached from that page, from
+  _(edit lodging alternatives)_ beside the question they answer.
+- **⚙️** is admin's alone. It used to be `Organise` and open to any approved member,
+  because it was the only way to reach the two lists above; now those have their own
+  way in, and what is left behind ⚙️ — the burn's shape, who gets in, payment, the
+  installation — is admin's. It still links to both lists, since an organiser
+  holding `admin` without `member` has no details page to reach the lodging list from.
+
+Hiding a link is presentation. Every page behind these is guarded again server-side,
+and `Layout.test.tsx` asserts each absence by name — a negated `arrayContaining`
+passes when any _one_ of the named links is missing, which is not the question.
+
 ## What this installation is called
 
 `sage-burner` is the software. What the people running it call their gathering
@@ -828,6 +934,19 @@ An invite's single use is enforced by a **partial unique index on
 every CLI-created account has none. Deleting the account would stop the index
 objecting, so redemption stamps `used_at` in the same transaction; neither
 mechanism is sufficient alone.
+
+### Every burn-scoped route takes an event id
+
+`activeEvent` decides one thing now: what the **public** homepage and the ICS feed
+are about. Everything a signed-in member looks at names its burn in the path —
+`/api/events/:eventId/{places,sessions,members,roles,options,attendance/me}` — and
+the selector in the bar is what supplies the id.
+
+The routes that take a bare id instead (`/api/places/:id`, `/api/sessions/:id`,
+`/api/roles/:id`) resolve the burn from the row and refuse one that has **ended**,
+through `openEvent`. Not `activeEvent`: the selector offers every burn still to
+come, so a dream can be offered for the one after next and a grid laid out months
+ahead. What is closed is the archive.
 
 ### Which event is active
 
@@ -1265,9 +1384,11 @@ both lists as rows — **per event**, unlike the application questions and the
 places, because what there is to sleep in depends on the site and what wants
 doing depends on the year.
 
-Organise → **Lodging and helping**, which follows the burn that is open. Setting
-them up before it starts works, since "active" is the soonest-ending burn that has
-not finished.
+`/options` — **Lodging and helping**, for the burn the selector is pointing at.
+Setting them up before that burn is the next one works because the selector offers
+every burn still to come. Reached from **(edit lodging alternatives)** on the details page,
+beside the question the list answers, and from ⚙️ as well — an organiser holding
+`admin` without `member` has no details page to reach it from.
 
 A lodging entry can carry a number of spaces — "Temple mattress: 9" — or leave it
 blank for the ones that do not run out, like a tent of one's own. Helping entries
@@ -1282,7 +1403,7 @@ there is nothing to map it onto, but an organiser still reads notes. Truncated t
 
 A member picks one lodging option on **your burn**, and the select disables the
 ones that are full, reading "— full". That is presentation: the API takes what it
-is sent, so `PATCH /api/events/active/attendance` counts the takers and answers
+is sent, so `PATCH /api/events/:eventId/attendance/me` counts the takers and answers
 **409** for a full option.
 
 The count is a plain read-and-compare, not race protection. Two people taking the
@@ -1340,7 +1461,9 @@ the grid is the thing the list exists to build. The same shape `event_option`
 already had for lodging and helping: definitions per burn, seeded rather than
 retyped.
 
-Organise → **Places**, which follows the burn that is open. A pencil edits, a trashcan removes, and the ⠿ handle
+`/places`, for the burn the selector is pointing at — reached from Schedule, since
+the lanes are what the grid draws, and from ⚙️.
+A pencil edits, a trashcan removes, and the ⠿ handle
 reorders — by dragging, and by ArrowUp/ArrowDown while it has focus. The handle
 takes keys as well as drags because a reorder only a pointer can do is one some
 people cannot do at all.
@@ -1366,6 +1489,17 @@ places is already public by design. Writes are open to any approved member — t
 lanes are the burn's furniture, not admin's. Editing and deleting stay on
 `/api/places/:id`, since an id already names one burn's lane.
 
+**Every write needs the burn to be open — to have not ended yet** (#171). A
+finished burn's grid is the record of what happened there, and an id noted while
+that burn was current should not still be a way to rewrite it. The rule is "has
+not ended" rather than "is the active burn", which is what the dreams routes use:
+a lane is laid down per burn, and that is how a burn still months off gets its
+grid set up, so scoping to the single soonest-ending burn would refuse the setup
+the copy exists for. A burn ending _today_ is still open, so the last day is not
+too late. All five writes are scoped the same way — closing only the two that
+take a bare id would be an archive half shut. Reading is untouched, including
+reading a finished grid in order to copy it forward.
+
 `order` is the server's to assign, so `POST` refuses a caller that sends one —
 otherwise two places could claim the same lane. `event_id` is refused for the same
 kind of reason: the path already says which burn, and a body naming another would
@@ -1390,7 +1524,9 @@ lanes, **carrying their order** so the copied grid reads left to right the way t
 burn it came from did. Never the dreams standing in them: which burn's Temple a
 dream was in is a fact about that burn. It answers **409** into a grid that already
 has lanes, and the page offers the control only while the grid is empty — merging
-two grids is a decision nobody asked for.
+two grids is a decision nobody asked for. The _target_ has to be open; the source
+does not, since copying forward out of a finished burn is the case it was built
+for.
 
 `GET /api/events/:eventId/places/sources` fills that picker, and
 `GET /api/events/:eventId/roles/sources` is the same query for the roles register;
@@ -1703,16 +1839,29 @@ Approval admits you once; then you decide, burn by burn. `attendance` is that
 second decision, keyed `(event, account)`, and it is what arrival dates, dreams
 and shifts hang off later.
 
-A member says it for themselves at `/my-burn`:
+A member says it for themselves on their own details page, one section per burn:
 
-- `GET /api/events/active/attendance` — the open burn and their row, either of
-  which may be null. "No burn open" and "open, not coming" are different states
-  and the page says so rather than showing a dead button.
-- `POST` — **idempotent**. Saying it twice is the same statement, not an error: a
-  double click, a retried request and a second tab all land there.
-- `DELETE` — withdrawing, but **only while nothing has been paid**. What a refund
-  means is a real decision and #31 owns it; deleting the row here would quietly
-  discard the record that money changed hands.
+- `GET /api/events/mine` — `{ coming, past }`. `coming` is every burn that has not
+  ended, joined or not, since joining is what the page is for; `past` is only the
+  ones they actually came to, because a burn somebody never joined is not their
+  history. The **server** splits them: that is a comparison against a clock, and a
+  browser deciding it from `end_date` would answer differently either side of
+  midnight depending on the reader's timezone.
+- `POST /api/events/:eventId/attendance/me` — **idempotent**. Saying it twice is the
+  same statement, not an error: a double click, a retried request and a second tab
+  all land there.
+- `DELETE /api/events/:eventId/attendance/me` — withdrawing, but **only while nothing
+  has been paid**. What a refund means is a real decision and #31 owns it; deleting
+  the row here would quietly discard the record that money changed hands.
+- `PATCH /api/events/:eventId/attendance/me` — the stay itself.
+
+**Named by event id, not by "active"** (#184). These were `…/events/active/attendance`
+while there was one place to see a burn and it was whichever came next. The details
+page lists every burn still to come and offers to join any of them, and the second
+one on that list is by definition not the soonest-ending — so an active-scoped join
+could not say yes to it. All three refuse a burn that has **ended**, and answer 404
+for that and for an id that never existed alike, so an id cannot be probed for
+existence.
 
 An organiser can do it for someone, because people ask over Discord and an
 organiser should not have to talk them through a UI:
@@ -1765,8 +1914,8 @@ Two pages, because the record has two lifetimes.
 burn to burn, so correcting an allergy corrects it everywhere — which is the
 whole reason they live on `account` rather than per stay.
 
-`/my-burn` edits the **stay**: arrival, departure, lodging, shift preference,
-notes, for the burn you have said you are coming to.
+The same page edits the **stay**, in a section per burn: arrival, departure,
+lodging, shift preference, notes, for each burn you have said you are coming to.
 
 **Whose row is written comes from the session, never from the body.** There is no
 id in either request to guess at or tamper with, and `account_id` in a profile

@@ -481,3 +481,136 @@ describe('what the roster says about helping out', () => {
     expect(entry.helping_option_ids).toEqual([])
   })
 })
+
+describe('the same list as a member sees it', () => {
+  const members = (
+    server: FastifyInstance,
+    cookie: string | undefined,
+    eventId: string,
+  ): Promise<LightMyRequestResponse> =>
+    server.inject({
+      method: 'GET',
+      url: `/api/events/${eventId}/members`,
+      headers: cookie === undefined ? {} : { cookie },
+    })
+
+  it('gives a member the details whoever is cooking needs', async () => {
+    // The reason allergies live on the account at all: somebody has to read them,
+    // and that somebody is not necessarily an organiser.
+    const server = await build()
+    const eventId = await givenEvent()
+    const ana = await givenAccount('Ana')
+    const reader = await givenAccount('Reader')
+    await givenComing(eventId, ana.id, '2026-07-01T00:00:00Z')
+
+    const response = await members(server, reader.cookie, eventId)
+
+    expect(response.statusCode).toBe(200)
+    const [entry] = response.json().entries
+    expect(entry.name).toBe('Ana')
+    expect(entry.allergies_notes).toBe('peanuts')
+    expect(entry.contact).toBe('Ana on discord')
+  })
+
+  it('says who has paid, which is the mark of somebody actually joining', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const paid = await givenAccount('Paid')
+    const owing = await givenAccount('Owing')
+    const reader = await givenAccount('Reader')
+    await givenComing(eventId, paid.id, '2026-07-01T00:00:00Z', true)
+    await givenComing(eventId, owing.id, '2026-07-02T00:00:00Z')
+
+    const { entries } = (await members(server, reader.cookie, eventId)).json()
+
+    expect(
+      entries.map((entry: { name: string; payment_status: string }) => [entry.name, entry.payment_status]),
+    ).toEqual([
+      ['Paid', 'paid'],
+      ['Owing', 'unpaid'],
+    ])
+  })
+
+  it('keeps the date it landed and the login identity out of it', async () => {
+    // Named one at a time. A single `expect(entry).not.toMatchObject({…})` passes
+    // when any one of the two is absent, which is not the question being asked.
+    const server = await build()
+    const eventId = await givenEvent()
+    const ana = await givenAccount('Ana')
+    const reader = await givenAccount('Reader')
+    await givenComing(eventId, ana.id, '2026-07-01T00:00:00Z', true)
+
+    const [entry] = (await members(server, reader.cookie, eventId)).json().entries
+
+    expect(Object.keys(entry)).not.toContain('payment_date')
+    expect(Object.keys(entry)).not.toContain('email')
+    expect(JSON.stringify(entry)).not.toContain('@example.org')
+    expect(JSON.stringify(entry)).not.toContain('2026-06-30')
+  })
+
+  it('still says who has a place and who is waiting', async () => {
+    // Derived from payment, which is exactly why it is worth proving it survives
+    // the projection: dropping the column it comes from would be an easy way to
+    // lose it.
+    const server = await build()
+    const eventId = await givenEvent(1)
+    const first = await givenAccount('First')
+    const second = await givenAccount('Second')
+    const reader = await givenAccount('Reader')
+    await givenComing(eventId, first.id, '2026-07-01T00:00:00Z')
+    await givenComing(eventId, second.id, '2026-07-02T00:00:00Z')
+
+    expect(names(await members(server, reader.cookie, eventId))).toEqual(['First', 'Second (waiting)'])
+  })
+
+  it('orders it the way the organiser sees it, so no two pages disagree', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const early = await givenAccount('Early')
+    const payer = await givenAccount('Payer')
+    const reader = await givenAccount('Reader')
+    await givenComing(eventId, early.id, '2026-07-01T00:00:00Z')
+    await givenComing(eventId, payer.id, '2026-07-02T00:00:00Z', true)
+
+    expect(names(await members(server, reader.cookie, eventId))).toEqual(['Payer', 'Early'])
+  })
+
+  it('opens to an organiser holding admin without member, like the rest of the shared pages', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const organiser = await givenAccount('Org', ['admin'])
+
+    expect((await members(server, organiser.cookie, eventId)).statusCode).toBe(200)
+  })
+
+  it('refuses an anonymous caller and an account still waiting on a decision', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const applicant = await givenAccount('Applicant', [])
+
+    expect((await members(server, undefined, eventId)).statusCode).toBe(401)
+    expect((await members(server, applicant.cookie, eventId)).statusCode).toBe(403)
+  })
+
+  it('answers 404 for an event that does not exist', async () => {
+    const server = await build()
+    const reader = await givenAccount('Reader')
+
+    expect((await members(server, reader.cookie, randomUUID())).statusCode).toBe(404)
+  })
+
+  it('is empty for a burn nobody has joined, rather than 404', async () => {
+    // A burn exists before anybody says they are coming to it, and the page for it
+    // should say so rather than look broken. There is no `active` variant: the
+    // selector names the burn, so the route never has to guess which one.
+    const server = await build()
+    const eventId = await givenEvent()
+    const reader = await givenAccount('Reader')
+
+    const response = await members(server, reader.cookie, eventId)
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().event.name).toBe('Summer burn')
+    expect(response.json().entries).toEqual([])
+  })
+})

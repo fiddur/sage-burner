@@ -90,7 +90,7 @@ export const Login = ({ api }: { api: Pick<ApiClient, 'login'> }) => {
         return
       }
 
-      setViewer({ id: signedIn.account_id, roles: signedIn.roles })
+      setViewer({ id: signedIn.account_id, name: signedIn.name, roles: signedIn.roles })
     } catch (failure) {
       // Three cases, because they want different behaviour from the member.
       //

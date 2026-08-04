@@ -1,5 +1,5 @@
 import type { CopySourcesResponse, LeadRole, LeadRoleResponse, LeadRolesResponse } from '@sage-burner/shared'
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, FastifyRequest } from 'fastify'
 
 import {
   errorResponse,
@@ -19,10 +19,32 @@ import { createGuards } from '../auth/guards.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
 import { account, attendance, event, leadRole, leadRoleMember } from '../db/schema.ts'
 import { noStore } from '../http.ts'
+import { viewerFor } from './auth.ts'
 import { copySourcesFor } from './copy-sources.ts'
 
 export interface LeadRoleDeps extends GuardDeps {
   now?: () => Date
+  /**
+   * Tell somebody something happened to them here.
+   *
+   * Injected rather than imported so the suite never reaches a push service, and
+   * so the routes below say *what* is worth telling somebody without also owning
+   * *how*. Defaults to doing nothing: notifying is a courtesy, and a register that
+   * refused to hand out a role because delivery was unavailable would be worse
+   * than a quiet one.
+   */
+  notify?: (accountId: string, message: string) => Promise<unknown>
+}
+
+/** Whose account holds an attendance, for telling somebody they have been taken off a role. */
+const accountForAttendance = async (db: Database, attendanceId: string) => {
+  const [row] = await db
+    .select({ account_id: attendance.account_id })
+    .from(attendance)
+    .where(eq(attendance.id, attendanceId))
+    .limit(1)
+
+  return row?.account_id
 }
 
 /** Whose attendance an account holds at this burn, or nothing if they are not coming. */
@@ -119,8 +141,25 @@ const roleOr404 = async (db: Database, id: string) => {
  * register names members, so unlike the schedule it is not public.
  */
 export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps) => {
-  const { db, sessions, now = () => new Date() } = deps
+  const { db, sessions, now = () => new Date(), notify = async () => undefined } = deps
   const { requireApproved } = createGuards({ db, sessions })
+
+  /**
+   * Tell somebody, unless they did it themselves.
+   *
+   * Taking a role you want is the common case, and a notification for your own
+   * click is noise that teaches people to ignore the channel. Awaited rather than
+   * fired and forgotten: an unawaited rejection would escape as an unhandled
+   * promise rejection, and `notify` already swallows delivery failure.
+   */
+  const tell = async (request: FastifyRequest, accountId: string | undefined, message: string) => {
+    if (accountId === undefined) return
+
+    const viewer = await viewerFor(request, { db, sessions })
+    if (viewer?.account_id === accountId) return
+
+    await notify(accountId, message)
+  }
 
   app.get<{ Params: { eventId: string } }>(
     '/api/events/:eventId/roles',
@@ -244,6 +283,20 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
         .set({ lead_attendance_id: leadAttendanceId })
         .where(eq(leadRole.id, request.params.id))
 
+      // Both ends of the handover, since one write can move a role off one person
+      // and onto another and each of them wants to know.
+      const before =
+        existing.lead_attendance_id === null
+          ? undefined
+          : await accountForAttendance(db, existing.lead_attendance_id)
+
+      if (before !== undefined && before !== parsed.data.account_id) {
+        await tell(request, before, `You are no longer ${existing.title} lead.`)
+      }
+      if (parsed.data.account_id !== null && parsed.data.account_id !== before) {
+        await tell(request, parsed.data.account_id, `You are now ${existing.title} lead.`)
+      }
+
       const roles = await rolesFor(db, existing.event_id)
       const role = roles.find((candidate) => candidate.id === request.params.id)
       if (role === undefined) return reply.code(404).send(errorResponse('not_found'))
@@ -275,6 +328,8 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
         .values({ role_id: request.params.id, attendance_id: attendanceId })
         .onConflictDoNothing()
 
+      await tell(request, parsed.data.account_id, `You have been added to the ${existing.title} team.`)
+
       const roles = await rolesFor(db, existing.event_id)
       const role = roles.find((candidate) => candidate.id === request.params.id)
       if (role === undefined) return reply.code(404).send(errorResponse('not_found'))
@@ -294,7 +349,7 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
 
       const attendanceId = await attendanceFor(db, existing.event_id, request.params.accountId)
       if (attendanceId !== undefined) {
-        await db
+        const removed = await db
           .delete(leadRoleMember)
           .where(
             and(
@@ -302,6 +357,14 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
               eq(leadRoleMember.attendance_id, attendanceId),
             ),
           )
+          .returning({ role_id: leadRoleMember.role_id })
+
+        // Only when a row actually went. This route is idempotent, so removing
+        // somebody who was never on the team is a 204 — and telling them they have
+        // been taken off something they were not on is worse than saying nothing.
+        if (removed.length > 0) {
+          await tell(request, request.params.accountId, `You have been taken off the ${existing.title} team.`)
+        }
       }
 
       return reply.code(204).send()

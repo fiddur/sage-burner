@@ -2,15 +2,24 @@ import type { FastifyInstance, LightMyRequestResponse } from 'fastify'
 
 import { eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { DbHandle } from '../db/index.ts'
+import type { Delivery } from '../push/push.ts'
 
 import { createApp } from '../app.ts'
 import { createSessions } from '../auth/session.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, attendance, event, leadRole, leadRoleMember } from '../db/schema.ts'
+import {
+  account,
+  accountRole,
+  attendance,
+  event,
+  leadRole,
+  leadRoleMember,
+  pushSubscription,
+} from '../db/schema.ts'
 import { SESSION_COOKIE } from './auth.ts'
 
 /**
@@ -42,16 +51,39 @@ const db = () => {
   return found
 }
 
-const build = async () => {
+const build = async (deliver: Delivery = () => Promise.resolve('sent')) => {
   handle = createDb({ url: ':memory:' })
   runMigrations(handle)
   app = await createApp({
     db: handle.db,
     config: createConfig({ LOG_LEVEL: 'silent', SESSION_SECRET: SECRET }),
     now: () => new Date(NOW),
+    deliver,
+    mintKeys: () => ({ publicKey: 'a-public-key', privateKey: 'a-private-key' }),
   })
   return app
 }
+
+/** One browser opted in, so there is somewhere for a notification to go. */
+const givenSubscribed = async (accountId: string) => {
+  await db()
+    .insert(pushSubscription)
+    .values({
+      id: randomUUID(),
+      endpoint: `https://push.example.org/${randomUUID()}`,
+      account_id: accountId,
+      p256dh: 'a-key',
+      auth: 'a-secret',
+      created_at: NOW,
+    })
+}
+
+/** What was pushed, as the strings a person would read. */
+const messagesFrom = (deliver: ReturnType<typeof vi.fn<Delivery>>) =>
+  deliver.mock.calls.map((call) => {
+    const parsed: unknown = JSON.parse(String(call[1]))
+    return typeof parsed === 'object' && parsed !== null && 'body' in parsed ? String(parsed.body) : ''
+  })
 
 const givenEvent = async (name = 'Summer burn', start = '2026-08-01') => {
   const id = randomUUID()
@@ -680,5 +712,125 @@ describe('the database, for writes that skip the API', () => {
     expect(() => insert('Sauna', -1)).toThrow()
     expect(() => insert('   ', 0)).toThrow()
     expect(() => insert('Sauna', 0)).not.toThrow()
+  })
+})
+
+describe('telling somebody a role moved', () => {
+  it('tells the person handed a role, and the person it came off', async () => {
+    // One write moves a role off one person and onto another, and both of them
+    // want to know.
+    const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
+    const server = await build(deliver)
+    const eventId = await givenEvent()
+    const organiser = await givenAccount(['member'], 'Org')
+    const before = await givenAccount(['member'], 'Bea')
+    const after = await givenAccount(['member'], 'Ada')
+    await givenComing(eventId, organiser.id)
+    await givenComing(eventId, before.id)
+    await givenComing(eventId, after.id)
+    await givenSubscribed(before.id)
+    await givenSubscribed(after.id)
+    const roleId = (await add(server, organiser.cookie, eventId, { title: 'Sauna' })).json().role.id
+    await setLead(server, organiser.cookie, roleId, { account_id: before.id })
+    deliver.mockClear()
+
+    await setLead(server, organiser.cookie, roleId, { account_id: after.id })
+
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(2))
+    expect(messagesFrom(deliver).toSorted()).toEqual([
+      'You are no longer Sauna lead.',
+      'You are now Sauna lead.',
+    ])
+  })
+
+  it('says nothing to somebody who did it themselves', async () => {
+    // Taking a role you want is the common case. A notification for your own click
+    // is noise, and noise is what teaches people to ignore the channel.
+    const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
+    const server = await build(deliver)
+    const eventId = await givenEvent()
+    const ada = await givenAccount(['member'], 'Ada')
+    await givenComing(eventId, ada.id)
+    await givenSubscribed(ada.id)
+    const roleId = (await add(server, ada.cookie, eventId, { title: 'Sauna' })).json().role.id
+
+    await setLead(server, ada.cookie, roleId, { account_id: ada.id })
+    await joinTeam(server, ada.cookie, roleId, ada.id)
+    await leaveTeam(server, ada.cookie, roleId, ada.id)
+
+    expect(deliver).not.toHaveBeenCalled()
+  })
+
+  it('tells somebody added to a team, and somebody taken off one', async () => {
+    const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
+    const server = await build(deliver)
+    const eventId = await givenEvent()
+    const organiser = await givenAccount(['member'], 'Org')
+    const ada = await givenAccount(['member'], 'Ada')
+    await givenComing(eventId, organiser.id)
+    await givenComing(eventId, ada.id)
+    await givenSubscribed(ada.id)
+    const roleId = (await add(server, organiser.cookie, eventId, { title: 'Kitchen' })).json().role.id
+
+    await joinTeam(server, organiser.cookie, roleId, ada.id)
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1))
+
+    await leaveTeam(server, organiser.cookie, roleId, ada.id)
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(2))
+
+    expect(messagesFrom(deliver)).toEqual([
+      'You have been added to the Kitchen team.',
+      'You have been taken off the Kitchen team.',
+    ])
+  })
+
+  it('says nothing when a removal removed nobody, since the route is idempotent', async () => {
+    // Removing somebody who was never on the team answers 204. Telling them they
+    // have been taken off something they were not on is worse than silence.
+    const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
+    const server = await build(deliver)
+    const eventId = await givenEvent()
+    const organiser = await givenAccount(['member'], 'Org')
+    const ada = await givenAccount(['member'], 'Ada')
+    await givenComing(eventId, organiser.id)
+    await givenComing(eventId, ada.id)
+    await givenSubscribed(ada.id)
+    const roleId = (await add(server, organiser.cookie, eventId, { title: 'Kitchen' })).json().role.id
+
+    expect((await leaveTeam(server, organiser.cookie, roleId, ada.id)).statusCode).toBe(204)
+    expect(deliver).not.toHaveBeenCalled()
+  })
+
+  it('says nothing to somebody who never opted in', async () => {
+    const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
+    const server = await build(deliver)
+    const eventId = await givenEvent()
+    const organiser = await givenAccount(['member'], 'Org')
+    const ada = await givenAccount(['member'], 'Ada')
+    await givenComing(eventId, organiser.id)
+    await givenComing(eventId, ada.id)
+    const roleId = (await add(server, organiser.cookie, eventId, { title: 'Kitchen' })).json().role.id
+
+    expect((await joinTeam(server, organiser.cookie, roleId, ada.id)).statusCode).toBe(200)
+    expect(deliver).not.toHaveBeenCalled()
+  })
+
+  it('hands the role over even when the push service is down', async () => {
+    // The register is the point; the notification is a courtesy. A role that could
+    // not be handed out because a push service was slow would be the worse failure.
+    const deliver = vi.fn<Delivery>(() => Promise.reject(new Error('push is down')))
+    const server = await build(deliver)
+    const eventId = await givenEvent()
+    const organiser = await givenAccount(['member'], 'Org')
+    const ada = await givenAccount(['member'], 'Ada')
+    await givenComing(eventId, organiser.id)
+    await givenComing(eventId, ada.id)
+    await givenSubscribed(ada.id)
+    const roleId = (await add(server, organiser.cookie, eventId, { title: 'Kitchen' })).json().role.id
+
+    const response = await setLead(server, organiser.cookie, roleId, { account_id: ada.id })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().role.lead?.account_id).toBe(ada.id)
   })
 })

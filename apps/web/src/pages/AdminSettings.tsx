@@ -124,6 +124,10 @@ export const AdminSettings = ({ api }: { api: AdminSettingsApi }) => {
         </form>
       )}
 
+      {/* Also on the details page, which is where a member finds it. Kept here for
+          the same reason ⚙️ keeps the Places and lodging links: an organiser holding
+          `admin` without `member` is refused from that page, and application
+          notifications go precisely to admins. */}
       <PushToggle api={api} />
     </GuardedPage>
   )

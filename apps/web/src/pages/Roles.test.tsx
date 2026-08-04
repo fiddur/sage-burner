@@ -1,4 +1,4 @@
-import type { Event, LeadRole } from '@sage-burner/shared'
+import type { Event, LeadRole, MyBurn } from '@sage-burner/shared'
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -7,13 +7,14 @@ import type { Viewer } from '../viewer.tsx'
 import type { RolesApi } from './Roles.tsx'
 
 import { apiError } from '../api/client.ts'
+import { BurnProvider } from '../burn.tsx'
 import { ViewerProvider } from '../viewer.tsx'
 import { Roles } from './Roles.tsx'
 
 afterEach(cleanup)
 
-const ADA: Viewer = { status: 'signed-in', account: { id: 'a-1', roles: ['member'] } }
-const ORGANISER: Viewer = { status: 'signed-in', account: { id: 'a-9', roles: ['admin'] } }
+const ADA: Viewer = { status: 'signed-in', account: { id: 'a-1', name: null, roles: ['member'] } }
+const ORGANISER: Viewer = { status: 'signed-in', account: { id: 'a-9', name: null, roles: ['admin'] } }
 
 const BURN: Event = {
   id: 'e-1',
@@ -50,7 +51,6 @@ const stub = (
     { account_id: 'a-2', name: 'Bea' },
   ],
 ): RolesApi => ({
-  getActiveEvent: () => Promise.resolve({ event: BURN }),
   getLeadRoles: () => Promise.resolve({ roles }),
   getEventAttendees: () => Promise.resolve({ attendees }),
   getLeadRoleSources: () => Promise.resolve({ sources: [] }),
@@ -64,10 +64,19 @@ const stub = (
   ...over,
 })
 
-const renderPage = (api: RolesApi, viewer: Viewer = ADA) =>
+/** The selector's view of the same burn, so the two cannot describe different ones. */
+const CHOSEN: MyBurn = { event: BURN, attendance: null }
+
+// `null`, not `undefined`: passing `undefined` to a parameter with a default gets
+// the default, so "no burn" written that way silently rendered the usual one.
+const renderPage = (api: RolesApi, viewer: Viewer = ADA, burn: MyBurn | null = CHOSEN) =>
   render(
     <ViewerProvider viewer={viewer}>
-      <Roles api={api} />
+      <BurnProvider
+        value={{ status: 'ready', burns: burn === null ? [] : [burn], selected: burn ?? undefined }}
+      >
+        <Roles api={api} />
+      </BurnProvider>
     </ViewerProvider>,
   )
 
@@ -342,7 +351,7 @@ describe('Roles', () => {
   })
 
   it('says there is nothing to look after when no burn is coming up', async () => {
-    renderPage(stub({ getActiveEvent: () => Promise.resolve({ event: null }) }))
+    renderPage(stub(), ADA, null)
 
     expect(await screen.findByText(/no burn coming up yet/)).toBeTruthy()
   })

@@ -42,7 +42,8 @@ import type {
   LeadRolesResponse,
   LoginRequest,
   MeResponse,
-  MyAttendanceResponse,
+  MemberRosterResponse,
+  MyBurnsResponse,
   PaymentUpdate,
   Place,
   PlaceCreate,
@@ -279,11 +280,15 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
       }),
 
     /** Members only. Scheduled dreams first, then the ones only offered. */
-    getSessions: (signal?: AbortSignal) => request<SessionsResponse>('/events/active/sessions', { signal }),
+    getSessions: (eventId: string, signal?: AbortSignal) =>
+      request<SessionsResponse>(`/events/${encodeURIComponent(eventId)}/sessions`, { signal }),
 
-    /** Members only. The host is the caller, and the burn is whichever is open. */
-    offerSession: (body: SessionCreateInput) =>
-      request<SessionResponse>('/events/active/sessions', { method: 'POST', body }),
+    /** Members only. The host is the caller; the burn is the one named. */
+    offerSession: (eventId: string, body: SessionCreateInput) =>
+      request<SessionResponse>(`/events/${encodeURIComponent(eventId)}/sessions`, {
+        method: 'POST',
+        body,
+      }),
 
     /** Members only — any member may arrange the schedule, not just the host. */
     updateSession: (id: string, body: SessionUpdate) =>
@@ -482,19 +487,26 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
     redeemInvite: (token: string, body: RedeemRequestInput) =>
       request<MeResponse>(`/invites/${encodeURIComponent(token)}/redeem`, { method: 'POST', body }),
 
-    /** Signed-in members only. `event` is null when no burn is open. */
-    getMyAttendance: (signal?: AbortSignal) =>
-      request<MyAttendanceResponse>('/events/active/attendance', { signal }),
+    /**
+     * Members only. Every burn their own page shows them, and their stay at each.
+     *
+     * Split into `coming` and `past` by the server, because that is a comparison
+     * against a clock and a browser would answer it differently across midnight.
+     */
+    getMyBurns: (signal?: AbortSignal) => request<MyBurnsResponse>('/events/mine', { signal }),
 
     /** Members only. Idempotent — saying it twice is the same statement. */
-    joinActiveEvent: () =>
-      request<{ attendance: Attendance }>('/events/active/attendance', { method: 'POST' }),
+    joinEvent: (eventId: string) =>
+      request<{ attendance: Attendance }>(`/events/${encodeURIComponent(eventId)}/attendance/me`, {
+        method: 'POST',
+      }),
 
     /**
      * Members only. Answers 204. Throws ApiError(409, 'conflict') once anything
      * has been paid — what a refund means is #31's decision.
      */
-    leaveActiveEvent: () => request<undefined>('/events/active/attendance', { method: 'DELETE' }),
+    leaveEvent: (eventId: string) =>
+      request<undefined>(`/events/${encodeURIComponent(eventId)}/attendance/me`, { method: 'DELETE' }),
 
     /** Members only. `name` and `contact` may be null on an account never filled in. */
     getMyProfile: (signal?: AbortSignal) => request<ProfileResponse>('/me/profile', { signal }),
@@ -508,12 +520,19 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
      * Throws ApiError(404) when they are not, ApiError(400) when the dates would
      * put the departure before the arrival.
      */
-    updateMyStay: (body: AttendanceUpdate) =>
-      request<{ attendance: Attendance }>('/events/active/attendance', { method: 'PATCH', body }),
+    updateMyStay: (eventId: string, body: AttendanceUpdate) =>
+      request<{ attendance: Attendance }>(`/events/${encodeURIComponent(eventId)}/attendance/me`, {
+        method: 'PATCH',
+        body,
+      }),
 
     /** Admin only. The open burn's roster; `event` is null when none is open. */
     getActiveRoster: (signal?: AbortSignal) =>
       request<RosterResponse>('/admin/events/active/roster', { signal }),
+
+    /** The same list without payment or email, for any approved member. */
+    getMembers: (eventId: string, signal?: AbortSignal) =>
+      request<MemberRosterResponse>(`/events/${encodeURIComponent(eventId)}/members`, { signal }),
 
     /** Admin only. Payment and payment date; nothing else on the row. */
     setPayment: (eventId: string, accountId: string, body: PaymentUpdate) =>
@@ -559,21 +578,21 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
       }),
 
     /**
-     * Admin only. The key a browser needs before it can subscribe.
+     * Any approved member. The key a browser needs before it can subscribe.
      *
      * `public_key` is null when push has not been set up — asking is what mints
      * the pair, so a null means the installation could not, not that it has not
      * been asked yet.
      */
-    getPushKey: (signal?: AbortSignal) => request<PushKeyResponse>('/admin/push/key', { signal }),
+    getPushKey: (signal?: AbortSignal) => request<PushKeyResponse>('/push/key', { signal }),
 
-    /** Admin only. Idempotent per browser: the endpoint is the key. */
+    /** Any approved member. Idempotent per browser: the endpoint is the key. */
     subscribeToPush: (body: PushSubscriptionCreate) =>
-      request<undefined>('/admin/push/subscriptions', { method: 'POST', body }),
+      request<undefined>('/push/subscriptions', { method: 'POST', body }),
 
-    /** Admin only. Answers 204 whether or not the endpoint was known. */
+    /** Any approved member. Answers 204 whether or not the endpoint was known. */
     unsubscribeFromPush: (endpoint: string) =>
-      request<undefined>('/admin/push/subscriptions', { method: 'DELETE', body: { endpoint } }),
+      request<undefined>('/push/subscriptions', { method: 'DELETE', body: { endpoint } }),
 
     /** Admin only. Never carries the token — only the digest is stored. */
     getInvites: (signal?: AbortSignal) => request<AdminInvitesResponse>('/admin/invites', { signal }),

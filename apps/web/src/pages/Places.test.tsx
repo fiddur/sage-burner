@@ -1,18 +1,19 @@
-import type { Place } from '@sage-burner/shared'
+import type { MyBurn, Place } from '@sage-burner/shared'
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Viewer } from '../viewer.tsx'
-import type { PlacesApi } from './AdminPlaces.tsx'
+import type { PlacesApi } from './Places.tsx'
 
 import { apiError } from '../api/client.ts'
+import { BurnProvider } from '../burn.tsx'
 import { ViewerProvider } from '../viewer.tsx'
-import { AdminPlaces } from './AdminPlaces.tsx'
+import { Places } from './Places.tsx'
 
 afterEach(cleanup)
 
-const ADMIN: Viewer = { status: 'signed-in', account: { id: 'a-1', roles: ['admin'] } }
+const ADMIN: Viewer = { status: 'signed-in', account: { id: 'a-1', name: null, roles: ['admin'] } }
 
 const BURN = {
   id: 'e-1',
@@ -42,7 +43,6 @@ const THREE: Place[] = [
 ]
 
 const stub = (over: Partial<PlacesApi> = {}, places: Place[] = THREE): PlacesApi => ({
-  getActiveEvent: () => Promise.resolve({ event: BURN }),
   getPlaces: () => Promise.resolve({ places }),
   getPlaceSources: () => Promise.resolve({ sources: [] }),
   addPlace: () => Promise.reject(new Error('addPlace is not stubbed here')),
@@ -53,16 +53,25 @@ const stub = (over: Partial<PlacesApi> = {}, places: Place[] = THREE): PlacesApi
   ...over,
 })
 
-const renderPage = (api: PlacesApi, viewer: Viewer = ADMIN) =>
+/** The selector's view of the same burn, so the two cannot describe different ones. */
+const CHOSEN: MyBurn = { event: BURN, attendance: null }
+
+// `null`, not `undefined`: passing `undefined` to a parameter with a default gets
+// the default, so "no burn" written that way silently rendered the usual one.
+const renderPage = (api: PlacesApi, viewer: Viewer = ADMIN, burn: MyBurn | null = CHOSEN) =>
   render(
     <ViewerProvider viewer={viewer}>
-      <AdminPlaces api={api} />
+      <BurnProvider
+        value={{ status: 'ready', burns: burn === null ? [] : [burn], selected: burn ?? undefined }}
+      >
+        <Places api={api} />
+      </BurnProvider>
     </ViewerProvider>,
   )
 
 const rowNames = () => [...document.querySelectorAll('.place-name')].map((node) => node.textContent)
 
-describe('AdminPlaces', () => {
+describe('Places', () => {
   it('lists the places in order, with their emoji and colour', async () => {
     renderPage(stub())
 
@@ -234,7 +243,7 @@ describe('AdminPlaces', () => {
   it('offers nothing to a signed-in account with no roles', async () => {
     // An applicant checking on their application has an account and no roles.
     const getPlaces = vi.fn<PlacesApi['getPlaces']>(() => Promise.resolve({ places: THREE }))
-    renderPage(stub({ getPlaces }), { status: 'signed-in', account: { id: 'a-9', roles: [] } })
+    renderPage(stub({ getPlaces }), { status: 'signed-in', account: { id: 'a-9', name: null, roles: [] } })
 
     expect(screen.getByText(/for members/)).toBeTruthy()
     expect(getPlaces).not.toHaveBeenCalled()
@@ -242,7 +251,7 @@ describe('AdminPlaces', () => {
 
   it('offers the lanes to a member who is not an admin', async () => {
     // The point of #155: this is not an admin page any more.
-    renderPage(stub(), { status: 'signed-in', account: { id: 'a-2', roles: ['member'] } })
+    renderPage(stub(), { status: 'signed-in', account: { id: 'a-2', name: null, roles: ['member'] } })
 
     expect(await screen.findByText('Temple')).toBeTruthy()
   })
@@ -258,7 +267,7 @@ describe('AdminPlaces', () => {
 
   it('says there is no grid to lay out when no burn is coming up', async () => {
     const getPlaces = vi.fn<PlacesApi['getPlaces']>(() => Promise.resolve({ places: [] }))
-    renderPage(stub({ getActiveEvent: () => Promise.resolve({ event: null }), getPlaces }))
+    renderPage(stub({ getPlaces }), ADMIN, null)
 
     expect(await screen.findByText(/no burn coming up yet/)).toBeTruthy()
     expect(getPlaces).not.toHaveBeenCalled()

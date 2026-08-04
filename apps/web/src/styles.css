@@ -94,9 +94,30 @@ a:hover {
 .site-header nav {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 1.25rem;
   font-family: ui-sans-serif, system-ui, sans-serif;
   font-size: 0.95rem;
+}
+
+.burn-selector {
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.95rem;
+  margin-inline-end: auto;
+}
+
+/* A placeholder for the avatar image that will replace it, so it is sized like one. */
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: 1px solid currentcolor;
+  font-size: 0.8rem;
+  line-height: 1;
+  text-decoration: none;
 }
 
 .site-main {

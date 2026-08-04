@@ -1,18 +1,19 @@
-import type { Event, EventOptionTaken } from '@sage-burner/shared'
+import type { Event, EventOptionTaken, MyBurn } from '@sage-burner/shared'
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Viewer } from '../viewer.tsx'
-import type { OptionsApi } from './AdminOptions.tsx'
+import type { OptionsApi } from './Options.tsx'
 
 import { apiError } from '../api/client.ts'
+import { BurnProvider } from '../burn.tsx'
 import { ViewerProvider } from '../viewer.tsx'
-import { AdminOptions } from './AdminOptions.tsx'
+import { Options } from './Options.tsx'
 
 afterEach(cleanup)
 
-const ADMIN: Viewer = { status: 'signed-in', account: { id: 'a-1', roles: ['admin'] } }
+const ADMIN: Viewer = { status: 'signed-in', account: { id: 'a-1', name: null, roles: ['admin'] } }
 
 const BURN: Event = {
   id: 'e-1',
@@ -50,9 +51,7 @@ const SAUNA = anOption({ id: 'o-3', label: 'Sauna tending', kind: 'helping', ord
 const stub = (
   over: Partial<OptionsApi> = {},
   options: EventOptionTaken[] = [TEMPLE, TENT, SAUNA],
-  event: Event | null = BURN,
 ): OptionsApi => ({
-  getActiveEvent: () => Promise.resolve({ event }),
   getEventOptions: () => Promise.resolve({ options }),
   addEventOption: () => Promise.reject(new Error('addEventOption is not stubbed here')),
   updateEventOption: () => Promise.reject(new Error('updateEventOption is not stubbed here')),
@@ -61,14 +60,23 @@ const stub = (
   ...over,
 })
 
-const renderPage = (api: OptionsApi, viewer: Viewer = ADMIN) =>
+/** The selector's view of the same burn, so the two cannot describe different ones. */
+const CHOSEN: MyBurn = { event: BURN, attendance: null }
+
+// `null`, not `undefined`: passing `undefined` to a parameter with a default gets
+// the default, so "no burn" written that way silently rendered the usual one.
+const renderPage = (api: OptionsApi, viewer: Viewer = ADMIN, burn: MyBurn | null = CHOSEN) =>
   render(
     <ViewerProvider viewer={viewer}>
-      <AdminOptions api={api} />
+      <BurnProvider
+        value={{ status: 'ready', burns: burn === null ? [] : [burn], selected: burn ?? undefined }}
+      >
+        <Options api={api} />
+      </BurnProvider>
     </ViewerProvider>,
   )
 
-describe('AdminOptions', () => {
+describe('Options', () => {
   it('shows both lists, with the spaces on the ones that have them', async () => {
     renderPage(stub())
 
@@ -248,7 +256,7 @@ describe('AdminOptions', () => {
   })
 
   it('says so when no burn is open, since the lists belong to one', async () => {
-    renderPage(stub({}, [], null))
+    renderPage(stub({}, []), ADMIN, null)
 
     expect(await screen.findByText(/no burn open/)).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Events' })).toBeTruthy()
@@ -259,7 +267,11 @@ describe('AdminOptions', () => {
     // Creating a burn is admin-only, so the link an admin gets here would answer
     // "This is an admin page." to a member — a dead end reachable only because
     // this page was opened to them.
-    renderPage(stub({}, [], null), { status: 'signed-in', account: { id: 'a-2', roles: ['member'] } })
+    renderPage(
+      stub({}, []),
+      { status: 'signed-in', account: { id: 'a-2', name: null, roles: ['member'] } },
+      null,
+    )
 
     expect(await screen.findByText(/Ask someone with admin/)).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'Events' })).toBeNull()
@@ -282,25 +294,26 @@ describe('AdminOptions', () => {
   it('offers nothing to someone who does not have admin, and asks the API nothing', async () => {
     // Asserted after a flush, not synchronously: the fetch is two awaits deep, so
     // an immediate assertion passes whether or not the guard is there.
-    const getActiveEvent = vi.fn<OptionsApi['getActiveEvent']>(() => Promise.resolve({ event: BURN }))
     const getEventOptions = vi.fn<OptionsApi['getEventOptions']>(() => Promise.resolve({ options: [] }))
-    renderPage(stub({ getActiveEvent, getEventOptions }), { status: 'signed-out' })
+    renderPage(stub({ getEventOptions }), { status: 'signed-out' })
 
     expect(screen.getByText(/for members/)).toBeTruthy()
-    await waitFor(() => expect(getActiveEvent).not.toHaveBeenCalled())
-    expect(getEventOptions).not.toHaveBeenCalled()
+    await waitFor(() => expect(getEventOptions).not.toHaveBeenCalled())
   })
 
   it('offers the lists to a member who is not an admin', async () => {
     // The point of #155: a member curates the lodging and helping lists.
-    renderPage(stub(), { status: 'signed-in', account: { id: 'a-2', roles: ['member'] } })
+    renderPage(stub(), { status: 'signed-in', account: { id: 'a-2', name: null, roles: ['member'] } })
 
     expect(await screen.findByText('Temple mattress')).toBeTruthy()
   })
 
   it('offers nothing to a signed-in account with no roles', async () => {
     const getEventOptions = vi.fn<OptionsApi['getEventOptions']>(() => Promise.resolve({ options: [] }))
-    renderPage(stub({ getEventOptions }), { status: 'signed-in', account: { id: 'a-9', roles: [] } })
+    renderPage(stub({ getEventOptions }), {
+      status: 'signed-in',
+      account: { id: 'a-9', name: null, roles: [] },
+    })
 
     expect(screen.getByText(/for members/)).toBeTruthy()
     await waitFor(() => expect(getEventOptions).not.toHaveBeenCalled())

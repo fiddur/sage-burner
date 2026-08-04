@@ -11,7 +11,7 @@ import { AdminSettings } from './AdminSettings.tsx'
 
 afterEach(cleanup)
 
-const ADMIN: Viewer = { status: 'signed-in', account: { id: 'a-1', roles: ['admin'] } }
+const ADMIN: Viewer = { status: 'signed-in', account: { id: 'a-1', name: null, roles: ['admin'] } }
 
 const stub = (over: Partial<AdminSettingsApi> = {}): AdminSettingsApi => ({
   getInstallation: () => Promise.resolve({ installation: { title: 'Sage Burner' } }),
@@ -142,7 +142,10 @@ describe('AdminSettings', () => {
     const getInstallation = vi.fn<AdminSettingsApi['getInstallation']>(() =>
       Promise.resolve({ installation: { title: 'Sage Burner' } }),
     )
-    renderPage(stub({ getInstallation }), { status: 'signed-in', account: { id: 'a-9', roles: ['member'] } })
+    renderPage(stub({ getInstallation }), {
+      status: 'signed-in',
+      account: { id: 'a-9', name: null, roles: ['member'] },
+    })
 
     expect(screen.getByText(/for organisers/)).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'Log in' })).toBeNull()

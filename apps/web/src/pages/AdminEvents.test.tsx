@@ -11,7 +11,7 @@ import { AdminEvents } from './AdminEvents.tsx'
 
 afterEach(cleanup)
 
-const ADMIN = { status: 'signed-in' as const, account: { id: 'a-1', roles: ['admin' as const] } }
+const ADMIN = { status: 'signed-in' as const, account: { id: 'a-1', name: null, roles: ['admin' as const] } }
 
 const summer: Event = {
   id: 'e-1',
@@ -347,7 +347,7 @@ describe('AdminEvents', () => {
   it('does not fetch for someone without the role', async () => {
     const getEvents = vi.fn(() => Promise.reject(new Error('should not be called')))
     render(
-      <ViewerProvider viewer={{ status: 'signed-in', account: { id: 'a-2', roles: ['member'] } }}>
+      <ViewerProvider viewer={{ status: 'signed-in', account: { id: 'a-2', name: null, roles: ['member'] } }}>
         <AdminEvents api={stub({ getEvents })} />
       </ViewerProvider>,
     )

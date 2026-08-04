@@ -129,29 +129,22 @@ export const forgetSubscription = async (deps: PushDeps, endpoint: string): Prom
 }
 
 /**
- * Notify every admin who has opted in, on every browser they opted in from.
+ * Deliver one payload to a set of browsers, forgetting the ones that have gone.
  *
- * Failures do not reach the caller's caller. The one caller is the public
- * application route, and an applicant must not be told their application failed
- * because Google was slow — the application is already written by the time this
- * runs. What comes back is a count of each outcome, for whoever wants to log it;
- * `app.ts` does.
+ * Failures do not reach the caller's caller. The callers are routes doing
+ * something else — writing an application, handing somebody a role — and none of
+ * them should fail because a push service was slow, since the thing being notified
+ * about is already written by the time this runs. What comes back is a count of
+ * each outcome, for whoever wants to log it; `app.ts` does.
  */
-export const notifyAdmins = async (deps: PushDeps, payload: string): Promise<DeliveryCounts> => {
+const notifyRows = async (
+  deps: PushDeps,
+  rows: readonly { endpoint: string; p256dh: string; auth: string }[],
+  payload: string,
+): Promise<DeliveryCounts> => {
   const { db, deliver } = deps
 
   const none = { sent: 0, failed: 0, gone: 0 }
-
-  const rows = await db
-    .select({
-      endpoint: pushSubscription.endpoint,
-      p256dh: pushSubscription.p256dh,
-      auth: pushSubscription.auth,
-    })
-    .from(pushSubscription)
-    .innerJoin(account, eq(account.id, pushSubscription.account_id))
-    .innerJoin(accountRole, eq(accountRole.account_id, account.id))
-    .where(eq(accountRole.role, 'admin'))
 
   // Asked for after the subscriptions, not before: an installation nobody has
   // opted into should not acquire a key as a side effect of someone applying.
@@ -182,3 +175,45 @@ export const notifyAdmins = async (deps: PushDeps, payload: string): Promise<Del
   // feature is most likely to have.
   return { sent, gone: gone.length, failed: results.length - sent - gone.length }
 }
+
+/** The columns a delivery needs, for whichever browsers a caller has selected. */
+const subscriptionColumns = {
+  endpoint: pushSubscription.endpoint,
+  p256dh: pushSubscription.p256dh,
+  auth: pushSubscription.auth,
+}
+
+/** Notify every admin who has opted in, on every browser they opted in from. */
+export const notifyAdmins = async (deps: PushDeps, payload: string): Promise<DeliveryCounts> =>
+  notifyRows(
+    deps,
+    await deps.db
+      .select(subscriptionColumns)
+      .from(pushSubscription)
+      .innerJoin(account, eq(account.id, pushSubscription.account_id))
+      .innerJoin(accountRole, eq(accountRole.account_id, account.id))
+      .where(eq(accountRole.role, 'admin')),
+    payload,
+  )
+
+/**
+ * Notify one person, on every browser they opted in from.
+ *
+ * No role check: what is being notified about is something that happened to *them*
+ * — being handed a role, or taken off one — and a subscription only exists because
+ * that person asked for it. An account that has lost its roles simply has nothing
+ * selecting it any more.
+ */
+export const notifyAccount = async (
+  deps: PushDeps,
+  accountId: string,
+  payload: string,
+): Promise<DeliveryCounts> =>
+  notifyRows(
+    deps,
+    await deps.db
+      .select(subscriptionColumns)
+      .from(pushSubscription)
+      .where(eq(pushSubscription.account_id, accountId)),
+    payload,
+  )

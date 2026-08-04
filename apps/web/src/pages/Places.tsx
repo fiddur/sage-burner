@@ -6,6 +6,7 @@ import { useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 import type { Loaded } from '../load.ts'
 
+import { useSelectedBurn } from '../burn.tsx'
 import { CopyFrom } from '../components/CopyFrom.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { useAction, useLoad } from '../load.ts'
@@ -14,7 +15,6 @@ import { isApproved, useViewer } from '../viewer.tsx'
 
 export type PlacesApi = Pick<
   ApiClient,
-  | 'getActiveEvent'
   | 'getPlaces'
   | 'addPlace'
   | 'updatePlace'
@@ -43,7 +43,7 @@ const isBlank = (fields: { name: string; emoji: string }) =>
   fields.name.trim() === '' || fields.emoji.trim() === ''
 
 /**
- * Where a dream can happen — one grid per burn, following the burn that is open.
+ * Where a dream can happen — one grid per burn, the one the bar is pointing at.
  *
  * The role check decides what to render, not what is allowed: the API refuses
  * anyone without a role whatever this does.
@@ -52,19 +52,19 @@ const isBlank = (fields: { name: string; emoji: string }) =>
  * overlap between burns is large, which is why an empty grid offers to copy a
  * previous one rather than only an empty form.
  */
-export const AdminPlaces = ({ api }: { api: PlacesApi }) => {
+export const Places = ({ api }: { api: PlacesApi }) => {
   const viewer = useViewer()
   const approved = isApproved(viewer)
   const [draft, setDraft] = useState<Draft>(BLANK)
   const [editing, setEditing] = useState<string | undefined>(undefined)
   const [dragging, setDragging] = useState<number | undefined>(undefined)
 
+  const burn = useSelectedBurn()
   const { loaded, reload } = useLoad<Grid>(
     async (signal) => {
-      const active = await api.getActiveEvent(signal)
-      if (active.event === null) return null
+      if (burn === undefined) return null
 
-      const eventId = active.event.id
+      const eventId = burn.event.id
       const [places, sources] = await Promise.all([
         api.getPlaces(eventId, signal),
         api.getPlaceSources(eventId, signal),
@@ -72,7 +72,7 @@ export const AdminPlaces = ({ api }: { api: PlacesApi }) => {
 
       return { eventId, places: places.places, sources: sources.sources }
     },
-    { enabled: approved, fallback: 'Could not load the places.' },
+    { enabled: approved, key: burn?.event.id ?? '', fallback: 'Could not load the places.' },
   )
 
   const { busy, error, setError, run } = useAction(reload)

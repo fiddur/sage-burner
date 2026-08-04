@@ -5,14 +5,13 @@ import type { ApiClient } from './api/client.ts'
 import type { Viewer } from './viewer.tsx'
 
 import { createApiClient } from './api/client.ts'
+import { FetchedBurnProvider } from './burn.tsx'
 import { Layout } from './components/Layout.tsx'
 import { FetchedInstallationProvider, InstallationProvider } from './installation.tsx'
 import { Admin } from './pages/Admin.tsx'
 import { AdminApplications } from './pages/AdminApplications.tsx'
 import { AdminEvents } from './pages/AdminEvents.tsx'
 import { AdminInvites } from './pages/AdminInvites.tsx'
-import { AdminOptions } from './pages/AdminOptions.tsx'
-import { AdminPlaces } from './pages/AdminPlaces.tsx'
 import { AdminQuestions } from './pages/AdminQuestions.tsx'
 import { AdminRoster } from './pages/AdminRoster.tsx'
 import { AdminSettings } from './pages/AdminSettings.tsx'
@@ -21,8 +20,10 @@ import { Dreams } from './pages/Dreams.tsx'
 import { Home } from './pages/Home.tsx'
 import { Invite } from './pages/Invite.tsx'
 import { Login } from './pages/Login.tsx'
-import { MyBurn } from './pages/MyBurn.tsx'
+import { Members } from './pages/Members.tsx'
 import { NotFound } from './pages/NotFound.tsx'
+import { Options } from './pages/Options.tsx'
+import { Places } from './pages/Places.tsx'
 import { ProfilePage } from './pages/Profile.tsx'
 import { Roles } from './pages/Roles.tsx'
 import { Schedule } from './pages/Schedule.tsx'
@@ -53,10 +54,11 @@ export type RoutesApi = Pick<
   | 'getMyProfile'
   | 'updateMyProfile'
   | 'updateMyStay'
-  | 'getMyAttendance'
-  | 'joinActiveEvent'
-  | 'leaveActiveEvent'
+  | 'getMyBurns'
+  | 'joinEvent'
+  | 'leaveEvent'
   | 'getActiveRoster'
+  | 'getMembers'
   | 'setPayment'
   | 'getPlaces'
   | 'addPlace'
@@ -139,12 +141,12 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
   const AdminQuestionsRoute = useMemo(() => () => <AdminQuestions api={api} />, [api])
   const AdminApplicationsRoute = useMemo(() => () => <AdminApplications api={api} />, [api])
   const AdminInvitesRoute = useMemo(() => () => <AdminInvites api={api} />, [api])
-  const AdminOptionsRoute = useMemo(() => () => <AdminOptions api={api} />, [api])
-  const AdminPlacesRoute = useMemo(() => () => <AdminPlaces api={api} />, [api])
+  const OptionsRoute = useMemo(() => () => <Options api={api} />, [api])
+  const PlacesRoute = useMemo(() => () => <Places api={api} />, [api])
   const AdminRosterRoute = useMemo(() => () => <AdminRoster api={api} />, [api])
   const AdminSettingsRoute = useMemo(() => () => <AdminSettings api={api} />, [api])
   const HomeRoute = useMemo(() => () => <Home api={api} />, [api])
-  const MyBurnRoute = useMemo(() => () => <MyBurn api={api} />, [api])
+  const MembersRoute = useMemo(() => () => <Members api={api} />, [api])
   const DreamsRoute = useMemo(() => () => <Dreams api={api} />, [api])
   const ScheduleRoute = useMemo(() => () => <Schedule api={api} />, [api])
   const RolesRoute = useMemo(() => () => <Roles api={api} />, [api])
@@ -162,7 +164,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
     <Router>
       <Route path="/" component={HomeRoute} />
       <Route path="/apply" component={ApplyRoute} />
-      <Route path="/my-burn" component={MyBurnRoute} />
+      <Route path="/members" component={MembersRoute} />
       <Route path="/dreams" component={DreamsRoute} />
       <Route path="/schedule" component={ScheduleRoute} />
       <Route path="/roles" component={RolesRoute} />
@@ -174,8 +176,8 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
       <Route path="/admin/questions" component={AdminQuestionsRoute} />
       <Route path="/admin/applications" component={AdminApplicationsRoute} />
       <Route path="/admin/invites" component={AdminInvitesRoute} />
-      <Route path="/admin/options" component={AdminOptionsRoute} />
-      <Route path="/admin/places" component={AdminPlacesRoute} />
+      <Route path="/options" component={OptionsRoute} />
+      <Route path="/places" component={PlacesRoute} />
       <Route path="/admin/roster" component={AdminRosterRoute} />
       <Route path="/admin/settings" component={AdminSettingsRoute} />
       <Route default component={NotFound} />
@@ -207,10 +209,15 @@ export const App = ({ viewer, title, api }: { viewer?: Viewer; title?: string; a
   // written to survive that changing; this would have stopped it.
   const client = useMemo(() => api ?? createApiClient(), [api])
 
+  // Inside the viewer provider, since which burns can be chosen between depends on
+  // who is looking, and outside `Layout`, since the selector is in the bar and every
+  // burn-scoped page below it reads the same choice.
   const framed = (
-    <Layout api={client}>
-      <Routes api={client} />
-    </Layout>
+    <FetchedBurnProvider api={client}>
+      <Layout api={client}>
+        <Routes api={client} />
+      </Layout>
+    </FetchedBurnProvider>
   )
 
   const content =

@@ -59,6 +59,11 @@ by reading Rollup's docs.
 
 - **Never hardcode a single event.** `event` exists from day one; the whole
   point is that this recurs up to 4x/year.
+- **Every burn-scoped route takes an event id** (#184). `activeEvent` decides only
+  what the public homepage and the ICS feed are about; the selector in the bar
+  supplies the id for everything a signed-in member looks at. Routes keyed by a bare
+  id resolve the burn from the row and refuse one that has **ended** — `openEvent`,
+  not `activeEvent`, because a grid is laid out and a dream offered months ahead.
 - **Payment is per `attendance`** — one row per `(event, account)` — not a
   global "has this person paid" flag. The same human may attend several burns and
   pays separately for each.
@@ -184,12 +189,34 @@ These are member records, so treat them as such:
   prefix**, never exempting it there — the hook's whole value is having no
   exception to forget.
 - Invite tokens are CSPRNG-random and unguessable, single-use, and expiring.
+- **Push is any approved member's**, not admin's (#184). The routes are
+  `/api/push/…`, moved out from under the admin prefix rather than exempted inside
+  it. `notifyAdmins` and `notifyAccount` share one delivery loop; the lead-roles
+  routes take `notify` as a dependency so the write cannot fail because a push
+  service did, and never notify somebody about their own click.
+- **The viewer carries `name`, and nothing else personal.** `/api/auth/me` returns
+  `{ account_id, name, roles }` — the name for the initials in the corner, which
+  every page renders, and which every other member already sees on the Members
+  page. The email stays out: it is the login identity, and a member's own record is
+  a separate authorised read.
 - **A member may read who else is coming, by name.**
   `GET /api/events/:eventId/attendees` returns account ids and display names and
   nothing else — the register has to offer somebody to hand a role to. It is a
   separate route rather than a relaxed roster because a route selecting two columns
-  cannot leak a third; the roster carries contact details, allergies and payment
-  state and stays admin's (#159).
+  cannot leak a third.
+- **A member may read the roster itself, minus the payment date and the email**
+  (#159). `GET /api/events/:eventId/members`, outside the admin prefix rather than
+  exempted inside it. Whoever cooks needs the allergies, which is why those live on
+  the account. **`payment_status` is shown to everyone** — having paid is the
+  definite mark of actually joining, and it was a column everyone could read in the
+  spreadsheet this replaces; what stays admin's is _recording_ it. `payment_date` is
+  bookkeeping, and `email` is the login identity rather than a way of reaching
+  somebody — `contact` is that. The projection is `asMemberEntry` in `roster.ts`,
+  an object literal against
+  `MemberRosterEntry`, so a column added to the organiser's row reaches members only
+  when somebody names it there; spreading the row and deleting keys would not have
+  that property. The two views share one query, so the order — which decides who has
+  a place — cannot come out differently on the two pages.
 - Markdown is sanitized before rendering, and members author it too — any longer
   field shown to other people is markdown. `markdown.ts` escapes raw HTML rather
   than filtering it and allowlists link schemes, so untrusted authors are inside

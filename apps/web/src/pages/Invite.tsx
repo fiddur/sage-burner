@@ -112,7 +112,9 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
       // mount and not refetched on client-side navigation — so without this the
       // nav still offers "Log in" to someone holding a valid session. `Login.tsx`
       // does the same thing after its own sign-in.
-      if (signedIn !== null) setViewer({ id: signedIn.account_id, roles: signedIn.roles })
+      if (signedIn !== null) {
+        setViewer({ id: signedIn.account_id, name: signedIn.name, roles: signedIn.roles })
+      }
       setDone(true)
     } catch (failure) {
       setError(messageForFailure(failure))

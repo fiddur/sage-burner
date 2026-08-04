@@ -38,13 +38,14 @@ const clientWith = (
   submitApplication: () => Promise.reject(new Error('submitApplication is not stubbed in this file')),
   getApplications: () => Promise.reject(new Error('getApplications is not stubbed in this file')),
   getActiveRoster: () => Promise.reject(new Error('getActiveRoster is not stubbed in this file')),
+  getMembers: () => Promise.reject(new Error('getMembers is not stubbed in this file')),
   setPayment: () => Promise.reject(new Error('setPayment is not stubbed in this file')),
-  getMyAttendance: () => Promise.reject(new Error('getMyAttendance is not stubbed in this file')),
+  getMyBurns: () => Promise.reject(new Error('getMyBurns is not stubbed in this file')),
   getMyProfile: () => Promise.reject(new Error('getMyProfile is not stubbed in this file')),
   updateMyProfile: () => Promise.reject(new Error('updateMyProfile is not stubbed in this file')),
   updateMyStay: () => Promise.reject(new Error('updateMyStay is not stubbed in this file')),
-  joinActiveEvent: () => Promise.reject(new Error('joinActiveEvent is not stubbed in this file')),
-  leaveActiveEvent: () => Promise.reject(new Error('leaveActiveEvent is not stubbed in this file')),
+  joinEvent: () => Promise.reject(new Error('joinEvent is not stubbed in this file')),
+  leaveEvent: () => Promise.reject(new Error('leaveEvent is not stubbed in this file')),
   getInviteState: () => Promise.reject(new Error('getInviteState is not stubbed in this file')),
   redeemInvite: () => Promise.reject(new Error('redeemInvite is not stubbed in this file')),
   getInvites: () => Promise.reject(new Error('getInvites is not stubbed in this file')),
@@ -178,7 +179,10 @@ describe('routing', () => {
     // The paths come from the links the landing page renders rather than a list
     // here: a hand-written list goes stale the moment someone adds a link, which
     // is the same failure one level up.
-    const admin = { status: 'signed-in', account: { id: 'a1', roles: ['admin', 'member'] } } as const
+    const admin = {
+      status: 'signed-in',
+      account: { id: 'a1', name: null, roles: ['admin', 'member'] },
+    } as const
     const { container } = renderAt('/admin', admin)
     // Every link the nav offers, too: `/profile` and `/schedule` sat there for
     // pages that were never routed, so a member clicking them got NotFound.
@@ -243,7 +247,7 @@ describe('signing out', () => {
     const logout = vi.fn(() => Promise.resolve({ viewer: null }))
     render(
       <App
-        viewer={{ status: 'signed-in', account: { id: 'a-1', roles: ['member'] } }}
+        viewer={{ status: 'signed-in', account: { id: 'a-1', name: null, roles: ['member'] } }}
         api={clientWith(logout)}
       />,
     )
@@ -261,7 +265,7 @@ describe('signing out', () => {
     const logout = vi.fn(() => Promise.reject(new TypeError('Failed to fetch')))
     render(
       <App
-        viewer={{ status: 'signed-in', account: { id: 'a-1', roles: ['member'] } }}
+        viewer={{ status: 'signed-in', account: { id: 'a-1', name: null, roles: ['member'] } }}
         api={clientWith(logout)}
       />,
     )
@@ -273,11 +277,12 @@ describe('signing out', () => {
 })
 
 describe('navigation', () => {
+  // ⚙️ is a glyph, so its name comes from `aria-label` rather than its text.
   const linkNames = () =>
     screen
       .getAllByRole('link')
-      .map((link) => link.textContent?.trim())
-      .filter((text): text is string => text !== undefined)
+      .map((link) => link.getAttribute('aria-label') ?? link.textContent?.trim())
+      .filter((text): text is string => text !== undefined && text !== null)
 
   it('offers the public entry points when signed out', () => {
     renderAt('/')
@@ -291,20 +296,20 @@ describe('navigation', () => {
   it('offers member pages once signed in, and drops the public ones', () => {
     renderAt('/', {
       status: 'signed-in',
-      account: { id: 'a1', roles: ['member'] },
+      account: { id: 'a1', name: null, roles: ['member'] },
     })
 
-    expect(linkNames()).toContain('Your burn')
+    expect(linkNames()).toContain('Your details')
     expect(linkNames()).not.toContain('Log in')
-    // Organise is offered: a member curates the places and the lodging and
-    // helping lists there, per #155. The page itself shows them only those.
-    expect(linkNames()).toContain('Organise')
+    // ⚙️ is admin's alone since #184. What a member curates is reached from the
+    // page it belongs to — Places from Schedule, the lodging list from Your burn.
+    expect(linkNames()).not.toContain('Organise')
   })
 
   it('offers Organise to nobody without a role', () => {
     // An applicant checking on their application has an account and no roles, and
     // there is nothing behind the link for them.
-    renderAt('/', { status: 'signed-in', account: { id: 'a1', roles: [] } })
+    renderAt('/', { status: 'signed-in', account: { id: 'a1', name: null, roles: [] } })
 
     expect(linkNames()).not.toContain('Organise')
   })
@@ -312,11 +317,11 @@ describe('navigation', () => {
   it('offers the organising pages to an admin', () => {
     renderAt('/', {
       status: 'signed-in',
-      account: { id: 'a1', roles: ['admin', 'member'] },
+      account: { id: 'a1', name: null, roles: ['admin', 'member'] },
     })
 
     expect(linkNames()).toContain('Organise')
-    expect(linkNames()).toContain('Your burn')
+    expect(linkNames()).toContain('Your details')
   })
 
   it('shows nothing role-specific while the session is still loading', () => {
@@ -325,7 +330,7 @@ describe('navigation', () => {
     renderAt('/', { status: 'loading' })
 
     expect(linkNames()).not.toContain('Log in')
-    expect(linkNames()).not.toContain('Your burn')
+    expect(linkNames()).not.toContain('Your details')
     expect(linkNames()).not.toContain('Organise')
   })
 })

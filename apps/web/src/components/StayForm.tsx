@@ -17,6 +17,7 @@ import { FormError, useFormError } from './FormError.tsx'
  */
 export const StayForm = ({
   api,
+  eventId,
   attendance,
   lodgingOptions = [],
   helpingOptions = [],
@@ -24,6 +25,8 @@ export const StayForm = ({
   onSaved,
 }: {
   api: Pick<ApiClient, 'updateMyStay'>
+  /** Which burn this stay is at. The page shows more than one. */
+  eventId: string
   attendance: Attendance
   /** This burn's lodging list, in the organiser's order. */
   lodgingOptions?: readonly EventOption[]
@@ -57,7 +60,7 @@ export const StayForm = ({
 
     setSaving(true)
     try {
-      const { attendance: updated } = await api.updateMyStay({
+      const { attendance: updated } = await api.updateMyStay(eventId, {
         arrival_date: blankToNull(arrival),
         departure_date: blankToNull(departure),
         lodging_option_id: lodging === '' ? null : lodging,
@@ -145,6 +148,14 @@ export const StayForm = ({
           })}
         </select>
       </label>
+
+      {/* The list itself is the burn's shared furniture, so the way to change it sits
+          beside the question it answers rather than on a page of its own. Offered to
+          everyone here, because everyone here may edit it — the page refuses anyone
+          who may not, and so does the API. */}
+      <p class="form-note">
+        <a href="/options">(edit lodging alternatives)</a>
+      </p>
 
       <fieldset class="field">
         <legend>What would you like to help with?</legend>
