@@ -42,6 +42,7 @@ import type {
   LeadRolesResponse,
   LoginRequest,
   MeResponse,
+  MemberRosterResponse,
   MyAttendanceResponse,
   PaymentUpdate,
   Place,
@@ -514,6 +515,10 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
     /** Admin only. The open burn's roster; `event` is null when none is open. */
     getActiveRoster: (signal?: AbortSignal) =>
       request<RosterResponse>('/admin/events/active/roster', { signal }),
+
+    /** The same list without payment or email, for any approved member. */
+    getActiveMembers: (signal?: AbortSignal) =>
+      request<MemberRosterResponse>('/events/active/members', { signal }),
 
     /** Admin only. Payment and payment date; nothing else on the row. */
     setPayment: (eventId: string, accountId: string, body: PaymentUpdate) =>

@@ -229,6 +229,35 @@ export const rosterResponseSchema = z.object({
 })
 
 /**
+ * The same list as a member sees it (#159).
+ *
+ * Derived by subtraction from the organiser's entry so the two cannot drift into
+ * describing different people. Three fields come off:
+ *
+ * - **`payment_status` and `payment_date`**, because who has paid is admin's — it
+ *   was the one column of the spreadsheet this replaces that everyone could see and
+ *   nobody but the organiser could edit, and the reason to show it was the editing.
+ * - **`email`**, which is the login identity, not a way of reaching somebody.
+ *   `profileUpdateSchema` refuses to change it for that reason, and `contact` is the
+ *   field a person fills in to be contacted. Nothing here falls back to it.
+ *
+ * `waiting` stays, derived from payment as it is for anyone: a waiting list is only
+ * any use to the people on it. The ordering it comes from puts paid before unpaid,
+ * so a member can infer that whoever is at the bottom of a full list has not paid.
+ * That is the waiting list working, not a leak of the column.
+ */
+export const memberRosterEntrySchema = rosterEntrySchema.omit({
+  email: true,
+  payment_status: true,
+  payment_date: true,
+})
+
+export const memberRosterResponseSchema = z.object({
+  event: eventFields.pick({ id: true, name: true, member_cap: true }).nullable(),
+  entries: z.array(memberRosterEntrySchema),
+})
+
+/**
  * What an organiser may set on someone's attendance. The status, and nothing else.
  *
  * `payment_date` is derived from the status and the clock rather than taken from
@@ -249,4 +278,6 @@ export const paymentUpdateSchema = z
 
 export type RosterEntry = z.infer<typeof rosterEntrySchema>
 export type RosterResponse = z.infer<typeof rosterResponseSchema>
+export type MemberRosterEntry = z.infer<typeof memberRosterEntrySchema>
+export type MemberRosterResponse = z.infer<typeof memberRosterResponseSchema>
 export type PaymentUpdate = z.infer<typeof paymentUpdateSchema>

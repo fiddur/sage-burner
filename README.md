@@ -659,13 +659,14 @@ This replaces a shared spreadsheet where everyone could edit everything except
 paid status, so the default for the burn's **shared furniture** is any approved
 member — not admin:
 
-| Open to any approved member   | Still admin                                                                     |
-| ----------------------------- | ------------------------------------------------------------------------------- |
-| Schedule places, per burn     | The burn's shape: name, slug, dates, gate times, `member_cap`, and creating one |
-| The lodging and helping lists | Payment                                                                         |
-| A burn's welcome text         | Applications, invites, role grants, installation settings                       |
-| The lead-roles register       |                                                                                 |
-| Who is coming, by name        |                                                                                 |
+| Open to any approved member                 | Still admin                                                                     |
+| ------------------------------------------- | ------------------------------------------------------------------------------- |
+| Schedule places, per burn                   | The burn's shape: name, slug, dates, gate times, `member_cap`, and creating one |
+| The lodging and helping lists               | Payment                                                                         |
+| A burn's welcome text                       | Applications, invites, role grants, installation settings                       |
+| The lead-roles register                     |                                                                                 |
+| Who is coming, by name                      |                                                                                 |
+| Reading the roster, minus payment and email |                                                                                 |
 
 "Approved" means **`member` or `admin`**, and the second half is load-bearing.
 The roles are independent — the accounts table grants either on its own, and an
@@ -680,14 +681,39 @@ afterwards without `member`.)
 Personal details stay the person's own: nobody edits somebody else's name, contact
 or allergies.
 
-**The roster is still admin-only**, and that is the code rather than the intent. It
-is served from `/api/admin/events/:eventId/roster`, it carries contact details,
-allergies and payment state, and a member cannot read it — which is a gap, since
-whoever cooks needs the allergies. Opening the read while keeping the write to a
-person's own stay is #159; this section describes what the guards do today, not what
-was decided for later.
+**A member reads the roster, minus payment and email** (#159). Whoever cooks needs
+the allergies, and that is why allergies live on the account rather than per burn.
+The write does not open with it: somebody else's stay stays theirs, through the
+`PATCH /api/events/active/attendance` they already have, and adding or removing
+someone else is still admin's.
 
-What a member _can_ read is **who is coming, by name**:
+`GET /api/events/:eventId/members` and `GET /api/events/active/members` serve it,
+**outside the admin prefix rather than exempted inside it** — the hook's whole value
+is having no exception to forget. Three columns come off the organiser's row:
+
+- **`payment_status` and `payment_date`.** Who has paid was the one column of the
+  spreadsheet this replaces that everyone could see and nobody but the organiser
+  could edit, and the reason to show it was the editing.
+- **`email`**, which is the login identity rather than a way of reaching somebody.
+  `profileUpdateSchema` refuses to change it for that reason, and `contact` is the
+  field a person fills in to be contacted. The member page has no fallback to it,
+  where the organiser's shows it when a name is missing.
+
+`waiting` stays, because a waiting list is only any use to the people on it. The
+ordering it comes from puts paid before unpaid, so somebody at the bottom of a full
+list can be guessed not to have paid — that is the waiting list working rather than
+the column leaking.
+
+The projection is `asMemberEntry` in `roster.ts`, written out field by field. That
+is the safety property, not tidiness: it is an object literal against
+`MemberRosterEntry`, so a column added to the organiser's row reaches members only
+when somebody names it there, and one removed from the member schema stops compiling
+rather than quietly still being sent. Both views run the same `rosterFor`, so the
+order — which decides who has a place — cannot come out differently on the two pages.
+
+The organiser's roster keeps its own route, its payment control and its CSV.
+
+What a member reads elsewhere, more narrowly, is **who is coming, by name**:
 `GET /api/events/:eventId/attendees` returns account ids and display names and
 nothing else. The lead-roles register has to offer somebody to hand a role to, and
 that is the whole of what it needs. It is a separate route rather than a relaxed
@@ -776,13 +802,14 @@ The bar carries **one entry per thing, not one per page** (#184). Everything els
 is reached from the page it belongs to, which is where somebody is standing when
 they want it.
 
-| Viewer                     | Bar                                          |
-| -------------------------- | -------------------------------------------- |
-| Signed out                 | Apply, Log in                                |
-| A role, not yet either one | nothing — an applicant waiting on a decision |
-| `member`                   | Your burn, Schedule, Roles, Your details     |
-| `admin` without `member`   | Schedule, Roles, ⚙️                          |
+| Viewer                   | Bar                                               |
+| ------------------------ | ------------------------------------------------- |
+| Signed out               | Apply, Log in                                     |
+| An account, neither role | nothing — an applicant waiting on a decision      |
+| `member`                 | Your burn, Members, Schedule, Roles, Your details |
+| `admin` without `member` | Members, Schedule, Roles, ⚙️                      |
 
+- **Members** is the roster a member may now read — see "What a member may change".
 - **Dreams** is reached from Schedule. Offering a dream and placing one are the
   same activity, and two entries for it is what the restructure undid.
 - **Places** is reached from Schedule too: the lanes are what the grid draws.

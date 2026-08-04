@@ -76,6 +76,7 @@ export const Layout = ({
               themselves allow. */}
           {isApproved(viewer) && (
             <>
+              <a href="/members">Members</a>
               <a href="/schedule">Schedule</a>
               <a href="/roles">Roles</a>
             </>

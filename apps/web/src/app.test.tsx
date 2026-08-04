@@ -38,6 +38,7 @@ const clientWith = (
   submitApplication: () => Promise.reject(new Error('submitApplication is not stubbed in this file')),
   getApplications: () => Promise.reject(new Error('getApplications is not stubbed in this file')),
   getActiveRoster: () => Promise.reject(new Error('getActiveRoster is not stubbed in this file')),
+  getActiveMembers: () => Promise.reject(new Error('getActiveMembers is not stubbed in this file')),
   setPayment: () => Promise.reject(new Error('setPayment is not stubbed in this file')),
   getMyAttendance: () => Promise.reject(new Error('getMyAttendance is not stubbed in this file')),
   getMyProfile: () => Promise.reject(new Error('getMyProfile is not stubbed in this file')),

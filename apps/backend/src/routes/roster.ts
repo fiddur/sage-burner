@@ -1,4 +1,9 @@
-import type { RosterResponse } from '@sage-burner/shared'
+import type {
+  MemberRosterEntry,
+  MemberRosterResponse,
+  RosterEntry,
+  RosterResponse,
+} from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
 import { errorResponse, paymentUpdateSchema, withPlaces } from '@sage-burner/shared'
@@ -6,6 +11,7 @@ import { and, eq } from 'drizzle-orm'
 
 import type { GuardDeps } from '../auth/guards.ts'
 
+import { createGuards } from '../auth/guards.ts'
 import { account, attendance, event, eventOption } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 import { activeEvent, todayIso } from './events.ts'
@@ -16,14 +22,53 @@ export interface RosterDeps extends GuardDeps {
 }
 
 /**
+ * What a member is shown of somebody else's stay.
+ *
+ * Written out field by field rather than spread-and-delete, and that is the whole
+ * safety property: this is an object literal against `MemberRosterEntry`, so a
+ * column added to the organiser's row reaches members only when somebody names it
+ * here, and one removed from the member schema stops compiling instead of quietly
+ * still being sent.
+ */
+const asMemberEntry = (entry: RosterEntry): MemberRosterEntry => ({
+  id: entry.id,
+  event_id: entry.event_id,
+  account_id: entry.account_id,
+  joined_at: entry.joined_at,
+  arrival_date: entry.arrival_date,
+  departure_date: entry.departure_date,
+  lodging_option_id: entry.lodging_option_id,
+  lodging: entry.lodging,
+  helping_option_ids: entry.helping_option_ids,
+  helping: entry.helping,
+  helping_other: entry.helping_other,
+  notes: entry.notes,
+  name: entry.name,
+  contact: entry.contact,
+  allergies_notes: entry.allergies_notes,
+  waiting: entry.waiting,
+})
+
+/**
  * Who is coming to a burn, and recording that they have paid.
  *
  * The direct replacement for the spreadsheet's Members tab. Person-level fields
  * are joined in from `account` rather than copied, so an allergy corrected on
  * someone's own profile page is corrected here in the same moment — which is the
  * point of the account/attendance split.
+ *
+ * Two readers, one query. The organiser's is under `/api/admin/` and carries
+ * payment; the member's is `/api/events/…/members`, outside that prefix rather than
+ * exempted inside it (#159, and #64 for why). They share `rosterFor` so the order —
+ * which decides who actually has a place — cannot come out differently on the two
+ * pages, and differ only by `asMemberEntry`.
  */
-export const registerRosterRoutes = (app: FastifyInstance, { db, now = () => new Date() }: RosterDeps) => {
+export const registerRosterRoutes = (
+  app: FastifyInstance,
+  { db, sessions, now = () => new Date() }: RosterDeps,
+) => {
+  const { requireApproved } = createGuards({ db, sessions })
+
   app.get<{ Params: { eventId: string } }>('/api/admin/events/:eventId/roster', async (request, reply) => {
     void noStore(reply)
 
@@ -46,6 +91,35 @@ export const registerRosterRoutes = (app: FastifyInstance, { db, now = () => new
     const summary = { id: open.id, name: open.name, member_cap: open.member_cap }
 
     return { event: summary, entries: await rosterFor(open.id, open.member_cap) } satisfies RosterResponse
+  })
+
+  app.get<{ Params: { eventId: string } }>(
+    '/api/events/:eventId/members',
+    { preHandler: requireApproved },
+    async (request, reply) => {
+      void noStore(reply)
+
+      const { eventId } = request.params
+      const found = await eventFor(eventId)
+      if (found === undefined) return reply.code(404).send(errorResponse('not_found'))
+
+      return {
+        event: found,
+        entries: (await rosterFor(eventId, found.member_cap)).map(asMemberEntry),
+      } satisfies MemberRosterResponse
+    },
+  )
+
+  app.get('/api/events/active/members', { preHandler: requireApproved }, async (_request, reply) => {
+    void noStore(reply)
+
+    const open = await activeEvent(db, todayIso(now))
+    if (open === undefined) return { event: null, entries: [] } satisfies MemberRosterResponse
+
+    return {
+      event: { id: open.id, name: open.name, member_cap: open.member_cap },
+      entries: (await rosterFor(open.id, open.member_cap)).map(asMemberEntry),
+    } satisfies MemberRosterResponse
   })
 
   app.patch<{ Params: { eventId: string; accountId: string } }>(

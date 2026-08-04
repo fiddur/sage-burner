@@ -50,13 +50,16 @@ describe('the nav', () => {
   it('offers a signed-out visitor the way in, and none of the pages behind it', () => {
     renderNav({ status: 'signed-out' })
 
-    expectLinks(['Apply', 'Log in'], ['Your burn', 'Schedule', 'Roles', 'Your details', 'Organise'])
+    expectLinks(
+      ['Apply', 'Log in'],
+      ['Your burn', 'Members', 'Schedule', 'Roles', 'Your details', 'Organise'],
+    )
   })
 
   it('gives a member their own pages and the shared ones', () => {
     renderNav(signedInAs('member'))
 
-    expectLinks(['Your burn', 'Schedule', 'Roles', 'Your details'], [])
+    expectLinks(['Your burn', 'Members', 'Schedule', 'Roles', 'Your details'], [])
   })
 
   it('keeps Organise from a member who is not an organiser', () => {
@@ -75,7 +78,7 @@ describe('the nav', () => {
     // `member`, since somebody not attending has no stay to fill in.
     renderNav(signedInAs('admin'))
 
-    expectLinks(['Schedule', 'Roles', 'Organise'], ['Your burn', 'Your details'])
+    expectLinks(['Members', 'Schedule', 'Roles', 'Organise'], ['Your burn', 'Your details'])
   })
 
   it('offers Dreams from the Schedule rather than from the bar', () => {
@@ -91,6 +94,6 @@ describe('the nav', () => {
     // this is the case where a leak would matter.
     renderNav(signedInAs())
 
-    expectLinks([], ['Your burn', 'Dreams', 'Schedule', 'Roles', 'Your details', 'Organise'])
+    expectLinks([], ['Your burn', 'Members', 'Dreams', 'Schedule', 'Roles', 'Your details', 'Organise'])
   })
 })
