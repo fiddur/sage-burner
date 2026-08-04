@@ -9,6 +9,7 @@ import type { Loaded } from '../load.ts'
 import { CopyFrom } from '../components/CopyFrom.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { useAction, useLoad } from '../load.ts'
+import { moveTo, swap } from '../reorder.ts'
 import { isApproved, useViewer } from '../viewer.tsx'
 
 export type PlacesApi = Pick<
@@ -40,31 +41,6 @@ const NEEDS_BOTH = 'A place needs a name and an emoji — both show in the sched
 
 const isBlank = (fields: { name: string; emoji: string }) =>
   fields.name.trim() === '' || fields.emoji.trim() === ''
-
-const swap = (ids: readonly string[], index: number, by: -1 | 1): string[] | undefined => {
-  const target = index + by
-  if (target < 0 || target >= ids.length) return undefined
-
-  const next = [...ids]
-  const moved = next[index]
-  const displaced = next[target]
-  if (moved === undefined || displaced === undefined) return undefined
-  next[index] = displaced
-  next[target] = moved
-
-  return next
-}
-
-const moveTo = (ids: readonly string[], from: number, to: number): string[] | undefined => {
-  if (from === to || from < 0 || to < 0 || from >= ids.length || to >= ids.length) return undefined
-
-  const next = [...ids]
-  const [moved] = next.splice(from, 1)
-  if (moved === undefined) return undefined
-  next.splice(to, 0, moved)
-
-  return next
-}
 
 /**
  * Where a dream can happen — one grid per burn, following the burn that is open.
