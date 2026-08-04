@@ -105,9 +105,11 @@ export const registerSessionRoutes = (
       host_account_id: viewer.account_id,
     }
 
-    // The place is checked by the foreign key rather than by a read first: a
-    // read-then-insert would let the place be deleted in between and still
-    // insert.
+    // Split deliberately. The foreign key is the authority on the place *existing*,
+    // including a concurrent delete a pre-read would miss; `placeIsOnThisBurn` above
+    // decides the pairing, which the key cannot see. That check cannot go stale in
+    // the direction that matters — no route moves a place between burns, since
+    // `placeUpdateSchema` omits `event_id`.
     try {
       await db.insert(session).values(row)
     } catch (failure) {

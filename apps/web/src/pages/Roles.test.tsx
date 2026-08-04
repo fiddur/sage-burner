@@ -250,6 +250,36 @@ describe('Roles', () => {
     })
   })
 
+  it('treats an emptied team size as unchanged rather than as nobody wanted', async () => {
+    // `Number('')` is 0, so clearing the box used to save "none asked for" — which
+    // the page then shows as a decision somebody made.
+    const updateLeadRole = vi.fn(() => Promise.resolve({ role: aRole({ id: 'r-1', title: 'Sauna' }) }))
+    renderPage(stub({ updateLeadRole }, [aRole({ id: 'r-1', title: 'Sauna', team_size_wanted: 3 })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
+    fireEvent.input(await screen.findByLabelText('Team wanted for Sauna'), { target: { value: '' } })
+    fireEvent.change(screen.getByLabelText('Effort during Sauna'), { target: { value: 'high' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => {
+      expect(updateLeadRole).toHaveBeenCalledWith('r-1', { effort_during: 'high' })
+    })
+  })
+
+  it('still saves a team size that was actually typed', async () => {
+    // The passing sibling: "empty means unchanged" must not swallow a real edit.
+    const updateLeadRole = vi.fn(() => Promise.resolve({ role: aRole({ id: 'r-1', title: 'Sauna' }) }))
+    renderPage(stub({ updateLeadRole }, [aRole({ id: 'r-1', title: 'Sauna', team_size_wanted: 3 })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
+    fireEvent.input(await screen.findByLabelText('Team wanted for Sauna'), { target: { value: '5' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => {
+      expect(updateLeadRole).toHaveBeenCalledWith('r-1', { team_size_wanted: 5 })
+    })
+  })
+
   it('takes somebody off the team by name', async () => {
     const leaveLeadRoleTeam = vi.fn(() => Promise.resolve(undefined))
     renderPage(

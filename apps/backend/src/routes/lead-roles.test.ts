@@ -220,6 +220,31 @@ describe('a role', () => {
     })
   })
 
+  it('carries no attendance id, on the list or on the one just added', async () => {
+    // `leadRoleSchema` does not declare `lead_attendance_id`, and neither
+    // `satisfies` nor the return annotation catches it: an object spread is exempt
+    // from excess-property checking, so a `select({ role: leadRole })` put it on the
+    // wire for months of nobody noticing.
+    const server = await build()
+    const eventId = await givenEvent()
+    const member = await givenAccount(['member'])
+    await givenComing(eventId, member.id)
+
+    const added = await add(server, member.cookie, eventId, { title: 'Sauna' })
+    expect(added.body).not.toContain('lead_attendance_id')
+
+    const id = added.json().role.id
+    await setLead(server, member.cookie, id, { account_id: member.id })
+
+    // With a lead set, so the column holds something to leak.
+    const listed = await list(server, member.cookie, eventId)
+    expect(listed.json().roles[0].lead).not.toBeNull()
+    expect(listed.body).not.toContain('lead_attendance_id')
+    expect((await edit(server, member.cookie, id, { title: 'Renamed' })).body).not.toContain(
+      'lead_attendance_id',
+    )
+  })
+
   it('keeps its three effort answers apart', async () => {
     // Three independent questions: a role can be all planning and no presence.
     const server = await build()
@@ -511,6 +536,57 @@ describe('seeding a new burn from a previous one', () => {
     expect((await sources(server, roleless.cookie, eventId)).statusCode).toBe(403)
   })
 
+  it('copies them in the order they were in, not in id order', async () => {
+    // One shared timestamp left the tie-break to a random UUID, so fifteen roles came
+    // back shuffled — and made the source `orderBy` a sort nothing could observe.
+    // Three titles in an order no id ordering would reproduce by luck.
+    const server = await build()
+    const last = await givenEvent('Last', '2025-08-01')
+    const next = await givenEvent('Next', '2026-08-01')
+    const { cookie } = await givenAccount(['member'])
+
+    // Written directly, with distinct stamps. Adding them through the API would give
+    // all three the same `created_at` — the app runs on a fixed clock here — so the
+    // source's own order would be id order, and a copy preserving id order would
+    // pass against an implementation preserving nothing.
+    for (const [index, title] of ['Sauna', 'Kitchen', 'Build'].entries()) {
+      await db()
+        .insert(leadRole)
+        .values({
+          id: randomUUID(),
+          event_id: last,
+          title,
+          purpose: '',
+          tasks: '',
+          effort_before: 'none',
+          effort_during: 'none',
+          effort_after: 'none',
+          team_size_wanted: 0,
+          lead_attendance_id: null,
+          created_at: new Date(Date.parse(NOW) + index).toISOString(),
+        })
+    }
+    expect((await list(server, cookie, last)).json().roles.map((r: { title: string }) => r.title)).toEqual([
+      'Sauna',
+      'Kitchen',
+      'Build',
+    ])
+
+    const copied = await copyFrom(server, cookie, next, last)
+
+    expect(copied.json().roles.map((role: { title: string }) => role.title)).toEqual([
+      'Sauna',
+      'Kitchen',
+      'Build',
+    ])
+    // And still in that order when read back, not only in the response it built.
+    expect((await list(server, cookie, next)).json().roles.map((r: { title: string }) => r.title)).toEqual([
+      'Sauna',
+      'Kitchen',
+      'Build',
+    ])
+  })
+
   it('refuses to copy into a register that already has roles', async () => {
     // Merging two registers is a decision nobody asked for. "Copy into empty" is the
     // case that removes the retyping.
@@ -538,6 +614,16 @@ describe('seeding a new burn from a previous one', () => {
     const last = await givenEvent('Last')
     const { cookie } = await givenAccount(['member'])
     await add(server, cookie, last, { title: 'Sauna' })
+
+    expect((await copyFrom(server, cookie, randomUUID(), last)).statusCode).toBe(404)
+  })
+
+  it('answers 404 for a burn that does not exist even when the source is empty', async () => {
+    // The combination the other 404 test cannot reach: the foreign key only fires
+    // when there is a row to insert, so this used to answer 201 with an empty list.
+    const server = await build()
+    const last = await givenEvent('Last', '2025-08-01')
+    const { cookie } = await givenAccount(['member'])
 
     expect((await copyFrom(server, cookie, randomUUID(), last)).statusCode).toBe(404)
   })

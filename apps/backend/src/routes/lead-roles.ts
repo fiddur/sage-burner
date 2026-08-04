@@ -17,7 +17,7 @@ import type { Database } from '../db/index.ts'
 
 import { createGuards } from '../auth/guards.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
-import { account, attendance, leadRole, leadRoleMember } from '../db/schema.ts'
+import { account, attendance, event, leadRole, leadRoleMember } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 import { copySourcesFor } from './copy-sources.ts'
 
@@ -43,9 +43,24 @@ const attendanceFor = async (db: Database, eventId: string, accountId: string) =
  * page, and a loop of selects would be the slower way to say the same thing.
  */
 const rolesFor = async (db: Database, eventId: string): Promise<LeadRole[]> => {
+  // The columns, not the row. A spread of `leadRole` carried `lead_attendance_id`
+  // into every response — an internal id `leadRoleSchema` does not declare, which
+  // neither `satisfies LeadRolesResponse` nor the `Promise<LeadRole[]>` annotation
+  // catches, because an object spread is exempt from excess-property checking. It is
+  // the same "a route selecting two columns cannot leak a third" argument that made
+  // `/events/:eventId/attendees` its own route.
   const rows = await db
     .select({
-      role: leadRole,
+      id: leadRole.id,
+      event_id: leadRole.event_id,
+      title: leadRole.title,
+      purpose: leadRole.purpose,
+      tasks: leadRole.tasks,
+      effort_before: leadRole.effort_before,
+      effort_during: leadRole.effort_during,
+      effort_after: leadRole.effort_after,
+      team_size_wanted: leadRole.team_size_wanted,
+      created_at: leadRole.created_at,
       leadAccountId: account.id,
       leadName: account.name,
     })
@@ -69,7 +84,7 @@ const rolesFor = async (db: Database, eventId: string): Promise<LeadRole[]> => {
     .where(
       inArray(
         leadRoleMember.role_id,
-        rows.map((row) => row.role.id),
+        rows.map((row) => row.id),
       ),
     )
     .orderBy(asc(account.name), asc(account.id))
@@ -82,7 +97,7 @@ const rolesFor = async (db: Database, eventId: string): Promise<LeadRole[]> => {
     ])
   }
 
-  return rows.map(({ role, leadAccountId, leadName }) => ({
+  return rows.map(({ leadAccountId, leadName, ...role }) => ({
     ...role,
     lead: leadAccountId === null ? null : { account_id: leadAccountId, name: leadName },
     team: teamByRole.get(role.id) ?? [],
@@ -128,16 +143,18 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
       const parsed = leadRoleCreateSchema.safeParse(request.body)
       if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
 
-      const row = {
+      const fields = {
         ...parsed.data,
         id: randomUUID(),
         event_id: request.params.eventId,
-        lead_attendance_id: null,
         created_at: now().toISOString(),
       }
 
       try {
-        await db.insert(leadRole).values(row).run()
+        await db
+          .insert(leadRole)
+          .values({ ...fields, lead_attendance_id: null })
+          .run()
       } catch (failure) {
         // A burn that does not exist. The foreign key is the authority rather than a
         // pre-read, which would be a second query saying the same thing.
@@ -148,7 +165,7 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
       // Built from what was written rather than read back: a new role is vacant and
       // has no team by definition, so a re-read would only be a query that could
       // fail to find its own insert and need an impossible branch for it.
-      const role: LeadRole = { ...row, lead: null, team: [] }
+      const role: LeadRole = { ...fields, lead: null, team: [] }
 
       return reply.code(201).send({ role } satisfies LeadRoleResponse)
     },
@@ -347,9 +364,22 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
       }
 
       const stamp = now().toISOString()
-      let seeded: 'conflict' | 'copied'
+      let seeded: 'conflict' | 'copied' | 'not_found'
       try {
         seeded = db.transaction((tx) => {
+          // Checked rather than left to the foreign key. The FK only fires when there
+          // is a row to insert, so copying from an empty source into a burn that does
+          // not exist answered 201 with an empty list — the one combination the other
+          // 404 test cannot reach.
+          const [burn] = tx
+            .select({ id: event.id })
+            .from(event)
+            .where(eq(event.id, request.params.eventId))
+            .limit(1)
+            .all()
+
+          if (burn === undefined) return 'not_found' as const
+
           const [already] = tx
             .select({ id: leadRole.id })
             .from(leadRole)
@@ -366,7 +396,13 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
             .orderBy(asc(leadRole.created_at), asc(leadRole.id))
             .all()
 
-          for (const row of source) {
+          // A millisecond per row, in source order. `rolesFor` sorts by
+          // `(created_at, id)`, so one shared stamp left the tie-break to a random
+          // UUID and a copied register came out shuffled — which also made the
+          // `orderBy` above decorative, a sort nothing downstream could observe.
+          const startedAt = Date.parse(stamp)
+
+          source.forEach((row, index) => {
             tx.insert(leadRole)
               .values({
                 id: randomUUID(),
@@ -379,10 +415,10 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
                 effort_after: row.effort_after,
                 team_size_wanted: row.team_size_wanted,
                 lead_attendance_id: null,
-                created_at: stamp,
+                created_at: new Date(startedAt + index).toISOString(),
               })
               .run()
-          }
+          })
 
           return 'copied' as const
         })
@@ -391,6 +427,7 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
         throw failure
       }
 
+      if (seeded === 'not_found') return reply.code(404).send(errorResponse('not_found'))
       if (seeded === 'conflict') return reply.code(409).send(errorResponse('conflict'))
 
       return reply

@@ -16,7 +16,7 @@ import type { Database } from '../db/index.ts'
 
 import { createGuards } from '../auth/guards.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
-import { place } from '../db/schema.ts'
+import { event, place } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 import { copySourcesFor } from './copy-sources.ts'
 
@@ -233,9 +233,22 @@ export const registerPlaceRoutes = (app: FastifyInstance, { db, sessions }: Guar
         return reply.code(400).send(errorResponse('bad_request'))
       }
 
-      let seeded: 'conflict' | 'copied'
+      let seeded: 'conflict' | 'copied' | 'not_found'
       try {
         seeded = db.transaction((tx) => {
+          // Checked rather than left to the foreign key. The FK only fires when there
+          // is a row to insert, so copying from an empty source into a burn that does
+          // not exist answered 201 with an empty list — the one combination the other
+          // 404 test cannot reach.
+          const [burn] = tx
+            .select({ id: event.id })
+            .from(event)
+            .where(eq(event.id, request.params.eventId))
+            .limit(1)
+            .all()
+
+          if (burn === undefined) return 'not_found' as const
+
           const [already] = tx
             .select({ id: place.id })
             .from(place)
@@ -274,6 +287,7 @@ export const registerPlaceRoutes = (app: FastifyInstance, { db, sessions }: Guar
         throw failure
       }
 
+      if (seeded === 'not_found') return reply.code(404).send(errorResponse('not_found'))
       if (seeded === 'conflict') return reply.code(409).send(errorResponse('conflict'))
 
       return reply
