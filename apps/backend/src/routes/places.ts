@@ -233,59 +233,65 @@ export const registerPlaceRoutes = (app: FastifyInstance, { db, sessions }: Guar
         return reply.code(400).send(errorResponse('bad_request'))
       }
 
-      let seeded: 'conflict' | 'copied' | 'not_found'
-      try {
-        seeded = db.transaction((tx) => {
-          // Checked rather than left to the foreign key. The FK only fires when there
-          // is a row to insert, so copying from an empty source into a burn that does
-          // not exist answered 201 with an empty list — the one combination the other
-          // 404 test cannot reach.
-          const [burn] = tx
-            .select({ id: event.id })
-            .from(event)
-            .where(eq(event.id, request.params.eventId))
-            .limit(1)
-            .all()
+      const seeded = db.transaction((tx) => {
+        // Checked rather than left to the foreign key. The FK only fires when there
+        // is a row to insert, so copying from an empty source into a burn that does
+        // not exist answered 201 with an empty list — the one combination the other
+        // 404 test cannot reach.
+        const [burn] = tx
+          .select({ id: event.id })
+          .from(event)
+          .where(eq(event.id, request.params.eventId))
+          .limit(1)
+          .all()
 
-          if (burn === undefined) return 'not_found' as const
+        if (burn === undefined) return 'not_found' as const
 
-          const [already] = tx
-            .select({ id: place.id })
-            .from(place)
-            .where(eq(place.event_id, request.params.eventId))
-            .limit(1)
-            .all()
+        // The source too, and for the same reason. Without it, copying *from* a
+        // burn that does not exist answered 201 with nothing copied — indis-
+        // tinguishable from a real burn that simply has none.
+        const [from] = tx
+          .select({ id: event.id })
+          .from(event)
+          .where(eq(event.id, parsed.data.from_event_id))
+          .limit(1)
+          .all()
 
-          if (already !== undefined) return 'conflict' as const
+        if (from === undefined) return 'not_found' as const
 
-          const source = tx
-            .select()
-            .from(place)
-            .where(eq(place.event_id, parsed.data.from_event_id))
-            .orderBy(asc(place.order), asc(place.id))
-            .all()
+        const [already] = tx
+          .select({ id: place.id })
+          .from(place)
+          .where(eq(place.event_id, request.params.eventId))
+          .limit(1)
+          .all()
 
-          // `order` is carried rather than reassigned, so the copied grid reads left
-          // to right the way the burn it came from did.
-          for (const row of source) {
-            tx.insert(place)
-              .values({
-                id: randomUUID(),
-                event_id: request.params.eventId,
-                order: row.order,
-                name: row.name,
-                emoji: row.emoji,
-                color: row.color,
-              })
-              .run()
-          }
+        if (already !== undefined) return 'conflict' as const
 
-          return 'copied' as const
-        })
-      } catch (failure) {
-        if (isForeignKeyViolation(failure)) return reply.code(404).send(errorResponse('not_found'))
-        throw failure
-      }
+        const source = tx
+          .select()
+          .from(place)
+          .where(eq(place.event_id, parsed.data.from_event_id))
+          .orderBy(asc(place.order), asc(place.id))
+          .all()
+
+        // `order` is carried rather than reassigned, so the copied grid reads left
+        // to right the way the burn it came from did.
+        for (const row of source) {
+          tx.insert(place)
+            .values({
+              id: randomUUID(),
+              event_id: request.params.eventId,
+              order: row.order,
+              name: row.name,
+              emoji: row.emoji,
+              color: row.color,
+            })
+            .run()
+        }
+
+        return 'copied' as const
+      })
 
       if (seeded === 'not_found') return reply.code(404).send(errorResponse('not_found'))
       if (seeded === 'conflict') return reply.code(409).send(errorResponse('conflict'))

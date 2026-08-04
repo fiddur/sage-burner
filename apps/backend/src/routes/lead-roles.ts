@@ -112,13 +112,11 @@ const roleOr404 = async (db: Database, id: string) => {
 /**
  * The lead-roles register — who is looking after what at this burn.
  *
- * **Open to any approved member, including removing a role somebody else staffed.**
- * That is the deliberate answer for a co-created event replacing a shared
- * spreadsheet, and it is the same trust the lodging and helping lists assume. There
- * is no undo.
+ * Every route here is `requireApproved`, removals included; `lead_role`'s own doc
+ * says why that divergence was chosen and what it costs.
  *
- * Reads need a role too: the register names members, so it is not public the way the
- * schedule is.
+ * **Reads need a role too**, which is the part not visible from the table: the
+ * register names members, so unlike the schedule it is not public.
  */
 export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps) => {
   const { db, sessions, now = () => new Date() } = deps
@@ -364,68 +362,74 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
       }
 
       const stamp = now().toISOString()
-      let seeded: 'conflict' | 'copied' | 'not_found'
-      try {
-        seeded = db.transaction((tx) => {
-          // Checked rather than left to the foreign key. The FK only fires when there
-          // is a row to insert, so copying from an empty source into a burn that does
-          // not exist answered 201 with an empty list — the one combination the other
-          // 404 test cannot reach.
-          const [burn] = tx
-            .select({ id: event.id })
-            .from(event)
-            .where(eq(event.id, request.params.eventId))
-            .limit(1)
-            .all()
+      const seeded = db.transaction((tx) => {
+        // Checked rather than left to the foreign key. The FK only fires when there
+        // is a row to insert, so copying from an empty source into a burn that does
+        // not exist answered 201 with an empty list — the one combination the other
+        // 404 test cannot reach.
+        const [burn] = tx
+          .select({ id: event.id })
+          .from(event)
+          .where(eq(event.id, request.params.eventId))
+          .limit(1)
+          .all()
 
-          if (burn === undefined) return 'not_found' as const
+        if (burn === undefined) return 'not_found' as const
 
-          const [already] = tx
-            .select({ id: leadRole.id })
-            .from(leadRole)
-            .where(eq(leadRole.event_id, request.params.eventId))
-            .limit(1)
-            .all()
+        // The source too, and for the same reason. Without it, copying *from* a
+        // burn that does not exist answered 201 with nothing copied — indis-
+        // tinguishable from a real burn that simply has none.
+        const [from] = tx
+          .select({ id: event.id })
+          .from(event)
+          .where(eq(event.id, parsed.data.from_event_id))
+          .limit(1)
+          .all()
 
-          if (already !== undefined) return 'conflict' as const
+        if (from === undefined) return 'not_found' as const
 
-          const source = tx
-            .select()
-            .from(leadRole)
-            .where(eq(leadRole.event_id, parsed.data.from_event_id))
-            .orderBy(asc(leadRole.created_at), asc(leadRole.id))
-            .all()
+        const [already] = tx
+          .select({ id: leadRole.id })
+          .from(leadRole)
+          .where(eq(leadRole.event_id, request.params.eventId))
+          .limit(1)
+          .all()
 
-          // A millisecond per row, in source order. `rolesFor` sorts by
-          // `(created_at, id)`, so one shared stamp left the tie-break to a random
-          // UUID and a copied register came out shuffled — which also made the
-          // `orderBy` above decorative, a sort nothing downstream could observe.
-          const startedAt = Date.parse(stamp)
+        if (already !== undefined) return 'conflict' as const
 
-          source.forEach((row, index) => {
-            tx.insert(leadRole)
-              .values({
-                id: randomUUID(),
-                event_id: request.params.eventId,
-                title: row.title,
-                purpose: row.purpose,
-                tasks: row.tasks,
-                effort_before: row.effort_before,
-                effort_during: row.effort_during,
-                effort_after: row.effort_after,
-                team_size_wanted: row.team_size_wanted,
-                lead_attendance_id: null,
-                created_at: new Date(startedAt + index).toISOString(),
-              })
-              .run()
-          })
+        const source = tx
+          .select()
+          .from(leadRole)
+          .where(eq(leadRole.event_id, parsed.data.from_event_id))
+          .orderBy(asc(leadRole.created_at), asc(leadRole.id))
+          .all()
 
-          return 'copied' as const
+        // A millisecond per row, in source order. `rolesFor` sorts by
+        // `(created_at, id)`, so one shared stamp left the tie-break to a random
+        // UUID and a copied register came out shuffled — which also made the
+        // `orderBy` above decorative, a sort nothing downstream could observe.
+        const startedAt = Date.parse(stamp)
+
+        source.forEach((row, index) => {
+          tx.insert(leadRole)
+            .values({
+              id: randomUUID(),
+              event_id: request.params.eventId,
+              title: row.title,
+              purpose: row.purpose,
+              tasks: row.tasks,
+              effort_before: row.effort_before,
+              effort_during: row.effort_during,
+              effort_after: row.effort_after,
+              team_size_wanted: row.team_size_wanted,
+              lead_attendance_id: null,
+              created_at: new Date(startedAt + index).toISOString(),
+            })
+            .run()
         })
-      } catch (failure) {
-        if (isForeignKeyViolation(failure)) return reply.code(404).send(errorResponse('not_found'))
-        throw failure
-      }
+
+        return 'copied' as const
+      })
 
       if (seeded === 'not_found') return reply.code(404).send(errorResponse('not_found'))
       if (seeded === 'conflict') return reply.code(409).send(errorResponse('conflict'))

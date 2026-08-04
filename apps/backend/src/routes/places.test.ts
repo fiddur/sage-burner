@@ -529,6 +529,14 @@ describe('seeding a burn’s grid from a previous one', () => {
     expect((await copyFrom(server, admin.cookie, randomUUID(), last)).statusCode).toBe(404)
   })
 
+  it('answers 404 for a source burn that does not exist', async () => {
+    const server = await build()
+    const next = await givenEvent('Next', '2026-08-01')
+    const admin = await givenAccount(['admin'])
+
+    expect((await copyFrom(server, admin.cookie, next, randomUUID())).statusCode).toBe(404)
+  })
+
   it('offers the burns that have a grid, newest first, and never this one', async () => {
     const server = await build()
     const older = await givenEvent('Two summers ago', '2024-08-01')

@@ -3,15 +3,21 @@ import { describe, expect, it } from 'vitest'
 import {
   accountRoles,
   applicationStatuses,
+  effortLevels,
+  eventOptionKinds,
   formQuestionTypes,
   isAccountRole,
   isApplicationStatus,
+  isEffortLevel,
+  isEventOptionKind,
   isFormQuestionType,
   isInviteStatus,
   isPaymentStatus,
+  isPlaceColor,
   inviteStatusOf,
   inviteStatuses,
   paymentStatuses,
+  placeColors,
 } from './enums.ts'
 
 describe('enum type guards', () => {
@@ -21,6 +27,9 @@ describe('enum type guards', () => {
     { name: 'form question type', values: formQuestionTypes, guard: isFormQuestionType },
     { name: 'payment status', values: paymentStatuses, guard: isPaymentStatus },
     { name: 'invite status', values: inviteStatuses, guard: isInviteStatus },
+    { name: 'effort level', values: effortLevels, guard: isEffortLevel },
+    { name: 'event option kind', values: eventOptionKinds, guard: isEventOptionKind },
+    { name: 'place colour', values: placeColors, guard: isPlaceColor },
   ]
 
   for (const { name, values, guard } of cases) {

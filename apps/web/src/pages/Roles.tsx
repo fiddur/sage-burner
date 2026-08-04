@@ -6,6 +6,7 @@ import { useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 import type { Loaded } from '../load.ts'
 
+import { CopyFrom } from '../components/CopyFrom.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
 import { useAction, useLoad } from '../load.ts'
@@ -55,14 +56,10 @@ const teamCount = (role: LeadRole) =>
 /**
  * The lead-roles register — who is looking after what at this burn.
  *
- * Every control here is open to any approved member, including removing a role
- * somebody else staffed. That is the deliberate answer for a co-created event
- * replacing a shared spreadsheet, and there is no undo, so the removal button asks
- * first.
- *
- * The wanted team size is shown and never enforced: a page that greys out "join"
- * when a role is full would be the lodging list's rule, and a pair of hands is not
- * a bed.
+ * Two things here would otherwise look like oversights. **The removal button asks
+ * first** because any member may remove any role and nothing undoes it. **"Join the
+ * team" is never disabled**, however many are wanted — the lodging list greys out a
+ * full option and this deliberately does not, because a pair of hands is not a bed.
  */
 export const Roles = ({ api }: { api: RolesApi }) => {
   const viewer = useViewer()
@@ -116,6 +113,7 @@ export const Roles = ({ api }: { api: RolesApi }) => {
       {ready !== undefined && ready.roles.length === 0 && ready.sources.length > 0 && (
         <CopyFrom
           sources={ready.sources}
+          what="roles"
           busy={busy}
           onCopy={(fromEventId) =>
             run(() => api.copyLeadRoles(ready.eventId, fromEventId), 'Could not copy those roles.')
@@ -125,7 +123,7 @@ export const Roles = ({ api }: { api: RolesApi }) => {
 
       <ol class="role-list">
         {(ready?.roles ?? []).map((role) => (
-          <li key={role.id} class="role-row">
+          <li key={role.id}>
             {editing === role.id ? (
               <RoleFields
                 role={role}
@@ -386,7 +384,7 @@ const AddToTeam = ({
   if (attendees.length === 0) return null
 
   return (
-    <div class="role-add-team">
+    <div>
       <label class="field">
         <span>Put somebody on it</span>
         <select
@@ -414,44 +412,6 @@ const AddToTeam = ({
       >
         Add them
       </button>
-    </div>
-  )
-}
-
-const CopyFrom = ({
-  sources,
-  busy,
-  onCopy,
-}: {
-  sources: readonly Source[]
-  busy: boolean
-  onCopy: (fromEventId: string) => void
-}) => {
-  const [chosen, setChosen] = useState(sources[0]?.event_id ?? '')
-
-  return (
-    <div class="copy-from">
-      <label class="field">
-        <span>Or start from a previous burn</span>
-        <select
-          aria-label="Burn to copy roles from"
-          disabled={busy}
-          value={chosen}
-          onChange={(changeEvent) => setChosen(changeEvent.currentTarget.value)}
-        >
-          {sources.map((source) => (
-            <option key={source.event_id} value={source.event_id}>
-              {source.name} ({source.count})
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <button type="button" disabled={busy || chosen === ''} onClick={() => onCopy(chosen)}>
-        Copy those roles
-      </button>
-
-      <p class="form-note">The roles themselves, not who held them.</p>
     </div>
   )
 }
