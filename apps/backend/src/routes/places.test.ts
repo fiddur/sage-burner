@@ -519,6 +519,16 @@ describe('seeding a burn’s grid from a previous one', () => {
     expect((await copyFrom(server, admin.cookie, randomUUID(), last)).statusCode).toBe(404)
   })
 
+  it('answers 404 for a burn that does not exist even when the source is empty', async () => {
+    // The foreign key only fires when there is a row to insert, so this used to
+    // answer 201 with an empty grid.
+    const server = await build()
+    const last = await givenEvent('Last', '2025-08-01')
+    const admin = await givenAccount(['admin'])
+
+    expect((await copyFrom(server, admin.cookie, randomUUID(), last)).statusCode).toBe(404)
+  })
+
   it('offers the burns that have a grid, newest first, and never this one', async () => {
     const server = await build()
     const older = await givenEvent('Two summers ago', '2024-08-01')

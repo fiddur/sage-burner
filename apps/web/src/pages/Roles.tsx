@@ -47,7 +47,6 @@ const EFFORT_LABEL: Record<EffortLevel, string> = {
 
 const nameOf = (person: Person) => person.name ?? 'Someone without a name yet'
 
-/** `2 of 4 wanted`, or `nobody wanted besides the lead` when the register asks for none. */
 const teamCount = (role: LeadRole) =>
   role.team_size_wanted === 0
     ? `${role.team.length} on the team, none asked for`
@@ -486,7 +485,12 @@ const RoleFields = ({
     ...(before === role.effort_before ? {} : { effort_before: before }),
     ...(during === role.effort_during ? {} : { effort_during: during }),
     ...(after === role.effort_after ? {} : { effort_after: after }),
-    ...(wanted === String(role.team_size_wanted) ? {} : { team_size_wanted: Number(wanted) }),
+    // An emptied number input is "I will fill this in later", not zero. `Number('')`
+    // is 0, so sending it saved "nobody wanted" — and the page then rendered that as
+    // "none asked for", which reads as a decision somebody made.
+    ...(wanted.trim() === '' || wanted === String(role.team_size_wanted)
+      ? {}
+      : { team_size_wanted: Number(wanted) }),
   })
 
   return (
@@ -525,6 +529,7 @@ const RoleFields = ({
         <input
           type="number"
           min={0}
+          step={1}
           aria-label={`Team wanted for ${role.title}`}
           value={wanted}
           onInput={(inputEvent) => setWanted(inputEvent.currentTarget.value)}

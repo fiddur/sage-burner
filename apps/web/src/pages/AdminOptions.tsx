@@ -110,9 +110,9 @@ export const AdminOptions = ({ api }: { api: OptionsApi }) => {
               Make an event under <a href="/admin/events">Events</a> first.
             </>
           ) : (
-            // Creating a burn is admin-only, so a member sent to that page would
-            // read "This is an admin page." A dead end is worse than a plain
-            // sentence saying who to ask.
+            // Creating a burn is admin-only, so a member sent to that page would be
+            // refused there. A dead end is worse than a plain sentence saying who to
+            // ask — the wording of the refusal is `GuardedPage`'s and can change.
             <>Ask someone with admin to create one first.</>
           )}
         </p>
