@@ -114,6 +114,7 @@ export const Roles = ({ api }: { api: RolesApi }) => {
         <CopyFrom
           sources={ready.sources}
           what="roles"
+          note="The roles themselves, not who held them."
           busy={busy}
           onCopy={(fromEventId) =>
             run(() => api.copyLeadRoles(ready.eventId, fromEventId), 'Could not copy those roles.')

@@ -149,6 +149,7 @@ export const AdminPlaces = ({ api }: { api: PlacesApi }) => {
         <CopyFrom
           sources={ready.sources}
           what="places"
+          note="The lanes, not the dreams standing in them."
           busy={busy}
           onCopy={(fromEventId) =>
             run(() => api.copyPlaces(ready.eventId, fromEventId), 'Could not copy those places.')

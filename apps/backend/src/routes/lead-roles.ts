@@ -376,9 +376,9 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
 
         if (burn === undefined) return 'not_found' as const
 
-        // The source too, and for the same reason. Without it, copying *from* a
-        // burn that does not exist answered 201 with nothing copied — indis-
-        // tinguishable from a real burn that simply has none.
+        // The source too, and for the same reason. Without it, copying *from* a burn
+        // that does not exist answered 201 with nothing copied — no different from a
+        // real burn that simply has none.
         const [from] = tx
           .select({ id: event.id })
           .from(event)

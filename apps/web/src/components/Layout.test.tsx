@@ -31,46 +31,47 @@ const signedInAs = (...roles: AccountRole[]): Viewer => ({
 
 const links = () => screen.getAllByRole('link').map((link) => link.textContent)
 
+/**
+ * Asserted one at a time, never as a negated `arrayContaining`.
+ *
+ * `expect(links).not.toEqual(expect.arrayContaining(['a', 'b', 'c']))` passes when
+ * *any one* of the three is absent — measured, not assumed — so a test written that
+ * way stays green while two of the three leak. Every absence here names one link.
+ */
+const expectLinks = (present: string[], absent: string[]) => {
+  const shown = links()
+  for (const label of present) expect(shown, `${label} should be offered`).toContain(label)
+  for (const label of absent) expect(shown, `${label} should not be offered`).not.toContain(label)
+}
+
 describe('the nav', () => {
-  it('offers a signed-out visitor the public entry points and nothing else', () => {
+  it('offers a signed-out visitor the way in, and none of the pages behind it', () => {
     renderNav({ status: 'signed-out' })
 
-    expect(links()).toEqual(expect.arrayContaining(['Apply', 'Log in']))
-    expect(links()).not.toEqual(expect.arrayContaining(['Your burn', 'Roles']))
+    expectLinks(['Apply', 'Log in'], ['Your burn', 'Dreams', 'Schedule', 'Roles', 'Your details'])
   })
 
-  it('gives a member their own pages', () => {
+  it('gives a member their own pages and the shared ones', () => {
     renderNav(signedInAs('member'))
 
-    expect(links()).toEqual(expect.arrayContaining(['Your burn', 'Dreams', 'Your details']))
+    expectLinks(['Your burn', 'Dreams', 'Schedule', 'Roles', 'Your details'], [])
   })
 
   it('reaches the shared pages for an organiser who holds admin alone', () => {
     // Schedule and Roles are `requireApproved` server-side, so an organiser who is
     // not attending may use them — and used to be able to only by typing the URL,
-    // because the nav gated them on `member`.
+    // because the nav gated them on `member`. The personal pages stay behind
+    // `member`, since somebody not attending has no stay to fill in.
     renderNav(signedInAs('admin'))
 
-    expect(links()).toEqual(expect.arrayContaining(['Schedule', 'Roles', 'Organise']))
+    expectLinks(['Schedule', 'Roles', 'Organise'], ['Your burn', 'Your details'])
   })
 
-  it('keeps the personal pages to members, since an organiser has no stay', () => {
-    renderNav(signedInAs('admin'))
-
-    expect(links()).not.toEqual(expect.arrayContaining(['Your burn']))
-    expect(links()).not.toEqual(expect.arrayContaining(['Your details']))
-  })
-
-  it('offers a member the shared pages too', () => {
-    renderNav(signedInAs('member'))
-
-    expect(links()).toEqual(expect.arrayContaining(['Schedule', 'Roles']))
-  })
-
-  it('offers nothing but the public entry points to an account with no roles', () => {
-    // An applicant with an account, waiting on a decision.
+  it('offers an account with no roles none of them', () => {
+    // An applicant with an account, waiting on a decision. Every link named, because
+    // this is the case where a leak would matter.
     renderNav(signedInAs())
 
-    expect(links()).not.toEqual(expect.arrayContaining(['Schedule', 'Roles', 'Organise']))
+    expectLinks([], ['Your burn', 'Dreams', 'Schedule', 'Roles', 'Your details', 'Organise'])
   })
 })

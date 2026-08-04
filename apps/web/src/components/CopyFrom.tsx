@@ -18,12 +18,18 @@ export type CopySource = CopySourcesResponse['sources'][number]
 export const CopyFrom = ({
   sources,
   what,
+  note,
   busy,
   onCopy,
 }: {
   sources: readonly CopySource[]
-  /** Plural, lowercase: "roles", "places". Fills the label, the button and the note. */
+  /** Plural, lowercase: "roles", "places". Fills the label and the button. */
   what: string
+  /**
+   * What is *not* copied. Not derivable from `what` and worth saying at the button:
+   * both lists carry people, and neither brings them across.
+   */
+  note: string
   busy: boolean
   onCopy: (fromEventId: string) => void
 }) => {
@@ -50,6 +56,8 @@ export const CopyFrom = ({
       <button type="button" disabled={busy || chosen === ''} onClick={() => onCopy(chosen)}>
         Copy those {what}
       </button>
+
+      <p class="form-note">{note}</p>
     </div>
   )
 }

@@ -323,7 +323,11 @@ describe('Roles', () => {
       stub({ copyLeadRoles, getLeadRoleSources: () => Promise.resolve(sources) }),
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Copy those roles' }))
+    // The note says what a copy leaves behind — it is not derivable from the button,
+    // and it was dropped once when this control was extracted.
+    expect(await screen.findByText('The roles themselves, not who held them.')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy those roles' }))
     await waitFor(() => {
       expect(copyLeadRoles).toHaveBeenCalledWith('e-1', 'e-0')
     })
