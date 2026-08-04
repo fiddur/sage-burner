@@ -9,7 +9,10 @@ import { InviteLink } from '../components/InviteLink.tsx'
 import { useAction, useLoad } from '../load.ts'
 import { isAdmin, useViewer } from '../viewer.tsx'
 
-export type ApplicationsApi = Pick<ApiClient, 'getApplications' | 'approveApplication' | 'rejectApplication'>
+export type ApplicationsApi = Pick<
+  ApiClient,
+  'getApplications' | 'approveApplication' | 'rejectApplication' | 'reissueInvite'
+>
 
 const answerText = (value: string | boolean) => {
   if (value === true) return 'Yes'
@@ -32,6 +35,31 @@ export const AdminApplications = ({ api }: { api: ApplicationsApi }) => {
   })
 
   const { error, run } = useAction(reload)
+
+  /**
+   * A fresh link when the first was lost.
+   *
+   * Offered on every approved application rather than only where one is known to be
+   * outstanding: the page cannot tell — the invite's state is not in this response —
+   * and the server refuses a used one with a 409 that says so. Guessing here would
+   * mean hiding the button from the person who needs it.
+   */
+  const reissue = (id: string) => {
+    setDeciding(id)
+    run(
+      async () => {
+        const { invite } = await api.reissueInvite(id)
+        setInvites((current) => ({ ...current, [id]: invite }))
+        setDeciding(undefined)
+      },
+      (failure: unknown) => {
+        setDeciding(undefined)
+        return isApiError(failure) && failure.status === 409
+          ? 'That invite has already been used, so they are already in.'
+          : 'Could not make a new link. Please try again.'
+      },
+    )
+  }
 
   const decide = (id: string, decision: 'approve' | 'reject') => {
     setDeciding(id)
@@ -142,6 +170,22 @@ export const AdminApplications = ({ api }: { api: ApplicationsApi }) => {
                 >
                   Reject
                 </button>
+              </p>
+            )}
+
+            {entry.status === 'approved' && (
+              <p class="row">
+                <button
+                  type="button"
+                  class="link-button"
+                  disabled={deciding === entry.id}
+                  onClick={() => reissue(entry.id)}
+                >
+                  Send a new link
+                </button>
+                <span class="form-note">
+                  If the first one was lost. The old link stops working straight away.
+                </span>
               </p>
             )}
 

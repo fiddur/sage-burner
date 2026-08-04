@@ -51,6 +51,7 @@ const clientWith = (
   createInvite: () => Promise.reject(new Error('createInvite is not stubbed in this file')),
   revokeInvite: () => Promise.reject(new Error('revokeInvite is not stubbed in this file')),
   approveApplication: () => Promise.reject(new Error('approveApplication is not stubbed in this file')),
+  reissueInvite: () => Promise.reject(new Error('reissueInvite is not stubbed in this file')),
   rejectApplication: () => Promise.reject(new Error('rejectApplication is not stubbed in this file')),
   addQuestion: () => Promise.reject(new Error('addQuestion is not stubbed in this file')),
   updateQuestion: () => Promise.reject(new Error('updateQuestion is not stubbed in this file')),
