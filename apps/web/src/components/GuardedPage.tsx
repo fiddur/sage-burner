@@ -3,19 +3,12 @@ import type { ComponentChildren } from 'preact'
 import { isAdmin, isApproved, isMember, useViewer } from '../viewer.tsx'
 
 /**
- * The page shell every role-gated page opened with, written once.
- *
- * Three states came before the content on seventeen pages — viewer still
- * resolving, signed out, signed in without the role — and the copies had drifted
- * into four different wordings of the same three things. Worse than untidy: only
- * four of the nine admin pages gave a signed-out visitor a login link, and the
- * other five told them to "ask someone who already has admin", which is advice
- * for somebody who is already signed in. `Admin.tsx`'s own comment said that was
- * the wrong message for that state, on a page that got it right.
+ * The three states that come before a role-gated page's content: viewer still
+ * resolving, signed out, signed in without the role.
  *
  * **This decides what to render, never what is allowed.** Every route behind these
  * pages enforces its own guard server-side; hiding a page is a courtesy to the
- * person looking at it.
+ * person looking at it, not access control.
  */
 export const GuardedPage = ({
   title,

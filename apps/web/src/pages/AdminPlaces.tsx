@@ -6,6 +6,7 @@ import { useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 import type { Loaded } from '../load.ts'
 
+import { CopyFrom } from '../components/CopyFrom.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { useAction, useLoad } from '../load.ts'
 import { isApproved, useViewer } from '../viewer.tsx'
@@ -147,6 +148,8 @@ export const AdminPlaces = ({ api }: { api: PlacesApi }) => {
       {ready !== undefined && places.length === 0 && ready.sources.length > 0 && (
         <CopyFrom
           sources={ready.sources}
+          what="places"
+          note="The lanes, not the dreams standing in them."
           busy={busy}
           onCopy={(fromEventId) =>
             run(() => api.copyPlaces(ready.eventId, fromEventId), 'Could not copy those places.')
@@ -398,48 +401,4 @@ const Notice = ({ loaded }: { loaded: Loaded<Grid> }) => {
   return loaded.data.places.length === 0 ? (
     <p class="form-note">No places yet. A dream cannot be scheduled until there is somewhere to put it.</p>
   ) : null
-}
-
-/**
- * Seed this burn's grid from a previous burn's.
- *
- * Offered only while the grid is empty, because the API refuses a copy into a grid
- * that has lanes — merging two grids is a decision nobody asked for.
- */
-const CopyFrom = ({
-  sources,
-  busy,
-  onCopy,
-}: {
-  sources: readonly Source[]
-  busy: boolean
-  onCopy: (fromEventId: string) => void
-}) => {
-  const [chosen, setChosen] = useState(sources[0]?.event_id ?? '')
-
-  return (
-    <div class="copy-from">
-      <label class="field">
-        <span>Or start from a previous burn</span>
-        <select
-          aria-label="Burn to copy places from"
-          disabled={busy}
-          value={chosen}
-          onChange={(changeEvent) => setChosen(changeEvent.currentTarget.value)}
-        >
-          {sources.map((source) => (
-            <option key={source.event_id} value={source.event_id}>
-              {source.name} ({source.count})
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <button type="button" disabled={busy || chosen === ''} onClick={() => onCopy(chosen)}>
-        Copy those places
-      </button>
-
-      <p class="form-note">The lanes, not the dreams standing in them.</p>
-    </div>
-  )
 }

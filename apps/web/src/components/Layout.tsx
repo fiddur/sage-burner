@@ -65,9 +65,17 @@ export const Layout = ({
             <>
               <a href="/my-burn">Your burn</a>
               <a href="/dreams">Dreams</a>
+              <a href="/profile">Your details</a>
+            </>
+          )}
+
+          {/* Open to `approved`, so an organiser holding `admin` alone reaches them
+              from the nav rather than by typing the URL — which is what the pages
+              themselves allow. */}
+          {isApproved(viewer) && (
+            <>
               <a href="/schedule">Schedule</a>
               <a href="/roles">Roles</a>
-              <a href="/profile">Your details</a>
             </>
           )}
 

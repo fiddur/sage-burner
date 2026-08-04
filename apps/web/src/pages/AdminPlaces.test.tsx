@@ -271,7 +271,9 @@ describe('AdminPlaces', () => {
     const sources = { sources: [{ event_id: 'e-0', name: 'Last summer', count: 3 }] }
     const { unmount } = renderPage(stub({ copyPlaces, getPlaceSources: () => Promise.resolve(sources) }, []))
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Copy those places' }))
+    expect(await screen.findByText('The lanes, not the dreams standing in them.')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy those places' }))
     await waitFor(() => {
       expect(copyPlaces).toHaveBeenCalledWith('e-1', 'e-0')
     })

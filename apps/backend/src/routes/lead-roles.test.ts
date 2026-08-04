@@ -628,6 +628,16 @@ describe('seeding a new burn from a previous one', () => {
     expect((await copyFrom(server, cookie, randomUUID(), last)).statusCode).toBe(404)
   })
 
+  it('answers 404 for a source burn that does not exist', async () => {
+    // Otherwise indistinguishable from a real burn with an empty register: both
+    // copied nothing and both said 201.
+    const server = await build()
+    const next = await givenEvent('Next', '2026-08-01')
+    const { cookie } = await givenAccount(['member'])
+
+    expect((await copyFrom(server, cookie, next, randomUUID())).statusCode).toBe(404)
+  })
+
   it('copies nothing from a burn that had nothing, without complaining', async () => {
     const server = await build()
     const last = await givenEvent('Last')
