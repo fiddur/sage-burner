@@ -1,9 +1,10 @@
 import { z } from 'zod'
 
 import { paymentStatuses } from '../enums.ts'
-import { MAX_CONTACT, MAX_NOTES, MAX_OPTION_LABEL, MAX_PERSON_NAME, MAX_SLUG, MAX_TITLE } from '../limits.ts'
+import { MAX_CONTACT, MAX_NOTES, MAX_OPTION_LABEL, MAX_PERSON_NAME } from '../limits.ts'
 import { emailSchema } from './auth.ts'
 import { dateSchema, dateTimeSchema, idSchema, nonEmptyText, optionalText } from './common.ts'
+import { eventFields } from './event.ts'
 
 /** Tolerates missing keys so `.partial()` and `.omit()` derivations still typecheck. */
 type Stay = { arrival_date?: string | null; departure_date?: string | null }
@@ -162,7 +163,11 @@ export type AttendanceUpdate = z.infer<typeof attendanceUpdateSchema>
  * coming" from "coming and nothing filled in yet", and both are ordinary states.
  */
 export const myAttendanceResponseSchema = z.object({
-  event: z.object({ id: idSchema, name: nonEmptyText(MAX_TITLE), slug: nonEmptyText(MAX_SLUG) }).nullable(),
+  // Derived rather than re-declared. Written out, this had `slug` as plain bounded
+  // text — so it accepted any 120 characters where `slugSchema` accepts 64 of
+  // lowercase-hyphenated words. A summary of a thing should not be a second, looser
+  // opinion about what that thing is.
+  event: eventFields.pick({ id: true, name: true, slug: true }).nullable(),
   attendance: attendanceSchema.nullable(),
 })
 
@@ -180,9 +185,11 @@ export type AttendanceCreate = z.infer<typeof attendanceCreateSchema>
  */
 export const rosterEntrySchema = attendanceFields.extend({
   email: emailSchema,
-  name: nonEmptyText(MAX_PERSON_NAME).nullable(),
-  contact: nonEmptyText(MAX_CONTACT).nullable(),
-  allergies_notes: optionalText(MAX_NOTES),
+  // From `profileFields`, so an allergy's bound is stated once. Nullable because
+  // the join reaches an account that may not have filled these in yet.
+  name: profileFields.shape.name.nullable(),
+  contact: profileFields.shape.contact.nullable(),
+  allergies_notes: profileFields.shape.allergies_notes,
   /**
    * The lodging option's label, resolved at read time.
    *
@@ -204,7 +211,7 @@ export const rosterEntrySchema = attendanceFields.extend({
 })
 
 export const rosterResponseSchema = z.object({
-  event: z.object({ id: idSchema, name: nonEmptyText(MAX_TITLE), member_cap: z.int().positive() }).nullable(),
+  event: eventFields.pick({ id: true, name: true, member_cap: true }).nullable(),
   entries: z.array(rosterEntrySchema),
 })
 

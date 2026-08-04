@@ -14,7 +14,14 @@ import { applicationCreateSchema, applicationSchema } from './application.ts'
 import { slugSchema } from './common.ts'
 import { eventFields, eventSchema, withEventDateOrder } from './event.ts'
 import { formQuestionSchema } from './form-question.ts'
-import { attendanceFields, attendanceSchema, profileSchema, withStayOrder } from './membership.ts'
+import {
+  attendanceFields,
+  attendanceSchema,
+  myAttendanceResponseSchema,
+  profileSchema,
+  rosterResponseSchema,
+  withStayOrder,
+} from './membership.ts'
 import {
   publicSessionFields,
   publicSessionSchema,
@@ -632,5 +639,49 @@ describe('the named length limits', () => {
     // `slugSchema` bounded it at 64 — one fact spelled two ways.
     expect(slugSchema.safeParse('a'.repeat(MAX_SLUG)).success).toBe(true)
     expect(slugSchema.safeParse('a'.repeat(MAX_SLUG + 1)).success).toBe(false)
+  })
+})
+
+describe('the summaries derived from `eventFields`', () => {
+  const anAttendance = {
+    id: ID,
+    event_id: OTHER_ID,
+    account_id: ID,
+    joined_at: '2026-07-02T00:00:00Z',
+    arrival_date: '2026-10-02',
+    departure_date: '2026-10-04',
+    lodging_option_id: null,
+    helping_option_ids: [],
+    helping_other: null,
+    notes: null,
+    payment_status: 'unpaid',
+    payment_date: null,
+  }
+
+  it('holds a summarised slug to the same rule as a real one', () => {
+    // The divergence this replaced: written out by hand, the summary bounded `slug`
+    // as plain text, so it accepted `Not A Slug!` where `slugSchema` — the thing it
+    // claims to summarise — accepts only lowercase hyphenated words.
+    const withSlug = (slug: string) =>
+      myAttendanceResponseSchema.safeParse({
+        event: { id: ID, name: 'Summer burn', slug },
+        attendance: anAttendance,
+      }).success
+
+    expect(withSlug('summer-2026')).toBe(true)
+    expect(withSlug('Not A Slug!')).toBe(false)
+    expect(withSlug('a'.repeat(MAX_SLUG + 1))).toBe(false)
+  })
+
+  it('refuses a member cap the event schema would refuse', () => {
+    const withCap = (member_cap: number) =>
+      rosterResponseSchema.safeParse({
+        event: { id: ID, name: 'Summer burn', member_cap },
+        entries: [],
+      }).success
+
+    expect(withCap(42)).toBe(true)
+    expect(withCap(0)).toBe(false)
+    expect(withCap(-1)).toBe(false)
   })
 })
