@@ -119,6 +119,7 @@ export const PushToggle = ({
   const turnOff = async () => {
     if (browser === undefined) return
 
+    let released = false
     setState('working')
     setError(undefined)
     try {
@@ -134,12 +135,18 @@ export const PushToggle = ({
         //
         // So if only one of these can happen, it should be this one.
         await existing.unsubscribe()
+        released = true
         await api.unsubscribeFromPush(existing.endpoint)
       }
       setState('off')
     } catch (failure) {
       setError(isApiError(failure) ? failure.message : 'Could not turn notifications off here.')
-      setState('on')
+
+      // Which state is truthful depends on how far it got. Once the browser has
+      // let go, nothing can arrive whatever the server thinks — saying "on" would
+      // offer a Stop button that hits the same failure forever, over a row that
+      // deletes itself at the next 410.
+      setState(released ? 'off' : 'on')
     }
   }
 

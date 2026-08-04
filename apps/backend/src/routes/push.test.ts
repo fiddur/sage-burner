@@ -93,6 +93,19 @@ const key = (server: FastifyInstance, cookie?: string) =>
     headers: cookie === undefined ? {} : { cookie },
   })
 
+/**
+ * Let the fire-and-forget notification finish, or fail to start.
+ *
+ * The route answers before delivery is attempted, so a negative assertion made
+ * the moment `inject()` resolves races the chain rather than out-waiting it — it
+ * would pass against a regression that notified a beat later. Two macrotask turns
+ * are more than the chain needs: the positive case takes one.
+ */
+const settle = async () => {
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  await new Promise((resolve) => setTimeout(resolve, 0))
+}
+
 const apply = (server: FastifyInstance) =>
   server.inject({
     method: 'POST',
@@ -255,6 +268,7 @@ describe('an application arriving', () => {
     await givenAccount(['admin'])
 
     expect((await apply(server)).statusCode).toBe(201)
+    await settle()
 
     expect(deliver).not.toHaveBeenCalled()
   })
@@ -271,6 +285,7 @@ describe('an application arriving', () => {
       .values({ id: randomUUID(), type: 'text', label: 'Why?', required: true, order: 0 })
 
     expect((await apply(server)).statusCode).toBe(400)
+    await settle()
 
     expect(deliver).not.toHaveBeenCalled()
   })

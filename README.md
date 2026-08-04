@@ -1703,9 +1703,11 @@ a bug rather than a policy. Images therefore have a _stricter_ allowlist than
 links: `https://` or site-relative only, since a plain `http://` image would hit
 that same mismatch. Links still accept `http://` — `img-src` does not govern
 navigation. There is no upload feature, so the alternative is
-that images do not work at all. The cost: an image host an organiser links to
-sees the IP of every homepage visitor, and this is the only external request the
-app can produce. Narrow it back to `'self' data:` if uploads ever land.
+that images do not work at all. The cost: an image host a member links to sees the
+IP of every homepage visitor. It is the only external request a _visitor's browser_
+makes; the server makes one of its own when it sends a push notification, which is
+under Notifications above. Narrow this back to `'self' data:` if uploads ever
+land.
 
 ## Security headers
 

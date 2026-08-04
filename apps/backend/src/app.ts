@@ -239,10 +239,11 @@ const helmetOptions = (): FastifyHelmetOptions => ({
       // image cannot downgrade the page, and images cannot execute — `script-src`
       // stays `'self'`.
       //
-      // The honest cost: an image host an organiser links to sees the IP of
-      // every visitor to the homepage. That is the organiser's choice to make in
-      // a field only they can write, and it is the only external request this
-      // app can produce. An upload feature would remove the need for it, and
+      // The honest cost: an image host a member links to sees the IP of every
+      // visitor to the homepage. That is the author's choice to make in a field
+      // they can write, and it is the only external request a *visitor's browser*
+      // makes — the server makes one of its own when it sends a push notification
+      // (#96). An upload feature would remove the need for it, and
       // narrowing this back to `'self' data:` is the change to make if one
       // arrives.
       'img-src': ["'self'", 'data:', 'https:'],

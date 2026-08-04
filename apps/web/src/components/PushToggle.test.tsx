@@ -334,6 +334,51 @@ describe('PushToggle', () => {
     await waitFor(() => expect(unsubscribe).toHaveBeenCalled())
   })
 
+  it('stays off when the browser was released but the server call failed', async () => {
+    // Once the browser has let go, nothing can arrive whatever the server thinks.
+    // Saying "on" would offer a Stop button that hits the same failure forever,
+    // over a row that deletes itself at the next 410.
+    const { browser } = rememberingBrowser()
+    render(
+      <PushToggle
+        api={stub({ unsubscribeFromPush: () => Promise.reject(apiError(500, 'internal', 'Fell over.')) })}
+        browser={browser}
+      />,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Stop notifying me here' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Fell over.')
+    expect(screen.getByRole('button', { name: 'Notify me here' })).toBeTruthy()
+  })
+
+  it('goes back to on when nothing was released at all', async () => {
+    // The passing sibling: a failure *before* the browser let go leaves it
+    // subscribed, so 'on' is the truthful state. Driven by a browser that
+    // registers for the mount effect and then stops, since a register that fails
+    // on mount is the unsupported branch instead.
+    const subscription = { ...aSubscription('https://push.example/mine'), unsubscribe: vi.fn() }
+    let registrations = 0
+    const browser = aBrowser({
+      register: () => {
+        registrations += 1
+        return registrations === 1
+          ? Promise.resolve({
+              getSubscription: () => Promise.resolve(subscription),
+              subscribe: () => Promise.resolve(subscription),
+            })
+          : Promise.reject(new Error('worker gone'))
+      },
+    })
+    render(<PushToggle api={stub()} browser={browser} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Stop notifying me here' }))
+
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Stop notifying me here' })).toBeTruthy()
+    expect(subscription.unsubscribe).not.toHaveBeenCalled()
+  })
+
   it('treats a browser whose service worker will not register as unsupported', async () => {
     // iOS Safari outside an installed web app, and any plain-HTTP deployment.
     render(
