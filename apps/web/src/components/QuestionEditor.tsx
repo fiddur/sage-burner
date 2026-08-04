@@ -12,6 +12,7 @@ import { useEffect, useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
+import { swap } from '../reorder.ts'
 import { MarkdownField } from './MarkdownField.tsx'
 
 export type QuestionsApi = Pick<
@@ -157,15 +158,12 @@ export const QuestionEditor = ({ api }: { api: QuestionsApi }) => {
   }
 
   const move = (questions: readonly FormQuestion[], index: number, by: -1 | 1) => {
-    const target = index + by
-    if (target < 0 || target >= questions.length) return
-
-    const ids = questions.map((row) => row.id)
-    const moved = ids[index]
-    const displaced = ids[target]
-    if (moved === undefined || displaced === undefined) return
-    ids[index] = displaced
-    ids[target] = moved
+    const ids = swap(
+      questions.map((row) => row.id),
+      index,
+      by,
+    )
+    if (ids === undefined) return
 
     void run(() => api.reorderQuestions(ids).then(() => undefined), 'Could not reorder.')
   }
