@@ -150,9 +150,11 @@ export const registerAttendanceRoutes = (
   /**
    * Who is coming, by name, so members can fill in the lists they share.
    *
-   * Deliberately not the roster: that carries contact details, allergies and
-   * payment state and stays admin's. Names are what the lead-roles register needs
-   * to offer, and members already see each other's on the dreams they host.
+   * Two columns, which is all the lead-roles register needs to offer somebody a
+   * role. Kept separate from the member roster (#159) rather than folded into it:
+   * a route that selects two columns cannot leak a third by someone later widening
+   * what it returns, and this one is reached from a picker on every register page
+   * rather than from a page somebody chose to open.
    */
   app.get<{ Params: { eventId: string } }>(
     '/api/events/:eventId/attendees',
