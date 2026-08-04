@@ -148,6 +148,50 @@ describe('PushToggle', () => {
     expect(await screen.findByRole('button', { name: 'Stop notifying me here' })).toBeTruthy()
   })
 
+  it('re-asserts an existing subscription on mount, so a lost row heals', async () => {
+    // The one drift the page cannot see by reading the browser: the row gone while
+    // the browser keeps its subscription — a restored volume, or a role removed and
+    // given back. Without this the toggle says "on" and nothing arrives, fixable
+    // only by pressing Stop and then Start.
+    const subscribeToPush = vi.fn<PushApi['subscribeToPush']>(() => Promise.resolve(undefined))
+    const { browser } = rememberingBrowser()
+    render(<PushToggle api={stub({ subscribeToPush })} browser={browser} />)
+
+    await screen.findByRole('button', { name: 'Stop notifying me here' })
+
+    await waitFor(() =>
+      expect(subscribeToPush).toHaveBeenCalledWith({
+        endpoint: 'https://push.example/mine',
+        p256dh: 'a-public-key',
+        auth: 'a-secret',
+      }),
+    )
+  })
+
+  it('does not re-assert when this browser has no subscription', async () => {
+    const subscribeToPush = vi.fn<PushApi['subscribeToPush']>(() => Promise.resolve(undefined))
+    render(<PushToggle api={stub({ subscribeToPush })} browser={aBrowser()} />)
+
+    await screen.findByRole('button', { name: 'Notify me here' })
+
+    expect(subscribeToPush).not.toHaveBeenCalled()
+  })
+
+  it('still shows on when the re-assertion is refused', async () => {
+    // Repair, not something the admin asked for: a failure leaves exactly the state
+    // they already had rather than an error they cannot act on.
+    const { browser } = rememberingBrowser()
+    render(
+      <PushToggle
+        api={stub({ subscribeToPush: () => Promise.reject(apiError(500, 'internal', 'Nope.')) })}
+        browser={browser}
+      />,
+    )
+
+    expect(await screen.findByRole('button', { name: 'Stop notifying me here' })).toBeTruthy()
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
   it('subscribes and sends the endpoint and keys', async () => {
     const subscribeToPush = vi.fn<PushApi['subscribeToPush']>(() => Promise.resolve(undefined))
     render(<PushToggle api={stub({ subscribeToPush })} browser={aBrowser()} />)

@@ -47,12 +47,28 @@ export const PushToggle = ({
 
     // Asked rather than assumed: permission granted once persists, so a reload
     // should show "on" without the admin pressing anything again.
+    //
+    // And re-asserted, not merely read. The state comes from the browser, so the
+    // one drift the page could not see is the *row* going missing while the
+    // browser keeps its subscription — a restored volume, or an admin whose role
+    // was removed and given back. The toggle would say "on" and nothing would
+    // arrive, fixable only by pressing Stop and then Start. `rememberSubscription`
+    // is an upsert keyed on the endpoint, so saying it again costs one request on
+    // the settings page and heals that.
     void browser
       .register()
       .then((manager) => manager.getSubscription())
-      .then((existing) => setState(existing === null ? 'off' : 'on'))
+      .then(async (existing) => {
+        setState(existing === null ? 'off' : 'on')
+        if (existing === null) return
+
+        const body = subscriptionBody(existing)
+        // Swallowed: this is repair, not something the admin asked for, and a
+        // failure leaves exactly the state they already had.
+        if (body !== undefined) await api.subscribeToPush(body).catch(() => undefined)
+      })
       .catch(() => setState('unsupported'))
-  }, [browser])
+  }, [api, browser])
 
   /** Best-effort: a browser that will not let go should not mask the real error. */
   const release = async (subscription: { unsubscribe: () => Promise<boolean> }) => {

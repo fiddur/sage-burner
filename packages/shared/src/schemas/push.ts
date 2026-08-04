@@ -8,7 +8,8 @@ import { nonEmptyText } from './common.ts'
  * The shape `PushSubscription.toJSON()` produces, flattened: the endpoint is the
  * push service's URL for that browser, and the two keys are what the payload is
  * encrypted to. `.strict()` for the usual reason — a misspelt key here would
- * store a subscription that can never be delivered to, and say 201.
+ * store a subscription that can never be delivered to, and answer 204 as though it
+ * had worked.
  *
  * **`https` only, and bounded.** This is the one field in the app whose stored
  * value the server itself then requests, on every application — so an endpoint of
