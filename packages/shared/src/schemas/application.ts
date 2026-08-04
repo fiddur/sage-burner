@@ -122,8 +122,9 @@ export const applicationsResponseSchema = z.object({ applications: z.array(appli
  * An invite, shown exactly once.
  *
  * Only the SHA-256 digest is kept, so the raw token exists in this response and
- * nowhere else — an organiser who loses the link cannot be sent it again, and
- * that is the point rather than an oversight.
+ * nowhere else. Losing it before pasting it somewhere is recoverable —
+ * `POST /api/admin/applications/:id/invite` mints a replacement into the same row
+ * and kills the old link doing it — but the token itself is gone for good.
  */
 export const inviteSchema = z.object({
   token: nonEmptyText(200),

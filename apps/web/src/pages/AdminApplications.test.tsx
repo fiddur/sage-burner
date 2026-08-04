@@ -26,6 +26,7 @@ const stub = (over: Partial<ApplicationsApi> = {}): ApplicationsApi => ({
   getApplications: () => Promise.resolve({ applications: [anApplication()] }),
   approveApplication: () => Promise.reject(new Error('approveApplication is not stubbed here')),
   rejectApplication: () => Promise.reject(new Error('rejectApplication is not stubbed here')),
+  reissueInvite: () => Promise.reject(new Error('reissueInvite is not stubbed here')),
   ...over,
 })
 
@@ -133,6 +134,53 @@ describe('AdminApplications', () => {
 
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull())
     expect(screen.queryByRole('button', { name: 'Reject' })).toBeNull()
+  })
+
+  it('offers a new link on an approved application, and shows it once', async () => {
+    const reissueInvite = vi.fn(() =>
+      Promise.resolve({ invite: { token: 'the-replacement', expires_at: '2026-09-02T00:00:00Z' } }),
+    )
+    renderPage(
+      stub({
+        getApplications: () =>
+          Promise.resolve({
+            applications: [anApplication({ status: 'approved', decided_at: '2026-07-03T00:00:00Z' })],
+          }),
+        reissueInvite,
+      }),
+    )
+
+    ;(await screen.findByRole('button', { name: 'Send a new link' })).click()
+
+    await waitFor(() => {
+      expect(reissueInvite).toHaveBeenCalledWith('app-1')
+    })
+    expect(await screen.findByText(/the-replacement/)).toBeTruthy()
+  })
+
+  it('does not offer a new link on one nobody has decided', async () => {
+    renderPage(stub())
+
+    expect(await screen.findByRole('button', { name: 'Approve' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Send a new link' })).toBeNull()
+  })
+
+  it('says so when the invite has already been used', async () => {
+    // A 409 here means they are already in, which is worth saying rather than
+    // "please try again".
+    renderPage(
+      stub({
+        getApplications: () =>
+          Promise.resolve({
+            applications: [anApplication({ status: 'approved', decided_at: '2026-07-03T00:00:00Z' })],
+          }),
+        reissueInvite: () => Promise.reject(apiError(409, 'conflict', 'Request failed (409).')),
+      }),
+    )
+
+    ;(await screen.findByRole('button', { name: 'Send a new link' })).click()
+
+    expect((await screen.findByRole('alert')).textContent).toContain('already in')
   })
 
   it('rejects without showing an invite', async () => {

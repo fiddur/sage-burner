@@ -55,6 +55,17 @@ const givenAdmin = async () => {
   return { id, cookie: `${SESSION_COOKIE}=${sessions.issue(id)}` }
 }
 
+const givenMember = async () => {
+  const id = randomUUID()
+  await db()
+    .insert(account)
+    .values({ id, email: `${id}@example.org`, password_hash: null, created_at: '2026-07-01T00:00:00Z' })
+  await db().insert(accountRole).values({ account_id: id, role: 'member' })
+
+  const sessions = createSessions({ secret: SECRET, now: () => new Date(), ttlSeconds: 3600 })
+  return { id, cookie: `${SESSION_COOKIE}=${sessions.issue(id)}` }
+}
+
 const givenApplication = async (name = 'Someone') => {
   const id = randomUUID()
   await db()
@@ -276,5 +287,151 @@ describe('reviewing applications', () => {
     const [row] = await db().select().from(application).where(eq(application.id, id))
     expect(row?.status).toBe('pending')
     expect(row?.decided_at).toBeNull()
+  })
+})
+
+describe('a fresh link when the first one was lost', () => {
+  const reissue = (server: FastifyInstance, cookie: string | undefined, id: string) =>
+    server.inject({
+      method: 'POST',
+      url: `/api/admin/applications/${encodeURIComponent(id)}/invite`,
+      headers: cookie === undefined ? {} : { cookie },
+    })
+
+  const digestOf = (token: string) => createHash('sha256').update(token).digest('hex')
+
+  it('mints a new token and kills the old one, in the same row', async () => {
+    // The row is updated rather than replaced, so "one invite per application"
+    // stays the index's invariant — and rewriting the digest is what makes the lost
+    // link dead rather than merely superseded.
+    const server = await build()
+    const { cookie } = await givenAdmin()
+    const id = await givenApplication()
+    const first = (await decide(server, cookie, id, 'approve')).json().invite.token
+
+    const response = await reissue(server, cookie, id)
+
+    expect(response.statusCode).toBe(200)
+    const second = response.json().invite.token
+    expect(second).not.toBe(first)
+
+    const rows = await db().select().from(inviteToken).where(eq(inviteToken.application_id, id))
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.token_hash).toBe(digestOf(second))
+    expect(rows[0]?.token_hash).not.toBe(digestOf(first))
+  })
+
+  it('leaves the lost link unredeemable', async () => {
+    // The point of the whole issue. Redeeming the old token must find nothing,
+    // rather than mint a second account for the same person.
+    const server = await build()
+    const { cookie } = await givenAdmin()
+    const id = await givenApplication()
+    const lost = (await decide(server, cookie, id, 'approve')).json().invite.token
+
+    await reissue(server, cookie, id)
+
+    // 200 with `unknown` rather than 404: the state route answers the same shape
+    // for all four cases, and `unknown` is what a digest matching nothing looks like.
+    const state = await server.inject({
+      method: 'GET',
+      url: `/api/invites/${encodeURIComponent(lost)}`,
+    })
+    expect(state.statusCode).toBe(200)
+    expect(state.json().status).toBe('unknown')
+  })
+
+  it('gives out a link that works', async () => {
+    // The passing sibling: the replacement must be redeemable, or "the old one is
+    // dead" would pass against a route that simply broke the invite.
+    const server = await build()
+    const { cookie } = await givenAdmin()
+    const id = await givenApplication()
+    await decide(server, cookie, id, 'approve')
+
+    const fresh = (await reissue(server, cookie, id)).json().invite.token
+
+    const state = await server.inject({
+      method: 'GET',
+      url: `/api/invites/${encodeURIComponent(fresh)}`,
+    })
+    expect(state.statusCode).toBe(200)
+    expect(state.json().status).toBe('outstanding')
+  })
+
+  it('pushes the expiry out from now rather than keeping the old one', async () => {
+    const server = await build()
+    const { cookie } = await givenAdmin()
+    const id = await givenApplication()
+    await decide(server, cookie, id, 'approve')
+    const stale = '2020-01-01T00:00:00.000Z'
+    await db().update(inviteToken).set({ expires_at: stale })
+
+    const response = await reissue(server, cookie, id)
+
+    // Against the stale value and the app's own clock, not `Date.now()`: the server
+    // runs on the fixed `NOW` here, so a wall-clock comparison would be testing when
+    // the suite ran.
+    const [row] = await db().select().from(inviteToken).where(eq(inviteToken.application_id, id))
+    expect(Date.parse(response.json().invite.expires_at)).toBeGreaterThan(Date.parse(stale))
+    expect(Date.parse(response.json().invite.expires_at)).toBeGreaterThan(Date.parse(NOW))
+    expect(row?.expires_at).toBe(response.json().invite.expires_at)
+  })
+
+  it('records who re-issued it, not who approved it', async () => {
+    const server = await build()
+    const approver = await givenAdmin()
+    const id = await givenApplication()
+    await decide(server, approver.cookie, id, 'approve')
+    const other = await givenAdmin()
+
+    await reissue(server, other.cookie, id)
+
+    const [row] = await db().select().from(inviteToken).where(eq(inviteToken.application_id, id))
+    expect(row?.created_by).toBe(other.id)
+  })
+
+  it('refuses once the invite has been used', async () => {
+    // They are already in. A fresh link then is a second account by another name —
+    // the same hole from the other end.
+    const server = await build()
+    const { cookie } = await givenAdmin()
+    const id = await givenApplication()
+    await decide(server, cookie, id, 'approve')
+    await db().update(inviteToken).set({ used_at: '2026-07-03T00:00:00.000Z' })
+
+    const response = await reissue(server, cookie, id)
+
+    expect(response.statusCode).toBe(409)
+  })
+
+  it('refuses an application nobody has approved, and one that was rejected', async () => {
+    const server = await build()
+    const { cookie } = await givenAdmin()
+    const pending = await givenApplication()
+    const rejected = await givenApplication('Rejected')
+    await decide(server, cookie, rejected, 'reject')
+
+    expect((await reissue(server, cookie, pending)).statusCode).toBe(409)
+    expect((await reissue(server, cookie, rejected)).statusCode).toBe(409)
+    expect(await db().select().from(inviteToken)).toEqual([])
+  })
+
+  it('answers 404 for an application that does not exist', async () => {
+    const server = await build()
+    const { cookie } = await givenAdmin()
+
+    expect((await reissue(server, cookie, randomUUID())).statusCode).toBe(404)
+  })
+
+  it('is admin only, like everything else under the prefix', async () => {
+    const server = await build()
+    const { cookie } = await givenAdmin()
+    const id = await givenApplication()
+    await decide(server, cookie, id, 'approve')
+    const member = await givenMember()
+
+    expect((await reissue(server, undefined, id)).statusCode).toBe(401)
+    expect((await reissue(server, member.cookie, id)).statusCode).toBe(403)
   })
 })

@@ -1550,28 +1550,37 @@ nowhere else — a leaked backup or a stray copy of the volume hands out no
 invites. The organiser copies it into Discord or Messenger themselves; there is
 no email.
 
-**A lost link cannot be re-sent, but the person is not stuck.** Re-approving
-matches nothing on `status = 'pending'` and answers `409`, and
-`invite_token_application_idx` refuses a second invite for the same application —
-so that application will never have another. What an organiser does instead is
-mint a direct one with `POST /api/admin/invites` and send that; the applicant gets
-in without anyone touching the database.
+**A lost link is re-issued, not worked around.**
+`POST /api/admin/applications/:id/invite` mints a replacement and shows it once,
+the same way approving does. The link is shown in a paragraph that vanishes on
+reload and the organiser has to paste it into Discord before navigating away, so
+losing it is a realistic accident rather than carelessness.
 
-That costs two things, both worth knowing before recommending it:
+**The row is updated, not replaced**, which is what makes this safe. One invite per
+application stays the invariant `invite_token_application_idx` already enforces, and
+rewriting `token_hash` kills the lost link in the same statement that mints its
+replacement — the old token no longer hashes to anything stored.
 
-- **The original link stays live.** It is the token that is lost, not the row: the
-  invite remains `outstanding` until it expires, and `DELETE /api/admin/invites/:id`
-  refuses it precisely because it belongs to an application. If the lost link turns
-  up later it can still be redeemed — with a _different_ email, since the same
-  address answers `409` against the account they now have. An invite is forwardable
-  and whoever holds it is a stranger, so that is the likelier shape anyway: a
-  second, unrelated account off an approval meant for one person. Waiting out the
-  expiry is the only thing that closes it today, and #137 is the decision about
-  which way to close it properly.
-- **The answers stay orphaned.** A direct invite carries no `application_id`, so
-  what they wrote is not tied to the account they end up with. #91 would restore
-  that tie by re-issuing against the same application, which is a convenience now
-  rather than the only route back.
+That matters because of what the previous workaround cost. Until this route,
+recovery meant minting a _direct_ invite with `POST /api/admin/invites`, and:
+
+- **the original link stayed live.** It is the token that is lost, not the row, and
+  `DELETE /api/admin/invites/:id` refuses an application's invite precisely because
+  it belongs to one. A lost link turning up later could still be redeemed — with a
+  _different_ email, since the same address answers `409` against the account they
+  now have. An invite is forwardable and whoever holds it is a stranger, so that was
+  the likelier shape anyway: a second, unrelated account off an approval meant for
+  one person (#137).
+- **the answers were orphaned.** A direct invite carries no `application_id`, so
+  what they wrote was not tied to the account they ended up with.
+
+Re-issuing closes both by construction. Direct invites remain, for the person who
+never applied through the form.
+
+**Refused once the invite has been used.** By then they are already in, and a fresh
+link would be a second account by another name — the same hole from the other end.
+An application that is pending or rejected is refused too: pending is approved
+instead, and rejected is not reopened by a side door.
 
 The copy button is deliberately silent on failure rather than claiming a copy
 that did not happen.

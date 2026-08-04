@@ -527,17 +527,28 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
       request<ApplicationsResponse>('/admin/applications', { signal }),
 
     /**
-     * Admin only. Returns the invite token once — it is never stored in the
-     * clear, and this application will never have another. An applicant who
-     * loses the link is not stuck: `createInvite` mints a direct one, which gets
-     * them in without the tie back to what they wrote. #91 would restore that
-     * tie by re-issuing against the same application.
+     * Admin only. Returns the invite token once — it is never stored in the clear.
+     * An organiser who loses it calls `reissueInvite`, which replaces the token in
+     * the same row and kills the lost link doing so.
      *
      * Throws ApiError(409, 'conflict') when the application has already been
      * decided, which is what stops a double click minting two invites.
      */
     approveApplication: (id: string) =>
       request<ApplicationDecisionResponse>(`/admin/applications/${encodeURIComponent(id)}/approve`, {
+        method: 'POST',
+      }),
+
+    /**
+     * Admin only. A fresh link for an approved application whose first one was lost,
+     * shown once like the original. The old link stops working the moment this
+     * answers.
+     *
+     * Throws ApiError(409, 'conflict') when the invite has already been used — they
+     * are already in — or when the application is not approved.
+     */
+    reissueInvite: (id: string) =>
+      request<InviteResponse>(`/admin/applications/${encodeURIComponent(id)}/invite`, {
         method: 'POST',
       }),
 
