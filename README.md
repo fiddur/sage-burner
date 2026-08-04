@@ -1384,9 +1384,9 @@ both lists as rows — **per event**, unlike the application questions and the
 places, because what there is to sleep in depends on the site and what wants
 doing depends on the year.
 
-`/options` — **Lodging and helping**, which follows the burn that is open. Setting
-them up before it starts works, since "active" is the soonest-ending burn that has
-not finished. Reached from **(edit lodging alternatives)** on the details page,
+`/options` — **Lodging and helping**, for the burn the selector is pointing at.
+Setting them up before that burn is the next one works because the selector offers
+every burn still to come. Reached from **(edit lodging alternatives)** on the details page,
 beside the question the list answers, and from ⚙️ as well — an organiser holding
 `admin` without `member` has no details page to reach it from.
 
@@ -1461,8 +1461,8 @@ the grid is the thing the list exists to build. The same shape `event_option`
 already had for lodging and helping: definitions per burn, seeded rather than
 retyped.
 
-`/places`, which follows the burn that is open — reached from Schedule, since the
-lanes are what the grid draws, and from ⚙️.
+`/places`, for the burn the selector is pointing at — reached from Schedule, since
+the lanes are what the grid draws, and from ⚙️.
 A pencil edits, a trashcan removes, and the ⠿ handle
 reorders — by dragging, and by ArrowUp/ArrowDown while it has focus. The handle
 takes keys as well as drags because a reorder only a pointer can do is one some

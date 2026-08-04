@@ -43,7 +43,7 @@ const isBlank = (fields: { name: string; emoji: string }) =>
   fields.name.trim() === '' || fields.emoji.trim() === ''
 
 /**
- * Where a dream can happen — one grid per burn, following the burn that is open.
+ * Where a dream can happen — one grid per burn, the one the bar is pointing at.
  *
  * The role check decides what to render, not what is allowed: the API refuses
  * anyone without a role whatever this does.

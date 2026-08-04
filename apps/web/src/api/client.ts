@@ -578,7 +578,7 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
       }),
 
     /**
-     * Admin only. The key a browser needs before it can subscribe.
+     * Any approved member. The key a browser needs before it can subscribe.
      *
      * `public_key` is null when push has not been set up — asking is what mints
      * the pair, so a null means the installation could not, not that it has not
@@ -586,11 +586,11 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
      */
     getPushKey: (signal?: AbortSignal) => request<PushKeyResponse>('/push/key', { signal }),
 
-    /** Admin only. Idempotent per browser: the endpoint is the key. */
+    /** Any approved member. Idempotent per browser: the endpoint is the key. */
     subscribeToPush: (body: PushSubscriptionCreate) =>
       request<undefined>('/push/subscriptions', { method: 'POST', body }),
 
-    /** Admin only. Answers 204 whether or not the endpoint was known. */
+    /** Any approved member. Answers 204 whether or not the endpoint was known. */
     unsubscribeFromPush: (endpoint: string) =>
       request<undefined>('/push/subscriptions', { method: 'DELETE', body: { endpoint } }),
 

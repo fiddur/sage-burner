@@ -33,11 +33,12 @@ const BLURB: Record<EventOptionKind, string> = {
 }
 
 /**
- * The two lists for the burn that is open.
+ * The two lists for the burn the bar is pointing at.
  *
- * Per event rather than per community, so this page follows the active event the
- * way the roster does. Setting them up before the burn works because "active" is
- * the soonest-ending burn that has not finished.
+ * Per event rather than per community, so the page has to be told which — it reads
+ * `useSelectedBurn()`, and setting a burn up before it is the next one works because
+ * the selector offers every burn still to come, not because of any rule about which
+ * is active.
  */
 export const Options = ({ api }: { api: OptionsApi }) => {
   const viewer = useViewer()

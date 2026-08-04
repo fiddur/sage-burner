@@ -61,11 +61,21 @@ export const YourBurns = ({ api }: { api: YourBurnsApi }) => {
 
   const { busy, error, run } = useAction(reload)
 
-  // A 409 always means the same class of thing — the burn moved on — but what
-  // exactly moved differs per action, so the caller supplies the words.
-  const act = (change: () => Promise<unknown>, whenRefused: string) => {
-    run(change, (failure: unknown) =>
-      isApiError(failure) && failure.status === 409 ? whenRefused : 'That did not work. Please try again.',
+  /**
+   * Run something, with words for the statuses that mean it was refused.
+   *
+   * A status map rather than one message for 409, which is what this was and which
+   * left the join path unable to say anything useful: joining a burn that has just
+   * ended answers **404**, deliberately — an ended burn and an id that never existed
+   * get the same answer, so an id cannot be probed for existence. Under a 409-only
+   * rule that member was told to try again, which is advice that cannot help.
+   */
+  const act = (change: () => Promise<unknown>, refusals: Readonly<Record<number, string>>) => {
+    run(
+      change,
+      (failure: unknown) =>
+        (isApiError(failure) ? refusals[failure.status] : undefined) ??
+        'That did not work. Please try again.',
     )
   }
 
@@ -110,7 +120,11 @@ export const YourBurns = ({ api }: { api: YourBurnsApi }) => {
                   <button
                     type="button"
                     disabled={busy}
-                    onClick={() => act(() => api.joinEvent(burn.event.id), 'That burn is no longer open.')}
+                    onClick={() =>
+                      act(() => api.joinEvent(burn.event.id), {
+                        404: 'That burn is over, so you cannot join it now.',
+                      })
+                    }
                   >
                     I am coming
                   </button>
@@ -149,10 +163,10 @@ export const YourBurns = ({ api }: { api: YourBurnsApi }) => {
                     class="link-button"
                     disabled={busy}
                     onClick={() =>
-                      act(
-                        () => api.leaveEvent(burn.event.id),
-                        'You have already paid for this burn, so someone with admin needs to sort this one out with you.',
-                      )
+                      act(() => api.leaveEvent(burn.event.id), {
+                        409: 'You have already paid for this burn, so someone with admin needs to sort this one out with you.',
+                        404: 'That burn is over, so there is nothing left to withdraw from.',
+                      })
                     }
                   >
                     I cannot come after all

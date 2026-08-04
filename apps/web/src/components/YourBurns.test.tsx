@@ -109,6 +109,29 @@ describe('YourBurns', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('already paid')
   })
 
+  it('says a burn is over rather than "try again" when joining it 404s', async () => {
+    // The route answers 404 for a burn that has ended, deliberately — an ended burn
+    // and an id that never existed get the same answer. Mapped only from 409, this
+    // told the member to retry, which is advice that cannot help.
+    const joinEvent = vi.fn(() => Promise.reject(apiError(404, 'not_found', 'Not found.')))
+    render(<YourBurns api={stub({ joinEvent }, { coming: [aBurn('e-1', 'Summer')], past: [] })} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'I am coming' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('That burn is over')
+  })
+
+  it('still falls back to try-again for a status that is not a refusal', async () => {
+    // The passing sibling: what the map replaces is the *refusals*, not the generic
+    // failure. A 500 is worth retrying and should still say so.
+    const joinEvent = vi.fn(() => Promise.reject(apiError(500, 'internal', 'Boom.')))
+    render(<YourBurns api={stub({ joinEvent }, { coming: [aBurn('e-1', 'Summer')], past: [] })} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'I am coming' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Please try again')
+  })
+
   it('keeps past burns behind a disclosure', async () => {
     render(<YourBurns api={stub({}, { coming: [], past: [aBurn('e-0', 'Last summer', anAttendance())] })} />)
 
