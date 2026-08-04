@@ -4,6 +4,7 @@ import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
+import { GuardedPage } from '../components/GuardedPage.tsx'
 import { toCsv } from '../csv.ts'
 import { useAction, useLoad } from '../load.ts'
 import { isAdmin, useViewer } from '../viewer.tsx'
@@ -61,29 +62,11 @@ export const AdminRoster = ({ api }: { api: RosterApi }) => {
     }, 'Could not record that. Please try again.')
   }
 
-  if (viewer.status === 'loading') {
-    return (
-      <section class="page">
-        <h1>Who is coming</h1>
-        <p class="form-note">One moment…</p>
-      </section>
-    )
-  }
-
-  if (!admin) {
-    return (
-      <section class="page">
-        <h1>Who is coming</h1>
-        <p>This is an admin page. If it should be open to you, ask someone who already has admin.</p>
-      </section>
-    )
-  }
-
   const roster = loaded.status === 'ready' ? loaded.data : undefined
   const confirmed = roster?.entries.filter((entry) => !entry.waiting).length ?? 0
 
   return (
-    <section class="page">
+    <GuardedPage title="Who is coming" require="admin">
       <h1>Who is coming</h1>
 
       {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
@@ -173,6 +156,6 @@ export const AdminRoster = ({ api }: { api: RosterApi }) => {
           )}
         </>
       )}
-    </section>
+    </GuardedPage>
   )
 }

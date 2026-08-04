@@ -5,6 +5,7 @@ import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
+import { GuardedPage } from '../components/GuardedPage.tsx'
 import { useAction, useLoad } from '../load.ts'
 import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
 
@@ -83,32 +84,8 @@ export const AdminOptions = ({ api }: { api: OptionsApi }) => {
 
   const { busy, error, setError, run } = useAction(reload)
 
-  if (viewer.status === 'loading') {
-    return (
-      <section class="page">
-        <h1>Lodging and helping</h1>
-        <p class="form-note">One moment…</p>
-      </section>
-    )
-  }
-
-  if (!approved) {
-    return (
-      <section class="page">
-        <h1>Lodging and helping</h1>
-        {viewer.status === 'signed-out' ? (
-          <p>This is for members. Sign in and it will be here.</p>
-        ) : (
-          // Signed in without a role — an applicant checking on their application.
-          // Telling them to sign in would be advice they have already taken.
-          <p>This is for members. Ask someone who already has a role.</p>
-        )}
-      </section>
-    )
-  }
-
   return (
-    <section class="page">
+    <GuardedPage title="Lodging and helping" require="approved">
       <h1>Lodging and helping</h1>
 
       {error !== undefined && (
@@ -159,7 +136,7 @@ export const AdminOptions = ({ api }: { api: OptionsApi }) => {
           ))}
         </>
       )}
-    </section>
+    </GuardedPage>
   )
 }
 

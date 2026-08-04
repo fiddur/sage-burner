@@ -5,6 +5,7 @@ import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
+import { GuardedPage } from '../components/GuardedPage.tsx'
 import { fromLocalInput, toLocalInput } from '../datetime.ts'
 import { useAction, useLoad } from '../load.ts'
 import { isMember, useViewer } from '../viewer.tsx'
@@ -71,31 +72,11 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
     }, 'Could not offer that.')
   }
 
-  if (viewer.status === 'loading') {
-    return (
-      <section class="page">
-        <h1>Dreams</h1>
-        <p class="form-note">One moment…</p>
-      </section>
-    )
-  }
-
-  if (!member) {
-    return (
-      <section class="page">
-        <h1>Dreams</h1>
-        <p>
-          This is for members. <a href="/login">Log in</a> to see it.
-        </p>
-      </section>
-    )
-  }
-
   const dreams = loaded.status === 'ready' ? loaded.data.sessions : []
   const places = loaded.status === 'ready' ? loaded.data.places : []
 
   return (
-    <section class="page">
+    <GuardedPage title="Dreams" require="member">
       <h1>Dreams</h1>
 
       <p class="form-note">
@@ -192,7 +173,7 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
           Offer it
         </button>
       </form>
-    </section>
+    </GuardedPage>
   )
 }
 

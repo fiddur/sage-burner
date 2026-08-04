@@ -3,6 +3,7 @@ import type { PaymentStatus } from '@sage-burner/shared'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
+import { GuardedPage } from '../components/GuardedPage.tsx'
 import { StayForm } from '../components/StayForm.tsx'
 import { useAction, useLoad } from '../load.ts'
 import { isMember, useViewer } from '../viewer.tsx'
@@ -52,29 +53,8 @@ export const MyBurn = ({ api }: { api: MyBurnApi }) => {
     )
   }
 
-  if (viewer.status === 'loading') {
-    return (
-      <section class="page">
-        <h1>Your burn</h1>
-        <p class="form-note">One moment…</p>
-      </section>
-    )
-  }
-
-  if (!member) {
-    return (
-      <section class="page">
-        <h1>Your burn</h1>
-        <p>
-          This is for members. <a href="/apply">Apply to join</a>, or <a href="/login">log in</a> if you
-          already have an account.
-        </p>
-      </section>
-    )
-  }
-
   return (
-    <section class="page">
+    <GuardedPage title="Your burn" require="member">
       <h1>Your burn</h1>
 
       {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
@@ -152,6 +132,6 @@ export const MyBurn = ({ api }: { api: MyBurnApi }) => {
           )}
         </>
       )}
-    </section>
+    </GuardedPage>
   )
 }

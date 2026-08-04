@@ -7,6 +7,7 @@ import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
 import { FormError, useFormError } from '../components/FormError.tsx'
+import { GuardedPage } from '../components/GuardedPage.tsx'
 import { isMember, useViewer } from '../viewer.tsx'
 
 export type ProfileApi = Pick<ApiClient, 'getMyProfile' | 'updateMyProfile'>
@@ -69,28 +70,8 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
     }
   }
 
-  if (viewer.status === 'loading') {
-    return (
-      <section class="page">
-        <h1>Your details</h1>
-        <p class="form-note">One moment…</p>
-      </section>
-    )
-  }
-
-  if (!member) {
-    return (
-      <section class="page">
-        <h1>Your details</h1>
-        <p>
-          This is for members. <a href="/login">Log in</a> to see it.
-        </p>
-      </section>
-    )
-  }
-
   return (
-    <section class="page">
+    <GuardedPage title="Your details" require="member">
       <h1>Your details</h1>
 
       <p class="form-note">
@@ -171,6 +152,6 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
         Signed in as {loaded.status === 'ready' ? loaded.profile.email : 'you'}. Changing that address is not
         possible yet — ask someone with admin.
       </p>
-    </section>
+    </GuardedPage>
   )
 }

@@ -184,7 +184,7 @@ describe('AdminRoster', () => {
       account: { id: 'a-1', roles: ['member'] },
     })
 
-    expect(screen.getByText(/admin page/)).toBeTruthy()
+    expect(screen.getByText(/for organisers/)).toBeTruthy()
     expect(getActiveRoster).not.toHaveBeenCalled()
   })
 

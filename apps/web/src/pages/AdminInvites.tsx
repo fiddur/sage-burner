@@ -5,6 +5,7 @@ import { useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
+import { GuardedPage } from '../components/GuardedPage.tsx'
 import { InviteLink } from '../components/InviteLink.tsx'
 import { useAction, useLoad } from '../load.ts'
 import { isAdmin, useViewer } from '../viewer.tsx'
@@ -49,37 +50,8 @@ export const AdminInvites = ({ api }: { api: InvitesApi }) => {
     )
   }
 
-  if (viewer.status === 'loading') {
-    return (
-      <section class="page">
-        <h1>Invites</h1>
-        <p class="form-note">One moment…</p>
-      </section>
-    )
-  }
-
-  if (viewer.status === 'signed-out') {
-    return (
-      <section class="page">
-        <h1>Invites</h1>
-        <p>
-          <a href="/login">Log in</a> to see this.
-        </p>
-      </section>
-    )
-  }
-
-  if (!admin) {
-    return (
-      <section class="page">
-        <h1>Invites</h1>
-        <p>This is an admin page. If it should be open to you, ask someone who already has admin.</p>
-      </section>
-    )
-  }
-
   return (
-    <section class="page">
+    <GuardedPage title="Invites" require="admin">
       <h1>Invites</h1>
 
       <p class="form-note">
@@ -150,6 +122,6 @@ export const AdminInvites = ({ api }: { api: InvitesApi }) => {
           </tbody>
         </table>
       )}
-    </section>
+    </GuardedPage>
   )
 }

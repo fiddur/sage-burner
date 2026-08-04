@@ -352,7 +352,7 @@ describe('AdminEvents', () => {
       </ViewerProvider>,
     )
 
-    expect(await screen.findByText(/admin page/)).toBeTruthy()
+    expect(await screen.findByText(/for organisers/)).toBeTruthy()
     expect(getEvents).not.toHaveBeenCalled()
   })
 })

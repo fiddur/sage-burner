@@ -6,6 +6,7 @@ import { useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 import type { Loaded } from '../load.ts'
 
+import { GuardedPage } from '../components/GuardedPage.tsx'
 import { useAction, useLoad } from '../load.ts'
 import { isApproved, useViewer } from '../viewer.tsx'
 
@@ -123,35 +124,11 @@ export const AdminPlaces = ({ api }: { api: PlacesApi }) => {
     }, 'Could not add the place.')
   }
 
-  if (viewer.status === 'loading') {
-    return (
-      <section class="page">
-        <h1>Places</h1>
-        <p class="form-note">One moment…</p>
-      </section>
-    )
-  }
-
-  if (!approved) {
-    return (
-      <section class="page">
-        <h1>Places</h1>
-        {viewer.status === 'signed-out' ? (
-          <p>This is for members. Sign in and it will be here.</p>
-        ) : (
-          // Signed in without a role — an applicant checking on their application.
-          // Telling them to sign in would be advice they have already taken.
-          <p>This is for members. Ask someone who already has a role.</p>
-        )}
-      </section>
-    )
-  }
-
   const places = ready?.places ?? []
   const ids = places.map((row) => row.id)
 
   return (
-    <section class="page">
+    <GuardedPage title="Places" require="approved">
       <h1>Places</h1>
 
       <p class="form-note">
@@ -318,7 +295,7 @@ export const AdminPlaces = ({ api }: { api: PlacesApi }) => {
           </button>
         </form>
       )}
-    </section>
+    </GuardedPage>
   )
 }
 
