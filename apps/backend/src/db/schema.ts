@@ -8,6 +8,8 @@ import {
   effortLevels,
   eventOptionKinds,
   formQuestionTypes,
+  mealRoles,
+  mealSlotKinds,
   paymentStatuses,
   placeColors,
   tickBoxRequired,
@@ -149,6 +151,8 @@ export const event = sqliteTable(
     start_time: text('start_time').notNull().default('00:00'),
     end_time: text('end_time').notNull().default('23:59'),
     welcome_markdown: text('welcome_markdown').notNull().default(''),
+    /** What the Meal page says above its table. Markdown, and any member may rewrite it. */
+    meal_intro_markdown: text('meal_intro_markdown').notNull().default(''),
     member_cap: integer('member_cap').notNull(),
     created_at: text('created_at').notNull(),
   },
@@ -796,6 +800,102 @@ export const sessionSupport = sqliteTable(
       .references(() => attendance.id, { onDelete: 'cascade' }),
   },
   (table) => [primaryKey({ columns: [table.session_id, table.attendance_id] })],
+)
+
+/**
+ * One recurring slot in the kitchen's day — `Lunch 13:00`, `Morning cleanup 9:00`.
+ *
+ * Per burn, and rarely touched once set: the slots are the burn's shape, like its
+ * dates. What they generate is not stored — see `meal_role` for why.
+ */
+export const mealSlot = sqliteTable(
+  'meal_slot',
+  {
+    id: text('id').notNull(),
+    event_id: text('event_id')
+      .notNull()
+      .references(() => event.id, { onDelete: 'cascade' }),
+    // Not unique: reordering swaps positions, and a transient collision mid-swap
+    // must not be rejected.
+    order: integer('order').notNull(),
+    label: text('label').notNull(),
+    /** `HH:MM`, fixed width, so the CHECK and the sort can both treat it as a string. */
+    at: text('at').notNull(),
+    kind: text('kind', { enum: mealSlotKinds }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    index('meal_slot_event_idx').on(table.event_id, table.order),
+    check('meal_slot_order_check', sql`${table.order} >= 0`),
+    check('meal_slot_label_check', sql`length(trim(${table.label})) > 0`),
+    check('meal_slot_at_check', isClockTime(table.at)),
+    check('meal_slot_kind_check', oneOf(table.kind, mealSlotKinds)),
+  ],
+)
+
+/**
+ * Somebody on one meal — its lead, a helper, or on the cleanup crew.
+ *
+ * **A meal has no row of its own.** It is a slot on a date, and both of those already
+ * exist: the slot is configured, the date comes from the burn's own span. Storing
+ * meals would mean reconciling them every time either changed — moving dinner half an
+ * hour, or shortening the burn — and a reconciliation job is exactly the thing that
+ * goes wrong quietly. So this references the slot and carries the date.
+ *
+ * An `attendance` for the reason a role's team is one: only somebody coming can cook,
+ * and withdrawing takes them off everything they had signed up for.
+ *
+ * The primary key is the whole "once each" rule. A member may be a helper *and* on
+ * cleanup for the same meal — different roles, different rows — but not twice over.
+ */
+export const mealRole = sqliteTable(
+  'meal_role',
+  {
+    slot_id: text('slot_id')
+      .notNull()
+      .references(() => mealSlot.id, { onDelete: 'cascade' }),
+    /** `YYYY-MM-DD`, which day's sitting this is. */
+    date: text('date').notNull(),
+    attendance_id: text('attendance_id')
+      .notNull()
+      .references(() => attendance.id, { onDelete: 'cascade' }),
+    role: text('role', { enum: mealRoles }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.slot_id, table.date, table.attendance_id, table.role] }),
+    check('meal_role_role_check', oneOf(table.role, mealRoles)),
+    check('meal_role_date_check', sql`${table.date} glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'`),
+    // One lead per sitting. The other two roles are unbounded — nothing runs out of
+    // people willing to wash up, and a cap would be an organiser's job to raise.
+    uniqueIndex('meal_role_lead_idx')
+      .on(table.slot_id, table.date)
+      .where(sql`${table.role} = 'lead'`),
+  ],
+)
+
+/**
+ * What somebody thought of cooking at one sitting — the sheet's "Food idea?" column.
+ *
+ * A row only where somebody has written one, which is why this is a side table rather
+ * than a column on a meal: most sittings never get an idea, and there is still no meal
+ * row to hang it off. `(slot, date)` is the key, the same identity `meal_role` uses.
+ *
+ * Optional in the sheet too — the header says "Not needed" under it. The lead decides
+ * what to cook from what is in; this is a note, not a plan anyone is held to.
+ */
+export const mealNote = sqliteTable(
+  'meal_note',
+  {
+    slot_id: text('slot_id')
+      .notNull()
+      .references(() => mealSlot.id, { onDelete: 'cascade' }),
+    date: text('date').notNull(),
+    food_idea: text('food_idea').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.slot_id, table.date] }),
+    check('meal_note_date_check', sql`${table.date} glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'`),
+  ],
 )
 
 // Deliberately no relations() / defineRelations() block.
