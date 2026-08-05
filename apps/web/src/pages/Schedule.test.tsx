@@ -611,6 +611,63 @@ describe('Schedule', () => {
     expect(pool.querySelector('.dream-heart')?.textContent).toContain('2')
   })
 
+  it('closes on Escape after something in the panel has been clicked', async () => {
+    // The bug: the handler was on the panel and waited for the key to bubble from
+    // inside it. Clicking anything disables it for the length of the write, and a
+    // disabled button drops focus to `<body>` — so Escape stopped working the moment
+    // you did anything, which is when you most want it.
+    const supportSession = vi.fn<ScheduleApi['supportSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'Cacao ceremony' }) }),
+    )
+    renderPage(stub({ supportSession }, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
+    const panel = await screen.findByRole('dialog', { name: 'Cacao ceremony' })
+    fireEvent.click(within(panel).getByRole('button', { name: 'Show support' }))
+    await waitFor(() => expect(supportSession).toHaveBeenCalled())
+
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  it('leaves the heart unadorned, since it is a control and not a link', async () => {
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
+    const panel = await screen.findByRole('dialog', { name: 'Cacao ceremony' })
+
+    expect(within(panel).getByRole('button', { name: 'Show support' }).className).not.toContain('link-button')
+  })
+
+  it('lets go of the chip when a resize pointer is cancelled', async () => {
+    // Without `onPointerCancel` the ref stays set and `onDragStart` goes on
+    // cancelling every drag of this chip, so it can never be moved again.
+    const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'Cacao ceremony' }) }),
+    )
+    renderPage(
+      stub({ updateSession }, [
+        aDream({
+          id: 's-1',
+          title: 'Cacao ceremony',
+          place_id: 'p-1',
+          time_slot_start: '2026-08-01T08:00:00.000Z',
+          time_slot_end: '2026-08-01T09:00:00.000Z',
+        }),
+      ]),
+    )
+
+    const handle = await screen.findByRole('button', { name: 'Change how long Cacao ceremony is' })
+    fireEvent.pointerDown(handle, { clientY: 100 })
+    fireEvent.pointerCancel(handle)
+
+    fireEvent.dragStart(screen.getByLabelText('Move Cacao ceremony'))
+    fireEvent.drop(cell('14:00', 1))
+
+    await waitFor(() => expect(updateSession).toHaveBeenCalled())
+  })
+
   it('gives a heart from the details too, and says how many want it', async () => {
     const supportSession = vi.fn<ScheduleApi['supportSession']>(() =>
       Promise.resolve({ session: aDream({ id: 's-1', title: 'Cacao ceremony' }) }),

@@ -40,19 +40,26 @@ export const DreamDetails = ({
   // only because the supporters are a count and nothing more.
   const helping = dream.helpers.some((person) => person.account_id === viewerId)
 
-  // Focus moves in, or Escape reaches nothing.
   useEffect(() => {
     panel.current?.focus()
   }, [])
 
+  // On the document rather than on the panel. Clicking anything in here disables it
+  // for the length of the write, and a disabled button drops focus to `<body>` — so
+  // a handler waiting for the key to bubble up from inside stopped hearing it after
+  // the first thing you did.
+  useEffect(() => {
+    const onKey = (keyEvent: KeyboardEvent) => {
+      if (keyEvent.key === 'Escape') onClose()
+    }
+
+    document.addEventListener('keydown', onKey)
+
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
   return (
-    <div
-      class="dream-modal"
-      onClick={onClose}
-      onKeyDown={(keyEvent) => {
-        if (keyEvent.key === 'Escape') onClose()
-      }}
-    >
+    <div class="dream-modal" onClick={onClose}>
       <div
         class="dream-panel"
         role="dialog"
@@ -83,7 +90,7 @@ export const DreamDetails = ({
         <p class="row">
           <button
             type="button"
-            class="link-button"
+            class="dream-heart"
             disabled={busy}
             aria-pressed={dream.supported_by_me}
             aria-label={dream.supported_by_me ? 'Take back your support' : 'Show support'}

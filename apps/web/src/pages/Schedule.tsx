@@ -359,6 +359,11 @@ const Chip = ({
 
             onResize(dream, rowsDragged(pointerEvent.clientY - grab.y, grab.rowHeight))
           }}
+          // Or a lost capture leaves the ref set, and `onDragStart` goes on
+          // cancelling every drag of this chip until the handle is grabbed again.
+          onPointerCancel={() => {
+            grabbed.current = null
+          }}
           onClick={(clickEvent) => clickEvent.stopPropagation()}
           onKeyDown={(keyEvent) => {
             // The handle is the keyboard route too, like the ⠿ on Places: a

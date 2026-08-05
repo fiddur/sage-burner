@@ -1238,6 +1238,12 @@ A flag rather than a recurrence rule, and no back-reference to what a copy came 
 A different facilitator on Sunday than on Saturday is the point of copying rather than
 repeating, and a parent link would only be something to keep consistent.
 
+A dream toggled repeatable _after_ it was scheduled is asymmetric, and deliberately:
+dragged within the grid it stamps a copy and the original stays put, while dragged to
+the pool it unschedules the original rather than copying. Both follow from the two
+rules above, and neither is reachable by the ordinary flow, since copies are created
+with the flag off.
+
 **The copying is the page's, not the API's.** Nothing server-side treats the flag
 specially — placing, moving and unplacing a dream are all one `PATCH`, so a server
 that copied on write would first have to decide which of those a given body is. The

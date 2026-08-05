@@ -269,6 +269,16 @@ const DreamFields = ({
           onChange={(changeEvent) => setFacilitator(changeEvent.currentTarget.value)}
         >
           <option value="">Nobody yet</option>
+          {facilitator !== '' &&
+            !attendees.some((person) => person.account_id === facilitator) && (
+              // They have withdrawn since being handed this. Named rather than left
+              // out, or the control reads as "Nobody yet" while the id is still stored
+              // — and saving anything else would keep a facilitator the page denies
+              // having. Disabled, so it can be left or changed but not chosen.
+              <option value={facilitator} disabled>
+                Somebody who is no longer coming
+              </option>
+            )}
           {attendees.map((person) => (
             <option key={person.account_id} value={person.account_id}>
               {person.name ?? 'Name not filled in yet'}
