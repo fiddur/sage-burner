@@ -16,7 +16,9 @@
   --muted: #78716c;
   --line: #e0d9cf;
   --radius: 0.5rem;
-  --measure: 38rem;
+  /* A reading width, for the two pages that are actually prose. `em` rather than
+     `rem` so it tracks the text it bounds if that ever changes size. */
+  --measure: 45em;
 
   color-scheme: light dark;
 }
@@ -120,12 +122,25 @@ a:hover {
   text-decoration: none;
 }
 
+/*
+  Full width, and prose opts *in* to a measure rather than out of it.
+
+  This was bounded by `--measure`, which made every page as narrow as an essay —
+  and almost none of them are one. The grids, the rosters and the registers are
+  tables and lists that had a reading width squeezing them into a column with the
+  rest of the screen empty. The schedule already escaped with a `:has()` override,
+  which is the shape of a default that is wrong: one page opting out, and the next
+  wide thing having to remember to.
+*/
 .site-main {
   flex: 1;
   width: 100%;
-  max-width: var(--measure);
-  margin-inline: auto;
   padding: clamp(1.5rem, 5vw, 3rem) clamp(1rem, 5vw, 3rem);
+}
+
+/* The homepage's welcome text and the 404 — the only long-form prose here. */
+.prose {
+  max-width: var(--measure);
 }
 
 .site-footer {
@@ -138,7 +153,6 @@ a:hover {
 
 .site-footer p {
   max-width: var(--measure);
-  margin-inline: auto;
 }
 
 .prose h1 {
@@ -573,14 +587,6 @@ a:hover {
 .schedule-daybreak th,
 .schedule-daybreak td {
   border-top: 2px solid currentColor;
-}
-
-/*
-  A timetable is not prose. `--measure` is a reading width and squeezes the grid
-  into a sliver on a wide screen, which is what it did.
-*/
-.site-main:has(.schedule-page) {
-  max-width: none;
 }
 
 .schedule-cell {

@@ -170,7 +170,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
 }
 
 const Framed = ({ children }: { children: ComponentChildren }) => (
-  <section class="page schedule-page">
+  <section class="page">
     <h1>Schedule</h1>
     {children}
   </section>

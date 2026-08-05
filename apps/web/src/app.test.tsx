@@ -243,14 +243,30 @@ describe('routing', () => {
 })
 
 describe('signing out', () => {
-  it('offers a log-out control only when signed in, and clears the viewer', async () => {
-    const logout = vi.fn(() => Promise.resolve({ viewer: null }))
-    render(
+  // On the details page rather than in the bar, beside the sentence naming the
+  // account it ends. Rendered through `App` so the route, the layout and the viewer
+  // provider are the real ones — clicking it has to actually empty the nav.
+  const renderProfile = (logout: AppApi['logout']) => {
+    window.history.replaceState(null, '', '/profile')
+
+    return render(
       <App
         viewer={{ status: 'signed-in', account: { id: 'a-1', name: null, roles: ['member'] } }}
+        title="The Burning Sage"
         api={clientWith(logout)}
       />,
     )
+  }
+
+  it('is not in the bar, where every other entry is a place', () => {
+    renderAt('/', { status: 'signed-in', account: { id: 'a-1', name: null, roles: ['member'] } })
+
+    expect(screen.queryByRole('button', { name: 'Log out' })).toBeNull()
+  })
+
+  it('clears the viewer, so the nav offers the way back in', async () => {
+    const logout = vi.fn(() => Promise.resolve({ viewer: null }))
+    renderProfile(logout)
 
     screen.getByRole('button', { name: 'Log out' }).click()
 
@@ -260,15 +276,9 @@ describe('signing out', () => {
   })
 
   it('clears the viewer even when the logout request fails', async () => {
-    // A nav still saying "Log out" after a failed request is worse than one
-    // that says signed-out while a stale cookie expires on its own.
-    const logout = vi.fn(() => Promise.reject(new TypeError('Failed to fetch')))
-    render(
-      <App
-        viewer={{ status: 'signed-in', account: { id: 'a-1', name: null, roles: ['member'] } }}
-        api={clientWith(logout)}
-      />,
-    )
+    // A nav still saying signed-in after a failed request is worse than one that
+    // says signed-out while a stale cookie expires on its own.
+    renderProfile(vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))))
 
     screen.getByRole('button', { name: 'Log out' }).click()
 

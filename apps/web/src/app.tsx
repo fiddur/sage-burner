@@ -45,6 +45,7 @@ export type RoutesApi = Pick<
   | 'createEvent'
   | 'deleteQuestion'
   | 'getActiveEvent'
+  | 'logout'
   | 'updateWelcome'
   | 'getAdminAccounts'
   | 'setAccountRoles'
@@ -214,7 +215,7 @@ export const App = ({ viewer, title, api }: { viewer?: Viewer; title?: string; a
   // burn-scoped page below it reads the same choice.
   const framed = (
     <FetchedBurnProvider api={client}>
-      <Layout api={client}>
+      <Layout>
         <Routes api={client} />
       </Layout>
     </FetchedBurnProvider>

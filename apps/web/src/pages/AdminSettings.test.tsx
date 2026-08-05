@@ -21,6 +21,7 @@ const stub = (over: Partial<AdminSettingsApi> = {}): AdminSettingsApi => ({
   getPushKey: () => Promise.resolve({ public_key: null }),
   subscribeToPush: () => Promise.reject(new Error('subscribeToPush is not stubbed here')),
   unsubscribeFromPush: () => Promise.reject(new Error('unsubscribeFromPush is not stubbed here')),
+  logout: () => Promise.reject(new Error('logout is not stubbed here')),
   ...over,
 })
 

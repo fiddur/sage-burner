@@ -5,13 +5,19 @@ import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
 import { GuardedPage } from '../components/GuardedPage.tsx'
+import { LogOutButton } from '../components/LogOutButton.tsx'
 import { PushToggle } from '../components/PushToggle.tsx'
 import { useSetInstallationTitle } from '../installation.tsx'
 import { isAdmin, useViewer } from '../viewer.tsx'
 
 export type AdminSettingsApi = Pick<
   ApiClient,
-  'getInstallation' | 'updateInstallation' | 'getPushKey' | 'subscribeToPush' | 'unsubscribeFromPush'
+  | 'getInstallation'
+  | 'updateInstallation'
+  | 'getPushKey'
+  | 'subscribeToPush'
+  | 'unsubscribeFromPush'
+  | 'logout'
 >
 
 type Loaded = { status: 'loading' } | { status: 'ready' } | { status: 'failed' }
@@ -129,6 +135,8 @@ export const AdminSettings = ({ api }: { api: AdminSettingsApi }) => {
           `admin` without `member` is refused from that page, and application
           notifications go precisely to admins. */}
       <PushToggle api={api} />
+
+      <LogOutButton api={api} />
     </GuardedPage>
   )
 }

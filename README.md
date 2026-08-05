@@ -873,6 +873,9 @@ month's grid with nothing on screen to say why.
 - **Dreams** is reached from Schedule. Offering a dream and placing one are the
   same activity, and two entries for it is what the restructure undid.
 - **Places** is reached from Schedule too: the lanes are what the grid draws.
+- **Signing out** is on the details page, under the line naming the account it ends,
+  and on ⚙️ → Settings for the organiser the details page refuses. Every entry in the
+  bar is a _place_; this is an action, and it was the only one there.
 - **The initials circle** is the details page: who you are, then a section per burn
   still to come — join it, or fill in your stay at it — then past burns behind
   _…show past burns_. It absorbed the page called "Your burn", singular, which was
@@ -884,6 +887,13 @@ month's grid with nothing on screen to say why.
   way in, and what is left behind ⚙️ — the burn's shape, who gets in, payment, the
   installation — is admin's. It still links to both lists, since an organiser
   holding `admin` without `member` has no details page to reach the lodging list from.
+
+**Pages are full width.** `--measure` is a reading width and only the two pages that
+are actually prose take it — the homepage's welcome text and the 404, through
+`.prose`. Everything else is grids, rosters and registers, which a 38rem column
+squeezed into a sliver with the rest of the screen empty. The schedule used to escape
+that with a `:has()` override, which is the shape of a default that is wrong: one
+page opting out, and the next wide thing having to remember to.
 
 Hiding a link is presentation. Every page behind these is guarded again server-side,
 and `Layout.test.tsx` asserts each absence by name — a negated `arrayContaining`
