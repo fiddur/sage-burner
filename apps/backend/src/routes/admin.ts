@@ -1,13 +1,19 @@
 import type { AdminAccount, AdminAccountResponse, AdminAccountsResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { accountRolesUpdateSchema, errorResponse } from '@sage-burner/shared'
+import { accountRolesUpdateSchema, adminPasswordResetSchema, errorResponse } from '@sage-burner/shared'
 import { count, eq } from 'drizzle-orm'
 
 import type { GuardDeps } from '../auth/guards.ts'
 
+import { hashPassword } from '../auth/password.ts'
 import { account, accountRole } from '../db/schema.ts'
 import { noStore } from '../http.ts'
+
+export interface AdminDeps extends GuardDeps {
+  /** Injected so the suite never pays for scrypt, the same seam redemption uses. */
+  hash?: (password: string) => Promise<string>
+}
 
 /** Thrown to roll the transaction back; never leaves this module. */
 const LAST_ADMIN = new Error('the last organiser cannot give up the role')
@@ -21,7 +27,7 @@ const LAST_ADMIN = new Error('the last organiser cannot give up the role')
  * address that already exists, but that is a shell on the server, not something an
  * organiser does.
  */
-export const registerAdminRoutes = (app: FastifyInstance, { db }: GuardDeps) => {
+export const registerAdminRoutes = (app: FastifyInstance, { db, hash = hashPassword }: AdminDeps) => {
   app.get('/api/admin/accounts', async (_request, reply) => {
     // Every account's email address. An organiser opening this on a shared
     // laptop would otherwise leave the whole roster in the browser's on-disk
@@ -90,6 +96,44 @@ export const registerAdminRoutes = (app: FastifyInstance, { db }: GuardDeps) => 
       }
 
       return { account: { ...found, roles } } satisfies AdminAccountResponse
+    },
+  )
+
+  /**
+   * Setting somebody's password for them.
+   *
+   * No old password, because an organiser does not have it — which is the point, and
+   * also what makes this the most powerful route here. Under `/api/admin/`, so the
+   * prefix hook is the only thing that lets it through.
+   *
+   * **It does not end their existing sessions.** Sessions are stateless signed
+   * cookies with a TTL and there is nothing to revoke them against, so a reset locks
+   * nobody out of a browser already signed in. That is fine for the case this exists
+   * for — a password lost or never written down — and not fine for a compromised
+   * account, which wants a session version to bump. Said plainly rather than left
+   * for somebody to discover.
+   */
+  app.put<{ Params: { accountId: string } }>(
+    '/api/admin/accounts/:accountId/password',
+    async (request, reply) => {
+      void noStore(reply)
+
+      const parsed = adminPasswordResetSchema.safeParse(request.body)
+      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+
+      // Hashed before the row is looked for, so a real account and a made-up one cost
+      // the same. Not much of an oracle behind the admin guard, but it is one line.
+      const password_hash = await hash(parsed.data.password)
+
+      const [updated] = await db
+        .update(account)
+        .set({ password_hash })
+        .where(eq(account.id, request.params.accountId))
+        .returning({ id: account.id })
+
+      // Nothing is echoed back: the caller already knows what they set, and a
+      // password in a response body is a password in somebody's network log.
+      return updated === undefined ? reply.code(404).send(errorResponse('not_found')) : reply.code(204).send()
     },
   )
 }

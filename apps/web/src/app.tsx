@@ -49,6 +49,7 @@ export type RoutesApi = Pick<
   | 'updateWelcome'
   | 'getAdminAccounts'
   | 'setAccountRoles'
+  | 'setAccountPassword'
   | 'getEvents'
   | 'getInviteState'
   | 'redeemInvite'

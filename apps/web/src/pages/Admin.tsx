@@ -10,7 +10,7 @@ import { GuardedPage } from '../components/GuardedPage.tsx'
 import { errorMessage, useAction, useLoad } from '../load.ts'
 import { isAdmin, useViewer } from '../viewer.tsx'
 
-export type AdminApi = Pick<ApiClient, 'getAdminAccounts' | 'setAccountRoles'>
+export type AdminApi = Pick<ApiClient, 'getAdminAccounts' | 'setAccountRoles' | 'setAccountPassword'>
 
 const withRole = (roles: readonly AccountRole[], role: AccountRole, held: boolean): AccountRole[] =>
   held ? [...new Set([...roles, role])] : roles.filter((entry) => entry !== role)
@@ -114,6 +114,7 @@ export const Admin = ({ api }: { api: AdminApi }) => {
                   {role}
                 </th>
               ))}
+              <th scope="col">Password</th>
             </tr>
           </thead>
           <tbody>
@@ -133,6 +134,9 @@ export const Admin = ({ api }: { api: AdminApi }) => {
                     />
                   </td>
                 ))}
+                <td>
+                  <SetPassword api={api} email={entry.email} accountId={entry.id} />
+                </td>
               </tr>
             ))}
           </tbody>
@@ -145,5 +149,72 @@ export const Admin = ({ api }: { api: AdminApi }) => {
         want both.
       </p>
     </GuardedPage>
+  )
+}
+
+/**
+ * Setting somebody's password for them.
+ *
+ * There is no other way to change one: redemption is where a password is chosen,
+ * `admin:create` refuses to touch an existing one, and nothing else writes it. So an
+ * account whose owner lost the password — or one an organiser made and did not write
+ * down — had no way back.
+ *
+ * Its own state per row rather than the page's, so typing in one row does not blank
+ * another. Deliberately not a `type="password"` field: an organiser is setting a
+ * password to read out or paste to somebody, and hiding it from the person choosing
+ * it helps nobody.
+ */
+const SetPassword = ({
+  api,
+  email,
+  accountId,
+}: {
+  api: Pick<ApiClient, 'setAccountPassword'>
+  email: string
+  accountId: string
+}) => {
+  const [password, setPassword] = useState('')
+  const [state, setState] = useState<'done' | 'failed' | 'idle' | 'saving'>('idle')
+
+  const save = async () => {
+    setState('saving')
+    try {
+      await api.setAccountPassword(accountId, { password })
+      setPassword('')
+      setState('done')
+    } catch {
+      setState('failed')
+    }
+  }
+
+  return (
+    <span class="row">
+      <input
+        type="text"
+        autocomplete="off"
+        aria-label={`New password for ${email}`}
+        placeholder="New password"
+        value={password}
+        disabled={state === 'saving'}
+        onInput={(inputEvent) => {
+          setPassword(inputEvent.currentTarget.value)
+          setState('idle')
+        }}
+      />
+      <button type="button" disabled={state === 'saving' || password === ''} onClick={() => void save()}>
+        Set it
+      </button>
+      {state === 'done' && (
+        <span class="form-note" role="status">
+          Set. Tell them what it is — nobody else can read it back.
+        </span>
+      )}
+      {state === 'failed' && (
+        <span class="form-error" role="alert">
+          Could not set that password.
+        </span>
+      )}
+    </span>
   )
 }

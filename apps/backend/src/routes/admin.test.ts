@@ -222,3 +222,100 @@ describe('an organiser editing who holds which role', () => {
     expect(found.roles.sort()).toEqual(['admin', 'member'])
   })
 })
+
+describe('an organiser setting somebody’s password', () => {
+  const setPassword = (
+    server: FastifyInstance,
+    cookie: string | undefined,
+    accountId: string,
+    payload: Record<string, unknown>,
+  ) =>
+    server.inject({
+      method: 'PUT',
+      url: `/api/admin/accounts/${accountId}/password`,
+      headers: cookie === undefined ? {} : { cookie },
+      payload,
+    })
+
+  const login = (server: FastifyInstance, email: string, password: string) =>
+    server.inject({ method: 'POST', url: '/api/auth/login', payload: { email, password } })
+
+  const emailOf = async (accountId: string) =>
+    (await db().select().from(account).where(eq(account.id, accountId)))[0]?.email ?? ''
+
+  it('lets them sign in with the new one', async () => {
+    // The whole point: there is no other way to change a password once it is set,
+    // so an account whose owner lost it — or one an organiser made and did not write
+    // down — had no way back at all.
+    const server = await build()
+    const admin = await givenAccount(['admin'])
+    const someone = await givenAccount(['member'])
+
+    const response = await setPassword(server, admin.cookie, someone.id, { password: 'a-new-password' })
+
+    expect(response.statusCode).toBe(204)
+    expect((await login(server, await emailOf(someone.id), 'a-new-password')).statusCode).toBe(200)
+  })
+
+  it('refuses the old one afterwards', async () => {
+    // The passing sibling. A write that added a second hash rather than replacing
+    // the one there would satisfy the test above.
+    const server = await build()
+    const admin = await givenAccount(['admin'])
+    const someone = await givenAccount(['member'])
+    await setPassword(server, admin.cookie, someone.id, { password: 'first-password' })
+
+    await setPassword(server, admin.cookie, someone.id, { password: 'second-password' })
+
+    expect((await login(server, await emailOf(someone.id), 'first-password')).statusCode).toBe(401)
+    expect((await login(server, await emailOf(someone.id), 'second-password')).statusCode).toBe(200)
+  })
+
+  it('never sends the password back', async () => {
+    const server = await build()
+    const admin = await givenAccount(['admin'])
+    const someone = await givenAccount(['member'])
+
+    const response = await setPassword(server, admin.cookie, someone.id, { password: 'a-new-password' })
+
+    expect(response.body).not.toContain('a-new-password')
+    expect(response.body).toBe('')
+  })
+
+  it('is admin only', async () => {
+    const server = await build()
+    const member = await givenAccount(['member'])
+    const someone = await givenAccount(['member'])
+
+    expect((await setPassword(server, member.cookie, someone.id, { password: 'x' })).statusCode).toBe(403)
+    expect((await setPassword(server, undefined, someone.id, { password: 'x' })).statusCode).toBe(401)
+  })
+
+  it('answers 404 for an account that does not exist', async () => {
+    const server = await build()
+    const admin = await givenAccount(['admin'])
+
+    expect((await setPassword(server, admin.cookie, randomUUID(), { password: 'x' })).statusCode).toBe(404)
+  })
+
+  it('refuses an empty password, and a body with anything else in it', async () => {
+    const server = await build()
+    const admin = await givenAccount(['admin'])
+    const someone = await givenAccount(['member'])
+
+    expect((await setPassword(server, admin.cookie, someone.id, { password: '' })).statusCode).toBe(400)
+    expect(
+      (await setPassword(server, admin.cookie, someone.id, { password: 'ok', email: 'x@y.z' })).statusCode,
+    ).toBe(400)
+  })
+
+  it('will set another organiser’s, which is the trust the role already carries', async () => {
+    const server = await build()
+    const admin = await givenAccount(['admin'])
+    const other = await givenAccount(['admin'])
+
+    expect(
+      (await setPassword(server, admin.cookie, other.id, { password: 'a-new-password' })).statusCode,
+    ).toBe(204)
+  })
+})
