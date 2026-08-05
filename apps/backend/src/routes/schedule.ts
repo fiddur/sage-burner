@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 
-import { errorResponse, publicSessionSchema } from '@sage-burner/shared'
+import { apiRoutes, errorResponse, publicSessionSchema } from '@sage-burner/shared'
 import { asc, eq } from 'drizzle-orm'
 
 import type { Database } from '../db/index.ts'
@@ -31,7 +31,7 @@ export const registerScheduleRoutes = (
   app: FastifyInstance,
   { db, now = () => new Date() }: ScheduleDeps,
 ) => {
-  app.get<{ Params: { eventId: string } }>('/events/:eventId/schedule.ics', async (request, reply) => {
+  app.get<{ Params: { eventId: string } }>(apiRoutes.scheduleFeed.fastify, async (request, reply) => {
     // Public and re-fetched on a client's own schedule, so it may be cached —
     // but an edit has to show up, and there is no ETag here to revalidate
     // against. Same reasoning as `/api/events/active`.

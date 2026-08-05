@@ -1,7 +1,7 @@
 import type { InviteState, RedeemResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { errorResponse, inviteStatusOf, redeemRequestSchema } from '@sage-burner/shared'
+import { apiRoutes, errorResponse, inviteStatusOf, redeemRequestSchema } from '@sage-burner/shared'
 import { and, eq, isNull } from 'drizzle-orm'
 import { createHash, randomUUID } from 'node:crypto'
 
@@ -43,7 +43,7 @@ export const registerRedemptionRoutes = (
   app: FastifyInstance,
   { db, config, sessions, now = () => new Date(), hash = hashPassword, gate }: RedemptionDeps,
 ) => {
-  app.get<{ Params: { token: string } }>('/api/invites/:token', async (request, reply) => {
+  app.get<{ Params: { token: string } }>(apiRoutes.getInviteState.fastify, async (request, reply) => {
     void noStore(reply)
 
     const [invite] = await db
@@ -76,7 +76,7 @@ export const registerRedemptionRoutes = (
     } satisfies InviteState
   })
 
-  app.post<{ Params: { token: string } }>('/api/invites/:token/redeem', async (request, reply) => {
+  app.post<{ Params: { token: string } }>(apiRoutes.redeemInvite.fastify, async (request, reply) => {
     void noStore(reply)
 
     const parsed = redeemRequestSchema.safeParse(request.body)

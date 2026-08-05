@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 
-import { errorResponse } from '@sage-burner/shared'
+import { apiRoutes, errorResponse } from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -62,7 +62,7 @@ export const registerAvatarRoutes = (
     },
   )
 
-  app.put('/api/me/avatar', { preHandler: requireApproved }, async (request, reply) => {
+  app.put(apiRoutes.setMyAvatar.fastify, { preHandler: requireApproved }, async (request, reply) => {
     void noStore(reply)
 
     const type = AVATAR_TYPES.find((candidate) => candidate === request.headers['content-type'])
@@ -90,7 +90,7 @@ export const registerAvatarRoutes = (
     return { avatar: updated_at }
   })
 
-  app.delete('/api/me/avatar', { preHandler: requireApproved }, async (request, reply) => {
+  app.delete(apiRoutes.removeMyAvatar.fastify, { preHandler: requireApproved }, async (request, reply) => {
     void noStore(reply)
 
     const viewer = await viewerFor(request, { db, sessions })
@@ -113,7 +113,7 @@ export const registerAvatarRoutes = (
    * data — the same reason the rest of this app sends `no-store`.
    */
   app.get<{ Params: { accountId: string } }>(
-    '/api/accounts/:accountId/avatar',
+    apiRoutes.accountAvatar.fastify,
     { preHandler: requireApproved },
     async (request, reply) => {
       const [row] = await db

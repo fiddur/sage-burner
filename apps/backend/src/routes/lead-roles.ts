@@ -2,6 +2,7 @@ import type { CopySourcesResponse, LeadRole, LeadRoleResponse, LeadRolesResponse
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 
 import {
+  apiRoutes,
   errorResponse,
   leadRoleCopySchema,
   leadRoleCreateSchema,
@@ -156,7 +157,7 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
     (await viewerFor(request, { db, sessions }))?.account_id ?? ''
 
   app.get<{ Params: { eventId: string } }>(
-    '/api/events/:eventId/roles',
+    apiRoutes.getLeadRoles.fastify,
     { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)
@@ -166,7 +167,7 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
   )
 
   app.post<{ Params: { eventId: string } }>(
-    '/api/events/:eventId/roles',
+    apiRoutes.addLeadRole.fastify,
     { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)
@@ -203,7 +204,7 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
   )
 
   app.patch<{ Params: { id: string } }>(
-    '/api/roles/:id',
+    apiRoutes.updateLeadRole.fastify,
     { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)
@@ -229,7 +230,7 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
   )
 
   app.delete<{ Params: { id: string } }>(
-    '/api/roles/:id',
+    apiRoutes.deleteLeadRole.fastify,
     { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)
@@ -252,7 +253,7 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
    * "take" and "assign" differ only in whose id is in the body. `null` vacates.
    */
   app.put<{ Params: { id: string } }>(
-    '/api/roles/:id/lead',
+    apiRoutes.setLeadRoleLead.fastify,
     { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)
@@ -302,7 +303,7 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
   )
 
   app.post<{ Params: { id: string } }>(
-    '/api/roles/:id/team',
+    apiRoutes.joinLeadRoleTeam.fastify,
     { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)
@@ -383,7 +384,7 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
    * business. Without it the copy control would have nothing to offer.
    */
   app.get<{ Params: { eventId: string } }>(
-    '/api/events/:eventId/roles/sources',
+    apiRoutes.getLeadRoleSources.fastify,
     { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)
@@ -417,7 +418,7 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
    * and nothing covers the window.
    */
   app.post<{ Params: { eventId: string } }>(
-    '/api/events/:eventId/roles/copy',
+    apiRoutes.copyLeadRoles.fastify,
     { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)

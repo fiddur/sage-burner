@@ -2,6 +2,7 @@ import type { Session, SessionResponse, SessionsResponse } from '@sage-burner/sh
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 
 import {
+  apiRoutes,
   errorResponse,
   hasValidTimeSlot,
   sessionCreateSchema,
@@ -185,7 +186,7 @@ export const registerSessionRoutes = (
   }
 
   app.get<{ Params: { eventId: string } }>(
-    '/api/events/:eventId/sessions',
+    apiRoutes.getSessions.fastify,
     { preHandler: requireMember },
     async (request, reply) => {
       void noStore(reply)
@@ -200,7 +201,7 @@ export const registerSessionRoutes = (
   )
 
   app.post<{ Params: { eventId: string } }>(
-    '/api/events/:eventId/sessions',
+    apiRoutes.offerSession.fastify,
     { preHandler: requireMember },
     async (request, reply) => {
       void noStore(reply)
@@ -248,7 +249,7 @@ export const registerSessionRoutes = (
   )
 
   app.patch<{ Params: { id: string } }>(
-    '/api/sessions/:id',
+    apiRoutes.updateSession.fastify,
     { preHandler: requireMember },
     async (request, reply) => {
       void noStore(reply)
@@ -311,7 +312,7 @@ export const registerSessionRoutes = (
   )
 
   app.delete<{ Params: { id: string } }>(
-    '/api/sessions/:id',
+    apiRoutes.withdrawSession.fastify,
     { preHandler: requireMember },
     async (request, reply) => {
       void noStore(reply)
@@ -365,7 +366,7 @@ export const registerSessionRoutes = (
    * is for, and it asks first.
    */
   app.post<{ Params: { id: string } }>(
-    '/api/sessions/:id/helpers/me',
+    apiRoutes.helpWithSession.fastify,
     { preHandler: requireMember },
     async (request, reply) => {
       void noStore(reply)
@@ -383,7 +384,7 @@ export const registerSessionRoutes = (
   )
 
   app.delete<{ Params: { id: string } }>(
-    '/api/sessions/:id/helpers/me',
+    apiRoutes.stopHelpingWithSession.fastify,
     { preHandler: requireMember },
     async (request, reply) => {
       void noStore(reply)
@@ -411,7 +412,7 @@ export const registerSessionRoutes = (
    * to ignore the channel.
    */
   app.post<{ Params: { id: string } }>(
-    '/api/sessions/:id/support/me',
+    apiRoutes.supportSession.fastify,
     { preHandler: requireMember },
     async (request, reply) => {
       void noStore(reply)
@@ -429,7 +430,7 @@ export const registerSessionRoutes = (
   )
 
   app.delete<{ Params: { id: string } }>(
-    '/api/sessions/:id/support/me',
+    apiRoutes.withdrawSupportForSession.fastify,
     { preHandler: requireMember },
     async (request, reply) => {
       void noStore(reply)

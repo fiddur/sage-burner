@@ -2,6 +2,7 @@ import type { CopySourcesResponse, Place, PlacesResponse } from '@sage-burner/sh
 import type { FastifyInstance } from 'fastify'
 
 import {
+  apiRoutes,
   errorResponse,
   placeCopySchema,
   placeCreateSchema,
@@ -85,7 +86,7 @@ export const registerPlaceRoutes = (
 ) => {
   const { requireApproved } = createGuards({ db, sessions })
 
-  app.get<{ Params: { eventId: string } }>('/api/events/:eventId/places', async (request, reply) => {
+  app.get<{ Params: { eventId: string } }>(apiRoutes.getPlaces.fastify, async (request, reply) => {
     // Same reasoning as the questions and the active event: public, but an edit
     // has to show up without waiting out a heuristic freshness window.
     void reply.header('cache-control', 'no-cache')
@@ -94,7 +95,7 @@ export const registerPlaceRoutes = (
   })
 
   app.post<{ Params: { eventId: string } }>(
-    '/api/events/:eventId/places',
+    apiRoutes.addPlace.fastify,
     { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)
@@ -149,7 +150,7 @@ export const registerPlaceRoutes = (
   )
 
   app.patch<{ Params: { id: string } }>(
-    '/api/places/:id',
+    apiRoutes.updatePlace.fastify,
     { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)
@@ -175,7 +176,7 @@ export const registerPlaceRoutes = (
   )
 
   app.delete<{ Params: { id: string } }>(
-    '/api/places/:id',
+    apiRoutes.deletePlace.fastify,
     { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)
@@ -214,7 +215,7 @@ export const registerPlaceRoutes = (
   )
 
   app.put<{ Params: { eventId: string } }>(
-    '/api/events/:eventId/places/order',
+    apiRoutes.reorderPlaces.fastify,
     { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)
@@ -257,7 +258,7 @@ export const registerPlaceRoutes = (
 
   /** The burns whose grid this one's could be seeded from, newest first. */
   app.get<{ Params: { eventId: string } }>(
-    '/api/events/:eventId/places/sources',
+    apiRoutes.getPlaceSources.fastify,
     { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)
@@ -285,7 +286,7 @@ export const registerPlaceRoutes = (
    * completion in turn, so no test here can exercise that window.
    */
   app.post<{ Params: { eventId: string } }>(
-    '/api/events/:eventId/places/copy',
+    apiRoutes.copyPlaces.fastify,
     { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)

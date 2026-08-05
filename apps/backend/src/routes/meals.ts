@@ -2,6 +2,7 @@ import type { Meal, MealResponse, MealSlot, MealSlotsResponse, MealsResponse } f
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
 import {
+  apiRoutes,
   errorResponse,
   mealCreateSchema,
   mealIdeaUpdateSchema,
@@ -184,7 +185,7 @@ export const registerMealRoutes = (
   }
 
   app.get<{ Params: { eventId: string } }>(
-    '/api/events/:eventId/meals',
+    apiRoutes.getMeals.fastify,
     { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)
@@ -202,7 +203,7 @@ export const registerMealRoutes = (
 
   /** The words above the table. Any approved member, like the burn's welcome text. */
   app.patch<{ Params: { eventId: string } }>(
-    '/api/events/:eventId/meal-intro',
+    apiRoutes.updateMealIntro.fastify,
     { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)
@@ -245,7 +246,7 @@ export const registerMealRoutes = (
    * no cost; that is the whole of the claim.
    */
   app.put<{ Params: { id: string } }>(
-    '/api/meals/:id/lead',
+    apiRoutes.setMealLead.fastify,
     { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)
@@ -364,7 +365,7 @@ export const registerMealRoutes = (
    * dropping stay admin's, because those change whether people get fed.
    */
   app.patch<{ Params: { id: string } }>(
-    '/api/meals/:id',
+    apiRoutes.updateMeal.fastify,
     { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)
@@ -410,7 +411,7 @@ export const registerMealRoutes = (
    * by it — the sheet's own header calls the column "Not needed".
    */
   app.put<{ Params: { id: string } }>(
-    '/api/meals/:id/idea',
+    apiRoutes.setMealIdea.fastify,
     { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)
@@ -440,47 +441,41 @@ export const registerMealAdminRoutes = (app: FastifyInstance, { db }: MealDeps) 
     slots: await slotsFor(db, eventId),
   })
 
-  app.get<{ Params: { eventId: string } }>(
-    '/api/admin/events/:eventId/meal-slots',
-    async (request, reply) => {
-      void noStore(reply)
+  app.get<{ Params: { eventId: string } }>(apiRoutes.getMealSlots.fastify, async (request, reply) => {
+    void noStore(reply)
 
-      // Looked up rather than selected straight by `event_id`, which answered
-      // `200 {slots: []}` for any id at all — including one that had never existed.
-      // Its siblings 404, and whoever reads one route to learn how the others behave
-      // should not be told something different by each.
-      const burn = await burnFor(db, request.params.eventId)
-      if (burn === undefined) return reply.code(404).send(errorResponse('not_found'))
+    // Looked up rather than selected straight by `event_id`, which answered
+    // `200 {slots: []}` for any id at all — including one that had never existed.
+    // Its siblings 404, and whoever reads one route to learn how the others behave
+    // should not be told something different by each.
+    const burn = await burnFor(db, request.params.eventId)
+    if (burn === undefined) return reply.code(404).send(errorResponse('not_found'))
 
-      return answerSlots(burn.id)
-    },
-  )
+    return answerSlots(burn.id)
+  })
 
-  app.post<{ Params: { eventId: string } }>(
-    '/api/admin/events/:eventId/meal-slots',
-    async (request, reply) => {
-      void noStore(reply)
+  app.post<{ Params: { eventId: string } }>(apiRoutes.addMealSlot.fastify, async (request, reply) => {
+    void noStore(reply)
 
-      const parsed = mealSlotCreateSchema.safeParse(request.body)
-      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+    const parsed = mealSlotCreateSchema.safeParse(request.body)
+    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
 
-      const existing = await slotsFor(db, request.params.eventId)
-      const order = existing.reduce((highest, slot) => Math.max(highest, slot.order + 1), 0)
+    const existing = await slotsFor(db, request.params.eventId)
+    const order = existing.reduce((highest, slot) => Math.max(highest, slot.order + 1), 0)
 
-      try {
-        await db
-          .insert(mealSlot)
-          .values({ ...parsed.data, id: randomUUID(), event_id: request.params.eventId, order })
-      } catch (failure) {
-        if (isForeignKeyViolation(failure)) return reply.code(404).send(errorResponse('not_found'))
-        throw failure
-      }
+    try {
+      await db
+        .insert(mealSlot)
+        .values({ ...parsed.data, id: randomUUID(), event_id: request.params.eventId, order })
+    } catch (failure) {
+      if (isForeignKeyViolation(failure)) return reply.code(404).send(errorResponse('not_found'))
+      throw failure
+    }
 
-      return reply.code(201).send(await answerSlots(request.params.eventId))
-    },
-  )
+    return reply.code(201).send(await answerSlots(request.params.eventId))
+  })
 
-  app.patch<{ Params: { id: string } }>('/api/admin/meal-slots/:id', async (request, reply) => {
+  app.patch<{ Params: { id: string } }>(apiRoutes.updateMealSlot.fastify, async (request, reply) => {
     void noStore(reply)
 
     const parsed = mealSlotUpdateSchema.safeParse(request.body)
@@ -500,7 +495,7 @@ export const registerMealAdminRoutes = (app: FastifyInstance, { db }: MealDeps) 
     return answerSlots(existing.event_id)
   })
 
-  app.delete<{ Params: { id: string } }>('/api/admin/meal-slots/:id', async (request, reply) => {
+  app.delete<{ Params: { id: string } }>(apiRoutes.deleteMealSlot.fastify, async (request, reply) => {
     void noStore(reply)
 
     const [row] = await db
@@ -523,43 +518,40 @@ export const registerMealAdminRoutes = (app: FastifyInstance, { db }: MealDeps) 
    * Saturday's dinner to 19:00 therefore survives regenerating, which is the whole
    * reason meals are rows.
    */
-  app.post<{ Params: { eventId: string } }>(
-    '/api/admin/events/:eventId/meals/generate',
-    async (request, reply) => {
-      void noStore(reply)
+  app.post<{ Params: { eventId: string } }>(apiRoutes.generateMeals.fastify, async (request, reply) => {
+    void noStore(reply)
 
-      const burn = await burnFor(db, request.params.eventId)
-      if (burn === undefined) return reply.code(404).send(errorResponse('not_found'))
+    const burn = await burnFor(db, request.params.eventId)
+    if (burn === undefined) return reply.code(404).send(errorResponse('not_found'))
 
-      const slots = await slotsFor(db, burn.id)
-      const existing = await db
-        .select({ date: meal.date, label: meal.label })
-        .from(meal)
-        .where(eq(meal.event_id, burn.id))
+    const slots = await slotsFor(db, burn.id)
+    const existing = await db
+      .select({ date: meal.date, label: meal.label })
+      .from(meal)
+      .where(eq(meal.event_id, burn.id))
 
-      const already = new Set(existing.map((row) => `${row.date} ${row.label}`))
+    const already = new Set(existing.map((row) => `${row.date} ${row.label}`))
 
-      const wanted = slots.flatMap((slot) =>
-        sittingDates(burn, slot.at)
-          .filter((date) => !already.has(`${date} ${slot.label}`))
-          .map((date) => ({
-            id: randomUUID(),
-            event_id: burn.id,
-            date,
-            at: slot.at,
-            label: slot.label,
-            kind: slot.kind,
-            food_idea: '',
-          })),
-      )
+    const wanted = slots.flatMap((slot) =>
+      sittingDates(burn, slot.at)
+        .filter((date) => !already.has(`${date} ${slot.label}`))
+        .map((date) => ({
+          id: randomUUID(),
+          event_id: burn.id,
+          date,
+          at: slot.at,
+          label: slot.label,
+          kind: slot.kind,
+          food_idea: '',
+        })),
+    )
 
-      if (wanted.length > 0) await db.insert(meal).values(wanted)
+    if (wanted.length > 0) await db.insert(meal).values(wanted)
 
-      return reply.code(201).send({ meals: await mealsFor(db, burn.id) })
-    },
-  )
+    return reply.code(201).send({ meals: await mealsFor(db, burn.id) })
+  })
 
-  app.post<{ Params: { eventId: string } }>('/api/admin/events/:eventId/meals', async (request, reply) => {
+  app.post<{ Params: { eventId: string } }>(apiRoutes.addMeal.fastify, async (request, reply) => {
     void noStore(reply)
 
     const parsed = mealCreateSchema.safeParse(request.body)
@@ -586,7 +578,7 @@ export const registerMealAdminRoutes = (app: FastifyInstance, { db }: MealDeps) 
       : reply.code(201).send({ meal: created } satisfies MealResponse)
   })
 
-  app.delete<{ Params: { id: string } }>('/api/admin/meals/:id', async (request, reply) => {
+  app.delete<{ Params: { id: string } }>(apiRoutes.deleteMeal.fastify, async (request, reply) => {
     void noStore(reply)
 
     const deleted = await db.delete(meal).where(eq(meal.id, request.params.id)).returning({ id: meal.id })

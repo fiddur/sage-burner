@@ -2,6 +2,7 @@ import type { ActiveEventResponse, Event, EventResponse, EventsResponse } from '
 import type { FastifyInstance } from 'fastify'
 
 import {
+  apiRoutes,
   errorResponse,
   eventCreateSchema,
   eventUpdateSchema,
@@ -87,7 +88,7 @@ export const registerEventRoutes = (
 ) => {
   const { requireApproved } = createGuards({ db, sessions })
 
-  app.get('/api/events/active', async (_request, reply) => {
+  app.get(apiRoutes.getActiveEvent.fastify, async (_request, reply) => {
     // `no-cache`, not `no-store`. This is public content, so there is no reason
     // to forbid storing it — but #13 requires an edit to show up without a
     // redeploy, and with no `ETag` or `Last-Modified` the response would
@@ -103,7 +104,7 @@ export const registerEventRoutes = (
     return { event: found ?? null } satisfies ActiveEventResponse
   })
 
-  app.get('/api/admin/events', async (_request, reply) => {
+  app.get(apiRoutes.getEvents.fastify, async (_request, reply) => {
     void noStore(reply)
 
     const events = await db.select().from(event).orderBy(asc(event.start_date))
@@ -111,7 +112,7 @@ export const registerEventRoutes = (
     return { events } satisfies EventsResponse
   })
 
-  app.post('/api/admin/events', async (request, reply) => {
+  app.post(apiRoutes.createEvent.fastify, async (request, reply) => {
     void noStore(reply)
 
     const parsed = eventCreateSchema.safeParse(request.body)
@@ -143,7 +144,7 @@ export const registerEventRoutes = (
    * trade.
    */
   app.patch<{ Params: { id: string } }>(
-    '/api/events/:id/welcome',
+    apiRoutes.updateWelcome.fastify,
     { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)
@@ -163,7 +164,7 @@ export const registerEventRoutes = (
     },
   )
 
-  app.patch<{ Params: { id: string } }>('/api/admin/events/:id', async (request, reply) => {
+  app.patch<{ Params: { id: string } }>(apiRoutes.updateEvent.fastify, async (request, reply) => {
     void noStore(reply)
 
     const { id } = request.params

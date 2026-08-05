@@ -1,7 +1,7 @@
 import type { EventAttendeesResponse, MyBurn, MyBurnsResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { attendanceCreateSchema, errorResponse } from '@sage-burner/shared'
+import { apiRoutes, attendanceCreateSchema, errorResponse } from '@sage-burner/shared'
 import { and, asc, eq, gte, isNotNull, or } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
@@ -149,7 +149,7 @@ export const registerAttendanceRoutes = (
    * `requireMember` that account got a 403, the provider swallowed it, and they faced
    * the empty selector this whole design exists to prevent.
    */
-  app.get('/api/events/mine', { preHandler: requireApproved }, async (request, reply) => {
+  app.get(apiRoutes.getMyBurns.fastify, { preHandler: requireApproved }, async (request, reply) => {
     void noStore(reply)
 
     const viewer = await viewerFor(request, { db, sessions })
@@ -202,7 +202,7 @@ export const registerAttendanceRoutes = (
   })
 
   app.post<{ Params: { eventId: string } }>(
-    '/api/events/:eventId/attendance/me',
+    apiRoutes.joinEvent.fastify,
     { preHandler: requireMember },
     async (request, reply) => {
       void noStore(reply)
@@ -218,7 +218,7 @@ export const registerAttendanceRoutes = (
   )
 
   app.delete<{ Params: { eventId: string } }>(
-    '/api/events/:eventId/attendance/me',
+    apiRoutes.leaveEvent.fastify,
     { preHandler: requireMember },
     async (request, reply) => {
       void noStore(reply)
@@ -263,7 +263,7 @@ export const registerAttendanceRoutes = (
    * rather than from a page somebody chose to open.
    */
   app.get<{ Params: { eventId: string } }>(
-    '/api/events/:eventId/attendees',
+    apiRoutes.getEventAttendees.fastify,
     { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)
@@ -280,54 +280,51 @@ export const registerAttendanceRoutes = (
     },
   )
 
-  app.post<{ Params: { eventId: string } }>(
-    '/api/admin/events/:eventId/attendance',
-    async (request, reply) => {
-      void noStore(reply)
+  app.post<{ Params: { eventId: string } }>(apiRoutes.adminAddAttendance.fastify, async (request, reply) => {
+    void noStore(reply)
 
-      const parsed = attendanceCreateSchema.safeParse(request.body)
-      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+    const parsed = attendanceCreateSchema.safeParse(request.body)
+    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
 
-      const existing = await joinedRow(request.params.eventId, parsed.data.account_id)
-      if (existing !== undefined) return { attendance: existing }
+    const existing = await joinedRow(request.params.eventId, parsed.data.account_id)
+    if (existing !== undefined) return { attendance: existing }
 
-      // Only for the dates. A missing event is still the foreign key's to
-      // reject below, so this read cannot answer 404 on its own.
-      const [burn] = await db
-        .select({ start_date: event.start_date, end_date: event.end_date })
-        .from(event)
-        .where(eq(event.id, request.params.eventId))
-        .limit(1)
+    // Only for the dates. A missing event is still the foreign key's to
+    // reject below, so this read cannot answer 404 on its own.
+    const [burn] = await db
+      .select({ start_date: event.start_date, end_date: event.end_date })
+      .from(event)
+      .where(eq(event.id, request.params.eventId))
+      .limit(1)
 
-      try {
-        await db.insert(attendance).values({
-          id: randomUUID(),
-          event_id: request.params.eventId,
-          account_id: parsed.data.account_id,
-          joined_at: now().toISOString(),
-          payment_status: 'unpaid',
-          // The same default an organiser would otherwise type in for them.
-          arrival_date: burn?.start_date ?? null,
-          departure_date: burn?.end_date ?? null,
-        })
-      } catch (error) {
-        // No pre-read for either id: the foreign keys already reject a missing
-        // event or account, and asking first would be a second query that says
-        // the same thing. Narrowed to those failures so a real bug still surfaces
-        // as a 500 rather than as a confident 404.
-        if (isForeignKeyViolation(error)) return reply.code(404).send(errorResponse('not_found'))
-        // The same race the member route has, and one it shares with it: an
-        // organiser adding someone at the moment they add themselves.
-        if (!isAlreadyJoined(error)) throw error
+    try {
+      await db.insert(attendance).values({
+        id: randomUUID(),
+        event_id: request.params.eventId,
+        account_id: parsed.data.account_id,
+        joined_at: now().toISOString(),
+        payment_status: 'unpaid',
+        // The same default an organiser would otherwise type in for them.
+        arrival_date: burn?.start_date ?? null,
+        departure_date: burn?.end_date ?? null,
+      })
+    } catch (error) {
+      // No pre-read for either id: the foreign keys already reject a missing
+      // event or account, and asking first would be a second query that says
+      // the same thing. Narrowed to those failures so a real bug still surfaces
+      // as a 500 rather than as a confident 404.
+      if (isForeignKeyViolation(error)) return reply.code(404).send(errorResponse('not_found'))
+      // The same race the member route has, and one it shares with it: an
+      // organiser adding someone at the moment they add themselves.
+      if (!isAlreadyJoined(error)) throw error
 
-        return { attendance: await joinedRow(request.params.eventId, parsed.data.account_id) }
-      }
+      return { attendance: await joinedRow(request.params.eventId, parsed.data.account_id) }
+    }
 
-      return reply
-        .code(201)
-        .send({ attendance: await joinedRow(request.params.eventId, parsed.data.account_id) })
-    },
-  )
+    return reply
+      .code(201)
+      .send({ attendance: await joinedRow(request.params.eventId, parsed.data.account_id) })
+  })
 
   app.delete<{ Params: { eventId: string; accountId: string } }>(
     '/api/admin/events/:eventId/attendance/:accountId',

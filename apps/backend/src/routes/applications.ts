@@ -1,7 +1,13 @@
 import type { Application, ApplicationResponse, StoredAnswers } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { answerProblems, applicationCreateSchema, errorResponse, isTickBox } from '@sage-burner/shared'
+import {
+  answerProblems,
+  apiRoutes,
+  applicationCreateSchema,
+  errorResponse,
+  isTickBox,
+} from '@sage-burner/shared'
 import { randomUUID } from 'node:crypto'
 
 import type { Database } from '../db/index.ts'
@@ -53,7 +59,7 @@ export const registerApplicationRoutes = (
   app: FastifyInstance,
   { db, now = () => new Date(), notify }: ApplicationRouteDeps,
 ) => {
-  app.post('/api/applications', async (request, reply) => {
+  app.post(apiRoutes.submitApplication.fastify, async (request, reply) => {
     void noStore(reply)
 
     const parsed = applicationCreateSchema.safeParse(request.body)

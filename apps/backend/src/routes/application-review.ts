@@ -1,7 +1,7 @@
 import type { ApplicationDecisionResponse, ApplicationsResponse, InviteResponse } from '@sage-burner/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
-import { errorResponse } from '@sage-burner/shared'
+import { apiRoutes, errorResponse } from '@sage-burner/shared'
 import { and, desc, eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
@@ -30,7 +30,7 @@ export const registerApplicationReviewRoutes = (
   app: FastifyInstance,
   { db, sessions, now = () => new Date() }: ApplicationReviewDeps,
 ) => {
-  app.get('/api/admin/applications', async (_request, reply) => {
+  app.get(apiRoutes.getApplications.fastify, async (_request, reply) => {
     void noStore(reply)
 
     const applications = await db.select().from(application).orderBy(desc(application.submitted_at))
@@ -101,9 +101,9 @@ export const registerApplicationReviewRoutes = (
       } satisfies ApplicationDecisionResponse
     }
 
-  app.post<{ Params: { id: string } }>('/api/admin/applications/:id/approve', settle('approved'))
+  app.post<{ Params: { id: string } }>(apiRoutes.approveApplication.fastify, settle('approved'))
 
-  app.post<{ Params: { id: string } }>('/api/admin/applications/:id/reject', settle('rejected'))
+  app.post<{ Params: { id: string } }>(apiRoutes.rejectApplication.fastify, settle('rejected'))
 
   /**
    * A fresh link for an application whose first one was lost.
@@ -127,7 +127,7 @@ export const registerApplicationReviewRoutes = (
    * link would be a second account by another name — the same hole from the other
    * end.
    */
-  app.post<{ Params: { id: string } }>('/api/admin/applications/:id/invite', async (request, reply) => {
+  app.post<{ Params: { id: string } }>(apiRoutes.reissueInvite.fastify, async (request, reply) => {
     void noStore(reply)
 
     const viewer = await viewerFor(request, { db, sessions })
