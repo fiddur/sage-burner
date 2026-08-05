@@ -32,6 +32,9 @@ type Person = NonNullable<Meal['lead']>
 type MealRow = typeof meal.$inferSelect
 type Burn = typeof event.$inferSelect
 
+/** What deciding a sitting's days actually needs — not the whole burn. */
+type BurnSpan = Pick<Burn, 'end_date' | 'end_time' | 'start_date' | 'start_time'>
+
 /** The two roles anybody may put themselves on. The lead is one person, elsewhere. */
 const STANDING = ['helper', 'cleanup'] as const
 
@@ -45,7 +48,7 @@ const STANDING = ['helper', 'cleanup'] as const
  * Both comparisons are on fixed-width strings, sound for the reason the CHECKs rely
  * on: `09:00` cannot also arrive as `9:00`.
  */
-export const sittingDates = (burn: Burn, at: string): string[] => {
+export const sittingDates = (burn: BurnSpan, at: string): string[] => {
   const dates: string[] = []
   const day = new Date(`${burn.start_date}T00:00:00Z`)
   const last = new Date(`${burn.end_date}T00:00:00Z`)
@@ -298,6 +301,40 @@ export const registerMealRoutes = (app: FastifyInstance, { db, sessions }: MealD
   )
 
   /**
+   * Moving a sitting, renaming it, or putting it on another day.
+   *
+   * `requireApproved`, unlike adding or dropping one. The schedule is the members'
+   * to arrange — that is what #20 settled — and a meal you can see in the grid but
+   * not nudge would be the one block on it that nobody could touch. Adding and
+   * dropping stay admin's, because those change whether people get fed.
+   */
+  app.patch<{ Params: { id: string } }>(
+    '/api/meals/:id',
+    { preHandler: requireApproved },
+    async (request, reply) => {
+      void noStore(reply)
+
+      const parsed = mealUpdateSchema.safeParse(request.body)
+      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+
+      const existing = await mealOr404(request.params.id)
+      if (existing === undefined) return reply.code(404).send(errorResponse('not_found'))
+
+      if (Object.keys(parsed.data).length > 0) {
+        try {
+          await db.update(meal).set(parsed.data).where(eq(meal.id, request.params.id))
+        } catch {
+          // Onto a day that already has one by that name, which the unique index
+          // refuses. A 409: the body is well formed and the burn already has one.
+          return reply.code(409).send(errorResponse('conflict'))
+        }
+      }
+
+      return answer(reply, request.params.id)
+    },
+  )
+
+  /**
    * What somebody thought of cooking. Anyone may write it, and the lead is not bound
    * by it — the sheet's own header calls the column "Not needed".
    */
@@ -468,30 +505,6 @@ export const registerMealAdminRoutes = (app: FastifyInstance, { db }: MealDeps) 
     return created === undefined
       ? reply.code(404).send(errorResponse('not_found'))
       : reply.code(201).send({ meal: created } satisfies MealResponse)
-  })
-
-  app.patch<{ Params: { id: string } }>('/api/admin/meals/:id', async (request, reply) => {
-    void noStore(reply)
-
-    const parsed = mealUpdateSchema.safeParse(request.body)
-    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
-
-    const [existing] = await db.select().from(meal).where(eq(meal.id, request.params.id)).limit(1)
-    if (existing === undefined) return reply.code(404).send(errorResponse('not_found'))
-
-    if (Object.keys(parsed.data).length > 0) {
-      try {
-        await db.update(meal).set(parsed.data).where(eq(meal.id, request.params.id))
-      } catch {
-        return reply.code(409).send(errorResponse('conflict'))
-      }
-    }
-
-    const updated = await oneMeal(db, request.params.id)
-
-    return updated === undefined
-      ? reply.code(404).send(errorResponse('not_found'))
-      : ({ meal: updated } satisfies MealResponse)
   })
 
   app.delete<{ Params: { id: string } }>('/api/admin/meals/:id', async (request, reply) => {
