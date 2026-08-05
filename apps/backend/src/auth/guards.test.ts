@@ -9,9 +9,9 @@ import { createApp } from '../app.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, accountRole } from '../db/schema.ts'
-import { SESSION_COOKIE } from '../routes/auth.ts'
 import { createGuards } from './guards.ts'
 import { createSessions } from './session.ts'
+import { SESSION_COOKIE } from './viewer.ts'
 
 /**
  * The guards, exercised through a real app rather than a fake request.

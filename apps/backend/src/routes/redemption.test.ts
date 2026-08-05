@@ -10,10 +10,10 @@ import type { DbHandle } from '../db/index.ts'
 import { createApp } from '../app.ts'
 import { createGate } from '../auth/gate.ts'
 import { verifyPassword } from '../auth/password.ts'
+import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, attendance, inviteToken } from '../db/schema.ts'
-import { SESSION_COOKIE } from './auth.ts'
 
 /**
  * Redeeming an invite: the single funnel both membership paths converge on.

@@ -815,6 +815,20 @@ same moment leave one, and a test asserts it.
 Nothing stops an organiser removing their _own_ `admin` while another exists —
 that is stepping down, not a lockout.
 
+**The viewer is resolved once per request.** A guard answers 401/403 from it and
+then has no way to hand it on, so the handler behind it used to ask again — two
+identical session+roles joins on every authenticated request, and the admin prefix
+hook made it two before the handler even ran. `viewerFor` now answers a repeat ask
+from a `WeakMap` keyed on the request object (#139), so the guard and its handler
+share one query and the entry goes when the request does. Told apart with `has`
+rather than a truthy `get`: a token that is valid but stale — signature good, account
+deleted — resolves to `undefined`, and on `get` alone that would pay for the join
+every time it was asked.
+
+It lives in `auth/viewer.ts` rather than `routes/auth.ts`, where it began. The guards
+need exactly this, so a guard was importing from a route file — `auth/` depending on
+the thing it exists to protect.
+
 Authorization is a `preHandler` on the route, not a hidden link:
 `/api/admin/*` answers **401** with `{ "error": "unauthenticated" }` when nobody
 is signed in and **403** with `{ "error": "forbidden" }` for a signed-in account

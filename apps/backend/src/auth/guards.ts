@@ -6,7 +6,7 @@ import { errorResponse } from '@sage-burner/shared'
 import type { Database } from '../db/index.ts'
 import type { Sessions } from './session.ts'
 
-import { viewerFor } from '../routes/auth.ts'
+import { viewerFor } from './viewer.ts'
 
 export interface GuardDeps {
   db: Database

@@ -8,10 +8,10 @@ import { randomUUID } from 'node:crypto'
 import type { GuardDeps } from '../auth/guards.ts'
 
 import { createGuards } from '../auth/guards.ts'
+import { viewerFor } from '../auth/viewer.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
 import { account, attendance, event } from '../db/schema.ts'
 import { noStore } from '../http.ts'
-import { viewerFor } from './auth.ts'
 import { openEvent, todayIso } from './events.ts'
 import { helpingFor, helpingIdsFor } from './helping.ts'
 
