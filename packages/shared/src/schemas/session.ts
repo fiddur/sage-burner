@@ -72,7 +72,16 @@ export const sessionFields = z.object({
   id: idSchema,
   event_id: idSchema,
   title: nonEmptyText(MAX_TITLE),
-  host_account_id: idSchema,
+  /**
+   * Who runs it, or null while nobody has said they will.
+   *
+   * Was `host_account_id`, meaning whoever wrote it down — required, and refused in
+   * every request body so that a dream could not be offered in someone else's name.
+   * #198 renamed it and opened it: handing a dream to the person who will facilitate
+   * it is the point, not something to prevent. The routes still check they are coming
+   * to this burn, the way the lead-roles register does.
+   */
+  facilitator_account_id: idSchema.nullable(),
   description: z.string().max(MAX_DESCRIPTION),
   time_slot_start: dateTimeSchema.nullable(),
   time_slot_end: dateTimeSchema.nullable(),
@@ -99,9 +108,9 @@ export type Session = z.infer<typeof sessionSchema>
 /**
  * The subset of a session that may appear in the public ICS feed.
  *
- * The feed needs no authentication, so this shape is the guard rail: it carries
- * no host identity, no contact details, no allergies and no payment state. If a
- * field is not here, it does not leave the building.
+ * The feed needs no authentication, so this shape is the guard rail: it carries no
+ * facilitator, no contact details, no allergies and no payment state. If a field is
+ * not here, it does not leave the building.
  *
  * Both timestamps are required — only scheduled sessions belong in a calendar —
  * and the ordering check is re-applied so the feed cannot emit an event whose
@@ -131,37 +140,42 @@ export type SessionResponse = z.infer<typeof sessionResponseSchema>
 /**
  * Offering a dream.
  *
- * `event_id` comes from the route and the host from the session, so neither is
- * accepted here — a body that could name either would let one member offer a
- * dream in someone else's name, or against a burn they are not looking at.
+ * `event_id` comes from the route, so it is not accepted here — a body naming one
+ * would let a member offer a dream against a burn they are not looking at.
+ *
+ * The facilitator **is** accepted, and defaults to nobody. Offering something for
+ * another member to run is an ordinary thing to do, and the route checks they are
+ * coming to this burn.
  */
 export const sessionCreateSchema = withValidTimeSlot(
   sessionFields
-    .omit({ id: true, event_id: true, host_account_id: true })
+    .omit({ id: true, event_id: true })
     .extend({
       description: sessionFields.shape.description.default(''),
       time_slot_start: sessionFields.shape.time_slot_start.default(null),
       time_slot_end: sessionFields.shape.time_slot_end.default(null),
       place_id: sessionFields.shape.place_id.default(null),
+      facilitator_account_id: sessionFields.shape.facilitator_account_id.default(null),
     })
     .strict(),
 )
 export type SessionCreate = z.infer<typeof sessionCreateSchema>
 
 /**
- * `SessionCreate` is the output type, so the four defaulted fields are required
+ * `SessionCreate` is the output type, so the five defaulted fields are required
  * there — which makes the defaults useless to a caller typed against it. This is
  * the request shape. Same split as `EventCreateInput`.
  */
 export type SessionCreateInput = z.input<typeof sessionCreateSchema>
 
 /**
- * Editing one, including scheduling it.
+ * Editing one, including scheduling it and handing it to a facilitator.
  *
- * `host_account_id` is not editable yet: reassigning a dream needs a member-
- * visible list of members to pick from, which does not exist.
+ * The facilitator became editable in #198, once there was a member-visible list of
+ * members to pick from — `GET /api/events/:eventId/attendees`, which the lead-roles
+ * register already uses for the same purpose.
  */
 export const sessionUpdateSchema = withValidTimeSlot(
-  sessionFields.omit({ id: true, event_id: true, host_account_id: true }).partial().strict(),
+  sessionFields.omit({ id: true, event_id: true }).partial().strict(),
 )
 export type SessionUpdate = z.infer<typeof sessionUpdateSchema>

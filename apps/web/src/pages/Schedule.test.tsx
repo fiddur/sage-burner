@@ -33,7 +33,7 @@ const SAUNA: Place = { id: 'p-2', event_id: 'e-1', order: 1, name: 'Sauna', emoj
 
 const aDream = (over: Partial<Session> & Pick<Session, 'id' | 'title'>): Session => ({
   event_id: 'e-1',
-  host_account_id: 'a-1',
+  facilitator_account_id: 'a-1',
   description: '',
   time_slot_start: null,
   time_slot_end: null,

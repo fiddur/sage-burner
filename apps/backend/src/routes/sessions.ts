@@ -16,7 +16,7 @@ import type { Database } from '../db/index.ts'
 import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
-import { place, session } from '../db/schema.ts'
+import { attendance, place, session } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 import { openEvent, todayIso } from './events.ts'
 
@@ -51,6 +51,28 @@ const placeIsOnThisBurn = async (db: Database, eventId: string, placeId: string 
     .select({ id: place.id })
     .from(place)
     .where(and(eq(place.id, placeId), eq(place.event_id, eventId)))
+    .limit(1)
+
+  return found !== undefined
+}
+
+/**
+ * Whether a facilitator is coming to the burn their dream is at.
+ *
+ * The same rule the lead-roles register applies to a lead, and for the same reason:
+ * somebody who is not there cannot run it. The foreign key only knows the account
+ * exists, so it cannot say this.
+ *
+ * `null` is always fine — a dream can be offered before anyone has said they will
+ * facilitate it, which is the ordinary state of one on the day it is written down.
+ */
+const facilitatorIsComing = async (db: Database, eventId: string, accountId: string | null | undefined) => {
+  if (accountId == null) return true
+
+  const [found] = await db
+    .select({ id: attendance.id })
+    .from(attendance)
+    .where(and(eq(attendance.event_id, eventId), eq(attendance.account_id, accountId)))
     .limit(1)
 
   return found !== undefined
@@ -104,12 +126,18 @@ export const registerSessionRoutes = (
       if (!(await placeIsOnThisBurn(db, open.id, parsed.data.place_id))) {
         return reply.code(400).send(errorResponse('bad_request'))
       }
+      if (!(await facilitatorIsComing(db, open.id, parsed.data.facilitator_account_id))) {
+        return reply.code(400).send(errorResponse('bad_request'))
+      }
 
+      // The facilitator comes from the body now, defaulting to nobody. It used to be
+      // the caller, on the reasoning that a dream in someone else's name was not an
+      // edit anyone should make by hand — but offering something for another member
+      // to run is exactly that edit, and #198 is it being wanted.
       const row: Session = {
         ...parsed.data,
         id: randomUUID(),
         event_id: open.id,
-        host_account_id: viewer.account_id,
       }
 
       // Split deliberately. The foreign key is the authority on the place *existing*,
@@ -161,6 +189,9 @@ export const registerSessionRoutes = (
       }
 
       if (!(await placeIsOnThisBurn(db, existing.event_id, parsed.data.place_id))) {
+        return reply.code(400).send(errorResponse('bad_request'))
+      }
+      if (!(await facilitatorIsComing(db, existing.event_id, parsed.data.facilitator_account_id))) {
         return reply.code(400).send(errorResponse('bad_request'))
       }
 

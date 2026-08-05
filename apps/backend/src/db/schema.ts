@@ -602,20 +602,23 @@ export const session = sqliteTable(
       .references(() => event.id, { onDelete: 'cascade' }),
     title: text('title').notNull(),
     /**
-     * The host is a person, not one of their stays.
+     * Who runs it — a person, not one of their stays.
      *
-     * Not constrained to require an `attendance` for this event, so a dream can
-     * name a host who is not coming to this burn — ordinary application logic
-     * rather than a race, so the scheduling routes (#20) own it.
+     * Was `host_account_id`, meaning whoever wrote the dream down, and it was set
+     * from the session and refused in the body. Renamed and opened in #198: a dream
+     * can be offered for somebody else to facilitate, and handing it to them is the
+     * point rather than something to prevent.
+     *
+     * **Nullable**, because a dream can be offered before anyone has said they will
+     * run it. Not constrained to require an `attendance` for this event either — the
+     * scheduling routes check that, the way the lead-roles register does.
      *
      * No `onDelete`, matching `invite_token.created_by` and
-     * `attendance.account_id`: an account that has hosted something cannot be
-     * deleted, rather than having every dream it ever hosted vanish with it.
-     * #35 owns what account deletion should actually do.
+     * `attendance.account_id`: an account that has facilitated something cannot be
+     * deleted, rather than having every dream it ever ran vanish with it. #35 owns
+     * what account deletion should actually do.
      */
-    host_account_id: text('host_account_id')
-      .notNull()
-      .references(() => account.id),
+    facilitator_account_id: text('facilitator_account_id').references(() => account.id),
     description: text('description').notNull().default(''),
     time_slot_start: text('time_slot_start'),
     time_slot_end: text('time_slot_end'),

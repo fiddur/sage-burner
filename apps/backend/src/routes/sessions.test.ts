@@ -11,7 +11,7 @@ import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, event, place, session } from '../db/schema.ts'
+import { account, accountRole, attendance, event, place, session } from '../db/schema.ts'
 
 const SECRET = 's'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
@@ -161,23 +161,63 @@ describe('dreams', () => {
       time_slot_start: null,
       time_slot_end: null,
       place_id: null,
-      host_account_id: member.id,
+      // Nobody, until somebody is handed it. It used to be whoever offered it, on the
+      // reasoning that a dream in someone else's name was not an edit anyone should
+      // make by hand — which is exactly the edit #198 wanted.
+      facilitator_account_id: null,
     })
   })
 
-  it('hosts it in the name of whoever offered it, whatever the body says', async () => {
-    // A dream in someone else's name is not an edit anyone should make by hand.
+  it('takes a facilitator who is coming, and refuses one who is not', async () => {
     const server = await build()
-    await givenEvent()
+    const eventId = await givenEvent()
     const member = await givenAccount(['member'])
-    const other = await givenAccount(['member'])
-
-    const response = await offer(server, member.cookie, {
-      title: 'Sunrise yoga',
-      host_account_id: other.id,
+    const elsewhere = await givenAccount(['member'])
+    await db().insert(attendance).values({
+      id: randomUUID(),
+      event_id: eventId,
+      account_id: member.id,
+      joined_at: NOW,
+      payment_status: 'unpaid',
     })
 
-    expect(response.statusCode).toBe(400)
+    const taken = await offer(server, member.cookie, {
+      title: 'Sunrise yoga',
+      facilitator_account_id: member.id,
+    })
+    expect(taken.statusCode).toBe(201)
+    expect(taken.json().session.facilitator_account_id).toBe(member.id)
+
+    // The same rule the lead-roles register applies to a lead: somebody who is not
+    // there cannot run it. A 400 rather than a 404 — the account exists, the pairing
+    // is what is wrong.
+    const absent = await offer(server, member.cookie, {
+      title: 'Cacao ceremony',
+      facilitator_account_id: elsewhere.id,
+    })
+    expect(absent.statusCode).toBe(400)
+  })
+
+  it('hands a dream to somebody else, which the old rule refused outright', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const member = await givenAccount(['member'])
+    const other = await givenAccount(['member'])
+    for (const who of [member.id, other.id]) {
+      await db().insert(attendance).values({
+        id: randomUUID(),
+        event_id: eventId,
+        account_id: who,
+        joined_at: NOW,
+        payment_status: 'unpaid',
+      })
+    }
+    const id = (await offer(server, member.cookie, { title: 'Sunrise yoga' })).json().session.id
+
+    const response = await editDream(server, member.cookie, id, { facilitator_account_id: other.id })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().session.facilitator_account_id).toBe(other.id)
   })
 
   it('refuses to attach it to a burn the caller did not name', async () => {
@@ -441,7 +481,7 @@ describe('dreams', () => {
     const old = randomUUID()
     await db()
       .insert(session)
-      .values({ id: old, event_id: finished, title: 'Last year', host_account_id: member.id })
+      .values({ id: old, event_id: finished, title: 'Last year', facilitator_account_id: member.id })
 
     expect((await editDream(server, member.cookie, old, { title: 'Rewritten' })).statusCode).toBe(404)
     expect((await drop(server, member.cookie, old)).statusCode).toBe(404)
@@ -554,7 +594,7 @@ describe('a dream belongs to the burn it names', () => {
       id,
       event_id: ENDED,
       title: 'Last summer',
-      host_account_id: member.id,
+      facilitator_account_id: member.id,
     })
 
     expect((await offer(server, member.cookie, { title: 'x' }, ENDED)).statusCode).toBe(404)
@@ -571,7 +611,7 @@ describe('a dream belongs to the burn it names', () => {
       id: randomUUID(),
       event_id: ENDED,
       title: 'Last summer',
-      host_account_id: member.id,
+      facilitator_account_id: member.id,
     })
 
     const response = await list(server, member.cookie, ENDED)

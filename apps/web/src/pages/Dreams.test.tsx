@@ -32,7 +32,7 @@ const TEMPLE: Place = { id: 'p-1', event_id: 'e-1', order: 0, name: 'Temple', em
 
 const aDream = (over: Partial<Session> & Pick<Session, 'id' | 'title'>): Session => ({
   event_id: 'e-1',
-  host_account_id: 'a-1',
+  facilitator_account_id: 'a-1',
   description: '',
   time_slot_start: null,
   time_slot_end: null,
@@ -303,7 +303,9 @@ describe('Dreams', () => {
     const updateSession = vi.fn<DreamsApi['updateSession']>(() =>
       Promise.resolve({ session: aDream({ id: 's-1', title: 'Theirs' }) }),
     )
-    renderPage(stub({ updateSession }, [aDream({ id: 's-1', title: 'Theirs', host_account_id: 'a-9' })]))
+    renderPage(
+      stub({ updateSession }, [aDream({ id: 's-1', title: 'Theirs', facilitator_account_id: 'a-9' })]),
+    )
 
     expect(await screen.findByRole('button', { name: 'Edit Theirs' })).toBeTruthy()
   })
