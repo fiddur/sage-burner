@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 import { accountRoles } from '../enums.ts'
-import { emailSchema } from './auth.ts'
+import { emailSchema, newPasswordSchema } from './auth.ts'
 import { dateTimeSchema, idSchema } from './common.ts'
 
 /**
@@ -21,6 +21,24 @@ export type AdminAccount = z.infer<typeof adminAccountSchema>
 
 export const adminAccountsResponseSchema = z.object({ accounts: z.array(adminAccountSchema) })
 export type AdminAccountsResponse = z.infer<typeof adminAccountsResponseSchema>
+
+/**
+ * Setting somebody's password for them.
+ *
+ * There is no other way to change one once it is set: redemption is where a
+ * password is chosen, `admin:create` refuses to touch an existing one, and nothing
+ * else writes the column except the silent rehash on login. So an account whose
+ * owner has lost the password — or one an organiser made and did not write down —
+ * had no way back at all.
+ *
+ * The **old** password is not asked for, because an organiser does not have it.
+ * That is the whole point, and it is also what makes this the most dangerous route
+ * in the app: it is admin taking over any account, including another admin's. At
+ * 42 people who all know each other that is the same trust the role already
+ * carries; it is written down here so nobody has to infer it.
+ */
+export const adminPasswordResetSchema = z.object({ password: newPasswordSchema }).strict()
+export type AdminPasswordReset = z.infer<typeof adminPasswordResetSchema>
 
 /**
  * The whole set an account should end up with, not a delta.

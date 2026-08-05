@@ -559,6 +559,35 @@ the corner — `admin:create` grants `member` alongside `admin`, because an orga
 is almost always also coming. The circle shows a 👤 until a name is filled in, which
 is the state that account starts in.
 
+**It never changes an existing password**, and says so when it finds one. Setting a
+password for somebody is the accounts list's job.
+
+### Setting somebody's password
+
+Every row of ⚙️'s accounts list has a field for it (#211). It is the **only** way a
+password changes once it is set: redemption is where one is chosen, `admin:create`
+refuses to touch an existing one, and nothing else writes the column except a silent
+rehash on login when scrypt's parameters have moved on. Before this, an account whose
+owner had lost the password — or one an organiser made and did not write down — had
+no way back at all.
+
+No old password is asked for, because an organiser does not have it. That is the
+point, and it also makes this the most powerful route in the app: admin taking over
+any account, another organiser's included. At 42 people who all know each other that
+is the trust the role already carries, and it is written here so nobody has to infer
+it.
+
+The field is deliberately **not** `type="password"`: an organiser is choosing a
+password to read out or paste to somebody, and hiding it from the person choosing it
+helps nobody. Nothing is echoed back by the API — 204 and an empty body, because a
+password in a response is a password in somebody's network log — so it has to be
+passed on before the page is left.
+
+**It does not end that account's existing sessions.** Sessions are stateless signed
+cookies with a TTL and there is nothing to revoke them against, so a reset locks
+nobody out of a browser already signed in. Fine for the case this exists for; not
+fine for a compromised account, which would want a session version to bump.
+
 Both values come from the environment, never from arguments. `read -rs` keeps
 the password out of the shell history, and `-e ADMIN_PASSWORD` with no `=`
 forwards the value from the caller's environment rather than restating it — so

@@ -4,6 +4,7 @@ import type {
   AdminAccountResponse,
   AdminAccountsResponse,
   AdminInvitesResponse,
+  AdminPasswordReset,
   ApplicationCreate,
   ApplicationDecisionResponse,
   ApplicationResponse,
@@ -285,6 +286,18 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
      */
     setAccountRoles: (accountId: string, body: AccountRolesUpdate) =>
       request<AdminAccountResponse>(`/admin/accounts/${encodeURIComponent(accountId)}/roles`, {
+        method: 'PUT',
+        body,
+      }),
+
+    /**
+     * Setting somebody's password for them, which nothing else can do.
+     *
+     * Answers 204 and echoes nothing: the caller already knows what they set, and a
+     * password in a response body is a password in somebody's network log.
+     */
+    setAccountPassword: (accountId: string, body: AdminPasswordReset) =>
+      request<undefined>(`/admin/accounts/${encodeURIComponent(accountId)}/password`, {
         method: 'PUT',
         body,
       }),
