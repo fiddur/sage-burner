@@ -18,6 +18,8 @@ import {
   attendance,
   passkey,
   session,
+  sessionHelper,
+  sessionSupport,
 } from './schema.ts'
 
 /**
@@ -208,6 +210,60 @@ describe('foreign keys', () => {
 
     expect(handle.db.select().from(attendance).all()).toHaveLength(0)
     expect(handle.db.select().from(session).all()).toHaveLength(0)
+  })
+
+  it('takes a dream’s helpers and hearts with it when the dream goes', () => {
+    seedAttendance(ids.attendance, ids.account)
+    handle.db
+      .insert(session)
+      .values({ id: 's1', event_id: ids.event, title: 'Cacao ceremony', description: '' })
+      .run()
+    handle.db.insert(sessionHelper).values({ session_id: 's1', attendance_id: ids.attendance }).run()
+    handle.db.insert(sessionSupport).values({ session_id: 's1', attendance_id: ids.attendance }).run()
+
+    handle.db.delete(session).where(eq(session.id, 's1')).run()
+
+    expect(handle.db.select().from(sessionHelper).all()).toHaveLength(0)
+    expect(handle.db.select().from(sessionSupport).all()).toHaveLength(0)
+  })
+
+  it('takes them with the person when they withdraw from the burn', () => {
+    // The reason both key on `attendance` rather than `account`: somebody who is no
+    // longer coming has not offered to carry anything, and a name on a helper list
+    // nobody can reach is worse than an empty one.
+    seedAttendance(ids.attendance, ids.account)
+    handle.db
+      .insert(session)
+      .values({ id: 's1', event_id: ids.event, title: 'Cacao ceremony', description: '' })
+      .run()
+    handle.db.insert(sessionHelper).values({ session_id: 's1', attendance_id: ids.attendance }).run()
+    handle.db.insert(sessionSupport).values({ session_id: 's1', attendance_id: ids.attendance }).run()
+
+    handle.db.delete(attendance).where(eq(attendance.id, ids.attendance)).run()
+
+    expect(handle.db.select().from(sessionHelper).all()).toHaveLength(0)
+    expect(handle.db.select().from(sessionSupport).all()).toHaveLength(0)
+    // The dream itself stays: it is the burn's, not the helper's.
+    expect(handle.db.select().from(session).all()).toHaveLength(1)
+  })
+
+  it('refuses a second heart from the same person, which is what makes the count sound', () => {
+    // Not a route test: the count is derived by reading rows, so "one each" has to
+    // hold against a write that skips the API as well as against `onConflictDoNothing`.
+    seedAttendance(ids.attendance, ids.account)
+    handle.db
+      .insert(session)
+      .values({ id: 's1', event_id: ids.event, title: 'Cacao ceremony', description: '' })
+      .run()
+    handle.client
+      .prepare('insert into session_support (session_id, attendance_id) values (?, ?)')
+      .run('s1', ids.attendance)
+
+    expect(() =>
+      handle.client
+        .prepare('insert into session_support (session_id, attendance_id) values (?, ?)')
+        .run('s1', ids.attendance),
+    ).toThrow()
   })
 
   it('leaves the questions and the applications alone, since neither belongs to an event', () => {

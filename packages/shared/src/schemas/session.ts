@@ -113,8 +113,22 @@ export const sessionFields = z.object({
  * An unscheduled dream (null time slot) is the normal state right up until the
  * burn, not an error: people offer things long before anyone decides when they
  * happen.
+ *
+ * The three read-only fields are not columns on `session` and are not accepted from
+ * any request body — which is why `sessionCreateSchema` and `sessionUpdateSchema`
+ * derive from `sessionFields` rather than from here. Helping and supporting are
+ * their own routes, because each is one person acting for themselves.
  */
-export const sessionSchema = withValidTimeSlot(sessionFields)
+export const sessionSchema = withValidTimeSlot(
+  sessionFields.extend({
+    /** Who has offered to help run it, by name, resolved at read time. */
+    helpers: z.array(z.object({ account_id: idSchema, name: z.string().nullable() })),
+    /** How many ❤️‍🔥 it has. Derived from the rows on every read, never stored. */
+    support_count: z.int().min(0),
+    /** Whether the reader is one of them, so the heart can be drawn filled. */
+    supported_by_me: z.boolean(),
+  }),
+)
 
 export type Session = z.infer<typeof sessionSchema>
 

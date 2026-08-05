@@ -403,6 +403,11 @@ describe('sessionSchema', () => {
     time_slot_start: '2026-10-03T09:00:00Z',
     time_slot_end: '2026-10-03T10:30:00Z',
     place_id: OTHER_ID,
+    // Read-only, and not columns on `session` — which is why the create and update
+    // bodies derive from `sessionFields` rather than from `sessionSchema`.
+    helpers: [{ account_id: ID, name: 'Ada' }],
+    support_count: 3,
+    supported_by_me: true,
   }
 
   it('lets a partial edit carry one end of the slot, which only the row can judge', () => {

@@ -1,5 +1,5 @@
 import type { Session, SessionResponse, SessionsResponse } from '@sage-burner/shared'
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, FastifyRequest } from 'fastify'
 
 import {
   errorResponse,
@@ -7,7 +7,7 @@ import {
   sessionCreateSchema,
   sessionUpdateSchema,
 } from '@sage-burner/shared'
-import { and, asc, eq, isNull } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNull } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -16,22 +16,127 @@ import type { Database } from '../db/index.ts'
 import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
-import { attendance, place, session } from '../db/schema.ts'
+import { account, attendance, place, session, sessionHelper, sessionSupport } from '../db/schema.ts'
 import { noStore } from '../http.ts'
+import { attendanceFor } from './attendance.ts'
 import { openEvent, todayIso } from './events.ts'
 
 export interface SessionDeps extends GuardDeps {
   now?: () => Date
 }
 
-const sessionsFor = (db: Database, eventId: string): Promise<Session[]> =>
-  db
+type DreamRow = typeof session.$inferSelect
+
+interface People {
+  helpers: ReadonlyMap<string, Session['helpers']>
+  support: ReadonlyMap<string, { count: number; mine: boolean }>
+}
+
+/**
+ * Who is helping with these dreams, and who has given them a ❤️‍🔥.
+ *
+ * Two queries for the whole list rather than two per dream: the page reads the
+ * programme at once, and a loop of selects would be the slower way to say the same
+ * thing. `rolesFor` in the lead-roles register is shaped the same way.
+ *
+ * The count is derived here on every read. A counter column would be a second place
+ * for the truth to live, and the primary key on `session_support` is already the
+ * whole "one heart each" rule.
+ */
+const peopleFor = async (db: Database, ids: string[], mine: string | undefined): Promise<People> => {
+  const helpers = new Map<string, Session['helpers']>()
+  const support = new Map<string, { count: number; mine: boolean }>()
+
+  // `inArray` with nothing in it is not a query worth sending, and SQLite refuses
+  // the `in ()` it renders to.
+  if (ids.length === 0) return { helpers, support }
+
+  const helperRows = await db
+    .select({ dreamId: sessionHelper.session_id, accountId: account.id, name: account.name })
+    .from(sessionHelper)
+    .innerJoin(attendance, eq(attendance.id, sessionHelper.attendance_id))
+    .innerJoin(account, eq(account.id, attendance.account_id))
+    .where(inArray(sessionHelper.session_id, ids))
+    .orderBy(asc(account.name), asc(account.id))
+
+  const supportRows = await db
+    .select({ dreamId: sessionSupport.session_id, attendanceId: sessionSupport.attendance_id })
+    .from(sessionSupport)
+    .where(inArray(sessionSupport.session_id, ids))
+
+  for (const row of helperRows) {
+    helpers.set(row.dreamId, [
+      ...(helpers.get(row.dreamId) ?? []),
+      { account_id: row.accountId, name: row.name },
+    ])
+  }
+
+  for (const row of supportRows) {
+    const sofar = support.get(row.dreamId) ?? { count: 0, mine: false }
+    support.set(row.dreamId, {
+      count: sofar.count + 1,
+      // `mine` is undefined for somebody not coming to this burn, and no stored id
+      // is undefined, so their heart stays empty rather than matching the first row.
+      mine: sofar.mine || row.attendanceId === mine,
+    })
+  }
+
+  return { helpers, support }
+}
+
+/**
+ * A stored dream as a reader sees it.
+ *
+ * Field by field rather than a spread of the row, for the reason `rolesFor` and
+ * `asMemberEntry` are: an object spread is exempt from excess-property checking, so
+ * a column added to `session` would reach every reader of the schedule without
+ * anybody naming it here.
+ */
+const asDream = (row: DreamRow, { helpers, support }: People): Session => ({
+  id: row.id,
+  event_id: row.event_id,
+  title: row.title,
+  facilitator_account_id: row.facilitator_account_id,
+  description: row.description,
+  repeatable: row.repeatable,
+  time_slot_start: row.time_slot_start,
+  time_slot_end: row.time_slot_end,
+  place_id: row.place_id,
+  helpers: helpers.get(row.id) ?? [],
+  support_count: support.get(row.id)?.count ?? 0,
+  supported_by_me: support.get(row.id)?.mine ?? false,
+})
+
+const sessionsFor = async (db: Database, eventId: string, mine: string | undefined): Promise<Session[]> => {
+  const rows = await db
     .select()
     .from(session)
     .where(eq(session.event_id, eventId))
     // Unscheduled dreams last, then by when they happen. `asc` puts nulls first
     // in SQLite, so the null-ness is sorted on explicitly rather than relied on.
     .orderBy(asc(isNull(session.time_slot_start)), asc(session.time_slot_start), asc(session.title))
+
+  const people = await peopleFor(
+    db,
+    rows.map((row) => row.id),
+    mine,
+  )
+
+  return rows.map((row) => asDream(row, people))
+}
+
+const oneDream = async (db: Database, row: DreamRow, mine: string | undefined): Promise<Session> =>
+  asDream(row, await peopleFor(db, [row.id], mine))
+
+interface Refusal {
+  code: 400 | 404
+  error: 'bad_request' | 'not_found'
+}
+
+interface Attending {
+  dream: DreamRow
+  attendanceId: string
+}
 
 /**
  * Whether a place belongs to the burn a dream is on.
@@ -66,17 +171,8 @@ const placeIsOnThisBurn = async (db: Database, eventId: string, placeId: string 
  * `null` is always fine — a dream can be offered before anyone has said they will
  * facilitate it, which is the ordinary state of one on the day it is written down.
  */
-const facilitatorIsComing = async (db: Database, eventId: string, accountId: string | null | undefined) => {
-  if (accountId == null) return true
-
-  const [found] = await db
-    .select({ id: attendance.id })
-    .from(attendance)
-    .where(and(eq(attendance.event_id, eventId), eq(attendance.account_id, accountId)))
-    .limit(1)
-
-  return found !== undefined
-}
+const facilitatorIsComing = async (db: Database, eventId: string, accountId: string | null | undefined) =>
+  accountId == null || (await attendanceFor(db, eventId, accountId)) !== undefined
 
 /**
  * Dreams — the member-offered workshops, ceremonies and happenings.
@@ -94,6 +190,19 @@ export const registerSessionRoutes = (
 ) => {
   const { requireMember } = createGuards({ db, sessions })
 
+  /**
+   * The caller's attendance at a burn, or nothing if they are not coming to it.
+   *
+   * Which is what `supported_by_me` is about, and what a helper row references.
+   * Somebody with the `member` role who has not joined this burn is the ordinary
+   * case here — they can read the programme and cannot yet be part of it.
+   */
+  const mineAt = async (request: FastifyRequest, eventId: string) => {
+    const viewer = await viewerFor(request, { db, sessions })
+
+    return viewer === undefined ? undefined : await attendanceFor(db, eventId, viewer.account_id)
+  }
+
   app.get<{ Params: { eventId: string } }>(
     '/api/events/:eventId/sessions',
     { preHandler: requireMember },
@@ -103,7 +212,9 @@ export const registerSessionRoutes = (
       // Reading a finished burn's dreams is reading its record, so this is not
       // scoped the way the writes below are. An empty list for an id that names
       // nothing is the same answer as for a burn nobody offered anything at.
-      return { sessions: await sessionsFor(db, request.params.eventId) } satisfies SessionsResponse
+      const mine = await mineAt(request, request.params.eventId)
+
+      return { sessions: await sessionsFor(db, request.params.eventId, mine) } satisfies SessionsResponse
     },
   )
 
@@ -133,7 +244,7 @@ export const registerSessionRoutes = (
       // the caller, on the reasoning that a dream in someone else's name was not an
       // edit anyone should make by hand — but offering something for another member
       // to run is exactly that edit, and #198 is it being wanted.
-      const row: Session = {
+      const row: DreamRow = {
         ...parsed.data,
         id: randomUUID(),
         event_id: open.id,
@@ -151,7 +262,12 @@ export const registerSessionRoutes = (
         throw failure
       }
 
-      return reply.code(201).send({ session: row } satisfies SessionResponse)
+      // Built from what was written rather than read back: a new dream has nobody
+      // helping and no hearts by definition, so a re-read would only be a query
+      // that could fail to find its own insert and need an impossible branch.
+      const dream: Session = { ...row, helpers: [], support_count: 0, supported_by_me: false }
+
+      return reply.code(201).send({ session: dream } satisfies SessionResponse)
     },
   )
 
@@ -176,7 +292,11 @@ export const registerSessionRoutes = (
         return reply.code(404).send(errorResponse('not_found'))
       }
 
-      if (Object.keys(parsed.data).length === 0) return { session: existing } satisfies SessionResponse
+      const mine = await mineAt(request, existing.event_id)
+
+      if (Object.keys(parsed.data).length === 0) {
+        return { session: await oneDream(db, existing, mine) } satisfies SessionResponse
+      }
 
       // The rule applied to the row as it would be, because a body carrying one
       // end of the slot cannot be judged on its own — `hasValidTimeSlot` is the
@@ -194,7 +314,7 @@ export const registerSessionRoutes = (
         return reply.code(400).send(errorResponse('bad_request'))
       }
 
-      let updated: Session[]
+      let updated: DreamRow[]
       try {
         updated = await db
           .update(session)
@@ -208,7 +328,9 @@ export const registerSessionRoutes = (
 
       const [row] = updated
 
-      return row === undefined ? reply.code(404).send(errorResponse('not_found')) : { session: row }
+      return row === undefined
+        ? reply.code(404).send(errorResponse('not_found'))
+        : ({ session: await oneDream(db, row, mine) } satisfies SessionResponse)
     },
   )
 
@@ -235,6 +357,130 @@ export const registerSessionRoutes = (
       if (deleted.length === 0) return reply.code(404).send(errorResponse('not_found'))
 
       return reply.code(204).send()
+    },
+  )
+
+  /**
+   * The dream and the caller's place at its burn, or the answer to give instead.
+   *
+   * All four routes below need the same three things and refuse on the same three
+   * grounds: a dream that is gone, or at a burn that has ended, is a 404 — the same
+   * scoping every other member-facing write here takes. A caller who is not coming
+   * to that burn is a **400**, not a 403: they may well be a member in good standing,
+   * and what is wrong is the pairing. That is the reading `facilitatorIsComing` takes
+   * and the one the lead-roles register takes for a lead.
+   */
+  const asAttendee = async (
+    request: FastifyRequest<{ Params: { id: string } }>,
+  ): Promise<Refusal | Attending> => {
+    const [dream] = await db.select().from(session).where(eq(session.id, request.params.id)).limit(1)
+    if (dream === undefined) return { code: 404, error: 'not_found' }
+
+    const open = await openEvent(db, todayIso(now), dream.event_id)
+    if (open === undefined) return { code: 404, error: 'not_found' }
+
+    const attendanceId = await mineAt(request, dream.event_id)
+    if (attendanceId === undefined) return { code: 400, error: 'bad_request' }
+
+    return { dream, attendanceId }
+  }
+
+  /**
+   * Offering to help run a dream, and taking the offer back.
+   *
+   * `/me` rather than an account id in a body: this is one person speaking for
+   * themselves, which is all #198 asked for. Signing somebody else up for work is
+   * what the lead-roles register is for, and it asks first.
+   *
+   * Both directions are idempotent. Clicking twice on a slow connection is the
+   * ordinary way this gets called twice, and the primary key already says a person
+   * helps once.
+   */
+  app.post<{ Params: { id: string } }>(
+    '/api/sessions/:id/helpers/me',
+    { preHandler: requireMember },
+    async (request, reply) => {
+      void noStore(reply)
+
+      const found = await asAttendee(request)
+      if ('code' in found) return reply.code(found.code).send(errorResponse(found.error))
+
+      await db
+        .insert(sessionHelper)
+        .values({ session_id: found.dream.id, attendance_id: found.attendanceId })
+        .onConflictDoNothing()
+
+      return { session: await oneDream(db, found.dream, found.attendanceId) } satisfies SessionResponse
+    },
+  )
+
+  app.delete<{ Params: { id: string } }>(
+    '/api/sessions/:id/helpers/me',
+    { preHandler: requireMember },
+    async (request, reply) => {
+      void noStore(reply)
+
+      const found = await asAttendee(request)
+      if ('code' in found) return reply.code(found.code).send(errorResponse(found.error))
+
+      await db
+        .delete(sessionHelper)
+        .where(
+          and(
+            eq(sessionHelper.session_id, found.dream.id),
+            eq(sessionHelper.attendance_id, found.attendanceId),
+          ),
+        )
+
+      return { session: await oneDream(db, found.dream, found.attendanceId) } satisfies SessionResponse
+    },
+  )
+
+  /**
+   * A ❤️‍🔥, and taking it back.
+   *
+   * One row per person, so the count cannot drift and a double click cannot inflate
+   * it. Nothing here is notified: a heart is a quiet signal that a dream is wanted,
+   * and forty of them arriving as notifications would teach people to ignore the
+   * channel.
+   */
+  app.post<{ Params: { id: string } }>(
+    '/api/sessions/:id/support/me',
+    { preHandler: requireMember },
+    async (request, reply) => {
+      void noStore(reply)
+
+      const found = await asAttendee(request)
+      if ('code' in found) return reply.code(found.code).send(errorResponse(found.error))
+
+      await db
+        .insert(sessionSupport)
+        .values({ session_id: found.dream.id, attendance_id: found.attendanceId })
+        .onConflictDoNothing()
+
+      return { session: await oneDream(db, found.dream, found.attendanceId) } satisfies SessionResponse
+    },
+  )
+
+  app.delete<{ Params: { id: string } }>(
+    '/api/sessions/:id/support/me',
+    { preHandler: requireMember },
+    async (request, reply) => {
+      void noStore(reply)
+
+      const found = await asAttendee(request)
+      if ('code' in found) return reply.code(found.code).send(errorResponse(found.error))
+
+      await db
+        .delete(sessionSupport)
+        .where(
+          and(
+            eq(sessionSupport.session_id, found.dream.id),
+            eq(sessionSupport.attendance_id, found.attendanceId),
+          ),
+        )
+
+      return { session: await oneDream(db, found.dream, found.attendanceId) } satisfies SessionResponse
     },
   )
 }

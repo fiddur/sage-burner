@@ -776,6 +776,53 @@ export const leadRoleMember = sqliteTable(
   (table) => [primaryKey({ columns: [table.role_id, table.attendance_id] })],
 )
 
+/**
+ * Somebody who will help run a dream.
+ *
+ * An `attendance` for the same reason a role's team is: only somebody coming to the
+ * burn can carry the cushions, and withdrawing takes them off everything they had
+ * offered to help with rather than leaving a name nobody can reach.
+ *
+ * No lead here, unlike `lead_role` — the facilitator is on the dream itself. This
+ * table is the pair of hands beside them, self-service in both directions (#198).
+ */
+export const sessionHelper = sqliteTable(
+  'session_helper',
+  {
+    session_id: text('session_id')
+      .notNull()
+      .references(() => session.id, { onDelete: 'cascade' }),
+    attendance_id: text('attendance_id')
+      .notNull()
+      .references(() => attendance.id, { onDelete: 'cascade' }),
+  },
+  (table) => [primaryKey({ columns: [table.session_id, table.attendance_id] })],
+)
+
+/**
+ * One ❤️‍🔥 — somebody saying they want this dream to happen.
+ *
+ * A row per person rather than a counter column, so the count cannot drift and
+ * clicking twice cannot inflate it: the primary key is the whole rule. The number
+ * shown is derived on every read.
+ *
+ * An `attendance` again, so the hearts belong to the burn. A dream copied into next
+ * year's programme starts at nothing, which is right — enthusiasm for last year's
+ * cacao ceremony is not a fact about this one.
+ */
+export const sessionSupport = sqliteTable(
+  'session_support',
+  {
+    session_id: text('session_id')
+      .notNull()
+      .references(() => session.id, { onDelete: 'cascade' }),
+    attendance_id: text('attendance_id')
+      .notNull()
+      .references(() => attendance.id, { onDelete: 'cascade' }),
+  },
+  (table) => [primaryKey({ columns: [table.session_id, table.attendance_id] })],
+)
+
 // Deliberately no relations() / defineRelations() block.
 //
 // Those exist to power the relational query builder (`db.query.x.findMany({

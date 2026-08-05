@@ -20,6 +20,7 @@ import { viewerFor } from '../auth/viewer.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
 import { account, attendance, event, leadRole, leadRoleMember } from '../db/schema.ts'
 import { noStore } from '../http.ts'
+import { attendanceFor } from './attendance.ts'
 import { copySourcesFor } from './copy-sources.ts'
 
 export interface LeadRoleDeps extends GuardDeps {
@@ -45,17 +46,6 @@ const accountForAttendance = async (db: Database, attendanceId: string) => {
     .limit(1)
 
   return row?.account_id
-}
-
-/** Whose attendance an account holds at this burn, or nothing if they are not coming. */
-const attendanceFor = async (db: Database, eventId: string, accountId: string) => {
-  const [row] = await db
-    .select({ id: attendance.id })
-    .from(attendance)
-    .where(and(eq(attendance.event_id, eventId), eq(attendance.account_id, accountId)))
-    .limit(1)
-
-  return row?.id
 }
 
 /**
