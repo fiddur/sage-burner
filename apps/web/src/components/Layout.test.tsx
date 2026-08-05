@@ -12,13 +12,11 @@ import { Layout, initials } from './Layout.tsx'
 
 afterEach(cleanup)
 
-const never = () => Promise.reject(new Error('logout is not stubbed here'))
-
 const renderNav = (viewer: Viewer) =>
   render(
     <InstallationProvider title="Sage Burner">
       <ViewerProvider viewer={viewer}>
-        <Layout api={{ logout: never }}>
+        <Layout>
           <p>the page</p>
         </Layout>
       </ViewerProvider>
@@ -158,7 +156,7 @@ describe('the burn selector', () => {
       <InstallationProvider title="Sage Burner">
         <ViewerProvider viewer={signedInAs('member')}>
           <BurnProvider value={{ status: 'ready', burns, selected: burns[0], select }}>
-            <Layout api={{ logout: never }}>
+            <Layout>
               <p>the page</p>
             </Layout>
           </BurnProvider>

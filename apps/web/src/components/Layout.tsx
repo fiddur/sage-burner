@@ -1,10 +1,8 @@
 import type { ComponentChildren } from 'preact'
 
-import type { ApiClient } from '../api/client.ts'
-
 import { useBurns } from '../burn.tsx'
 import { useInstallationTitle } from '../installation.tsx'
-import { isAdmin, isApproved, isMember, useSetViewer, useViewer } from '../viewer.tsx'
+import { isAdmin, isApproved, isMember, useViewer } from '../viewer.tsx'
 
 /**
  * The initials for the corner — "Fredrik Liljegren" is FL, "Ada" is A.
@@ -44,36 +42,15 @@ export const initials = (name: string | null | undefined): string => {
  * from Schedule, which is where a dream is placed; Places from Schedule too, since
  * the lanes are what the grid draws; the lodging list from Your burn, beside the
  * question it answers. An organiser who is not attending reaches both from ⚙️.
+ *
+ * Every entry here is a **place**, which is why signing out is not among them: it is
+ * an action, and it lives beside the sentence naming the account it ends. That also
+ * leaves this frame needing no API client at all.
  */
-export const Layout = ({
-  children,
-  api,
-}: {
-  children: ComponentChildren
-  api: Pick<ApiClient, 'logout'>
-}) => {
+export const Layout = ({ children }: { children: ComponentChildren }) => {
   const viewer = useViewer()
   const { burns, selected, select } = useBurns()
-  const setViewer = useSetViewer()
   const title = useInstallationTitle()
-
-  const logOut = async () => {
-    // The cookie is cleared server-side; the local viewer is cleared either
-    // way. A failed logout that left the nav saying "Log out" would be worse
-    // than one that says signed-out while a stale cookie expires on its own.
-    //
-    // Caught rather than only `finally`, which is what this had first: without
-    // a catch the rejection escapes as an unhandled promise rejection, since
-    // the click handler cannot await it. There is nothing to report — the user
-    // asked to be signed out and, locally, they are.
-    try {
-      await api.logout()
-    } catch {
-      // Deliberately ignored; see above.
-    }
-
-    setViewer(null)
-  }
 
   return (
     <div class="layout">
@@ -132,12 +109,6 @@ export const Layout = ({
             <a class="avatar" href="/profile" aria-label="Your details" title="Your details">
               <span aria-hidden="true">{initials(viewer.account?.name)}</span>
             </a>
-          )}
-
-          {viewer.status === 'signed-in' && (
-            <button type="button" class="link-button" onClick={() => void logOut()}>
-              Log out
-            </button>
           )}
         </nav>
       </header>
