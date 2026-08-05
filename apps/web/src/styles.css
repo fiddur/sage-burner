@@ -920,3 +920,18 @@ img.avatar {
   display: inline-flex;
   vertical-align: middle;
 }
+
+/* One registered passkey: what it is called, when it arrived, and a way to drop it. */
+.passkey-list {
+  list-style: none;
+  margin: 0.5rem 0;
+  padding: 0;
+}
+
+.passkey-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: baseline;
+  padding: 0.15rem 0;
+}

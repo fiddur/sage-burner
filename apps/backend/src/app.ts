@@ -32,6 +32,7 @@ import { registerInstallationRoutes } from './routes/installation.ts'
 import { registerInviteRoutes } from './routes/invites.ts'
 import { registerLeadRoleRoutes } from './routes/lead-roles.ts'
 import { registerMealAdminRoutes, registerMealRoutes } from './routes/meals.ts'
+import { registerPasskeyRoutes } from './routes/passkeys.ts'
 import { registerPlaceRoutes } from './routes/places.ts'
 import { registerProfileRoutes } from './routes/profile.ts'
 import { registerPushRoutes } from './routes/push.ts'
@@ -391,6 +392,7 @@ export const createApp = async ({
   registerAdminPrefixGuard(app, { db, sessions })
 
   registerAuthRoutes(app, { db, config, sessions, gate })
+  registerPasskeyRoutes(app, { db, config, sessions, now })
   registerAdminRoutes(app, { db, sessions })
   registerInstallationRoutes(app, { db, sessions })
   registerEventRoutes(app, { db, sessions, now })

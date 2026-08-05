@@ -20,6 +20,7 @@ import {
   session,
   sessionHelper,
   sessionSupport,
+  webauthnChallenge,
 } from './schema.ts'
 
 /**
@@ -655,15 +656,16 @@ describe('check constraints', () => {
 })
 
 describe('passkeys', () => {
-  const seedPasskey = (id: string, credential_id: string, counter = 0) =>
+  const seedPasskey = (id: string, credential_id: string, account_id = ids.account) =>
     handle.db
       .insert(passkey)
       .values({
         id,
-        account_id: ids.account,
+        account_id,
         credential_id,
         public_key: 'cHVibGljLWtleQ==',
-        counter,
+        counter: 0,
+        label: 'Phone',
         created_at: NOW,
       })
       .run()
@@ -679,33 +681,50 @@ describe('passkeys', () => {
   })
 
   it('rejects a negative signature counter', () => {
-    expect(() =>
+    const insert = (counter: number) =>
       handle.client
         .prepare(
-          `INSERT INTO passkey (id, account_id, credential_id, public_key, counter, created_at)
-           VALUES (?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO passkey (id, account_id, credential_id, public_key, counter, label, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
         )
-        .run('pk-neg', ids.account, 'cred-neg', 'key', -1, NOW),
-    ).toThrow()
+        .run(`pk-${counter}`, ids.account, `cred-${counter}`, 'key', counter, 'Phone', NOW)
+
+    // The passing sibling, and it earns its place: the column list above is written
+    // out by hand, so a statement this rejects for naming no `label` would look
+    // exactly like one the CHECK refused.
+    expect(() => insert(0)).not.toThrow()
+    expect(() => insert(-1)).toThrow()
   })
 
   it('goes away with the account it belongs to', () => {
     seedAccount(ids.otherAccount, 'someone.else@example.org')
-    handle.db
-      .insert(passkey)
-      .values({
-        id: 'pk1',
-        account_id: ids.otherAccount,
-        credential_id: 'cred-1',
-        public_key: 'cHVibGljLWtleQ==',
-        counter: 0,
-        created_at: NOW,
-      })
-      .run()
+    seedPasskey('pk1', 'cred-1', ids.otherAccount)
 
     handle.db.delete(account).where(eq(account.id, ids.otherAccount)).run()
 
     expect(handle.db.select().from(passkey).all()).toHaveLength(0)
+  })
+})
+
+describe('webauthn challenges', () => {
+  it('keeps one row per challenge', () => {
+    const mint = (challenge: string) =>
+      handle.db.insert(webauthnChallenge).values({ challenge, account_id: null, expires_at: NOW }).run()
+
+    expect(() => mint('c1')).not.toThrow()
+    expect(() => mint('c1')).toThrow()
+  })
+
+  it('goes away with the account that asked for it', () => {
+    seedAccount(ids.otherAccount, 'someone.else@example.org')
+    handle.db
+      .insert(webauthnChallenge)
+      .values({ challenge: 'c1', account_id: ids.otherAccount, expires_at: NOW })
+      .run()
+
+    handle.db.delete(account).where(eq(account.id, ids.otherAccount)).run()
+
+    expect(handle.db.select().from(webauthnChallenge).all()).toHaveLength(0)
   })
 })
 

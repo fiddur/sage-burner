@@ -96,9 +96,22 @@ expands to an empty string rather than to nothing.
 | `TRUST_PROXY`         | `false`                     | `false`, `true`, a hop count like `1`, or an address/CIDR list                                                                                          |
 | `SESSION_SECRET`      | _(none)_                    | **Required if `NODE_ENV=production`, `HOST` is not loopback, or `WEB_ROOT` is set.** HMAC key for session cookies, 32+ chars. `openssl rand -base64 48` |
 | `SESSION_TTL_SECONDS` | `1209600`                   | How long a session lasts. Two weeks                                                                                                                     |
+| `PUBLIC_ORIGIN`       | _(unset)_                   | Where a browser reaches this installation, e.g. `https://burn.example.org`. Only passkeys read it — see below                                           |
 
 Invalid configuration fails at boot with every problem listed, rather than
 starting and behaving subtly wrong.
+
+**Set `PUBLIC_ORIGIN` if you use passkeys.** WebAuthn binds a credential to one
+domain and hands it to no other, so the domain has to be settled and stay
+settled. Left unset, each ceremony takes the browser's own `Origin` header, which
+works — but it means an installation reachable as both a hostname and an IP gives
+a member two separate sets of passkeys depending on which link they followed, and
+only one set works on any given day. It also means a proxy relaying this app on
+another domain would have its own origin accepted, so a member could be led to
+register a passkey scoped to it. They still could not use anyone's _existing_
+passkey — the authenticator will not sign for a domain the credential was not
+registered under — but this closes the other half. It is one line, and it is not
+required only because `docker compose up` has to stay sufficient.
 
 `TRUST_PROXY` defaults to trusting nothing. See the deployment notes below for
 what to set it to.
@@ -423,6 +436,9 @@ There is **no open sign-up**. Accounts are created only by redeeming an invite
 - `POST /api/auth/logout` — clears the cookie.
 - `GET /api/auth/me` — `{ viewer }` or `{ viewer: null }`. Always 200: an
   anonymous visitor on the public homepage is the expected case, not an error.
+- `POST /api/auth/passkey/challenge` and `POST /api/auth/passkey/login` — the two
+  halves of signing in with a passkey. Same 200 and same cookie as the password
+  route, same 401 for everything else.
 
 **Passwords** are hashed with scrypt from `node:crypto` (N=2^16, r=8, p=2 — one
 of OWASP's listed configurations). #8 asked for argon2 or bcrypt; both are
@@ -618,6 +634,45 @@ those are the app deciding what a good password is on someone else's behalf, and
 they push people towards the one they already reuse everywhere. A rule here would
 also have to apply to a password being _set_ and never at login, so that adding
 one later cannot lock out an existing member.
+
+### Passkeys
+
+Anybody signed in can register one from the details page behind the initials
+circle, and any of them signs in from `/login`. They **sit alongside the password
+rather than replacing it** (#9): an account may hold both, either, or several
+passkeys and no password at all.
+
+- Per **device**, like notifications. A passkey lives in the phone or laptop that
+  made it, so somebody with both registers twice — and names each, which is what
+  makes the list act-on-able three months later.
+- **Signing in asks for no address.** Registration requires a discoverable
+  credential (`residentKey: 'required'`), so the browser offers whatever it holds
+  for this domain and the server resolves the account from the credential itself.
+  Naming credentials would mean sending an address first, and answering "which
+  passkeys does this address have" is the enumeration oracle the password login
+  goes to some length to avoid.
+- **User verification is required** at both ends — a fingerprint, a face or a PIN,
+  not merely a tap. Asking for it in the options rather than only at verification
+  is what keeps a device that cannot do it from failing at the last step, after
+  the browser has already said yes.
+- **Removing the last passkey is refused when there is no password** — 409, and
+  the page says why. There is no mail service to send a reset through ([#30]), so
+  that combination is a lockout with nothing to undo it.
+- The **challenge is a row**, not a signed cookie, and it is deleted by the
+  statement that reads it. Single-use is the whole point of a challenge, and a
+  signed one is replayable for as long as it is valid. Expired rows are swept
+  whenever a new challenge is minted; nothing else makes them, so nothing else
+  needs to clean them up.
+- Which domain a credential belongs to comes from `PUBLIC_ORIGIN` when it is set
+  and from the browser's `Origin` otherwise. See the configuration section for
+  what the fallback costs.
+
+Both ends use `@simplewebauthn`. The backend's tests carry a small authenticator —
+a P-256 key, `authenticatorData`, a CBOR attestation object and a real ECDSA
+signature — rather than stubbing the verifier, because the verifier is the part
+worth testing.
+
+[#30]: https://github.com/fiddur/sage-burner/issues/30
 
 ### Notifications
 

@@ -28,6 +28,8 @@ import type {
   MealSlotCreateInput,
   MealSlotUpdate,
   MealUpdate,
+  PasskeyLogin,
+  PasskeyRegistration,
   PaymentUpdate,
   PlaceCreate,
   PlaceOrder,
@@ -91,6 +93,11 @@ export const apiRoutes = {
     method: 'POST',
     fastify: '/api/admin/events/:eventId/meal-slots',
     path: (eventId: string) => `/api/admin/events/${encodeURIComponent(eventId)}/meal-slots`,
+  },
+  addPasskey: {
+    method: 'POST',
+    fastify: '/api/me/passkeys',
+    path: () => '/api/me/passkeys',
   },
   addPlace: {
     method: 'POST',
@@ -172,6 +179,11 @@ export const apiRoutes = {
     method: 'DELETE',
     fastify: '/api/admin/questions/:id',
     path: (id: string) => `/api/admin/questions/${encodeURIComponent(id)}`,
+  },
+  finishPasskeyLogin: {
+    method: 'POST',
+    fastify: '/api/auth/passkey/login',
+    path: () => '/api/auth/passkey/login',
   },
   generateMeals: {
     method: 'POST',
@@ -262,6 +274,11 @@ export const apiRoutes = {
     method: 'GET',
     fastify: '/api/events/mine',
     path: () => '/api/events/mine',
+  },
+  getMyPasskeys: {
+    method: 'GET',
+    fastify: '/api/me/passkeys',
+    path: () => '/api/me/passkeys',
   },
   getMyProfile: {
     method: 'GET',
@@ -369,6 +386,11 @@ export const apiRoutes = {
     fastify: '/api/me/avatar',
     path: () => '/api/me/avatar',
   },
+  removePasskey: {
+    method: 'DELETE',
+    fastify: '/api/me/passkeys/:id',
+    path: (id: string) => `/api/me/passkeys/${encodeURIComponent(id)}`,
+  },
   reorderEventOptions: {
     method: 'PUT',
     fastify: '/api/events/:eventId/options/:kind/order',
@@ -430,6 +452,16 @@ export const apiRoutes = {
     fastify: '/api/admin/events/:eventId/attendance/:accountId/payment',
     path: (eventId: string, accountId: string) =>
       `/api/admin/events/${encodeURIComponent(eventId)}/attendance/${encodeURIComponent(accountId)}/payment`,
+  },
+  startPasskeyLogin: {
+    method: 'POST',
+    fastify: '/api/auth/passkey/challenge',
+    path: () => '/api/auth/passkey/challenge',
+  },
+  startPasskeyRegistration: {
+    method: 'POST',
+    fastify: '/api/me/passkeys/challenge',
+    path: () => '/api/me/passkeys/challenge',
   },
   stopHelpingWithSession: {
     method: 'DELETE',
@@ -555,6 +587,7 @@ export interface RouteBodies {
   addLeadRole: LeadRoleCreateInput
   addMeal: MealCreateInput
   addMealSlot: MealSlotCreateInput
+  addPasskey: PasskeyRegistration
   addPlace: PlaceCreate
   addQuestion: FormQuestionCreateInput
   adminAddAttendance: AttendanceCreate
@@ -562,6 +595,7 @@ export interface RouteBodies {
   copyPlaces: CopyFrom
   createEvent: EventCreateInput
   createInvite: InviteCreate
+  finishPasskeyLogin: PasskeyLogin
   joinLeadRoleTeam: LeadRoleTeam
   login: LoginRequest
   offerSession: SessionCreateInput

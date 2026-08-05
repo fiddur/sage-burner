@@ -33,6 +33,7 @@ import type {
   MeResponse,
   MemberRosterResponse,
   MyBurnsResponse,
+  PasskeysResponse,
   Place,
   PlaceOrder,
   PlacesResponse,
@@ -44,6 +45,10 @@ import type {
   SessionsResponse,
   VersionResponse,
 } from '@sage-burner/shared'
+import type {
+  PublicKeyCredentialCreationOptionsJSON,
+  PublicKeyCredentialRequestOptionsJSON,
+} from '@simplewebauthn/browser'
 
 import { apiRoutes } from '@sage-burner/shared'
 
@@ -257,6 +262,56 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
       request<MeResponse>(apiRoutes.login.path(), { method: apiRoutes.login.method, body }),
 
     logout: () => request<MeResponse>(apiRoutes.logout.path(), { method: apiRoutes.logout.method }),
+
+    /**
+     * The four halves of the two passkey ceremonies (#9).
+     *
+     * The option objects are the WebAuthn spec's own shapes rather than anything
+     * declared in `@sage-burner/shared`: both ends already depend on
+     * `@simplewebauthn` for the ceremony itself, so its types are the contract
+     * here, and mirroring them would be a second spelling to keep in step. The
+     * request *bodies* still come from the manifest, since those are what the
+     * backend validates.
+     *
+     * Signed in, any account — a role is not required to manage your own way in.
+     */
+    startPasskeyRegistration: () =>
+      request<{ options: PublicKeyCredentialCreationOptionsJSON }>(
+        apiRoutes.startPasskeyRegistration.path(),
+        { method: apiRoutes.startPasskeyRegistration.method },
+      ),
+
+    /** Throws ApiError(409, 'conflict') for a credential already registered. */
+    addPasskey: (body: BodyOf<'addPasskey'>) =>
+      request<PasskeysResponse>(apiRoutes.addPasskey.path(), {
+        method: apiRoutes.addPasskey.method,
+        body,
+      }),
+
+    getMyPasskeys: (signal?: AbortSignal) =>
+      request<PasskeysResponse>(apiRoutes.getMyPasskeys.path(), { signal }),
+
+    /**
+     * Throws ApiError(409, 'conflict') when it would leave an account with no
+     * password and no passkey — which is a lockout with nothing to undo it.
+     */
+    removePasskey: (id: string) =>
+      request<PasskeysResponse>(apiRoutes.removePasskey.path(id), {
+        method: apiRoutes.removePasskey.method,
+      }),
+
+    /** Public, and usernameless: no address is sent, so nothing here says who exists. */
+    startPasskeyLogin: () =>
+      request<{ options: PublicKeyCredentialRequestOptionsJSON }>(apiRoutes.startPasskeyLogin.path(), {
+        method: apiRoutes.startPasskeyLogin.method,
+      }),
+
+    /** Throws ApiError(401, 'invalid_credentials') for anything that does not verify. */
+    finishPasskeyLogin: (body: BodyOf<'finishPasskeyLogin'>) =>
+      request<MeResponse>(apiRoutes.finishPasskeyLogin.path(), {
+        method: apiRoutes.finishPasskeyLogin.method,
+        body,
+      }),
 
     /**
      * Admin only. Throws ApiError(401) signed out, ApiError(403) without the

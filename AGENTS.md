@@ -195,6 +195,14 @@ These are member records, so treat them as such:
   prefix**, never exempting it there — the hook's whole value is having no
   exception to forget.
 - Invite tokens are CSPRNG-random and unguessable, single-use, and expiring.
+- **A passkey is an extra way in, never the only one imposed.** Passwords and
+  passkeys coexist per account (#9), so the routes live outside both `/api/admin/`
+  and `requireApproved` — the guard is being signed in at all, because an account
+  with no role yet still has to be able to add one and get back in with it. Login
+  is usernameless, so nothing there can be asked "does this address have an
+  account". Challenges are rows and the statement that reads one deletes it;
+  single-use is what a challenge is for, and a signed cookie cannot give it.
+  Removing the last passkey off an account with no password is refused.
 - **Push is any approved member's**, not admin's (#184). The routes are
   `/api/push/…`, moved out from under the admin prefix rather than exempted inside
   it. `notifyAdmins` and `notifyAccount` share one delivery loop; the lead-roles

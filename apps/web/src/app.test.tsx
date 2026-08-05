@@ -61,6 +61,13 @@ const clientWith = (
   updateQuestion: () => Promise.reject(new Error('updateQuestion is not stubbed in this file')),
   deleteQuestion: () => Promise.reject(new Error('deleteQuestion is not stubbed in this file')),
   reorderQuestions: () => Promise.reject(new Error('reorderQuestions is not stubbed in this file')),
+  startPasskeyRegistration: () =>
+    Promise.reject(new Error('startPasskeyRegistration is not stubbed in this file')),
+  addPasskey: () => Promise.reject(new Error('addPasskey is not stubbed in this file')),
+  getMyPasskeys: () => Promise.reject(new Error('getMyPasskeys is not stubbed in this file')),
+  removePasskey: () => Promise.reject(new Error('removePasskey is not stubbed in this file')),
+  startPasskeyLogin: () => Promise.reject(new Error('startPasskeyLogin is not stubbed in this file')),
+  finishPasskeyLogin: () => Promise.reject(new Error('finishPasskeyLogin is not stubbed in this file')),
   getEvents: () => Promise.reject(new Error('getEvents is not stubbed in this file')),
   createEvent: () => Promise.reject(new Error('createEvent is not stubbed in this file')),
   updateEvent: () => Promise.reject(new Error('updateEvent is not stubbed in this file')),
