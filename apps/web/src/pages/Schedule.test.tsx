@@ -1,6 +1,6 @@
 import type { Event, MyBurn, Place, Session } from '@sage-burner/shared'
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Viewer } from '../viewer.tsx'
@@ -609,6 +609,21 @@ describe('Schedule', () => {
     const pool = await screen.findByRole('complementary')
 
     expect(pool.querySelector('.dream-heart')?.textContent).toContain('2')
+  })
+
+  it('gives a heart from the details too, and says how many want it', async () => {
+    const supportSession = vi.fn<ScheduleApi['supportSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'Cacao ceremony' }) }),
+    )
+    renderPage(stub({ supportSession }, [aDream({ id: 's-1', title: 'Cacao ceremony', support_count: 4 })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
+    const panel = await screen.findByRole('dialog', { name: 'Cacao ceremony' })
+    expect(panel.textContent).toContain('4 people want this')
+
+    fireEvent.click(within(panel).getByRole('button', { name: 'Show support' }))
+
+    await waitFor(() => expect(supportSession).toHaveBeenCalledWith('s-1'))
   })
 
   it('offers to help from the details, and to stop when already helping', async () => {

@@ -26,7 +26,7 @@ export const DreamDetails = ({
   dream: Session
   place: Place | undefined
   facilitatorName: string | null | undefined
-  /** Whose reading it, so the button can say "I cannot help after all". */
+  /** Who is reading it, so the button can say "I cannot help after all". */
   viewerId: string | undefined
   busy: boolean
   onClose: () => void
@@ -80,13 +80,13 @@ export const DreamDetails = ({
           />
         )}
 
-        <p class="dream-support-row">
+        <p class="row">
           <button
             type="button"
             class="link-button"
             disabled={busy}
             aria-pressed={dream.supported_by_me}
-            aria-label={`${dream.supported_by_me ? 'Take back your support for' : 'Show support for'} ${dream.title}`}
+            aria-label={dream.supported_by_me ? 'Take back your support' : 'Show support'}
             onClick={() => onSupport(!dream.supported_by_me)}
           >
             <span aria-hidden="true">{dream.supported_by_me ? '❤️‍🔥' : '♡'}</span> {dream.support_count}
