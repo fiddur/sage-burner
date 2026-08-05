@@ -600,11 +600,38 @@ a:hover {
 }
 
 /*
-  No `height: 100%` here. Inside a table cell it resolves against the row rather
-  than the spanned block, so a chip in a three-hour slot painted its background
-  one row tall and let the title overflow below it — which is what a two-hour
-  dream looked like before anyone noticed the rows.
+  A placed dream is as tall as the hours it runs.
+
+  It was not: the cell spans the right number of rows — `rowSpanOf` is tested, and
+  `laneCells` has an invariant test proving anchors plus spans account for every row
+  — but the chip inside it is content-height, so a 19:00→22:00 dream painted about an
+  hour and a half and read as ending at 20:45. A narrow screen looked right only by
+  accident, the title wrapping to more lines until the chip happened to fill.
+
+  `height: 100%` on the chip cannot fix it: inside a table cell it resolves against
+  the row rather than the spanned block, which is what an earlier attempt found. So
+  the stack is taken out of flow against the cell — `.schedule-cell` is `position:
+  relative`, which makes it the containing block whatever it spans — and the chips
+  divide its height between them.
+
+  Clipping rather than overflowing is the trade: a title too long for a one-hour slot
+  is cut off here where it used to bleed over the rows below, which read as a longer
+  dream. The `title` attribute still carries the times on hover.
 */
+.dream-stack {
+  position: absolute;
+  inset: 0.15rem 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.dream-stack .dream-chip {
+  flex: 1;
+  margin: 0;
+  overflow: hidden;
+}
+
 .dream-chip {
   box-sizing: border-box;
 }

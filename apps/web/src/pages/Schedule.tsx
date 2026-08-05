@@ -298,14 +298,20 @@ const Timetable = ({
                       onDrop(row, place.id)
                     }}
                   >
-                    {cell.kind === 'anchor' &&
-                      cell.dreams.map((dream) => {
-                        const full = dreams.find((entry) => entry.id === dream.id)
+                    {cell.kind === 'anchor' && (
+                      // Out of flow against the cell, so the block is as tall as the
+                      // hours it spans rather than as tall as its own text. See
+                      // `.dream-stack`.
+                      <div class="dream-stack">
+                        {cell.dreams.map((dream) => {
+                          const full = dreams.find((entry) => entry.id === dream.id)
 
-                        return full === undefined ? null : (
-                          <Chip key={full.id} dream={full} busy={busy} onDragStart={onDragStart} />
-                        )
-                      })}
+                          return full === undefined ? null : (
+                            <Chip key={full.id} dream={full} busy={busy} onDragStart={onDragStart} />
+                          )
+                        })}
+                      </div>
+                    )}
                   </td>
                 )
               })}

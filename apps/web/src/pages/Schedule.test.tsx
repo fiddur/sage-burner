@@ -350,6 +350,31 @@ describe('Schedule', () => {
     expect(setData).toHaveBeenCalledWith('text/plain', 's-1')
   })
 
+  it('wraps a placed dream in the stack the height rule needs', async () => {
+    // The only half of this a suite can reach. happy-dom computes no layout, so
+    // nothing here can assert a rendered height — but the CSS that makes a block as
+    // tall as its hours hangs off this element being inside the spanning cell, and
+    // that is checkable. Without it a three-hour dream draws about an hour and a
+    // half, which is what #198 part 7 was.
+    renderPage(
+      stub({}, [
+        aDream({
+          id: 's-1',
+          title: 'Cacao ceremony',
+          place_id: 'p-2',
+          time_slot_start: '2026-08-01T08:00:00.000Z',
+          time_slot_end: '2026-08-01T10:00:00.000Z',
+        }),
+      ]),
+    )
+
+    const chip = await screen.findByText('Cacao ceremony')
+    const stack = chip.closest('.dream-stack')
+
+    expect(stack).not.toBeNull()
+    expect(stack?.closest('td')?.getAttribute('rowspan')).toBe('2')
+  })
+
   it('says so when no burn is open, rather than drawing an empty grid', async () => {
     renderPage(stub({}, [], [TEMPLE]), MEMBER, null)
 
