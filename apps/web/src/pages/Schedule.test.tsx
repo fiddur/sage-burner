@@ -664,6 +664,125 @@ describe('Schedule', () => {
     expect(screen.getByRole('button', { name: 'I want to help out' })).toBeTruthy()
   })
 
+  it('lengthens and shortens a placed dream from the keyboard', async () => {
+    // The pointer half of the gesture cannot be tested here — happy-dom computes no
+    // layout, so every row is nought pixels tall. `rowsDragged` and `resizedEnd`
+    // carry that; this is the route somebody without a mouse takes.
+    const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'Cacao ceremony' }) }),
+    )
+    renderPage(
+      stub({ updateSession }, [
+        aDream({
+          id: 's-1',
+          title: 'Cacao ceremony',
+          place_id: 'p-1',
+          time_slot_start: '2026-08-01T08:00:00.000Z',
+          time_slot_end: '2026-08-01T09:00:00.000Z',
+        }),
+      ]),
+    )
+
+    const handle = await screen.findByRole('button', { name: 'Change how long Cacao ceremony is' })
+    fireEvent.keyDown(handle, { key: 'ArrowDown' })
+
+    await waitFor(() =>
+      expect(updateSession).toHaveBeenCalledWith('s-1', { time_slot_end: '2026-08-01T10:00:00.000Z' }),
+    )
+
+    updateSession.mockClear()
+    fireEvent.keyDown(handle, { key: 'ArrowUp' })
+
+    // Already an hour, so shortening it changes nothing and sends nothing.
+    await waitFor(() => expect(updateSession).not.toHaveBeenCalled())
+  })
+
+  it('shortens a longer one, so ArrowUp is not simply ignored', async () => {
+    const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'Cacao ceremony' }) }),
+    )
+    renderPage(
+      stub({ updateSession }, [
+        aDream({
+          id: 's-1',
+          title: 'Cacao ceremony',
+          place_id: 'p-1',
+          time_slot_start: '2026-08-01T08:00:00.000Z',
+          time_slot_end: '2026-08-01T11:00:00.000Z',
+        }),
+      ]),
+    )
+
+    fireEvent.keyDown(await screen.findByRole('button', { name: 'Change how long Cacao ceremony is' }), {
+      key: 'ArrowUp',
+    })
+
+    await waitFor(() =>
+      expect(updateSession).toHaveBeenCalledWith('s-1', { time_slot_end: '2026-08-01T10:00:00.000Z' }),
+    )
+  })
+
+  it('offers no handle in the pool, where there are no rows to pull against', async () => {
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))
+
+    await screen.findByRole('complementary')
+
+    expect(screen.queryByRole('button', { name: 'Change how long Sunrise yoga is' })).toBeNull()
+  })
+
+  it('does not drag the dream away when the handle is what was grabbed', async () => {
+    // `draggable` is on the chip, so without the guard a resize would also pick the
+    // whole dream up and drop it in whatever lane the pointer ended over.
+    // Asserted through the drop rather than through `preventDefault`: the
+    // `dragstart` testing-library builds is not cancelable, so its return value says
+    // nothing here even though a browser's does.
+    const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'Cacao ceremony' }) }),
+    )
+    renderPage(
+      stub({ updateSession }, [
+        aDream({
+          id: 's-1',
+          title: 'Cacao ceremony',
+          place_id: 'p-1',
+          time_slot_start: '2026-08-01T08:00:00.000Z',
+          time_slot_end: '2026-08-01T09:00:00.000Z',
+        }),
+      ]),
+    )
+
+    const handle = await screen.findByRole('button', { name: 'Change how long Cacao ceremony is' })
+    fireEvent.pointerDown(handle, { clientY: 100 })
+    fireEvent.dragStart(screen.getByLabelText('Move Cacao ceremony'))
+    fireEvent.drop(cell('14:00', 1))
+
+    expect(updateSession).not.toHaveBeenCalled()
+  })
+
+  it('starts an ordinary drag when the handle was not grabbed', async () => {
+    // The passing sibling: a guard that always prevented the default would satisfy
+    // the test above and make the grid undraggable.
+    const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'Cacao ceremony' }) }),
+    )
+    renderPage(
+      stub({ updateSession }, [
+        aDream({
+          id: 's-1',
+          title: 'Cacao ceremony',
+          place_id: 'p-1',
+          time_slot_start: '2026-08-01T08:00:00.000Z',
+          time_slot_end: '2026-08-01T09:00:00.000Z',
+        }),
+      ]),
+    )
+
+    fireEvent.dragStart(await screen.findByLabelText('Move Cacao ceremony'))
+    fireEvent.drop(cell('14:00', 1))
+
+    await waitFor(() => expect(updateSession).toHaveBeenCalled())
+  })
+
   it('shows what the server said when a move is refused', async () => {
     renderPage(
       stub({ updateSession: () => Promise.reject(apiError(400, 'bad_request', 'That will not do.')) }, [

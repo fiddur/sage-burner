@@ -1296,6 +1296,32 @@ The heart is on the chip as well as in the panel, placed or not: something can w
 support long before anybody has decided when it happens. Its click is stopped at the
 button, or every heart would also open the panel.
 
+### Pulling the bottom edge
+
+A placed chip carries a handle on its bottom edge. Dragging it changes the length in
+**whole hours** — a row is an hour, so a grid cannot show a dream finishing at 20:40
+and must not let anyone set one from here. The Dreams form is where a
+minute-precision end is typed. A dream never goes under the hour it already is: it
+has to occupy the row it starts in.
+
+The row height is measured off the anchor cell, which spans `rowspan` rows, rather
+than read from a number the CSS and the component would both have to hold.
+
+**Arrow keys do the same thing**, one hour at a time, exactly as ⠿ on the Places
+page does for reordering: a resize nobody can do without a mouse is one half the
+people here cannot do.
+
+`draggable` is on the chip, so grabbing the handle would otherwise pick the whole
+dream up and drop it in whichever lane the pointer ended over. `dragstart` is
+cancelled while the handle is held.
+
+**The pointer half is not unit-tested and cannot be.** happy-dom computes no layout,
+so every row measures nought pixels tall — `rowsDragged` and `resizedEnd` are pure
+and carry the arithmetic, the keyboard path is tested through the page, and the drag
+itself wants one click-through in a browser. The guard against dragging the dream
+away is asserted through the drop it would cause, since the `dragstart` that
+testing-library builds is not cancelable and its return value says nothing.
+
 `session.location` was free text; it is now `place_id`, referencing #78's places.
 The scheduling grid draws one column per place, and a column cannot be spelled
 three ways. The column has no `onDelete`, so **deleting a place a dream stands in

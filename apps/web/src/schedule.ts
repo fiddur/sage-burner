@@ -55,19 +55,47 @@ export const hourOf = (iso: string | null): string | undefined => {
   return local === '' ? undefined : `${local.slice(0, 13)}:00`
 }
 
+const HOUR = 60 * 60 * 1000
+
+/** How many whole rows a pointer travelled, for a row `rowHeight` pixels tall. */
+export const rowsDragged = (deltaY: number, rowHeight: number): number =>
+  rowHeight > 0 ? Math.round(deltaY / rowHeight) : 0
+
+/**
+ * The end a dream gets when its bottom edge is pulled `byRows` rows.
+ *
+ * Whole hours, because a row is one: a grid cannot show a dream finishing at 20:40,
+ * so letting somebody set that from the grid would be letting them set something
+ * they cannot see. The Dreams form is where a minute-precision end is typed.
+ *
+ * Null when nothing changes — a drag that never crossed a boundary, or a shortening
+ * that would take a dream under the hour it already is.
+ */
+export const resizedEnd = (
+  dream: { time_slot_start: string | null; time_slot_end: string | null },
+  byRows: number,
+): string | null => {
+  if (dream.time_slot_start === null || dream.time_slot_end === null || byRows === 0) return null
+
+  const start = Date.parse(dream.time_slot_start)
+  const hours = Math.max(1, Math.round((Date.parse(dream.time_slot_end) - start) / HOUR) + byRows)
+  const end = new Date(start + hours * HOUR).toISOString()
+
+  return end === dream.time_slot_end ? null : end
+}
+
 /** Where a dream ends when it is dropped into `row`, keeping the length it had. */
 export const endFor = (
   row: string,
   dream: { time_slot_start: string | null; time_slot_end: string | null },
 ) => {
-  const hour = 60 * 60 * 1000
   const kept =
     dream.time_slot_start === null || dream.time_slot_end === null
-      ? hour
+      ? HOUR
       : Date.parse(dream.time_slot_end) - Date.parse(dream.time_slot_start)
 
   const at = new Date(row)
-  at.setTime(at.getTime() + (kept > 0 ? kept : hour))
+  at.setTime(at.getTime() + (kept > 0 ? kept : HOUR))
 
   return at.toISOString()
 }

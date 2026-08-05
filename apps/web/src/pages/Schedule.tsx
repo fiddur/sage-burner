@@ -11,7 +11,7 @@ import { NoBurn } from '../components/NoBurn.tsx'
 import { fromLocalInput, toLocalInput } from '../datetime.ts'
 import { initials } from '../initials.ts'
 import { useAction, useLoad } from '../load.ts'
-import { endFor, hourOf, hoursOf, laneCells } from '../schedule.ts'
+import { endFor, hourOf, hoursOf, laneCells, resizedEnd, rowsDragged } from '../schedule.ts'
 import { isMember, useViewer } from '../viewer.tsx'
 
 export type ScheduleApi = Pick<
@@ -188,6 +188,13 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
     )
   }
 
+  const resize = (dream: Session, byRows: number) => {
+    const end = resizedEnd(dream, byRows)
+    if (end === null) return
+
+    move(dream.id, { time_slot_end: end })
+  }
+
   const help = (id: string, helping: boolean) => {
     run(() => (helping ? api.helpWithSession(id) : api.stopHelpingWithSession(id)), 'Could not save that.')
   }
@@ -212,6 +219,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
           onDragStart={setDragged}
           onOpen={setOpened}
           onSupport={support}
+          onResize={resize}
           onDrop={() => {
             // Back to the pool is how a dream gets unscheduled.
             if (dragged === undefined) return
@@ -229,6 +237,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
           onDragStart={setDragged}
           onOpen={setOpened}
           onSupport={support}
+          onResize={resize}
           onDrop={dropInto}
         />
       </div>
@@ -262,20 +271,26 @@ const Chip = ({
   dream,
   names,
   busy,
+  resizable,
   onDragStart,
   onOpen,
   onSupport,
+  onResize,
 }: {
   dream: Session
   names: ReadonlyMap<string, string | null>
   busy: boolean
+  /** Only in the grid: there are no rows to pull against in the pool. */
+  resizable: boolean
   onDragStart: (id: string) => void
   onOpen: (id: string) => void
   onSupport: (id: string, supporting: boolean) => void
+  onResize: (dream: Session, byRows: number) => void
 }) => {
   // Google Calendar's rule: the click a drag leaves behind is not a click. Cleared
   // on the next press rather than on `dragend`, which fires *before* that click.
   const dragging = useRef(false)
+  const grabbed = useRef<{ y: number; rowHeight: number } | null>(null)
 
   return (
     <span
@@ -287,6 +302,13 @@ const Chip = ({
         dragging.current = false
       }}
       onDragStart={(dragEvent) => {
+        // `draggable` is on the chip, so a grab anywhere inside it — the resize
+        // handle included — would otherwise drag the whole dream to another lane.
+        if (grabbed.current !== null) {
+          dragEvent.preventDefault()
+          return
+        }
+
         // Firefox refuses to start a drag whose data store was never written to,
         // so this is what makes the gesture work at all there. The id is carried
         // in state rather than read back out of the transfer; this only has to
@@ -312,6 +334,46 @@ const Chip = ({
       <Facilitator dream={dream} names={names} />
       <Support dream={dream} busy={busy} onSupport={onSupport} />
       {span(dream) !== null && <span class="dream-span">{span(dream)}</span>}
+
+      {resizable && (
+        <button
+          type="button"
+          class="dream-resize"
+          disabled={busy}
+          aria-label={`Change how long ${dream.title} is`}
+          onPointerDown={(pointerEvent) => {
+            // Measured off the cell rather than from a number the CSS and this
+            // would both have to hold: it spans `rowspan` rows, so its own height
+            // says what a row is worth on this screen.
+            const cell = pointerEvent.currentTarget.closest('td')
+            const spanned = Math.max(Number(cell?.getAttribute('rowspan') ?? '1'), 1)
+            const height = cell?.getBoundingClientRect().height ?? 0
+
+            grabbed.current = { y: pointerEvent.clientY, rowHeight: height / spanned }
+            pointerEvent.currentTarget.setPointerCapture(pointerEvent.pointerId)
+          }}
+          onPointerUp={(pointerEvent) => {
+            const grab = grabbed.current
+            grabbed.current = null
+            if (grab === null) return
+
+            onResize(dream, rowsDragged(pointerEvent.clientY - grab.y, grab.rowHeight))
+          }}
+          onClick={(clickEvent) => clickEvent.stopPropagation()}
+          onKeyDown={(keyEvent) => {
+            // The handle is the keyboard route too, like the ⠿ on Places: a
+            // resize nobody can do without a mouse is one half the people here
+            // cannot do.
+            const by = keyEvent.key === 'ArrowDown' ? 1 : keyEvent.key === 'ArrowUp' ? -1 : undefined
+            if (by === undefined) return
+
+            keyEvent.preventDefault()
+            onResize(dream, by)
+          }}
+        >
+          <span aria-hidden="true">⇕</span>
+        </button>
+      )}
     </span>
   )
 }
@@ -375,6 +437,7 @@ const Pool = ({
   onDragStart,
   onOpen,
   onSupport,
+  onResize,
   onDrop,
 }: {
   dreams: readonly Session[]
@@ -383,6 +446,7 @@ const Pool = ({
   onDragStart: (id: string) => void
   onOpen: (id: string) => void
   onSupport: (id: string, supporting: boolean) => void
+  onResize: (dream: Session, byRows: number) => void
   onDrop: () => void
 }) => (
   <aside
@@ -403,9 +467,11 @@ const Pool = ({
           dream={dream}
           names={names}
           busy={busy}
+          resizable={false}
           onDragStart={onDragStart}
           onOpen={onOpen}
           onSupport={onSupport}
+          onResize={onResize}
         />
       </p>
     ))}
@@ -426,6 +492,7 @@ const Timetable = ({
   onDragStart,
   onOpen,
   onSupport,
+  onResize,
   onDrop,
 }: {
   rows: readonly string[]
@@ -436,6 +503,7 @@ const Timetable = ({
   onDragStart: (id: string) => void
   onOpen: (id: string) => void
   onSupport: (id: string, supporting: boolean) => void
+  onResize: (dream: Session, byRows: number) => void
   onDrop: (row: string, placeId: string) => void
 }) => {
   const lanes = new Map(
@@ -496,9 +564,11 @@ const Timetable = ({
                               dream={full}
                               names={names}
                               busy={busy}
+                              resizable
                               onDragStart={onDragStart}
                               onOpen={onOpen}
                               onSupport={onSupport}
+                              onResize={onResize}
                             />
                           )
                         })}

@@ -659,6 +659,27 @@ a:hover {
   margin-inline-start: 0.15rem;
 }
 
+/* The bottom edge, pulled to make a dream longer or shorter. Only in the grid. */
+.dream-resize {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 0.6rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: 0.55rem;
+  line-height: 0.6rem;
+  text-align: center;
+  cursor: ns-resize;
+  opacity: 0.55;
+}
+
+.dream-resize:focus-visible {
+  opacity: 1;
+}
+
 /* Over the timetable rather than beside it — the grid is as wide as the screen. */
 .dream-modal {
   position: fixed;
@@ -722,6 +743,8 @@ a:hover {
   flex: 1;
   margin: 0;
   overflow: hidden;
+  /* The resize handle sits against this chip's bottom edge, not the cell's. */
+  position: relative;
 }
 
 .dream-chip {
