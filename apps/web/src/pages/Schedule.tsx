@@ -800,8 +800,8 @@ const Timetable = ({
         {/*
           Fixed layout, so the lanes share what is left equally rather than sizing
           themselves to whichever happens to hold the longest title. The time column
-          is `17ch` because that is what `2026-10-03 00:00` measures — the widest
-          label it ever holds, on the daybreak rows.
+          is `17ch`: the widest label it holds is `2026-10-03 00:00` on the daybreak
+          rows, which is sixteen mostly-numeric characters, plus one for slack.
         */}
         <colgroup>
           <col class="schedule-time-col" />

@@ -51,7 +51,15 @@ const stub = (over: Partial<MealsApi> = {}, meals: Meal[] = [aMeal()]): MealsApi
       slots: [{ id: 's-1', event_id: 'e-1', order: 0, label: 'Dinner', at: '18:00', kind: 'meal' }],
       meals,
     }),
-  getEventAttendees: () => Promise.resolve({ attendees: [{ account_id: 'a-1', name: 'Ada', avatar: null }] }),
+  getEventAttendees: () =>
+    Promise.resolve({
+      attendees: [
+        { account_id: 'a-1', name: 'Ada', avatar: null },
+        // A second, so a control offering everybody can be told from one offering only
+        // whoever is already on the sitting.
+        { account_id: 'a-2', name: 'Bea', avatar: null },
+      ],
+    }),
   setMealLead: () => Promise.reject(new Error('setMealLead is not stubbed here')),
   joinMealCrew: () => Promise.reject(new Error('joinMealCrew is not stubbed here')),
   leaveMealCrew: () => Promise.reject(new Error('leaveMealCrew is not stubbed here')),
@@ -183,13 +191,26 @@ describe('a chore that still has somebody on it', () => {
     await waitFor(() => expect(setMealLead).toHaveBeenCalledWith('m-1', { account_id: null }))
   })
 
-  it('offers nobody else to hand it to, since the API would refuse', async () => {
+  it('names whoever is on it, and offers nobody else, since the API would refuse', async () => {
+    // Two options and no more: "Nobody yet", which vacates, and the person already on
+    // it. Without the second nothing matches the control's value and it draws blank —
+    // vacant-looking while somebody is still on it, which is the thing the whole
+    // stale-lead option exists to prevent.
     renderPage(stub({}, [chore({ lead: { account_id: 'a-1', name: 'Ada' } })]))
 
     const select = await screen.findByLabelText('Lead for Morning cleanup on 2026-08-01')
+    const options = [...select.querySelectorAll('option')].map((option) => option.textContent)
 
-    // Only "Nobody yet" and the person already on it.
-    expect(select.querySelectorAll('option')).toHaveLength(1)
+    expect(options).toEqual(['Nobody yet', 'Ada'])
+    expect(select).toHaveProperty('value', 'a-1')
+  })
+
+  it('says so when the one on it has withdrawn as well', async () => {
+    renderPage(stub({}, [chore({ lead: { account_id: 'a-9', name: 'Gone' } })]))
+
+    const select = await screen.findByLabelText('Lead for Morning cleanup on 2026-08-01')
+
+    expect(select.textContent).toContain('Gone — no longer coming')
   })
 
   it('lets a stranded cook stand down, and offers nobody the chance to join', async () => {

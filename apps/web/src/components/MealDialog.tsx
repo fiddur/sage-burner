@@ -43,6 +43,10 @@ export const MealDialog = ({
   const [label, setLabel] = useState(meal.label)
   const [idea, setIdea] = useState(meal.food_idea)
 
+  // Nobody may be handed a chore's lead, so nobody is offered for it. Whoever is
+  // already on one still gets an option, or the control would show blank.
+  const offered = meal.kind === 'chore' ? [] : attendees
+
   return (
     <DreamPanel label={meal.label} error={error} onClose={onClose}>
       <h2>{meal.label}</h2>
@@ -126,19 +130,23 @@ export const MealDialog = ({
           >
             <option value="">Nobody yet</option>
             {meal.lead !== null &&
-              !attendees.some((who) => who.account_id === meal.lead?.account_id) && (
-                // They have withdrawn since taking it on. Named rather than left out, or
-                // the control reads as vacant while somebody is still on it.
+              !offered.some((who) => who.account_id === meal.lead?.account_id) && (
+                // Whenever the list below does not hold them — because they have withdrawn,
+                // or because this is a chore and the list is empty. Without it nothing
+                // matches the control's value and it reads as vacant while somebody is
+                // still on it.
                 <option value={meal.lead.account_id} disabled>
-                  {nameOf(meal.lead)} — no longer coming
+                  {nameOf(meal.lead)}
+                  {attendees.some((who) => who.account_id === meal.lead?.account_id)
+                    ? ''
+                    : ' — no longer coming'}
                 </option>
               )}
-            {meal.kind !== 'chore' &&
-              attendees.map((who) => (
-                <option key={who.account_id} value={who.account_id}>
-                  {nameOf(who)}
-                </option>
-              ))}
+            {offered.map((who) => (
+              <option key={who.account_id} value={who.account_id}>
+                {nameOf(who)}
+              </option>
+            ))}
           </select>
           {meal.kind === 'chore' && (
             <span class="form-note">Nothing is cooked here, so this can only be vacated.</span>

@@ -248,20 +248,7 @@ const MealTable = ({
                 onChange={(changeEvent) => onLead(meal.id, changeEvent.currentTarget.value || null)}
               >
                 <option value="">Nobody yet</option>
-                {meal.lead !== null &&
-                  !attendees.some((who) => who.account_id === meal.lead?.account_id) && (
-                    // They have withdrawn since taking it on. Named rather than left out,
-                    // or the control reads as vacant while somebody is still on it.
-                    <option value={meal.lead.account_id} disabled>
-                      {nameOf(meal.lead)} — no longer coming
-                    </option>
-                  )}
-                {meal.kind !== 'chore' &&
-                  attendees.map((who) => (
-                    <option key={who.account_id} value={who.account_id}>
-                      {nameOf(who)}
-                    </option>
-                  ))}
+                <LeadOptions meal={meal} attendees={attendees} />
               </select>
             )}
           </td>
@@ -287,6 +274,35 @@ const MealTable = ({
     </tbody>
   </table>
 )
+
+/**
+ * Whoever may hold this sitting's lead, as options.
+ *
+ * Nobody may be handed a **chore's**, so nobody is offered for one — but whoever is
+ * already on it still needs an option, or nothing matches the control's value and it
+ * reads as vacant while somebody is still on it. Same for a lead who has withdrawn,
+ * which is where that rule started.
+ */
+const LeadOptions = ({ meal, attendees }: { meal: Meal; attendees: readonly Person[] }) => {
+  const offered = meal.kind === 'chore' ? [] : attendees
+  const lead = meal.lead
+
+  return (
+    <>
+      {lead !== null && !offered.some((who) => who.account_id === lead.account_id) && (
+        <option value={lead.account_id} disabled>
+          {nameOf(lead)}
+          {attendees.some((who) => who.account_id === lead.account_id) ? '' : ' — no longer coming'}
+        </option>
+      )}
+      {offered.map((who) => (
+        <option key={who.account_id} value={who.account_id}>
+          {nameOf(who)}
+        </option>
+      ))}
+    </>
+  )
+}
 
 /** The sheet's "Food idea?", whose own header says "Not needed". */
 const FoodIdea = ({

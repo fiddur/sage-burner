@@ -192,17 +192,12 @@ export const registerRedemptionRoutes = (
       cookieHeader(sessions.issue(accountId), config, config.session_ttl_seconds),
     )
 
-    // The whole viewer, with `satisfies` — which is what was missing. Redeeming
-    // answered with two of its four fields, so a freshly redeemed member's in-memory
-    // viewer carried `name: undefined` and, once the circle could be a picture,
-    // `avatar: undefined`. That is not `null`: the details page compares against
-    // `null`, so their first visit offered "Change it" and "Back to initials" for a
-    // picture they do not have, over a broken `<img src=…?v=undefined>`.
+    // The whole viewer, with `satisfies`: the page reads every field, and `undefined`
+    // is not `null` to a control comparing against it.
     return reply.code(201).send({
       viewer: {
         account_id: accountId,
         name: parsed.data.name,
-        // Nobody has a picture the moment they redeem.
         avatar: null,
         roles: ['member'],
       },
