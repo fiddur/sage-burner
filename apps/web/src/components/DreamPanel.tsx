@@ -12,10 +12,13 @@ import { useEffect, useRef } from 'preact/hooks'
  */
 export const DreamPanel = ({
   label,
+  error,
   onClose,
   children,
 }: {
   label: string
+  /** Shown here rather than on the page, which renders under the overlay. */
+  error: string | undefined
   onClose: () => void
   children: ComponentChildren
 }) => {
@@ -51,6 +54,11 @@ export const DreamPanel = ({
         // Reading the description must not close the thing you opened to read it.
         onClick={(clickEvent) => clickEvent.stopPropagation()}
       >
+        {error !== undefined && (
+          <p class="form-error" role="alert">
+            {error}
+          </p>
+        )}
         {children}
       </div>
     </div>

@@ -999,6 +999,104 @@ describe('Schedule', () => {
     expect(offerSession).not.toHaveBeenCalled()
   })
 
+  it('keeps a refused offer on screen, with everything that was typed', async () => {
+    // The defect this replaced: the panel closed on the click, not on the write. A
+    // start with no end is half a slot and a 400 from the schema — an ordinary
+    // mistake, not a corner — and the title and description went with the panel.
+    renderPage(
+      stub({
+        offerSession: () => Promise.reject(apiError(400, 'bad_request', 'That will not do.')),
+      }),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Offer a dream' }))
+    fireEvent.input(screen.getByLabelText('Title of the new dream'), { target: { value: 'Check in' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Offer it' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('That will not do.')
+    expect(screen.getByRole('dialog', { name: 'Offer a dream' })).toBeTruthy()
+    expect(screen.getByLabelText('Title of the new dream')).toHaveProperty('value', 'Check in')
+  })
+
+  it('closes the offer panel once the dream is actually offered', async () => {
+    // The passing sibling: a panel that never closed would satisfy the test above.
+    const offerSession = vi.fn<ScheduleApi['offerSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-2', title: 'Check in' }) }),
+    )
+    renderPage(stub({ offerSession }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Offer a dream' }))
+    fireEvent.input(screen.getByLabelText('Title of the new dream'), { target: { value: 'Check in' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Offer it' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  it('keeps a refused edit open, with the edits still in the fields', async () => {
+    renderPage(
+      stub({ updateSession: () => Promise.reject(apiError(400, 'bad_request', 'That will not do.')) }, [
+        aDream({ id: 's-1', title: 'Cacao ceremony' }),
+      ]),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Cacao ceremony' }))
+    fireEvent.input(screen.getByLabelText('Title of Cacao ceremony'), { target: { value: 'Renamed' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('That will not do.')
+    expect(screen.getByLabelText('Title of Cacao ceremony')).toHaveProperty('value', 'Renamed')
+  })
+
+  it('leaves the form once a save lands, and says the right thing when one does not', async () => {
+    // The passing sibling for the edit, and the message: a refused *edit* used to
+    // report "Could not move that dream", because it went through the drag path.
+    const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'Renamed' }) }),
+    )
+    renderPage(stub({ updateSession }, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Cacao ceremony' }))
+    fireEvent.input(screen.getByLabelText('Title of Cacao ceremony'), { target: { value: 'Renamed' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(screen.queryByLabelText('Title of Cacao ceremony')).toBeNull())
+    expect(screen.getByRole('dialog')).toBeTruthy()
+  })
+
+  it('reports a refused save as a save, not as a move', async () => {
+    renderPage(
+      stub({ updateSession: () => Promise.reject(new Error('nope')) }, [
+        aDream({ id: 's-1', title: 'Cacao ceremony' }),
+      ]),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Cacao ceremony' }))
+    fireEvent.input(screen.getByLabelText('Title of Cacao ceremony'), { target: { value: 'Renamed' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Could not save that.')
+  })
+
+  it('shows the failure inside the panel, which covers the page it would print on', async () => {
+    // `.dream-modal` is a fixed overlay, so the page-level error renders under it.
+    renderPage(
+      stub({ supportSession: () => Promise.reject(new Error('nope')) }, [
+        aDream({ id: 's-1', title: 'Cacao ceremony' }),
+      ]),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
+    const panel = await screen.findByRole('dialog', { name: 'Cacao ceremony' })
+    fireEvent.click(within(panel).getByRole('button', { name: 'Show support' }))
+
+    const alert = await screen.findByRole('alert')
+
+    expect(panel.contains(alert)).toBe(true)
+  })
+
   it('shows what the server said when a move is refused', async () => {
     renderPage(
       stub({ updateSession: () => Promise.reject(apiError(400, 'bad_request', 'That will not do.')) }, [

@@ -44,7 +44,7 @@ type Timetable = {
  * a helper leaves the panel showing what the server now says.
  */
 type Opened =
-  | { kind: 'dream'; id: string }
+  | { kind: 'dream'; id: string; editing: boolean }
   | { kind: 'new'; place_id: string | null; time_slot_start: string | null; time_slot_end: string | null }
 
 const label = (row: string) => row.slice(11)
@@ -212,21 +212,48 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
     run(() => (helping ? api.helpWithSession(id) : api.stopHelpingWithSession(id)), 'Could not save that.')
   }
 
-  // The form disables its own button until there is a title, so the fallback is
-  // unreachable — and if that ever stopped being true, an empty title is a 400 the
-  // page reports, which beats a click that silently does nothing.
+  /**
+   * Every write the panel makes closes it **only once the write has landed**.
+   *
+   * Closing on the click threw the member's typing away whenever the server said no,
+   * and that is an ordinary path rather than a corner: filling Starts and leaving
+   * Ends empty is half a slot, which the schema refuses with a 400.
+   *
+   * The fallback title is unreachable — the form disables its own button until there
+   * is one — and if that stopped being true, an empty title is a 400 the panel now
+   * reports with the text still in it.
+   */
   const offer = ({ title = '', ...fields }: SessionUpdate) => {
-    run(() => api.offerSession(event.id, { ...fields, title }), 'Could not offer that.')
-    setOpened(undefined)
+    run(async () => {
+      await api.offerSession(event.id, { ...fields, title })
+      setOpened(undefined)
+    }, 'Could not offer that.')
+  }
+
+  const save = (id: string, changes: SessionUpdate) => {
+    run(async () => {
+      await api.updateSession(id, changes)
+      setOpened({ kind: 'dream', id, editing: false })
+    }, 'Could not save that.')
+  }
+
+  const remove = (id: string) => {
+    run(async () => {
+      await api.withdrawSession(id)
+      setOpened(undefined)
+    }, 'Could not withdraw that.')
   }
 
   return (
     <Framed>
-      {error !== undefined && (
-        <p class="form-error" role="alert">
-          {error}
-        </p>
-      )}
+      {error !== undefined &&
+        opened === undefined && (
+          // Only when no panel is open: the overlay covers this, and the panel shows
+          // the same message itself. Two would also be announced twice.
+          <p class="form-error" role="alert">
+            {error}
+          </p>
+        )}
 
       <div class="schedule">
         <Pool
@@ -234,7 +261,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
           names={names}
           busy={busy}
           onDragStart={setDragged}
-          onOpen={(id) => setOpened({ kind: 'dream', id })}
+          onOpen={(id) => setOpened({ kind: 'dream', id, editing: false })}
           onOffer={() =>
             setOpened({ kind: 'new', place_id: null, time_slot_start: null, time_slot_end: null })
           }
@@ -255,7 +282,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
           names={names}
           busy={busy}
           onDragStart={setDragged}
-          onOpen={(id) => setOpened({ kind: 'dream', id })}
+          onOpen={(id) => setOpened({ kind: 'dream', id, editing: false })}
           onOfferAt={(row, placeId) =>
             setOpened({
               kind: 'new',
@@ -278,15 +305,15 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
         names={names}
         viewerId={viewer.account?.id}
         busy={busy}
+        error={error}
+        onEdit={(id) => setOpened({ kind: 'dream', id, editing: true })}
+        onCancelEdit={(id) => setOpened({ kind: 'dream', id, editing: false })}
         onClose={() => setOpened(undefined)}
         onHelp={help}
         onSupport={support}
-        onSave={move}
+        onSave={save}
         onOffer={offer}
-        onRemove={(id) => {
-          run(() => api.withdrawSession(id), 'Could not withdraw that.')
-          setOpened(undefined)
-        }}
+        onRemove={remove}
       />
     </Framed>
   )
@@ -306,6 +333,9 @@ const Opened = ({
   names,
   viewerId,
   busy,
+  error,
+  onEdit,
+  onCancelEdit,
   onClose,
   onHelp,
   onSupport,
@@ -320,6 +350,9 @@ const Opened = ({
   names: ReadonlyMap<string, string | null>
   viewerId: string | undefined
   busy: boolean
+  error: string | undefined
+  onEdit: (id: string) => void
+  onCancelEdit: (id: string) => void
   onClose: () => void
   onHelp: (id: string, helping: boolean) => void
   onSupport: (id: string, supporting: boolean) => void
@@ -331,7 +364,7 @@ const Opened = ({
 
   if (opened.kind === 'new') {
     return (
-      <DreamPanel label="Offer a dream" onClose={onClose}>
+      <DreamPanel label="Offer a dream" error={error} onClose={onClose}>
         <h2>Offer a dream</h2>
         <DreamFields
           dream={{
@@ -370,6 +403,10 @@ const Opened = ({
       }
       viewerId={viewerId}
       busy={busy}
+      error={error}
+      editing={opened.editing}
+      onEdit={() => onEdit(dream.id)}
+      onCancelEdit={() => onCancelEdit(dream.id)}
       onClose={onClose}
       onHelp={(helping) => onHelp(dream.id, helping)}
       onSupport={(supporting) => onSupport(dream.id, supporting)}
@@ -677,7 +714,7 @@ const Timetable = ({
                   <td
                     key={place.id}
                     rowSpan={cell.kind === 'anchor' ? cell.span : undefined}
-                    class={`schedule-cell place-${place.color}`}
+                    class={`schedule-cell place-${place.color}${cell.kind === 'empty' ? ' is-free' : ''}`}
                     onDragOver={(dragEvent) => dragEvent.preventDefault()}
                     onDrop={(dropEvent) => {
                       dropEvent.preventDefault()

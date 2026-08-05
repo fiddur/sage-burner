@@ -19,6 +19,10 @@ export const DreamDetails = ({
   facilitatorName,
   viewerId,
   busy,
+  error,
+  editing,
+  onEdit,
+  onCancelEdit,
   onClose,
   onHelp,
   onSupport,
@@ -32,6 +36,15 @@ export const DreamDetails = ({
   /** Who is reading it, so the button can say "I cannot help after all". */
   viewerId: string | undefined
   busy: boolean
+  error: string | undefined
+  /**
+   * Owned by the page, not held here: the form must stay open when a save is
+   * refused, and only the page knows whether one was. Closing it on the click
+   * threw away everything the member had typed.
+   */
+  editing: boolean
+  onEdit: () => void
+  onCancelEdit: () => void
   onClose: () => void
   /** `true` to offer, `false` to take the offer back. */
   onHelp: (helping: boolean) => void
@@ -39,7 +52,6 @@ export const DreamDetails = ({
   onSave: (changes: SessionUpdate) => void
   onRemove: () => void
 }) => {
-  const [editing, setEditing] = useState(false)
   const [confirming, setConfirming] = useState(false)
 
   // Read off the list rather than carried as its own field. `supported_by_me` exists
@@ -49,7 +61,7 @@ export const DreamDetails = ({
   const place = places.find((lane) => lane.id === dream.place_id)
 
   return (
-    <DreamPanel label={dream.title} onClose={onClose}>
+    <DreamPanel label={dream.title} error={error} onClose={onClose}>
       <h2>{dream.title}</h2>
 
       {editing ? (
@@ -59,11 +71,8 @@ export const DreamDetails = ({
           places={places}
           attendees={attendees}
           busy={busy}
-          onCancel={() => setEditing(false)}
-          onSave={(changes) => {
-            onSave(changes)
-            setEditing(false)
-          }}
+          onCancel={onCancelEdit}
+          onSave={onSave}
         />
       ) : (
         <>
@@ -119,7 +128,7 @@ export const DreamDetails = ({
               class="link-button"
               disabled={busy}
               aria-label={`Edit ${dream.title}`}
-              onClick={() => setEditing(true)}
+              onClick={onEdit}
             >
               ✏️
             </button>

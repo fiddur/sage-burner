@@ -1323,6 +1323,14 @@ protect a concurrent editor's work, and a dream that does not exist yet has none
 protect — while a slot prefilled from the clicked cell would be diffed away as
 unchanged and the new dream would land nowhere.
 
+**Every write closes the panel only once it has landed**, never on the click. Closing
+on the click threw away everything the member had typed whenever the server said no,
+and that is an ordinary path rather than a corner: filling _Starts_ and leaving _Ends_
+empty is half a slot, which the schema refuses with a 400. The failure is shown
+**inside** the panel, because `.dream-modal` is a fixed overlay and the page's own
+error renders under it; the page suppresses its copy while a panel is open, so the
+message is never announced twice.
+
 ### Pulling the bottom edge
 
 A placed chip carries a handle on its bottom edge. Dragging it changes the length in

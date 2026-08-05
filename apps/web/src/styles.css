@@ -719,8 +719,12 @@ a:hover {
   line-height: 1;
 }
 
-/* An empty hour is a place to offer something, so it should look like one. */
-.schedule-cell {
+/*
+  An empty hour is a place to offer something, so it should look like one — and an
+  occupied one is not, so it should not. The class is put on by the same branch that
+  decides the click does anything.
+*/
+.schedule-cell.is-free {
   cursor: pointer;
 }
 
