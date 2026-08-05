@@ -42,6 +42,16 @@ import type {
   LeadRoleUpdate,
   LeadRolesResponse,
   LoginRequest,
+  MealCreateInput,
+  MealIdeaUpdate,
+  MealIntroUpdate,
+  MealLead,
+  MealResponse,
+  MealSlotCreateInput,
+  MealSlotUpdate,
+  MealSlotsResponse,
+  MealUpdate,
+  MealsResponse,
   MeResponse,
   MemberRosterResponse,
   MyBurnsResponse,
@@ -291,6 +301,71 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
         method: 'PUT',
         body,
       }),
+
+    /**
+     * The burn's meals, its slot templates and the words above the table.
+     *
+     * Any approved member, like the lead-roles register — this replaces a tab of a
+     * spreadsheet everyone could edit.
+     */
+    getMeals: (eventId: string, signal?: AbortSignal) =>
+      request<MealsResponse>(`/events/${encodeURIComponent(eventId)}/meals`, { signal }),
+
+    /** Moving a sitting or renaming it. Any approved member: the schedule is theirs. */
+    updateMeal: (id: string, body: MealUpdate) =>
+      request<MealResponse>(`/meals/${encodeURIComponent(id)}`, { method: 'PATCH', body }),
+
+    /** Taking a meal's lead, handing it on, or vacating it with `null`. */
+    setMealLead: (id: string, body: MealLead) =>
+      request<MealResponse>(`/meals/${encodeURIComponent(id)}/lead`, { method: 'PUT', body }),
+
+    /** Standing for a meal's helpers or its cleanup crew, and standing down. */
+    joinMealCrew: (id: string, role: 'cleanup' | 'helper') =>
+      request<MealResponse>(`/meals/${encodeURIComponent(id)}/${role}/me`, { method: 'PUT' }),
+
+    leaveMealCrew: (id: string, role: 'cleanup' | 'helper') =>
+      request<MealResponse>(`/meals/${encodeURIComponent(id)}/${role}/me`, { method: 'DELETE' }),
+
+    /** What somebody thought of cooking. An empty one removes the note. */
+    setMealIdea: (id: string, body: MealIdeaUpdate) =>
+      request<MealResponse>(`/meals/${encodeURIComponent(id)}/idea`, { method: 'PUT', body }),
+
+    /** The words above the table, which any approved member may rewrite. */
+    updateMealIntro: (eventId: string, body: MealIntroUpdate) =>
+      request<{ meal_intro_markdown: string }>(`/events/${encodeURIComponent(eventId)}/meal-intro`, {
+        method: 'PATCH',
+        body,
+      }),
+
+    /** The slot templates, and filling the burn's days in from them. Admin only. */
+    getMealSlots: (eventId: string, signal?: AbortSignal) =>
+      request<MealSlotsResponse>(`/admin/events/${encodeURIComponent(eventId)}/meal-slots`, { signal }),
+
+    addMealSlot: (eventId: string, body: MealSlotCreateInput) =>
+      request<MealSlotsResponse>(`/admin/events/${encodeURIComponent(eventId)}/meal-slots`, {
+        method: 'POST',
+        body,
+      }),
+
+    updateMealSlot: (id: string, body: MealSlotUpdate) =>
+      request<MealSlotsResponse>(`/admin/meal-slots/${encodeURIComponent(id)}`, { method: 'PATCH', body }),
+
+    deleteMealSlot: (id: string) =>
+      request<undefined>(`/admin/meal-slots/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+    /** Adds what is missing and touches nothing else, so it is safe to press again. */
+    generateMeals: (eventId: string) =>
+      request<{ meals: MealsResponse['meals'] }>(
+        `/admin/events/${encodeURIComponent(eventId)}/meals/generate`,
+        { method: 'POST' },
+      ),
+
+    /** Adding a sitting the slots never made, and dropping one. Admin only. */
+    addMeal: (eventId: string, body: MealCreateInput) =>
+      request<MealResponse>(`/admin/events/${encodeURIComponent(eventId)}/meals`, { method: 'POST', body }),
+
+    deleteMeal: (id: string) =>
+      request<undefined>(`/admin/meals/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
     /** Members only. Scheduled dreams first, then the ones only offered. */
     getSessions: (eventId: string, signal?: AbortSignal) =>

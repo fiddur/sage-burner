@@ -1,19 +1,30 @@
-import type { EventAttendeesResponse, MyBurn, Place, Session, SessionUpdate } from '@sage-burner/shared'
+import type { EventAttendeesResponse, Meal, MyBurn, Place, Session, SessionUpdate } from '@sage-burner/shared'
 import type { ComponentChildren } from 'preact'
 
 import { useRef, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
+import type { LaneCell, MealBlock } from '../schedule.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
 import { DreamDetails } from '../components/DreamDetails.tsx'
 import { DreamFields } from '../components/DreamFields.tsx'
 import { DreamPanel } from '../components/DreamPanel.tsx'
+import { MealDialog } from '../components/MealDialog.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
 import { fromLocalInput, toLocalInput } from '../datetime.ts'
 import { initials } from '../initials.ts'
 import { useAction, useLoad } from '../load.ts'
-import { endFor, hourOf, hoursOf, laneCells, resizedEnd, rowsDragged } from '../schedule.ts'
+import {
+  endFor,
+  hourOf,
+  hoursOf,
+  laneCells,
+  mealBlocks,
+  mealMovedTo,
+  resizedEnd,
+  rowsDragged,
+} from '../schedule.ts'
 import { isMember, useViewer } from '../viewer.tsx'
 
 export type ScheduleApi = Pick<
@@ -28,6 +39,12 @@ export type ScheduleApi = Pick<
   | 'supportSession'
   | 'withdrawSupportForSession'
   | 'withdrawSession'
+  | 'getMeals'
+  | 'updateMeal'
+  | 'setMealLead'
+  | 'joinMealCrew'
+  | 'leaveMealCrew'
+  | 'setMealIdea'
 >
 
 type Timetable = {
@@ -35,6 +52,8 @@ type Timetable = {
   places: readonly Place[]
   sessions: readonly Session[]
   attendees: readonly EventAttendeesResponse['attendees'][number][]
+  /** The kitchen's whole content. A burn with none gets no kitchen lane at all. */
+  meals: readonly Meal[]
 }
 
 /**
@@ -71,19 +90,25 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
   const viewer = useViewer()
   const member = isMember(viewer)
   const [dragged, setDragged] = useState<string | undefined>(undefined)
+  // A meal's block, when that is what is being dragged. Held apart from `dragged` so
+  // a dream cannot be dropped in the kitchen nor a meal in a lane — the kitchen is
+  // for cooking, fetching food and washing up, and that is the whole of it.
+  const [draggedMeal, setDraggedMeal] = useState<MealBlock | undefined>(undefined)
   const [opened, setOpened] = useState<Opened | undefined>(undefined)
+  const [openedMeal, setOpenedMeal] = useState<string | undefined>(undefined)
 
   // The burn comes first: since #156 the lanes belong to one, so there is no grid to
   // ask for until we know which.
   const burn = useSelectedBurn()
   const { loaded, reload } = useLoad<Timetable>(
     async (signal) => {
-      if (burn === undefined) return { event: null, places: [], sessions: [], attendees: [] }
+      if (burn === undefined) return { event: null, places: [], sessions: [], attendees: [], meals: [] }
 
-      const [places, dreams, attendees] = await Promise.all([
+      const [places, dreams, attendees, plan] = await Promise.all([
         api.getPlaces(burn.event.id, signal),
         api.getSessions(burn.event.id, signal),
         api.getEventAttendees(burn.event.id, signal),
+        api.getMeals(burn.event.id, signal),
       ])
 
       return {
@@ -91,6 +116,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
         places: places.places,
         sessions: dreams.sessions,
         attendees: attendees.attendees,
+        meals: plan.meals,
       }
     },
     { enabled: member, key: burn?.event.id ?? '', fallback: 'Could not load the schedule.' },
@@ -126,7 +152,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
     )
   }
 
-  const { event, places, sessions, attendees } = loaded.data
+  const { event, places, sessions, attendees, meals } = loaded.data
   // By id, because a chip has one and needs a name for the circle.
   const names = new Map(attendees.map((person) => [person.account_id, person.name]))
 
@@ -138,7 +164,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
     )
   }
 
-  if (places.length === 0) {
+  if (places.length === 0 && meals.length === 0) {
     return (
       <Framed>
         <p class="notice">
@@ -208,6 +234,37 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
     move(dream.id, { time_slot_end: end })
   }
 
+  /**
+   * Exactly one thing is being dragged, so starting either drag ends the other.
+   *
+   * They were two independent states, and nothing cleared either when a drag was
+   * abandoned — dropping outside every target fires no `drop`. So an abandoned dream
+   * drag left `dragged` set, and the next meal dropped in a lane found it and moved
+   * the *dream* there instead. The kitchen's rule held only for a first drag.
+   */
+  const dragDream = (id: string) => {
+    setDragged(id)
+    setDraggedMeal(undefined)
+  }
+
+  const dragMeal = (block: MealBlock) => {
+    setDraggedMeal(block)
+    setDragged(undefined)
+  }
+
+  // `dragend` fires on the source whether the drag ended in a drop or was abandoned,
+  // so nothing stale survives to be found by a drop that has nothing to do with it —
+  // text dragged in from elsewhere, say. Bound on each chip rather than on the grid:
+  // it does not reach an ancestor here, which a probe established rather than the
+  // spec, so the placement is load-bearing.
+  const endDrag = () => {
+    setDragged(undefined)
+    setDraggedMeal(undefined)
+  }
+
+  const blocks = meals.flatMap((meal) => mealBlocks(meal))
+  const shownMeal = meals.find((meal) => meal.id === openedMeal)
+
   const help = (id: string, helping: boolean) => {
     run(() => (helping ? api.helpWithSession(id) : api.stopHelpingWithSession(id)), 'Could not save that.')
   }
@@ -247,7 +304,8 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
   return (
     <Framed>
       {error !== undefined &&
-        opened === undefined && (
+        opened === undefined &&
+        shownMeal === undefined && (
           // Only when no panel is open: the overlay covers this, and the panel shows
           // the same message itself. Two would also be announced twice.
           <p class="form-error" role="alert">
@@ -260,7 +318,8 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
           dreams={unscheduled}
           names={names}
           busy={busy}
-          onDragStart={setDragged}
+          onDragStart={dragDream}
+          onDragEnd={endDrag}
           onOpen={(id) => setOpened({ kind: 'dream', id, editing: false })}
           onOffer={() =>
             setOpened({ kind: 'new', place_id: null, time_slot_start: null, time_slot_end: null })
@@ -278,10 +337,19 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
         <Timetable
           rows={rows}
           places={places}
+          blocks={blocks}
+          onOpenMeal={setOpenedMeal}
+          onDragMeal={dragMeal}
+          onDropInKitchen={(row) => {
+            const to = draggedMeal && mealMovedTo(draggedMeal.part, row)
+            setDraggedMeal(undefined)
+            if (to) run(() => api.updateMeal(draggedMeal.meal_id, to), 'Could not move that meal.')
+          }}
           dreams={sessions}
           names={names}
           busy={busy}
-          onDragStart={setDragged}
+          onDragStart={dragDream}
+          onDragEnd={endDrag}
           onOpen={(id) => setOpened({ kind: 'dream', id, editing: false })}
           onOfferAt={(row, placeId) =>
             setOpened({
@@ -296,6 +364,17 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
           onDrop={dropInto}
         />
       </div>
+
+      <OpenedMeal
+        meal={shownMeal}
+        api={api}
+        attendees={attendees}
+        viewerId={viewer.account?.id}
+        busy={busy}
+        error={error}
+        run={run}
+        onClose={() => setOpenedMeal(undefined)}
+      />
 
       <Opened
         opened={opened}
@@ -429,6 +508,7 @@ const Chip = ({
   busy,
   resizable,
   onDragStart,
+  onDragEnd,
   onOpen,
   onSupport,
   onResize,
@@ -439,6 +519,7 @@ const Chip = ({
   /** Only in the grid: there are no rows to pull against in the pool. */
   resizable: boolean
   onDragStart: (id: string) => void
+  onDragEnd: () => void
   onOpen: (id: string) => void
   onSupport: (id: string, supporting: boolean) => void
   onResize: (dream: Session, byRows: number) => void
@@ -473,6 +554,7 @@ const Chip = ({
         dragEvent.dataTransfer?.setData('text/plain', dream.id)
         onDragStart(dream.id)
       }}
+      onDragEnd={onDragEnd}
       onClick={() => {
         if (dragging.current) return
         onOpen(dream.id)
@@ -596,6 +678,7 @@ const Pool = ({
   names,
   busy,
   onDragStart,
+  onDragEnd,
   onOpen,
   onOffer,
   onSupport,
@@ -606,6 +689,7 @@ const Pool = ({
   names: ReadonlyMap<string, string | null>
   busy: boolean
   onDragStart: (id: string) => void
+  onDragEnd: () => void
   onOpen: (id: string) => void
   onOffer: () => void
   onSupport: (id: string, supporting: boolean) => void
@@ -637,6 +721,7 @@ const Pool = ({
           busy={busy}
           resizable={false}
           onDragStart={onDragStart}
+          onDragEnd={onDragEnd}
           onOpen={onOpen}
           onSupport={onSupport}
           onResize={onResize}
@@ -658,21 +743,31 @@ const Timetable = ({
   dreams,
   names,
   busy,
+  blocks,
   onDragStart,
+  onDragEnd,
   onOpen,
   onOfferAt,
+  onOpenMeal,
+  onDragMeal,
+  onDropInKitchen,
   onSupport,
   onResize,
   onDrop,
 }: {
   rows: readonly string[]
   places: readonly Place[]
+  blocks: readonly MealBlock[]
   dreams: readonly Session[]
   names: ReadonlyMap<string, string | null>
   busy: boolean
   onDragStart: (id: string) => void
+  onDragEnd: () => void
   onOpen: (id: string) => void
   onOfferAt: (row: string, placeId: string) => void
+  onOpenMeal: (mealId: string) => void
+  onDragMeal: (block: MealBlock) => void
+  onDropInKitchen: (row: string) => void
   onSupport: (id: string, supporting: boolean) => void
   onResize: (dream: Session, byRows: number) => void
   onDrop: (row: string, placeId: string) => void
@@ -687,6 +782,12 @@ const Timetable = ({
     ]),
   )
 
+  // Its own lane, drawn from the meals rather than from a place: nothing can be put
+  // in the kitchen but cooking, fetching food and washing up. A burn with no meals
+  // gets no column at all.
+  const kitchen = blocks.length === 0 ? undefined : laneCells(rows, blocks)
+  const byId = new Map(blocks.map((block) => [block.id, block]))
+
   return (
     <div class="schedule-grid-wrap">
       <table class="schedule-grid">
@@ -698,6 +799,11 @@ const Timetable = ({
                 <span aria-hidden="true">{place.emoji}</span> {place.name}
               </th>
             ))}
+            {kitchen !== undefined && (
+              <th scope="col">
+                <span aria-hidden="true">🍳</span> Kitchen
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -743,6 +849,7 @@ const Timetable = ({
                               busy={busy}
                               resizable
                               onDragStart={onDragStart}
+                              onDragEnd={onDragEnd}
                               onOpen={onOpen}
                               onSupport={onSupport}
                               onResize={onResize}
@@ -754,10 +861,142 @@ const Timetable = ({
                   </td>
                 )
               })}
+
+              {kitchen !== undefined && (
+                <KitchenCell
+                  cell={kitchen[index]}
+                  blocks={byId}
+                  busy={busy}
+                  onOpenMeal={onOpenMeal}
+                  onDragMeal={onDragMeal}
+                  onDragEnd={onDragEnd}
+                  onDrop={() => onDropInKitchen(row)}
+                />
+              )}
             </tr>
           ))}
         </tbody>
       </table>
     </div>
+  )
+}
+
+/**
+ * The meal panel, or nothing — its own component so the page keeps one branch, the
+ * same reason `Opened` is one.
+ */
+const OpenedMeal = ({
+  meal,
+  api,
+  attendees,
+  viewerId,
+  busy,
+  error,
+  run,
+  onClose,
+}: {
+  meal: Meal | undefined
+  api: Pick<ScheduleApi, 'joinMealCrew' | 'leaveMealCrew' | 'setMealIdea' | 'setMealLead' | 'updateMeal'>
+  attendees: readonly EventAttendeesResponse['attendees'][number][]
+  viewerId: string | undefined
+  busy: boolean
+  error: string | undefined
+  run: (work: () => Promise<unknown>, fallback: string) => void
+  onClose: () => void
+}) => {
+  if (meal === undefined) return null
+
+  return (
+    <MealDialog
+      meal={meal}
+      attendees={attendees}
+      viewerId={viewerId}
+      busy={busy}
+      error={error}
+      onClose={onClose}
+      onLead={(accountId) =>
+        run(() => api.setMealLead(meal.id, { account_id: accountId }), 'Could not save that.')
+      }
+      onStand={(role, joining) =>
+        run(
+          () => (joining ? api.joinMealCrew(meal.id, role) : api.leaveMealCrew(meal.id, role)),
+          'Could not save that.',
+        )
+      }
+      onIdea={(food_idea) => run(() => api.setMealIdea(meal.id, { food_idea }), 'Could not save that.')}
+      onRename={(changes) => run(() => api.updateMeal(meal.id, changes), 'Could not save that.')}
+    />
+  )
+}
+
+/**
+ * One hour of the kitchen.
+ *
+ * The same `laneCells` machinery a place's column uses, so a three-hour block of
+ * cooking spans three rows the way a dream does. What it does not get is a resize
+ * handle: the three blocks come from one time, so there is nothing to make longer —
+ * changing the length would mean changing what "cooking" means.
+ */
+const KitchenCell = ({
+  cell,
+  blocks,
+  busy,
+  onOpenMeal,
+  onDragMeal,
+  onDragEnd,
+  onDrop,
+}: {
+  cell: LaneCell | undefined
+  blocks: ReadonlyMap<string, MealBlock>
+  busy: boolean
+  onOpenMeal: (mealId: string) => void
+  onDragMeal: (block: MealBlock) => void
+  onDragEnd: () => void
+  onDrop: () => void
+}) => {
+  if (cell === undefined || cell.kind === 'covered') return null
+
+  return (
+    <td
+      class="schedule-cell place-grey"
+      rowSpan={cell.kind === 'anchor' ? cell.span : undefined}
+      onDragOver={(dragEvent) => dragEvent.preventDefault()}
+      onDrop={(dropEvent) => {
+        dropEvent.preventDefault()
+        onDrop()
+      }}
+    >
+      {cell.kind === 'anchor' && (
+        <div class="dream-stack">
+          {cell.dreams.map((placed) => {
+            const block = blocks.get(placed.id)
+
+            return block === undefined ? null : (
+              <span
+                key={block.id}
+                class={`dream-chip meal-chip meal-${block.part}`}
+                draggable={!busy}
+                aria-label={`Move ${block.title}`}
+                onDragStart={(dragEvent) => {
+                  // Firefox refuses a drag whose data store was never written to.
+                  dragEvent.dataTransfer?.setData('text/plain', block.id)
+                  onDragMeal(block)
+                }}
+                onDragEnd={onDragEnd}
+              >
+                <button
+                  type="button"
+                  class="dream-open"
+                  aria-label={`Open ${block.title}`}
+                  onClick={() => onOpenMeal(block.meal_id)}
+                >
+                  {block.title}
+                </button>
+              </span>
+            )
+          })}
+        </div>
+      )}
+    </td>
   )
 }

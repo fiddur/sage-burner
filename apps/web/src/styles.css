@@ -821,3 +821,63 @@ a:hover {
   border: 1px dashed var(--line);
   border-radius: 0.5rem;
 }
+
+/* The meal plan's table — the spreadsheet tab it replaces, minus the merged cells. */
+.meal-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.meal-table th,
+.meal-table td {
+  border: 1px solid var(--line);
+  padding: 0.3rem 0.5rem;
+  text-align: start;
+  vertical-align: top;
+}
+
+.meal-table th[scope='row'] {
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.meal-crew {
+  margin: 0;
+  padding-inline-start: 1rem;
+}
+
+.meal-idea {
+  width: 100%;
+  min-width: 8rem;
+}
+
+.meal-intro {
+  margin-block-end: 1rem;
+}
+
+/*
+  The kitchen's blocks. Not draggable-looking in the same way a dream is: a meal is
+  the burn's plan rather than somebody's offer, and its length is not its own.
+*/
+.meal-chip {
+  cursor: grab;
+  font-size: 0.8rem;
+}
+
+.meal-cook,
+.meal-clean {
+  opacity: 0.75;
+}
+
+.meal-slot-list {
+  list-style: none;
+  margin: 0.5rem 0;
+  padding: 0;
+}
+
+.meal-slot-list li {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.15rem 0;
+}

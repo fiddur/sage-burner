@@ -8,10 +8,18 @@ import { nonEmptyText, optionalText } from './common.ts'
 /**
  * What a visitor may do with an invite before it is spent.
  *
- * The token is never echoed back, and neither is anything about who it was minted
- * for: an invite link is unguessable but forwardable, so whoever holds it is
- * treated as a stranger until they redeem it. Telling them "this was for
- * fredrik@example.org" would turn a leaked link into a disclosure.
+ * The token is never echoed back, and the **email** never is either: it is the login
+ * identity, and confirming that an address has an application is an enumeration
+ * oracle. An invite link is unguessable but forwardable, so whoever holds it is
+ * treated as a stranger until they redeem.
+ *
+ * The applicant's **name** is the one exception, and a deliberate trade: they typed
+ * it on the application and are then asked for it again on the form the invite leads
+ * to, which reads as a system that was not listening. Pre-filling it means a
+ * forwarded link tells its holder whose invite it was — weighed against a token that
+ * is 256 bits of CSPRNG, single-use and expiring, and a name that is not a
+ * credential. Returned **only while the invite is outstanding**, so a spent or
+ * expired link discloses nothing.
  */
 export const inviteStateSchema = z.object({
   // Derived from `inviteStatuses` rather than a second list of the same words,
@@ -19,6 +27,8 @@ export const inviteStateSchema = z.object({
   // reported as a status rather than a 404 so probing for live tokens gets the
   // same answer shape as holding one.
   status: z.enum([...inviteStatuses, 'unknown']),
+  /** What they called themselves when they applied, for the form to start from. */
+  name: z.string().nullable(),
 })
 
 /**

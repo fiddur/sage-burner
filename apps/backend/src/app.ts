@@ -30,6 +30,7 @@ import { registerEventRoutes } from './routes/events.ts'
 import { registerInstallationRoutes } from './routes/installation.ts'
 import { registerInviteRoutes } from './routes/invites.ts'
 import { registerLeadRoleRoutes } from './routes/lead-roles.ts'
+import { registerMealAdminRoutes, registerMealRoutes } from './routes/meals.ts'
 import { registerPlaceRoutes } from './routes/places.ts'
 import { registerProfileRoutes } from './routes/profile.ts'
 import { registerPushRoutes } from './routes/push.ts'
@@ -395,6 +396,11 @@ export const createApp = async ({
   registerEventOptionRoutes(app, { db, sessions })
   registerQuestionRoutes(app, { db, sessions })
   registerPlaceRoutes(app, { db, sessions, now })
+  registerMealRoutes(app, { db, sessions, now })
+  // Separate registration, not a separate guard: the plan lives under `/api/admin/`,
+  // where the prefix hook is the only thing that lets it through. The member-facing
+  // meal routes above are outside it.
+  registerMealAdminRoutes(app, { db, sessions, now })
   // One `PushDeps` for the routes that manage subscriptions and the route that
   // sends. `deliver` is the only part that talks to a push service, and it is
   // injectable so the suite never does.

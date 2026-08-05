@@ -4,9 +4,11 @@ import { MAX_SLUG, MAX_TITLE, MAX_WELCOME_LENGTH } from '@sage-burner/shared'
 import { useEffect, useRef, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
+import type { MealSlotsApi } from '../components/MealSlots.tsx'
 
 import { isApiError } from '../api/client.ts'
 import { GuardedPage } from '../components/GuardedPage.tsx'
+import { MealSlots } from '../components/MealSlots.tsx'
 import { renderMarkdown } from '../markdown.ts'
 import { isAdmin, useViewer } from '../viewer.tsx'
 
@@ -15,7 +17,7 @@ type Events =
   | { status: 'ready'; events: readonly Event[] }
   | { status: 'failed'; message: string }
 
-export type EventsApi = Pick<ApiClient, 'createEvent' | 'getEvents' | 'updateEvent'>
+export type EventsApi = MealSlotsApi & Pick<ApiClient, 'createEvent' | 'getEvents' | 'updateEvent'>
 
 type Editable = Pick<
   Event,
@@ -259,6 +261,12 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
                 {row.start_date} {row.start_time} – {row.end_date} {row.end_time} · /{row.slug} · cap{' '}
                 {row.member_cap}
               </p>
+
+              {/* Folded away: set once per burn, and rarely looked at again. */}
+              <details>
+                <summary>Meal times</summary>
+                <MealSlots api={api} eventId={row.id} />
+              </details>
 
               {editing === row.id ? (
                 <>

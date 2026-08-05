@@ -70,6 +70,7 @@ export const Layout = ({ children }: { children: ComponentChildren }) => {
               <a href="/members">Members</a>
               <a href="/schedule">Schedule</a>
               <a href="/roles">Roles</a>
+              <a href="/meals">Meals</a>
             </>
           )}
 

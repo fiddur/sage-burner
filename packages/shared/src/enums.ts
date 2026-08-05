@@ -35,6 +35,23 @@ export const isPlaceColor = (value: unknown): value is PlaceColor => isOneOf(pla
  * `helping` is a multiple choice and does not: nothing runs out of people
  * willing to tend the sauna.
  */
+/**
+ * What a slot in the kitchen's day is.
+ *
+ * `meal` draws three blocks in the schedule — the two hours cooking, the hour of
+ * eating, the hour cleaning up. `chore` draws one, because cooking for a morning
+ * cleanup is nonsense. Nothing else reads it: both kinds take a lead, helpers and
+ * a cleanup crew.
+ */
+export const mealSlotKinds = ['meal', 'chore'] as const
+export type MealSlotKind = (typeof mealSlotKinds)[number]
+export const isMealSlotKind = (value: unknown): value is MealSlotKind => isOneOf(mealSlotKinds, value)
+
+/** Who somebody is on a meal. One lead; any number of the other two. */
+export const mealRoles = ['lead', 'helper', 'cleanup'] as const
+export type MealRole = (typeof mealRoles)[number]
+export const isMealRole = (value: unknown): value is MealRole => isOneOf(mealRoles, value)
+
 export const eventOptionKinds = ['lodging', 'helping'] as const
 export type EventOptionKind = (typeof eventOptionKinds)[number]
 export const isEventOptionKind = (value: unknown): value is EventOptionKind =>

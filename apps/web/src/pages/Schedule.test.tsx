@@ -1,4 +1,4 @@
-import type { Event, MyBurn, Place, Session } from '@sage-burner/shared'
+import type { Event, Meal, MyBurn, Place, Session } from '@sage-burner/shared'
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -60,6 +60,12 @@ const stub = (
   supportSession: () => Promise.reject(new Error('supportSession is not stubbed here')),
   withdrawSupportForSession: () => Promise.reject(new Error('withdrawSupportForSession is not stubbed here')),
   withdrawSession: () => Promise.reject(new Error('withdrawSession is not stubbed here')),
+  getMeals: () => Promise.resolve({ intro_markdown: '', slots: [], meals: [] }),
+  updateMeal: () => Promise.reject(new Error('updateMeal is not stubbed here')),
+  setMealLead: () => Promise.reject(new Error('setMealLead is not stubbed here')),
+  joinMealCrew: () => Promise.reject(new Error('joinMealCrew is not stubbed here')),
+  leaveMealCrew: () => Promise.reject(new Error('leaveMealCrew is not stubbed here')),
+  setMealIdea: () => Promise.reject(new Error('setMealIdea is not stubbed here')),
   ...over,
 })
 
@@ -1122,5 +1128,204 @@ describe('Schedule', () => {
 
     expect(screen.getByText(/for members/)).toBeTruthy()
     expect(getSessions).not.toHaveBeenCalled()
+  })
+})
+
+describe('the kitchen', () => {
+  const aMeal = (over: Partial<Meal> = {}): Meal => ({
+    id: 'm-1',
+    event_id: 'e-1',
+    date: '2026-08-01',
+    at: '18:00',
+    label: 'Dinner',
+    kind: 'meal',
+    food_idea: '',
+    lead: null,
+    helpers: [],
+    cleanup: [],
+    ...over,
+  })
+
+  const withMeals = (meals: Meal[], over: Partial<ScheduleApi> = {}, sessions: Session[] = []) =>
+    stub({ getMeals: () => Promise.resolve({ intro_markdown: '', slots: [], meals }), ...over }, sessions)
+
+  it('draws no lane at all for a burn with no meals', async () => {
+    renderPage(stub())
+
+    await screen.findByRole('columnheader', { name: /Temple/ })
+
+    expect(screen.queryByRole('columnheader', { name: /Kitchen/ })).toBeNull()
+  })
+
+  it('draws the cooking, the eating and the washing up', async () => {
+    // 18:00 local in August is 16:00Z, so cooking runs 16:00–18:00 local.
+    renderPage(withMeals([aMeal()]))
+
+    expect(await screen.findByRole('columnheader', { name: /Kitchen/ })).toBeTruthy()
+    expect(screen.getByLabelText('Move Cooking · Dinner')).toBeTruthy()
+    expect(screen.getByLabelText('Move Dinner')).toBeTruthy()
+    expect(screen.getByLabelText('Move Cleanup · Dinner')).toBeTruthy()
+  })
+
+  it('draws a chore as one block, with no cooking before it', async () => {
+    renderPage(withMeals([aMeal({ label: 'Morning cleanup', at: '09:00', kind: 'chore' })]))
+
+    expect(await screen.findByLabelText('Move Morning cleanup')).toBeTruthy()
+    expect(screen.queryByLabelText(/Cooking/)).toBeNull()
+  })
+
+  it('opens the meal when a block is clicked', async () => {
+    renderPage(withMeals([aMeal({ food_idea: 'Vegan bolognese' })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Cooking · Dinner' }))
+
+    const panel = await screen.findByRole('dialog', { name: 'Dinner' })
+    expect(within(panel).getByLabelText('Food idea for Dinner')).toHaveProperty('value', 'Vegan bolognese')
+  })
+
+  it('moves the meal so the block lands where it was dropped', async () => {
+    // The cleanup block is the hour after, so dropping it on 15:00 is a 14:00 meal.
+    const updateMeal = vi.fn<ScheduleApi['updateMeal']>(() => Promise.resolve({ meal: aMeal() }))
+    renderPage(withMeals([aMeal()], { updateMeal }))
+
+    fireEvent.dragStart(await screen.findByLabelText('Move Cleanup · Dinner'))
+    fireEvent.drop(cell('15:00', 2))
+
+    await waitFor(() => expect(updateMeal).toHaveBeenCalledWith('m-1', { date: '2026-08-01', at: '14:00' }))
+  })
+
+  it('will not take a dream into the kitchen', async () => {
+    // The kitchen is for cooking, fetching food and washing up, and that is the whole
+    // of it — so a dream dropped there must not land.
+    const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'Sunrise yoga' }) }),
+    )
+    const updateMeal = vi.fn<ScheduleApi['updateMeal']>(() => Promise.resolve({ meal: aMeal() }))
+    renderPage(
+      withMeals([aMeal()], { updateSession, updateMeal }, [aDream({ id: 's-1', title: 'Sunrise yoga' })]),
+    )
+
+    fireEvent.dragStart(await screen.findByLabelText('Move Sunrise yoga'))
+    fireEvent.drop(cell('10:00', 2))
+
+    expect(updateSession).not.toHaveBeenCalled()
+    expect(updateMeal).not.toHaveBeenCalled()
+  })
+
+  it('will not take a meal into a lane', async () => {
+    // The other way round, and the passing sibling: a meal belongs to the kitchen.
+    const updateMeal = vi.fn<ScheduleApi['updateMeal']>(() => Promise.resolve({ meal: aMeal() }))
+    const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'x' }) }),
+    )
+    renderPage(withMeals([aMeal()], { updateMeal, updateSession }))
+
+    fireEvent.dragStart(await screen.findByLabelText('Move Dinner'))
+    fireEvent.drop(cell('10:00', 0))
+
+    expect(updateMeal).not.toHaveBeenCalled()
+    expect(updateSession).not.toHaveBeenCalled()
+  })
+
+  it('offers no resize handle on a meal, since its length is not its own', async () => {
+    renderPage(withMeals([aMeal()]))
+
+    await screen.findByLabelText('Move Dinner')
+
+    expect(screen.queryByRole('button', { name: /Change how long/ })).toBeNull()
+  })
+})
+
+describe('a drag that was abandoned', () => {
+  const aMeal = (): Meal => ({
+    id: 'm-1',
+    event_id: 'e-1',
+    date: '2026-08-01',
+    at: '18:00',
+    label: 'Dinner',
+    kind: 'meal',
+    food_idea: '',
+    lead: null,
+    helpers: [],
+    cleanup: [],
+  })
+
+  const both = (over: Partial<ScheduleApi>) =>
+    stub({ getMeals: () => Promise.resolve({ intro_markdown: '', slots: [], meals: [aMeal()] }), ...over }, [
+      aDream({ id: 's-1', title: 'Sunrise yoga' }),
+    ])
+
+  /**
+   * Dropping outside every target fires no `drop`, so an abandoned drag used to
+   * leave its id behind. The next drop of the *other* kind then found it: a meal
+   * dropped in a lane moved the abandoned dream instead, which is the kitchen's own
+   * rule failing on the second drag rather than the first.
+   */
+  it('does not let an abandoned dream drag be moved by a later meal drop', async () => {
+    const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'x' }) }),
+    )
+    const updateMeal = vi.fn<ScheduleApi['updateMeal']>(() => Promise.resolve({ meal: aMeal() }))
+    renderPage(both({ updateSession, updateMeal }))
+
+    fireEvent.dragStart(await screen.findByLabelText('Move Sunrise yoga'))
+    fireEvent.dragStart(screen.getByLabelText('Move Dinner'))
+    fireEvent.drop(cell('10:00', 0))
+
+    expect(updateSession).not.toHaveBeenCalled()
+    expect(updateMeal).not.toHaveBeenCalled()
+  })
+
+  it('does not let an abandoned meal drag be moved by a later dream drop', async () => {
+    const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'x' }) }),
+    )
+    const updateMeal = vi.fn<ScheduleApi['updateMeal']>(() => Promise.resolve({ meal: aMeal() }))
+    renderPage(both({ updateSession, updateMeal }))
+
+    fireEvent.dragStart(await screen.findByLabelText('Move Dinner'))
+    fireEvent.dragStart(screen.getByLabelText('Move Sunrise yoga'))
+    fireEvent.drop(cell('10:00', 2))
+
+    expect(updateMeal).not.toHaveBeenCalled()
+    expect(updateSession).not.toHaveBeenCalled()
+  })
+
+  it('forgets a drag that ended without a drop', async () => {
+    const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'x' }) }),
+    )
+    renderPage(both({ updateSession }))
+
+    const chip = await screen.findByLabelText('Move Sunrise yoga')
+    fireEvent.dragStart(chip)
+    fireEvent.dragEnd(chip)
+    fireEvent.drop(cell('10:00', 0))
+
+    expect(updateSession).not.toHaveBeenCalled()
+  })
+
+  it('still moves a dream on an ordinary drag and drop', async () => {
+    // The passing sibling for all three: clearing too eagerly would make the grid
+    // undraggable while satisfying every test above.
+    const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'x' }) }),
+    )
+    renderPage(both({ updateSession }))
+
+    fireEvent.dragStart(await screen.findByLabelText('Move Sunrise yoga'))
+    fireEvent.drop(cell('10:00', 0))
+
+    await waitFor(() => expect(updateSession).toHaveBeenCalled())
+  })
+
+  it('still moves a meal on an ordinary drag and drop', async () => {
+    const updateMeal = vi.fn<ScheduleApi['updateMeal']>(() => Promise.resolve({ meal: aMeal() }))
+    renderPage(both({ updateMeal }))
+
+    fireEvent.dragStart(await screen.findByLabelText('Move Dinner'))
+    fireEvent.drop(cell('14:00', 2))
+
+    await waitFor(() => expect(updateMeal).toHaveBeenCalledWith('m-1', { date: '2026-08-01', at: '14:00' }))
   })
 })

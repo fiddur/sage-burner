@@ -32,6 +32,15 @@ export interface BurnChoice {
 
 interface BurnContextValue extends BurnChoice {
   select: (eventId: string) => void
+  /**
+   * Ask for the list again.
+   *
+   * Joining a burn changes what this holds, and nothing else on the page knows that:
+   * a member who joined and then opened Members or Schedule was told they were not
+   * coming to a burn until they reloaded, because the fetch happens once for the
+   * session. Whoever writes the change says so here.
+   */
+  reload: () => void
 }
 
 const EMPTY: BurnContextValue = {
@@ -39,6 +48,7 @@ const EMPTY: BurnContextValue = {
   burns: [],
   selected: undefined,
   select: () => undefined,
+  reload: () => undefined,
 }
 
 const BurnContext = createContext<BurnContextValue>(EMPTY)
@@ -61,8 +71,12 @@ export const BurnProvider = ({
   value = EMPTY,
 }: {
   children: ComponentChildren
-  value?: Omit<BurnContextValue, 'select'> & Partial<Pick<BurnContextValue, 'select'>>
-}) => <BurnContext.Provider value={{ select: () => undefined, ...value }}>{children}</BurnContext.Provider>
+  value?: Omit<BurnContextValue, 'reload' | 'select'> & Partial<Pick<BurnContextValue, 'reload' | 'select'>>
+}) => (
+  <BurnContext.Provider value={{ select: () => undefined, reload: () => undefined, ...value }}>
+    {children}
+  </BurnContext.Provider>
+)
 
 /**
  * The choice, fetched once and held for the session.
@@ -86,6 +100,7 @@ export const FetchedBurnProvider = ({
   const [burns, setBurns] = useState<readonly MyBurn[]>([])
   const [status, setStatus] = useState<'loading' | 'ready'>('loading')
   const [chosen, setChosen] = useState<string | undefined>(undefined)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     if (!approved) {
@@ -112,12 +127,17 @@ export const FetchedBurnProvider = ({
       })
 
     return () => controller.abort()
-  }, [api, approved, admin])
+  }, [api, approved, admin, attempt])
 
   const select = useCallback((eventId: string) => setChosen(eventId), [])
+  const reload = useCallback(() => setAttempt((before) => before + 1), [])
   const selected = burns.find((burn) => burn.event.id === chosen) ?? burns[0]
 
-  return <BurnContext.Provider value={{ status, burns, selected, select }}>{children}</BurnContext.Provider>
+  return (
+    <BurnContext.Provider value={{ status, burns, selected, select, reload }}>
+      {children}
+    </BurnContext.Provider>
+  )
 }
 
 export const useBurns = (): BurnContextValue => useContext(BurnContext)

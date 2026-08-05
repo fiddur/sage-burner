@@ -8,6 +8,8 @@ import {
   effortLevels,
   eventOptionKinds,
   formQuestionTypes,
+  mealRoles,
+  mealSlotKinds,
   paymentStatuses,
   placeColors,
   tickBoxRequired,
@@ -149,6 +151,8 @@ export const event = sqliteTable(
     start_time: text('start_time').notNull().default('00:00'),
     end_time: text('end_time').notNull().default('23:59'),
     welcome_markdown: text('welcome_markdown').notNull().default(''),
+    /** What the Meal page says above its table. Markdown, and any member may rewrite it. */
+    meal_intro_markdown: text('meal_intro_markdown').notNull().default(''),
     member_cap: integer('member_cap').notNull(),
     created_at: text('created_at').notNull(),
   },
@@ -796,6 +800,112 @@ export const sessionSupport = sqliteTable(
       .references(() => attendance.id, { onDelete: 'cascade' }),
   },
   (table) => [primaryKey({ columns: [table.session_id, table.attendance_id] })],
+)
+
+/**
+ * One recurring slot in the kitchen's day — `Lunch 13:00`, `Morning cleanup 9:00`.
+ *
+ * Per burn, and rarely touched once set: the slots are the burn's shape, like its
+ * dates. What they generate is not stored — see `meal_role` for why.
+ */
+export const mealSlot = sqliteTable(
+  'meal_slot',
+  {
+    id: text('id').notNull(),
+    event_id: text('event_id')
+      .notNull()
+      .references(() => event.id, { onDelete: 'cascade' }),
+    // Not unique: reordering swaps positions, and a transient collision mid-swap
+    // must not be rejected.
+    order: integer('order').notNull(),
+    label: text('label').notNull(),
+    /** `HH:MM`, fixed width, so the CHECK and the sort can both treat it as a string. */
+    at: text('at').notNull(),
+    kind: text('kind', { enum: mealSlotKinds }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    index('meal_slot_event_idx').on(table.event_id, table.order),
+    check('meal_slot_order_check', sql`${table.order} >= 0`),
+    check('meal_slot_label_check', sql`length(trim(${table.label})) > 0`),
+    check('meal_slot_at_check', isClockTime(table.at)),
+    check('meal_slot_kind_check', oneOf(table.kind, mealSlotKinds)),
+  ],
+)
+
+/**
+ * One sitting — Monday's lunch, Saturday's dinner.
+ *
+ * **Generated from the slots, not derived from them.** A derived meal is identical to
+ * its template forever: no postponing Saturday's dinner an hour, no dropping lunch on
+ * the day everybody leaves, no adding a late supper. Generating writes rows an
+ * organiser can then change one at a time, and every change is a visible edit rather
+ * than a rule somewhere that has to be read to be understood.
+ *
+ * The slot's values are **copied**, and there is no link back to it. Renaming a slot
+ * afterwards leaves the meals it already made alone, which is the same call the
+ * repeatable dream makes about its copies — an instance edited on its own is the
+ * point, and a parent link would only be something to keep consistent.
+ */
+export const meal = sqliteTable(
+  'meal',
+  {
+    id: text('id').notNull(),
+    event_id: text('event_id')
+      .notNull()
+      .references(() => event.id, { onDelete: 'cascade' }),
+    /** `YYYY-MM-DD`. */
+    date: text('date').notNull(),
+    /** `HH:MM`, fixed width, so the CHECK and the sort can both treat it as a string. */
+    at: text('at').notNull(),
+    label: text('label').notNull(),
+    kind: text('kind', { enum: mealSlotKinds }).notNull(),
+    /** The sheet's "Food idea?", whose own header says "Not needed". */
+    food_idea: text('food_idea').notNull().default(''),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    index('meal_event_idx').on(table.event_id, table.date, table.at),
+    // What makes generating safe to run again: it fills in what is missing and
+    // touches nothing else, so adding a slot or extending the burn is one click and
+    // never a duplicate. Two lunches on one day is a mistake, not a plan.
+    uniqueIndex('meal_event_date_label_idx').on(table.event_id, table.date, table.label),
+    check('meal_label_check', sql`length(trim(${table.label})) > 0`),
+    check('meal_at_check', isClockTime(table.at)),
+    check('meal_kind_check', oneOf(table.kind, mealSlotKinds)),
+    check('meal_date_check', sql`${table.date} glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'`),
+  ],
+)
+
+/**
+ * Somebody on one meal — its lead, a helper, or on the cleanup crew.
+ *
+ * An `attendance` for the reason a role's team is one: only somebody coming can cook,
+ * and withdrawing takes them off everything they had signed up for.
+ *
+ * The primary key is the whole "once each" rule. A member may be a helper *and* on
+ * cleanup for the same meal — different roles, different rows — but not twice over.
+ */
+export const mealRole = sqliteTable(
+  'meal_role',
+  {
+    meal_id: text('meal_id')
+      .notNull()
+      .references(() => meal.id, { onDelete: 'cascade' }),
+    attendance_id: text('attendance_id')
+      .notNull()
+      .references(() => attendance.id, { onDelete: 'cascade' }),
+    role: text('role', { enum: mealRoles }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.meal_id, table.attendance_id, table.role] }),
+    check('meal_role_role_check', oneOf(table.role, mealRoles)),
+    // One lead per meal. The other two are unbounded — nothing runs out of people
+    // willing to wash up, and a cap would only be something for an organiser to raise.
+    uniqueIndex('meal_role_lead_idx')
+      .on(table.meal_id)
+      .where(sql`${table.role} = 'lead'`),
+  ],
 )
 
 // Deliberately no relations() / defineRelations() block.
