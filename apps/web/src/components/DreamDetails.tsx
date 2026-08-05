@@ -54,6 +54,15 @@ export const DreamDetails = ({
 }) => {
   const [confirming, setConfirming] = useState(false)
 
+  // Dropped whenever the panel switches between reading and editing (#208). Without
+  // it, 🗑️ then ✏️ then Cancel comes back to a "Withdraw it?" nobody is still asking:
+  // `confirming` is local state, and nothing else resets it.
+  const [confirmingFor, setConfirmingFor] = useState(editing)
+  if (confirmingFor !== editing) {
+    setConfirmingFor(editing)
+    setConfirming(false)
+  }
+
   // Read off the list rather than carried as its own field. `supported_by_me` exists
   // only because the supporters are a count and nothing more.
   const helping = dream.helpers.some((person) => person.account_id === viewerId)

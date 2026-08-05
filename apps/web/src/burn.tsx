@@ -23,7 +23,13 @@ import { isAdmin, isApproved, useViewer } from './viewer.tsx'
  */
 
 export interface BurnChoice {
-  status: 'loading' | 'ready'
+  /**
+   * `failed` is separate from `ready` with nothing, because the two mean opposite
+   * things to a reader: one is a fact about them, the other is a fact about the
+   * request. Collapsed together, a dropped connection told a member "you are not
+   * coming to a burn yet" (#193).
+   */
+  status: 'loading' | 'ready' | 'failed'
   /** Every burn this viewer may look at, soonest first. */
   burns: readonly MyBurn[]
   /** The one the pages are about, or nothing when there is none to be about. */
@@ -98,7 +104,7 @@ export const FetchedBurnProvider = ({
   const approved = isApproved(viewer)
   const admin = isAdmin(viewer)
   const [burns, setBurns] = useState<readonly MyBurn[]>([])
-  const [status, setStatus] = useState<'loading' | 'ready'>('loading')
+  const [status, setStatus] = useState<BurnChoice['status']>('loading')
   const [chosen, setChosen] = useState<string | undefined>(undefined)
   const [attempt, setAttempt] = useState(0)
 
@@ -121,9 +127,10 @@ export const FetchedBurnProvider = ({
         setStatus('ready')
       })
       .catch(() => {
-        // The pages each report their own failure to load; an empty selector is the
-        // honest thing for the bar to show meanwhile.
-        if (!controller.signal.aborted) setStatus('ready')
+        // Not `ready` with nothing: the selector is empty either way, but a page
+        // reading this has to be able to tell "you have joined none" from "we could
+        // not ask".
+        if (!controller.signal.aborted) setStatus('failed')
       })
 
     return () => controller.abort()
