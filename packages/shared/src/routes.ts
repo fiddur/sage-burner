@@ -538,9 +538,13 @@ export type RouteKey = keyof typeof apiRoutes
 /**
  * What each write accepts, as a caller sends it.
  *
- * Partial by design: reads and bodiless writes are simply absent, and asking for one
- * is a type error rather than `unknown`. The `Input` variant where a schema has one,
- * since that is the pre-parse shape a client actually sends.
+ * Partial by design, and the criterion is exact: a route is here when it takes a JSON
+ * body. Reads and bodiless writes are absent, and so is `setMyAvatar` — it sends image
+ * bytes rather than JSON, and a `Blob` is not a shape a schema describes. Asking for a
+ * key that is absent is a type error rather than `unknown`.
+ *
+ * The `Input` variant where a schema has one, since that is the pre-parse shape a
+ * client actually sends.
  *
  * This is the half that made #152 worth doing rather than a tidy-up: a body type was
  * previously chosen at each client method by hand, with nothing checking it against

@@ -36,8 +36,10 @@ afterEach(async () => {
  * are the same route to it — and it prints them merged, as `:id|:eventId`, when two
  * routes share a prefix and name that segment differently. Comparing shapes is
  * therefore comparing the thing routing actually decides on. The names still matter to
- * the handler reading `request.params`, and that is what the route's own generic
- * checks.
+ * the handler reading `request.params`, and nothing here covers that — the route's
+ * `<{ Params: … }>` generic is an assertion about the path string, not a check against
+ * it. What catches a renamed parameter is the route's own tests, which request real
+ * paths.
  */
 const shape = (path: string) => path.replaceAll(/:[^/]+/g, ':*')
 
