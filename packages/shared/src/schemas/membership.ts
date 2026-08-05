@@ -211,7 +211,14 @@ export const myBurnsResponseSchema = z.object({
  * its host offered.
  */
 export const eventAttendeesResponseSchema = z.object({
-  attendees: z.array(z.object({ account_id: idSchema, name: z.string().nullable() })),
+  attendees: z.array(
+    z.object({
+      account_id: idSchema,
+      name: z.string().nullable(),
+      /** When their picture last changed, or null for the initials. See `viewerSchema`. */
+      avatar: z.string().nullable(),
+    }),
+  ),
 })
 
 export type AttendanceCreate = z.infer<typeof attendanceCreateSchema>

@@ -106,7 +106,9 @@ describe('Invite', () => {
     renderPage(
       stub({
         redeemInvite: () =>
-          Promise.resolve({ viewer: { account_id: 'a-1', name: null, roles: ['member' as const] } }),
+          Promise.resolve({
+            viewer: { account_id: 'a-1', name: null, avatar: null, roles: ['member' as const] },
+          }),
       }),
     )
 

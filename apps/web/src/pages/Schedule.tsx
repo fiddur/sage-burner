@@ -788,9 +788,25 @@ const Timetable = ({
   const kitchen = blocks.length === 0 ? undefined : laneCells(rows, blocks)
   const byId = new Map(blocks.map((block) => [block.id, block]))
 
+  // The lanes plus the kitchen, so the table can be told how narrow it may get before
+  // the wrapper scrolls instead.
+  const columns = places.length + (kitchen === undefined ? 0 : 1)
+
   return (
     <div class="schedule-grid-wrap">
-      <table class="schedule-grid">
+      <table class="schedule-grid" style={{ '--lanes': columns }}>
+        {/*
+          Fixed layout, so the lanes share what is left equally rather than sizing
+          themselves to whichever happens to hold the longest title. The time column
+          is `17ch` because that is what `2026-10-03 00:00` measures — the widest
+          label it ever holds, on the daybreak rows.
+        */}
+        <colgroup>
+          <col class="schedule-time-col" />
+          {Array.from({ length: columns }, (_, at) => (
+            <col key={at} />
+          ))}
+        </colgroup>
         <thead>
           <tr>
             <th scope="col">Time</th>
@@ -958,7 +974,7 @@ const KitchenCell = ({
 
   return (
     <td
-      class="schedule-cell place-grey"
+      class="schedule-cell schedule-kitchen"
       rowSpan={cell.kind === 'anchor' ? cell.span : undefined}
       onDragOver={(dragEvent) => dragEvent.preventDefault()}
       onDrop={(dropEvent) => {

@@ -54,7 +54,8 @@ const stub = (
   getSessions: () => Promise.resolve({ sessions }),
   updateSession: () => Promise.reject(new Error('updateSession is not stubbed here')),
   offerSession: () => Promise.reject(new Error('offerSession is not stubbed here')),
-  getEventAttendees: () => Promise.resolve({ attendees: [{ account_id: 'a-1', name: 'Ada Lovelace' }] }),
+  getEventAttendees: () =>
+    Promise.resolve({ attendees: [{ account_id: 'a-1', name: 'Ada Lovelace', avatar: null }] }),
   helpWithSession: () => Promise.reject(new Error('helpWithSession is not stubbed here')),
   stopHelpingWithSession: () => Promise.reject(new Error('stopHelpingWithSession is not stubbed here')),
   supportSession: () => Promise.reject(new Error('supportSession is not stubbed here')),

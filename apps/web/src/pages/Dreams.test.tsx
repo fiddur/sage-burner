@@ -53,8 +53,8 @@ const stub = (over: Partial<DreamsApi> = {}, sessions: Session[] = []): DreamsAp
   getEventAttendees: () =>
     Promise.resolve({
       attendees: [
-        { account_id: 'a-1', name: 'Ada' },
-        { account_id: 'a-2', name: 'Bea' },
+        { account_id: 'a-1', name: 'Ada', avatar: null },
+        { account_id: 'a-2', name: 'Bea', avatar: null },
       ],
     }),
   ...over,

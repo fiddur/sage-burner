@@ -105,32 +105,36 @@ export const MealDialog = ({
         />
       </label>
 
-      <label class="field">
-        <span>Meal lead</span>
-        <select
-          aria-label={`Lead for ${meal.label}`}
-          disabled={busy}
-          value={meal.lead?.account_id ?? ''}
-          onChange={(changeEvent) => onLead(changeEvent.currentTarget.value || null)}
-        >
-          <option value="">Nobody yet</option>
-          {meal.lead !== null &&
-            !attendees.some((who) => who.account_id === meal.lead?.account_id) && (
-              // They have withdrawn since taking it on. Named rather than left out, or
-              // the control reads as vacant while somebody is still on it.
-              <option value={meal.lead.account_id} disabled>
-                {nameOf(meal.lead)} — no longer coming
-              </option>
-            )}
-          {attendees.map((who) => (
-            <option key={who.account_id} value={who.account_id}>
-              {nameOf(who)}
-            </option>
-          ))}
-        </select>
-      </label>
+      {meal.kind !== 'chore' && (
+        <>
+          <label class="field">
+            <span>Meal lead</span>
+            <select
+              aria-label={`Lead for ${meal.label}`}
+              disabled={busy}
+              value={meal.lead?.account_id ?? ''}
+              onChange={(changeEvent) => onLead(changeEvent.currentTarget.value || null)}
+            >
+              <option value="">Nobody yet</option>
+              {meal.lead !== null &&
+                !attendees.some((who) => who.account_id === meal.lead?.account_id) && (
+                  // They have withdrawn since taking it on. Named rather than left out, or
+                  // the control reads as vacant while somebody is still on it.
+                  <option value={meal.lead.account_id} disabled>
+                    {nameOf(meal.lead)} — no longer coming
+                  </option>
+                )}
+              {attendees.map((who) => (
+                <option key={who.account_id} value={who.account_id}>
+                  {nameOf(who)}
+                </option>
+              ))}
+            </select>
+          </label>
 
-      <Crew meal={meal} role="helper" viewerId={viewerId} busy={busy} onStand={onStand} />
+          <Crew meal={meal} role="helper" viewerId={viewerId} busy={busy} onStand={onStand} />
+        </>
+      )}
       <Crew meal={meal} role="cleanup" viewerId={viewerId} busy={busy} onStand={onStand} />
 
       <p class="row">

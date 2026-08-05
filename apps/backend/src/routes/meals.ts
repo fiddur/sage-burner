@@ -247,6 +247,10 @@ export const registerMealRoutes = (
       const existing = await openMeal(request.params.id)
       if (existing === undefined) return reply.code(404).send(errorResponse('not_found'))
 
+      // A chore has nobody cooking, so it has nobody leading the cooking. Refused
+      // rather than only hidden: the page not offering it is not the rule.
+      if (existing.kind === 'chore') return reply.code(400).send(errorResponse('bad_request'))
+
       let taking: string | undefined
       if (parsed.data.account_id !== null) {
         taking = await attendanceFor(db, existing.event_id, parsed.data.account_id)
@@ -286,6 +290,13 @@ export const registerMealRoutes = (
 
       const existing = await openMeal(request.params.id)
       if (existing === undefined) return reply.code(404).send(errorResponse('not_found'))
+
+      // Nothing is cooked at a chore, so there is nothing to help cook. Standing down
+      // stays allowed whatever the kind, or a slot changed to a chore would strand
+      // whoever had already put their name to it.
+      if (existing.kind === 'chore' && role === 'helper' && joining) {
+        return reply.code(400).send(errorResponse('bad_request'))
+      }
 
       const viewer = await viewerFor(request, { db, sessions })
       if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))

@@ -15,7 +15,7 @@ import type { Sessions } from './session.ts'
  */
 type Requesting = Pick<FastifyRequest, 'headers'>
 
-import { account, accountRole } from '../db/schema.ts'
+import { account, accountAvatar, accountRole } from '../db/schema.ts'
 
 /**
  * Who is signed in, and the cookie that says so.
@@ -161,9 +161,16 @@ const readViewer = async (
   // to a viewer, since "signed in with no role" is an ordinary state (an
   // applicant checking on their application).
   const rows = await deps.db
-    .select({ id: account.id, name: account.name, role: accountRole.role })
+    .select({
+      id: account.id,
+      name: account.name,
+      avatar: accountAvatar.updated_at,
+      role: accountRole.role,
+    })
     .from(account)
     .leftJoin(accountRole, eq(accountRole.account_id, account.id))
+    // Left: most accounts have no picture, and the circle falls back to initials.
+    .leftJoin(accountAvatar, eq(accountAvatar.account_id, account.id))
     .where(eq(account.id, payload.account_id))
 
   const first = rows[0]
@@ -173,6 +180,7 @@ const readViewer = async (
   return {
     account_id: first.id,
     name: first.name,
+    avatar: first.avatar,
     roles: rows.map((row) => row.role).filter((role) => role !== null),
   }
 }

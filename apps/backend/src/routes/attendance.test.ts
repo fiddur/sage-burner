@@ -603,8 +603,8 @@ describe('who is coming, by name', () => {
 
     expect(response.statusCode).toBe(200)
     expect(response.json().attendees).toEqual([
-      { account_id: ada.id, name: 'Ada' },
-      { account_id: bea.id, name: 'Bea' },
+      { account_id: ada.id, name: 'Ada', avatar: null },
+      { account_id: bea.id, name: 'Bea', avatar: null },
     ])
   })
 

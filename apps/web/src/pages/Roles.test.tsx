@@ -47,8 +47,8 @@ const stub = (
   over: Partial<RolesApi> = {},
   roles: LeadRole[] = [],
   attendees = [
-    { account_id: 'a-1', name: 'Ada' },
-    { account_id: 'a-2', name: 'Bea' },
+    { account_id: 'a-1', name: 'Ada', avatar: null },
+    { account_id: 'a-2', name: 'Bea', avatar: null },
   ],
 ): RolesApi => ({
   getLeadRoles: () => Promise.resolve({ roles }),

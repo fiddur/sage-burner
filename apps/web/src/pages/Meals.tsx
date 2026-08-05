@@ -235,29 +235,40 @@ const MealTable = ({
             <FoodIdea meal={meal} busy={busy} onIdea={onIdea} />
           </td>
           <td>
-            <select
-              aria-label={`Lead for ${meal.label} on ${meal.date}`}
-              disabled={busy}
-              value={meal.lead?.account_id ?? ''}
-              onChange={(changeEvent) => onLead(meal.id, changeEvent.currentTarget.value || null)}
-            >
-              <option value="">Nobody yet</option>
-              {meal.lead !== null &&
-                !attendees.some((who) => who.account_id === meal.lead?.account_id) && (
-                  // They have withdrawn since taking it on. Named rather than left out,
-                  // or the control reads as vacant while somebody is still on it.
-                  <option value={meal.lead.account_id} disabled>
-                    {nameOf(meal.lead)} — no longer coming
+            {/* A chore has nobody cooking, so it has nobody leading the cooking. */}
+            {meal.kind === 'chore' ? (
+              <span class="form-note">—</span>
+            ) : (
+              <select
+                aria-label={`Lead for ${meal.label} on ${meal.date}`}
+                disabled={busy}
+                value={meal.lead?.account_id ?? ''}
+                onChange={(changeEvent) => onLead(meal.id, changeEvent.currentTarget.value || null)}
+              >
+                <option value="">Nobody yet</option>
+                {meal.lead !== null &&
+                  !attendees.some((who) => who.account_id === meal.lead?.account_id) && (
+                    // They have withdrawn since taking it on. Named rather than left out,
+                    // or the control reads as vacant while somebody is still on it.
+                    <option value={meal.lead.account_id} disabled>
+                      {nameOf(meal.lead)} — no longer coming
+                    </option>
+                  )}
+                {attendees.map((who) => (
+                  <option key={who.account_id} value={who.account_id}>
+                    {nameOf(who)}
                   </option>
-                )}
-              {attendees.map((who) => (
-                <option key={who.account_id} value={who.account_id}>
-                  {nameOf(who)}
-                </option>
-              ))}
-            </select>
+                ))}
+              </select>
+            )}
           </td>
-          <Crew meal={meal} role="helper" viewerId={viewerId} busy={busy} onStand={onStand} />
+          {meal.kind === 'chore' ? (
+            <td>
+              <span class="form-note">—</span>
+            </td>
+          ) : (
+            <Crew meal={meal} role="helper" viewerId={viewerId} busy={busy} onStand={onStand} />
+          )}
           <Crew meal={meal} role="cleanup" viewerId={viewerId} busy={busy} onStand={onStand} />
         </tr>
       ))}

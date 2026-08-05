@@ -15,7 +15,16 @@ import {
   tickBoxRequired,
 } from '@sage-burner/shared'
 import { sql } from 'drizzle-orm'
-import { check, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import {
+  blob,
+  check,
+  index,
+  integer,
+  primaryKey,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from 'drizzle-orm/sqlite-core'
 
 /**
  * `column` is a fixed-width 24-hour `HH:MM`.
@@ -905,6 +914,41 @@ export const mealRole = sqliteTable(
     uniqueIndex('meal_role_lead_idx')
       .on(table.meal_id)
       .where(sql`${table.role} = 'lead'`),
+  ],
+)
+
+/**
+ * Somebody's picture for the circle in the corner.
+ *
+ * **In the database**, because the container has no writable path but the data volume
+ * and `docker compose up` has to stay sufficient — the same argument that keeps the
+ * VAPID keys here. A bind mount for uploads would be a second thing to back up and a
+ * second thing to get wrong.
+ *
+ * Its own table rather than a column on `account`: avatars are tens of kilobytes and
+ * `select().from(account)` is on the path of nearly every request. A blob there would
+ * be read by all of them to be used by none.
+ *
+ * `updated_at` is what the URL carries as a version, so a new picture is a new URL and
+ * no cache has to be persuaded. Sized down in the browser before it is sent, so
+ * nothing here decodes an image — there is no image library in this process and no
+ * appetite for one.
+ */
+export const accountAvatar = sqliteTable(
+  'account_avatar',
+  {
+    account_id: text('account_id')
+      .notNull()
+      .references(() => account.id, { onDelete: 'cascade' }),
+    image: blob('image', { mode: 'buffer' }).notNull(),
+    content_type: text('content_type').notNull(),
+    updated_at: text('updated_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.account_id] }),
+    // The three the upload route accepts. A CHECK as well, because the constraint
+    // exists for writes that do not come through the API.
+    check('account_avatar_type_check', oneOf(table.content_type, ['image/jpeg', 'image/png', 'image/webp'])),
   ],
 )
 

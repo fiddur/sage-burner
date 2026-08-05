@@ -583,6 +583,18 @@ a:hover {
 .schedule-grid {
   border-collapse: collapse;
   width: 100%;
+  /* So the lanes share the remaining width equally. See the `colgroup`. */
+  table-layout: fixed;
+  /*
+    …but never so narrow that a lane is unreadable. Below this the wrapper scrolls,
+    which is what `min-width: 7rem` on the cells did before fixed layout stopped
+    cells having any say in their column's width.
+  */
+  min-width: calc(17ch + var(--lanes, 1) * 7rem);
+}
+
+.schedule-time-col {
+  width: 17ch;
 }
 
 .schedule-grid th,
@@ -601,7 +613,6 @@ a:hover {
 }
 
 .schedule-cell {
-  min-width: 7rem;
   height: 1.6rem;
 }
 
@@ -856,6 +867,16 @@ a:hover {
 }
 
 /*
+  The kitchen's own tint, warm rather than the grey a lane would read as switched off.
+  Derived from `--ember` at low alpha so it sits with the palette in both themes
+  instead of being a colour of its own — the kitchen is not a place, and its column
+  should not look like one that has been greyed out.
+*/
+.schedule-kitchen {
+  background: color-mix(in oklab, var(--ember) 12%, transparent);
+}
+
+/*
   The kitchen's blocks. Not draggable-looking in the same way a dream is: a meal is
   the burn's plan rather than somebody's offer, and its length is not its own.
 */
@@ -864,9 +885,11 @@ a:hover {
   font-size: 0.8rem;
 }
 
+/* The hours around the meal read quieter than the meal itself. */
 .meal-cook,
 .meal-clean {
-  opacity: 0.75;
+  opacity: 0.7;
+  font-style: italic;
 }
 
 .meal-slot-list {

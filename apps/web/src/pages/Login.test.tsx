@@ -30,7 +30,9 @@ const submit = () => screen.getByRole('button', { name: 'Log in' }).click()
 
 describe('Login', () => {
   it('sends what was typed', async () => {
-    const login = vi.fn(() => Promise.resolve({ viewer: { account_id: 'a-1', name: null, roles: [] } }))
+    const login = vi.fn(() =>
+      Promise.resolve({ viewer: { account_id: 'a-1', name: null, avatar: null, roles: [] } }),
+    )
     renderLogin(login)
 
     fillIn('ada@example.org', 'a good long passphrase')
@@ -125,7 +127,9 @@ describe('Login', () => {
 
   it('announces the signed-in state rather than leaving the form up', async () => {
     const login = vi.fn(() =>
-      Promise.resolve({ viewer: { account_id: 'a-1', name: null, roles: ['member' as const] } }),
+      Promise.resolve({
+        viewer: { account_id: 'a-1', name: null, avatar: null, roles: ['member' as const] },
+      }),
     )
     renderLogin(login)
 
