@@ -228,9 +228,7 @@ describe('foreign keys', () => {
   })
 
   it('takes them with the person when they withdraw from the burn', () => {
-    // The reason both key on `attendance` rather than `account`: somebody who is no
-    // longer coming has not offered to carry anything, and a name on a helper list
-    // nobody can reach is worse than an empty one.
+    // The reason both key on `attendance` rather than `account`.
     seedAttendance(ids.attendance, ids.account)
     handle.db
       .insert(session)
@@ -248,8 +246,8 @@ describe('foreign keys', () => {
   })
 
   it('refuses a second heart from the same person, which is what makes the count sound', () => {
-    // Not a route test: the count is derived by reading rows, so "one each" has to
-    // hold against a write that skips the API as well as against `onConflictDoNothing`.
+    // The count is derived by reading rows, so "one each" has to hold against a write
+    // that skips the API as well as against `onConflictDoNothing`.
     seedAttendance(ids.attendance, ids.account)
     handle.db
       .insert(session)
@@ -997,10 +995,8 @@ describe('the facilitator rename', () => {
 
 describe('the repeatable-dream column', () => {
   it('leaves every dream that already existed a one-off', () => {
-    // The added column's only claim. Without the `DEFAULT false` the column would be
-    // null on every existing row, and the schedule page reads it as a flag — a null
-    // is falsy in JavaScript, so the page would look right while the database
-    // disagreed with `NOT NULL`.
+    // The added column's only claim: without the `DEFAULT false` there is nothing to
+    // put in the column for rows that already exist.
     const fresh = createDb({ url: ':memory:' })
     const { staged, kept } = stagedThrough(REPEATABLE)
 

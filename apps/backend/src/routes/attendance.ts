@@ -28,14 +28,7 @@ import { helpingFor, helpingIdsFor } from './helping.ts'
 export const isAlreadyJoined = (error: unknown) =>
   error instanceof Error && /UNIQUE constraint failed: attendance\./i.test(error.message)
 
-/**
- * Whose attendance an account holds at this burn, or nothing if they are not coming.
- *
- * The lead-roles register and the dreams both need it, because both hang a person
- * off an `attendance` rather than an `account`: only somebody coming can lead
- * something, help with something, or be handed a dream to facilitate. Written once
- * here rather than twice, so the pairing rule has one home.
- */
+/** Whose attendance an account holds at this burn, or nothing if they are not coming. */
 export const attendanceFor = async (db: Database, eventId: string, accountId: string) => {
   const [row] = await db
     .select({ id: attendance.id })

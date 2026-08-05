@@ -1247,6 +1247,55 @@ repeatable dream is withdrawn by hand once it has been planned in everywhere.
 Chips carry a ↻, in the pool and on the Dreams list, so it is visible which ones
 behave that way before anyone drags one.
 
+### Helpers, and the ❤️‍🔥
+
+Two tables, `session_helper` and `session_support`, both keyed on `attendance`
+rather than `account` — the same reason a lead role's team is. Only somebody coming
+can carry the cushions, and withdrawing from the burn takes their offers of help and
+their hearts with them rather than leaving names nobody can reach.
+
+**The support count is not a column.** A row per person makes the primary key the
+whole "one heart each" rule, so a double click cannot inflate it and nothing can
+drift. The number is derived on every read, and `supported_by_me` is the _reader's_
+answer — one dream reads differently to two people, which is what makes a filled
+heart mean "mine" rather than "somebody's".
+
+Four routes, all `/me`: `POST`/`DELETE` on `/api/sessions/:id/helpers/me` and
+`/api/sessions/:id/support/me`. The caller speaks for themselves; signing somebody
+else up for work is what the lead-roles register is for, and it asks first. Each is
+idempotent, and each answers with the dream as it now stands.
+
+A caller who is not coming to that burn gets a **400**, not a 403: they may be a
+member in good standing, and the pairing is what is wrong. A dream at a burn that
+has ended is a 404, like every other member-facing write here.
+
+`helpers` carries account ids, so whether the reader is on the list is derived from
+it; `supported_by_me` exists because the supporters are a count and nothing more. A
+`helping_me` beside the list would be a second thing to keep true.
+
+### Clicking a chip
+
+Clicking a dream opens a panel over the grid: when and where, who is facilitating,
+the description as markdown, the ❤️‍🔥, the helper list and one button to join or
+leave it. Editing stays on Dreams, which has the form and the keyboard route.
+
+**A drag leaves a click behind, and that click is not a click** — Google Calendar's
+rule. A ref is set on `dragstart` and cleared on `mousedown`, so the click ending a
+drag is swallowed and the next real press opens as usual. `dragend` would not do:
+it fires _before_ any click, so a flag cleared there is already false by the time the
+click arrives.
+
+Not a `<dialog>`: `showModal` is an imperative call on a ref, and the focus trap it
+brings is then a second thing to keep in step with the component's own open state.
+`role="dialog"` with `aria-modal` says the same to a screen reader, and Escape and
+the backdrop are the two ways out people reach for. A click on the panel stops
+there — without that, reading the description would close the thing you opened to
+read it.
+
+The heart is on the chip as well as in the panel, placed or not: something can want
+support long before anybody has decided when it happens. Its click is stopped at the
+button, or every heart would also open the panel.
+
 `session.location` was free text; it is now `place_id`, referencing #78's places.
 The scheduling grid draws one column per place, and a column cannot be spelled
 three ways. The column has no `onDelete`, so **deleting a place a dream stands in

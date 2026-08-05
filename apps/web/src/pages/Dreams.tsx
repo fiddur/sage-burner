@@ -315,8 +315,7 @@ const DreamFields = ({
         />
       </label>
 
-      {/* Placing it in the grid then copies it rather than moving it, which is how
-          one check-in entry becomes four mornings. */}
+      {/* Placing it in the grid then copies it rather than moving it. */}
       <label class="field-inline">
         <input
           type="checkbox"

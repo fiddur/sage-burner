@@ -72,28 +72,15 @@ export const sessionFields = z.object({
   id: idSchema,
   event_id: idSchema,
   title: nonEmptyText(MAX_TITLE),
-  /**
-   * Who runs it, or null while nobody has said they will.
-   *
-   * Was `host_account_id`, meaning whoever wrote it down — required, and refused in
-   * every request body so that a dream could not be offered in someone else's name.
-   * #198 renamed it and opened it: handing a dream to the person who will facilitate
-   * it is the point, not something to prevent. The routes still check they are coming
-   * to this burn, the way the lead-roles register does.
-   */
+  /** Who runs it, or null while nobody has said they will. The routes check they are coming. */
   facilitator_account_id: idSchema.nullable(),
   description: z.string().max(MAX_DESCRIPTION),
   /**
    * Whether placing it leaves it behind to place again.
    *
-   * The check-in happens every morning, so #198 wanted one dream planned several
-   * times rather than four near-identical ones typed out. Dropping a repeatable
-   * dream into the grid writes a copy with this **off**; the copy is then an
-   * ordinary dream, editable on its own.
-   *
-   * Nothing in the API treats it specially — it is a flag the schedule page reads.
-   * That is deliberate: a server that copied on write would need to know what a
-   * "placement" is, and placing, moving and unplacing are all one PATCH.
+   * Nothing in the API treats it specially — the schedule page copies on drop.
+   * Placing, moving and unplacing are all one PATCH, so a server that copied on
+   * write would first have to decide which of those a given body is.
    */
   repeatable: z.boolean(),
   time_slot_start: dateTimeSchema.nullable(),
@@ -114,18 +101,14 @@ export const sessionFields = z.object({
  * burn, not an error: people offer things long before anyone decides when they
  * happen.
  *
- * The three read-only fields are not columns on `session` and are not accepted from
- * any request body — which is why `sessionCreateSchema` and `sessionUpdateSchema`
- * derive from `sessionFields` rather than from here. Helping and supporting are
- * their own routes, because each is one person acting for themselves.
+ * The three added here are read-only and belong to no request body, which is why
+ * the create and update schemas derive from `sessionFields` rather than from this.
  */
 export const sessionSchema = withValidTimeSlot(
   sessionFields.extend({
-    /** Who has offered to help run it, by name, resolved at read time. */
     helpers: z.array(z.object({ account_id: idSchema, name: z.string().nullable() })),
-    /** How many ❤️‍🔥 it has. Derived from the rows on every read, never stored. */
     support_count: z.int().min(0),
-    /** Whether the reader is one of them, so the heart can be drawn filled. */
+    /** The reader's own answer, so one dream reads differently to two people. */
     supported_by_me: z.boolean(),
   }),
 )
@@ -169,10 +152,6 @@ export type SessionResponse = z.infer<typeof sessionResponseSchema>
  *
  * `event_id` comes from the route, so it is not accepted here — a body naming one
  * would let a member offer a dream against a burn they are not looking at.
- *
- * The facilitator **is** accepted, and defaults to nobody. Offering something for
- * another member to run is an ordinary thing to do, and the route checks they are
- * coming to this burn.
  */
 export const sessionCreateSchema = withValidTimeSlot(
   sessionFields
@@ -190,19 +169,13 @@ export const sessionCreateSchema = withValidTimeSlot(
 export type SessionCreate = z.infer<typeof sessionCreateSchema>
 
 /**
- * `SessionCreate` is the output type, so the five defaulted fields are required
+ * `SessionCreate` is the output type, so the defaulted fields are required
  * there — which makes the defaults useless to a caller typed against it. This is
  * the request shape. Same split as `EventCreateInput`.
  */
 export type SessionCreateInput = z.input<typeof sessionCreateSchema>
 
-/**
- * Editing one, including scheduling it and handing it to a facilitator.
- *
- * The facilitator became editable in #198, once there was a member-visible list of
- * members to pick from — `GET /api/events/:eventId/attendees`, which the lead-roles
- * register already uses for the same purpose.
- */
+/** Editing one, including scheduling it and handing it to a facilitator. */
 export const sessionUpdateSchema = withValidTimeSlot(
   sessionFields.omit({ id: true, event_id: true }).partial().strict(),
 )

@@ -1,11 +1,12 @@
 import type { MyBurn, Place, Session } from '@sage-burner/shared'
 import type { ComponentChildren } from 'preact'
 
-import { useState } from 'preact/hooks'
+import { useRef, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
+import { DreamDetails } from '../components/DreamDetails.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
 import { fromLocalInput, toLocalInput } from '../datetime.ts'
 import { initials } from '../initials.ts'
@@ -15,7 +16,15 @@ import { isMember, useViewer } from '../viewer.tsx'
 
 export type ScheduleApi = Pick<
   ApiClient,
-  'getSessions' | 'getPlaces' | 'updateSession' | 'offerSession' | 'getEventAttendees'
+  | 'getSessions'
+  | 'getPlaces'
+  | 'updateSession'
+  | 'offerSession'
+  | 'getEventAttendees'
+  | 'helpWithSession'
+  | 'stopHelpingWithSession'
+  | 'supportSession'
+  | 'withdrawSupportForSession'
 >
 
 type Timetable = {
@@ -50,6 +59,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
   const viewer = useViewer()
   const member = isMember(viewer)
   const [dragged, setDragged] = useState<string | undefined>(undefined)
+  const [opened, setOpened] = useState<string | undefined>(undefined)
 
   // The burn comes first: since #156 the lanes belong to one, so there is no grid to
   // ask for until we know which.
@@ -151,10 +161,8 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
     }
 
     if (dream.repeatable) {
-      // A repeatable dream is a stamp rather than a thing that moves: the check-in
-      // is planned into four mornings from one entry, so placing it writes a copy
-      // and leaves the original where it was. The copy is an ordinary dream —
-      // `repeatable: false` — or moving it afterwards would stamp again.
+      // A stamp rather than a thing that moves. The copy is an ordinary dream, or
+      // moving it afterwards would stamp again.
       run(
         () =>
           api.offerSession(event.id, {
@@ -173,6 +181,21 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
     setDragged(undefined)
   }
 
+  const support = (id: string, supporting: boolean) => {
+    run(
+      () => (supporting ? api.supportSession(id) : api.withdrawSupportForSession(id)),
+      'Could not save that.',
+    )
+  }
+
+  const help = (id: string, helping: boolean) => {
+    run(() => (helping ? api.helpWithSession(id) : api.stopHelpingWithSession(id)), 'Could not save that.')
+  }
+
+  // Found again rather than held in state, so a reload after a heart or a helper
+  // leaves the panel showing what the server now says.
+  const shown = sessions.find((dream) => dream.id === opened)
+
   return (
     <Framed>
       {error !== undefined && (
@@ -187,6 +210,8 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
           names={names}
           busy={busy}
           onDragStart={setDragged}
+          onOpen={setOpened}
+          onSupport={support}
           onDrop={() => {
             // Back to the pool is how a dream gets unscheduled.
             if (dragged === undefined) return
@@ -202,9 +227,26 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
           names={names}
           busy={busy}
           onDragStart={setDragged}
+          onOpen={setOpened}
+          onSupport={support}
           onDrop={dropInto}
         />
       </div>
+
+      {shown !== undefined && (
+        <DreamDetails
+          dream={shown}
+          place={places.find((lane) => lane.id === shown.place_id)}
+          facilitatorName={
+            shown.facilitator_account_id === null ? undefined : names.get(shown.facilitator_account_id)
+          }
+          viewerId={viewer.account?.id}
+          busy={busy}
+          onClose={() => setOpened(undefined)}
+          onHelp={(helping) => help(shown.id, helping)}
+          onSupport={(supporting) => support(shown.id, supporting)}
+        />
+      )}
     </Framed>
   )
 }
@@ -221,36 +263,88 @@ const Chip = ({
   names,
   busy,
   onDragStart,
+  onOpen,
+  onSupport,
 }: {
   dream: Session
   names: ReadonlyMap<string, string | null>
   busy: boolean
   onDragStart: (id: string) => void
+  onOpen: (id: string) => void
+  onSupport: (id: string, supporting: boolean) => void
+}) => {
+  // Google Calendar's rule: the click a drag leaves behind is not a click. Cleared
+  // on the next press rather than on `dragend`, which fires *before* that click.
+  const dragging = useRef(false)
+
+  return (
+    <span
+      class="dream-chip"
+      draggable={!busy}
+      aria-label={`Move ${dream.title}`}
+      title={span(dream) ?? undefined}
+      onMouseDown={() => {
+        dragging.current = false
+      }}
+      onDragStart={(dragEvent) => {
+        // Firefox refuses to start a drag whose data store was never written to,
+        // so this is what makes the gesture work at all there. The id is carried
+        // in state rather than read back out of the transfer; this only has to
+        // exist.
+        dragging.current = true
+        dragEvent.dataTransfer?.setData('text/plain', dream.id)
+        onDragStart(dream.id)
+      }}
+      onClick={() => {
+        if (dragging.current) return
+        onOpen(dream.id)
+      }}
+    >
+      <button type="button" class="dream-open" aria-label={`Open ${dream.title}`}>
+        {dream.title}
+        {dream.repeatable && (
+          <span class="dream-repeats">
+            <span aria-hidden="true">↻</span>
+            <span class="visually-hidden">Can be planned more than once</span>
+          </span>
+        )}
+      </button>
+      <Facilitator dream={dream} names={names} />
+      <Support dream={dream} busy={busy} onSupport={onSupport} />
+      {span(dream) !== null && <span class="dream-span">{span(dream)}</span>}
+    </span>
+  )
+}
+
+/**
+ * The ♡ that fills in, with how many people have given one.
+ *
+ * The click is stopped here rather than bubbling on to the chip: giving a dream a
+ * heart is not a request to read about it.
+ */
+const Support = ({
+  dream,
+  busy,
+  onSupport,
+}: {
+  dream: Session
+  busy: boolean
+  onSupport: (id: string, supporting: boolean) => void
 }) => (
-  <span
-    class="dream-chip"
-    draggable={!busy}
-    aria-label={`Move ${dream.title}`}
-    title={span(dream) ?? undefined}
-    onDragStart={(dragEvent) => {
-      // Firefox refuses to start a drag whose data store was never written to,
-      // so this is what makes the gesture work at all there. The id is carried
-      // in state rather than read back out of the transfer; this only has to
-      // exist.
-      dragEvent.dataTransfer?.setData('text/plain', dream.id)
-      onDragStart(dream.id)
+  <button
+    type="button"
+    class="dream-heart"
+    disabled={busy}
+    aria-pressed={dream.supported_by_me}
+    aria-label={`${dream.supported_by_me ? 'Take back your support for' : 'Show support for'} ${dream.title}`}
+    onClick={(clickEvent) => {
+      clickEvent.stopPropagation()
+      onSupport(dream.id, !dream.supported_by_me)
     }}
   >
-    {dream.title}
-    {dream.repeatable && (
-      <span class="dream-repeats">
-        <span aria-hidden="true">↻</span>
-        <span class="visually-hidden">Can be planned more than once</span>
-      </span>
-    )}
-    <Facilitator dream={dream} names={names} />
-    {span(dream) !== null && <span class="dream-span">{span(dream)}</span>}
-  </span>
+    <span aria-hidden="true">{dream.supported_by_me ? '❤️‍🔥' : '♡'}</span>
+    {dream.support_count > 0 && <span class="dream-heart-count">{dream.support_count}</span>}
+  </button>
 )
 
 /**
@@ -279,12 +373,16 @@ const Pool = ({
   names,
   busy,
   onDragStart,
+  onOpen,
+  onSupport,
   onDrop,
 }: {
   dreams: readonly Session[]
   names: ReadonlyMap<string, string | null>
   busy: boolean
   onDragStart: (id: string) => void
+  onOpen: (id: string) => void
+  onSupport: (id: string, supporting: boolean) => void
   onDrop: () => void
 }) => (
   <aside
@@ -301,7 +399,14 @@ const Pool = ({
 
     {dreams.map((dream) => (
       <p key={dream.id}>
-        <Chip dream={dream} names={names} busy={busy} onDragStart={onDragStart} />
+        <Chip
+          dream={dream}
+          names={names}
+          busy={busy}
+          onDragStart={onDragStart}
+          onOpen={onOpen}
+          onSupport={onSupport}
+        />
       </p>
     ))}
 
@@ -319,6 +424,8 @@ const Timetable = ({
   names,
   busy,
   onDragStart,
+  onOpen,
+  onSupport,
   onDrop,
 }: {
   rows: readonly string[]
@@ -327,6 +434,8 @@ const Timetable = ({
   names: ReadonlyMap<string, string | null>
   busy: boolean
   onDragStart: (id: string) => void
+  onOpen: (id: string) => void
+  onSupport: (id: string, supporting: boolean) => void
   onDrop: (row: string, placeId: string) => void
 }) => {
   const lanes = new Map(
@@ -388,6 +497,8 @@ const Timetable = ({
                               names={names}
                               busy={busy}
                               onDragStart={onDragStart}
+                              onOpen={onOpen}
+                              onSupport={onSupport}
                             />
                           )
                         })}

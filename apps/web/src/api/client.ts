@@ -283,10 +283,7 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
     getSessions: (eventId: string, signal?: AbortSignal) =>
       request<SessionsResponse>(`/events/${encodeURIComponent(eventId)}/sessions`, { signal }),
 
-    /**
-     * Members only. The burn is the one named; the facilitator is whoever the body
-     * says, defaulting to nobody.
-     */
+    /** Members only. The burn is the one named; the facilitator is whoever the body says. */
     offerSession: (eventId: string, body: SessionCreateInput) =>
       request<SessionResponse>(`/events/${encodeURIComponent(eventId)}/sessions`, {
         method: 'POST',
@@ -301,20 +298,14 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
     withdrawSession: (id: string) =>
       request<undefined>(`/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
-    /**
-     * Offering to help run a dream, and taking the offer back.
-     *
-     * `/me`: the caller speaks for themselves. Both are idempotent, and both answer
-     * with the dream as it now stands, so the heart and the helper list update
-     * without re-reading the whole programme.
-     */
+    /** Offering to help run a dream, and taking the offer back. Both are idempotent. */
     helpWithSession: (id: string) =>
       request<SessionResponse>(`/sessions/${encodeURIComponent(id)}/helpers/me`, { method: 'POST' }),
 
     stopHelpingWithSession: (id: string) =>
       request<SessionResponse>(`/sessions/${encodeURIComponent(id)}/helpers/me`, { method: 'DELETE' }),
 
-    /** A ❤️‍🔥, and taking it back. One per person, so clicking twice changes nothing. */
+    /** A ❤️‍🔥, and taking it back. */
     supportSession: (id: string) =>
       request<SessionResponse>(`/sessions/${encodeURIComponent(id)}/support/me`, { method: 'POST' }),
 

@@ -602,36 +602,19 @@ export const session = sqliteTable(
       .references(() => event.id, { onDelete: 'cascade' }),
     title: text('title').notNull(),
     /**
-     * Who runs it — a person, not one of their stays.
+     * Who runs it — a person, not one of their stays. Null until somebody is handed it.
      *
-     * Was `host_account_id`, meaning whoever wrote the dream down, and it was set
-     * from the session and refused in the body. Renamed and opened in #198: a dream
-     * can be offered for somebody else to facilitate, and handing it to them is the
-     * point rather than something to prevent.
-     *
-     * **Nullable**, because a dream can be offered before anyone has said they will
-     * run it. Not constrained to require an `attendance` for this event either — the
-     * scheduling routes check that, the way the lead-roles register does.
-     *
-     * No `onDelete`, matching `invite_token.created_by` and
-     * `attendance.account_id`: an account that has facilitated something cannot be
-     * deleted, rather than having every dream it ever ran vanish with it. #35 owns
-     * what account deletion should actually do.
+     * An `account` rather than an `attendance`, unlike the two tables below, so it
+     * survives a withdrawal for somebody to notice; the routes check they are coming.
+     * No `onDelete`, matching `invite_token.created_by`: #35 owns account deletion.
      */
     facilitator_account_id: text('facilitator_account_id').references(() => account.id),
     description: text('description').notNull().default(''),
     /**
      * Whether placing it in the grid leaves it behind to place again.
      *
-     * The daily check-in happens every morning and circling twice in a weekend is
-     * ordinary, so #198 wanted one dream that can be planned several times. A flag
-     * rather than a recurrence rule: dropping a repeatable dream into the grid
-     * writes a **copy** with this off, and the copy is then an ordinary dream with
-     * its own time, place and description to edit.
-     *
-     * No back-reference to what it was copied from. Each instance is edited on its
-     * own — a different facilitator on Sunday than on Saturday is the point — and a
-     * parent link would only be something to keep consistent.
+     * Dropping one writes a copy with this off, so the check-in becomes four
+     * mornings. No back-reference to the original: each morning is edited on its own.
      */
     repeatable: integer('repeatable', { mode: 'boolean' }).notNull().default(false),
     time_slot_start: text('time_slot_start'),
@@ -779,12 +762,9 @@ export const leadRoleMember = sqliteTable(
 /**
  * Somebody who will help run a dream.
  *
- * An `attendance` for the same reason a role's team is: only somebody coming to the
- * burn can carry the cushions, and withdrawing takes them off everything they had
- * offered to help with rather than leaving a name nobody can reach.
- *
- * No lead here, unlike `lead_role` — the facilitator is on the dream itself. This
- * table is the pair of hands beside them, self-service in both directions (#198).
+ * An `attendance` for the same reason a role's team is: only somebody coming can
+ * carry the cushions, and withdrawing takes them off what they had offered to help
+ * with rather than leaving a name nobody can reach.
  */
 export const sessionHelper = sqliteTable(
   'session_helper',
@@ -802,13 +782,8 @@ export const sessionHelper = sqliteTable(
 /**
  * One ❤️‍🔥 — somebody saying they want this dream to happen.
  *
- * A row per person rather than a counter column, so the count cannot drift and
- * clicking twice cannot inflate it: the primary key is the whole rule. The number
- * shown is derived on every read.
- *
- * An `attendance` again, so the hearts belong to the burn. A dream copied into next
- * year's programme starts at nothing, which is right — enthusiasm for last year's
- * cacao ceremony is not a fact about this one.
+ * A row per person rather than a counter column: the primary key is then the whole
+ * "one each" rule, and the number is derived on every read rather than kept in step.
  */
 export const sessionSupport = sqliteTable(
   'session_support',

@@ -88,6 +88,12 @@ const clientWith = (
   offerSession: () => Promise.reject(new Error('offerSession is not stubbed in this file')),
   updateSession: () => Promise.reject(new Error('updateSession is not stubbed in this file')),
   withdrawSession: () => Promise.reject(new Error('withdrawSession is not stubbed in this file')),
+  helpWithSession: () => Promise.reject(new Error('helpWithSession is not stubbed in this file')),
+  stopHelpingWithSession: () =>
+    Promise.reject(new Error('stopHelpingWithSession is not stubbed in this file')),
+  supportSession: () => Promise.reject(new Error('supportSession is not stubbed in this file')),
+  withdrawSupportForSession: () =>
+    Promise.reject(new Error('withdrawSupportForSession is not stubbed in this file')),
   getInstallation: () => Promise.reject(new Error('getInstallation is not stubbed in this file')),
   updateInstallation: () => Promise.reject(new Error('updateInstallation is not stubbed in this file')),
   updateWelcome: () => Promise.reject(new Error('updateWelcome is not stubbed in this file')),

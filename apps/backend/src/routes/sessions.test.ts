@@ -188,9 +188,6 @@ describe('dreams', () => {
       time_slot_start: null,
       time_slot_end: null,
       place_id: null,
-      // Nobody, until somebody is handed it. It used to be whoever offered it, on the
-      // reasoning that a dream in someone else's name was not an edit anyone should
-      // make by hand — which is exactly the edit #198 wanted.
       facilitator_account_id: null,
     })
   })
@@ -215,9 +212,7 @@ describe('dreams', () => {
     expect(taken.statusCode).toBe(201)
     expect(taken.json().session.facilitator_account_id).toBe(member.id)
 
-    // The same rule the lead-roles register applies to a lead: somebody who is not
-    // there cannot run it. A 400 rather than a 404 — the account exists, the pairing
-    // is what is wrong.
+    // A 400 rather than a 404: the account exists, the pairing is what is wrong.
     const absent = await offer(server, member.cookie, {
       title: 'Cacao ceremony',
       facilitator_account_id: elsewhere.id,
@@ -692,8 +687,7 @@ describe('helping with a dream', () => {
   })
 
   it('resolves the name at read time, so correcting it corrects the list', async () => {
-    // The account carries the person. A name copied onto the helper row would have
-    // to be corrected in as many places as somebody had offered to help.
+    // The account carries the person, so a name is corrected in one place.
     const server = await build()
     const eventId = await givenEvent()
     const ada = await givenAttending(eventId)
@@ -733,8 +727,7 @@ describe('helping with a dream', () => {
   })
 
   it('refuses a member who is not coming to that burn', async () => {
-    // A 400, not a 403: they are a member in good standing, and it is the pairing
-    // that is wrong. The same reading the facilitator check takes.
+    // A 400, not a 403: they are a member in good standing; the pairing is wrong.
     const server = await build()
     await givenEvent()
     const elsewhere = await givenAccount(['member'])
@@ -785,9 +778,8 @@ describe('supporting a dream', () => {
   })
 
   it('says whose heart it is, and only to them', async () => {
-    // `supported_by_me` is the reader's own answer, so the same dream reads
-    // differently to two people. Without the per-reader half, everybody would see a
-    // filled heart the moment anybody gave one.
+    // Without the per-reader half everybody would see a filled heart the moment
+    // anybody gave one.
     const server = await build()
     const eventId = await givenEvent()
     const ada = await givenAttending(eventId)
@@ -828,9 +820,8 @@ describe('supporting a dream', () => {
   })
 
   it('keeps the helpers and hearts across an ordinary edit', async () => {
-    // The PATCH answers with the dream as it now stands, and `.returning()` gives
-    // back a row rather than a dream — so the fields it does not know about have to
-    // be attached again, or every save would look like everybody had let go.
+    // `.returning()` gives back a row rather than a dream, so the fields it does not
+    // know about have to be attached again or a save looks like everybody let go.
     const server = await build()
     const eventId = await givenEvent()
     const ada = await givenAttending(eventId)
