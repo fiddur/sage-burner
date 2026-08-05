@@ -1,4 +1,4 @@
-import type { InviteState, MeResponse } from '@sage-burner/shared'
+import type { InviteState, RedeemResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
 import { errorResponse, inviteStatusOf, redeemRequestSchema } from '@sage-burner/shared'
@@ -13,6 +13,7 @@ import type { Database } from '../db/index.ts'
 import { hashPassword } from '../auth/password.ts'
 import { account, accountRole, application, inviteToken } from '../db/schema.ts'
 import { noStore } from '../http.ts'
+import { joinBurn } from './attendance.ts'
 import { cookieHeader } from './auth.ts'
 
 export interface RedemptionDeps {
@@ -192,15 +193,24 @@ export const registerRedemptionRoutes = (
       cookieHeader(sessions.issue(accountId), config, config.session_ttl_seconds),
     )
 
-    // The whole viewer, with `satisfies`: the page reads every field, and `undefined`
-    // is not `null` to a control comparing against it.
+    // Outside the transaction above, and after it, on purpose. Redeeming is the one
+    // operation whose failure cannot be retried — the token is spent and cannot be
+    // re-sent — so nothing optional may be given the power to roll it back. A burn
+    // that ended while the form was open, or an id that names nothing, leaves the
+    // account made and the box unticked; the page reads `attendance` and says so.
+    const wanted = parsed.data.join_event_id ?? undefined
+    const joined = wanted === undefined ? undefined : await joinBurn(db, wanted, accountId, now)
+
     return reply.code(201).send({
+      // The whole viewer, with `satisfies`: the page reads every field, and
+      // `undefined` is not `null` to a control comparing against it.
       viewer: {
         account_id: accountId,
         name: parsed.data.name,
         avatar: null,
         roles: ['member'],
       },
-    } satisfies MeResponse)
+      attendance: joined?.stay ?? null,
+    } satisfies RedeemResponse)
   })
 }

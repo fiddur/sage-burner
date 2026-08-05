@@ -66,6 +66,7 @@ import type {
   PushKeyResponse,
   PushSubscriptionCreate,
   RedeemRequestInput,
+  RedeemResponse,
   RosterResponse,
   SessionCreateInput,
   SessionResponse,
@@ -598,7 +599,7 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
      * hashing it will run at once.
      */
     redeemInvite: (token: string, body: RedeemRequestInput) =>
-      request<MeResponse>(`/invites/${encodeURIComponent(token)}/redeem`, { method: 'POST', body }),
+      request<RedeemResponse>(`/invites/${encodeURIComponent(token)}/redeem`, { method: 'POST', body }),
 
     /**
      * Members only. Every burn their own page shows them, and their stay at each.

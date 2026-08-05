@@ -28,6 +28,71 @@ import { helpingFor, helpingIdsFor } from './helping.ts'
 export const isAlreadyJoined = (error: unknown) =>
   error instanceof Error && /UNIQUE constraint failed: attendance\./i.test(error.message)
 
+/** Somebody's stay at a burn, with the helping ticks that live in another table. */
+export const stayAt = async (db: Database, eventId: string, accountId: string) => {
+  const [row] = await db
+    .select()
+    .from(attendance)
+    .where(and(eq(attendance.event_id, eventId), eq(attendance.account_id, accountId)))
+    .limit(1)
+
+  // The ticks travel with the row everywhere it is returned, so a caller never
+  // has to know they live in another table.
+  return row === undefined ? undefined : { ...row, helping_option_ids: await helpingIdsFor(db, row.id) }
+}
+
+/**
+ * Saying somebody is coming to a burn.
+ *
+ * Two callers, which is why it is here rather than inside a route: a member's own "I
+ * am coming", and spending an invite with the upcoming burn ticked (#224). The
+ * defaults are the interesting part, and having them in one place is what stops the
+ * two doors leading to differently-shaped rows.
+ *
+ * Idempotent — saying it twice is the same statement, not an error. A double click, a
+ * retried request and a second tab all land here.
+ *
+ * Answers `undefined` for a burn that has ended and for one that never existed, which
+ * are deliberately the same answer: distinguishing them would tell an unrelated caller
+ * that an id is real.
+ */
+export const joinBurn = async (db: Database, eventId: string, accountId: string, now: () => Date) => {
+  const found = await openEvent(db, todayIso(now), eventId)
+  if (found === undefined) return undefined
+
+  // A shortcut, not the guarantee — two requests can both pass it before either
+  // writes. `attendance_event_account_idx` is what actually holds the invariant, so
+  // losing to it means someone else just said the same thing, which is the answer
+  // this gives anyway.
+  const existing = await stayAt(db, found.id, accountId)
+  if (existing !== undefined) return { stay: existing, created: false }
+
+  try {
+    await db.insert(attendance).values({
+      id: randomUUID(),
+      event_id: found.id,
+      account_id: accountId,
+      joined_at: now().toISOString(),
+      payment_status: 'unpaid',
+      // The whole burn, which is what almost everyone means by coming to it.
+      // Written rather than left null and prefilled in the form: an organiser
+      // reading the roster wants the common answer already there, and the people
+      // arriving late or leaving early are the ones who should have to change
+      // something.
+      arrival_date: found.start_date,
+      departure_date: found.end_date,
+    })
+  } catch (error) {
+    if (!isAlreadyJoined(error)) throw error
+
+    const raced = await stayAt(db, found.id, accountId)
+    return raced === undefined ? undefined : { stay: raced, created: false }
+  }
+
+  const made = await stayAt(db, found.id, accountId)
+  return made === undefined ? undefined : { stay: made, created: true }
+}
+
 /** Whose attendance an account holds at this burn, or nothing if they are not coming. */
 export const attendanceFor = async (db: Database, eventId: string, accountId: string) => {
   const [row] = await db
@@ -64,17 +129,7 @@ export const registerAttendanceRoutes = (
 ) => {
   const { requireApproved, requireMember } = createGuards({ db, sessions })
 
-  const joinedRow = async (eventId: string, accountId: string) => {
-    const [row] = await db
-      .select()
-      .from(attendance)
-      .where(and(eq(attendance.event_id, eventId), eq(attendance.account_id, accountId)))
-      .limit(1)
-
-    // The ticks travel with the row everywhere it is returned, so a caller never
-    // has to know they live in another table.
-    return row === undefined ? undefined : { ...row, helping_option_ids: await helpingIdsFor(db, row.id) }
-  }
+  const joinedRow = (eventId: string, accountId: string) => stayAt(db, eventId, accountId)
 
   /**
    * Every burn somebody's own page shows them, and their stay at each.
@@ -155,43 +210,10 @@ export const registerAttendanceRoutes = (
       const viewer = await viewerFor(request, { db, sessions })
       if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
 
-      // A burn that has ended, or one that never existed, get the same answer.
-      // Distinguishing them would tell an unrelated caller that an id is real.
-      const found = await openEvent(db, todayIso(now), request.params.eventId)
-      if (found === undefined) return reply.code(404).send(errorResponse('not_found'))
+      const joined = await joinBurn(db, request.params.eventId, viewer.account_id, now)
+      if (joined === undefined) return reply.code(404).send(errorResponse('not_found'))
 
-      // Idempotent: saying it twice is the same statement, not an error. A double
-      // click, a retried request and a second tab all land here.
-      //
-      // The read is a shortcut, not the guarantee — two requests can both pass it
-      // before either writes. `attendance_event_account_idx` is what actually holds
-      // the invariant, so losing to it means someone else just said the same thing,
-      // which is the answer this route gives anyway.
-      const existing = await joinedRow(found.id, viewer.account_id)
-      if (existing !== undefined) return { attendance: existing }
-
-      try {
-        await db.insert(attendance).values({
-          id: randomUUID(),
-          event_id: found.id,
-          account_id: viewer.account_id,
-          joined_at: now().toISOString(),
-          payment_status: 'unpaid',
-          // The whole burn, which is what almost everyone means by coming to it.
-          // Written rather than left null and prefilled in the form: an organiser
-          // reading the roster wants the common answer already there, and the
-          // people arriving late or leaving early are the ones who should have to
-          // change something.
-          arrival_date: found.start_date,
-          departure_date: found.end_date,
-        })
-      } catch (error) {
-        if (!isAlreadyJoined(error)) throw error
-
-        return { attendance: await joinedRow(found.id, viewer.account_id) }
-      }
-
-      return reply.code(201).send({ attendance: await joinedRow(found.id, viewer.account_id) })
+      return joined.created ? reply.code(201).send({ attendance: joined.stay }) : { attendance: joined.stay }
     },
   )
 
