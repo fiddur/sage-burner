@@ -7,9 +7,10 @@ import type { ApiClient } from '../api/client.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
+import { NoBurn } from '../components/NoBurn.tsx'
 import { useAction, useLoad } from '../load.ts'
 import { moveTo, swap } from '../reorder.ts'
-import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
+import { isApproved, useViewer } from '../viewer.tsx'
 
 export type OptionsApi = Pick<
   ApiClient,
@@ -43,7 +44,6 @@ const BLURB: Record<EventOptionKind, string> = {
 export const Options = ({ api }: { api: OptionsApi }) => {
   const viewer = useViewer()
   const approved = isApproved(viewer)
-  const admin = isAdmin(viewer)
   const burn = useSelectedBurn()
   const { loaded, reload } = useLoad<Lists>(
     async (signal) => {
@@ -76,19 +76,7 @@ export const Options = ({ api }: { api: OptionsApi }) => {
       )}
 
       {loaded.status === 'ready' && loaded.data.event === null && (
-        <p class="notice">
-          There is no burn open, and these lists belong to one.{' '}
-          {admin ? (
-            <>
-              Make an event under <a href="/admin/events">Events</a> first.
-            </>
-          ) : (
-            // Creating a burn is admin-only, so a member sent to that page would be
-            // refused there. A dead end is worse than a plain sentence saying who to
-            // ask — the wording of the refusal is `GuardedPage`'s and can change.
-            <>Ask someone with admin to create one first.</>
-          )}
-        </p>
+        <NoBurn absent="these lists have no burn to belong to" />
       )}
 
       {loaded.status === 'ready' && loaded.data.event !== null && (

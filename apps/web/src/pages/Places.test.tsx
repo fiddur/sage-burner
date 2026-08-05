@@ -269,7 +269,7 @@ describe('Places', () => {
     const getPlaces = vi.fn<PlacesApi['getPlaces']>(() => Promise.resolve({ places: [] }))
     renderPage(stub({ getPlaces }), ADMIN, null)
 
-    expect(await screen.findByText(/no burn coming up yet/)).toBeTruthy()
+    expect(await screen.findByText(/no burn planned yet/)).toBeTruthy()
     expect(getPlaces).not.toHaveBeenCalled()
     // No form either: it would take a name and have nowhere to put it.
     expect(screen.queryByRole('textbox', { name: 'Name' })).toBeNull()

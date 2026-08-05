@@ -16,9 +16,9 @@ export type YourBurnsApi = Pick<
 /**
  * Every status gets its own sentence.
  *
- * A `Record` rather than a conditional, so adding a fourth status is a type error
- * here instead of quietly reading as one of the others — which is what `partial`
- * did: it showed the same ", not yet paid." as having paid nothing.
+ * A `Record` rather than a conditional, so a third status would be a type error here
+ * instead of quietly reading as one of the two — which is what `partial` did: it
+ * showed the same ", not yet paid." as having paid nothing.
  */
 const PAYMENT_NOTES: Record<PaymentStatus, string> = {
   unpaid: ', not yet paid.',

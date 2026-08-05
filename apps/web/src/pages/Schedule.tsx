@@ -6,6 +6,7 @@ import { useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
+import { NoBurn } from '../components/NoBurn.tsx'
 import { fromLocalInput, toLocalInput } from '../datetime.ts'
 import { useAction, useLoad } from '../load.ts'
 import { endFor, hourOf, hoursOf, laneCells } from '../schedule.ts'
@@ -92,7 +93,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
   if (event === null) {
     return (
       <Framed>
-        <p class="notice">There is no burn scheduled at the moment. Check back later.</p>
+        <NoBurn absent="there is no timetable to draw" />
       </Framed>
     )
   }

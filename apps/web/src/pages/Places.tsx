@@ -9,6 +9,7 @@ import type { Loaded } from '../load.ts'
 import { useSelectedBurn } from '../burn.tsx'
 import { CopyFrom } from '../components/CopyFrom.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
+import { NoBurn } from '../components/NoBurn.tsx'
 import { useAction, useLoad } from '../load.ts'
 import { moveTo, swap } from '../reorder.ts'
 import { isApproved, useViewer } from '../viewer.tsx'
@@ -371,7 +372,7 @@ const Notice = ({ loaded }: { loaded: Loaded<Grid> }) => {
     )
   }
   if (loaded.data === null) {
-    return <p class="form-note">There is no burn coming up yet, so there is no grid to lay out.</p>
+    return <NoBurn absent="there is no grid to lay out" />
   }
 
   return loaded.data.places.length === 0 ? (

@@ -2,6 +2,7 @@ import type { ApiClient } from '../api/client.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
+import { NoBurn } from '../components/NoBurn.tsx'
 import { useLoad } from '../load.ts'
 import { isApproved, useViewer } from '../viewer.tsx'
 
@@ -47,9 +48,7 @@ export const Members = ({ api }: { api: MembersApi }) => {
         </p>
       )}
 
-      {roster !== undefined && roster.event === null && (
-        <p class="form-note">There is no burn open at the moment.</p>
-      )}
+      {roster !== undefined && roster.event === null && <NoBurn absent="there is nobody to list" />}
 
       {roster !== undefined && roster.event !== null && (
         <>
