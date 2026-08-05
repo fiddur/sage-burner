@@ -105,7 +105,7 @@ export const MealDialog = ({
         />
       </label>
 
-      {meal.kind !== 'chore' && (
+      {(meal.kind !== 'chore' || meal.helpers.length > 0) && (
         <>
           <label class="field">
             <span>Meal lead</span>

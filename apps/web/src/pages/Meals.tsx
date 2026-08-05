@@ -262,7 +262,9 @@ const MealTable = ({
               </select>
             )}
           </td>
-          {meal.kind === 'chore' ? (
+          {/* A chore asks for no cooks — but one already signed up before the slot
+              became a chore still needs a way off, which the API allows. */}
+          {meal.kind === 'chore' && meal.helpers.length === 0 ? (
             <td>
               <span class="form-note">—</span>
             </td>

@@ -249,7 +249,13 @@ export const registerMealRoutes = (
 
       // A chore has nobody cooking, so it has nobody leading the cooking. Refused
       // rather than only hidden: the page not offering it is not the rule.
-      if (existing.kind === 'chore') return reply.code(400).send(errorResponse('bad_request'))
+      //
+      // Vacating stays allowed, like standing down from the crew below: a sitting
+      // changed to a chore under whoever was leading it must not strand them there
+      // with no way off.
+      if (existing.kind === 'chore' && parsed.data.account_id !== null) {
+        return reply.code(400).send(errorResponse('bad_request'))
+      }
 
       let taking: string | undefined
       if (parsed.data.account_id !== null) {

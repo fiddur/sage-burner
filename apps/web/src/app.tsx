@@ -53,8 +53,6 @@ export type RoutesApi = Pick<
   | 'setAccountPassword'
   | 'setMyAvatar'
   | 'removeMyAvatar'
-  | 'setMyAvatar'
-  | 'removeMyAvatar'
   | 'getEvents'
   | 'getInviteState'
   | 'redeemInvite'

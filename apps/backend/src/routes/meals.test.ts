@@ -646,3 +646,31 @@ describe('a chore', () => {
     expect(response.json().meal.helpers).toEqual([])
   })
 })
+
+describe('a lead stranded by a slot becoming a chore', () => {
+  it('can still be vacated, though nobody new may be handed it', async () => {
+    // The same escape hatch standing down from a crew has: a sitting changed under
+    // whoever was leading it must not trap them there with no way off.
+    const server = await build()
+    await givenBurn()
+    const organiser = await givenAccount(['admin'])
+    await addSlot(server, organiser.cookie, { label: 'Dinner', at: '18:00' })
+    await generate(server, organiser.cookie)
+    const ada = await givenAttending()
+    const [meal] = (await listMeals(server, ada.cookie)).meals
+    await send(server, 'PUT', `/api/meals/${meal.id}/lead`, ada.cookie, { account_id: ada.id })
+
+    await db().update(mealTable).set({ kind: 'chore' }).where(eq(mealTable.id, meal.id))
+
+    const handed = await send(server, 'PUT', `/api/meals/${meal.id}/lead`, ada.cookie, {
+      account_id: ada.id,
+    })
+    expect(handed.statusCode).toBe(400)
+
+    const vacated = await send(server, 'PUT', `/api/meals/${meal.id}/lead`, ada.cookie, {
+      account_id: null,
+    })
+    expect(vacated.statusCode).toBe(200)
+    expect(vacated.json().meal.lead).toBeNull()
+  })
+})
