@@ -108,6 +108,27 @@ a:hover {
   margin-inline-end: auto;
 }
 
+/* Off-screen but read aloud. The circle shows letters; a screen reader needs the name. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Smaller than the corner's, since a chip is an hour tall at best. */
+.dream-facilitator {
+  width: 1.35rem;
+  height: 1.35rem;
+  font-size: 0.6rem;
+  margin-inline-start: 0.35rem;
+  vertical-align: middle;
+}
+
 /* A placeholder for the avatar image that will replace it, so it is sized like one. */
 .avatar {
   display: inline-flex;
@@ -599,12 +620,133 @@ a:hover {
   opacity: 0.75;
 }
 
+/* The ↻: this one stays in the pool when it is placed, and a copy goes in the grid. */
+.dream-repeats {
+  margin-inline-start: 0.3rem;
+  opacity: 0.7;
+}
+
 /*
-  No `height: 100%` here. Inside a table cell it resolves against the row rather
-  than the spanned block, so a chip in a three-hour slot painted its background
-  one row tall and let the title overflow below it — which is what a two-hour
-  dream looked like before anyone noticed the rows.
+  The chip's title, as a button so the details panel has a keyboard route.
+
+  Styled back down to text: the chip is already the affordance, and a second button
+  frame inside it would read as two controls.
 */
+.dream-open {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.dream-heart {
+  background: none;
+  border: 0;
+  padding: 0 0.15rem;
+  margin-inline-start: 0.3rem;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.dream-heart-count {
+  font-size: 0.75rem;
+  margin-inline-start: 0.15rem;
+}
+
+/* The bottom edge, pulled to make a dream longer or shorter. Only in the grid. */
+.dream-resize {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 0.6rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: 0.55rem;
+  line-height: 0.6rem;
+  text-align: center;
+  cursor: ns-resize;
+  opacity: 0.55;
+}
+
+.dream-resize:focus-visible {
+  opacity: 1;
+}
+
+/* Over the timetable rather than beside it — the grid is as wide as the screen. */
+.dream-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgb(0 0 0 / 45%);
+}
+
+.dream-panel {
+  max-width: 32rem;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 1rem 1.25rem;
+  border-radius: 0.5rem;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.dream-panel h2 {
+  margin-top: 0;
+}
+
+.dream-helpers {
+  margin: 0.25rem 0;
+  padding-inline-start: 1.25rem;
+}
+
+/*
+  A placed dream is as tall as the hours it runs.
+
+  It was not: the cell spans the right number of rows — `rowSpanOf` is tested, and
+  `laneCells` has an invariant test proving anchors plus spans account for every row
+  — but the chip inside it is content-height, so a 19:00→22:00 dream painted about an
+  hour and a half and read as ending at 20:45. A narrow screen looked right only by
+  accident, the title wrapping to more lines until the chip happened to fill.
+
+  `height: 100%` on the chip cannot fix it: inside a table cell it resolves against
+  the row rather than the spanned block, which is what an earlier attempt found. So
+  the stack is taken out of flow against the cell — `.schedule-cell` is `position:
+  relative`, which makes it the containing block whatever it spans — and the chips
+  divide its height between them.
+
+  Clipping rather than overflowing is the trade: a title too long for a one-hour slot
+  is cut off here where it used to bleed over the rows below, which read as a longer
+  dream. The `title` attribute still carries the times on hover.
+*/
+.dream-stack {
+  position: absolute;
+  inset: 0.15rem 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.dream-stack .dream-chip {
+  flex: 1;
+  margin: 0;
+  overflow: hidden;
+  /* The resize handle sits against this chip's bottom edge, not the cell's. */
+  position: relative;
+}
+
 .dream-chip {
   box-sizing: border-box;
 }

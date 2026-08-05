@@ -1,20 +1,39 @@
 import type { MyBurn, Place, Session } from '@sage-burner/shared'
 import type { ComponentChildren } from 'preact'
 
-import { useState } from 'preact/hooks'
+import { useRef, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
+import { DreamDetails } from '../components/DreamDetails.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
 import { fromLocalInput, toLocalInput } from '../datetime.ts'
+import { initials } from '../initials.ts'
 import { useAction, useLoad } from '../load.ts'
-import { endFor, hourOf, hoursOf, laneCells } from '../schedule.ts'
+import { endFor, hourOf, hoursOf, laneCells, resizedEnd, rowsDragged } from '../schedule.ts'
 import { isMember, useViewer } from '../viewer.tsx'
 
-export type ScheduleApi = Pick<ApiClient, 'getSessions' | 'getPlaces' | 'updateSession'>
+export type ScheduleApi = Pick<
+  ApiClient,
+  | 'getSessions'
+  | 'getPlaces'
+  | 'updateSession'
+  | 'offerSession'
+  | 'getEventAttendees'
+  | 'helpWithSession'
+  | 'stopHelpingWithSession'
+  | 'supportSession'
+  | 'withdrawSupportForSession'
+>
 
-type Timetable = { event: MyBurn['event'] | null; places: readonly Place[]; sessions: readonly Session[] }
+type Timetable = {
+  event: MyBurn['event'] | null
+  places: readonly Place[]
+  sessions: readonly Session[]
+  /** Facilitator names by account id, for the circle on a chip. */
+  names: ReadonlyMap<string, string | null>
+}
 
 const label = (row: string) => row.slice(11)
 
@@ -40,20 +59,28 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
   const viewer = useViewer()
   const member = isMember(viewer)
   const [dragged, setDragged] = useState<string | undefined>(undefined)
+  const [opened, setOpened] = useState<string | undefined>(undefined)
 
   // The burn comes first: since #156 the lanes belong to one, so there is no grid to
   // ask for until we know which.
   const burn = useSelectedBurn()
   const { loaded, reload } = useLoad<Timetable>(
     async (signal) => {
-      if (burn === undefined) return { event: null, places: [], sessions: [] }
+      if (burn === undefined) return { event: null, places: [], sessions: [], names: new Map() }
 
-      const [places, dreams] = await Promise.all([
+      const [places, dreams, attendees] = await Promise.all([
         api.getPlaces(burn.event.id, signal),
         api.getSessions(burn.event.id, signal),
+        api.getEventAttendees(burn.event.id, signal),
       ])
 
-      return { event: burn.event, places: places.places, sessions: dreams.sessions }
+      return {
+        event: burn.event,
+        places: places.places,
+        sessions: dreams.sessions,
+        // By id, because the chip has one and needs a name for the circle.
+        names: new Map(attendees.attendees.map((person) => [person.account_id, person.name])),
+      }
     },
     { enabled: member, key: burn?.event.id ?? '', fallback: 'Could not load the schedule.' },
   )
@@ -88,7 +115,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
     )
   }
 
-  const { event, places, sessions } = loaded.data
+  const { event, places, sessions, names } = loaded.data
 
   if (event === null) {
     return (
@@ -127,13 +154,54 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
 
     // Keeps whatever length it already had. Forcing an hour would quietly
     // shorten a two-hour session just because someone moved it to another lane.
-    move(dream.id, {
+    const placement = {
       place_id: placeId,
       time_slot_start: fromLocalInput(row),
       time_slot_end: endFor(row, dream),
-    })
+    }
+
+    if (dream.repeatable) {
+      // A stamp rather than a thing that moves. The copy is an ordinary dream, or
+      // moving it afterwards would stamp again.
+      run(
+        () =>
+          api.offerSession(event.id, {
+            title: dream.title,
+            description: dream.description,
+            facilitator_account_id: dream.facilitator_account_id,
+            repeatable: false,
+            ...placement,
+          }),
+        'Could not place that dream.',
+      )
+    } else {
+      move(dream.id, placement)
+    }
+
     setDragged(undefined)
   }
+
+  const support = (id: string, supporting: boolean) => {
+    run(
+      () => (supporting ? api.supportSession(id) : api.withdrawSupportForSession(id)),
+      'Could not save that.',
+    )
+  }
+
+  const resize = (dream: Session, byRows: number) => {
+    const end = resizedEnd(dream, byRows)
+    if (end === null) return
+
+    move(dream.id, { time_slot_end: end })
+  }
+
+  const help = (id: string, helping: boolean) => {
+    run(() => (helping ? api.helpWithSession(id) : api.stopHelpingWithSession(id)), 'Could not save that.')
+  }
+
+  // Found again rather than held in state, so a reload after a heart or a helper
+  // leaves the panel showing what the server now says.
+  const shown = sessions.find((dream) => dream.id === opened)
 
   return (
     <Framed>
@@ -146,8 +214,12 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
       <div class="schedule">
         <Pool
           dreams={unscheduled}
+          names={names}
           busy={busy}
           onDragStart={setDragged}
+          onOpen={setOpened}
+          onSupport={support}
+          onResize={resize}
           onDrop={() => {
             // Back to the pool is how a dream gets unscheduled.
             if (dragged === undefined) return
@@ -160,11 +232,30 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
           rows={rows}
           places={places}
           dreams={sessions}
+          names={names}
           busy={busy}
           onDragStart={setDragged}
+          onOpen={setOpened}
+          onSupport={support}
+          onResize={resize}
           onDrop={dropInto}
         />
       </div>
+
+      {shown !== undefined && (
+        <DreamDetails
+          dream={shown}
+          place={places.find((lane) => lane.id === shown.place_id)}
+          facilitatorName={
+            shown.facilitator_account_id === null ? undefined : names.get(shown.facilitator_account_id)
+          }
+          viewerId={viewer.account?.id}
+          busy={busy}
+          onClose={() => setOpened(undefined)}
+          onHelp={(helping) => help(shown.id, helping)}
+          onSupport={(supporting) => support(shown.id, supporting)}
+        />
+      )}
     </Framed>
   )
 }
@@ -178,41 +269,184 @@ const Framed = ({ children }: { children: ComponentChildren }) => (
 
 const Chip = ({
   dream,
+  names,
   busy,
+  resizable,
   onDragStart,
+  onOpen,
+  onSupport,
+  onResize,
+}: {
+  dream: Session
+  names: ReadonlyMap<string, string | null>
+  busy: boolean
+  /** Only in the grid: there are no rows to pull against in the pool. */
+  resizable: boolean
+  onDragStart: (id: string) => void
+  onOpen: (id: string) => void
+  onSupport: (id: string, supporting: boolean) => void
+  onResize: (dream: Session, byRows: number) => void
+}) => {
+  // Google Calendar's rule: the click a drag leaves behind is not a click. Cleared
+  // on the next press rather than on `dragend`, which fires *before* that click.
+  const dragging = useRef(false)
+  const grabbed = useRef<{ y: number; rowHeight: number } | null>(null)
+
+  return (
+    <span
+      class="dream-chip"
+      draggable={!busy}
+      aria-label={`Move ${dream.title}`}
+      title={span(dream) ?? undefined}
+      onMouseDown={() => {
+        dragging.current = false
+      }}
+      onDragStart={(dragEvent) => {
+        // `draggable` is on the chip, so a grab anywhere inside it — the resize
+        // handle included — would otherwise drag the whole dream to another lane.
+        if (grabbed.current !== null) {
+          dragEvent.preventDefault()
+          return
+        }
+
+        // Firefox refuses to start a drag whose data store was never written to,
+        // so this is what makes the gesture work at all there. The id is carried
+        // in state rather than read back out of the transfer; this only has to
+        // exist.
+        dragging.current = true
+        dragEvent.dataTransfer?.setData('text/plain', dream.id)
+        onDragStart(dream.id)
+      }}
+      onClick={() => {
+        if (dragging.current) return
+        onOpen(dream.id)
+      }}
+    >
+      <button type="button" class="dream-open" aria-label={`Open ${dream.title}`}>
+        {dream.title}
+        {dream.repeatable && (
+          <span class="dream-repeats">
+            <span aria-hidden="true">↻</span>
+            <span class="visually-hidden">Can be planned more than once</span>
+          </span>
+        )}
+      </button>
+      <Facilitator dream={dream} names={names} />
+      <Support dream={dream} busy={busy} onSupport={onSupport} />
+      {span(dream) !== null && <span class="dream-span">{span(dream)}</span>}
+
+      {resizable && (
+        <button
+          type="button"
+          class="dream-resize"
+          disabled={busy}
+          aria-label={`Change how long ${dream.title} is`}
+          onPointerDown={(pointerEvent) => {
+            // Measured off the cell rather than from a number the CSS and this
+            // would both have to hold: it spans `rowspan` rows, so its own height
+            // says what a row is worth on this screen.
+            const cell = pointerEvent.currentTarget.closest('td')
+            const spanned = Math.max(Number(cell?.getAttribute('rowspan') ?? '1'), 1)
+            const height = cell?.getBoundingClientRect().height ?? 0
+
+            grabbed.current = { y: pointerEvent.clientY, rowHeight: height / spanned }
+            pointerEvent.currentTarget.setPointerCapture(pointerEvent.pointerId)
+          }}
+          onPointerUp={(pointerEvent) => {
+            const grab = grabbed.current
+            grabbed.current = null
+            if (grab === null) return
+
+            onResize(dream, rowsDragged(pointerEvent.clientY - grab.y, grab.rowHeight))
+          }}
+          onClick={(clickEvent) => clickEvent.stopPropagation()}
+          onKeyDown={(keyEvent) => {
+            // The handle is the keyboard route too, like the ⠿ on Places: a
+            // resize nobody can do without a mouse is one half the people here
+            // cannot do.
+            const by = keyEvent.key === 'ArrowDown' ? 1 : keyEvent.key === 'ArrowUp' ? -1 : undefined
+            if (by === undefined) return
+
+            keyEvent.preventDefault()
+            onResize(dream, by)
+          }}
+        >
+          <span aria-hidden="true">⇕</span>
+        </button>
+      )}
+    </span>
+  )
+}
+
+/**
+ * The ♡ that fills in, with how many people have given one.
+ *
+ * The click is stopped here rather than bubbling on to the chip: giving a dream a
+ * heart is not a request to read about it.
+ */
+const Support = ({
+  dream,
+  busy,
+  onSupport,
 }: {
   dream: Session
   busy: boolean
-  onDragStart: (id: string) => void
+  onSupport: (id: string, supporting: boolean) => void
 }) => (
-  <span
-    class="dream-chip"
-    draggable={!busy}
-    aria-label={`Move ${dream.title}`}
-    title={span(dream) ?? undefined}
-    onDragStart={(dragEvent) => {
-      // Firefox refuses to start a drag whose data store was never written to,
-      // so this is what makes the gesture work at all there. The id is carried
-      // in state rather than read back out of the transfer; this only has to
-      // exist.
-      dragEvent.dataTransfer?.setData('text/plain', dream.id)
-      onDragStart(dream.id)
+  <button
+    type="button"
+    class="dream-heart"
+    disabled={busy}
+    aria-pressed={dream.supported_by_me}
+    aria-label={`${dream.supported_by_me ? 'Take back your support for' : 'Show support for'} ${dream.title}`}
+    onClick={(clickEvent) => {
+      clickEvent.stopPropagation()
+      onSupport(dream.id, !dream.supported_by_me)
     }}
   >
-    {dream.title}
-    {span(dream) !== null && <span class="dream-span">{span(dream)}</span>}
-  </span>
+    <span aria-hidden="true">{dream.supported_by_me ? '❤️‍🔥' : '♡'}</span>
+    {dream.support_count > 0 && <span class="dream-heart-count">{dream.support_count}</span>}
+  </button>
 )
+
+/**
+ * Who is running it, as the initials circle the corner uses.
+ *
+ * The name is on `title` rather than beside the letters: a chip is an hour tall at
+ * best, and two of them in a lane get half that. Nothing when nobody has been handed
+ * it — an empty circle would read as somebody whose name is missing.
+ */
+const Facilitator = ({ dream, names }: { dream: Session; names: ReadonlyMap<string, string | null> }) => {
+  const who = dream.facilitator_account_id
+  if (who === null) return null
+
+  const name = names.get(who) ?? null
+
+  return (
+    <span class="avatar dream-facilitator" title={name ?? 'Name not filled in yet'}>
+      <span aria-hidden="true">{initials(name)}</span>
+      <span class="visually-hidden">Facilitated by {name ?? 'somebody who has no name filled in'}</span>
+    </span>
+  )
+}
 
 const Pool = ({
   dreams,
+  names,
   busy,
   onDragStart,
+  onOpen,
+  onSupport,
+  onResize,
   onDrop,
 }: {
   dreams: readonly Session[]
+  names: ReadonlyMap<string, string | null>
   busy: boolean
   onDragStart: (id: string) => void
+  onOpen: (id: string) => void
+  onSupport: (id: string, supporting: boolean) => void
+  onResize: (dream: Session, byRows: number) => void
   onDrop: () => void
 }) => (
   <aside
@@ -229,12 +463,22 @@ const Pool = ({
 
     {dreams.map((dream) => (
       <p key={dream.id}>
-        <Chip dream={dream} busy={busy} onDragStart={onDragStart} />
+        <Chip
+          dream={dream}
+          names={names}
+          busy={busy}
+          resizable={false}
+          onDragStart={onDragStart}
+          onOpen={onOpen}
+          onSupport={onSupport}
+          onResize={onResize}
+        />
       </p>
     ))}
 
     <p class="form-note">
       Drag one into the grid to place it, or set the time and place precisely on <a href="/dreams">Dreams</a>.
+      A ↻ dream stays here when you place it, so the same one can go into several mornings.
     </p>
   </aside>
 )
@@ -243,15 +487,23 @@ const Timetable = ({
   rows,
   places,
   dreams,
+  names,
   busy,
   onDragStart,
+  onOpen,
+  onSupport,
+  onResize,
   onDrop,
 }: {
   rows: readonly string[]
   places: readonly Place[]
   dreams: readonly Session[]
+  names: ReadonlyMap<string, string | null>
   busy: boolean
   onDragStart: (id: string) => void
+  onOpen: (id: string) => void
+  onSupport: (id: string, supporting: boolean) => void
+  onResize: (dream: Session, byRows: number) => void
   onDrop: (row: string, placeId: string) => void
 }) => {
   const lanes = new Map(
@@ -298,14 +550,30 @@ const Timetable = ({
                       onDrop(row, place.id)
                     }}
                   >
-                    {cell.kind === 'anchor' &&
-                      cell.dreams.map((dream) => {
-                        const full = dreams.find((entry) => entry.id === dream.id)
+                    {cell.kind === 'anchor' && (
+                      // Out of flow against the cell, so the block is as tall as the
+                      // hours it spans rather than as tall as its own text. See
+                      // `.dream-stack`.
+                      <div class="dream-stack">
+                        {cell.dreams.map((dream) => {
+                          const full = dreams.find((entry) => entry.id === dream.id)
 
-                        return full === undefined ? null : (
-                          <Chip key={full.id} dream={full} busy={busy} onDragStart={onDragStart} />
-                        )
-                      })}
+                          return full === undefined ? null : (
+                            <Chip
+                              key={full.id}
+                              dream={full}
+                              names={names}
+                              busy={busy}
+                              resizable
+                              onDragStart={onDragStart}
+                              onOpen={onOpen}
+                              onSupport={onSupport}
+                              onResize={onResize}
+                            />
+                          )
+                        })}
+                      </div>
+                    )}
                   </td>
                 )
               })}

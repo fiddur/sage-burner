@@ -6,9 +6,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Viewer } from '../viewer.tsx'
 
 import { BurnProvider } from '../burn.tsx'
+import { initials } from '../initials.ts'
 import { InstallationProvider } from '../installation.tsx'
 import { ViewerProvider } from '../viewer.tsx'
-import { Layout, initials } from './Layout.tsx'
+import { Layout } from './Layout.tsx'
 
 afterEach(cleanup)
 

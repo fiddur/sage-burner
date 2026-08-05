@@ -18,6 +18,8 @@ import {
   attendance,
   passkey,
   session,
+  sessionHelper,
+  sessionSupport,
 } from './schema.ts'
 
 /**
@@ -199,7 +201,7 @@ describe('foreign keys', () => {
         id: 's1',
         event_id: ids.event,
         title: 'Cacao ceremony',
-        host_account_id: ids.account,
+        facilitator_account_id: ids.account,
         description: 'Bring a cup.',
       })
       .run()
@@ -208,6 +210,80 @@ describe('foreign keys', () => {
 
     expect(handle.db.select().from(attendance).all()).toHaveLength(0)
     expect(handle.db.select().from(session).all()).toHaveLength(0)
+  })
+
+  it('takes a dream’s helpers and hearts with it when the dream goes', () => {
+    seedAttendance(ids.attendance, ids.account)
+    handle.db
+      .insert(session)
+      .values({ id: 's1', event_id: ids.event, title: 'Cacao ceremony', description: '' })
+      .run()
+    handle.db.insert(sessionHelper).values({ session_id: 's1', attendance_id: ids.attendance }).run()
+    handle.db.insert(sessionSupport).values({ session_id: 's1', attendance_id: ids.attendance }).run()
+
+    handle.db.delete(session).where(eq(session.id, 's1')).run()
+
+    expect(handle.db.select().from(sessionHelper).all()).toHaveLength(0)
+    expect(handle.db.select().from(sessionSupport).all()).toHaveLength(0)
+  })
+
+  it('takes them with the person when they withdraw from the burn', () => {
+    // The reason both key on `attendance` rather than `account`.
+    seedAttendance(ids.attendance, ids.account)
+    handle.db
+      .insert(session)
+      .values({ id: 's1', event_id: ids.event, title: 'Cacao ceremony', description: '' })
+      .run()
+    handle.db.insert(sessionHelper).values({ session_id: 's1', attendance_id: ids.attendance }).run()
+    handle.db.insert(sessionSupport).values({ session_id: 's1', attendance_id: ids.attendance }).run()
+
+    handle.db.delete(attendance).where(eq(attendance.id, ids.attendance)).run()
+
+    expect(handle.db.select().from(sessionHelper).all()).toHaveLength(0)
+    expect(handle.db.select().from(sessionSupport).all()).toHaveLength(0)
+    // The dream itself stays: it is the burn's, not the helper's.
+    expect(handle.db.select().from(session).all()).toHaveLength(1)
+  })
+
+  it('keeps a dream’s facilitator when they withdraw from the burn', () => {
+    // A regression guard, not a proof: nothing links the column to an attendance, so
+    // no mutation of the schema kills this. It is here because the obvious "fix" for
+    // a stale facilitator is to make it cascade, and a dream left without whoever was
+    // going to run it is something somebody has to notice rather than tidy away.
+    seedAttendance(ids.attendance, ids.account)
+    handle.db
+      .insert(session)
+      .values({
+        id: 's1',
+        event_id: ids.event,
+        title: 'Cacao ceremony',
+        facilitator_account_id: ids.account,
+        description: '',
+      })
+      .run()
+
+    handle.db.delete(attendance).where(eq(attendance.id, ids.attendance)).run()
+
+    expect(handle.db.select().from(session).all()[0]?.facilitator_account_id).toBe(ids.account)
+  })
+
+  it('refuses a second heart from the same person, which is what makes the count sound', () => {
+    // The count is derived by reading rows, so "one each" has to hold against a write
+    // that skips the API as well as against `onConflictDoNothing`.
+    seedAttendance(ids.attendance, ids.account)
+    handle.db
+      .insert(session)
+      .values({ id: 's1', event_id: ids.event, title: 'Cacao ceremony', description: '' })
+      .run()
+    handle.client
+      .prepare('insert into session_support (session_id, attendance_id) values (?, ?)')
+      .run('s1', ids.attendance)
+
+    expect(() =>
+      handle.client
+        .prepare('insert into session_support (session_id, attendance_id) values (?, ?)')
+        .run('s1', ids.attendance),
+    ).toThrow()
   })
 
   it('leaves the questions and the applications alone, since neither belongs to an event', () => {
@@ -483,7 +559,7 @@ describe('check constraints', () => {
     expect(() =>
       handle.client
         .prepare(
-          `INSERT INTO session (id, event_id, title, host_account_id, description, time_slot_start, time_slot_end)
+          `INSERT INTO session (id, event_id, title, facilitator_account_id, description, time_slot_start, time_slot_end)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
         )
         .run('s-half', ids.event, 'Half a slot', ids.account, '', '2026-10-03T09:00:00Z', null),
@@ -687,7 +763,7 @@ describe('sessions', () => {
         id: 's2',
         event_id: ids.event,
         title: 'Something unplanned',
-        host_account_id: ids.account,
+        facilitator_account_id: ids.account,
         description: '',
         time_slot_start: null,
         time_slot_end: null,
@@ -724,6 +800,54 @@ describe('json columns', () => {
   })
 })
 
+const REBUILD = '20260804105125_places_per_burn'
+const FACILITATOR = '20260805040000_facilitator'
+const REPEATABLE = '20260805050000_repeatable_dream'
+
+// This drizzle version discovers migrations by listing the folder, and throws
+// outright if it finds a `meta/_journal.json` — so staging is a copy of the
+// directories whose timestamped names sort before the one under test.
+const stagedThrough = (exclude: string) => {
+  const staged = mkdtempSync(path.join(tmpdir(), 'sage-migrations-'))
+  const kept = readdirSync(migrationsFolder)
+    .filter((name) => name < exclude)
+    .toSorted()
+
+  for (const tag of kept) {
+    cpSync(path.join(migrationsFolder, tag), path.join(staged, tag), { recursive: true })
+  }
+
+  return { staged, kept }
+}
+
+const beforeTheRebuild = () => {
+  const fresh = createDb({ url: ':memory:' })
+  const { staged, kept } = stagedThrough(REBUILD)
+
+  // Asserted: a mistyped tag would stage every migration, the rebuild included,
+  // and every test below would then pass while proving nothing about it.
+  expect(kept).not.toContain(REBUILD)
+  expect(kept.length).toBeGreaterThan(0)
+
+  runMigrations(fresh, staged)
+  expect(columnsOf(fresh, 'place')).not.toContain('event_id')
+
+  return fresh
+}
+
+const columnsOf = (db: DbHandle, table: string) =>
+  db.client
+    .prepare(`PRAGMA table_info(${table})`)
+    .all()
+    .map((row) => row.name)
+
+const anEvent = (db: DbHandle, id: string, slug: string, created_at: string) =>
+  db.client
+    .prepare(
+      'insert into event (id, name, slug, start_date, end_date, member_cap, created_at) values (?, ?, ?, ?, ?, ?, ?)',
+    )
+    .run(id, slug, slug, '2026-10-02', '2026-10-04', 42, created_at)
+
 describe('the places-per-burn migration', () => {
   /**
    * A data migration is only tested by running it over the old shape with rows in
@@ -733,56 +857,11 @@ describe('the places-per-burn migration', () => {
    * `runMigrations` on a fresh database would apply the rebuild before anything
    * could be inserted, which is why the two-step staging is not ceremony.
    */
-  const REBUILD = '20260804105125_places_per_burn'
-
-  // This drizzle version discovers migrations by listing the folder, and throws
-  // outright if it finds a `meta/_journal.json` — so staging is a copy of the
-  // directories whose timestamped names sort before the one under test.
-  const stagedThrough = (exclude: string) => {
-    const staged = mkdtempSync(path.join(tmpdir(), 'sage-migrations-'))
-    const kept = readdirSync(migrationsFolder)
-      .filter((name) => name < exclude)
-      .toSorted()
-
-    for (const tag of kept) {
-      cpSync(path.join(migrationsFolder, tag), path.join(staged, tag), { recursive: true })
-    }
-
-    return { staged, kept }
-  }
-
-  const beforeTheRebuild = () => {
-    const fresh = createDb({ url: ':memory:' })
-    const { staged, kept } = stagedThrough(REBUILD)
-
-    // Asserted: a mistyped tag would stage every migration, the rebuild included,
-    // and every test below would then pass while proving nothing about it.
-    expect(kept).not.toContain(REBUILD)
-    expect(kept.length).toBeGreaterThan(0)
-
-    runMigrations(fresh, staged)
-    expect(columnsOf(fresh, 'place')).not.toContain('event_id')
-
-    return fresh
-  }
-
-  const columnsOf = (db: DbHandle, table: string) =>
-    db.client
-      .prepare(`PRAGMA table_info(${table})`)
-      .all()
-      .map((row) => row.name)
 
   const oldPlace = (db: DbHandle, id: string, order: number, name: string) =>
     db.client
       .prepare('insert into place (id, "order", name, emoji, color) values (?, ?, ?, ?, ?)')
       .run(id, order, name, '🛕', 'yellow')
-
-  const anEvent = (db: DbHandle, id: string, slug: string, created_at: string) =>
-    db.client
-      .prepare(
-        'insert into event (id, name, slug, start_date, end_date, member_cap, created_at) values (?, ?, ?, ?, ?, ?, ?)',
-      )
-      .run(id, slug, slug, '2026-10-02', '2026-10-04', 42, created_at)
 
   it('gives existing places to the last created event', () => {
     const fresh = beforeTheRebuild()
@@ -834,6 +913,9 @@ describe('the places-per-burn migration', () => {
         .run('a-1', 'host@example.org', NOW)
       oldPlace(fresh, 'p-1', 0, 'Temple')
       fresh.client
+        // `host_account_id`, deliberately: this writes against the schema as it was
+        // *before* the rebuild under test, and the rename to `facilitator_account_id`
+        // is a later migration than the one being replayed here.
         .prepare(
           'insert into session (id, event_id, host_account_id, title, description, place_id) values (?, ?, ?, ?, ?, ?)',
         )
@@ -866,6 +948,97 @@ describe('the places-per-burn migration', () => {
       fresh.client.prepare('delete from event where id = ?').run('e-1')
 
       expect(fresh.client.prepare('select count(*) as n from place').get()?.n).toBe(0)
+    } finally {
+      fresh.close()
+    }
+  })
+})
+
+describe('the facilitator rename', () => {
+  it('carries every host across as the facilitator, rather than dropping them', () => {
+    // The rename's whole claim: "every existing row keeps its value". Without this
+    // the backfill could select NULL and nothing in the suite would notice — which
+    // is exactly what a mutation found.
+    const fresh = createDb({ url: ':memory:' })
+    const { staged, kept } = stagedThrough(FACILITATOR)
+
+    // Asserted, or a mistyped tag stages everything and this proves nothing.
+    expect(kept).not.toContain(FACILITATOR)
+    expect(kept).toContain(REBUILD)
+
+    try {
+      runMigrations(fresh, staged)
+      expect(columnsOf(fresh, 'session')).toContain('host_account_id')
+
+      anEvent(fresh, 'e-1', 'a-burn', '2026-01-01T00:00:00Z')
+      fresh.client
+        .prepare('insert into account (id, email, created_at) values (?, ?, ?)')
+        .run('a-1', 'ada@example.org', NOW)
+      fresh.client
+        .prepare(
+          'insert into session (id, event_id, host_account_id, title, description) values (?, ?, ?, ?, ?)',
+        )
+        .run('s-1', 'e-1', 'a-1', 'Sunrise yoga', '')
+
+      runMigrations(fresh)
+
+      expect(columnsOf(fresh, 'session')).not.toContain('host_account_id')
+      expect(
+        fresh.client.prepare('select facilitator_account_id from session where id = ?').get('s-1')
+          ?.facilitator_account_id,
+      ).toBe('a-1')
+      expect(fresh.client.prepare('PRAGMA foreign_key_check').all()).toEqual([])
+    } finally {
+      fresh.close()
+    }
+  })
+
+  it('lets a dream have no facilitator at all, which the old column refused', () => {
+    // The passing sibling: the column also stopped being NOT NULL, and a rebuild
+    // that only renamed would leave that half undone.
+    const fresh = createDb({ url: ':memory:' })
+    try {
+      runMigrations(fresh)
+      anEvent(fresh, 'e-1', 'a-burn', '2026-01-01T00:00:00Z')
+
+      fresh.client
+        .prepare('insert into session (id, event_id, title, description) values (?, ?, ?, ?)')
+        .run('s-1', 'e-1', 'Nobody yet', '')
+
+      expect(
+        fresh.client.prepare('select facilitator_account_id from session where id = ?').get('s-1')
+          ?.facilitator_account_id,
+      ).toBeNull()
+    } finally {
+      fresh.close()
+    }
+  })
+})
+
+describe('the repeatable-dream column', () => {
+  it('leaves every dream that already existed a one-off', () => {
+    // The added column's only claim: without the `DEFAULT false` there is nothing to
+    // put in the column for rows that already exist.
+    const fresh = createDb({ url: ':memory:' })
+    const { staged, kept } = stagedThrough(REPEATABLE)
+
+    expect(kept).not.toContain(REPEATABLE)
+    expect(kept).toContain(FACILITATOR)
+
+    try {
+      runMigrations(fresh, staged)
+      expect(columnsOf(fresh, 'session')).not.toContain('repeatable')
+
+      anEvent(fresh, 'e-1', 'a-burn', '2026-01-01T00:00:00Z')
+      fresh.client
+        .prepare('insert into session (id, event_id, title, description) values (?, ?, ?, ?)')
+        .run('s-1', 'e-1', 'Sunrise yoga', '')
+
+      runMigrations(fresh)
+
+      expect(fresh.client.prepare('select repeatable from session where id = ?').get('s-1')?.repeatable).toBe(
+        0,
+      )
     } finally {
       fresh.close()
     }

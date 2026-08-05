@@ -96,7 +96,7 @@ const givenDream = async (
       id,
       event_id: eventId,
       title: over.title ?? 'Cacao ceremony',
-      host_account_id: hostId,
+      facilitator_account_id: hostId,
       description: over.description ?? 'Bring a cup.',
       // `in` rather than `??`: a deliberate null is the whole point of the
       // unscheduled case, and `null ?? default` quietly schedules it again.
@@ -278,12 +278,12 @@ describe('the public calendar feed', () => {
       time_slot_end: '2026-08-02T20:00:00.000Z',
       location: null,
       color: null,
-      host_account_id: host,
+      facilitator_account_id: host,
       allergies_notes: 'peanuts',
     })
 
     expect(smuggled.success).toBe(true)
-    expect(smuggled.success && 'host_account_id' in smuggled.data).toBe(false)
+    expect(smuggled.success && 'facilitator_account_id' in smuggled.data).toBe(false)
     expect(smuggled.success && 'allergies_notes' in smuggled.data).toBe(false)
     expect(body).not.toContain('peanuts')
   })

@@ -11,7 +11,7 @@ import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, event, place, session } from '../db/schema.ts'
+import { account, accountRole, attendance, event, place, session } from '../db/schema.ts'
 
 const SECRET = 's'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
@@ -124,6 +124,33 @@ const drop = (server: FastifyInstance, cookie: string | undefined, id: string) =
     headers: cookie === undefined ? {} : { cookie },
   })
 
+const givenAttending = async (eventId: string, roles: ('admin' | 'member')[] = ['member']) => {
+  const who = await givenAccount(roles)
+  await db().insert(attendance).values({
+    id: randomUUID(),
+    event_id: eventId,
+    account_id: who.id,
+    joined_at: NOW,
+    payment_status: 'unpaid',
+  })
+
+  return who
+}
+
+/** `POST` or `DELETE` on `/api/sessions/:id/helpers/me` or `/support/me`. */
+const selfService = (
+  server: FastifyInstance,
+  cookie: string | undefined,
+  id: string,
+  what: 'helpers' | 'support',
+  method: 'POST' | 'DELETE',
+) =>
+  server.inject({
+    method,
+    url: `/api/sessions/${id}/${what}/me`,
+    headers: cookie === undefined ? {} : { cookie },
+  })
+
 describe('dreams', () => {
   it('is empty before anyone offers one', async () => {
     const server = await build()
@@ -161,23 +188,84 @@ describe('dreams', () => {
       time_slot_start: null,
       time_slot_end: null,
       place_id: null,
-      host_account_id: member.id,
+      facilitator_account_id: null,
     })
   })
 
-  it('hosts it in the name of whoever offered it, whatever the body says', async () => {
-    // A dream in someone else's name is not an edit anyone should make by hand.
+  it('takes a facilitator who is coming, and refuses one who is not', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const member = await givenAccount(['member'])
+    const elsewhere = await givenAccount(['member'])
+    await db().insert(attendance).values({
+      id: randomUUID(),
+      event_id: eventId,
+      account_id: member.id,
+      joined_at: NOW,
+      payment_status: 'unpaid',
+    })
+
+    const taken = await offer(server, member.cookie, {
+      title: 'Sunrise yoga',
+      facilitator_account_id: member.id,
+    })
+    expect(taken.statusCode).toBe(201)
+    expect(taken.json().session.facilitator_account_id).toBe(member.id)
+
+    // A 400 rather than a 404: the account exists, the pairing is what is wrong.
+    const absent = await offer(server, member.cookie, {
+      title: 'Cacao ceremony',
+      facilitator_account_id: elsewhere.id,
+    })
+    expect(absent.statusCode).toBe(400)
+  })
+
+  it('hands a dream to somebody else, which the old rule refused outright', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const member = await givenAccount(['member'])
+    const other = await givenAccount(['member'])
+    for (const who of [member.id, other.id]) {
+      await db().insert(attendance).values({
+        id: randomUUID(),
+        event_id: eventId,
+        account_id: who,
+        joined_at: NOW,
+        payment_status: 'unpaid',
+      })
+    }
+    const id = (await offer(server, member.cookie, { title: 'Sunrise yoga' })).json().session.id
+
+    const response = await editDream(server, member.cookie, id, { facilitator_account_id: other.id })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().session.facilitator_account_id).toBe(other.id)
+  })
+
+  it('offers a dream as a one-off unless it is asked to repeat', async () => {
     const server = await build()
     await givenEvent()
     const member = await givenAccount(['member'])
-    const other = await givenAccount(['member'])
 
-    const response = await offer(server, member.cookie, {
-      title: 'Sunrise yoga',
-      host_account_id: other.id,
-    })
+    const once = await offer(server, member.cookie, { title: 'Sunrise yoga' })
+    const again = await offer(server, member.cookie, { title: 'Check in', repeatable: true })
 
-    expect(response.statusCode).toBe(400)
+    expect(once.json().session.repeatable).toBe(false)
+    expect(again.json().session.repeatable).toBe(true)
+  })
+
+  it('turns the flag on and off again, since it is a decision people change', async () => {
+    const server = await build()
+    await givenEvent()
+    const member = await givenAccount(['member'])
+    const id = (await offer(server, member.cookie, { title: 'Check in' })).json().session.id
+
+    expect((await editDream(server, member.cookie, id, { repeatable: true })).json().session.repeatable).toBe(
+      true,
+    )
+    expect(
+      (await editDream(server, member.cookie, id, { repeatable: false })).json().session.repeatable,
+    ).toBe(false)
   })
 
   it('refuses to attach it to a burn the caller did not name', async () => {
@@ -441,7 +529,7 @@ describe('dreams', () => {
     const old = randomUUID()
     await db()
       .insert(session)
-      .values({ id: old, event_id: finished, title: 'Last year', host_account_id: member.id })
+      .values({ id: old, event_id: finished, title: 'Last year', facilitator_account_id: member.id })
 
     expect((await editDream(server, member.cookie, old, { title: 'Rewritten' })).statusCode).toBe(404)
     expect((await drop(server, member.cookie, old)).statusCode).toBe(404)
@@ -554,7 +642,7 @@ describe('a dream belongs to the burn it names', () => {
       id,
       event_id: ENDED,
       title: 'Last summer',
-      host_account_id: member.id,
+      facilitator_account_id: member.id,
     })
 
     expect((await offer(server, member.cookie, { title: 'x' }, ENDED)).statusCode).toBe(404)
@@ -571,12 +659,196 @@ describe('a dream belongs to the burn it names', () => {
       id: randomUUID(),
       event_id: ENDED,
       title: 'Last summer',
-      host_account_id: member.id,
+      facilitator_account_id: member.id,
     })
 
     const response = await list(server, member.cookie, ENDED)
 
     expect(response.statusCode).toBe(200)
     expect(response.json().sessions.map((dream: { title: string }) => dream.title)).toEqual(['Last summer'])
+  })
+})
+
+describe('helping with a dream', () => {
+  it('adds the caller, by name, and takes them off again', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAttending(eventId)
+    await db().update(account).set({ name: 'Ada' }).where(eq(account.id, ada.id))
+    const id = (await offer(server, ada.cookie, { title: 'Sunrise yoga' })).json().session.id
+
+    const joined = await selfService(server, ada.cookie, id, 'helpers', 'POST')
+    expect(joined.statusCode).toBe(200)
+    expect(joined.json().session.helpers).toEqual([{ account_id: ada.id, name: 'Ada' }])
+
+    const left = await selfService(server, ada.cookie, id, 'helpers', 'DELETE')
+    expect(left.statusCode).toBe(200)
+    expect(left.json().session.helpers).toEqual([])
+  })
+
+  it('resolves the name at read time, so correcting it corrects the list', async () => {
+    // The account carries the person, so a name is corrected in one place.
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAttending(eventId)
+    const id = (await offer(server, ada.cookie, { title: 'Sunrise yoga' })).json().session.id
+    await selfService(server, ada.cookie, id, 'helpers', 'POST')
+
+    await db().update(account).set({ name: 'Ada Lovelace' }).where(eq(account.id, ada.id))
+
+    expect((await list(server, ada.cookie)).json().sessions[0].helpers).toEqual([
+      { account_id: ada.id, name: 'Ada Lovelace' },
+    ])
+  })
+
+  it('is the same after two clicks as after one', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAttending(eventId)
+    const id = (await offer(server, ada.cookie, { title: 'Sunrise yoga' })).json().session.id
+
+    await selfService(server, ada.cookie, id, 'helpers', 'POST')
+    const again = await selfService(server, ada.cookie, id, 'helpers', 'POST')
+
+    expect(again.statusCode).toBe(200)
+    expect(again.json().session.helpers).toHaveLength(1)
+  })
+
+  it('takes somebody off who was never on, rather than failing', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAttending(eventId)
+    const id = (await offer(server, ada.cookie, { title: 'Sunrise yoga' })).json().session.id
+
+    const response = await selfService(server, ada.cookie, id, 'helpers', 'DELETE')
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().session.helpers).toEqual([])
+  })
+
+  it('refuses a member who is not coming to that burn', async () => {
+    // A 400, not a 403: they are a member in good standing; the pairing is wrong.
+    const server = await build()
+    await givenEvent()
+    const elsewhere = await givenAccount(['member'])
+    const coming = await givenAttending(OPEN_BURN)
+    const id = (await offer(server, coming.cookie, { title: 'Sunrise yoga' })).json().session.id
+
+    expect((await selfService(server, elsewhere.cookie, id, 'helpers', 'POST')).statusCode).toBe(400)
+    expect((await selfService(server, elsewhere.cookie, id, 'support', 'POST')).statusCode).toBe(400)
+  })
+
+  it('refuses a dream that does not exist, and one at a burn that has ended', async () => {
+    const server = await build()
+    const ended = randomUUID()
+    await givenEvent({ id: ended, start_date: '2025-08-01', end_date: '2025-08-05' })
+    const ada = await givenAttending(ended)
+    const old = randomUUID()
+    await db().insert(session).values({ id: old, event_id: ended, title: 'Last summer' })
+
+    expect((await selfService(server, ada.cookie, randomUUID(), 'helpers', 'POST')).statusCode).toBe(404)
+    expect((await selfService(server, ada.cookie, old, 'helpers', 'POST')).statusCode).toBe(404)
+    expect((await selfService(server, ada.cookie, old, 'support', 'POST')).statusCode).toBe(404)
+  })
+
+  it('needs a member, like everything else on the schedule', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAttending(eventId)
+    const id = (await offer(server, ada.cookie, { title: 'Sunrise yoga' })).json().session.id
+
+    expect((await selfService(server, undefined, id, 'helpers', 'POST')).statusCode).toBe(401)
+    expect((await selfService(server, undefined, id, 'support', 'POST')).statusCode).toBe(401)
+  })
+})
+
+describe('supporting a dream', () => {
+  it('counts one heart per person, however many times they click', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAttending(eventId)
+    const bea = await givenAttending(eventId)
+    const id = (await offer(server, ada.cookie, { title: 'Sunrise yoga' })).json().session.id
+
+    await selfService(server, ada.cookie, id, 'support', 'POST')
+    await selfService(server, ada.cookie, id, 'support', 'POST')
+    const second = await selfService(server, bea.cookie, id, 'support', 'POST')
+
+    expect(second.json().session.support_count).toBe(2)
+  })
+
+  it('says whose heart it is, and only to them', async () => {
+    // Without the per-reader half everybody would see a filled heart the moment
+    // anybody gave one.
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAttending(eventId)
+    const bea = await givenAttending(eventId)
+    const id = (await offer(server, ada.cookie, { title: 'Sunrise yoga' })).json().session.id
+
+    await selfService(server, ada.cookie, id, 'support', 'POST')
+
+    expect((await list(server, ada.cookie)).json().sessions[0].supported_by_me).toBe(true)
+    expect((await list(server, bea.cookie)).json().sessions[0].supported_by_me).toBe(false)
+    expect((await list(server, bea.cookie)).json().sessions[0].support_count).toBe(1)
+  })
+
+  it('takes a heart back, leaving everybody else’s', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAttending(eventId)
+    const bea = await givenAttending(eventId)
+    const id = (await offer(server, ada.cookie, { title: 'Sunrise yoga' })).json().session.id
+    await selfService(server, ada.cookie, id, 'support', 'POST')
+    await selfService(server, bea.cookie, id, 'support', 'POST')
+
+    const withdrawn = await selfService(server, ada.cookie, id, 'support', 'DELETE')
+
+    expect(withdrawn.json().session.support_count).toBe(1)
+    expect(withdrawn.json().session.supported_by_me).toBe(false)
+    expect((await list(server, bea.cookie)).json().sessions[0].supported_by_me).toBe(true)
+  })
+
+  it('starts a new dream with nobody helping and no hearts', async () => {
+    const server = await build()
+    await givenEvent()
+    const ada = await givenAttending(OPEN_BURN)
+
+    const offered = await offer(server, ada.cookie, { title: 'Sunrise yoga' })
+
+    expect(offered.json().session).toMatchObject({ helpers: [], support_count: 0, supported_by_me: false })
+  })
+
+  it('keeps the helpers and hearts across an ordinary edit', async () => {
+    // `.returning()` gives back a row rather than a dream, so the fields it does not
+    // know about have to be attached again or a save looks like everybody let go.
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAttending(eventId)
+    const id = (await offer(server, ada.cookie, { title: 'Sunrise yoga' })).json().session.id
+    await selfService(server, ada.cookie, id, 'helpers', 'POST')
+    await selfService(server, ada.cookie, id, 'support', 'POST')
+
+    const renamed = await editDream(server, ada.cookie, id, { title: 'Sunrise stretching' })
+
+    expect(renamed.json().session).toMatchObject({
+      title: 'Sunrise stretching',
+      support_count: 1,
+      supported_by_me: true,
+    })
+    expect(renamed.json().session.helpers).toHaveLength(1)
+  })
+
+  it('keeps them across a PATCH that changes nothing, which reads rather than writes', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAttending(eventId)
+    const id = (await offer(server, ada.cookie, { title: 'Sunrise yoga' })).json().session.id
+    await selfService(server, ada.cookie, id, 'support', 'POST')
+
+    const unchanged = await editDream(server, ada.cookie, id, {})
+
+    expect(unchanged.statusCode).toBe(200)
+    expect(unchanged.json().session).toMatchObject({ support_count: 1, supported_by_me: true })
   })
 })

@@ -602,21 +602,21 @@ export const session = sqliteTable(
       .references(() => event.id, { onDelete: 'cascade' }),
     title: text('title').notNull(),
     /**
-     * The host is a person, not one of their stays.
+     * Who runs it — a person, not one of their stays. Null until somebody is handed it.
      *
-     * Not constrained to require an `attendance` for this event, so a dream can
-     * name a host who is not coming to this burn — ordinary application logic
-     * rather than a race, so the scheduling routes (#20) own it.
-     *
-     * No `onDelete`, matching `invite_token.created_by` and
-     * `attendance.account_id`: an account that has hosted something cannot be
-     * deleted, rather than having every dream it ever hosted vanish with it.
-     * #35 owns what account deletion should actually do.
+     * An `account` rather than an `attendance`, unlike the two tables below: a
+     * withdrawal leaves the name here for somebody to notice. The routes are what
+     * check they are coming. No `onDelete` — #35 owns account deletion.
      */
-    host_account_id: text('host_account_id')
-      .notNull()
-      .references(() => account.id),
+    facilitator_account_id: text('facilitator_account_id').references(() => account.id),
     description: text('description').notNull().default(''),
+    /**
+     * Whether placing it in the grid leaves it behind to place again.
+     *
+     * Dropping one writes a copy with this off, so the check-in becomes four
+     * mornings. No back-reference to the original: each morning is edited on its own.
+     */
+    repeatable: integer('repeatable', { mode: 'boolean' }).notNull().default(false),
     time_slot_start: text('time_slot_start'),
     time_slot_end: text('time_slot_end'),
     /**
@@ -757,6 +757,45 @@ export const leadRoleMember = sqliteTable(
       .references(() => attendance.id, { onDelete: 'cascade' }),
   },
   (table) => [primaryKey({ columns: [table.role_id, table.attendance_id] })],
+)
+
+/**
+ * Somebody who will help run a dream.
+ *
+ * An `attendance` for the same reason a role's team is: only somebody coming can
+ * carry the cushions, and withdrawing takes them off what they had offered to help
+ * with rather than leaving a name nobody can reach.
+ */
+export const sessionHelper = sqliteTable(
+  'session_helper',
+  {
+    session_id: text('session_id')
+      .notNull()
+      .references(() => session.id, { onDelete: 'cascade' }),
+    attendance_id: text('attendance_id')
+      .notNull()
+      .references(() => attendance.id, { onDelete: 'cascade' }),
+  },
+  (table) => [primaryKey({ columns: [table.session_id, table.attendance_id] })],
+)
+
+/**
+ * One ❤️‍🔥 — somebody saying they want this dream to happen.
+ *
+ * A row per person rather than a counter column: the primary key is then the whole
+ * "one each" rule, and the number is derived on every read rather than kept in step.
+ */
+export const sessionSupport = sqliteTable(
+  'session_support',
+  {
+    session_id: text('session_id')
+      .notNull()
+      .references(() => session.id, { onDelete: 'cascade' }),
+    attendance_id: text('attendance_id')
+      .notNull()
+      .references(() => attendance.id, { onDelete: 'cascade' }),
+  },
+  (table) => [primaryKey({ columns: [table.session_id, table.attendance_id] })],
 )
 
 // Deliberately no relations() / defineRelations() block.

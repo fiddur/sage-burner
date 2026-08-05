@@ -72,8 +72,17 @@ export const sessionFields = z.object({
   id: idSchema,
   event_id: idSchema,
   title: nonEmptyText(MAX_TITLE),
-  host_account_id: idSchema,
+  /** Who runs it, or null while nobody has said they will. The routes check they are coming. */
+  facilitator_account_id: idSchema.nullable(),
   description: z.string().max(MAX_DESCRIPTION),
+  /**
+   * Whether placing it leaves it behind to place again.
+   *
+   * Nothing in the API treats it specially — the schedule page copies on drop.
+   * Placing, moving and unplacing are all one PATCH, so a server that copied on
+   * write would first have to decide which of those a given body is.
+   */
+  repeatable: z.boolean(),
   time_slot_start: dateTimeSchema.nullable(),
   time_slot_end: dateTimeSchema.nullable(),
   /**
@@ -91,17 +100,27 @@ export const sessionFields = z.object({
  * An unscheduled dream (null time slot) is the normal state right up until the
  * burn, not an error: people offer things long before anyone decides when they
  * happen.
+ *
+ * The three added here are read-only and belong to no request body, which is why
+ * the create and update schemas derive from `sessionFields` rather than from this.
  */
-export const sessionSchema = withValidTimeSlot(sessionFields)
+export const sessionSchema = withValidTimeSlot(
+  sessionFields.extend({
+    helpers: z.array(z.object({ account_id: idSchema, name: z.string().nullable() })),
+    support_count: z.int().min(0),
+    /** The reader's own answer, so one dream reads differently to two people. */
+    supported_by_me: z.boolean(),
+  }),
+)
 
 export type Session = z.infer<typeof sessionSchema>
 
 /**
  * The subset of a session that may appear in the public ICS feed.
  *
- * The feed needs no authentication, so this shape is the guard rail: it carries
- * no host identity, no contact details, no allergies and no payment state. If a
- * field is not here, it does not leave the building.
+ * The feed needs no authentication, so this shape is the guard rail: it carries no
+ * facilitator, no contact details, no allergies and no payment state. If a field is
+ * not here, it does not leave the building.
  *
  * Both timestamps are required — only scheduled sessions belong in a calendar —
  * and the ordering check is re-applied so the feed cannot emit an event whose
@@ -131,37 +150,33 @@ export type SessionResponse = z.infer<typeof sessionResponseSchema>
 /**
  * Offering a dream.
  *
- * `event_id` comes from the route and the host from the session, so neither is
- * accepted here — a body that could name either would let one member offer a
- * dream in someone else's name, or against a burn they are not looking at.
+ * `event_id` comes from the route, so it is not accepted here — a body naming one
+ * would let a member offer a dream against a burn they are not looking at.
  */
 export const sessionCreateSchema = withValidTimeSlot(
   sessionFields
-    .omit({ id: true, event_id: true, host_account_id: true })
+    .omit({ id: true, event_id: true })
     .extend({
       description: sessionFields.shape.description.default(''),
       time_slot_start: sessionFields.shape.time_slot_start.default(null),
       time_slot_end: sessionFields.shape.time_slot_end.default(null),
       place_id: sessionFields.shape.place_id.default(null),
+      facilitator_account_id: sessionFields.shape.facilitator_account_id.default(null),
+      repeatable: sessionFields.shape.repeatable.default(false),
     })
     .strict(),
 )
 export type SessionCreate = z.infer<typeof sessionCreateSchema>
 
 /**
- * `SessionCreate` is the output type, so the four defaulted fields are required
+ * `SessionCreate` is the output type, so the defaulted fields are required
  * there — which makes the defaults useless to a caller typed against it. This is
  * the request shape. Same split as `EventCreateInput`.
  */
 export type SessionCreateInput = z.input<typeof sessionCreateSchema>
 
-/**
- * Editing one, including scheduling it.
- *
- * `host_account_id` is not editable yet: reassigning a dream needs a member-
- * visible list of members to pick from, which does not exist.
- */
+/** Editing one, including scheduling it and handing it to a facilitator. */
 export const sessionUpdateSchema = withValidTimeSlot(
-  sessionFields.omit({ id: true, event_id: true, host_account_id: true }).partial().strict(),
+  sessionFields.omit({ id: true, event_id: true }).partial().strict(),
 )
 export type SessionUpdate = z.infer<typeof sessionUpdateSchema>

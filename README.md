@@ -1151,7 +1151,7 @@ unguessable, but it is not a secret beyond that: **do not post it anywhere outsi
 the gathering.** That is the trade that lets descriptions go out in full.
 
 What leaves the building is the title, the description, the times, and the place's
-name, emoji and colour. No host, no contact details, no allergies, no payment
+name, emoji and colour. No facilitator, no contact details, no allergies, no payment
 state.
 
 Two guards, catching different things:
@@ -1199,18 +1199,128 @@ The workshops, ceremonies and happenings members offer each other. **A dream wit
 no time slot is offered but not yet scheduled** — that is where most of them sit
 right up until the burn, and it is the normal state, not an error.
 
-**Members**, not admins. `/api/events/active/sessions` and `/api/sessions/:id` are
+**Members**, not admins. `/api/events/:eventId/sessions` and `/api/sessions/:id` are
 behind `requireMember`, because the schedule belongs to the people coming: any
 member may reschedule any dream, not only the one who offered it. Gated on the
 `member` role rather than on having an `attendance` row, so someone can help plan
 next burn's programme before they have said they are coming.
 
-The host is **the member who offered it**, taken from the session and never from
-the body — `sessionCreateSchema` omits `host_account_id` entirely, so a dream in
-someone else's name is a 400 rather than an edit anyone can make by hand.
-Reassigning one is still not offered; the list to pick from now exists
-(`GET /api/events/:eventId/attendees`, added for the roles register), so what is
-missing is the route and the control, not the names.
+The **facilitator** is who runs it, and is **assignable** (#198). It was
+`host_account_id` — whoever wrote the dream down, taken from the session and refused
+in the body, so that a dream in someone else's name was a 400 rather than an edit
+anyone could make by hand. Offering something for another member to run is exactly
+that edit, and it is what was wanted, so the field was renamed and opened.
+
+It is **nullable**: a dream can be offered before anyone has said they will run it,
+which is how most of them start. The routes check that whoever is named is **coming
+to this burn** — the same rule the lead-roles register applies to a lead, and the
+same picker feed, `GET /api/events/:eventId/attendees`. A 400 rather than a 404: the
+account exists, the pairing is what is wrong.
+
+The rename was a table rebuild rather than `ALTER TABLE … RENAME COLUMN`, because the
+column also lost `NOT NULL` and SQLite cannot drop a constraint in place. Every
+existing row carried its host across — there was no way to name anyone else, so that
+person was in practice the one expected to run it.
+
+The schedule shows the facilitator as the initials circle, with the name on hover and
+read aloud; nothing at all when nobody has been handed it, since an empty circle would
+read as somebody whose name is missing.
+
+### A dream that can be planned more than once
+
+The check-in happens every morning and circling twice in a weekend is ordinary, so
+`repeatable` is a flag on the dream (#198). Dropping a repeatable dream into the grid
+writes a **copy** and leaves the original in "Not placed yet"; the copy has the flag
+**off**, or dragging it afterwards would stamp again. One entry then becomes four
+mornings, each with its own time, place, facilitator and description to edit.
+
+A flag rather than a recurrence rule, and no back-reference to what a copy came from.
+A different facilitator on Sunday than on Saturday is the point of copying rather than
+repeating, and a parent link would only be something to keep consistent.
+
+**The copying is the page's, not the API's.** Nothing server-side treats the flag
+specially — placing, moving and unplacing a dream are all one `PATCH`, so a server
+that copied on write would first have to decide which of those a given body is. The
+pool therefore does not empty as things are planned in, which is expected: the last
+repeatable dream is withdrawn by hand once it has been planned in everywhere.
+
+Chips carry a ↻, in the pool and on the Dreams list, so it is visible which ones
+behave that way before anyone drags one.
+
+### Helpers, and the ❤️‍🔥
+
+Two tables, `session_helper` and `session_support`, both keyed on `attendance`
+rather than `account` — the same reason a lead role's team is. Only somebody coming
+can carry the cushions, and withdrawing from the burn takes their offers of help and
+their hearts with them rather than leaving names nobody can reach.
+
+**The support count is not a column.** A row per person makes the primary key the
+whole "one heart each" rule, so a double click cannot inflate it and nothing can
+drift. The number is derived on every read, and `supported_by_me` is the _reader's_
+answer — one dream reads differently to two people, which is what makes a filled
+heart mean "mine" rather than "somebody's".
+
+Four routes, all `/me`: `POST`/`DELETE` on `/api/sessions/:id/helpers/me` and
+`/api/sessions/:id/support/me`. The caller speaks for themselves; signing somebody
+else up for work is what the lead-roles register is for, and it asks first. Each is
+idempotent, and each answers with the dream as it now stands.
+
+A caller who is not coming to that burn gets a **400**, not a 403: they may be a
+member in good standing, and the pairing is what is wrong. A dream at a burn that
+has ended is a 404, like every other member-facing write here.
+
+`helpers` carries account ids, so whether the reader is on the list is derived from
+it; `supported_by_me` exists because the supporters are a count and nothing more. A
+`helping_me` beside the list would be a second thing to keep true.
+
+### Clicking a chip
+
+Clicking a dream opens a panel over the grid: when and where, who is facilitating,
+the description as markdown, the ❤️‍🔥, the helper list and one button to join or
+leave it. Editing stays on Dreams, which has the form and the keyboard route.
+
+**A drag leaves a click behind, and that click is not a click** — Google Calendar's
+rule. A ref is set on `dragstart` and cleared on `mousedown`, so the click ending a
+drag is swallowed and the next real press opens as usual. `dragend` would not do:
+it fires _before_ any click, so a flag cleared there is already false by the time the
+click arrives.
+
+Not a `<dialog>`: `showModal` is an imperative call on a ref, and the focus trap it
+brings is then a second thing to keep in step with the component's own open state.
+`role="dialog"` with `aria-modal` says the same to a screen reader, and Escape and
+the backdrop are the two ways out people reach for. A click on the panel stops
+there — without that, reading the description would close the thing you opened to
+read it.
+
+The heart is on the chip as well as in the panel, placed or not: something can want
+support long before anybody has decided when it happens. Its click is stopped at the
+button, or every heart would also open the panel.
+
+### Pulling the bottom edge
+
+A placed chip carries a handle on its bottom edge. Dragging it changes the length in
+**whole hours** — a row is an hour, so a grid cannot show a dream finishing at 20:40
+and must not let anyone set one from here. The Dreams form is where a
+minute-precision end is typed. A dream never goes under the hour it already is: it
+has to occupy the row it starts in.
+
+The row height is measured off the anchor cell, which spans `rowspan` rows, rather
+than read from a number the CSS and the component would both have to hold.
+
+**Arrow keys do the same thing**, one hour at a time, exactly as ⠿ on the Places
+page does for reordering: a resize nobody can do without a mouse is one half the
+people here cannot do.
+
+`draggable` is on the chip, so grabbing the handle would otherwise pick the whole
+dream up and drop it in whichever lane the pointer ended over. `dragstart` is
+cancelled while the handle is held.
+
+**The pointer half is not unit-tested and cannot be.** happy-dom computes no layout,
+so every row measures nought pixels tall — `rowsDragged` and `resizedEnd` are pure
+and carry the arithmetic, the keyboard path is tested through the page, and the drag
+itself wants one click-through in a browser. The guard against dragging the dream
+away is asserted through the drop it would cause, since the `dragstart` that
+testing-library builds is not cancelable and its return value says nothing.
 
 `session.location` was free text; it is now `place_id`, referencing #78's places.
 The scheduling grid draws one column per place, and a column cannot be spelled
@@ -1326,20 +1436,14 @@ outside the days on show, and guessing "unplaced means a null field" left that o
 in neither the grid nor the pool — gone from the page while still fine on
 `/dreams`. Deriving it means nothing can vanish whatever the date.
 
-The grid runs one day **past** `end_date`, because a burn's last night regularly
-carries into the small hours of the day after. A dream at 01:00 is part of the
-burn whatever the calendar says.
+The grid runs from the burn's own `start_time` to its `end_time`, so an organiser
+who says midday Friday to midday Sunday gets 49 rows rather than three whole days.
+A burn whose last night carries into the small hours says so by ending at 02:00 on
+the day after, which is a date the organiser types rather than a day the grid adds.
 
 Dragging an already-scheduled dream to another lane **keeps the length it had**.
 Forcing an hour would quietly shorten a two-hour session for the crime of being
 moved.
-
-Rows are built from the event's calendar days rather than from any instant,
-because that is what "the burn runs the 1st to the 5th" means to whoever typed
-it. They are also deduplicated, for the one hour a year that does not exist:
-on the spring-forward day `setHours(2)` lands on 03:00, so 03:00 would appear
-twice and two rows would share a key. Checked in Europe/Stockholm, which the web
-suite is pinned to.
 
 Both drag sources write to `dataTransfer` on `dragstart`. The id travels in
 component state, so nothing reads it back — but Firefox refuses to begin a drag

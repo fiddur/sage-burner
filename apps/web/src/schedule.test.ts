@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { hourOf, hoursOf, laneCells, rowSpanOf } from './schedule.ts'
+import { hourOf, hoursOf, laneCells, resizedEnd, rowSpanOf, rowsDragged } from './schedule.ts'
 
 describe('the timetable rows', () => {
   it('covers every hour of every day when the burn runs the whole days', () => {
@@ -186,5 +186,67 @@ describe('a lane as table cells', () => {
 
     expect(spanned).toBe(ROWS.length)
     expect(rendered).toBeLessThan(ROWS.length)
+  })
+})
+
+describe('pulling a dream’s bottom edge', () => {
+  const twoHours = {
+    time_slot_start: '2026-08-01T18:00:00.000Z',
+    time_slot_end: '2026-08-01T20:00:00.000Z',
+  }
+
+  it('makes it longer by whole hours', () => {
+    expect(resizedEnd(twoHours, 1)).toBe('2026-08-01T21:00:00.000Z')
+    expect(resizedEnd(twoHours, 3)).toBe('2026-08-01T23:00:00.000Z')
+  })
+
+  it('makes it shorter, down to the hour a row is worth', () => {
+    expect(resizedEnd(twoHours, -1)).toBe('2026-08-01T19:00:00.000Z')
+    // Not zero, and not backwards: a dream still has to occupy the row it starts in.
+    expect(resizedEnd(twoHours, -5)).toBe('2026-08-01T19:00:00.000Z')
+  })
+
+  it('answers null when nothing would change', () => {
+    // The caller sends no PATCH for these. A drag that never crossed a boundary is
+    // the common one — a few pixels of hand tremor is not a resize.
+    expect(resizedEnd(twoHours, 0)).toBeNull()
+    expect(
+      resizedEnd(
+        { time_slot_start: twoHours.time_slot_start, time_slot_end: '2026-08-01T19:00:00.000Z' },
+        -1,
+      ),
+    ).toBeNull()
+  })
+
+  it('leaves an unscheduled dream alone, since it has no edge to pull', () => {
+    expect(resizedEnd({ time_slot_start: null, time_slot_end: null }, 1)).toBeNull()
+    expect(resizedEnd({ time_slot_start: twoHours.time_slot_start, time_slot_end: null }, 1)).toBeNull()
+  })
+
+  it('snaps an odd length onto the hour it is nearest', () => {
+    // The grid cannot show 20:40, so a resize done in it must not set one. The
+    // Dreams form is where a minute-precision end is typed.
+    const ninety = {
+      time_slot_start: '2026-08-01T18:00:00.000Z',
+      time_slot_end: '2026-08-01T19:30:00.000Z',
+    }
+
+    expect(resizedEnd(ninety, 1)).toBe('2026-08-01T21:00:00.000Z')
+  })
+})
+
+describe('how far a pointer dragged, in rows', () => {
+  it('rounds to the nearest whole row', () => {
+    expect(rowsDragged(0, 40)).toBe(0)
+    expect(rowsDragged(19, 40)).toBe(0)
+    expect(rowsDragged(21, 40)).toBe(1)
+    expect(rowsDragged(-85, 40)).toBe(-2)
+  })
+
+  it('says nothing moved when the row has no height to divide by', () => {
+    // Which is every row under happy-dom: it computes no layout, so the pointer
+    // half of this gesture wants a click-through in a browser. Guarded rather than
+    // left to produce Infinity and a resize to the end of time.
+    expect(rowsDragged(120, 0)).toBe(0)
   })
 })

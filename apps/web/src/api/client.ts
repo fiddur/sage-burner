@@ -283,20 +283,34 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
     getSessions: (eventId: string, signal?: AbortSignal) =>
       request<SessionsResponse>(`/events/${encodeURIComponent(eventId)}/sessions`, { signal }),
 
-    /** Members only. The host is the caller; the burn is the one named. */
+    /** Members only. The burn is the one named; the facilitator is whoever the body says. */
     offerSession: (eventId: string, body: SessionCreateInput) =>
       request<SessionResponse>(`/events/${encodeURIComponent(eventId)}/sessions`, {
         method: 'POST',
         body,
       }),
 
-    /** Members only — any member may arrange the schedule, not just the host. */
+    /** Members only — any member may arrange the schedule, not just whoever offered it. */
     updateSession: (id: string, body: SessionUpdate) =>
       request<SessionResponse>(`/sessions/${encodeURIComponent(id)}`, { method: 'PATCH', body }),
 
     /** Members only. */
     withdrawSession: (id: string) =>
       request<undefined>(`/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+    /** Offering to help run a dream, and taking the offer back. Both are idempotent. */
+    helpWithSession: (id: string) =>
+      request<SessionResponse>(`/sessions/${encodeURIComponent(id)}/helpers/me`, { method: 'POST' }),
+
+    stopHelpingWithSession: (id: string) =>
+      request<SessionResponse>(`/sessions/${encodeURIComponent(id)}/helpers/me`, { method: 'DELETE' }),
+
+    /** A ❤️‍🔥, and taking it back. */
+    supportSession: (id: string) =>
+      request<SessionResponse>(`/sessions/${encodeURIComponent(id)}/support/me`, { method: 'POST' }),
+
+    withdrawSupportForSession: (id: string) =>
+      request<SessionResponse>(`/sessions/${encodeURIComponent(id)}/support/me`, { method: 'DELETE' }),
 
     /**
      * Who is coming to a burn, by name. Any approved member — names and ids only,

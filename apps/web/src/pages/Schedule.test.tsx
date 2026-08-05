@@ -1,6 +1,6 @@
 import type { Event, MyBurn, Place, Session } from '@sage-burner/shared'
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Viewer } from '../viewer.tsx'
@@ -33,11 +33,15 @@ const SAUNA: Place = { id: 'p-2', event_id: 'e-1', order: 1, name: 'Sauna', emoj
 
 const aDream = (over: Partial<Session> & Pick<Session, 'id' | 'title'>): Session => ({
   event_id: 'e-1',
-  host_account_id: 'a-1',
+  facilitator_account_id: null,
   description: '',
+  repeatable: false,
   time_slot_start: null,
   time_slot_end: null,
   place_id: null,
+  helpers: [],
+  support_count: 0,
+  supported_by_me: false,
   ...over,
 })
 
@@ -49,6 +53,12 @@ const stub = (
   getPlaces: () => Promise.resolve({ places }),
   getSessions: () => Promise.resolve({ sessions }),
   updateSession: () => Promise.reject(new Error('updateSession is not stubbed here')),
+  offerSession: () => Promise.reject(new Error('offerSession is not stubbed here')),
+  getEventAttendees: () => Promise.resolve({ attendees: [{ account_id: 'a-1', name: 'Ada Lovelace' }] }),
+  helpWithSession: () => Promise.reject(new Error('helpWithSession is not stubbed here')),
+  stopHelpingWithSession: () => Promise.reject(new Error('stopHelpingWithSession is not stubbed here')),
+  supportSession: () => Promise.reject(new Error('supportSession is not stubbed here')),
+  withdrawSupportForSession: () => Promise.reject(new Error('withdrawSupportForSession is not stubbed here')),
   ...over,
 })
 
@@ -301,6 +311,70 @@ describe('Schedule', () => {
     )
   })
 
+  it('copies a repeatable dream into the grid, leaving the original in the pool', async () => {
+    const offerSession = vi.fn<ScheduleApi['offerSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-2', title: 'Check in' }) }),
+    )
+    const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
+      Promise.reject(new Error('a repeatable dream is copied, not moved')),
+    )
+    renderPage(
+      stub({ offerSession, updateSession }, [
+        aDream({ id: 's-1', title: 'Check in', description: 'Every morning.', repeatable: true }),
+      ]),
+    )
+
+    fireEvent.dragStart(await screen.findByLabelText('Move Check in'))
+    fireEvent.drop(cell('10:00', 0))
+
+    await waitFor(() =>
+      expect(offerSession).toHaveBeenCalledWith('e-1', {
+        title: 'Check in',
+        description: 'Every morning.',
+        facilitator_account_id: null,
+        repeatable: false,
+        place_id: 'p-1',
+        time_slot_start: '2026-08-01T08:00:00.000Z',
+        time_slot_end: '2026-08-01T09:00:00.000Z',
+      }),
+    )
+    expect(updateSession).not.toHaveBeenCalled()
+  })
+
+  it('moves an ordinary dream rather than copying it', async () => {
+    // The passing sibling. Without it, a `dropInto` that copied unconditionally
+    // would satisfy the test above and quietly duplicate every dream anyone moved.
+    const offerSession = vi.fn<ScheduleApi['offerSession']>(() =>
+      Promise.reject(new Error('an ordinary dream is moved, not copied')),
+    )
+    const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'Sunrise yoga' }) }),
+    )
+    renderPage(stub({ offerSession, updateSession }, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))
+
+    fireEvent.dragStart(await screen.findByLabelText('Move Sunrise yoga'))
+    fireEvent.drop(cell('10:00', 0))
+
+    await waitFor(() => expect(updateSession).toHaveBeenCalled())
+    expect(offerSession).not.toHaveBeenCalled()
+  })
+
+  it('marks a repeatable dream, so the pool says which ones stay', async () => {
+    renderPage(
+      stub({}, [
+        aDream({ id: 's-1', title: 'Check in', repeatable: true }),
+        aDream({ id: 's-2', title: 'Sunrise yoga' }),
+      ]),
+    )
+
+    const pool = await screen.findByRole('complementary')
+    const marked = [...pool.querySelectorAll('.dream-chip')].filter((chip) => chip.textContent?.includes('↻'))
+
+    expect(marked).toHaveLength(1)
+    expect(marked[0]?.textContent).toContain('Check in')
+    expect(pool.textContent).toContain('Can be planned more than once')
+  })
+
   it('unschedules a dream dropped back on the pool', async () => {
     const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
       Promise.resolve({ session: aDream({ id: 's-1', title: 'Cacao ceremony' }) }),
@@ -350,6 +424,73 @@ describe('Schedule', () => {
     expect(setData).toHaveBeenCalledWith('text/plain', 's-1')
   })
 
+  it('shows the facilitator as initials, with the name for a reader', async () => {
+    renderPage(
+      stub({}, [
+        aDream({
+          id: 's-1',
+          title: 'Cacao ceremony',
+          place_id: 'p-2',
+          facilitator_account_id: 'a-1',
+          time_slot_start: '2026-08-01T08:00:00.000Z',
+          time_slot_end: '2026-08-01T09:00:00.000Z',
+        }),
+      ]),
+    )
+
+    await screen.findByText('Cacao ceremony')
+
+    // The letters are `aria-hidden`; the name is what a screen reader gets, and the
+    // `title` is what a pointer gets. "AL" alone tells neither of them anything.
+    expect(screen.getByText('AL')).toBeTruthy()
+    expect(screen.getByText(/Facilitated by Ada Lovelace/)).toBeTruthy()
+  })
+
+  it('shows no circle at all when nobody is facilitating', async () => {
+    // The passing sibling, and the case a dream starts in: an empty circle would
+    // read as somebody whose name is missing.
+    renderPage(
+      stub({}, [
+        aDream({
+          id: 's-1',
+          title: 'Cacao ceremony',
+          place_id: 'p-2',
+          time_slot_start: '2026-08-01T08:00:00.000Z',
+          time_slot_end: '2026-08-01T09:00:00.000Z',
+        }),
+      ]),
+    )
+
+    await screen.findByText('Cacao ceremony')
+
+    expect(screen.queryByText(/Facilitated by/)).toBeNull()
+  })
+
+  it('wraps a placed dream in the stack the height rule needs', async () => {
+    // The only half of this a suite can reach. happy-dom computes no layout, so
+    // nothing here can assert a rendered height — but the CSS that makes a block as
+    // tall as its hours hangs off this element being inside the spanning cell, and
+    // that is checkable. Without it a three-hour dream draws about an hour and a
+    // half, which is what #198 part 7 was.
+    renderPage(
+      stub({}, [
+        aDream({
+          id: 's-1',
+          title: 'Cacao ceremony',
+          place_id: 'p-2',
+          time_slot_start: '2026-08-01T08:00:00.000Z',
+          time_slot_end: '2026-08-01T10:00:00.000Z',
+        }),
+      ]),
+    )
+
+    const chip = await screen.findByText('Cacao ceremony')
+    const stack = chip.closest('.dream-stack')
+
+    expect(stack).not.toBeNull()
+    expect(stack?.closest('td')?.getAttribute('rowspan')).toBe('2')
+  })
+
   it('says so when no burn is open, rather than drawing an empty grid', async () => {
     renderPage(stub({}, [], [TEMPLE]), MEMBER, null)
 
@@ -362,6 +503,299 @@ describe('Schedule', () => {
 
     expect(await screen.findByRole('link', { name: 'Places' })).toBeTruthy()
     expect(document.querySelector('.schedule-grid')).toBeNull()
+  })
+
+  it('opens the details when a chip is clicked', async () => {
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony', description: 'Bring a cup.' })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
+
+    const panel = await screen.findByRole('dialog', { name: 'Cacao ceremony' })
+    expect(panel.textContent).toContain('Bring a cup.')
+  })
+
+  it('does not open the details on the click a drag leaves behind', async () => {
+    // Dragging a dream across the grid must not also open a panel over where it landed.
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
+
+    const chip = await screen.findByLabelText('Move Cacao ceremony')
+    fireEvent.mouseDown(chip)
+    fireEvent.dragStart(chip)
+    fireEvent.click(chip)
+
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('opens on the next ordinary click, so a drag suppresses one click and not all of them', async () => {
+    // The passing sibling. A flag set by the drag and never cleared would satisfy the
+    // test above by never opening the panel again at all.
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
+
+    const chip = await screen.findByLabelText('Move Cacao ceremony')
+    fireEvent.mouseDown(chip)
+    fireEvent.dragStart(chip)
+    fireEvent.click(chip)
+
+    fireEvent.mouseDown(chip)
+    fireEvent.click(chip)
+
+    expect(await screen.findByRole('dialog', { name: 'Cacao ceremony' })).toBeTruthy()
+  })
+
+  it('closes the details again', async () => {
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Close' }))
+
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('closes on Escape and on the backdrop, but not on the panel itself', async () => {
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
+    const open = async () => {
+      fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
+      return screen.findByRole('dialog', { name: 'Cacao ceremony' })
+    }
+
+    fireEvent.keyDown(await open(), { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    // Without the guard, reading the description would close the thing you opened.
+    fireEvent.click(await open())
+    expect(screen.queryByRole('dialog')).toBeTruthy()
+
+    const backdrop = document.querySelector('.dream-modal')
+    if (backdrop === null) throw new Error('the panel is open, so there is a backdrop')
+    fireEvent.click(backdrop)
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('gives a dream a heart from the chip, without opening anything', async () => {
+    const supportSession = vi.fn<ScheduleApi['supportSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'Cacao ceremony' }) }),
+    )
+    renderPage(stub({ supportSession }, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Show support for Cacao ceremony' }))
+
+    await waitFor(() => expect(supportSession).toHaveBeenCalledWith('s-1'))
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('takes the heart back when it is already mine', async () => {
+    const withdrawSupportForSession = vi.fn<ScheduleApi['withdrawSupportForSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'Cacao ceremony' }) }),
+    )
+    renderPage(
+      stub({ withdrawSupportForSession }, [
+        aDream({ id: 's-1', title: 'Cacao ceremony', supported_by_me: true, support_count: 3 }),
+      ]),
+    )
+
+    const heart = await screen.findByRole('button', { name: 'Take back your support for Cacao ceremony' })
+
+    expect(heart.getAttribute('aria-pressed')).toBe('true')
+    expect(heart.textContent).toContain('3')
+
+    fireEvent.click(heart)
+
+    await waitFor(() => expect(withdrawSupportForSession).toHaveBeenCalledWith('s-1'))
+  })
+
+  it('shows the heart on an unplaced dream too, since a dream wants support before it has a time', async () => {
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Sunrise yoga', support_count: 2 })]))
+
+    const pool = await screen.findByRole('complementary')
+
+    expect(pool.querySelector('.dream-heart')?.textContent).toContain('2')
+  })
+
+  it('gives a heart from the details too, and says how many want it', async () => {
+    const supportSession = vi.fn<ScheduleApi['supportSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'Cacao ceremony' }) }),
+    )
+    renderPage(stub({ supportSession }, [aDream({ id: 's-1', title: 'Cacao ceremony', support_count: 4 })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
+    const panel = await screen.findByRole('dialog', { name: 'Cacao ceremony' })
+    expect(panel.textContent).toContain('4 people want this')
+
+    fireEvent.click(within(panel).getByRole('button', { name: 'Show support' }))
+
+    await waitFor(() => expect(supportSession).toHaveBeenCalledWith('s-1'))
+  })
+
+  it('offers to help from the details, and to stop when already helping', async () => {
+    const helpWithSession = vi.fn<ScheduleApi['helpWithSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'Cacao ceremony' }) }),
+    )
+    renderPage(stub({ helpWithSession }, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
+    fireEvent.click(screen.getByRole('button', { name: 'I want to help out' }))
+
+    await waitFor(() => expect(helpWithSession).toHaveBeenCalledWith('s-1'))
+  })
+
+  it('says “I cannot help after all” to somebody already on the list', async () => {
+    const stopHelpingWithSession = vi.fn<ScheduleApi['stopHelpingWithSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'Cacao ceremony' }) }),
+    )
+    renderPage(
+      stub({ stopHelpingWithSession }, [
+        aDream({
+          id: 's-1',
+          title: 'Cacao ceremony',
+          // 'a-1' is the viewer, so the button is the other way round for them.
+          helpers: [{ account_id: 'a-1', name: 'Ada Lovelace' }],
+        }),
+      ]),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
+    expect(screen.getByRole('dialog').textContent).toContain('Ada Lovelace')
+
+    fireEvent.click(screen.getByRole('button', { name: 'I cannot help after all' }))
+
+    await waitFor(() => expect(stopHelpingWithSession).toHaveBeenCalledWith('s-1'))
+  })
+
+  it('offers to help when somebody else is on the list, rather than reading the list as mine', async () => {
+    // The passing sibling for the button above. A `helpers.length > 0` test would
+    // satisfy that one and offer to *stop* helping to somebody who never started.
+    renderPage(
+      stub({}, [
+        aDream({
+          id: 's-1',
+          title: 'Cacao ceremony',
+          helpers: [{ account_id: 'a-9', name: 'Someone else' }],
+        }),
+      ]),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
+
+    expect(screen.getByRole('button', { name: 'I want to help out' })).toBeTruthy()
+  })
+
+  it('lengthens and shortens a placed dream from the keyboard', async () => {
+    // The pointer half of the gesture cannot be tested here — happy-dom computes no
+    // layout, so every row is nought pixels tall. `rowsDragged` and `resizedEnd`
+    // carry that; this is the route somebody without a mouse takes.
+    const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'Cacao ceremony' }) }),
+    )
+    renderPage(
+      stub({ updateSession }, [
+        aDream({
+          id: 's-1',
+          title: 'Cacao ceremony',
+          place_id: 'p-1',
+          time_slot_start: '2026-08-01T08:00:00.000Z',
+          time_slot_end: '2026-08-01T09:00:00.000Z',
+        }),
+      ]),
+    )
+
+    const handle = await screen.findByRole('button', { name: 'Change how long Cacao ceremony is' })
+    fireEvent.keyDown(handle, { key: 'ArrowDown' })
+
+    await waitFor(() =>
+      expect(updateSession).toHaveBeenCalledWith('s-1', { time_slot_end: '2026-08-01T10:00:00.000Z' }),
+    )
+
+    updateSession.mockClear()
+    fireEvent.keyDown(handle, { key: 'ArrowUp' })
+
+    // Already an hour, so shortening it changes nothing and sends nothing.
+    await waitFor(() => expect(updateSession).not.toHaveBeenCalled())
+  })
+
+  it('shortens a longer one, so ArrowUp is not simply ignored', async () => {
+    const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'Cacao ceremony' }) }),
+    )
+    renderPage(
+      stub({ updateSession }, [
+        aDream({
+          id: 's-1',
+          title: 'Cacao ceremony',
+          place_id: 'p-1',
+          time_slot_start: '2026-08-01T08:00:00.000Z',
+          time_slot_end: '2026-08-01T11:00:00.000Z',
+        }),
+      ]),
+    )
+
+    fireEvent.keyDown(await screen.findByRole('button', { name: 'Change how long Cacao ceremony is' }), {
+      key: 'ArrowUp',
+    })
+
+    await waitFor(() =>
+      expect(updateSession).toHaveBeenCalledWith('s-1', { time_slot_end: '2026-08-01T10:00:00.000Z' }),
+    )
+  })
+
+  it('offers no handle in the pool, where there are no rows to pull against', async () => {
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))
+
+    await screen.findByRole('complementary')
+
+    expect(screen.queryByRole('button', { name: 'Change how long Sunrise yoga is' })).toBeNull()
+  })
+
+  it('does not drag the dream away when the handle is what was grabbed', async () => {
+    // `draggable` is on the chip, so without the guard a resize would also pick the
+    // whole dream up and drop it in whatever lane the pointer ended over.
+    // Asserted through the drop rather than through `preventDefault`: the
+    // `dragstart` testing-library builds is not cancelable, so its return value says
+    // nothing here even though a browser's does.
+    const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'Cacao ceremony' }) }),
+    )
+    renderPage(
+      stub({ updateSession }, [
+        aDream({
+          id: 's-1',
+          title: 'Cacao ceremony',
+          place_id: 'p-1',
+          time_slot_start: '2026-08-01T08:00:00.000Z',
+          time_slot_end: '2026-08-01T09:00:00.000Z',
+        }),
+      ]),
+    )
+
+    const handle = await screen.findByRole('button', { name: 'Change how long Cacao ceremony is' })
+    fireEvent.pointerDown(handle, { clientY: 100 })
+    fireEvent.dragStart(screen.getByLabelText('Move Cacao ceremony'))
+    fireEvent.drop(cell('14:00', 1))
+
+    expect(updateSession).not.toHaveBeenCalled()
+  })
+
+  it('starts an ordinary drag when the handle was not grabbed', async () => {
+    // The passing sibling: a guard that always prevented the default would satisfy
+    // the test above and make the grid undraggable.
+    const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'Cacao ceremony' }) }),
+    )
+    renderPage(
+      stub({ updateSession }, [
+        aDream({
+          id: 's-1',
+          title: 'Cacao ceremony',
+          place_id: 'p-1',
+          time_slot_start: '2026-08-01T08:00:00.000Z',
+          time_slot_end: '2026-08-01T09:00:00.000Z',
+        }),
+      ]),
+    )
+
+    fireEvent.dragStart(await screen.findByLabelText('Move Cacao ceremony'))
+    fireEvent.drop(cell('14:00', 1))
+
+    await waitFor(() => expect(updateSession).toHaveBeenCalled())
   })
 
   it('shows what the server said when a move is refused', async () => {

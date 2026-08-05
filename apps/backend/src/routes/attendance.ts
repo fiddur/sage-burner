@@ -6,6 +6,7 @@ import { and, asc, eq, gte, isNotNull, or } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
+import type { Database } from '../db/index.ts'
 
 import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
@@ -26,6 +27,17 @@ import { helpingFor, helpingIdsFor } from './helping.ts'
  */
 export const isAlreadyJoined = (error: unknown) =>
   error instanceof Error && /UNIQUE constraint failed: attendance\./i.test(error.message)
+
+/** Whose attendance an account holds at this burn, or nothing if they are not coming. */
+export const attendanceFor = async (db: Database, eventId: string, accountId: string) => {
+  const [row] = await db
+    .select({ id: attendance.id })
+    .from(attendance)
+    .where(and(eq(attendance.event_id, eventId), eq(attendance.account_id, accountId)))
+    .limit(1)
+
+  return row?.id
+}
 
 export interface AttendanceDeps extends GuardDeps {
   now?: () => Date

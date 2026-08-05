@@ -32,11 +32,15 @@ const TEMPLE: Place = { id: 'p-1', event_id: 'e-1', order: 0, name: 'Temple', em
 
 const aDream = (over: Partial<Session> & Pick<Session, 'id' | 'title'>): Session => ({
   event_id: 'e-1',
-  host_account_id: 'a-1',
+  facilitator_account_id: 'a-1',
   description: '',
+  repeatable: false,
   time_slot_start: null,
   time_slot_end: null,
   place_id: null,
+  helpers: [],
+  support_count: 0,
+  supported_by_me: false,
   ...over,
 })
 
@@ -46,6 +50,13 @@ const stub = (over: Partial<DreamsApi> = {}, sessions: Session[] = []): DreamsAp
   offerSession: () => Promise.reject(new Error('offerSession is not stubbed here')),
   updateSession: () => Promise.reject(new Error('updateSession is not stubbed here')),
   withdrawSession: () => Promise.reject(new Error('withdrawSession is not stubbed here')),
+  getEventAttendees: () =>
+    Promise.resolve({
+      attendees: [
+        { account_id: 'a-1', name: 'Ada' },
+        { account_id: 'a-2', name: 'Bea' },
+      ],
+    }),
   ...over,
 })
 
@@ -289,6 +300,51 @@ describe('Dreams', () => {
     expect(screen.getByLabelText('End of Cacao ceremony').getAttribute('min')).toBe('2026-08-02T20:00')
   })
 
+  it('marks a dream as one that can be planned more than once', async () => {
+    const updateSession = vi.fn<DreamsApi['updateSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'Check in', repeatable: true }) }),
+    )
+    renderPage(stub({ updateSession }, [aDream({ id: 's-1', title: 'Check in' })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Check in' }))
+    fireEvent.click(screen.getByLabelText('Plan Check in more than once'))
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(updateSession).toHaveBeenCalledWith('s-1', { repeatable: true }))
+  })
+
+  it('leaves the flag out of an edit that did not touch it', async () => {
+    // The passing sibling, and the same rule the other five fields follow: sending
+    // every field would carry the values loaded at mount, so fixing a typo would put
+    // back whatever somebody else changed meanwhile.
+    const updateSession = vi.fn<DreamsApi['updateSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'Renamed', repeatable: true }) }),
+    )
+    renderPage(stub({ updateSession }, [aDream({ id: 's-1', title: 'Check in', repeatable: true })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Check in' }))
+    fireEvent.input(screen.getByLabelText('Title of Check in'), { target: { value: 'Renamed' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(updateSession).toHaveBeenCalledWith('s-1', { title: 'Renamed' }))
+  })
+
+  it('shows the ↻ on the row, so the list says which ones repeat', async () => {
+    renderPage(
+      stub({}, [
+        aDream({ id: 's-1', title: 'Check in', repeatable: true }),
+        aDream({ id: 's-2', title: 'Sunrise yoga' }),
+      ]),
+    )
+
+    const marked = [...(await screen.findAllByRole('listitem'))].filter((row) =>
+      row.textContent?.includes('↻'),
+    )
+
+    expect(marked).toHaveLength(1)
+    expect(marked[0]?.textContent).toContain('Check in')
+  })
+
   it('withdraws one', async () => {
     const withdrawSession = vi.fn<DreamsApi['withdrawSession']>(() => Promise.resolve(undefined))
     renderPage(stub({ withdrawSession }, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))
@@ -303,7 +359,9 @@ describe('Dreams', () => {
     const updateSession = vi.fn<DreamsApi['updateSession']>(() =>
       Promise.resolve({ session: aDream({ id: 's-1', title: 'Theirs' }) }),
     )
-    renderPage(stub({ updateSession }, [aDream({ id: 's-1', title: 'Theirs', host_account_id: 'a-9' })]))
+    renderPage(
+      stub({ updateSession }, [aDream({ id: 's-1', title: 'Theirs', facilitator_account_id: 'a-9' })]),
+    )
 
     expect(await screen.findByRole('button', { name: 'Edit Theirs' })).toBeTruthy()
   })
