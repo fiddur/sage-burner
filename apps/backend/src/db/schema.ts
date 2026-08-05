@@ -620,6 +620,20 @@ export const session = sqliteTable(
      */
     facilitator_account_id: text('facilitator_account_id').references(() => account.id),
     description: text('description').notNull().default(''),
+    /**
+     * Whether placing it in the grid leaves it behind to place again.
+     *
+     * The daily check-in happens every morning and circling twice in a weekend is
+     * ordinary, so #198 wanted one dream that can be planned several times. A flag
+     * rather than a recurrence rule: dropping a repeatable dream into the grid
+     * writes a **copy** with this off, and the copy is then an ordinary dream with
+     * its own time, place and description to edit.
+     *
+     * No back-reference to what it was copied from. Each instance is edited on its
+     * own — a different facilitator on Sunday than on Saturday is the point — and a
+     * parent link would only be something to keep consistent.
+     */
+    repeatable: integer('repeatable', { mode: 'boolean' }).notNull().default(false),
     time_slot_start: text('time_slot_start'),
     time_slot_end: text('time_slot_end'),
     /**

@@ -1199,7 +1199,7 @@ The workshops, ceremonies and happenings members offer each other. **A dream wit
 no time slot is offered but not yet scheduled** — that is where most of them sit
 right up until the burn, and it is the normal state, not an error.
 
-**Members**, not admins. `/api/events/active/sessions` and `/api/sessions/:id` are
+**Members**, not admins. `/api/events/:eventId/sessions` and `/api/sessions/:id` are
 behind `requireMember`, because the schedule belongs to the people coming: any
 member may reschedule any dream, not only the one who offered it. Gated on the
 `member` role rather than on having an `attendance` row, so someone can help plan
@@ -1225,6 +1225,27 @@ person was in practice the one expected to run it.
 The schedule shows the facilitator as the initials circle, with the name on hover and
 read aloud; nothing at all when nobody has been handed it, since an empty circle would
 read as somebody whose name is missing.
+
+### A dream that can be planned more than once
+
+The check-in happens every morning and circling twice in a weekend is ordinary, so
+`repeatable` is a flag on the dream (#198). Dropping a repeatable dream into the grid
+writes a **copy** and leaves the original in "Not placed yet"; the copy has the flag
+**off**, or dragging it afterwards would stamp again. One entry then becomes four
+mornings, each with its own time, place, facilitator and description to edit.
+
+A flag rather than a recurrence rule, and no back-reference to what a copy came from.
+A different facilitator on Sunday than on Saturday is the point of copying rather than
+repeating, and a parent link would only be something to keep consistent.
+
+**The copying is the page's, not the API's.** Nothing server-side treats the flag
+specially — placing, moving and unplacing a dream are all one `PATCH`, so a server
+that copied on write would first have to decide which of those a given body is. The
+pool therefore does not empty as things are planned in, which is expected: the last
+repeatable dream is withdrawn by hand once it has been planned in everywhere.
+
+Chips carry a ↻, in the pool and on the Dreams list, so it is visible which ones
+behave that way before anyone drags one.
 
 `session.location` was free text; it is now `place_id`, referencing #78's places.
 The scheduling grid draws one column per place, and a column cannot be spelled
@@ -1340,20 +1361,14 @@ outside the days on show, and guessing "unplaced means a null field" left that o
 in neither the grid nor the pool — gone from the page while still fine on
 `/dreams`. Deriving it means nothing can vanish whatever the date.
 
-The grid runs one day **past** `end_date`, because a burn's last night regularly
-carries into the small hours of the day after. A dream at 01:00 is part of the
-burn whatever the calendar says.
+The grid runs from the burn's own `start_time` to its `end_time`, so an organiser
+who says midday Friday to midday Sunday gets 49 rows rather than three whole days.
+A burn whose last night carries into the small hours says so by ending at 02:00 on
+the day after, which is a date the organiser types rather than a day the grid adds.
 
 Dragging an already-scheduled dream to another lane **keeps the length it had**.
 Forcing an hour would quietly shorten a two-hour session for the crime of being
 moved.
-
-Rows are built from the event's calendar days rather than from any instant,
-because that is what "the burn runs the 1st to the 5th" means to whoever typed
-it. They are also deduplicated, for the one hour a year that does not exist:
-on the spring-forward day `setHours(2)` lands on 03:00, so 03:00 would appear
-twice and two rows would share a key. Checked in Europe/Stockholm, which the web
-suite is pinned to.
 
 Both drag sources write to `dataTransfer` on `dragstart`. The id travels in
 component state, so nothing reads it back — but Firefox refuses to begin a drag

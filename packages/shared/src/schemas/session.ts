@@ -83,6 +83,19 @@ export const sessionFields = z.object({
    */
   facilitator_account_id: idSchema.nullable(),
   description: z.string().max(MAX_DESCRIPTION),
+  /**
+   * Whether placing it leaves it behind to place again.
+   *
+   * The check-in happens every morning, so #198 wanted one dream planned several
+   * times rather than four near-identical ones typed out. Dropping a repeatable
+   * dream into the grid writes a copy with this **off**; the copy is then an
+   * ordinary dream, editable on its own.
+   *
+   * Nothing in the API treats it specially — it is a flag the schedule page reads.
+   * That is deliberate: a server that copied on write would need to know what a
+   * "placement" is, and placing, moving and unplacing are all one PATCH.
+   */
+  repeatable: z.boolean(),
   time_slot_start: dateTimeSchema.nullable(),
   time_slot_end: dateTimeSchema.nullable(),
   /**
@@ -156,6 +169,7 @@ export const sessionCreateSchema = withValidTimeSlot(
       time_slot_end: sessionFields.shape.time_slot_end.default(null),
       place_id: sessionFields.shape.place_id.default(null),
       facilitator_account_id: sessionFields.shape.facilitator_account_id.default(null),
+      repeatable: sessionFields.shape.repeatable.default(false),
     })
     .strict(),
 )

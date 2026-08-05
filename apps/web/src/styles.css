@@ -620,6 +620,12 @@ a:hover {
   opacity: 0.75;
 }
 
+/* The ↻: this one stays in the pool when it is placed, and a copy goes in the grid. */
+.dream-repeats {
+  margin-inline-start: 0.3rem;
+  opacity: 0.7;
+}
+
 /*
   A placed dream is as tall as the hours it runs.
 

@@ -127,7 +127,15 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
               />
             ) : (
               <>
-                <span class="dream-title">{dream.title}</span>
+                <span class="dream-title">
+                  {dream.title}
+                  {dream.repeatable && (
+                    <span class="dream-repeats">
+                      <span aria-hidden="true">↻</span>
+                      <span class="visually-hidden">Can be planned more than once</span>
+                    </span>
+                  )}
+                </span>
                 <span class="dream-when">{when(dream) ?? 'not scheduled yet'}</span>
                 <span class="dream-place">{placeLabel(places, dream.place_id) ?? '—'}</span>
 
@@ -202,6 +210,7 @@ const DreamFields = ({
   const [title, setTitle] = useState(dream.title)
   const [facilitator, setFacilitator] = useState(dream.facilitator_account_id ?? '')
   const [description, setDescription] = useState(dream.description)
+  const [repeatable, setRepeatable] = useState(dream.repeatable)
   const [placeId, setPlaceId] = useState(dream.place_id ?? '')
   const [start, setStart] = useState(toLocalInput(dream.time_slot_start))
   const [end, setEnd] = useState(toLocalInput(dream.time_slot_end))
@@ -224,6 +233,7 @@ const DreamFields = ({
     ...(facilitator === (dream.facilitator_account_id ?? '')
       ? {}
       : { facilitator_account_id: facilitator === '' ? null : facilitator }),
+    ...(repeatable === dream.repeatable ? {} : { repeatable }),
   })
 
   return (
@@ -303,6 +313,18 @@ const DreamFields = ({
           value={end}
           onInput={(inputEvent) => setEnd(inputEvent.currentTarget.value)}
         />
+      </label>
+
+      {/* Placing it in the grid then copies it rather than moving it, which is how
+          one check-in entry becomes four mornings. */}
+      <label class="field-inline">
+        <input
+          type="checkbox"
+          aria-label={`Plan ${dream.title} more than once`}
+          checked={repeatable}
+          onChange={(changeEvent) => setRepeatable(changeEvent.currentTarget.checked)}
+        />
+        <span>Can be planned more than once</span>
       </label>
 
       <button type="button" disabled={busy} onClick={() => onSave(edits())}>

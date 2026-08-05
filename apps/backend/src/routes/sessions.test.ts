@@ -220,6 +220,32 @@ describe('dreams', () => {
     expect(response.json().session.facilitator_account_id).toBe(other.id)
   })
 
+  it('offers a dream as a one-off unless it is asked to repeat', async () => {
+    const server = await build()
+    await givenEvent()
+    const member = await givenAccount(['member'])
+
+    const once = await offer(server, member.cookie, { title: 'Sunrise yoga' })
+    const again = await offer(server, member.cookie, { title: 'Check in', repeatable: true })
+
+    expect(once.json().session.repeatable).toBe(false)
+    expect(again.json().session.repeatable).toBe(true)
+  })
+
+  it('turns the flag on and off again, since it is a decision people change', async () => {
+    const server = await build()
+    await givenEvent()
+    const member = await givenAccount(['member'])
+    const id = (await offer(server, member.cookie, { title: 'Check in' })).json().session.id
+
+    expect((await editDream(server, member.cookie, id, { repeatable: true })).json().session.repeatable).toBe(
+      true,
+    )
+    expect(
+      (await editDream(server, member.cookie, id, { repeatable: false })).json().session.repeatable,
+    ).toBe(false)
+  })
+
   it('refuses to attach it to a burn the caller did not name', async () => {
     const server = await build()
     await givenEvent()

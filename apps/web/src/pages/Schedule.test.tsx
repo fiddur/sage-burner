@@ -37,6 +37,7 @@ const aDream = (over: Partial<Session> & Pick<Session, 'id' | 'title'>): Session
   // facilitator name one.
   facilitator_account_id: null,
   description: '',
+  repeatable: false,
   time_slot_start: null,
   time_slot_end: null,
   place_id: null,
@@ -51,6 +52,7 @@ const stub = (
   getPlaces: () => Promise.resolve({ places }),
   getSessions: () => Promise.resolve({ sessions }),
   updateSession: () => Promise.reject(new Error('updateSession is not stubbed here')),
+  offerSession: () => Promise.reject(new Error('offerSession is not stubbed here')),
   getEventAttendees: () => Promise.resolve({ attendees: [{ account_id: 'a-1', name: 'Ada Lovelace' }] }),
   ...over,
 })
@@ -302,6 +304,72 @@ describe('Schedule', () => {
         time_slot_end: '2026-08-01T09:00:00.000Z',
       }),
     )
+  })
+
+  it('copies a repeatable dream into the grid, leaving the original in the pool', async () => {
+    const offerSession = vi.fn<ScheduleApi['offerSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-2', title: 'Check in' }) }),
+    )
+    const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
+      Promise.reject(new Error('a repeatable dream is copied, not moved')),
+    )
+    renderPage(
+      stub({ offerSession, updateSession }, [
+        aDream({ id: 's-1', title: 'Check in', description: 'Every morning.', repeatable: true }),
+      ]),
+    )
+
+    fireEvent.dragStart(await screen.findByLabelText('Move Check in'))
+    fireEvent.drop(cell('10:00', 0))
+
+    await waitFor(() =>
+      expect(offerSession).toHaveBeenCalledWith('e-1', {
+        title: 'Check in',
+        description: 'Every morning.',
+        facilitator_account_id: null,
+        // Off on the copy, or dragging the copy somewhere else would stamp again
+        // and the grid would fill with check-ins nobody asked for.
+        repeatable: false,
+        place_id: 'p-1',
+        time_slot_start: '2026-08-01T08:00:00.000Z',
+        time_slot_end: '2026-08-01T09:00:00.000Z',
+      }),
+    )
+    expect(updateSession).not.toHaveBeenCalled()
+  })
+
+  it('moves an ordinary dream rather than copying it', async () => {
+    // The passing sibling. Without it, a `dropInto` that copied unconditionally
+    // would satisfy the test above and quietly duplicate every dream anyone moved.
+    const offerSession = vi.fn<ScheduleApi['offerSession']>(() =>
+      Promise.reject(new Error('an ordinary dream is moved, not copied')),
+    )
+    const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'Sunrise yoga' }) }),
+    )
+    renderPage(stub({ offerSession, updateSession }, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))
+
+    fireEvent.dragStart(await screen.findByLabelText('Move Sunrise yoga'))
+    fireEvent.drop(cell('10:00', 0))
+
+    await waitFor(() => expect(updateSession).toHaveBeenCalled())
+    expect(offerSession).not.toHaveBeenCalled()
+  })
+
+  it('marks a repeatable dream, so the pool says which ones stay', async () => {
+    renderPage(
+      stub({}, [
+        aDream({ id: 's-1', title: 'Check in', repeatable: true }),
+        aDream({ id: 's-2', title: 'Sunrise yoga' }),
+      ]),
+    )
+
+    const pool = await screen.findByRole('complementary')
+    const marked = [...pool.querySelectorAll('.dream-chip')].filter((chip) => chip.textContent?.includes('↻'))
+
+    expect(marked).toHaveLength(1)
+    expect(marked[0]?.textContent).toContain('Check in')
+    expect(pool.textContent).toContain('Can be planned more than once')
   })
 
   it('unschedules a dream dropped back on the pool', async () => {

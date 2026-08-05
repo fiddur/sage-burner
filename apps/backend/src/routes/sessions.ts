@@ -85,9 +85,8 @@ const facilitatorIsComing = async (db: Database, eventId: string, accountId: str
  * state for most of them right up until the burn, not an error.
  *
  * Members rather than admins, because the schedule is theirs to arrange: #20
- * says any member can administrate it. The host is the member who offered it and
- * is not accepted from the body — a dream in someone else's name is not an edit
- * anyone should be able to make by hand.
+ * says any member can administrate it — including handing a dream to the member who
+ * will facilitate it, which is a body field rather than something to prevent.
  */
 export const registerSessionRoutes = (
   app: FastifyInstance,

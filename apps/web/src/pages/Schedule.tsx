@@ -13,7 +13,10 @@ import { useAction, useLoad } from '../load.ts'
 import { endFor, hourOf, hoursOf, laneCells } from '../schedule.ts'
 import { isMember, useViewer } from '../viewer.tsx'
 
-export type ScheduleApi = Pick<ApiClient, 'getSessions' | 'getPlaces' | 'updateSession' | 'getEventAttendees'>
+export type ScheduleApi = Pick<
+  ApiClient,
+  'getSessions' | 'getPlaces' | 'updateSession' | 'offerSession' | 'getEventAttendees'
+>
 
 type Timetable = {
   event: MyBurn['event'] | null
@@ -141,11 +144,32 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
 
     // Keeps whatever length it already had. Forcing an hour would quietly
     // shorten a two-hour session just because someone moved it to another lane.
-    move(dream.id, {
+    const placement = {
       place_id: placeId,
       time_slot_start: fromLocalInput(row),
       time_slot_end: endFor(row, dream),
-    })
+    }
+
+    if (dream.repeatable) {
+      // A repeatable dream is a stamp rather than a thing that moves: the check-in
+      // is planned into four mornings from one entry, so placing it writes a copy
+      // and leaves the original where it was. The copy is an ordinary dream —
+      // `repeatable: false` — or moving it afterwards would stamp again.
+      run(
+        () =>
+          api.offerSession(event.id, {
+            title: dream.title,
+            description: dream.description,
+            facilitator_account_id: dream.facilitator_account_id,
+            repeatable: false,
+            ...placement,
+          }),
+        'Could not place that dream.',
+      )
+    } else {
+      move(dream.id, placement)
+    }
+
     setDragged(undefined)
   }
 
@@ -218,6 +242,12 @@ const Chip = ({
     }}
   >
     {dream.title}
+    {dream.repeatable && (
+      <span class="dream-repeats">
+        <span aria-hidden="true">↻</span>
+        <span class="visually-hidden">Can be planned more than once</span>
+      </span>
+    )}
     <Facilitator dream={dream} names={names} />
     {span(dream) !== null && <span class="dream-span">{span(dream)}</span>}
   </span>
@@ -277,6 +307,7 @@ const Pool = ({
 
     <p class="form-note">
       Drag one into the grid to place it, or set the time and place precisely on <a href="/dreams">Dreams</a>.
+      A ↻ dream stays here when you place it, so the same one can go into several mornings.
     </p>
   </aside>
 )

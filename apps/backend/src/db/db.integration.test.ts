@@ -725,6 +725,8 @@ describe('json columns', () => {
 })
 
 const REBUILD = '20260804105125_places_per_burn'
+const FACILITATOR = '20260805040000_facilitator'
+const REPEATABLE = '20260805050000_repeatable_dream'
 
 // This drizzle version discovers migrations by listing the folder, and throws
 // outright if it finds a `meta/_journal.json` — so staging is a copy of the
@@ -877,8 +879,6 @@ describe('the places-per-burn migration', () => {
 })
 
 describe('the facilitator rename', () => {
-  const FACILITATOR = '20260805040000_facilitator'
-
   it('carries every host across as the facilitator, rather than dropping them', () => {
     // The rename's whole claim: "every existing row keeps its value". Without this
     // the backfill could select NULL and nothing in the suite would notice — which
@@ -933,6 +933,38 @@ describe('the facilitator rename', () => {
         fresh.client.prepare('select facilitator_account_id from session where id = ?').get('s-1')
           ?.facilitator_account_id,
       ).toBeNull()
+    } finally {
+      fresh.close()
+    }
+  })
+})
+
+describe('the repeatable-dream column', () => {
+  it('leaves every dream that already existed a one-off', () => {
+    // The added column's only claim. Without the `DEFAULT false` the column would be
+    // null on every existing row, and the schedule page reads it as a flag — a null
+    // is falsy in JavaScript, so the page would look right while the database
+    // disagreed with `NOT NULL`.
+    const fresh = createDb({ url: ':memory:' })
+    const { staged, kept } = stagedThrough(REPEATABLE)
+
+    expect(kept).not.toContain(REPEATABLE)
+    expect(kept).toContain(FACILITATOR)
+
+    try {
+      runMigrations(fresh, staged)
+      expect(columnsOf(fresh, 'session')).not.toContain('repeatable')
+
+      anEvent(fresh, 'e-1', 'a-burn', '2026-01-01T00:00:00Z')
+      fresh.client
+        .prepare('insert into session (id, event_id, title, description) values (?, ?, ?, ?)')
+        .run('s-1', 'e-1', 'Sunrise yoga', '')
+
+      runMigrations(fresh)
+
+      expect(fresh.client.prepare('select repeatable from session where id = ?').get('s-1')?.repeatable).toBe(
+        0,
+      )
     } finally {
       fresh.close()
     }
