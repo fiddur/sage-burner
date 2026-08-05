@@ -1238,6 +1238,12 @@ A flag rather than a recurrence rule, and no back-reference to what a copy came 
 A different facilitator on Sunday than on Saturday is the point of copying rather than
 repeating, and a parent link would only be something to keep consistent.
 
+A dream toggled repeatable _after_ it was scheduled is asymmetric, and deliberately:
+dragged within the grid it stamps a copy and the original stays put, while dragged to
+the pool it unschedules the original rather than copying. Both follow from the two
+rules above, and neither is reachable by the ordinary flow, since copies are created
+with the flag off.
+
 **The copying is the page's, not the API's.** Nothing server-side treats the flag
 specially — placing, moving and unplacing a dream are all one `PATCH`, so a server
 that copied on write would first have to decide which of those a given body is. The
@@ -1295,6 +1301,35 @@ read it.
 The heart is on the chip as well as in the panel, placed or not: something can want
 support long before anybody has decided when it happens. Its click is stopped at the
 button, or every heart would also open the panel.
+
+Escape is bound on the **document**, not on the panel. Clicking anything in the panel
+disables it for the length of the write, and a disabled button drops focus to
+`<body>` — so a handler waiting for the key to bubble up from inside stopped hearing
+it after the first thing you did, which is when you most want it.
+
+### Everything a dream needs, without leaving the grid
+
+The panel edits and withdraws as well as reads. **✏️** swaps in the same form the
+Dreams page uses — `DreamFields`, one component, so the two cannot drift — and **🗑️**
+withdraws behind a confirmation, for scheduled and unscheduled dreams alike.
+
+Offering one has two ways in: **＋** beside "Not placed yet", and **clicking an empty
+hour**, which prefills that slot and that lane the way a calendar does. Only an
+_empty_ cell — a chip's click bubbles to the cell it sits in, so without the check
+opening a dream would also open the offer panel on top of it.
+
+**A create sends every field; an edit sends only what changed.** The diff exists to
+protect a concurrent editor's work, and a dream that does not exist yet has none to
+protect — while a slot prefilled from the clicked cell would be diffed away as
+unchanged and the new dream would land nowhere.
+
+**Every write closes the panel only once it has landed**, never on the click. Closing
+on the click threw away everything the member had typed whenever the server said no,
+and that is an ordinary path rather than a corner: filling _Starts_ and leaving _Ends_
+empty is half a slot, which the schema refuses with a 400. The failure is shown
+**inside** the panel, because `.dream-modal` is a fixed overlay and the page's own
+error renders under it; the page suppresses its copy while a panel is open, so the
+message is never announced twice.
 
 ### Pulling the bottom edge
 

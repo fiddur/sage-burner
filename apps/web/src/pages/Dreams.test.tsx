@@ -345,6 +345,31 @@ describe('Dreams', () => {
     expect(marked[0]?.textContent).toContain('Check in')
   })
 
+  it('names a facilitator who has since withdrawn, rather than reading as nobody', async () => {
+    // The control is fed by the attendee list, so an id that is no longer on it
+    // selects nothing and the select falls back to its first option — "Nobody yet",
+    // while the id is still stored. What is shown and what would be saved disagreed.
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony', facilitator_account_id: 'a-9' })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Cacao ceremony' }))
+    const select = screen.getByLabelText('Facilitator for Cacao ceremony')
+
+    expect(select).toHaveProperty('value', 'a-9')
+    expect(select.textContent).toContain('Somebody who is no longer coming')
+  })
+
+  it('offers no such option when the facilitator is coming', async () => {
+    // The passing sibling: an option added unconditionally would satisfy the test
+    // above and put "no longer coming" beside every name on the list.
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony', facilitator_account_id: 'a-2' })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Cacao ceremony' }))
+
+    expect(screen.getByLabelText('Facilitator for Cacao ceremony').textContent).not.toContain(
+      'no longer coming',
+    )
+  })
+
   it('withdraws one', async () => {
     const withdrawSession = vi.fn<DreamsApi['withdrawSession']>(() => Promise.resolve(undefined))
     renderPage(stub({ withdrawSession }, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))

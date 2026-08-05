@@ -1,127 +1,175 @@
-import type { Place, Session } from '@sage-burner/shared'
+import type { EventAttendeesResponse, Place, Session, SessionUpdate } from '@sage-burner/shared'
 
-import { useEffect, useRef } from 'preact/hooks'
+import { useState } from 'preact/hooks'
 
 import { toLocalInput } from '../datetime.ts'
 import { renderMarkdown } from '../markdown.ts'
+import { DreamFields } from './DreamFields.tsx'
+import { DreamPanel } from './DreamPanel.tsx'
 
 /**
- * One dream, opened from the grid. Read-only apart from the two buttons — precise
- * editing stays on Dreams, which has the form.
+ * One dream, opened from the grid — read, edited or withdrawn without leaving it.
  *
- * Not a `<dialog>`: `showModal` is an imperative call on a ref, and the focus trap
- * it brings is then a second thing to keep in step with this component's own open
- * state. `role="dialog"` with `aria-modal` says the same to a screen reader.
+ * The Dreams page keeps the same form for the list view; both use `DreamFields`.
  */
 export const DreamDetails = ({
   dream,
-  place,
+  places,
+  attendees,
   facilitatorName,
   viewerId,
   busy,
+  error,
+  editing,
+  onEdit,
+  onCancelEdit,
   onClose,
   onHelp,
   onSupport,
+  onSave,
+  onRemove,
 }: {
   dream: Session
-  place: Place | undefined
+  places: readonly Place[]
+  attendees: readonly EventAttendeesResponse['attendees'][number][]
   facilitatorName: string | null | undefined
   /** Who is reading it, so the button can say "I cannot help after all". */
   viewerId: string | undefined
   busy: boolean
+  error: string | undefined
+  /**
+   * Owned by the page, not held here: the form must stay open when a save is
+   * refused, and only the page knows whether one was. Closing it on the click
+   * threw away everything the member had typed.
+   */
+  editing: boolean
+  onEdit: () => void
+  onCancelEdit: () => void
   onClose: () => void
   /** `true` to offer, `false` to take the offer back. */
   onHelp: (helping: boolean) => void
   onSupport: (supporting: boolean) => void
+  onSave: (changes: SessionUpdate) => void
+  onRemove: () => void
 }) => {
-  const panel = useRef<HTMLDivElement>(null)
+  const [confirming, setConfirming] = useState(false)
 
   // Read off the list rather than carried as its own field. `supported_by_me` exists
   // only because the supporters are a count and nothing more.
   const helping = dream.helpers.some((person) => person.account_id === viewerId)
 
-  // Focus moves in, or Escape reaches nothing.
-  useEffect(() => {
-    panel.current?.focus()
-  }, [])
+  const place = places.find((lane) => lane.id === dream.place_id)
 
   return (
-    <div
-      class="dream-modal"
-      onClick={onClose}
-      onKeyDown={(keyEvent) => {
-        if (keyEvent.key === 'Escape') onClose()
-      }}
-    >
-      <div
-        class="dream-panel"
-        role="dialog"
-        aria-modal="true"
-        aria-label={dream.title}
-        tabIndex={-1}
-        ref={panel}
-        // Reading the description must not close the thing you opened to read it.
-        onClick={(clickEvent) => clickEvent.stopPropagation()}
-      >
-        <h2>{dream.title}</h2>
+    <DreamPanel label={dream.title} error={error} onClose={onClose}>
+      <h2>{dream.title}</h2>
 
-        <p class="form-note">
-          {whenAndWhere(dream, place)}
-          {dream.facilitator_account_id !== null && (
-            <> · Facilitated by {facilitatorName ?? 'somebody who has no name filled in'}</>
+      {editing ? (
+        <DreamFields
+          dream={dream}
+          subject={dream.title}
+          places={places}
+          attendees={attendees}
+          busy={busy}
+          onCancel={onCancelEdit}
+          onSave={onSave}
+        />
+      ) : (
+        <>
+          <p class="form-note">
+            {whenAndWhere(dream, place)}
+            {dream.facilitator_account_id !== null && (
+              <> · Facilitated by {facilitatorName ?? 'somebody who has no name filled in'}</>
+            )}
+          </p>
+
+          {dream.description.trim() !== '' && (
+            // Safe by construction: `renderMarkdown` escapes raw HTML rather than filtering it.
+            <div
+              class="markdown-preview"
+              dangerouslySetInnerHTML={{ __html: renderMarkdown(dream.description) }}
+            />
           )}
-        </p>
 
-        {dream.description.trim() !== '' && (
-          // Safe by construction: `renderMarkdown` escapes raw HTML rather than filtering it.
-          <div
-            class="markdown-preview"
-            dangerouslySetInnerHTML={{ __html: renderMarkdown(dream.description) }}
-          />
-        )}
+          <p class="row">
+            <button
+              type="button"
+              class="dream-heart"
+              disabled={busy}
+              aria-pressed={dream.supported_by_me}
+              aria-label={dream.supported_by_me ? 'Take back your support' : 'Show support'}
+              onClick={() => onSupport(!dream.supported_by_me)}
+            >
+              <span aria-hidden="true">{dream.supported_by_me ? '❤️‍🔥' : '♡'}</span> {dream.support_count}
+            </button>
+            <span class="form-note">
+              {dream.support_count === 1 ? '1 person wants this' : `${dream.support_count} people want this`}
+            </span>
+          </p>
 
-        <p class="row">
-          <button
-            type="button"
-            class="link-button"
-            disabled={busy}
-            aria-pressed={dream.supported_by_me}
-            aria-label={dream.supported_by_me ? 'Take back your support' : 'Show support'}
-            onClick={() => onSupport(!dream.supported_by_me)}
-          >
-            <span aria-hidden="true">{dream.supported_by_me ? '❤️‍🔥' : '♡'}</span> {dream.support_count}
-          </button>{' '}
-          <span class="form-note">
-            {dream.support_count === 1 ? '1 person wants this' : `${dream.support_count} people want this`}
-          </span>
-        </p>
+          <h3>Helping out</h3>
 
-        <h3>Helping out</h3>
+          {dream.helpers.length === 0 ? (
+            <p class="form-note">Nobody has offered to help yet.</p>
+          ) : (
+            <ul class="dream-helpers">
+              {dream.helpers.map((person) => (
+                <li key={person.account_id}>{person.name ?? 'Someone without a name yet'}</li>
+              ))}
+            </ul>
+          )}
 
-        {dream.helpers.length === 0 ? (
-          <p class="form-note">Nobody has offered to help yet.</p>
-        ) : (
-          <ul class="dream-helpers">
-            {dream.helpers.map((person) => (
-              <li key={person.account_id}>{person.name ?? 'Someone without a name yet'}</li>
-            ))}
-          </ul>
-        )}
-
-        <p class="row">
-          <button type="button" disabled={busy} onClick={() => onHelp(!helping)}>
-            {helping ? 'I cannot help after all' : 'I want to help out'}
-          </button>
-          <button type="button" class="link-button" onClick={onClose}>
-            Close
-          </button>
-        </p>
-
-        <p class="form-note">
-          Times, place and description are edited on <a href="/dreams">Dreams</a>.
-        </p>
-      </div>
-    </div>
+          <p class="row">
+            <button type="button" disabled={busy} onClick={() => onHelp(!helping)}>
+              {helping ? 'I cannot help after all' : 'I want to help out'}
+            </button>
+            <button
+              type="button"
+              class="link-button"
+              disabled={busy}
+              aria-label={`Edit ${dream.title}`}
+              onClick={onEdit}
+            >
+              ✏️
+            </button>
+            {confirming ? (
+              <>
+                <span class="form-note">Withdraw it? Its helpers and hearts go too.</span>
+                <button
+                  type="button"
+                  disabled={busy}
+                  aria-label={`Really withdraw ${dream.title}`}
+                  onClick={onRemove}
+                >
+                  Withdraw it
+                </button>
+                <button
+                  type="button"
+                  class="link-button"
+                  disabled={busy}
+                  onClick={() => setConfirming(false)}
+                >
+                  Keep it
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                class="link-button"
+                disabled={busy}
+                aria-label={`Withdraw ${dream.title}`}
+                onClick={() => setConfirming(true)}
+              >
+                🗑️
+              </button>
+            )}
+            <button type="button" class="link-button" onClick={onClose}>
+              Close
+            </button>
+          </p>
+        </>
+      )}
+    </DreamPanel>
   )
 }
 

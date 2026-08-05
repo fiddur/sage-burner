@@ -1,4 +1,4 @@
-import type { MyBurn, Place, Session } from '@sage-burner/shared'
+import type { EventAttendeesResponse, MyBurn, Place, Session, SessionUpdate } from '@sage-burner/shared'
 import type { ComponentChildren } from 'preact'
 
 import { useRef, useState } from 'preact/hooks'
@@ -7,6 +7,8 @@ import type { ApiClient } from '../api/client.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
 import { DreamDetails } from '../components/DreamDetails.tsx'
+import { DreamFields } from '../components/DreamFields.tsx'
+import { DreamPanel } from '../components/DreamPanel.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
 import { fromLocalInput, toLocalInput } from '../datetime.ts'
 import { initials } from '../initials.ts'
@@ -25,15 +27,25 @@ export type ScheduleApi = Pick<
   | 'stopHelpingWithSession'
   | 'supportSession'
   | 'withdrawSupportForSession'
+  | 'withdrawSession'
 >
 
 type Timetable = {
   event: MyBurn['event'] | null
   places: readonly Place[]
   sessions: readonly Session[]
-  /** Facilitator names by account id, for the circle on a chip. */
-  names: ReadonlyMap<string, string | null>
+  attendees: readonly EventAttendeesResponse['attendees'][number][]
 }
+
+/**
+ * What the dialog is showing: an existing dream, or a new one being offered.
+ *
+ * The existing case holds an id rather than the dream, so a reload after a heart or
+ * a helper leaves the panel showing what the server now says.
+ */
+type Opened =
+  | { kind: 'dream'; id: string; editing: boolean }
+  | { kind: 'new'; place_id: string | null; time_slot_start: string | null; time_slot_end: string | null }
 
 const label = (row: string) => row.slice(11)
 
@@ -59,14 +71,14 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
   const viewer = useViewer()
   const member = isMember(viewer)
   const [dragged, setDragged] = useState<string | undefined>(undefined)
-  const [opened, setOpened] = useState<string | undefined>(undefined)
+  const [opened, setOpened] = useState<Opened | undefined>(undefined)
 
   // The burn comes first: since #156 the lanes belong to one, so there is no grid to
   // ask for until we know which.
   const burn = useSelectedBurn()
   const { loaded, reload } = useLoad<Timetable>(
     async (signal) => {
-      if (burn === undefined) return { event: null, places: [], sessions: [], names: new Map() }
+      if (burn === undefined) return { event: null, places: [], sessions: [], attendees: [] }
 
       const [places, dreams, attendees] = await Promise.all([
         api.getPlaces(burn.event.id, signal),
@@ -78,8 +90,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
         event: burn.event,
         places: places.places,
         sessions: dreams.sessions,
-        // By id, because the chip has one and needs a name for the circle.
-        names: new Map(attendees.attendees.map((person) => [person.account_id, person.name])),
+        attendees: attendees.attendees,
       }
     },
     { enabled: member, key: burn?.event.id ?? '', fallback: 'Could not load the schedule.' },
@@ -115,7 +126,9 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
     )
   }
 
-  const { event, places, sessions, names } = loaded.data
+  const { event, places, sessions, attendees } = loaded.data
+  // By id, because a chip has one and needs a name for the circle.
+  const names = new Map(attendees.map((person) => [person.account_id, person.name]))
 
   if (event === null) {
     return (
@@ -199,17 +212,48 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
     run(() => (helping ? api.helpWithSession(id) : api.stopHelpingWithSession(id)), 'Could not save that.')
   }
 
-  // Found again rather than held in state, so a reload after a heart or a helper
-  // leaves the panel showing what the server now says.
-  const shown = sessions.find((dream) => dream.id === opened)
+  /**
+   * Every write the panel makes closes it **only once the write has landed**.
+   *
+   * Closing on the click threw the member's typing away whenever the server said no,
+   * and that is an ordinary path rather than a corner: filling Starts and leaving
+   * Ends empty is half a slot, which the schema refuses with a 400.
+   *
+   * The fallback title is unreachable — the form disables its own button until there
+   * is one — and if that stopped being true, an empty title is a 400 the panel now
+   * reports with the text still in it.
+   */
+  const offer = ({ title = '', ...fields }: SessionUpdate) => {
+    run(async () => {
+      await api.offerSession(event.id, { ...fields, title })
+      setOpened(undefined)
+    }, 'Could not offer that.')
+  }
+
+  const save = (id: string, changes: SessionUpdate) => {
+    run(async () => {
+      await api.updateSession(id, changes)
+      setOpened({ kind: 'dream', id, editing: false })
+    }, 'Could not save that.')
+  }
+
+  const remove = (id: string) => {
+    run(async () => {
+      await api.withdrawSession(id)
+      setOpened(undefined)
+    }, 'Could not withdraw that.')
+  }
 
   return (
     <Framed>
-      {error !== undefined && (
-        <p class="form-error" role="alert">
-          {error}
-        </p>
-      )}
+      {error !== undefined &&
+        opened === undefined && (
+          // Only when no panel is open: the overlay covers this, and the panel shows
+          // the same message itself. Two would also be announced twice.
+          <p class="form-error" role="alert">
+            {error}
+          </p>
+        )}
 
       <div class="schedule">
         <Pool
@@ -217,7 +261,10 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
           names={names}
           busy={busy}
           onDragStart={setDragged}
-          onOpen={setOpened}
+          onOpen={(id) => setOpened({ kind: 'dream', id, editing: false })}
+          onOffer={() =>
+            setOpened({ kind: 'new', place_id: null, time_slot_start: null, time_slot_end: null })
+          }
           onSupport={support}
           onResize={resize}
           onDrop={() => {
@@ -235,28 +282,137 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
           names={names}
           busy={busy}
           onDragStart={setDragged}
-          onOpen={setOpened}
+          onOpen={(id) => setOpened({ kind: 'dream', id, editing: false })}
+          onOfferAt={(row, placeId) =>
+            setOpened({
+              kind: 'new',
+              place_id: placeId,
+              time_slot_start: fromLocalInput(row),
+              time_slot_end: endFor(row, { time_slot_start: null, time_slot_end: null }),
+            })
+          }
           onSupport={support}
           onResize={resize}
           onDrop={dropInto}
         />
       </div>
 
-      {shown !== undefined && (
-        <DreamDetails
-          dream={shown}
-          place={places.find((lane) => lane.id === shown.place_id)}
-          facilitatorName={
-            shown.facilitator_account_id === null ? undefined : names.get(shown.facilitator_account_id)
-          }
-          viewerId={viewer.account?.id}
-          busy={busy}
-          onClose={() => setOpened(undefined)}
-          onHelp={(helping) => help(shown.id, helping)}
-          onSupport={(supporting) => support(shown.id, supporting)}
-        />
-      )}
+      <Opened
+        opened={opened}
+        dreams={sessions}
+        places={places}
+        attendees={attendees}
+        names={names}
+        viewerId={viewer.account?.id}
+        busy={busy}
+        error={error}
+        onEdit={(id) => setOpened({ kind: 'dream', id, editing: true })}
+        onCancelEdit={(id) => setOpened({ kind: 'dream', id, editing: false })}
+        onClose={() => setOpened(undefined)}
+        onHelp={help}
+        onSupport={support}
+        onSave={save}
+        onOffer={offer}
+        onRemove={remove}
+      />
     </Framed>
+  )
+}
+
+/**
+ * Whichever panel is open over the grid, or nothing.
+ *
+ * Its own component so the page keeps one branch where it had four — the same
+ * reason `NoBurn` is one.
+ */
+const Opened = ({
+  opened,
+  dreams,
+  places,
+  attendees,
+  names,
+  viewerId,
+  busy,
+  error,
+  onEdit,
+  onCancelEdit,
+  onClose,
+  onHelp,
+  onSupport,
+  onSave,
+  onOffer,
+  onRemove,
+}: {
+  opened: Opened | undefined
+  dreams: readonly Session[]
+  places: readonly Place[]
+  attendees: readonly EventAttendeesResponse['attendees'][number][]
+  names: ReadonlyMap<string, string | null>
+  viewerId: string | undefined
+  busy: boolean
+  error: string | undefined
+  onEdit: (id: string) => void
+  onCancelEdit: (id: string) => void
+  onClose: () => void
+  onHelp: (id: string, helping: boolean) => void
+  onSupport: (id: string, supporting: boolean) => void
+  onSave: (id: string, changes: SessionUpdate) => void
+  onOffer: (fields: SessionUpdate) => void
+  onRemove: (id: string) => void
+}) => {
+  if (opened === undefined) return null
+
+  if (opened.kind === 'new') {
+    return (
+      <DreamPanel label="Offer a dream" error={error} onClose={onClose}>
+        <h2>Offer a dream</h2>
+        <DreamFields
+          dream={{
+            title: '',
+            description: '',
+            facilitator_account_id: null,
+            repeatable: false,
+            place_id: opened.place_id,
+            time_slot_start: opened.time_slot_start,
+            time_slot_end: opened.time_slot_end,
+          }}
+          subject="the new dream"
+          places={places}
+          attendees={attendees}
+          busy={busy}
+          creating
+          onCancel={onClose}
+          onSave={onOffer}
+        />
+      </DreamPanel>
+    )
+  }
+
+  // Looked up rather than held, so a reload after a heart or a helper leaves the
+  // panel showing what the server now says.
+  const dream = dreams.find((candidate) => candidate.id === opened.id)
+  if (dream === undefined) return null
+
+  return (
+    <DreamDetails
+      dream={dream}
+      places={places}
+      attendees={attendees}
+      facilitatorName={
+        dream.facilitator_account_id === null ? undefined : names.get(dream.facilitator_account_id)
+      }
+      viewerId={viewerId}
+      busy={busy}
+      error={error}
+      editing={opened.editing}
+      onEdit={() => onEdit(dream.id)}
+      onCancelEdit={() => onCancelEdit(dream.id)}
+      onClose={onClose}
+      onHelp={(helping) => onHelp(dream.id, helping)}
+      onSupport={(supporting) => onSupport(dream.id, supporting)}
+      onSave={(changes) => onSave(dream.id, changes)}
+      onRemove={() => onRemove(dream.id)}
+    />
   )
 }
 
@@ -359,6 +515,11 @@ const Chip = ({
 
             onResize(dream, rowsDragged(pointerEvent.clientY - grab.y, grab.rowHeight))
           }}
+          // Or a lost capture leaves the ref set, and `onDragStart` goes on
+          // cancelling every drag of this chip until the handle is grabbed again.
+          onPointerCancel={() => {
+            grabbed.current = null
+          }}
           onClick={(clickEvent) => clickEvent.stopPropagation()}
           onKeyDown={(keyEvent) => {
             // The handle is the keyboard route too, like the ⠿ on Places: a
@@ -436,6 +597,7 @@ const Pool = ({
   busy,
   onDragStart,
   onOpen,
+  onOffer,
   onSupport,
   onResize,
   onDrop,
@@ -445,6 +607,7 @@ const Pool = ({
   busy: boolean
   onDragStart: (id: string) => void
   onOpen: (id: string) => void
+  onOffer: () => void
   onSupport: (id: string, supporting: boolean) => void
   onResize: (dream: Session, byRows: number) => void
   onDrop: () => void
@@ -457,7 +620,12 @@ const Pool = ({
       onDrop()
     }}
   >
-    <h2>Not placed yet</h2>
+    <h2>
+      Not placed yet
+      <button type="button" class="link-button" disabled={busy} aria-label="Offer a dream" onClick={onOffer}>
+        ＋
+      </button>
+    </h2>
 
     {dreams.length === 0 && <p class="form-note">Everything has somewhere to be.</p>}
 
@@ -477,8 +645,9 @@ const Pool = ({
     ))}
 
     <p class="form-note">
-      Drag one into the grid to place it, or set the time and place precisely on <a href="/dreams">Dreams</a>.
-      A ↻ dream stays here when you place it, so the same one can go into several mornings.
+      Drag one into the grid to place it, or click an empty hour to offer something there. A ↻ dream stays
+      here when you place it, so the same one can go into several mornings. The whole list is on{' '}
+      <a href="/dreams">Dreams</a>.
     </p>
   </aside>
 )
@@ -491,6 +660,7 @@ const Timetable = ({
   busy,
   onDragStart,
   onOpen,
+  onOfferAt,
   onSupport,
   onResize,
   onDrop,
@@ -502,6 +672,7 @@ const Timetable = ({
   busy: boolean
   onDragStart: (id: string) => void
   onOpen: (id: string) => void
+  onOfferAt: (row: string, placeId: string) => void
   onSupport: (id: string, supporting: boolean) => void
   onResize: (dream: Session, byRows: number) => void
   onDrop: (row: string, placeId: string) => void
@@ -543,11 +714,17 @@ const Timetable = ({
                   <td
                     key={place.id}
                     rowSpan={cell.kind === 'anchor' ? cell.span : undefined}
-                    class={`schedule-cell place-${place.color}`}
+                    class={`schedule-cell place-${place.color}${cell.kind === 'empty' ? ' is-free' : ''}`}
                     onDragOver={(dragEvent) => dragEvent.preventDefault()}
                     onDrop={(dropEvent) => {
                       dropEvent.preventDefault()
                       onDrop(row, place.id)
+                    }}
+                    onClick={() => {
+                      // Only an empty hour. A click that reached an anchor cell went
+                      // past the chip filling it, and offering a second dream on top
+                      // of one somebody just clicked is not what they meant.
+                      if (cell.kind === 'empty') onOfferAt(row, place.id)
                     }}
                   >
                     {cell.kind === 'anchor' && (

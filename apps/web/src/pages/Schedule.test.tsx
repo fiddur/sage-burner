@@ -59,6 +59,7 @@ const stub = (
   stopHelpingWithSession: () => Promise.reject(new Error('stopHelpingWithSession is not stubbed here')),
   supportSession: () => Promise.reject(new Error('supportSession is not stubbed here')),
   withdrawSupportForSession: () => Promise.reject(new Error('withdrawSupportForSession is not stubbed here')),
+  withdrawSession: () => Promise.reject(new Error('withdrawSession is not stubbed here')),
   ...over,
 })
 
@@ -611,6 +612,63 @@ describe('Schedule', () => {
     expect(pool.querySelector('.dream-heart')?.textContent).toContain('2')
   })
 
+  it('closes on Escape after something in the panel has been clicked', async () => {
+    // The bug: the handler was on the panel and waited for the key to bubble from
+    // inside it. Clicking anything disables it for the length of the write, and a
+    // disabled button drops focus to `<body>` — so Escape stopped working the moment
+    // you did anything, which is when you most want it.
+    const supportSession = vi.fn<ScheduleApi['supportSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'Cacao ceremony' }) }),
+    )
+    renderPage(stub({ supportSession }, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
+    const panel = await screen.findByRole('dialog', { name: 'Cacao ceremony' })
+    fireEvent.click(within(panel).getByRole('button', { name: 'Show support' }))
+    await waitFor(() => expect(supportSession).toHaveBeenCalled())
+
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  it('leaves the heart unadorned, since it is a control and not a link', async () => {
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
+    const panel = await screen.findByRole('dialog', { name: 'Cacao ceremony' })
+
+    expect(within(panel).getByRole('button', { name: 'Show support' }).className).not.toContain('link-button')
+  })
+
+  it('lets go of the chip when a resize pointer is cancelled', async () => {
+    // Without `onPointerCancel` the ref stays set and `onDragStart` goes on
+    // cancelling every drag of this chip, so it can never be moved again.
+    const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'Cacao ceremony' }) }),
+    )
+    renderPage(
+      stub({ updateSession }, [
+        aDream({
+          id: 's-1',
+          title: 'Cacao ceremony',
+          place_id: 'p-1',
+          time_slot_start: '2026-08-01T08:00:00.000Z',
+          time_slot_end: '2026-08-01T09:00:00.000Z',
+        }),
+      ]),
+    )
+
+    const handle = await screen.findByRole('button', { name: 'Change how long Cacao ceremony is' })
+    fireEvent.pointerDown(handle, { clientY: 100 })
+    fireEvent.pointerCancel(handle)
+
+    fireEvent.dragStart(screen.getByLabelText('Move Cacao ceremony'))
+    fireEvent.drop(cell('14:00', 1))
+
+    await waitFor(() => expect(updateSession).toHaveBeenCalled())
+  })
+
   it('gives a heart from the details too, and says how many want it', async () => {
     const supportSession = vi.fn<ScheduleApi['supportSession']>(() =>
       Promise.resolve({ session: aDream({ id: 's-1', title: 'Cacao ceremony' }) }),
@@ -624,6 +682,42 @@ describe('Schedule', () => {
     fireEvent.click(within(panel).getByRole('button', { name: 'Show support' }))
 
     await waitFor(() => expect(supportSession).toHaveBeenCalledWith('s-1'))
+  })
+
+  it('withdraws a dream from the dialog, but only after asking', async () => {
+    const withdrawSession = vi.fn<ScheduleApi['withdrawSession']>(() => Promise.resolve(undefined))
+    renderPage(stub({ withdrawSession }, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Withdraw Cacao ceremony' }))
+
+    // The first click asks; nothing has gone yet.
+    expect(withdrawSession).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Really withdraw Cacao ceremony' }))
+
+    await waitFor(() => expect(withdrawSession).toHaveBeenCalledWith('s-1'))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  it('keeps the dream when the confirmation is declined', async () => {
+    const withdrawSession = vi.fn<ScheduleApi['withdrawSession']>(() => Promise.resolve(undefined))
+    renderPage(stub({ withdrawSession }, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Withdraw Cacao ceremony' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Keep it' }))
+
+    expect(withdrawSession).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog')).toBeTruthy()
+  })
+
+  it('offers the withdrawal on an unplaced dream too', async () => {
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Sunrise yoga' }))
+
+    expect(await screen.findByRole('button', { name: 'Withdraw Sunrise yoga' })).toBeTruthy()
   })
 
   it('offers to help from the details, and to stop when already helping', async () => {
@@ -796,6 +890,211 @@ describe('Schedule', () => {
     fireEvent.drop(cell('14:00', 1))
 
     await waitFor(() => expect(updateSession).toHaveBeenCalled())
+  })
+
+  it('edits a dream in the dialog, without going to the Dreams page', async () => {
+    const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'Renamed' }) }),
+    )
+    renderPage(stub({ updateSession }, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Cacao ceremony' }))
+    fireEvent.input(screen.getByLabelText('Title of Cacao ceremony'), { target: { value: 'Renamed' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    // Only what changed, the same rule the Dreams page follows.
+    await waitFor(() => expect(updateSession).toHaveBeenCalledWith('s-1', { title: 'Renamed' }))
+  })
+
+  it('offers a dream from the pool, with nowhere and no time', async () => {
+    const offerSession = vi.fn<ScheduleApi['offerSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-2', title: 'Check in' }) }),
+    )
+    renderPage(stub({ offerSession }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Offer a dream' }))
+    fireEvent.input(screen.getByLabelText('Title of the new dream'), { target: { value: '  Check in  ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Offer it' }))
+
+    await waitFor(() =>
+      expect(offerSession).toHaveBeenCalledWith('e-1', {
+        title: 'Check in',
+        description: '',
+        place_id: null,
+        time_slot_start: null,
+        time_slot_end: null,
+        facilitator_account_id: null,
+        repeatable: false,
+      }),
+    )
+  })
+
+  it('offers a dream in the hour and the lane that were clicked', async () => {
+    // What a calendar does. The slot is prefilled from the cell, so the whole body
+    // is sent rather than a diff — a prefill diffed against itself is no change.
+    const offerSession = vi.fn<ScheduleApi['offerSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-2', title: 'Sunrise yoga' }) }),
+    )
+    renderPage(stub({ offerSession }))
+
+    await screen.findByRole('columnheader', { name: /Sauna/ })
+    fireEvent.click(cell('10:00', 1))
+
+    fireEvent.input(await screen.findByLabelText('Title of the new dream'), {
+      target: { value: 'Sunrise yoga' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Offer it' }))
+
+    await waitFor(() =>
+      expect(offerSession).toHaveBeenCalledWith('e-1', {
+        title: 'Sunrise yoga',
+        description: '',
+        place_id: 'p-2',
+        time_slot_start: '2026-08-01T08:00:00.000Z',
+        time_slot_end: '2026-08-01T09:00:00.000Z',
+        facilitator_account_id: null,
+        repeatable: false,
+      }),
+    )
+  })
+
+  it('offers nothing on an hour a dream already fills', async () => {
+    // The passing sibling for the cell click, and the reason it tests `empty` rather
+    // than any cell: a chip's click bubbles to the cell it sits in, so without the
+    // check, opening a dream would also open the offer panel on top of it.
+    const occupied = aDream({
+      id: 's-1',
+      title: 'Cacao ceremony',
+      place_id: 'p-2',
+      time_slot_start: '2026-08-01T08:00:00.000Z',
+      time_slot_end: '2026-08-01T09:00:00.000Z',
+    })
+    renderPage(stub({}, [occupied]))
+
+    await screen.findByRole('columnheader', { name: /Sauna/ })
+    fireEvent.click(cell('10:00', 1))
+
+    expect(screen.queryByLabelText('Title of the new dream')).toBeNull()
+
+    // …and the chip inside it still opens the dream itself.
+    fireEvent.click(screen.getByRole('button', { name: 'Open Cacao ceremony' }))
+
+    expect(await screen.findByRole('dialog', { name: 'Cacao ceremony' })).toBeTruthy()
+    expect(screen.queryByLabelText('Title of the new dream')).toBeNull()
+  })
+
+  it('will not offer a nameless dream', async () => {
+    const offerSession = vi.fn<ScheduleApi['offerSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-2', title: 'x' }) }),
+    )
+    renderPage(stub({ offerSession }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Offer a dream' }))
+    const offer = screen.getByRole('button', { name: 'Offer it' })
+
+    expect(offer).toHaveProperty('disabled', true)
+
+    fireEvent.click(offer)
+    expect(offerSession).not.toHaveBeenCalled()
+  })
+
+  it('keeps a refused offer on screen, with everything that was typed', async () => {
+    // The defect this replaced: the panel closed on the click, not on the write. A
+    // start with no end is half a slot and a 400 from the schema — an ordinary
+    // mistake, not a corner — and the title and description went with the panel.
+    renderPage(
+      stub({
+        offerSession: () => Promise.reject(apiError(400, 'bad_request', 'That will not do.')),
+      }),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Offer a dream' }))
+    fireEvent.input(screen.getByLabelText('Title of the new dream'), { target: { value: 'Check in' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Offer it' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('That will not do.')
+    expect(screen.getByRole('dialog', { name: 'Offer a dream' })).toBeTruthy()
+    expect(screen.getByLabelText('Title of the new dream')).toHaveProperty('value', 'Check in')
+  })
+
+  it('closes the offer panel once the dream is actually offered', async () => {
+    // The passing sibling: a panel that never closed would satisfy the test above.
+    const offerSession = vi.fn<ScheduleApi['offerSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-2', title: 'Check in' }) }),
+    )
+    renderPage(stub({ offerSession }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Offer a dream' }))
+    fireEvent.input(screen.getByLabelText('Title of the new dream'), { target: { value: 'Check in' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Offer it' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  it('keeps a refused edit open, with the edits still in the fields', async () => {
+    renderPage(
+      stub({ updateSession: () => Promise.reject(apiError(400, 'bad_request', 'That will not do.')) }, [
+        aDream({ id: 's-1', title: 'Cacao ceremony' }),
+      ]),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Cacao ceremony' }))
+    fireEvent.input(screen.getByLabelText('Title of Cacao ceremony'), { target: { value: 'Renamed' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('That will not do.')
+    expect(screen.getByLabelText('Title of Cacao ceremony')).toHaveProperty('value', 'Renamed')
+  })
+
+  it('leaves the form once a save lands, and says the right thing when one does not', async () => {
+    // The passing sibling for the edit, and the message: a refused *edit* used to
+    // report "Could not move that dream", because it went through the drag path.
+    const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'Renamed' }) }),
+    )
+    renderPage(stub({ updateSession }, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Cacao ceremony' }))
+    fireEvent.input(screen.getByLabelText('Title of Cacao ceremony'), { target: { value: 'Renamed' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(screen.queryByLabelText('Title of Cacao ceremony')).toBeNull())
+    expect(screen.getByRole('dialog')).toBeTruthy()
+  })
+
+  it('reports a refused save as a save, not as a move', async () => {
+    renderPage(
+      stub({ updateSession: () => Promise.reject(new Error('nope')) }, [
+        aDream({ id: 's-1', title: 'Cacao ceremony' }),
+      ]),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Cacao ceremony' }))
+    fireEvent.input(screen.getByLabelText('Title of Cacao ceremony'), { target: { value: 'Renamed' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Could not save that.')
+  })
+
+  it('shows the failure inside the panel, which covers the page it would print on', async () => {
+    // `.dream-modal` is a fixed overlay, so the page-level error renders under it.
+    renderPage(
+      stub({ supportSession: () => Promise.reject(new Error('nope')) }, [
+        aDream({ id: 's-1', title: 'Cacao ceremony' }),
+      ]),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
+    const panel = await screen.findByRole('dialog', { name: 'Cacao ceremony' })
+    fireEvent.click(within(panel).getByRole('button', { name: 'Show support' }))
+
+    const alert = await screen.findByRole('alert')
+
+    expect(panel.contains(alert)).toBe(true)
   })
 
   it('shows what the server said when a move is refused', async () => {
