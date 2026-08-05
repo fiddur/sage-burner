@@ -388,7 +388,14 @@ export const account = sqliteTable(
   ],
 )
 
-/** A registered WebAuthn credential. An account may have several, or none. */
+/**
+ * A registered WebAuthn credential. An account may have several, or none.
+ *
+ * Passkeys and passwords coexist rather than replacing each other (#9): the same
+ * account may hold both, either, and — for a passkey-only account —
+ * `account.password_hash` is null. What must never happen is neither, which is
+ * why removing the last passkey off an account with no password is refused.
+ */
 export const passkey = sqliteTable(
   'passkey',
   {
@@ -397,10 +404,24 @@ export const passkey = sqliteTable(
       .notNull()
       .references(() => account.id, { onDelete: 'cascade' }),
     credential_id: text('credential_id').notNull().unique(),
+    /** COSE public key, base64url. Not a secret; verifying a signature needs it. */
     public_key: text('public_key').notNull(),
     /** Signature counter, for cloned-authenticator detection. */
     counter: integer('counter').notNull().default(0),
+    /**
+     * How the browser said it reaches this authenticator — `internal`, `usb`,
+     * `hybrid`. Comma-separated, and null when it said nothing.
+     *
+     * Only a hint, and only used to build `excludeCredentials`, so an unknown
+     * value is dropped rather than refused: the transport list is not what makes
+     * a credential usable.
+     */
+    transports: text('transports'),
+    /** What the member calls it, so a list of three is possible to act on. */
+    label: text('label').notNull(),
     created_at: text('created_at').notNull(),
+    /** Null until it has signed somebody in. */
+    last_used_at: text('last_used_at'),
   },
   (table) => [
     primaryKey({ columns: [table.id] }),
@@ -408,6 +429,25 @@ export const passkey = sqliteTable(
     check('passkey_counter_check', sql`${table.counter} >= 0`),
   ],
 )
+
+/**
+ * One outstanding ceremony, so an assertion cannot be replayed.
+ *
+ * A row rather than a signed cookie because single-use is the property that
+ * matters and only storage gives it: a signed challenge is replayable for as long
+ * as it is valid, and defeating replay is what a challenge is *for*. Deleted when
+ * it is consumed, and the expired ones are swept whenever a new one is minted —
+ * at 42 members that is cheaper than anything scheduled.
+ *
+ * `account_id` is null for a login ceremony, where nobody has said who they are
+ * yet; a registration challenge carries the account that asked for it, and is
+ * refused if a different one comes back with it.
+ */
+export const webauthnChallenge = sqliteTable('webauthn_challenge', {
+  challenge: text('challenge').primaryKey(),
+  account_id: text('account_id').references(() => account.id, { onDelete: 'cascade' }),
+  expires_at: text('expires_at').notNull(),
+})
 
 /** Coarse access level. No fine-grained permissions in v1. */
 export const accountRole = sqliteTable(

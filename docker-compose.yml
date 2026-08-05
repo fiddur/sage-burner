@@ -56,6 +56,10 @@ services:
       # the intended failure. A default here would defeat that check.
       - SESSION_SECRET=${SESSION_SECRET}
       - SESSION_TTL_SECONDS=${SESSION_TTL_SECONDS:-1209600}
+      # No default, and an empty value is treated as unset: a passkey is bound to
+      # whatever domain is named here, and a wrong guess is worse than no guess —
+      # it would register credentials nobody can then sign in with.
+      - PUBLIC_ORIGIN=${PUBLIC_ORIGIN:-}
     volumes:
       # The database. A named volume rather than a bind mount so `docker
       # compose down` cannot take the members with it.

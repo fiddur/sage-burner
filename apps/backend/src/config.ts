@@ -148,6 +148,15 @@ export const envSchema = z.object({
    * after a merge.
    */
   SESSION_SECRET: optional(z.string().min(32).optional()),
+  /**
+   * Where a browser reaches this installation, e.g. `https://burn.example.org`.
+   *
+   * Only passkeys read it, and what they need from it is a *stable* domain: a
+   * WebAuthn credential belongs to one, and is invisible under any other. Left
+   * unset, each ceremony takes the browser's own `Origin` — which works, and
+   * which `auth/webauthn.ts` says exactly what it costs.
+   */
+  PUBLIC_ORIGIN: optional(z.url().optional()),
   /** How long a session lasts. Two weeks by default. */
   SESSION_TTL_SECONDS: optional(
     z.coerce
@@ -179,6 +188,8 @@ export interface Config {
   build_sha: string
   web_root?: string
   trust_proxy: boolean | number | string
+  /** The origin passkeys are bound to, when the operator has named one. */
+  public_origin?: string
 }
 
 /**
@@ -251,5 +262,6 @@ export const createConfig = (env: NodeJS.ProcessEnv = process.env): Config => {
     build_sha: value.BUILD_SHA,
     trust_proxy,
     ...(value.WEB_ROOT === undefined ? {} : { web_root: value.WEB_ROOT }),
+    ...(value.PUBLIC_ORIGIN === undefined ? {} : { public_origin: value.PUBLIC_ORIGIN }),
   }
 }

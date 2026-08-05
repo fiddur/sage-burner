@@ -39,6 +39,14 @@ const stub = (over: Partial<ProfileApi> = {}, profile = aProfile()): ProfileApi 
   getPushKey: () => Promise.reject(new Error('getPushKey is not stubbed here')),
   subscribeToPush: () => Promise.reject(new Error('subscribeToPush is not stubbed here')),
   unsubscribeFromPush: () => Promise.reject(new Error('unsubscribeFromPush is not stubbed here')),
+  // `PasskeysField` has its own file. It renders "this browser cannot use passkeys"
+  // under happy-dom, which has no `navigator.credentials`, so only the list is read.
+  getMyPasskeys: () => Promise.resolve({ passkeys: [] }),
+  startPasskeyRegistration: () => Promise.reject(new Error('startPasskeyRegistration is not stubbed here')),
+  addPasskey: () => Promise.reject(new Error('addPasskey is not stubbed here')),
+  removePasskey: () => Promise.reject(new Error('removePasskey is not stubbed here')),
+  startPasskeyLogin: () => Promise.reject(new Error('startPasskeyLogin is not stubbed here')),
+  finishPasskeyLogin: () => Promise.reject(new Error('finishPasskeyLogin is not stubbed here')),
   ...over,
 })
 

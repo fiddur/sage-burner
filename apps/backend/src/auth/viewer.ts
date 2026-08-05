@@ -155,12 +155,26 @@ const readViewer = async (
   const payload = deps.sessions.read(token)
   if (payload === undefined) return undefined
 
-  // One query, not two. A left join rather than an existence check followed by
-  // `rolesFor`: this runs on every guarded request, so the second round trip was
+  return viewerOf(deps.db, payload.account_id)
+}
+
+/**
+ * The viewer for an account id, with no request in reach.
+ *
+ * What the two login routes answer with once they know whose account it is —
+ * password and passkey alike, so the projection cannot come out differently on
+ * the two ways in.
+ *
+ * Returns undefined when no such account exists. A session token proves it was
+ * signed by us, not that the row survived.
+ */
+export const viewerOf = async (db: Database, accountId: string): Promise<Viewer | undefined> => {
+  // One query, not two. A left join rather than an existence check followed by a
+  // roles lookup: this runs on every guarded request, so the second round trip was
   // pure overhead. Left, not inner — an account with no roles must still resolve
   // to a viewer, since "signed in with no role" is an ordinary state (an
   // applicant checking on their application).
-  const rows = await deps.db
+  const rows = await db
     .select({
       id: account.id,
       name: account.name,
@@ -170,7 +184,7 @@ const readViewer = async (
     .from(account)
     .leftJoin(accountRole, eq(accountRole.account_id, account.id))
     .leftJoin(accountAvatar, eq(accountAvatar.account_id, account.id))
-    .where(eq(account.id, payload.account_id))
+    .where(eq(account.id, accountId))
 
   const first = rows[0]
   if (first === undefined) return undefined

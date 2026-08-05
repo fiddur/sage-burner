@@ -292,15 +292,15 @@ describe('POST /api/auth/login', () => {
     expect(selects.count).toBeGreaterThan(0)
   })
 
-  it('issues no cookie when the roles lookup fails', async () => {
+  it('issues no cookie when the viewer lookup fails', async () => {
     // The cookie is set after every query that can fail, not before. `reply
-    // .header` sticks to the reply, so the natural order — issue, then look up
-    // roles — answers 500 with a valid session attached: the member is told the
+    // .header` sticks to the reply, so the natural order — issue, then read the
+    // viewer — answers 500 with a valid session attached: the member is told the
     // login failed while being signed in, and their next request works for no
     // reason they can see.
     const server = await build()
     await givenAccount({ email: 'ada@example.org', password: 'a good long passphrase' })
-    breakSelectsAfter(1) // the account lookup succeeds; the roles lookup does not
+    breakSelectsAfter(1) // the password lookup succeeds; the viewer lookup does not
 
     const response = await login(server, 'ada@example.org', 'a good long passphrase')
 
@@ -363,9 +363,10 @@ describe('GET /api/auth/me', () => {
     expect(response.json()).toMatchObject({ viewer: { roles: [] } })
   })
 
-  // `Viewer.roles` is derived twice: `viewerFor` uses a left join, the login handler
-  // uses `rolesFor`. Both routes return a `Viewer`, and only `/me` was covered — so
-  // nothing would notice if the two drifted.
+  // Both routes answer with a `Viewer`, and only `/me` was covered — so nothing
+  // would notice if the two disagreed. They read it through one function now,
+  // `viewerOf`, which is what made them stop being able to; this is what says so,
+  // and what would fail if a third caller went back to assembling its own.
   //
   // `it.each` rather than a loop inside one `it`: `build()` overwrites the
   // module-level `handle` and `app`, and `afterEach` closes only whatever was
@@ -393,12 +394,10 @@ describe('GET /api/auth/me', () => {
       const fromLogin = loggedIn.json().viewer
       const fromMe = me.json().viewer
 
-      // Compared as a set, not a sequence. Neither query orders: `rolesFor` does a
-      // bare `SELECT role FROM account_role WHERE account_id = ?` and `viewerFor`
-      // reads them out of a left join, so the two agreeing on *order* is incidental
-      // — both plans happen to walk the same `(account_id, role)` composite-PK
-      // index. `toEqual` on the whole viewer would have pinned that accident as
-      // though it were the contract, and role order is not part of the contract.
+      // Compared as a set, not a sequence. Nothing in the query orders the roles —
+      // the plan happens to walk the `(account_id, role)` composite-PK index —
+      // and `toEqual` on the whole viewer would pin that accident as though it
+      // were the contract. Role order is not part of the contract.
       expect(fromMe.account_id).toEqual(fromLogin.account_id)
       expect([...fromMe.roles].sort()).toEqual([...fromLogin.roles].sort())
       expect([...fromMe.roles].sort()).toEqual([...roles].sort())

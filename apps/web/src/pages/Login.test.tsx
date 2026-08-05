@@ -1,7 +1,13 @@
+import type {
+  AuthenticationResponseJSON,
+  PublicKeyCredentialRequestOptionsJSON,
+} from '@simplewebauthn/browser'
+
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { AppApi } from '../app.tsx'
+import type { Ceremony, PasskeyApi } from '../passkey.ts'
 
 import { apiError } from '../api/client.ts'
 import { ViewerProvider } from '../viewer.tsx'
@@ -14,10 +20,23 @@ import { Login } from './Login.tsx'
 
 afterEach(cleanup)
 
+/**
+ * The passkey half is stubbed to reject: these tests are about the password form,
+ * and a stub that resolved would let one of them pass while the ceremony it
+ * silently ran did nothing. The `signing in with a passkey` block below supplies
+ * its own.
+ */
+const noPasskeys = (): PasskeyApi => ({
+  startPasskeyRegistration: () => Promise.reject(new Error('startPasskeyRegistration is not stubbed here')),
+  addPasskey: () => Promise.reject(new Error('addPasskey is not stubbed here')),
+  startPasskeyLogin: () => Promise.reject(new Error('startPasskeyLogin is not stubbed here')),
+  finishPasskeyLogin: () => Promise.reject(new Error('finishPasskeyLogin is not stubbed here')),
+})
+
 const renderLogin = (login: AppApi['login']) =>
   render(
     <ViewerProvider viewer={{ status: 'signed-out' }}>
-      <Login api={{ login }} />
+      <Login api={{ login, ...noPasskeys() }} />
     </ViewerProvider>,
   )
 
@@ -172,7 +191,7 @@ describe('Login', () => {
     // be typed into.
     render(
       <ViewerProvider viewer={{ status: 'loading' }}>
-        <Login api={{ login: vi.fn(() => Promise.resolve({ viewer: null })) }} />
+        <Login api={{ login: vi.fn(() => Promise.resolve({ viewer: null })), ...noPasskeys() }} />
       </ViewerProvider>,
     )
 
@@ -187,5 +206,100 @@ describe('Login', () => {
 
     const note = await screen.findByText(/Accounts are created by invitation/)
     expect(note.textContent).toContain('ask someone with admin')
+  })
+})
+
+describe('signing in with a passkey', () => {
+  const ASSERTION: AuthenticationResponseJSON = {
+    id: 'cred-1',
+    rawId: 'cred-1',
+    response: { clientDataJSON: 'client', authenticatorData: 'auth', signature: 'signature' },
+    clientExtensionResults: {},
+    type: 'public-key',
+  }
+
+  const ceremonyOf = (over: Partial<Ceremony> = {}): Ceremony => ({
+    register: () => Promise.reject(new Error('not used here')),
+    authenticate: () => Promise.resolve(ASSERTION),
+    ...over,
+  })
+
+  const REQUEST_OPTIONS: PublicKeyCredentialRequestOptionsJSON = {
+    challenge: 'from-the-server',
+    rpId: 'burn.example.org',
+  }
+
+  const renderWithPasskeys = (
+    api: Partial<PasskeyApi & Pick<AppApi, 'login'>>,
+    ceremony = ceremonyOf(),
+    passkeys = true,
+  ) =>
+    render(
+      <ViewerProvider viewer={{ status: 'signed-out' }}>
+        <Login
+          api={{
+            login: () => Promise.reject(new Error('login is not stubbed here')),
+            ...noPasskeys(),
+            ...api,
+          }}
+          ceremony={ceremony}
+          passkeys={passkeys}
+        />
+      </ViewerProvider>,
+    )
+
+  it('signs in without an email or a password', async () => {
+    // Usernameless: the browser offers whatever it holds for this domain, so
+    // nothing is typed and nothing here says which addresses have accounts.
+    const login = vi.fn<AppApi['login']>(() => Promise.reject(new Error('the password route was used')))
+    const finish = vi.fn(() =>
+      Promise.resolve({ viewer: { account_id: 'a-1', name: 'Ada', avatar: null, roles: [] } }),
+    )
+    renderWithPasskeys({
+      login,
+      startPasskeyLogin: () => Promise.resolve({ options: REQUEST_OPTIONS }),
+      finishPasskeyLogin: finish,
+    })
+
+    screen.getByRole('button', { name: 'Use a passkey' }).click()
+
+    expect(await screen.findByText('You are signed in')).toBeTruthy()
+    expect(finish).toHaveBeenCalledWith({ response: ASSERTION })
+    expect(login).not.toHaveBeenCalled()
+  })
+
+  it('says nothing when the member closes the dialog', async () => {
+    const aborted = new Error('cancelled')
+    aborted.name = 'NotAllowedError'
+    renderWithPasskeys(
+      { startPasskeyLogin: () => Promise.resolve({ options: { challenge: 'c' } }) },
+      ceremonyOf({ authenticate: () => Promise.reject(aborted) }),
+    )
+
+    screen.getByRole('button', { name: 'Use a passkey' }).click()
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Use a passkey' }).hasAttribute('disabled')).toBe(false),
+    )
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('points at the password when the passkey is refused', async () => {
+    renderWithPasskeys({
+      startPasskeyLogin: () => Promise.resolve({ options: REQUEST_OPTIONS }),
+      finishPasskeyLogin: () => Promise.reject(new Error('nope')),
+    })
+
+    screen.getByRole('button', { name: 'Use a passkey' }).click()
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Try your password instead.')
+  })
+
+  it('offers no button where passkeys cannot work', () => {
+    // An old browser, or a page not on HTTPS. The password form is still there.
+    renderWithPasskeys({}, ceremonyOf(), false)
+
+    expect(screen.queryByRole('button', { name: 'Use a passkey' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Log in' })).toBeTruthy()
   })
 })

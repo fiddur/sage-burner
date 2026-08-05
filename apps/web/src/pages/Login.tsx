@@ -1,9 +1,13 @@
+import type { MeResponse } from '@sage-burner/shared'
+
 import { useRef, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
+import type { Ceremony, PasskeyApi } from '../passkey.ts'
 
 import { isApiError } from '../api/client.ts'
 import { FormError, useFormError } from '../components/FormError.tsx'
+import { messageForCeremony, passkeysWork, signInWithPasskey } from '../passkey.ts'
 import { useSetViewer, useViewer } from '../viewer.tsx'
 
 /**
@@ -32,7 +36,16 @@ const messageForFailure = (failure: unknown): string => {
  * send a reset through (#30). An admin resets a password out of band until
  * either exists — saying so here is better than a dead link.
  */
-export const Login = ({ api }: { api: Pick<ApiClient, 'login'> }) => {
+export const Login = ({
+  api,
+  ceremony,
+  passkeys = passkeysWork(),
+}: {
+  api: Pick<ApiClient, 'login'> & PasskeyApi
+  ceremony?: Ceremony
+  /** Injectable: `navigator.credentials` is absent under happy-dom. */
+  passkeys?: boolean
+}) => {
   const viewer = useViewer()
   const setViewer = useSetViewer()
 
@@ -72,6 +85,46 @@ export const Login = ({ api }: { api: Pick<ApiClient, 'login'> }) => {
     )
   }
 
+  /**
+   * Both ways in end here.
+   *
+   * The API answers 401 for a failed login, so a 200 with no viewer is a
+   * contradiction rather than a rejection. Saying "wrong password" would send
+   * someone hunting for a typo that is not there.
+   */
+  const arrive = (signedIn: MeResponse['viewer']) => {
+    if (signedIn === null) {
+      setError('Signed in, but the server did not say who as. Please try again.')
+      return
+    }
+
+    setViewer({
+      id: signedIn.account_id,
+      name: signedIn.name,
+      avatar: signedIn.avatar,
+      roles: signedIn.roles,
+    })
+  }
+
+  const withPasskey = async () => {
+    if (inFlight.current) return
+
+    inFlight.current = true
+    setSubmitting(true)
+    setError(undefined)
+
+    try {
+      arrive((await signInWithPasskey(api, ceremony)).viewer)
+    } catch (failure) {
+      // Undefined for a dialog the member closed, which is not a failure to
+      // report — the form is still there, and so is the button.
+      setError(messageForCeremony(failure, 'That passkey did not sign you in. Try your password instead.'))
+    } finally {
+      inFlight.current = false
+      setSubmitting(false)
+    }
+  }
+
   const submit = async (event: Event) => {
     event.preventDefault()
     if (inFlight.current) return
@@ -81,21 +134,7 @@ export const Login = ({ api }: { api: Pick<ApiClient, 'login'> }) => {
     setError(undefined)
 
     try {
-      const { viewer: signedIn } = await api.login({ email, password })
-      if (signedIn === null) {
-        // The API answers 401 for a failed login, so a 200 with no viewer is a
-        // contradiction rather than a rejection. Saying "wrong password" would
-        // send someone hunting for a typo that is not there.
-        setError('Signed in, but the server did not say who as. Please try again.')
-        return
-      }
-
-      setViewer({
-        id: signedIn.account_id,
-        name: signedIn.name,
-        avatar: signedIn.avatar,
-        roles: signedIn.roles,
-      })
+      arrive((await api.login({ email, password })).viewer)
     } catch (failure) {
       // Three cases, because they want different behaviour from the member.
       //
@@ -153,6 +192,20 @@ export const Login = ({ api }: { api: Pick<ApiClient, 'login'> }) => {
           {submitting ? 'Signing in…' : 'Log in'}
         </button>
       </form>
+
+      {passkeys && (
+        <p class="row">
+          {/*
+            Outside the form on purpose: inside it, a browser that ignores
+            `type="button"` would submit the empty email and password and answer a
+            401 over a ceremony that had not failed.
+          */}
+          <button type="button" disabled={submitting} onClick={() => void withPasskey()}>
+            Use a passkey
+          </button>
+          <span class="form-note">If you have registered one on this device.</span>
+        </p>
+      )}
 
       <p class="form-note">
         Accounts are created by invitation, so there is nothing to sign up for here. If you have lost your

@@ -1,4 +1,4 @@
-import type { MeResponse, Viewer } from '@sage-burner/shared'
+import type { MeResponse } from '@sage-burner/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
 import { apiRoutes, errorResponse, loginRequestSchema } from '@sage-burner/shared'
@@ -10,8 +10,8 @@ import type { Config } from '../config.ts'
 import type { Database } from '../db/index.ts'
 
 import { hashPassword, needsRehash, verifyPassword } from '../auth/password.ts'
-import { SESSION_COOKIE, viewerFor } from '../auth/viewer.ts'
-import { account, accountAvatar, accountRole } from '../db/schema.ts'
+import { SESSION_COOKIE, viewerFor, viewerOf } from '../auth/viewer.ts'
+import { account } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 
 /**
@@ -63,15 +63,6 @@ export const cookieHeader = (token: string, config: Config, maxAgeSeconds: numbe
   return parts.join('; ')
 }
 
-const rolesFor = async (db: Database, accountId: string) => {
-  const rows = await db
-    .select({ role: accountRole.role })
-    .from(accountRole)
-    .where(eq(accountRole.account_id, accountId))
-
-  return rows.map((row) => row.role)
-}
-
 export interface AuthRouteDeps {
   db: Database
   config: Config
@@ -92,14 +83,8 @@ export const registerAuthRoutes = (app: FastifyInstance, { db, config, sessions,
     }
 
     const [row] = await db
-      .select({
-        id: account.id,
-        name: account.name,
-        avatar: accountAvatar.updated_at,
-        password_hash: account.password_hash,
-      })
+      .select({ id: account.id, password_hash: account.password_hash })
       .from(account)
-      .leftJoin(accountAvatar, eq(accountAvatar.account_id, account.id))
       .where(eq(account.email, parsed.data.email))
       .limit(1)
 
@@ -134,19 +119,18 @@ export const registerAuthRoutes = (app: FastifyInstance, { db, config, sessions,
       }
     }
 
-    // Roles first, then the cookie. The other order reads more naturally and is
-    // wrong: `reply.header` sticks to the reply, so a database failure in
-    // `rolesFor` answers 500 with a valid session cookie already attached — the
+    // The viewer first, then the cookie. The other order reads more naturally and
+    // is wrong: `reply.header` sticks to the reply, so a database failure while
+    // reading it answers 500 with a valid session cookie already attached — the
     // member is told the login failed while being signed in, and the next
     // request succeeds for no reason they can see. Nothing is issued until
     // every query that can fail has succeeded.
-    const roles = await rolesFor(db, row.id)
+    const viewer = await viewerOf(db, row.id)
+    if (viewer === undefined) return reply.code(401).send(errorResponse('invalid_credentials'))
 
     void reply.header('set-cookie', cookieHeader(sessions.issue(row.id), config, config.session_ttl_seconds))
 
-    return reply.code(200).send({
-      viewer: { account_id: row.id, name: row.name, avatar: row.avatar, roles } satisfies Viewer,
-    } satisfies MeResponse)
+    return reply.code(200).send({ viewer } satisfies MeResponse)
   }
 
   app.post(apiRoutes.login.fastify, async (request, reply) => {
