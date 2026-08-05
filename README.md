@@ -1222,6 +1222,66 @@ Folding counts **octets, not characters**, per RFC 5545: a place emoji is four
 bytes, so a line that looks short can be well over the 75-octet limit, and a fold
 in the middle of a multi-byte sequence corrupts it.
 
+## Meals
+
+Who cooks, who helps and who washes up — the spreadsheet's Meal tab (#210).
+
+**`meal_slot` is a template, `meal` is a sitting.** An organiser sets the times once
+per burn — Lunch 13:00, Dinner 18:00, and for some burns a Morning cleanup at 09:00,
+which is why a slot carries a **kind**. Generating from those writes the rows.
+
+**Generated, not derived**, and that was reversed mid-build. Deriving each sitting
+from its slot means nothing to keep in sync — and means every sitting is identical to
+its template forever: no postponing Saturday's dinner, no dropping lunch on the day
+everybody leaves, no adding a late supper. Each would have needed an exceptions table,
+which is worse than the rows it would be excepting.
+
+Generating **adds what is missing and touches nothing else**, so it is safe to press
+again after adding a slot or moving the dates. It **never removes** one: somebody may
+already have signed up to cook it. A sitting already exists when the burn has one that
+day with that name, which a unique index says too — so a meal that has been moved
+stays moved.
+
+The slot's values are **copied with no link back**. Renaming a slot leaves what it has
+already made alone, the same call the repeatable dream makes about its copies.
+
+**Which days a sitting falls on comes from the burn's hours, not its days.** A 13:00
+lunch on a day the gates open at 16:00 is not a meal anyone eats, and a day that ends
+at noon has no dinner — which is why the spreadsheet's own plan starts at a Sunday
+dinner and ends at a Sunday lunch.
+
+### Who may do what
+
+Any approved member takes a lead, hands one over, stands for the helpers or the
+cleanup crew, writes a food idea, moves a sitting or renames it, and rewrites the
+words above the table. This replaces a tab everyone could edit, and the lead-roles
+register made the same call.
+
+**Adding and dropping a sitting stay admin's**, under `/api/admin/`: those decide
+whether people get fed. Moving one does not, because the schedule is the members' to
+arrange (#20) — a meal you could see in the grid but not nudge would be the one block
+on it nobody could touch.
+
+Roles reference an `attendance`, so only somebody coming can be on one and withdrawing
+takes them off everything. One lead per sitting, which a partial unique index enforces;
+the other two are unbounded, because nothing runs out of people willing to wash up.
+
+### The kitchen is not a place
+
+It is a lane the schedule draws itself, from the meals. So **nothing but cooking,
+fetching food and washing up can be put in it** — a dream dropped there does not land,
+and a meal dropped in an ordinary lane does not either. A burn with no meals gets no
+column at all, which is also the on/off switch: there is no setting.
+
+Each sitting draws three blocks — two hours cooking, the hour of eating, the hour
+washing up. A `chore` draws one hour of itself, because cooking for a morning cleanup
+is nonsense.
+
+**Dragging any block moves the meal, and the block lands where it was dropped**: pull
+the cooking block to 12:00 and the meal is at 14:00. **There is no resize handle** —
+the three blocks come from one time, so there is nothing to make longer; changing the
+length would mean changing what "cooking" means.
+
 ## Dreams
 
 The workshops, ceremonies and happenings members offer each other. **A dream with

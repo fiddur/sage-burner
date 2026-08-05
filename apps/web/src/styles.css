@@ -854,3 +854,30 @@ a:hover {
 .meal-intro {
   margin-block-end: 1rem;
 }
+
+/*
+  The kitchen's blocks. Not draggable-looking in the same way a dream is: a meal is
+  the burn's plan rather than somebody's offer, and its length is not its own.
+*/
+.meal-chip {
+  cursor: grab;
+  font-size: 0.8rem;
+}
+
+.meal-cook,
+.meal-clean {
+  opacity: 0.75;
+}
+
+.meal-slot-list {
+  list-style: none;
+  margin: 0.5rem 0;
+  padding: 0;
+}
+
+.meal-slot-list li {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.15rem 0;
+}
