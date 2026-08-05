@@ -65,7 +65,9 @@ describe('the route manifest', () => {
     }
   })
 
-  it('describes every route as one of the five verbs, and none twice', () => {
+  it('declares no (method, path) pair twice', () => {
+    // Only the uniqueness half is asserted here. That a method is one of the five is
+    // `ApiMethod`'s job, and restating a type as a test is a test that cannot fail.
     const seen = new Set<string>()
 
     for (const key of keys) {

@@ -112,7 +112,7 @@ export const registerRosterRoutes = (
   )
 
   app.patch<{ Params: { eventId: string; accountId: string } }>(
-    '/api/admin/events/:eventId/attendance/:accountId/payment',
+    apiRoutes.setPayment.fastify,
     async (request, reply) => {
       void noStore(reply)
 

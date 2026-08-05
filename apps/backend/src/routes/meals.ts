@@ -346,12 +346,12 @@ export const registerMealRoutes = (
     }
 
   app.put<{ Params: { id: string; role: string } }>(
-    '/api/meals/:id/:role/me',
+    apiRoutes.joinMealCrew.fastify,
     { preHandler: requireApproved },
     stand(true),
   )
   app.delete<{ Params: { id: string; role: string } }>(
-    '/api/meals/:id/:role/me',
+    apiRoutes.leaveMealCrew.fastify,
     { preHandler: requireApproved },
     stand(false),
   )

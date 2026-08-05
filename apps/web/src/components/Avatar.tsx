@@ -1,3 +1,5 @@
+import { apiRoutes } from '@sage-burner/shared'
+
 import { AVATAR_PIXELS } from '../avatar.ts'
 import { initials } from '../initials.ts'
 
@@ -37,7 +39,7 @@ export const Avatar = ({
   return (
     <img
       class={classes}
-      src={`/api/accounts/${encodeURIComponent(accountId)}/avatar?v=${encodeURIComponent(avatar)}`}
+      src={`${apiRoutes.accountAvatar.path(accountId)}?v=${encodeURIComponent(avatar)}`}
       // The name is beside it wherever this is drawn — on the chip as a title, in the
       // corner as the link's label — so repeating it here would have a screen reader
       // say it twice.

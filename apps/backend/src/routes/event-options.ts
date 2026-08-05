@@ -166,7 +166,7 @@ export const registerEventOptionRoutes = (app: FastifyInstance, { db, sessions }
   )
 
   app.put<{ Params: { eventId: string; kind: string } }>(
-    '/api/events/:eventId/options/:kind/order',
+    apiRoutes.reorderEventOptions.fastify,
     { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)

@@ -327,7 +327,7 @@ export const registerAttendanceRoutes = (
   })
 
   app.delete<{ Params: { eventId: string; accountId: string } }>(
-    '/api/admin/events/:eventId/attendance/:accountId',
+    apiRoutes.adminRemoveAttendance.fastify,
     async (request, reply) => {
       void noStore(reply)
 

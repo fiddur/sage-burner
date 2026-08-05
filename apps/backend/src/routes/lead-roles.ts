@@ -340,7 +340,7 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
   )
 
   app.delete<{ Params: { id: string; accountId: string } }>(
-    '/api/roles/:id/team/:accountId',
+    apiRoutes.leaveLeadRoleTeam.fastify,
     { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)
