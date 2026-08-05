@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
 
-import { hourOf, hoursOf, laneCells, resizedEnd, rowSpanOf, rowsDragged } from './schedule.ts'
+import {
+  hourOf,
+  hoursOf,
+  laneCells,
+  mealBlocks,
+  mealMovedTo,
+  resizedEnd,
+  rowSpanOf,
+  rowsDragged,
+} from './schedule.ts'
 
 describe('the timetable rows', () => {
   it('covers every hour of every day when the burn runs the whole days', () => {
@@ -248,5 +257,68 @@ describe('how far a pointer dragged, in rows', () => {
     // half of this gesture wants a click-through in a browser. Guarded rather than
     // left to produce Infinity and a resize to the end of time.
     expect(rowsDragged(120, 0)).toBe(0)
+  })
+})
+
+describe('the blocks a meal draws', () => {
+  const dinner = { id: 'm-1', date: '2026-08-01', at: '18:00', label: 'Dinner', kind: 'meal' as const }
+
+  it('cooks for two hours, eats for one and washes up for one', () => {
+    // Pinned to Europe/Stockholm: 18:00 local in August is 16:00Z.
+    expect(mealBlocks(dinner)).toEqual([
+      {
+        id: 'm-1:cook',
+        meal_id: 'm-1',
+        part: 'cook',
+        title: 'Cooking · Dinner',
+        time_slot_start: '2026-08-01T14:00:00.000Z',
+        time_slot_end: '2026-08-01T16:00:00.000Z',
+      },
+      {
+        id: 'm-1:serve',
+        meal_id: 'm-1',
+        part: 'serve',
+        title: 'Dinner',
+        time_slot_start: '2026-08-01T16:00:00.000Z',
+        time_slot_end: '2026-08-01T17:00:00.000Z',
+      },
+      {
+        id: 'm-1:clean',
+        meal_id: 'm-1',
+        part: 'clean',
+        title: 'Cleanup · Dinner',
+        time_slot_start: '2026-08-01T17:00:00.000Z',
+        time_slot_end: '2026-08-01T18:00:00.000Z',
+      },
+    ])
+  })
+
+  it('draws a chore as one hour of itself, since cooking for a cleanup is nonsense', () => {
+    const blocks = mealBlocks({ ...dinner, label: 'Morning cleanup', at: '09:00', kind: 'chore' })
+
+    expect(blocks).toHaveLength(1)
+    expect(blocks[0]).toMatchObject({ part: 'serve', title: 'Morning cleanup' })
+  })
+
+  it('draws nothing for a meal whose time makes no sense', () => {
+    expect(mealBlocks({ ...dinner, at: 'noon' })).toEqual([])
+  })
+})
+
+describe('dropping one of a meal’s blocks', () => {
+  it('puts the block where it landed, and the meal follows', () => {
+    // Cooking is the two hours before, so dropping it on 12:00 is a 14:00 meal.
+    expect(mealMovedTo('cook', '2026-08-02T12:00')).toEqual({ date: '2026-08-02', at: '14:00' })
+    expect(mealMovedTo('serve', '2026-08-02T14:00')).toEqual({ date: '2026-08-02', at: '14:00' })
+    expect(mealMovedTo('clean', '2026-08-02T15:00')).toEqual({ date: '2026-08-02', at: '14:00' })
+  })
+
+  it('carries the meal onto another day when the offset crosses midnight', () => {
+    // Dropping the cleanup block on 00:00 means a meal at 23:00 the night before.
+    expect(mealMovedTo('clean', '2026-08-03T00:00')).toEqual({ date: '2026-08-02', at: '23:00' })
+  })
+
+  it('answers nothing for a row that is not a time', () => {
+    expect(mealMovedTo('serve', 'whenever')).toBeUndefined()
   })
 })

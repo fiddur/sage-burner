@@ -190,3 +190,79 @@ export const laneCells = (rows: readonly string[], dreams: readonly Placed[]): L
 
   return cells
 }
+
+export interface MealBlock {
+  id: string
+  title: string
+  time_slot_start: string
+  time_slot_end: string
+  meal_id: string
+  part: MealPart
+}
+
+/**
+ * Which of a meal's three blocks this is.
+ *
+ * The offsets are what makes a drag land where it was dropped: pull the cooking
+ * block to 12:00 and the meal is at 14:00, because cooking is the two hours before.
+ */
+export type MealPart = 'clean' | 'cook' | 'serve'
+
+const OFFSET_HOURS: Record<MealPart, number> = { cook: -2, serve: 0, clean: 1 }
+
+/**
+ * The blocks one sitting draws in the kitchen lane.
+ *
+ * Two hours cooking, the hour of eating, the hour washing up — the shape a burn's
+ * kitchen actually runs on. A `chore` draws one block of its own hour instead:
+ * cooking for a morning cleanup is nonsense.
+ *
+ * `date` and `at` are local wall-clock, which is what the grid's rows are; the ends
+ * come back as instants, which is what everything else on the page speaks.
+ */
+export const mealBlocks = (meal: {
+  id: string
+  date: string
+  at: string
+  label: string
+  kind: 'chore' | 'meal'
+}): MealBlock[] => {
+  const at = new Date(`${meal.date}T${meal.at}`)
+  if (Number.isNaN(at.getTime())) return []
+
+  const hour = 60 * 60 * 1000
+  const from = (hours: number) => new Date(at.getTime() + hours * hour).toISOString()
+  const block = (part: MealPart, title: string, start: number, end: number): MealBlock => ({
+    id: `${meal.id}:${part}`,
+    meal_id: meal.id,
+    part,
+    title,
+    time_slot_start: from(start),
+    time_slot_end: from(end),
+  })
+
+  if (meal.kind === 'chore') return [block('serve', meal.label, 0, 1)]
+
+  return [
+    block('cook', `Cooking · ${meal.label}`, -2, 0),
+    block('serve', meal.label, 0, 1),
+    block('clean', `Cleanup · ${meal.label}`, 1, 2),
+  ]
+}
+
+/**
+ * Where a meal ends up when one of its blocks is dropped on `row`.
+ *
+ * The block lands where it was put and the meal follows, so dropping the cleanup
+ * block on 15:00 means a 14:00 meal. Local wall-clock both ways — a meal is stored
+ * as a date and a clock time, not as an instant.
+ */
+export const mealMovedTo = (part: MealPart, row: string): { date: string; at: string } | undefined => {
+  const at = new Date(row)
+  if (Number.isNaN(at.getTime())) return undefined
+
+  at.setHours(at.getHours() - OFFSET_HOURS[part])
+  const local = toLocalInput(at.toISOString())
+
+  return local === '' ? undefined : { date: local.slice(0, 10), at: local.slice(11) }
+}
