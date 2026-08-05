@@ -445,3 +445,131 @@ describe('the plan itself', () => {
     expect((await listMeals(server, ada.cookie)).intro_markdown).toContain('Breakfast is DIY')
   })
 })
+
+describe('a burn that has ended', () => {
+  /**
+   * The rule every bare-id route here follows: the burn is resolved from the row and
+   * refused if it is over. Without it a dream in a past burn could not be moved while
+   * the meal block beside it on the same grid could, and anybody could rewrite who
+   * cooked last summer.
+   */
+  const ENDED = 'b1b2b3b4-0000-4000-8000-00000000dead'
+
+  const setUp = async () => {
+    const server = await build()
+    await db().insert(event).values({
+      id: ENDED,
+      name: 'Last summer',
+      slug: 'last-summer',
+      start_date: '2025-08-01',
+      end_date: '2025-08-03',
+      start_time: '00:00',
+      end_time: '23:59',
+      member_cap: 42,
+      created_at: NOW,
+    })
+    const organiser = await givenAccount(['admin', 'member'])
+    await db().insert(attendance).values({
+      id: randomUUID(),
+      event_id: ENDED,
+      account_id: organiser.id,
+      joined_at: NOW,
+      payment_status: 'unpaid',
+    })
+    await send(server, 'POST', `/api/admin/events/${ENDED}/meal-slots`, organiser.cookie, {
+      label: 'Dinner',
+      at: '18:00',
+    })
+    await send(server, 'POST', `/api/admin/events/${ENDED}/meals/generate`, organiser.cookie)
+    const [meal] = (await send(server, 'GET', `/api/events/${ENDED}/meals`, organiser.cookie)).json().meals
+
+    return { server, organiser, meal }
+  }
+
+  it('refuses every member-facing write', async () => {
+    const { server, organiser, meal } = await setUp()
+
+    expect(
+      (await send(server, 'PATCH', `/api/meals/${meal.id}`, organiser.cookie, { at: '19:00' })).statusCode,
+    ).toBe(404)
+    expect(
+      (
+        await send(server, 'PUT', `/api/meals/${meal.id}/lead`, organiser.cookie, {
+          account_id: organiser.id,
+        })
+      ).statusCode,
+    ).toBe(404)
+    expect((await send(server, 'PUT', `/api/meals/${meal.id}/helper/me`, organiser.cookie)).statusCode).toBe(
+      404,
+    )
+    expect(
+      (await send(server, 'DELETE', `/api/meals/${meal.id}/cleanup/me`, organiser.cookie)).statusCode,
+    ).toBe(404)
+    expect(
+      (await send(server, 'PUT', `/api/meals/${meal.id}/idea`, organiser.cookie, { food_idea: 'x' }))
+        .statusCode,
+    ).toBe(404)
+    expect(
+      (
+        await send(server, 'PATCH', `/api/events/${ENDED}/meal-intro`, organiser.cookie, {
+          meal_intro_markdown: 'x',
+        })
+      ).statusCode,
+    ).toBe(404)
+  })
+
+  it('leaves the record alone when a write is refused', async () => {
+    const { server, organiser, meal } = await setUp()
+
+    await send(server, 'PATCH', `/api/meals/${meal.id}`, organiser.cookie, { at: '19:00' })
+    await send(server, 'PUT', `/api/meals/${meal.id}/idea`, organiser.cookie, { food_idea: 'Tacos' })
+
+    const after = (await send(server, 'GET', `/api/events/${ENDED}/meals`, organiser.cookie)).json().meals[0]
+    expect(after.at).toBe('18:00')
+    expect(after.food_idea).toBe('')
+  })
+
+  it('still reads it, because a finished burn’s meals are its record', async () => {
+    const { server, organiser } = await setUp()
+
+    const response = await send(server, 'GET', `/api/events/${ENDED}/meals`, organiser.cookie)
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().meals).toHaveLength(3)
+  })
+
+  it('still takes every one of those writes on a burn that has not ended', async () => {
+    // The passing sibling for all six: a guard that refused unconditionally would
+    // satisfy the test above while making the feature useless.
+    const server = await build()
+    await givenBurn()
+    const organiser = await givenAccount(['admin'])
+    const ada = await givenAttending()
+    await addSlot(server, organiser.cookie, { label: 'Dinner', at: '18:00' })
+    await generate(server, organiser.cookie)
+    const [meal] = (await listMeals(server, ada.cookie)).meals
+
+    expect(
+      (await send(server, 'PATCH', `/api/meals/${meal.id}`, ada.cookie, { at: '19:00' })).statusCode,
+    ).toBe(200)
+    expect(
+      (await send(server, 'PUT', `/api/meals/${meal.id}/lead`, ada.cookie, { account_id: ada.id }))
+        .statusCode,
+    ).toBe(200)
+    expect((await send(server, 'PUT', `/api/meals/${meal.id}/helper/me`, ada.cookie)).statusCode).toBe(200)
+    expect((await send(server, 'DELETE', `/api/meals/${meal.id}/cleanup/me`, ada.cookie)).statusCode).toBe(
+      200,
+    )
+    expect(
+      (await send(server, 'PUT', `/api/meals/${meal.id}/idea`, ada.cookie, { food_idea: 'Tacos' }))
+        .statusCode,
+    ).toBe(200)
+    expect(
+      (
+        await send(server, 'PATCH', `/api/events/${BURN}/meal-intro`, ada.cookie, {
+          meal_intro_markdown: 'x',
+        })
+      ).statusCode,
+    ).toBe(200)
+  })
+})

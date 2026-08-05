@@ -23,6 +23,7 @@ import { isForeignKeyViolation } from '../db/errors.ts'
 import { account, attendance, event, meal, mealRole, mealSlot } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 import { attendanceFor } from './attendance.ts'
+import { openEvent, todayIso } from './events.ts'
 
 export interface MealDeps extends GuardDeps {
   now?: () => Date
@@ -149,12 +150,29 @@ const burnFor = async (db: Database, eventId: string) => {
  * the same reason. What stays admin's is the plan itself — the slots, and adding,
  * moving or dropping a sitting — which is why those live under `/api/admin/`.
  */
-export const registerMealRoutes = (app: FastifyInstance, { db, sessions }: MealDeps) => {
+export const registerMealRoutes = (
+  app: FastifyInstance,
+  { db, sessions, now = () => new Date() }: MealDeps,
+) => {
   const { requireApproved } = createGuards({ db, sessions })
 
-  const mealOr404 = async (id: string): Promise<MealRow | undefined> => {
+  /**
+   * The sitting, if its burn has not ended.
+   *
+   * Every write below is keyed by a bare meal id, so the burn is resolved from the
+   * row — `openEvent`, not `activeEvent`, because a plan is laid months ahead. A
+   * finished burn's meals are its record: readable, and not something an id noted
+   * while it was current should still be a way to rewrite.
+   *
+   * Without this a dream in a past burn could not be moved while the meal block
+   * beside it on the same grid could, and anybody could rewrite who cooked last
+   * summer.
+   */
+  const openMeal = async (id: string): Promise<MealRow | undefined> => {
     const [row] = await db.select().from(meal).where(eq(meal.id, id)).limit(1)
-    return row
+    if (row === undefined) return undefined
+
+    return (await openEvent(db, todayIso(now), row.event_id)) === undefined ? undefined : row
   }
 
   const answer = async (reply: FastifyReply, id: string) => {
@@ -192,6 +210,12 @@ export const registerMealRoutes = (app: FastifyInstance, { db, sessions }: MealD
       const parsed = mealIntroUpdateSchema.safeParse(request.body)
       if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
 
+      // Scoped like the writes below, and unlike `/events/:id/welcome`, which has the
+      // same gap — see #218. New code follows the rule rather than the neighbour.
+      if ((await openEvent(db, todayIso(now), request.params.eventId)) === undefined) {
+        return reply.code(404).send(errorResponse('not_found'))
+      }
+
       const [row] = await db
         .update(event)
         .set({ meal_intro_markdown: parsed.data.meal_intro_markdown })
@@ -220,7 +244,7 @@ export const registerMealRoutes = (app: FastifyInstance, { db, sessions }: MealD
       const parsed = mealLeadSchema.safeParse(request.body)
       if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
 
-      const existing = await mealOr404(request.params.id)
+      const existing = await openMeal(request.params.id)
       if (existing === undefined) return reply.code(404).send(errorResponse('not_found'))
 
       let taking: string | undefined
@@ -260,7 +284,7 @@ export const registerMealRoutes = (app: FastifyInstance, { db, sessions }: MealD
       const role = STANDING.find((candidate) => candidate === request.params.role)
       if (role === undefined) return reply.code(404).send(errorResponse('not_found'))
 
-      const existing = await mealOr404(request.params.id)
+      const existing = await openMeal(request.params.id)
       if (existing === undefined) return reply.code(404).send(errorResponse('not_found'))
 
       const viewer = await viewerFor(request, { db, sessions })
@@ -317,7 +341,7 @@ export const registerMealRoutes = (app: FastifyInstance, { db, sessions }: MealD
       const parsed = mealUpdateSchema.safeParse(request.body)
       if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
 
-      const existing = await mealOr404(request.params.id)
+      const existing = await openMeal(request.params.id)
       if (existing === undefined) return reply.code(404).send(errorResponse('not_found'))
 
       if (Object.keys(parsed.data).length > 0) {
@@ -347,13 +371,12 @@ export const registerMealRoutes = (app: FastifyInstance, { db, sessions }: MealD
       const parsed = mealIdeaUpdateSchema.safeParse(request.body)
       if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
 
-      const [row] = await db
-        .update(meal)
-        .set({ food_idea: parsed.data.food_idea.trim() })
-        .where(eq(meal.id, request.params.id))
-        .returning({ id: meal.id })
+      const existing = await openMeal(request.params.id)
+      if (existing === undefined) return reply.code(404).send(errorResponse('not_found'))
 
-      return row === undefined ? reply.code(404).send(errorResponse('not_found')) : answer(reply, row.id)
+      await db.update(meal).set({ food_idea: parsed.data.food_idea.trim() }).where(eq(meal.id, existing.id))
+
+      return answer(reply, existing.id)
     },
   )
 }
