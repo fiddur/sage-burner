@@ -7,13 +7,13 @@ import type { ApiClient } from '../api/client.ts'
 import type { LaneCell, MealBlock } from '../schedule.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
+import { Avatar } from '../components/Avatar.tsx'
 import { DreamDetails } from '../components/DreamDetails.tsx'
 import { DreamFields } from '../components/DreamFields.tsx'
 import { DreamPanel } from '../components/DreamPanel.tsx'
 import { MealDialog } from '../components/MealDialog.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
 import { fromLocalInput, toLocalInput } from '../datetime.ts'
-import { initials } from '../initials.ts'
 import { useAction, useLoad } from '../load.ts'
 import {
   endFor,
@@ -46,6 +46,8 @@ export type ScheduleApi = Pick<
   | 'leaveMealCrew'
   | 'setMealIdea'
 >
+
+type Person = EventAttendeesResponse['attendees'][number]
 
 type Timetable = {
   event: MyBurn['event'] | null
@@ -153,8 +155,8 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
   }
 
   const { event, places, sessions, attendees, meals } = loaded.data
-  // By id, because a chip has one and needs a name for the circle.
-  const names = new Map(attendees.map((person) => [person.account_id, person.name]))
+  // By id, because a chip has one and needs the name and the picture for its circle.
+  const people = new Map(attendees.map((person) => [person.account_id, person]))
 
   if (event === null) {
     return (
@@ -316,7 +318,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
       <div class="schedule">
         <Pool
           dreams={unscheduled}
-          names={names}
+          people={people}
           busy={busy}
           onDragStart={dragDream}
           onDragEnd={endDrag}
@@ -346,7 +348,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
             if (to) run(() => api.updateMeal(draggedMeal.meal_id, to), 'Could not move that meal.')
           }}
           dreams={sessions}
-          names={names}
+          people={people}
           busy={busy}
           onDragStart={dragDream}
           onDragEnd={endDrag}
@@ -381,7 +383,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
         dreams={sessions}
         places={places}
         attendees={attendees}
-        names={names}
+        people={people}
         viewerId={viewer.account?.id}
         busy={busy}
         error={error}
@@ -409,7 +411,7 @@ const Opened = ({
   dreams,
   places,
   attendees,
-  names,
+  people,
   viewerId,
   busy,
   error,
@@ -426,7 +428,7 @@ const Opened = ({
   dreams: readonly Session[]
   places: readonly Place[]
   attendees: readonly EventAttendeesResponse['attendees'][number][]
-  names: ReadonlyMap<string, string | null>
+  people: ReadonlyMap<string, Person>
   viewerId: string | undefined
   busy: boolean
   error: string | undefined
@@ -478,7 +480,7 @@ const Opened = ({
       places={places}
       attendees={attendees}
       facilitatorName={
-        dream.facilitator_account_id === null ? undefined : names.get(dream.facilitator_account_id)
+        dream.facilitator_account_id === null ? undefined : people.get(dream.facilitator_account_id)?.name
       }
       viewerId={viewerId}
       busy={busy}
@@ -504,7 +506,7 @@ const Framed = ({ children }: { children: ComponentChildren }) => (
 
 const Chip = ({
   dream,
-  names,
+  people,
   busy,
   resizable,
   onDragStart,
@@ -514,7 +516,7 @@ const Chip = ({
   onResize,
 }: {
   dream: Session
-  names: ReadonlyMap<string, string | null>
+  people: ReadonlyMap<string, Person>
   busy: boolean
   /** Only in the grid: there are no rows to pull against in the pool. */
   resizable: boolean
@@ -569,7 +571,7 @@ const Chip = ({
           </span>
         )}
       </button>
-      <Facilitator dream={dream} names={names} />
+      <Facilitator dream={dream} people={people} />
       <Support dream={dream} busy={busy} onSupport={onSupport} />
       {span(dream) !== null && <span class="dream-span">{span(dream)}</span>}
 
@@ -659,15 +661,15 @@ const Support = ({
  * best, and two of them in a lane get half that. Nothing when nobody has been handed
  * it — an empty circle would read as somebody whose name is missing.
  */
-const Facilitator = ({ dream, names }: { dream: Session; names: ReadonlyMap<string, string | null> }) => {
+const Facilitator = ({ dream, people }: { dream: Session; people: ReadonlyMap<string, Person> }) => {
   const who = dream.facilitator_account_id
   if (who === null) return null
 
-  const name = names.get(who) ?? null
+  const name = people.get(who)?.name ?? null
 
   return (
-    <span class="avatar dream-facilitator" title={name ?? 'Name not filled in yet'}>
-      <span aria-hidden="true">{initials(name)}</span>
+    <span class="dream-facilitator-wrap" title={name ?? 'Name not filled in yet'}>
+      <Avatar accountId={who} name={name} avatar={people.get(who)?.avatar ?? null} size="dream-facilitator" />
       <span class="visually-hidden">Facilitated by {name ?? 'somebody who has no name filled in'}</span>
     </span>
   )
@@ -675,7 +677,7 @@ const Facilitator = ({ dream, names }: { dream: Session; names: ReadonlyMap<stri
 
 const Pool = ({
   dreams,
-  names,
+  people,
   busy,
   onDragStart,
   onDragEnd,
@@ -686,7 +688,7 @@ const Pool = ({
   onDrop,
 }: {
   dreams: readonly Session[]
-  names: ReadonlyMap<string, string | null>
+  people: ReadonlyMap<string, Person>
   busy: boolean
   onDragStart: (id: string) => void
   onDragEnd: () => void
@@ -717,7 +719,7 @@ const Pool = ({
       <p key={dream.id}>
         <Chip
           dream={dream}
-          names={names}
+          people={people}
           busy={busy}
           resizable={false}
           onDragStart={onDragStart}
@@ -741,7 +743,7 @@ const Timetable = ({
   rows,
   places,
   dreams,
-  names,
+  people,
   busy,
   blocks,
   onDragStart,
@@ -759,7 +761,7 @@ const Timetable = ({
   places: readonly Place[]
   blocks: readonly MealBlock[]
   dreams: readonly Session[]
-  names: ReadonlyMap<string, string | null>
+  people: ReadonlyMap<string, Person>
   busy: boolean
   onDragStart: (id: string) => void
   onDragEnd: () => void
@@ -788,9 +790,25 @@ const Timetable = ({
   const kitchen = blocks.length === 0 ? undefined : laneCells(rows, blocks)
   const byId = new Map(blocks.map((block) => [block.id, block]))
 
+  // The lanes plus the kitchen, so the table can be told how narrow it may get before
+  // the wrapper scrolls instead.
+  const columns = places.length + (kitchen === undefined ? 0 : 1)
+
   return (
     <div class="schedule-grid-wrap">
-      <table class="schedule-grid">
+      <table class="schedule-grid" style={{ '--lanes': columns }}>
+        {/*
+          Fixed layout, so the lanes share what is left equally rather than sizing
+          themselves to whichever happens to hold the longest title. The time column
+          is `17ch`: the widest label it holds is `2026-10-03 00:00` on the daybreak
+          rows, which is sixteen mostly-numeric characters, plus one for slack.
+        */}
+        <colgroup>
+          <col class="schedule-time-col" />
+          {Array.from({ length: columns }, (_, at) => (
+            <col key={at} />
+          ))}
+        </colgroup>
         <thead>
           <tr>
             <th scope="col">Time</th>
@@ -845,7 +863,7 @@ const Timetable = ({
                             <Chip
                               key={full.id}
                               dream={full}
-                              names={names}
+                              people={people}
                               busy={busy}
                               resizable
                               onDragStart={onDragStart}
@@ -958,7 +976,7 @@ const KitchenCell = ({
 
   return (
     <td
-      class="schedule-cell place-grey"
+      class="schedule-cell schedule-kitchen"
       rowSpan={cell.kind === 'anchor' ? cell.span : undefined}
       onDragOver={(dragEvent) => dragEvent.preventDefault()}
       onDrop={(dropEvent) => {

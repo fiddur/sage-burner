@@ -22,7 +22,7 @@ const renderShell = (require: 'admin' | 'approved' | 'member', viewer: Viewer) =
 
 const signedInAs = (...roles: AccountRole[]): Viewer => ({
   status: 'signed-in',
-  account: { id: 'a-1', name: null, roles },
+  account: { id: 'a-1', name: null, avatar: null, roles },
 })
 
 const LOADING: Viewer = { status: 'loading' }

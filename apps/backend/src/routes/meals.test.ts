@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 
+import { eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it } from 'vitest'
 
@@ -10,7 +11,7 @@ import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, attendance, event } from '../db/schema.ts'
+import { account, accountRole, attendance, event, meal as mealTable } from '../db/schema.ts'
 import { sittingDates } from './meals.ts'
 
 const SECRET = 's'.repeat(40)
@@ -571,5 +572,105 @@ describe('a burn that has ended', () => {
         })
       ).statusCode,
     ).toBe(200)
+  })
+})
+
+describe('a chore', () => {
+  /**
+   * Nothing is cooked at a morning cleanup, so it has nobody leading the cooking and
+   * nobody helping with it — only cleaners. Refused rather than only hidden: the page
+   * not offering a control is not the rule.
+   */
+  const setUp = async () => {
+    const server = await build()
+    await givenBurn()
+    const organiser = await givenAccount(['admin'])
+    await addSlot(server, organiser.cookie, { label: 'Morning cleanup', at: '09:00', kind: 'chore' })
+    await addSlot(server, organiser.cookie, { label: 'Dinner', at: '18:00' })
+    await generate(server, organiser.cookie)
+    const ada = await givenAttending()
+    const meals = (await listMeals(server, ada.cookie)).meals
+    const chore = meals.find((one: { kind: string }) => one.kind === 'chore')
+    const meal = meals.find((one: { kind: string }) => one.kind === 'meal')
+
+    return { server, ada, chore, meal }
+  }
+
+  it('takes nobody as its lead', async () => {
+    const { server, ada, chore } = await setUp()
+
+    const response = await send(server, 'PUT', `/api/meals/${chore.id}/lead`, ada.cookie, {
+      account_id: ada.id,
+    })
+
+    expect(response.statusCode).toBe(400)
+  })
+
+  it('takes nobody to help cook, because nothing is cooked', async () => {
+    const { server, ada, chore } = await setUp()
+
+    expect((await send(server, 'PUT', `/api/meals/${chore.id}/helper/me`, ada.cookie)).statusCode).toBe(400)
+  })
+
+  it('takes cleaners, which is the whole of what it wants', async () => {
+    const { server, ada, chore } = await setUp()
+
+    const response = await send(server, 'PUT', `/api/meals/${chore.id}/cleanup/me`, ada.cookie)
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().meal.cleanup).toHaveLength(1)
+  })
+
+  it('leaves an ordinary meal alone', async () => {
+    // The passing sibling for all three: a rule applied to every sitting would
+    // satisfy them while making the feature useless.
+    const { server, ada, meal } = await setUp()
+
+    expect(
+      (await send(server, 'PUT', `/api/meals/${meal.id}/lead`, ada.cookie, { account_id: ada.id }))
+        .statusCode,
+    ).toBe(200)
+    expect((await send(server, 'PUT', `/api/meals/${meal.id}/helper/me`, ada.cookie)).statusCode).toBe(200)
+  })
+
+  it('lets somebody stand down from helping even after the slot became a chore', async () => {
+    // Only joining is refused. A sitting changed to a chore under somebody who had
+    // already put their name to it must not trap them there.
+    const { server, ada, meal } = await setUp()
+    await send(server, 'PUT', `/api/meals/${meal.id}/helper/me`, ada.cookie)
+    await db().update(mealTable).set({ kind: 'chore' }).where(eq(mealTable.id, meal.id))
+
+    const response = await send(server, 'DELETE', `/api/meals/${meal.id}/helper/me`, ada.cookie)
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().meal.helpers).toEqual([])
+  })
+})
+
+describe('a lead stranded by a slot becoming a chore', () => {
+  it('can still be vacated, though nobody new may be handed it', async () => {
+    // The same escape hatch standing down from a crew has: a sitting changed under
+    // whoever was leading it must not trap them there with no way off.
+    const server = await build()
+    await givenBurn()
+    const organiser = await givenAccount(['admin'])
+    await addSlot(server, organiser.cookie, { label: 'Dinner', at: '18:00' })
+    await generate(server, organiser.cookie)
+    const ada = await givenAttending()
+    const [meal] = (await listMeals(server, ada.cookie)).meals
+    await send(server, 'PUT', `/api/meals/${meal.id}/lead`, ada.cookie, { account_id: ada.id })
+
+    await db().update(mealTable).set({ kind: 'chore' }).where(eq(mealTable.id, meal.id))
+
+    const handed = await send(server, 'PUT', `/api/meals/${meal.id}/lead`, ada.cookie, {
+      account_id: ada.id,
+    })
+    expect(handed.statusCode).toBe(400)
+
+    const vacated = await send(server, 'PUT', `/api/meals/${meal.id}/lead`, ada.cookie, {
+      account_id: null,
+    })
+    expect(vacated.statusCode).toBe(200)
+    expect(vacated.json().meal.lead).toBeNull()
   })
 })

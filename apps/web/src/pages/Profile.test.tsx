@@ -25,6 +25,8 @@ const aProfile = (over: Partial<Profile> = {}): Profile => ({
 // details form is what these tests are looking at.
 const stub = (over: Partial<ProfileApi> = {}, profile = aProfile()): ProfileApi => ({
   getMyProfile: () => Promise.resolve({ profile }),
+  setMyAvatar: () => Promise.reject(new Error('setMyAvatar is not stubbed here')),
+  removeMyAvatar: () => Promise.reject(new Error('removeMyAvatar is not stubbed here')),
   updateMyProfile: () => Promise.reject(new Error('updateMyProfile is not stubbed here')),
   getMyBurns: () => Promise.resolve({ coming: [], past: [] }),
   getEventOptions: () => Promise.reject(new Error('getEventOptions is not stubbed here')),
@@ -42,7 +44,10 @@ const stub = (over: Partial<ProfileApi> = {}, profile = aProfile()): ProfileApi 
 
 const renderPage = (
   api: ProfileApi,
-  viewer: Viewer = { status: 'signed-in', account: { id: 'a-1', name: null, roles: ['member'] } },
+  viewer: Viewer = {
+    status: 'signed-in',
+    account: { id: 'a-1', name: null, avatar: null, roles: ['member'] },
+  },
 ) =>
   render(
     <ViewerProvider viewer={viewer}>

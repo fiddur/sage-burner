@@ -43,6 +43,10 @@ export const MealDialog = ({
   const [label, setLabel] = useState(meal.label)
   const [idea, setIdea] = useState(meal.food_idea)
 
+  // Nobody may be handed a chore's lead, so nobody is offered for it. Whoever is
+  // already on one still gets an option, or the control would show blank.
+  const offered = meal.kind === 'chore' ? [] : attendees
+
   return (
     <DreamPanel label={meal.label} error={error} onClose={onClose}>
       <h2>{meal.label}</h2>
@@ -105,33 +109,63 @@ export const MealDialog = ({
         />
       </label>
 
-      <label class="field">
-        <span>Meal lead</span>
-        <select
-          aria-label={`Lead for ${meal.label}`}
-          disabled={busy}
-          value={meal.lead?.account_id ?? ''}
-          onChange={(changeEvent) => onLead(changeEvent.currentTarget.value || null)}
-        >
-          <option value="">Nobody yet</option>
-          {meal.lead !== null &&
-            !attendees.some((who) => who.account_id === meal.lead?.account_id) && (
-              // They have withdrawn since taking it on. Named rather than left out, or
-              // the control reads as vacant while somebody is still on it.
-              <option value={meal.lead.account_id} disabled>
-                {nameOf(meal.lead)} — no longer coming
-              </option>
-            )}
-          {attendees.map((who) => (
-            <option key={who.account_id} value={who.account_id}>
-              {nameOf(who)}
-            </option>
-          ))}
-        </select>
-      </label>
+      {/*
+        A chore has nobody cooking, so it offers no lead and no cooks — **unless one
+        is still recorded** from before the slot became a chore. Then the control
+        appears so they can get off, which is what the API allows: vacating and
+        standing down stay open where handing over and joining are refused.
 
-      <Crew meal={meal} role="helper" viewerId={viewerId} busy={busy} onStand={onStand} />
-      <Crew meal={meal} role="cleanup" viewerId={viewerId} busy={busy} onStand={onStand} />
+        The two are gated separately, deliberately. Tied together, a chore with
+        leftover helpers showed a lead select whose only affirmative action answers
+        400, and a chore with a lead and no helpers offered no way to vacate at all.
+      */}
+      {(meal.kind !== 'chore' || meal.lead !== null) && (
+        <label class="field">
+          <span>Meal lead</span>
+          <select
+            aria-label={`Lead for ${meal.label}`}
+            disabled={busy}
+            value={meal.lead?.account_id ?? ''}
+            onChange={(changeEvent) => onLead(changeEvent.currentTarget.value || null)}
+          >
+            <option value="">Nobody yet</option>
+            {meal.lead !== null &&
+              !offered.some((who) => who.account_id === meal.lead?.account_id) && (
+                // Whenever the list below does not hold them — because they have withdrawn,
+                // or because this is a chore and the list is empty. Without it nothing
+                // matches the control's value and it reads as vacant while somebody is
+                // still on it.
+                <option value={meal.lead.account_id} disabled>
+                  {nameOf(meal.lead)}
+                  {attendees.some((who) => who.account_id === meal.lead?.account_id)
+                    ? ''
+                    : ' — no longer coming'}
+                </option>
+              )}
+            {offered.map((who) => (
+              <option key={who.account_id} value={who.account_id}>
+                {nameOf(who)}
+              </option>
+            ))}
+          </select>
+          {meal.kind === 'chore' && (
+            <span class="form-note">Nothing is cooked here, so this can only be vacated.</span>
+          )}
+        </label>
+      )}
+
+      {(meal.kind !== 'chore' || meal.helpers.length > 0) && (
+        <Crew
+          meal={meal}
+          role="helper"
+          viewerId={viewerId}
+          busy={busy}
+          joinable={meal.kind !== 'chore'}
+          onStand={onStand}
+        />
+      )}
+
+      <Crew meal={meal} role="cleanup" viewerId={viewerId} busy={busy} joinable onStand={onStand} />
 
       <p class="row">
         <button type="button" class="link-button" onClick={onClose}>
@@ -150,12 +184,15 @@ const Crew = ({
   role,
   viewerId,
   busy,
+  joinable,
   onStand,
 }: {
   meal: Meal
   role: 'cleanup' | 'helper'
   viewerId: string | undefined
   busy: boolean
+  /** False for a chore's cooks: whoever is on it may leave, nobody new may join. */
+  joinable: boolean
   onStand: (role: 'cleanup' | 'helper', joining: boolean) => void
 }) => {
   const crew = role === 'helper' ? meal.helpers : meal.cleanup
@@ -174,11 +211,13 @@ const Crew = ({
           ))}
         </ul>
       )}
-      <p class="row">
-        <button type="button" disabled={busy} onClick={() => onStand(role, !standing)}>
-          {standing ? 'Not me after all' : `I can ${what}`}
-        </button>
-      </p>
+      {(joinable || standing) && (
+        <p class="row">
+          <button type="button" disabled={busy} onClick={() => onStand(role, !standing)}>
+            {standing ? 'Not me after all' : `I can ${what}`}
+          </button>
+        </p>
+      )}
     </>
   )
 }

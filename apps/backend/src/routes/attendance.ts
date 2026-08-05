@@ -11,7 +11,7 @@ import type { Database } from '../db/index.ts'
 import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
-import { account, attendance, event } from '../db/schema.ts'
+import { account, accountAvatar, attendance, event } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 import { openEvent, todayIso } from './events.ts'
 import { helpingFor, helpingIdsFor } from './helping.ts'
@@ -247,9 +247,11 @@ export const registerAttendanceRoutes = (
       void noStore(reply)
 
       const attendees = await db
-        .select({ account_id: account.id, name: account.name })
+        .select({ account_id: account.id, name: account.name, avatar: accountAvatar.updated_at })
         .from(attendance)
         .innerJoin(account, eq(account.id, attendance.account_id))
+        // Left: most accounts have no picture, and the circle falls back to initials.
+        .leftJoin(accountAvatar, eq(accountAvatar.account_id, account.id))
         .where(eq(attendance.event_id, request.params.eventId))
         .orderBy(asc(account.name), asc(account.id))
 

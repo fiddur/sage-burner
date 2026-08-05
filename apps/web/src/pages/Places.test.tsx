@@ -13,7 +13,10 @@ import { Places } from './Places.tsx'
 
 afterEach(cleanup)
 
-const ADMIN: Viewer = { status: 'signed-in', account: { id: 'a-1', name: null, roles: ['admin'] } }
+const ADMIN: Viewer = {
+  status: 'signed-in',
+  account: { id: 'a-1', name: null, avatar: null, roles: ['admin'] },
+}
 
 const BURN = {
   id: 'e-1',
@@ -243,7 +246,10 @@ describe('Places', () => {
   it('offers nothing to a signed-in account with no roles', async () => {
     // An applicant checking on their application has an account and no roles.
     const getPlaces = vi.fn<PlacesApi['getPlaces']>(() => Promise.resolve({ places: THREE }))
-    renderPage(stub({ getPlaces }), { status: 'signed-in', account: { id: 'a-9', name: null, roles: [] } })
+    renderPage(stub({ getPlaces }), {
+      status: 'signed-in',
+      account: { id: 'a-9', name: null, avatar: null, roles: [] },
+    })
 
     expect(screen.getByText(/for members/)).toBeTruthy()
     expect(getPlaces).not.toHaveBeenCalled()
@@ -251,7 +257,10 @@ describe('Places', () => {
 
   it('offers the lanes to a member who is not an admin', async () => {
     // The point of #155: this is not an admin page any more.
-    renderPage(stub(), { status: 'signed-in', account: { id: 'a-2', name: null, roles: ['member'] } })
+    renderPage(stub(), {
+      status: 'signed-in',
+      account: { id: 'a-2', name: null, avatar: null, roles: ['member'] },
+    })
 
     expect(await screen.findByText('Temple')).toBeTruthy()
   })

@@ -96,28 +96,34 @@ describe('viewerSchema', () => {
   const accountId = '5f9d4a0e-3c1b-4d7a-9e2f-8b6c0a1d3e4f'
 
   it('accepts an account with no roles, which is what an applicant has', () => {
-    expect(viewerSchema.safeParse({ account_id: accountId, name: null, roles: [] }).success).toBe(true)
+    expect(
+      viewerSchema.safeParse({ account_id: accountId, name: null, avatar: null, roles: [] }).success,
+    ).toBe(true)
   })
 
   it('rejects a role outside the vocabulary', () => {
-    expect(viewerSchema.safeParse({ account_id: accountId, name: null, roles: ['superuser'] }).success).toBe(
-      false,
-    )
+    expect(
+      viewerSchema.safeParse({ account_id: accountId, name: null, avatar: null, roles: ['superuser'] })
+        .success,
+    ).toBe(false)
   })
 
   it('accepts a name nobody has filled in, which the bootstrap admin has', () => {
     // Required as a key, nullable as a value. An account can exist before anyone
     // types a name into it, and the corner falls back to a glyph for exactly that.
     expect(viewerSchema.safeParse({ account_id: accountId, roles: [] }).success).toBe(false)
-    expect(viewerSchema.safeParse({ account_id: accountId, name: null, roles: [] }).success).toBe(true)
+    expect(
+      viewerSchema.safeParse({ account_id: accountId, name: null, avatar: null, roles: [] }).success,
+    ).toBe(true)
   })
 
   it('carries no email, so an XSS finds one less thing already fetched', () => {
-    // `name` is here and the address is not, deliberately: the corner needs
-    // initials on every page, and a display name is what every other member
-    // already sees. The email is the login identity and stays a separate read.
-    const parsed = viewerSchema.parse({ account_id: accountId, name: 'Ada', roles: ['admin'] })
+    // `name` and `avatar` are here and the address is not, deliberately: the corner
+    // draws a circle on every page, and both the display name and the picture are
+    // what every other member already sees. The email is the login identity and
+    // stays a separate, authorised read.
+    const parsed = viewerSchema.parse({ account_id: accountId, name: 'Ada', avatar: null, roles: ['admin'] })
 
-    expect(Object.keys(parsed).sort()).toEqual(['account_id', 'name', 'roles'])
+    expect(Object.keys(parsed).sort()).toEqual(['account_id', 'avatar', 'name', 'roles'])
   })
 })

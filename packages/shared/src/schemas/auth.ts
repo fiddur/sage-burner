@@ -70,6 +70,14 @@ export const viewerSchema = z.object({
    * hosts. The email stays out; that is the login identity.
    */
   name: z.string().nullable(),
+  /**
+   * When their picture last changed, or null for the initials.
+   *
+   * A version rather than a flag: it is what the circle's URL carries, so a new
+   * picture is a new URL and no cache has to be persuaded to let go of the old one.
+   * Null also spares every initials-only account a request that would 404.
+   */
+  avatar: z.string().nullable(),
 })
 export type Viewer = z.infer<typeof viewerSchema>
 

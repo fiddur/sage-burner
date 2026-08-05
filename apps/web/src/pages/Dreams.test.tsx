@@ -13,7 +13,10 @@ import { Dreams } from './Dreams.tsx'
 
 afterEach(cleanup)
 
-const MEMBER: Viewer = { status: 'signed-in', account: { id: 'a-1', name: null, roles: ['member'] } }
+const MEMBER: Viewer = {
+  status: 'signed-in',
+  account: { id: 'a-1', name: null, avatar: null, roles: ['member'] },
+}
 
 const BURN = {
   id: 'e-1',
@@ -53,8 +56,8 @@ const stub = (over: Partial<DreamsApi> = {}, sessions: Session[] = []): DreamsAp
   getEventAttendees: () =>
     Promise.resolve({
       attendees: [
-        { account_id: 'a-1', name: 'Ada' },
-        { account_id: 'a-2', name: 'Bea' },
+        { account_id: 'a-1', name: 'Ada', avatar: null },
+        { account_id: 'a-2', name: 'Bea', avatar: null },
       ],
     }),
   ...over,

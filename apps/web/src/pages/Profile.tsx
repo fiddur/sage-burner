@@ -8,6 +8,7 @@ import type { PushApi } from '../components/PushToggle.tsx'
 import type { YourBurnsApi } from '../components/YourBurns.tsx'
 
 import { isApiError } from '../api/client.ts'
+import { AvatarField } from '../components/AvatarField.tsx'
 import { FormError, useFormError } from '../components/FormError.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { LogOutButton } from '../components/LogOutButton.tsx'
@@ -15,7 +16,10 @@ import { PushToggle } from '../components/PushToggle.tsx'
 import { YourBurns } from '../components/YourBurns.tsx'
 import { isMember, useViewer } from '../viewer.tsx'
 
-export type ProfileApi = Pick<ApiClient, 'getMyProfile' | 'updateMyProfile' | 'logout'> &
+export type ProfileApi = Pick<
+  ApiClient,
+  'getMyProfile' | 'updateMyProfile' | 'logout' | 'setMyAvatar' | 'removeMyAvatar'
+> &
   PushApi &
   YourBurnsApi
 
@@ -159,6 +163,8 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
         Signed in as {loaded.status === 'ready' ? loaded.profile.email : 'you'}. Changing that address is not
         possible yet — ask someone with admin.
       </p>
+
+      <AvatarField api={api} />
 
       <LogOutButton api={api} />
 

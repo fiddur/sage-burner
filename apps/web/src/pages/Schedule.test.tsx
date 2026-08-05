@@ -13,7 +13,10 @@ import { Schedule } from './Schedule.tsx'
 
 afterEach(cleanup)
 
-const MEMBER: Viewer = { status: 'signed-in', account: { id: 'a-1', name: null, roles: ['member'] } }
+const MEMBER: Viewer = {
+  status: 'signed-in',
+  account: { id: 'a-1', name: null, avatar: null, roles: ['member'] },
+}
 
 const BURN: Event = {
   id: 'e-1',
@@ -54,7 +57,15 @@ const stub = (
   getSessions: () => Promise.resolve({ sessions }),
   updateSession: () => Promise.reject(new Error('updateSession is not stubbed here')),
   offerSession: () => Promise.reject(new Error('offerSession is not stubbed here')),
-  getEventAttendees: () => Promise.resolve({ attendees: [{ account_id: 'a-1', name: 'Ada Lovelace' }] }),
+  getEventAttendees: () =>
+    Promise.resolve({
+      attendees: [
+        { account_id: 'a-1', name: 'Ada Lovelace', avatar: null },
+        // A second, so a control offering everybody can be told from one offering only
+        // whoever is already on the sitting.
+        { account_id: 'a-2', name: 'Bea', avatar: null },
+      ],
+    }),
   helpWithSession: () => Promise.reject(new Error('helpWithSession is not stubbed here')),
   stopHelpingWithSession: () => Promise.reject(new Error('stopHelpingWithSession is not stubbed here')),
   supportSession: () => Promise.reject(new Error('supportSession is not stubbed here')),
@@ -1327,5 +1338,114 @@ describe('a drag that was abandoned', () => {
     fireEvent.drop(cell('14:00', 2))
 
     await waitFor(() => expect(updateMeal).toHaveBeenCalledWith('m-1', { date: '2026-08-01', at: '14:00' }))
+  })
+})
+
+describe('a chore in the kitchen', () => {
+  const aChore = (): Meal => ({
+    id: 'm-2',
+    event_id: 'e-1',
+    date: '2026-08-01',
+    at: '09:00',
+    label: 'Morning cleanup',
+    kind: 'chore',
+    food_idea: '',
+    lead: null,
+    helpers: [],
+    cleanup: [],
+  })
+
+  it('asks for cleaners and nothing else', async () => {
+    // Nothing is cooked at a morning cleanup, so it has nobody leading the cooking
+    // and nobody helping with it. The API refuses both as well.
+    renderPage(
+      stub({ getMeals: () => Promise.resolve({ intro_markdown: '', slots: [], meals: [aChore()] }) }),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Morning cleanup' }))
+    const panel = await screen.findByRole('dialog', { name: 'Morning cleanup' })
+
+    expect(within(panel).queryByLabelText('Lead for Morning cleanup')).toBeNull()
+    expect(within(panel).queryByText('Helping cook')).toBeNull()
+    expect(within(panel).getByText('Washing up')).toBeTruthy()
+  })
+
+  it('still asks for all three on an ordinary meal', async () => {
+    // The passing sibling: hiding them everywhere would satisfy the test above.
+    const meal: Meal = { ...aChore(), id: 'm-1', label: 'Dinner', at: '18:00', kind: 'meal' }
+    renderPage(stub({ getMeals: () => Promise.resolve({ intro_markdown: '', slots: [], meals: [meal] }) }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Dinner' }))
+    const panel = await screen.findByRole('dialog', { name: 'Dinner' })
+
+    expect(within(panel).getByLabelText('Lead for Dinner')).toBeTruthy()
+    expect(within(panel).getByText('Helping cook')).toBeTruthy()
+    expect(within(panel).getByText('Washing up')).toBeTruthy()
+  })
+})
+
+describe('a chore’s lead, in the panel', () => {
+  const stranded = (lead: { account_id: string; name: string } | null): Meal => ({
+    id: 'm-3',
+    event_id: 'e-1',
+    date: '2026-08-01',
+    at: '09:00',
+    label: 'Morning cleanup',
+    kind: 'chore',
+    food_idea: '',
+    lead,
+    helpers: [],
+    cleanup: [],
+  })
+
+  const withMeal = (meal: Meal) =>
+    stub({ getMeals: () => Promise.resolve({ intro_markdown: '', slots: [], meals: [meal] }) })
+
+  it('names whoever is on it, and offers nobody else', async () => {
+    // Without an option of their own nothing matches the control's value and it draws
+    // blank — vacant-looking while somebody is still on it.
+    renderPage(withMeal(stranded({ account_id: 'a-1', name: 'Ada Lovelace' })))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Morning cleanup' }))
+    const select = await screen.findByLabelText('Lead for Morning cleanup')
+
+    expect([...select.querySelectorAll('option')].map((o) => o.textContent)).toEqual([
+      'Nobody yet',
+      'Ada Lovelace',
+    ])
+    expect(select).toHaveProperty('value', 'a-1')
+  })
+
+  it('vacates it, which is the one thing the API allows here', async () => {
+    const updateMeal = vi.fn<ScheduleApi['updateMeal']>(() => Promise.resolve({ meal: stranded(null) }))
+    const setMealLead = vi.fn<ScheduleApi['setMealLead']>(() => Promise.resolve({ meal: stranded(null) }))
+    renderPage(
+      stub({
+        getMeals: () =>
+          Promise.resolve({
+            intro_markdown: '',
+            slots: [],
+            meals: [stranded({ account_id: 'a-1', name: 'Ada Lovelace' })],
+          }),
+        setMealLead,
+        updateMeal,
+      }),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Morning cleanup' }))
+    fireEvent.change(await screen.findByLabelText('Lead for Morning cleanup'), { target: { value: '' } })
+
+    await waitFor(() => expect(setMealLead).toHaveBeenCalledWith('m-3', { account_id: null }))
+  })
+
+  it('offers no lead at all on a chore nobody leads', async () => {
+    // The passing sibling: showing it whenever the kind is a chore would put back the
+    // control whose only affirmative action the API refuses.
+    renderPage(withMeal(stranded(null)))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Morning cleanup' }))
+    await screen.findByRole('dialog', { name: 'Morning cleanup' })
+
+    expect(screen.queryByLabelText('Lead for Morning cleanup')).toBeNull()
   })
 })

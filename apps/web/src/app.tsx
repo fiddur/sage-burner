@@ -51,6 +51,8 @@ export type RoutesApi = Pick<
   | 'getAdminAccounts'
   | 'setAccountRoles'
   | 'setAccountPassword'
+  | 'setMyAvatar'
+  | 'removeMyAvatar'
   | 'getEvents'
   | 'getInviteState'
   | 'redeemInvite'

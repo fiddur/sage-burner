@@ -423,7 +423,9 @@ describe('GET /api/auth/me', () => {
 
     // The whole body, not a subset: the point of this viewer is what it does *not*
     // carry. `name` is here for the initials in the corner; the address is not.
-    expect(response.json()).toEqual({ viewer: { account_id: id, name: 'Ada', roles: ['member'] } })
+    expect(response.json()).toEqual({
+      viewer: { account_id: id, name: 'Ada', avatar: null, roles: ['member'] },
+    })
   })
 
   it('carries the name from the login itself, not only from the next request', async () => {
@@ -456,7 +458,7 @@ describe('GET /api/auth/me', () => {
       headers: { cookie: `${SESSION_COOKIE}=${readSessionCookie(cookie) ?? ''}` },
     })
 
-    expect(response.json()).toEqual({ viewer: { account_id: id, name: null, roles: [] } })
+    expect(response.json()).toEqual({ viewer: { account_id: id, name: null, avatar: null, roles: [] } })
   })
 
   it('ignores a tampered cookie rather than trusting it', async () => {

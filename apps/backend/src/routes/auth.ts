@@ -11,7 +11,7 @@ import type { Database } from '../db/index.ts'
 
 import { hashPassword, needsRehash, verifyPassword } from '../auth/password.ts'
 import { SESSION_COOKIE, viewerFor } from '../auth/viewer.ts'
-import { account, accountRole } from '../db/schema.ts'
+import { account, accountAvatar, accountRole } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 
 /**
@@ -92,8 +92,15 @@ export const registerAuthRoutes = (app: FastifyInstance, { db, config, sessions,
     }
 
     const [row] = await db
-      .select({ id: account.id, name: account.name, password_hash: account.password_hash })
+      .select({
+        id: account.id,
+        name: account.name,
+        avatar: accountAvatar.updated_at,
+        password_hash: account.password_hash,
+      })
       .from(account)
+      // Left: most accounts have no picture, and the circle falls back to initials.
+      .leftJoin(accountAvatar, eq(accountAvatar.account_id, account.id))
       .where(eq(account.email, parsed.data.email))
       .limit(1)
 
@@ -138,9 +145,9 @@ export const registerAuthRoutes = (app: FastifyInstance, { db, config, sessions,
 
     void reply.header('set-cookie', cookieHeader(sessions.issue(row.id), config, config.session_ttl_seconds))
 
-    return reply
-      .code(200)
-      .send({ viewer: { account_id: row.id, name: row.name, roles } satisfies Viewer } satisfies MeResponse)
+    return reply.code(200).send({
+      viewer: { account_id: row.id, name: row.name, avatar: row.avatar, roles } satisfies Viewer,
+    } satisfies MeResponse)
   }
 
   app.post('/api/auth/login', async (request, reply) => {

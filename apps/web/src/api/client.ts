@@ -203,7 +203,10 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
     // Serialised outside the `try`: a body that will not stringify is a bug in
     // the caller, and reporting it as "could not reach the server" sends whoever
     // reads that to check their wifi.
-    const payload = body === undefined ? undefined : JSON.stringify(body)
+    // A Blob goes as itself, with its own type. Everything else is JSON.
+    const binary = body instanceof Blob
+    const payload = body === undefined ? undefined : binary ? body : JSON.stringify(body)
+    const contentType = binary ? body.type : 'application/json'
 
     try {
       response = await doFetch(`/api${path}`, {
@@ -212,7 +215,7 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
         // Sessions are cookie-based; without this the browser omits them on
         // fetch by default and every authenticated call would 401.
         credentials: 'same-origin',
-        headers: payload === undefined ? undefined : { 'content-type': 'application/json' },
+        headers: payload === undefined ? undefined : { 'content-type': contentType },
         body: payload,
       })
     } catch (cause) {
@@ -366,6 +369,14 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
 
     deleteMeal: (id: string) =>
       request<undefined>(`/admin/meals/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+    /**
+     * A picture for the circle. Raw bytes, already sized down by the browser — this
+     * process has no image library and wants none.
+     */
+    setMyAvatar: (image: Blob) => request<{ avatar: string }>('/me/avatar', { method: 'PUT', body: image }),
+
+    removeMyAvatar: () => request<undefined>('/me/avatar', { method: 'DELETE' }),
 
     /** Members only. Scheduled dreams first, then the ones only offered. */
     getSessions: (eventId: string, signal?: AbortSignal) =>

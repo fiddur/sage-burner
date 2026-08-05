@@ -589,3 +589,24 @@ describe('the name an invite carries', () => {
     expect(Object.keys((await look(server, token)).json())).toEqual(['status', 'name'])
   })
 })
+
+describe('the viewer a redemption answers with', () => {
+  it('carries the whole thing, not two of its four fields', async () => {
+    // It carried `account_id` and `roles` and nothing else, so a freshly redeemed
+    // member's in-memory viewer had `name: undefined` and `avatar: undefined` — which
+    // is not `null`, and the details page compares against `null`. Their first visit
+    // offered "Change it" and "Back to initials" over a broken image, for a picture
+    // they had never uploaded.
+    const server = await build()
+    const token = await givenInvite()
+
+    const response = await redeem(server, token)
+
+    expect(response.json().viewer).toEqual({
+      account_id: expect.any(String),
+      name: 'Fredrik',
+      avatar: null,
+      roles: ['member'],
+    })
+  })
+})

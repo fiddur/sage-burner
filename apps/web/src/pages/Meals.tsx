@@ -235,35 +235,74 @@ const MealTable = ({
             <FoodIdea meal={meal} busy={busy} onIdea={onIdea} />
           </td>
           <td>
-            <select
-              aria-label={`Lead for ${meal.label} on ${meal.date}`}
-              disabled={busy}
-              value={meal.lead?.account_id ?? ''}
-              onChange={(changeEvent) => onLead(meal.id, changeEvent.currentTarget.value || null)}
-            >
-              <option value="">Nobody yet</option>
-              {meal.lead !== null &&
-                !attendees.some((who) => who.account_id === meal.lead?.account_id) && (
-                  // They have withdrawn since taking it on. Named rather than left out,
-                  // or the control reads as vacant while somebody is still on it.
-                  <option value={meal.lead.account_id} disabled>
-                    {nameOf(meal.lead)} — no longer coming
-                  </option>
-                )}
-              {attendees.map((who) => (
-                <option key={who.account_id} value={who.account_id}>
-                  {nameOf(who)}
-                </option>
-              ))}
-            </select>
+            {/* A chore has nobody cooking — unless one is still recorded from before the
+                slot became one, who then needs a way off. The API allows exactly that:
+                vacating stays open where handing over is refused. */}
+            {meal.kind === 'chore' && meal.lead === null ? (
+              <span class="form-note">—</span>
+            ) : (
+              <select
+                aria-label={`Lead for ${meal.label} on ${meal.date}`}
+                disabled={busy}
+                value={meal.lead?.account_id ?? ''}
+                onChange={(changeEvent) => onLead(meal.id, changeEvent.currentTarget.value || null)}
+              >
+                <option value="">Nobody yet</option>
+                <LeadOptions meal={meal} attendees={attendees} />
+              </select>
+            )}
           </td>
-          <Crew meal={meal} role="helper" viewerId={viewerId} busy={busy} onStand={onStand} />
-          <Crew meal={meal} role="cleanup" viewerId={viewerId} busy={busy} onStand={onStand} />
+          {/* A chore asks for no cooks — but one already signed up before the slot
+              became a chore still needs a way off, which the API allows. */}
+          {meal.kind === 'chore' && meal.helpers.length === 0 ? (
+            <td>
+              <span class="form-note">—</span>
+            </td>
+          ) : (
+            <Crew
+              meal={meal}
+              role="helper"
+              viewerId={viewerId}
+              busy={busy}
+              joinable={meal.kind !== 'chore'}
+              onStand={onStand}
+            />
+          )}
+          <Crew meal={meal} role="cleanup" viewerId={viewerId} busy={busy} joinable onStand={onStand} />
         </tr>
       ))}
     </tbody>
   </table>
 )
+
+/**
+ * Whoever may hold this sitting's lead, as options.
+ *
+ * Nobody may be handed a **chore's**, so nobody is offered for one — but whoever is
+ * already on it still needs an option, or nothing matches the control's value and it
+ * reads as vacant while somebody is still on it. Same for a lead who has withdrawn,
+ * which is where that rule started.
+ */
+const LeadOptions = ({ meal, attendees }: { meal: Meal; attendees: readonly Person[] }) => {
+  const offered = meal.kind === 'chore' ? [] : attendees
+  const lead = meal.lead
+
+  return (
+    <>
+      {lead !== null && !offered.some((who) => who.account_id === lead.account_id) && (
+        <option value={lead.account_id} disabled>
+          {nameOf(lead)}
+          {attendees.some((who) => who.account_id === lead.account_id) ? '' : ' — no longer coming'}
+        </option>
+      )}
+      {offered.map((who) => (
+        <option key={who.account_id} value={who.account_id}>
+          {nameOf(who)}
+        </option>
+      ))}
+    </>
+  )
+}
 
 /** The sheet's "Food idea?", whose own header says "Not needed". */
 const FoodIdea = ({
@@ -301,12 +340,15 @@ const Crew = ({
   role,
   viewerId,
   busy,
+  joinable,
   onStand,
 }: {
   meal: Meal
   role: 'cleanup' | 'helper'
   viewerId: string | undefined
   busy: boolean
+  /** False for a chore's cooks: whoever is on it may leave, nobody new may join. */
+  joinable: boolean
   onStand: (id: string, role: 'cleanup' | 'helper', joining: boolean) => void
 }) => {
   const crew = role === 'helper' ? meal.helpers : meal.cleanup
@@ -320,15 +362,17 @@ const Crew = ({
           <li key={who.account_id}>{nameOf(who)}</li>
         ))}
       </ul>
-      <button
-        type="button"
-        class="link-button"
-        disabled={busy}
-        aria-label={`${standing ? 'Do not' : 'Help'} ${what} at ${meal.label} on ${meal.date}`}
-        onClick={() => onStand(meal.id, role, !standing)}
-      >
-        {standing ? 'Not me after all' : `I can ${what}`}
-      </button>
+      {(joinable || standing) && (
+        <button
+          type="button"
+          class="link-button"
+          disabled={busy}
+          aria-label={`${standing ? 'Do not' : 'Help'} ${what} at ${meal.label} on ${meal.date}`}
+          onClick={() => onStand(meal.id, role, !standing)}
+        >
+          {standing ? 'Not me after all' : `I can ${what}`}
+        </button>
+      )}
     </td>
   )
 }

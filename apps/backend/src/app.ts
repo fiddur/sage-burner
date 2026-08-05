@@ -25,6 +25,7 @@ import { registerApplicationReviewRoutes } from './routes/application-review.ts'
 import { registerApplicationRoutes } from './routes/applications.ts'
 import { registerAttendanceRoutes } from './routes/attendance.ts'
 import { registerAuthRoutes } from './routes/auth.ts'
+import { registerAvatarRoutes } from './routes/avatars.ts'
 import { registerEventOptionRoutes } from './routes/event-options.ts'
 import { registerEventRoutes } from './routes/events.ts'
 import { registerInstallationRoutes } from './routes/installation.ts'
@@ -396,6 +397,7 @@ export const createApp = async ({
   registerEventOptionRoutes(app, { db, sessions })
   registerQuestionRoutes(app, { db, sessions })
   registerPlaceRoutes(app, { db, sessions, now })
+  registerAvatarRoutes(app, { db, sessions, now })
   registerMealRoutes(app, { db, sessions, now })
   // Separate registration, not a separate guard: the plan lives under `/api/admin/`,
   // where the prefix hook is the only thing that lets it through. The member-facing

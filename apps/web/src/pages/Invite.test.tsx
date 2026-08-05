@@ -106,7 +106,9 @@ describe('Invite', () => {
     renderPage(
       stub({
         redeemInvite: () =>
-          Promise.resolve({ viewer: { account_id: 'a-1', name: null, roles: ['member' as const] } }),
+          Promise.resolve({
+            viewer: { account_id: 'a-1', name: null, avatar: null, roles: ['member' as const] },
+          }),
       }),
     )
 
@@ -327,7 +329,7 @@ describe('Invite', () => {
     const getInviteState = vi.fn(() => Promise.resolve({ status: 'outstanding' as const, name: null }))
     renderPage(stub({ getInviteState }), {
       status: 'signed-in',
-      account: { id: 'a-1', name: null, roles: ['member'] },
+      account: { id: 'a-1', name: null, avatar: null, roles: ['member'] },
     })
 
     expect(screen.getByText(/already signed in/)).toBeTruthy()

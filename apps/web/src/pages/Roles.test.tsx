@@ -13,8 +13,14 @@ import { Roles } from './Roles.tsx'
 
 afterEach(cleanup)
 
-const ADA: Viewer = { status: 'signed-in', account: { id: 'a-1', name: null, roles: ['member'] } }
-const ORGANISER: Viewer = { status: 'signed-in', account: { id: 'a-9', name: null, roles: ['admin'] } }
+const ADA: Viewer = {
+  status: 'signed-in',
+  account: { id: 'a-1', name: null, avatar: null, roles: ['member'] },
+}
+const ORGANISER: Viewer = {
+  status: 'signed-in',
+  account: { id: 'a-9', name: null, avatar: null, roles: ['admin'] },
+}
 
 const BURN: Event = {
   id: 'e-1',
@@ -47,8 +53,8 @@ const stub = (
   over: Partial<RolesApi> = {},
   roles: LeadRole[] = [],
   attendees = [
-    { account_id: 'a-1', name: 'Ada' },
-    { account_id: 'a-2', name: 'Bea' },
+    { account_id: 'a-1', name: 'Ada', avatar: null },
+    { account_id: 'a-2', name: 'Bea', avatar: null },
   ],
 ): RolesApi => ({
   getLeadRoles: () => Promise.resolve({ roles }),

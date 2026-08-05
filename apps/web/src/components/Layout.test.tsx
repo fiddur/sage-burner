@@ -26,7 +26,7 @@ const renderNav = (viewer: Viewer) =>
 
 const signedInAs = (...roles: AccountRole[]): Viewer => ({
   status: 'signed-in',
-  account: { id: 'a-1', name: 'Ada Lovelace', roles },
+  account: { id: 'a-1', name: 'Ada Lovelace', avatar: null, roles },
 })
 
 // The gear is a glyph, so its name comes from `aria-label` rather than its text.
@@ -97,7 +97,7 @@ describe('the nav', () => {
     expect(screen.getByRole('link', { name: 'Your details' }).textContent).toBe('AL')
 
     cleanup()
-    renderNav({ status: 'signed-in', account: { id: 'a-2', name: null, roles: ['member'] } })
+    renderNav({ status: 'signed-in', account: { id: 'a-2', name: null, avatar: null, roles: ['member'] } })
     expect(screen.getByRole('link', { name: 'Your details' }).textContent).toBe('👤')
   })
 

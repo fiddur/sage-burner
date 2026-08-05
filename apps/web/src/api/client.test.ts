@@ -261,3 +261,49 @@ describe('createApiClient', () => {
     expect(doFetch.mock.calls[0]?.[1]?.signal).toBe(controller.signal)
   })
 })
+
+describe('a body that is not JSON', () => {
+  /**
+   * The seam neither side's tests reached: every backend test injects raw bytes and
+   * every page test stubs the client, so an avatar arriving as the string `{}` under
+   * a JSON content type was refused with 415 and nothing noticed.
+   */
+  it('sends a Blob as itself, under its own content type', async () => {
+    const doFetch = vi.fn<typeof fetch>(() =>
+      Promise.resolve(new Response(JSON.stringify({ avatar: 'v1' }), { status: 200 })),
+    )
+    const api = createApiClient(doFetch)
+    const image = new Blob([new Uint8Array([1, 2, 3])], { type: 'image/webp' })
+
+    await api.setMyAvatar(image)
+
+    const [, init] = doFetch.mock.calls[0] ?? []
+    expect(init?.body).toBe(image)
+    expect(init?.headers).toEqual({ 'content-type': 'image/webp' })
+  })
+
+  it('still stringifies an ordinary body, under JSON', async () => {
+    // The passing sibling: sending everything raw would satisfy the test above and
+    // break every other route in the app.
+    const doFetch = vi.fn<typeof fetch>(() =>
+      Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 })),
+    )
+    const api = createApiClient(doFetch)
+
+    await api.updateMealIntro('e-1', { meal_intro_markdown: 'Hello' })
+
+    const [, init] = doFetch.mock.calls[0] ?? []
+    expect(init?.body).toBe('{"meal_intro_markdown":"Hello"}')
+    expect(init?.headers).toEqual({ 'content-type': 'application/json' })
+  })
+
+  it('sends no content type when there is no body at all', async () => {
+    const doFetch = vi.fn<typeof fetch>(() => Promise.resolve(new Response(null, { status: 204 })))
+    const api = createApiClient(doFetch)
+
+    await api.removeMyAvatar()
+
+    const [, init] = doFetch.mock.calls[0] ?? []
+    expect(init?.headers).toBeUndefined()
+  })
+})

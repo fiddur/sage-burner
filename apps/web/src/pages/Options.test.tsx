@@ -13,7 +13,10 @@ import { Options } from './Options.tsx'
 
 afterEach(cleanup)
 
-const ADMIN: Viewer = { status: 'signed-in', account: { id: 'a-1', name: null, roles: ['admin'] } }
+const ADMIN: Viewer = {
+  status: 'signed-in',
+  account: { id: 'a-1', name: null, avatar: null, roles: ['admin'] },
+}
 
 const BURN: Event = {
   id: 'e-1',
@@ -270,7 +273,7 @@ describe('Options', () => {
     // so their own page is both the likelier fix and one they can do themselves.
     renderPage(
       stub({}, []),
-      { status: 'signed-in', account: { id: 'a-2', name: null, roles: ['member'] } },
+      { status: 'signed-in', account: { id: 'a-2', name: null, avatar: null, roles: ['member'] } },
       null,
     )
 
@@ -305,7 +308,10 @@ describe('Options', () => {
 
   it('offers the lists to a member who is not an admin', async () => {
     // The point of #155: a member curates the lodging and helping lists.
-    renderPage(stub(), { status: 'signed-in', account: { id: 'a-2', name: null, roles: ['member'] } })
+    renderPage(stub(), {
+      status: 'signed-in',
+      account: { id: 'a-2', name: null, avatar: null, roles: ['member'] },
+    })
 
     expect(await screen.findByText('Temple mattress')).toBeTruthy()
   })
@@ -314,7 +320,7 @@ describe('Options', () => {
     const getEventOptions = vi.fn<OptionsApi['getEventOptions']>(() => Promise.resolve({ options: [] }))
     renderPage(stub({ getEventOptions }), {
       status: 'signed-in',
-      account: { id: 'a-9', name: null, roles: [] },
+      account: { id: 'a-9', name: null, avatar: null, roles: [] },
     })
 
     expect(screen.getByText(/for members/)).toBeTruthy()

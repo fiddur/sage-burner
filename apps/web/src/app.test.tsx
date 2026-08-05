@@ -35,6 +35,8 @@ const clientWith = (
   getAdminAccounts: () => Promise.reject(new Error('getAdminAccounts is not stubbed in this file')),
   setAccountRoles: () => Promise.reject(new Error('setAccountRoles is not stubbed in this file')),
   setAccountPassword: () => Promise.reject(new Error('setAccountPassword is not stubbed in this file')),
+  setMyAvatar: () => Promise.reject(new Error('setMyAvatar is not stubbed in this file')),
+  removeMyAvatar: () => Promise.reject(new Error('removeMyAvatar is not stubbed in this file')),
   getQuestions: () => Promise.reject(new Error('getQuestions is not stubbed in this file')),
   submitApplication: () => Promise.reject(new Error('submitApplication is not stubbed in this file')),
   getApplications: () => Promise.reject(new Error('getApplications is not stubbed in this file')),
@@ -202,7 +204,7 @@ describe('routing', () => {
     // is the same failure one level up.
     const admin = {
       status: 'signed-in',
-      account: { id: 'a1', name: null, roles: ['admin', 'member'] },
+      account: { id: 'a1', name: null, avatar: null, roles: ['admin', 'member'] },
     } as const
     const { container } = renderAt('/admin', admin)
     // Every link the nav offers, too: `/profile` and `/schedule` sat there for
@@ -272,7 +274,7 @@ describe('signing out', () => {
 
     return render(
       <App
-        viewer={{ status: 'signed-in', account: { id: 'a-1', name: null, roles: ['member'] } }}
+        viewer={{ status: 'signed-in', account: { id: 'a-1', name: null, avatar: null, roles: ['member'] } }}
         title="The Burning Sage"
         api={clientWith(logout)}
       />,
@@ -280,7 +282,10 @@ describe('signing out', () => {
   }
 
   it('is not in the bar, where every other entry is a place', () => {
-    renderAt('/', { status: 'signed-in', account: { id: 'a-1', name: null, roles: ['member'] } })
+    renderAt('/', {
+      status: 'signed-in',
+      account: { id: 'a-1', name: null, avatar: null, roles: ['member'] },
+    })
 
     expect(screen.queryByRole('button', { name: 'Log out' })).toBeNull()
   })
@@ -327,7 +332,7 @@ describe('navigation', () => {
   it('offers member pages once signed in, and drops the public ones', () => {
     renderAt('/', {
       status: 'signed-in',
-      account: { id: 'a1', name: null, roles: ['member'] },
+      account: { id: 'a1', name: null, avatar: null, roles: ['member'] },
     })
 
     expect(linkNames()).toContain('Your details')
@@ -340,7 +345,7 @@ describe('navigation', () => {
   it('offers Organise to nobody without a role', () => {
     // An applicant checking on their application has an account and no roles, and
     // there is nothing behind the link for them.
-    renderAt('/', { status: 'signed-in', account: { id: 'a1', name: null, roles: [] } })
+    renderAt('/', { status: 'signed-in', account: { id: 'a1', name: null, avatar: null, roles: [] } })
 
     expect(linkNames()).not.toContain('Organise')
   })
@@ -348,7 +353,7 @@ describe('navigation', () => {
   it('offers the organising pages to an admin', () => {
     renderAt('/', {
       status: 'signed-in',
-      account: { id: 'a1', name: null, roles: ['admin', 'member'] },
+      account: { id: 'a1', name: null, avatar: null, roles: ['admin', 'member'] },
     })
 
     expect(linkNames()).toContain('Organise')
