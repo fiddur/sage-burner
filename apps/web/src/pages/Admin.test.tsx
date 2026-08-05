@@ -20,10 +20,12 @@ const renderAdmin = (
   viewer: Viewer = ADMIN,
   setAccountRoles: AdminApi['setAccountRoles'] = () =>
     Promise.reject(new Error('setAccountRoles is not stubbed here')),
+  setAccountPassword: AdminApi['setAccountPassword'] = () =>
+    Promise.reject(new Error('setAccountPassword is not stubbed here')),
 ) =>
   render(
     <ViewerProvider viewer={viewer}>
-      <Admin api={{ getAdminAccounts, setAccountRoles }} />
+      <Admin api={{ getAdminAccounts, setAccountRoles, setAccountPassword }} />
     </ViewerProvider>,
   )
 
@@ -202,5 +204,75 @@ describe('Admin', () => {
     await waitFor(() => {
       expect(screen.getByRole('alert').textContent).toBe('You do not have access to that.')
     })
+  })
+})
+
+describe('setting somebody’s password', () => {
+  const ONE = { id: 'a-9', email: 'ada@example.org', roles: [], created_at: '2026-01-01T00:00:00.000Z' }
+
+  it('sends what was typed, for that account', async () => {
+    const setAccountPassword = vi.fn<AdminApi['setAccountPassword']>(() => Promise.resolve(undefined))
+    renderAdmin(roster([ONE]), ADMIN, undefined, setAccountPassword)
+
+    fireEvent.input(await screen.findByLabelText('New password for ada@example.org'), {
+      target: { value: 'a-new-password' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Set it' }))
+
+    await waitFor(() =>
+      expect(setAccountPassword).toHaveBeenCalledWith('a-9', { password: 'a-new-password' }),
+    )
+  })
+
+  it('clears the field and says so, since nobody can read it back', async () => {
+    renderAdmin(roster([ONE]), ADMIN, undefined, () => Promise.resolve(undefined))
+
+    fireEvent.input(await screen.findByLabelText('New password for ada@example.org'), {
+      target: { value: 'a-new-password' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Set it' }))
+
+    expect((await screen.findByRole('status')).textContent).toContain('Tell them what it is')
+    expect(screen.getByLabelText('New password for ada@example.org')).toHaveProperty('value', '')
+  })
+
+  it('will not send an empty one', async () => {
+    const setAccountPassword = vi.fn<AdminApi['setAccountPassword']>(() => Promise.resolve(undefined))
+    renderAdmin(roster([ONE]), ADMIN, undefined, setAccountPassword)
+
+    await screen.findByLabelText('New password for ada@example.org')
+
+    expect(screen.getByRole('button', { name: 'Set it' })).toHaveProperty('disabled', true)
+    expect(setAccountPassword).not.toHaveBeenCalled()
+  })
+
+  it('says when it did not work, and keeps what was typed', async () => {
+    renderAdmin(roster([ONE]), ADMIN, undefined, () => Promise.reject(new Error('nope')))
+
+    fireEvent.input(await screen.findByLabelText('New password for ada@example.org'), {
+      target: { value: 'a-new-password' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Set it' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Could not set that password')
+    expect(screen.getByLabelText('New password for ada@example.org')).toHaveProperty(
+      'value',
+      'a-new-password',
+    )
+  })
+
+  it('keeps each row’s field to itself', async () => {
+    // A regression guard, not a proof: the state is per row because each row renders
+    // its own component, so no edit to a line makes this fail. It is here because
+    // hoisting it to the page is the obvious tidy-up, and it would put the password
+    // you typed for one person into the box beside everybody else's name.
+    const second = { ...ONE, id: 'a-8', email: 'bea@example.org' }
+    renderAdmin(roster([ONE, second]), ADMIN, undefined, () => Promise.resolve(undefined))
+
+    fireEvent.input(await screen.findByLabelText('New password for ada@example.org'), {
+      target: { value: 'for-ada' },
+    })
+
+    expect(screen.getByLabelText('New password for bea@example.org')).toHaveProperty('value', '')
   })
 })
