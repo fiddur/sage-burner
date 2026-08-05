@@ -35,6 +35,11 @@ export const isPlaceColor = (value: unknown): value is PlaceColor => isOneOf(pla
  * `helping` is a multiple choice and does not: nothing runs out of people
  * willing to tend the sauna.
  */
+export const eventOptionKinds = ['lodging', 'helping'] as const
+export type EventOptionKind = (typeof eventOptionKinds)[number]
+export const isEventOptionKind = (value: unknown): value is EventOptionKind =>
+  isOneOf(eventOptionKinds, value)
+
 /**
  * What a slot in the kitchen's day is.
  *
@@ -51,11 +56,6 @@ export const isMealSlotKind = (value: unknown): value is MealSlotKind => isOneOf
 export const mealRoles = ['lead', 'helper', 'cleanup'] as const
 export type MealRole = (typeof mealRoles)[number]
 export const isMealRole = (value: unknown): value is MealRole => isOneOf(mealRoles, value)
-
-export const eventOptionKinds = ['lodging', 'helping'] as const
-export type EventOptionKind = (typeof eventOptionKinds)[number]
-export const isEventOptionKind = (value: unknown): value is EventOptionKind =>
-  isOneOf(eventOptionKinds, value)
 
 /** Lifecycle of a membership application. */
 export const applicationStatuses = ['pending', 'approved', 'rejected'] as const

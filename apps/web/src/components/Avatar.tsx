@@ -1,3 +1,4 @@
+import { AVATAR_PIXELS } from '../avatar.ts'
 import { initials } from '../initials.ts'
 
 /**
@@ -41,8 +42,11 @@ export const Avatar = ({
       // corner as the link's label — so repeating it here would have a screen reader
       // say it twice.
       alt=""
-      width={64}
-      height={64}
+      // What is stored, so the ratio the browser reserves space by is the picture's
+      // own. CSS decides the size it is drawn at — 2rem in the corner, less on a
+      // schedule chip — and these only have to agree with each other.
+      width={AVATAR_PIXELS}
+      height={AVATAR_PIXELS}
     />
   )
 }

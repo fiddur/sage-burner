@@ -250,7 +250,6 @@ export const registerAttendanceRoutes = (
         .select({ account_id: account.id, name: account.name, avatar: accountAvatar.updated_at })
         .from(attendance)
         .innerJoin(account, eq(account.id, attendance.account_id))
-        // Left: most accounts have no picture, and the circle falls back to initials.
         .leftJoin(accountAvatar, eq(accountAvatar.account_id, account.id))
         .where(eq(attendance.event_id, request.params.eventId))
         .orderBy(asc(account.name), asc(account.id))

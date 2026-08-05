@@ -169,7 +169,6 @@ const readViewer = async (
     })
     .from(account)
     .leftJoin(accountRole, eq(accountRole.account_id, account.id))
-    // Left: most accounts have no picture, and the circle falls back to initials.
     .leftJoin(accountAvatar, eq(accountAvatar.account_id, account.id))
     .where(eq(account.id, payload.account_id))
 
