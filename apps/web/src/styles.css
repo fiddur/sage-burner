@@ -712,6 +712,18 @@ a:hover {
   padding-inline-start: 1.25rem;
 }
 
+/* The ＋ beside "Not placed yet". Bigger than the heading it sits in, on purpose. */
+.dream-pool h2 .link-button {
+  font-size: 1.3rem;
+  margin-inline-start: 0.4rem;
+  line-height: 1;
+}
+
+/* An empty hour is a place to offer something, so it should look like one. */
+.schedule-cell {
+  cursor: pointer;
+}
+
 /*
   A placed dream is as tall as the hours it runs.
 

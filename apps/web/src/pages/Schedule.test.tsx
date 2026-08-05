@@ -59,6 +59,7 @@ const stub = (
   stopHelpingWithSession: () => Promise.reject(new Error('stopHelpingWithSession is not stubbed here')),
   supportSession: () => Promise.reject(new Error('supportSession is not stubbed here')),
   withdrawSupportForSession: () => Promise.reject(new Error('withdrawSupportForSession is not stubbed here')),
+  withdrawSession: () => Promise.reject(new Error('withdrawSession is not stubbed here')),
   ...over,
 })
 
@@ -683,6 +684,42 @@ describe('Schedule', () => {
     await waitFor(() => expect(supportSession).toHaveBeenCalledWith('s-1'))
   })
 
+  it('withdraws a dream from the dialog, but only after asking', async () => {
+    const withdrawSession = vi.fn<ScheduleApi['withdrawSession']>(() => Promise.resolve(undefined))
+    renderPage(stub({ withdrawSession }, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Withdraw Cacao ceremony' }))
+
+    // The first click asks; nothing has gone yet.
+    expect(withdrawSession).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Really withdraw Cacao ceremony' }))
+
+    await waitFor(() => expect(withdrawSession).toHaveBeenCalledWith('s-1'))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  it('keeps the dream when the confirmation is declined', async () => {
+    const withdrawSession = vi.fn<ScheduleApi['withdrawSession']>(() => Promise.resolve(undefined))
+    renderPage(stub({ withdrawSession }, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Withdraw Cacao ceremony' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Keep it' }))
+
+    expect(withdrawSession).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog')).toBeTruthy()
+  })
+
+  it('offers the withdrawal on an unplaced dream too', async () => {
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Sunrise yoga' }))
+
+    expect(await screen.findByRole('button', { name: 'Withdraw Sunrise yoga' })).toBeTruthy()
+  })
+
   it('offers to help from the details, and to stop when already helping', async () => {
     const helpWithSession = vi.fn<ScheduleApi['helpWithSession']>(() =>
       Promise.resolve({ session: aDream({ id: 's-1', title: 'Cacao ceremony' }) }),
@@ -853,6 +890,113 @@ describe('Schedule', () => {
     fireEvent.drop(cell('14:00', 1))
 
     await waitFor(() => expect(updateSession).toHaveBeenCalled())
+  })
+
+  it('edits a dream in the dialog, without going to the Dreams page', async () => {
+    const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'Renamed' }) }),
+    )
+    renderPage(stub({ updateSession }, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Cacao ceremony' }))
+    fireEvent.input(screen.getByLabelText('Title of Cacao ceremony'), { target: { value: 'Renamed' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    // Only what changed, the same rule the Dreams page follows.
+    await waitFor(() => expect(updateSession).toHaveBeenCalledWith('s-1', { title: 'Renamed' }))
+  })
+
+  it('offers a dream from the pool, with nowhere and no time', async () => {
+    const offerSession = vi.fn<ScheduleApi['offerSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-2', title: 'Check in' }) }),
+    )
+    renderPage(stub({ offerSession }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Offer a dream' }))
+    fireEvent.input(screen.getByLabelText('Title of the new dream'), { target: { value: '  Check in  ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Offer it' }))
+
+    await waitFor(() =>
+      expect(offerSession).toHaveBeenCalledWith('e-1', {
+        title: 'Check in',
+        description: '',
+        place_id: null,
+        time_slot_start: null,
+        time_slot_end: null,
+        facilitator_account_id: null,
+        repeatable: false,
+      }),
+    )
+  })
+
+  it('offers a dream in the hour and the lane that were clicked', async () => {
+    // What a calendar does. The slot is prefilled from the cell, so the whole body
+    // is sent rather than a diff — a prefill diffed against itself is no change.
+    const offerSession = vi.fn<ScheduleApi['offerSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-2', title: 'Sunrise yoga' }) }),
+    )
+    renderPage(stub({ offerSession }))
+
+    await screen.findByRole('columnheader', { name: /Sauna/ })
+    fireEvent.click(cell('10:00', 1))
+
+    fireEvent.input(await screen.findByLabelText('Title of the new dream'), {
+      target: { value: 'Sunrise yoga' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Offer it' }))
+
+    await waitFor(() =>
+      expect(offerSession).toHaveBeenCalledWith('e-1', {
+        title: 'Sunrise yoga',
+        description: '',
+        place_id: 'p-2',
+        time_slot_start: '2026-08-01T08:00:00.000Z',
+        time_slot_end: '2026-08-01T09:00:00.000Z',
+        facilitator_account_id: null,
+        repeatable: false,
+      }),
+    )
+  })
+
+  it('offers nothing on an hour a dream already fills', async () => {
+    // The passing sibling for the cell click, and the reason it tests `empty` rather
+    // than any cell: a chip's click bubbles to the cell it sits in, so without the
+    // check, opening a dream would also open the offer panel on top of it.
+    const occupied = aDream({
+      id: 's-1',
+      title: 'Cacao ceremony',
+      place_id: 'p-2',
+      time_slot_start: '2026-08-01T08:00:00.000Z',
+      time_slot_end: '2026-08-01T09:00:00.000Z',
+    })
+    renderPage(stub({}, [occupied]))
+
+    await screen.findByRole('columnheader', { name: /Sauna/ })
+    fireEvent.click(cell('10:00', 1))
+
+    expect(screen.queryByLabelText('Title of the new dream')).toBeNull()
+
+    // …and the chip inside it still opens the dream itself.
+    fireEvent.click(screen.getByRole('button', { name: 'Open Cacao ceremony' }))
+
+    expect(await screen.findByRole('dialog', { name: 'Cacao ceremony' })).toBeTruthy()
+    expect(screen.queryByLabelText('Title of the new dream')).toBeNull()
+  })
+
+  it('will not offer a nameless dream', async () => {
+    const offerSession = vi.fn<ScheduleApi['offerSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-2', title: 'x' }) }),
+    )
+    renderPage(stub({ offerSession }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Offer a dream' }))
+    const offer = screen.getByRole('button', { name: 'Offer it' })
+
+    expect(offer).toHaveProperty('disabled', true)
+
+    fireEvent.click(offer)
+    expect(offerSession).not.toHaveBeenCalled()
   })
 
   it('shows what the server said when a move is refused', async () => {

@@ -1,4 +1,4 @@
-import type { MyBurn, Place, Session } from '@sage-burner/shared'
+import type { EventAttendeesResponse, MyBurn, Place, Session, SessionUpdate } from '@sage-burner/shared'
 import type { ComponentChildren } from 'preact'
 
 import { useRef, useState } from 'preact/hooks'
@@ -7,6 +7,8 @@ import type { ApiClient } from '../api/client.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
 import { DreamDetails } from '../components/DreamDetails.tsx'
+import { DreamFields } from '../components/DreamFields.tsx'
+import { DreamPanel } from '../components/DreamPanel.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
 import { fromLocalInput, toLocalInput } from '../datetime.ts'
 import { initials } from '../initials.ts'
@@ -25,15 +27,25 @@ export type ScheduleApi = Pick<
   | 'stopHelpingWithSession'
   | 'supportSession'
   | 'withdrawSupportForSession'
+  | 'withdrawSession'
 >
 
 type Timetable = {
   event: MyBurn['event'] | null
   places: readonly Place[]
   sessions: readonly Session[]
-  /** Facilitator names by account id, for the circle on a chip. */
-  names: ReadonlyMap<string, string | null>
+  attendees: readonly EventAttendeesResponse['attendees'][number][]
 }
+
+/**
+ * What the dialog is showing: an existing dream, or a new one being offered.
+ *
+ * The existing case holds an id rather than the dream, so a reload after a heart or
+ * a helper leaves the panel showing what the server now says.
+ */
+type Opened =
+  | { kind: 'dream'; id: string }
+  | { kind: 'new'; place_id: string | null; time_slot_start: string | null; time_slot_end: string | null }
 
 const label = (row: string) => row.slice(11)
 
@@ -59,14 +71,14 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
   const viewer = useViewer()
   const member = isMember(viewer)
   const [dragged, setDragged] = useState<string | undefined>(undefined)
-  const [opened, setOpened] = useState<string | undefined>(undefined)
+  const [opened, setOpened] = useState<Opened | undefined>(undefined)
 
   // The burn comes first: since #156 the lanes belong to one, so there is no grid to
   // ask for until we know which.
   const burn = useSelectedBurn()
   const { loaded, reload } = useLoad<Timetable>(
     async (signal) => {
-      if (burn === undefined) return { event: null, places: [], sessions: [], names: new Map() }
+      if (burn === undefined) return { event: null, places: [], sessions: [], attendees: [] }
 
       const [places, dreams, attendees] = await Promise.all([
         api.getPlaces(burn.event.id, signal),
@@ -78,8 +90,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
         event: burn.event,
         places: places.places,
         sessions: dreams.sessions,
-        // By id, because the chip has one and needs a name for the circle.
-        names: new Map(attendees.attendees.map((person) => [person.account_id, person.name])),
+        attendees: attendees.attendees,
       }
     },
     { enabled: member, key: burn?.event.id ?? '', fallback: 'Could not load the schedule.' },
@@ -115,7 +126,9 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
     )
   }
 
-  const { event, places, sessions, names } = loaded.data
+  const { event, places, sessions, attendees } = loaded.data
+  // By id, because a chip has one and needs a name for the circle.
+  const names = new Map(attendees.map((person) => [person.account_id, person.name]))
 
   if (event === null) {
     return (
@@ -199,9 +212,13 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
     run(() => (helping ? api.helpWithSession(id) : api.stopHelpingWithSession(id)), 'Could not save that.')
   }
 
-  // Found again rather than held in state, so a reload after a heart or a helper
-  // leaves the panel showing what the server now says.
-  const shown = sessions.find((dream) => dream.id === opened)
+  // The form disables its own button until there is a title, so the fallback is
+  // unreachable — and if that ever stopped being true, an empty title is a 400 the
+  // page reports, which beats a click that silently does nothing.
+  const offer = ({ title = '', ...fields }: SessionUpdate) => {
+    run(() => api.offerSession(event.id, { ...fields, title }), 'Could not offer that.')
+    setOpened(undefined)
+  }
 
   return (
     <Framed>
@@ -217,7 +234,10 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
           names={names}
           busy={busy}
           onDragStart={setDragged}
-          onOpen={setOpened}
+          onOpen={(id) => setOpened({ kind: 'dream', id })}
+          onOffer={() =>
+            setOpened({ kind: 'new', place_id: null, time_slot_start: null, time_slot_end: null })
+          }
           onSupport={support}
           onResize={resize}
           onDrop={() => {
@@ -235,28 +255,127 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
           names={names}
           busy={busy}
           onDragStart={setDragged}
-          onOpen={setOpened}
+          onOpen={(id) => setOpened({ kind: 'dream', id })}
+          onOfferAt={(row, placeId) =>
+            setOpened({
+              kind: 'new',
+              place_id: placeId,
+              time_slot_start: fromLocalInput(row),
+              time_slot_end: endFor(row, { time_slot_start: null, time_slot_end: null }),
+            })
+          }
           onSupport={support}
           onResize={resize}
           onDrop={dropInto}
         />
       </div>
 
-      {shown !== undefined && (
-        <DreamDetails
-          dream={shown}
-          place={places.find((lane) => lane.id === shown.place_id)}
-          facilitatorName={
-            shown.facilitator_account_id === null ? undefined : names.get(shown.facilitator_account_id)
-          }
-          viewerId={viewer.account?.id}
-          busy={busy}
-          onClose={() => setOpened(undefined)}
-          onHelp={(helping) => help(shown.id, helping)}
-          onSupport={(supporting) => support(shown.id, supporting)}
-        />
-      )}
+      <Opened
+        opened={opened}
+        dreams={sessions}
+        places={places}
+        attendees={attendees}
+        names={names}
+        viewerId={viewer.account?.id}
+        busy={busy}
+        onClose={() => setOpened(undefined)}
+        onHelp={help}
+        onSupport={support}
+        onSave={move}
+        onOffer={offer}
+        onRemove={(id) => {
+          run(() => api.withdrawSession(id), 'Could not withdraw that.')
+          setOpened(undefined)
+        }}
+      />
     </Framed>
+  )
+}
+
+/**
+ * Whichever panel is open over the grid, or nothing.
+ *
+ * Its own component so the page keeps one branch where it had four — the same
+ * reason `NoBurn` is one.
+ */
+const Opened = ({
+  opened,
+  dreams,
+  places,
+  attendees,
+  names,
+  viewerId,
+  busy,
+  onClose,
+  onHelp,
+  onSupport,
+  onSave,
+  onOffer,
+  onRemove,
+}: {
+  opened: Opened | undefined
+  dreams: readonly Session[]
+  places: readonly Place[]
+  attendees: readonly EventAttendeesResponse['attendees'][number][]
+  names: ReadonlyMap<string, string | null>
+  viewerId: string | undefined
+  busy: boolean
+  onClose: () => void
+  onHelp: (id: string, helping: boolean) => void
+  onSupport: (id: string, supporting: boolean) => void
+  onSave: (id: string, changes: SessionUpdate) => void
+  onOffer: (fields: SessionUpdate) => void
+  onRemove: (id: string) => void
+}) => {
+  if (opened === undefined) return null
+
+  if (opened.kind === 'new') {
+    return (
+      <DreamPanel label="Offer a dream" onClose={onClose}>
+        <h2>Offer a dream</h2>
+        <DreamFields
+          dream={{
+            title: '',
+            description: '',
+            facilitator_account_id: null,
+            repeatable: false,
+            place_id: opened.place_id,
+            time_slot_start: opened.time_slot_start,
+            time_slot_end: opened.time_slot_end,
+          }}
+          subject="the new dream"
+          places={places}
+          attendees={attendees}
+          busy={busy}
+          creating
+          onCancel={onClose}
+          onSave={onOffer}
+        />
+      </DreamPanel>
+    )
+  }
+
+  // Looked up rather than held, so a reload after a heart or a helper leaves the
+  // panel showing what the server now says.
+  const dream = dreams.find((candidate) => candidate.id === opened.id)
+  if (dream === undefined) return null
+
+  return (
+    <DreamDetails
+      dream={dream}
+      places={places}
+      attendees={attendees}
+      facilitatorName={
+        dream.facilitator_account_id === null ? undefined : names.get(dream.facilitator_account_id)
+      }
+      viewerId={viewerId}
+      busy={busy}
+      onClose={onClose}
+      onHelp={(helping) => onHelp(dream.id, helping)}
+      onSupport={(supporting) => onSupport(dream.id, supporting)}
+      onSave={(changes) => onSave(dream.id, changes)}
+      onRemove={() => onRemove(dream.id)}
+    />
   )
 }
 
@@ -441,6 +560,7 @@ const Pool = ({
   busy,
   onDragStart,
   onOpen,
+  onOffer,
   onSupport,
   onResize,
   onDrop,
@@ -450,6 +570,7 @@ const Pool = ({
   busy: boolean
   onDragStart: (id: string) => void
   onOpen: (id: string) => void
+  onOffer: () => void
   onSupport: (id: string, supporting: boolean) => void
   onResize: (dream: Session, byRows: number) => void
   onDrop: () => void
@@ -462,7 +583,12 @@ const Pool = ({
       onDrop()
     }}
   >
-    <h2>Not placed yet</h2>
+    <h2>
+      Not placed yet
+      <button type="button" class="link-button" disabled={busy} aria-label="Offer a dream" onClick={onOffer}>
+        ＋
+      </button>
+    </h2>
 
     {dreams.length === 0 && <p class="form-note">Everything has somewhere to be.</p>}
 
@@ -482,8 +608,9 @@ const Pool = ({
     ))}
 
     <p class="form-note">
-      Drag one into the grid to place it, or set the time and place precisely on <a href="/dreams">Dreams</a>.
-      A ↻ dream stays here when you place it, so the same one can go into several mornings.
+      Drag one into the grid to place it, or click an empty hour to offer something there. A ↻ dream stays
+      here when you place it, so the same one can go into several mornings. The whole list is on{' '}
+      <a href="/dreams">Dreams</a>.
     </p>
   </aside>
 )
@@ -496,6 +623,7 @@ const Timetable = ({
   busy,
   onDragStart,
   onOpen,
+  onOfferAt,
   onSupport,
   onResize,
   onDrop,
@@ -507,6 +635,7 @@ const Timetable = ({
   busy: boolean
   onDragStart: (id: string) => void
   onOpen: (id: string) => void
+  onOfferAt: (row: string, placeId: string) => void
   onSupport: (id: string, supporting: boolean) => void
   onResize: (dream: Session, byRows: number) => void
   onDrop: (row: string, placeId: string) => void
@@ -553,6 +682,12 @@ const Timetable = ({
                     onDrop={(dropEvent) => {
                       dropEvent.preventDefault()
                       onDrop(row, place.id)
+                    }}
+                    onClick={() => {
+                      // Only an empty hour. A click that reached an anchor cell went
+                      // past the chip filling it, and offering a second dream on top
+                      // of one somebody just clicked is not what they meant.
+                      if (cell.kind === 'empty') onOfferAt(row, place.id)
                     }}
                   >
                     {cell.kind === 'anchor' && (
