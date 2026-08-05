@@ -8,13 +8,20 @@ import type { ApiClient } from '../api/client.ts'
 import { useSelectedBurn } from '../burn.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
 import { fromLocalInput, toLocalInput } from '../datetime.ts'
+import { initials } from '../initials.ts'
 import { useAction, useLoad } from '../load.ts'
 import { endFor, hourOf, hoursOf, laneCells } from '../schedule.ts'
 import { isMember, useViewer } from '../viewer.tsx'
 
-export type ScheduleApi = Pick<ApiClient, 'getSessions' | 'getPlaces' | 'updateSession'>
+export type ScheduleApi = Pick<ApiClient, 'getSessions' | 'getPlaces' | 'updateSession' | 'getEventAttendees'>
 
-type Timetable = { event: MyBurn['event'] | null; places: readonly Place[]; sessions: readonly Session[] }
+type Timetable = {
+  event: MyBurn['event'] | null
+  places: readonly Place[]
+  sessions: readonly Session[]
+  /** Facilitator names by account id, for the circle on a chip. */
+  names: ReadonlyMap<string, string | null>
+}
 
 const label = (row: string) => row.slice(11)
 
@@ -46,14 +53,21 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
   const burn = useSelectedBurn()
   const { loaded, reload } = useLoad<Timetable>(
     async (signal) => {
-      if (burn === undefined) return { event: null, places: [], sessions: [] }
+      if (burn === undefined) return { event: null, places: [], sessions: [], names: new Map() }
 
-      const [places, dreams] = await Promise.all([
+      const [places, dreams, attendees] = await Promise.all([
         api.getPlaces(burn.event.id, signal),
         api.getSessions(burn.event.id, signal),
+        api.getEventAttendees(burn.event.id, signal),
       ])
 
-      return { event: burn.event, places: places.places, sessions: dreams.sessions }
+      return {
+        event: burn.event,
+        places: places.places,
+        sessions: dreams.sessions,
+        // By id, because the chip has one and needs a name for the circle.
+        names: new Map(attendees.attendees.map((person) => [person.account_id, person.name])),
+      }
     },
     { enabled: member, key: burn?.event.id ?? '', fallback: 'Could not load the schedule.' },
   )
@@ -88,7 +102,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
     )
   }
 
-  const { event, places, sessions } = loaded.data
+  const { event, places, sessions, names } = loaded.data
 
   if (event === null) {
     return (
@@ -146,6 +160,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
       <div class="schedule">
         <Pool
           dreams={unscheduled}
+          names={names}
           busy={busy}
           onDragStart={setDragged}
           onDrop={() => {
@@ -160,6 +175,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
           rows={rows}
           places={places}
           dreams={sessions}
+          names={names}
           busy={busy}
           onDragStart={setDragged}
           onDrop={dropInto}
@@ -178,10 +194,12 @@ const Framed = ({ children }: { children: ComponentChildren }) => (
 
 const Chip = ({
   dream,
+  names,
   busy,
   onDragStart,
 }: {
   dream: Session
+  names: ReadonlyMap<string, string | null>
   busy: boolean
   onDragStart: (id: string) => void
 }) => (
@@ -200,17 +218,41 @@ const Chip = ({
     }}
   >
     {dream.title}
+    <Facilitator dream={dream} names={names} />
     {span(dream) !== null && <span class="dream-span">{span(dream)}</span>}
   </span>
 )
 
+/**
+ * Who is running it, as the initials circle the corner uses.
+ *
+ * The name is on `title` rather than beside the letters: a chip is an hour tall at
+ * best, and two of them in a lane get half that. Nothing when nobody has been handed
+ * it — an empty circle would read as somebody whose name is missing.
+ */
+const Facilitator = ({ dream, names }: { dream: Session; names: ReadonlyMap<string, string | null> }) => {
+  const who = dream.facilitator_account_id
+  if (who === null) return null
+
+  const name = names.get(who) ?? null
+
+  return (
+    <span class="avatar dream-facilitator" title={name ?? 'Name not filled in yet'}>
+      <span aria-hidden="true">{initials(name)}</span>
+      <span class="visually-hidden">Facilitated by {name ?? 'somebody who has no name filled in'}</span>
+    </span>
+  )
+}
+
 const Pool = ({
   dreams,
+  names,
   busy,
   onDragStart,
   onDrop,
 }: {
   dreams: readonly Session[]
+  names: ReadonlyMap<string, string | null>
   busy: boolean
   onDragStart: (id: string) => void
   onDrop: () => void
@@ -229,7 +271,7 @@ const Pool = ({
 
     {dreams.map((dream) => (
       <p key={dream.id}>
-        <Chip dream={dream} busy={busy} onDragStart={onDragStart} />
+        <Chip dream={dream} names={names} busy={busy} onDragStart={onDragStart} />
       </p>
     ))}
 
@@ -243,6 +285,7 @@ const Timetable = ({
   rows,
   places,
   dreams,
+  names,
   busy,
   onDragStart,
   onDrop,
@@ -250,6 +293,7 @@ const Timetable = ({
   rows: readonly string[]
   places: readonly Place[]
   dreams: readonly Session[]
+  names: ReadonlyMap<string, string | null>
   busy: boolean
   onDragStart: (id: string) => void
   onDrop: (row: string, placeId: string) => void
@@ -307,7 +351,13 @@ const Timetable = ({
                           const full = dreams.find((entry) => entry.id === dream.id)
 
                           return full === undefined ? null : (
-                            <Chip key={full.id} dream={full} busy={busy} onDragStart={onDragStart} />
+                            <Chip
+                              key={full.id}
+                              dream={full}
+                              names={names}
+                              busy={busy}
+                              onDragStart={onDragStart}
+                            />
                           )
                         })}
                       </div>

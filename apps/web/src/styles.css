@@ -108,6 +108,27 @@ a:hover {
   margin-inline-end: auto;
 }
 
+/* Off-screen but read aloud. The circle shows letters; a screen reader needs the name. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Smaller than the corner's, since a chip is an hour tall at best. */
+.dream-facilitator {
+  width: 1.35rem;
+  height: 1.35rem;
+  font-size: 0.6rem;
+  margin-inline-start: 0.35rem;
+  vertical-align: middle;
+}
+
 /* A placeholder for the avatar image that will replace it, so it is sized like one. */
 .avatar {
   display: inline-flex;

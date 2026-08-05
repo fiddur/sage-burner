@@ -1151,7 +1151,7 @@ unguessable, but it is not a secret beyond that: **do not post it anywhere outsi
 the gathering.** That is the trade that lets descriptions go out in full.
 
 What leaves the building is the title, the description, the times, and the place's
-name, emoji and colour. No host, no contact details, no allergies, no payment
+name, emoji and colour. No facilitator, no contact details, no allergies, no payment
 state.
 
 Two guards, catching different things:
@@ -1205,12 +1205,26 @@ member may reschedule any dream, not only the one who offered it. Gated on the
 `member` role rather than on having an `attendance` row, so someone can help plan
 next burn's programme before they have said they are coming.
 
-The host is **the member who offered it**, taken from the session and never from
-the body — `sessionCreateSchema` omits `host_account_id` entirely, so a dream in
-someone else's name is a 400 rather than an edit anyone can make by hand.
-Reassigning one is still not offered; the list to pick from now exists
-(`GET /api/events/:eventId/attendees`, added for the roles register), so what is
-missing is the route and the control, not the names.
+The **facilitator** is who runs it, and is **assignable** (#198). It was
+`host_account_id` — whoever wrote the dream down, taken from the session and refused
+in the body, so that a dream in someone else's name was a 400 rather than an edit
+anyone could make by hand. Offering something for another member to run is exactly
+that edit, and it is what was wanted, so the field was renamed and opened.
+
+It is **nullable**: a dream can be offered before anyone has said they will run it,
+which is how most of them start. The routes check that whoever is named is **coming
+to this burn** — the same rule the lead-roles register applies to a lead, and the
+same picker feed, `GET /api/events/:eventId/attendees`. A 400 rather than a 404: the
+account exists, the pairing is what is wrong.
+
+The rename was a table rebuild rather than `ALTER TABLE … RENAME COLUMN`, because the
+column also lost `NOT NULL` and SQLite cannot drop a constraint in place. Every
+existing row carried its host across — there was no way to name anyone else, so that
+person was in practice the one expected to run it.
+
+The schedule shows the facilitator as the initials circle, with the name on hover and
+read aloud; nothing at all when nobody has been handed it, since an empty circle would
+read as somebody whose name is missing.
 
 `session.location` was free text; it is now `place_id`, referencing #78's places.
 The scheduling grid draws one column per place, and a column cannot be spelled

@@ -1,4 +1,4 @@
-import type { Place, Session, SessionUpdate } from '@sage-burner/shared'
+import type { EventAttendeesResponse, Place, Session, SessionUpdate } from '@sage-burner/shared'
 
 import { MAX_DESCRIPTION, MAX_TITLE } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
@@ -13,7 +13,7 @@ import { isMember, useViewer } from '../viewer.tsx'
 
 export type DreamsApi = Pick<
   ApiClient,
-  'getSessions' | 'offerSession' | 'updateSession' | 'withdrawSession' | 'getPlaces'
+  'getSessions' | 'offerSession' | 'updateSession' | 'withdrawSession' | 'getPlaces' | 'getEventAttendees'
 >
 
 const placeLabel = (places: readonly Place[], id: string | null) => {
@@ -49,14 +49,15 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
   const burn = useSelectedBurn()
   const { loaded, reload } = useLoad(
     async (signal) => {
-      if (burn === undefined) return { sessions: [], places: [] }
+      if (burn === undefined) return { sessions: [], places: [], attendees: [] }
 
-      const [dreams, places] = await Promise.all([
+      const [dreams, places, attendees] = await Promise.all([
         api.getSessions(burn.event.id, signal),
         api.getPlaces(burn.event.id, signal),
+        api.getEventAttendees(burn.event.id, signal),
       ])
 
-      return { sessions: dreams.sessions, places: places.places }
+      return { sessions: dreams.sessions, places: places.places, attendees: attendees.attendees }
     },
     { enabled: member, key: burn?.event.id ?? '', fallback: 'Could not load the dreams.' },
   )
@@ -78,6 +79,7 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
 
   const dreams = loaded.status === 'ready' ? loaded.data.sessions : []
   const places = loaded.status === 'ready' ? loaded.data.places : []
+  const attendees = loaded.status === 'ready' ? loaded.data.attendees : []
 
   return (
     <GuardedPage title="Dreams" require="member">
@@ -113,6 +115,7 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
               <DreamFields
                 dream={dream}
                 places={places}
+                attendees={attendees}
                 busy={busy}
                 onCancel={() => setEditing(undefined)}
                 onSave={(changes) =>
@@ -184,17 +187,20 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
 const DreamFields = ({
   dream,
   places,
+  attendees,
   busy,
   onSave,
   onCancel,
 }: {
   dream: Session
   places: readonly Place[]
+  attendees: readonly EventAttendeesResponse['attendees'][number][]
   busy: boolean
   onSave: (changes: SessionUpdate) => void
   onCancel: () => void
 }) => {
   const [title, setTitle] = useState(dream.title)
+  const [facilitator, setFacilitator] = useState(dream.facilitator_account_id ?? '')
   const [description, setDescription] = useState(dream.description)
   const [placeId, setPlaceId] = useState(dream.place_id ?? '')
   const [start, setStart] = useState(toLocalInput(dream.time_slot_start))
@@ -215,6 +221,9 @@ const DreamFields = ({
     ...(placeId === (dream.place_id ?? '') ? {} : { place_id: placeId === '' ? null : placeId }),
     ...(start === toLocalInput(dream.time_slot_start) ? {} : { time_slot_start: fromLocalInput(start) }),
     ...(end === toLocalInput(dream.time_slot_end) ? {} : { time_slot_end: fromLocalInput(end) }),
+    ...(facilitator === (dream.facilitator_account_id ?? '')
+      ? {}
+      : { facilitator_account_id: facilitator === '' ? null : facilitator }),
   })
 
   return (
@@ -238,6 +247,24 @@ const DreamFields = ({
           value={description}
           onInput={(inputEvent) => setDescription(inputEvent.currentTarget.value)}
         />
+      </label>
+
+      {/* Only people coming to this burn: the API refuses anyone else, since
+          somebody who is not there cannot run it. */}
+      <label class="field">
+        <span>Who is facilitating?</span>
+        <select
+          aria-label={`Facilitator for ${dream.title}`}
+          value={facilitator}
+          onChange={(changeEvent) => setFacilitator(changeEvent.currentTarget.value)}
+        >
+          <option value="">Nobody yet</option>
+          {attendees.map((person) => (
+            <option key={person.account_id} value={person.account_id}>
+              {person.name ?? 'Name not filled in yet'}
+            </option>
+          ))}
+        </select>
       </label>
 
       <label class="field">

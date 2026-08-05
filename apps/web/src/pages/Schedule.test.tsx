@@ -33,7 +33,9 @@ const SAUNA: Place = { id: 'p-2', event_id: 'e-1', order: 1, name: 'Sauna', emoj
 
 const aDream = (over: Partial<Session> & Pick<Session, 'id' | 'title'>): Session => ({
   event_id: 'e-1',
-  facilitator_account_id: 'a-1',
+  // Nobody, which is what a dream starts with now — the tests that want a
+  // facilitator name one.
+  facilitator_account_id: null,
   description: '',
   time_slot_start: null,
   time_slot_end: null,
@@ -49,6 +51,7 @@ const stub = (
   getPlaces: () => Promise.resolve({ places }),
   getSessions: () => Promise.resolve({ sessions }),
   updateSession: () => Promise.reject(new Error('updateSession is not stubbed here')),
+  getEventAttendees: () => Promise.resolve({ attendees: [{ account_id: 'a-1', name: 'Ada Lovelace' }] }),
   ...over,
 })
 
@@ -348,6 +351,48 @@ describe('Schedule', () => {
     fireEvent.dragStart(await screen.findByLabelText('Move Sunrise yoga'), { dataTransfer: { setData } })
 
     expect(setData).toHaveBeenCalledWith('text/plain', 's-1')
+  })
+
+  it('shows the facilitator as initials, with the name for a reader', async () => {
+    renderPage(
+      stub({}, [
+        aDream({
+          id: 's-1',
+          title: 'Cacao ceremony',
+          place_id: 'p-2',
+          facilitator_account_id: 'a-1',
+          time_slot_start: '2026-08-01T08:00:00.000Z',
+          time_slot_end: '2026-08-01T09:00:00.000Z',
+        }),
+      ]),
+    )
+
+    await screen.findByText('Cacao ceremony')
+
+    // The letters are `aria-hidden`; the name is what a screen reader gets, and the
+    // `title` is what a pointer gets. "AL" alone tells neither of them anything.
+    expect(screen.getByText('AL')).toBeTruthy()
+    expect(screen.getByText(/Facilitated by Ada Lovelace/)).toBeTruthy()
+  })
+
+  it('shows no circle at all when nobody is facilitating', async () => {
+    // The passing sibling, and the case a dream starts in: an empty circle would
+    // read as somebody whose name is missing.
+    renderPage(
+      stub({}, [
+        aDream({
+          id: 's-1',
+          title: 'Cacao ceremony',
+          place_id: 'p-2',
+          time_slot_start: '2026-08-01T08:00:00.000Z',
+          time_slot_end: '2026-08-01T09:00:00.000Z',
+        }),
+      ]),
+    )
+
+    await screen.findByText('Cacao ceremony')
+
+    expect(screen.queryByText(/Facilitated by/)).toBeNull()
   })
 
   it('wraps a placed dream in the stack the height rule needs', async () => {

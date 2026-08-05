@@ -46,6 +46,13 @@ const stub = (over: Partial<DreamsApi> = {}, sessions: Session[] = []): DreamsAp
   offerSession: () => Promise.reject(new Error('offerSession is not stubbed here')),
   updateSession: () => Promise.reject(new Error('updateSession is not stubbed here')),
   withdrawSession: () => Promise.reject(new Error('withdrawSession is not stubbed here')),
+  getEventAttendees: () =>
+    Promise.resolve({
+      attendees: [
+        { account_id: 'a-1', name: 'Ada' },
+        { account_id: 'a-2', name: 'Bea' },
+      ],
+    }),
   ...over,
 })
 
