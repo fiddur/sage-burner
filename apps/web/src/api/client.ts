@@ -21,14 +21,12 @@ import type {
   FormQuestionResponse,
   FormQuestionsResponse,
   InstallationResponse,
-  InviteCreate,
   InviteResponse,
   InviteState,
   LeadRoleLead,
   LeadRoleResponse,
   LeadRoleTeam,
   LeadRolesResponse,
-  LoginRequest,
   MealResponse,
   MealSlotsResponse,
   MealsResponse,
@@ -255,7 +253,7 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
     getMe: (signal?: AbortSignal) => request<MeResponse>(apiRoutes.getMe.path(), { signal }),
 
     /** Throws ApiError(401, 'invalid_credentials') on a bad email or password alike. */
-    login: (body: LoginRequest) =>
+    login: (body: BodyOf<'login'>) =>
       request<MeResponse>(apiRoutes.login.path(), { method: apiRoutes.login.method, body }),
 
     logout: () => request<MeResponse>(apiRoutes.logout.path(), { method: apiRoutes.logout.method }),
@@ -748,7 +746,7 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
     unsubscribeFromPush: (endpoint: string) =>
       request<undefined>(apiRoutes.unsubscribeFromPush.path(), {
         method: apiRoutes.unsubscribeFromPush.method,
-        body: { endpoint },
+        body: { endpoint } satisfies BodyOf<'unsubscribeFromPush'>,
       }),
 
     /** Admin only. Never carries the token — only the digest is stored. */
@@ -764,7 +762,7 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
      *
      * Omit `expires_at` for the default 30 days.
      */
-    createInvite: (body: InviteCreate = {}) =>
+    createInvite: (body: BodyOf<'createInvite'> = {}) =>
       request<InviteResponse>(apiRoutes.createInvite.path(), { method: apiRoutes.createInvite.method, body }),
 
     /**

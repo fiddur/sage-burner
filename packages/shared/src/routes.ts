@@ -1,4 +1,6 @@
 import type {
+  LoginRequest,
+  InviteCreate,
   AccountRolesUpdate,
   AdminPasswordReset,
   ApplicationCreate,
@@ -555,7 +557,9 @@ export interface RouteBodies {
   copyLeadRoles: CopyFrom
   copyPlaces: CopyFrom
   createEvent: EventCreateInput
+  createInvite: InviteCreate
   joinLeadRoleTeam: LeadRoleTeam
+  login: LoginRequest
   offerSession: SessionCreateInput
   redeemInvite: RedeemRequestInput
   reorderEventOptions: EventOptionOrder
@@ -569,6 +573,7 @@ export interface RouteBodies {
   setPayment: PaymentUpdate
   submitApplication: ApplicationCreate
   subscribeToPush: PushSubscriptionCreate
+  unsubscribeFromPush: Pick<PushSubscriptionCreate, 'endpoint'>
   updateEvent: EventUpdate
   updateEventOption: EventOptionUpdate
   updateInstallation: InstallationUpdate

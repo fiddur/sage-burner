@@ -13,15 +13,10 @@ import { createDb, runMigrations } from '../db/index.ts'
  * The manifest and the routing table say the same thing, checked against Fastify
  * rather than against the source.
  *
- * Structural rather than disciplinary, and that distinction is why this file exists.
- * #152's first pass converted the registrations with a regex and left six behind —
- * every one a two-parameter route, because the generic in
- * `app.delete<{ Params: { id: string; role: string } }>` contains a semicolon and the
- * sweep's pattern stopped at one. The grep written to confirm the sweep had the same
- * blind spot, so it reported success on precisely what it could not see.
- *
- * A table read back out of Fastify cannot have that hole: it does not care how the
- * path reached it.
+ * Structural rather than disciplinary, which is the whole reason it reads the table
+ * back out of Fastify instead of scanning the route files. A check that inspects the
+ * source has to model how a registration is written — and can therefore share a blind
+ * spot with the thing it is checking. This one does not care how the path got there.
  */
 
 let handle: DbHandle | undefined
