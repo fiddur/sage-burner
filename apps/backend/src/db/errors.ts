@@ -22,6 +22,20 @@ export const isForeignKeyViolation = (failure: unknown): boolean =>
   failure instanceof Error && /FOREIGN KEY constraint failed/i.test(failure.message)
 
 /**
+ * SQLite refusing a duplicate, on a UNIQUE column or a unique index.
+ *
+ * Untargeted, unlike `isCheckViolation`: the message names columns rather than the
+ * index, so a table with two unique indexes cannot be told apart here. Every caller
+ * so far has one, and a second would want the distinction made by the write rather
+ * than by a wider regex.
+ *
+ * The narrowing is the point. A `catch` that answers 409 to everything tells a caller
+ * "there is already one of those" when the disk filled up.
+ */
+export const isUniqueViolation = (failure: unknown): boolean =>
+  failure instanceof Error && /UNIQUE constraint failed/i.test(failure.message)
+
+/**
  * SQLite refusing a named CHECK.
  *
  * The handler validates before writing, so this only fires for a combination no

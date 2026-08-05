@@ -10,6 +10,7 @@ import { createApp } from '../app.ts'
 import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
+import { isForeignKeyViolation, isUniqueViolation } from '../db/errors.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, accountRole, attendance, event, meal as mealTable } from '../db/schema.ts'
 import { sittingDates } from './meals.ts'
@@ -41,6 +42,12 @@ const build = async () => {
 
 const db = () => {
   const found = handle?.db
+  if (found === undefined) throw new Error('build() first')
+  return found
+}
+
+const client = () => {
+  const found = handle?.client
   if (found === undefined) throw new Error('build() first')
   return found
 }
@@ -181,6 +188,35 @@ describe('meal slots', () => {
     expect((await addSlot(server, organiser.cookie, { label: 'Lunch', at: '1pm' })).statusCode).toBe(400)
     expect((await addSlot(server, organiser.cookie, { label: '   ', at: '13:00' })).statusCode).toBe(400)
   })
+
+  it('says a burn that does not exist does not, rather than answering with no slots', async () => {
+    // It selected by `event_id` and answered 200 for any id at all, while its
+    // siblings looked the burn up and 404'd (#217).
+    const server = await build()
+    await givenBurn()
+    const organiser = await givenAccount(['admin'])
+
+    const response = await send(
+      server,
+      'GET',
+      `/api/admin/events/2b1f0a9c-0000-4000-8000-000000000000/meal-slots`,
+      organiser.cookie,
+    )
+
+    expect(response.statusCode).toBe(404)
+  })
+
+  it('lists them for a burn that does exist', async () => {
+    const server = await build()
+    await givenBurn()
+    const organiser = await givenAccount(['admin'])
+    await addSlot(server, organiser.cookie, { label: 'Lunch', at: '13:00' })
+
+    const response = await send(server, 'GET', `/api/admin/events/${BURN}/meal-slots`, organiser.cookie)
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().slots).toHaveLength(1)
+  })
 })
 
 describe('generating the sittings', () => {
@@ -236,6 +272,34 @@ describe('generating the sittings', () => {
     const after = (await listMeals(server, organiser.cookie)).meals
     expect(after).toHaveLength(3)
     expect(after.find((meal: { id: string }) => meal.id === first.id).at).toBe('19:30')
+  })
+
+  it('makes a new one for the day a sitting was moved off, because the slot still says so', async () => {
+    // The limit of "a moved sitting stays moved" (#216): a sitting is recognised by
+    // its day and name, so moving one to another *day* leaves its old day without
+    // one — and the slot still says that day has a dinner. The 3rd closes at 12:00,
+    // so it is the one day generating never put a dinner on, which is what makes it
+    // free to be moved onto.
+    const server = await build()
+    await givenBurn({ end_time: '12:00' })
+    const organiser = await givenAccount(['admin'])
+    await addSlot(server, organiser.cookie, { label: 'Dinner', at: '18:00' })
+    await generate(server, organiser.cookie)
+    const [first] = (await listMeals(server, organiser.cookie)).meals
+    expect(first.date).toBe('2026-08-01')
+
+    await send(server, 'PATCH', `/api/meals/${first.id}`, organiser.cookie, { date: '2026-08-03' })
+    await generate(server, organiser.cookie)
+
+    const after = (await listMeals(server, organiser.cookie)).meals
+    expect(after.map((meal: { date: string }) => meal.date)).toEqual([
+      // Remade, because the slot still wants one here.
+      '2026-08-01',
+      '2026-08-02',
+      // Where it was dragged, and generating leaves it alone.
+      '2026-08-03',
+    ])
+    expect(after.find((meal: { id: string }) => meal.id === first.id).date).toBe('2026-08-03')
   })
 
   it('never removes one, however the slots change', async () => {
@@ -408,6 +472,89 @@ describe('the plan itself', () => {
     })
 
     expect(response.statusCode).toBe(409)
+  })
+
+  it('refuses moving one onto a day that already has one by that name', async () => {
+    // The burn runs the whole clock, so generating gave every one of its three days a
+    // Dinner. Moving the first onto the second's day is the collision.
+    const { server, meal } = await setUp()
+    const ada = await givenAttending()
+
+    const response = await send(server, 'PATCH', `/api/meals/${meal.id}`, ada.cookie, {
+      date: '2026-08-02',
+    })
+
+    expect(response.statusCode).toBe(409)
+  })
+
+  it('refuses moving one off the days the burn covers', async () => {
+    // It would vanish from the schedule, whose rows span the burn's own hours, while
+    // still showing on the Meals page — the two views disagreeing about whether it
+    // exists at all (#221).
+    const { server, meal } = await setUp()
+    const ada = await givenAttending()
+
+    expect(
+      (await send(server, 'PATCH', `/api/meals/${meal.id}`, ada.cookie, { date: '2026-08-09' })).statusCode,
+    ).toBe(400)
+    expect(
+      (await send(server, 'PATCH', `/api/meals/${meal.id}`, ada.cookie, { date: '2026-07-30' })).statusCode,
+    ).toBe(400)
+  })
+
+  it('tells a duplicate from anything else, which is what the 409 rests on', async () => {
+    // Pinned against a real violation, like `isForeignKeyViolation` and
+    // `isCheckViolation`: the predicate is a string match on a driver's message, so a
+    // driver rewording it should fail the suite rather than turn a 409 into a 500.
+    //
+    // The route's own catch cannot be tested both ways — a transient database error
+    // is not something this suite can provoke mid-UPDATE — so the narrowing is
+    // pinned here, on the predicate the catch asks.
+    const { server, organiser, meal } = await setUp()
+    await send(server, 'GET', `/api/events/${BURN}/meals`, organiser.cookie)
+
+    let duplicate: unknown
+    try {
+      client()
+        .prepare('insert into meal (id, event_id, date, at, label, kind, food_idea) values (?,?,?,?,?,?,?)')
+        .run(randomUUID(), BURN, meal.date, '20:00', meal.label, 'meal', '')
+    } catch (failure) {
+      duplicate = failure
+    }
+
+    let orphan: unknown
+    try {
+      client()
+        .prepare('insert into meal (id, event_id, date, at, label, kind, food_idea) values (?,?,?,?,?,?,?)')
+        .run(randomUUID(), 'no-such-burn', '2026-08-01', '20:00', 'Nowhere', 'meal', '')
+    } catch (failure) {
+      orphan = failure
+    }
+
+    expect(isUniqueViolation(duplicate)).toBe(true)
+    expect(isUniqueViolation(orphan)).toBe(false)
+    expect(isForeignKeyViolation(orphan)).toBe(true)
+    expect(isUniqueViolation(new Error('disk I/O error'))).toBe(false)
+  })
+
+  it('allows moving one to another day inside the burn', async () => {
+    // The passing sibling the refusals need: three tests saying no, and none saying
+    // an ordinary move still works, is where the gap lands.
+    const { server, organiser } = await setUp()
+    const supper = (
+      await send(server, 'POST', `/api/admin/events/${BURN}/meals`, organiser.cookie, {
+        date: '2026-08-02',
+        at: '22:00',
+        label: 'Late supper',
+      })
+    ).json().meal
+
+    const response = await send(server, 'PATCH', `/api/meals/${supper.id}`, organiser.cookie, {
+      date: '2026-08-03',
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().meal.date).toBe('2026-08-03')
   })
 
   it('drops one, and everybody signed up for it', async () => {

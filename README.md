@@ -1284,8 +1284,14 @@ which is worse than the rows it would be excepting.
 Generating **adds what is missing and touches nothing else**, so it is safe to press
 again after adding a slot or moving the dates. It **never removes** one: somebody may
 already have signed up to cook it. A sitting already exists when the burn has one that
-day with that name, which a unique index says too — so a meal that has been moved
-stays moved.
+day with that name, which a unique index says too — so a sitting moved to another
+**time** stays put when generating runs again.
+
+Moved to another **day** it does not, and that follows from the same rule rather than
+working around it: dragging Saturday's dinner to Sunday leaves Saturday without one,
+and the slot still says Saturday has a dinner, so the next run makes it. Recognising a
+sitting wherever it went would mean carrying the slot id on the meal — the link back
+that "copied with no link back" below deliberately does without.
 
 The slot's values are **copied with no link back**. Renaming a slot leaves what it has
 already made alone, the same call the repeatable dream makes about its copies.
