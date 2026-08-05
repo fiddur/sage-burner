@@ -13,7 +13,7 @@ import { Invite } from './Invite.tsx'
 afterEach(cleanup)
 
 const stub = (over: Partial<InviteApi> = {}): InviteApi => ({
-  getInviteState: () => Promise.resolve({ status: 'outstanding' }),
+  getInviteState: () => Promise.resolve({ status: 'outstanding', name: null }),
   redeemInvite: () => Promise.reject(new Error('redeemInvite is not stubbed here')),
   ...over,
 })
@@ -42,7 +42,7 @@ const complete = () => {
 const join = () => screen.getByRole('button', { name: 'Join' }).click()
 
 const withState = (status: InviteState['status']) =>
-  stub({ getInviteState: () => Promise.resolve({ status }) })
+  stub({ getInviteState: () => Promise.resolve({ status, name: null }) })
 
 describe('Invite', () => {
   it('offers the form for a live invite', async () => {
@@ -324,7 +324,7 @@ describe('Invite', () => {
   it('does not offer redemption to someone already signed in', async () => {
     // It would create a second account for the same human, and the page cannot
     // tell whether that is what they meant.
-    const getInviteState = vi.fn(() => Promise.resolve({ status: 'outstanding' as const }))
+    const getInviteState = vi.fn(() => Promise.resolve({ status: 'outstanding' as const, name: null }))
     renderPage(stub({ getInviteState }), {
       status: 'signed-in',
       account: { id: 'a-1', name: null, roles: ['member'] },
@@ -339,5 +339,31 @@ describe('Invite', () => {
 
     expect((await screen.findByRole('alert')).textContent).toContain('reload')
     expect(screen.queryByRole('button', { name: 'Join' })).toBeNull()
+  })
+})
+
+describe('the name the applicant already gave', () => {
+  it('starts the form from it, rather than asking twice', async () => {
+    renderPage(stub({ getInviteState: () => Promise.resolve({ status: 'outstanding', name: 'Ada' }) }))
+
+    expect(await screen.findByLabelText('Your name', { exact: false })).toHaveProperty('value', 'Ada')
+  })
+
+  it('leaves it blank for an invite nobody applied for', async () => {
+    // An admin's direct invite has no application behind it, and is still a
+    // perfectly good invite.
+    renderPage(stub())
+
+    expect(await screen.findByLabelText('Your name', { exact: false })).toHaveProperty('value', '')
+  })
+
+  it('is still the reader’s to change', async () => {
+    renderPage(stub({ getInviteState: () => Promise.resolve({ status: 'outstanding', name: 'Ada' }) }))
+
+    fireEvent.input(await screen.findByLabelText('Your name', { exact: false }), {
+      target: { value: 'Ada Lovelace' },
+    })
+
+    expect(screen.getByLabelText('Your name', { exact: false })).toHaveProperty('value', 'Ada Lovelace')
   })
 })

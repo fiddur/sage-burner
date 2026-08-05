@@ -76,7 +76,12 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
     api
       .getInviteState(token, controller.signal)
       .then((state) => {
-        if (!controller.signal.aborted) setLoaded({ status: 'ready', state })
+        if (controller.signal.aborted) return
+
+        setLoaded({ status: 'ready', state })
+        // What they typed on the application. Asked for it twice, a form reads as
+        // one that was not listening the first time.
+        if (state.name !== null) setName(state.name)
       })
       .catch(() => {
         if (!controller.signal.aborted) setLoaded({ status: 'failed' })

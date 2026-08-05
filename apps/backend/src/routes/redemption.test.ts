@@ -13,7 +13,7 @@ import { verifyPassword } from '../auth/password.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, attendance, inviteToken } from '../db/schema.ts'
+import { account, application, attendance, inviteToken } from '../db/schema.ts'
 
 /**
  * Redeeming an invite: the single funnel both membership paths converge on.
@@ -66,18 +66,34 @@ const db = () => {
   return found
 }
 
-const givenInvite = async (over: { expires_at?: string; used_at?: string | null } = {}) => {
+const givenInvite = async (
+  over: { expires_at?: string; used_at?: string | null; applicantName?: string } = {},
+) => {
   const token = `token-${randomUUID()}`
   const admin = randomUUID()
   await db()
     .insert(account)
     .values({ id: admin, email: `${admin}@example.org`, password_hash: null, created_at: NOW })
+
+  let applicationId: string | null = null
+  if (over.applicantName !== undefined) {
+    applicationId = randomUUID()
+    await db().insert(application).values({
+      id: applicationId,
+      answers: [],
+      status: 'approved',
+      applicant_name: over.applicantName,
+      applicant_contact: 'somewhere',
+      submitted_at: NOW,
+    })
+  }
+
   await db()
     .insert(inviteToken)
     .values({
       id: randomUUID(),
       token_hash: createHash('sha256').update(token).digest('hex'),
-      application_id: null,
+      application_id: applicationId,
       expires_at: over.expires_at ?? '2026-08-01T00:00:00.000Z',
       used_at: over.used_at ?? null,
       created_by: admin,
@@ -142,17 +158,18 @@ describe('looking at an invite before redeeming it', () => {
     expect(response.json().status).toBe('unknown')
   })
 
-  it('never echoes the token or who it was for', async () => {
+  it('never echoes the token, nor the email it was minted for', async () => {
     // An invite link is unguessable but forwardable, so whoever holds it is a
-    // stranger until they redeem. Naming the applicant would turn a leaked link
-    // into a disclosure.
+    // stranger until they redeem. The email is the login identity, and confirming an
+    // address has an application is an enumeration oracle. The applicant's *name* is
+    // the one deliberate exception — see "the name an invite carries" below.
     const server = await build()
-    const token = await givenInvite()
+    const token = await givenInvite({ applicantName: 'Ada' })
 
     const body = (await look(server, token)).body
 
     expect(body).not.toContain(token)
-    expect(Object.keys(JSON.parse(body))).toEqual(['status'])
+    expect(Object.keys(JSON.parse(body))).toEqual(['status', 'name'])
   })
 })
 
@@ -532,5 +549,43 @@ describe('redeeming', () => {
     await redeem(server, token)
 
     expect(await db().select().from(attendance)).toHaveLength(0)
+  })
+})
+
+describe('the name an invite carries', () => {
+  it('gives back what the applicant called themselves, so the form need not ask twice', async () => {
+    const server = await build()
+    const token = await givenInvite({ applicantName: 'Ada Lovelace' })
+
+    expect(await look(server, token).then((response) => response.json())).toEqual({
+      status: 'outstanding',
+      name: 'Ada Lovelace',
+    })
+  })
+
+  it('has none for an invite an organiser minted directly', async () => {
+    const server = await build()
+    const token = await givenInvite()
+
+    expect((await look(server, token)).json().name).toBeNull()
+  })
+
+  it('stops naming them once the link is spent or expired', async () => {
+    // The trade this makes is a forwarded *live* link telling its holder whose it
+    // was. A spent one has no form to fill, so naming them then would be disclosure
+    // bought for nothing.
+    const server = await build()
+    const used = await givenInvite({ applicantName: 'Ada', used_at: '2026-07-01T00:00:00.000Z' })
+    const expired = await givenInvite({ applicantName: 'Ada', expires_at: '2026-06-01T00:00:00.000Z' })
+
+    expect((await look(server, used)).json()).toEqual({ status: 'used', name: null })
+    expect((await look(server, expired)).json()).toEqual({ status: 'expired', name: null })
+  })
+
+  it('never gives back the email, which is the login identity', async () => {
+    const server = await build()
+    const token = await givenInvite({ applicantName: 'Ada' })
+
+    expect(Object.keys((await look(server, token)).json())).toEqual(['status', 'name'])
   })
 })

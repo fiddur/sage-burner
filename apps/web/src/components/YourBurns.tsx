@@ -5,6 +5,7 @@ import { useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
+import { useBurns } from '../burn.tsx'
 import { useAction, useLoad } from '../load.ts'
 import { StayForm } from './StayForm.tsx'
 
@@ -43,6 +44,8 @@ type Loaded = { burns: readonly MyBurn[]; past: readonly MyBurn[]; options: Map<
 export const YourBurns = ({ api }: { api: YourBurnsApi }) => {
   const [showPast, setShowPast] = useState(false)
 
+  // The bar's own list, which this page is the only thing that changes.
+  const { reload: refreshBurns } = useBurns()
   const { loaded, reload } = useLoad<Loaded>(
     async (signal) => {
       const { coming, past } = await api.getMyBurns(signal)
@@ -121,9 +124,17 @@ export const YourBurns = ({ api }: { api: YourBurnsApi }) => {
                     type="button"
                     disabled={busy}
                     onClick={() =>
-                      act(() => api.joinEvent(burn.event.id), {
-                        404: 'That burn is over, so you cannot join it now.',
-                      })
+                      act(
+                        async () => {
+                          await api.joinEvent(burn.event.id)
+                          // The bar's list is fetched once for the session, so without
+                          // this the burn you just joined is not selectable and every
+                          // burn-scoped page says you are not coming to one — until a
+                          // reload, which is not a thing to ask of anybody.
+                          refreshBurns()
+                        },
+                        { 404: 'That burn is over, so you cannot join it now.' },
+                      )
                     }
                   >
                     I am coming
@@ -163,10 +174,16 @@ export const YourBurns = ({ api }: { api: YourBurnsApi }) => {
                     class="link-button"
                     disabled={busy}
                     onClick={() =>
-                      act(() => api.leaveEvent(burn.event.id), {
-                        409: 'You have already paid for this burn, so someone with admin needs to sort this one out with you.',
-                        404: 'That burn is over, so there is nothing left to withdraw from.',
-                      })
+                      act(
+                        async () => {
+                          await api.leaveEvent(burn.event.id)
+                          refreshBurns()
+                        },
+                        {
+                          409: 'You have already paid for this burn, so someone with admin needs to sort this one out with you.',
+                          404: 'That burn is over, so there is nothing left to withdraw from.',
+                        },
+                      )
                     }
                   >
                     I cannot come after all

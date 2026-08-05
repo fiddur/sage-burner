@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { YourBurnsApi } from './YourBurns.tsx'
 
 import { apiError } from '../api/client.ts'
+import { BurnProvider } from '../burn.tsx'
 import { YourBurns } from './YourBurns.tsx'
 
 afterEach(cleanup)
@@ -154,5 +155,63 @@ describe('YourBurns', () => {
     render(<YourBurns api={stub()} />)
 
     expect(await screen.findByText(/no burn planned/)).toBeTruthy()
+  })
+})
+
+describe('the bar’s list of burns', () => {
+  /**
+   * The selector fetches once for the session, so this page — the only thing that
+   * changes what belongs in it — has to say when it has. Without that, somebody who
+   * joined and then opened Members or Schedule was told they were not coming to a
+   * burn, and a reload was the only way out of it.
+   */
+  const renderWithBurns = (api: YourBurnsApi, reload: () => void) =>
+    render(
+      <BurnProvider value={{ status: 'ready', burns: [], selected: undefined, reload }}>
+        <YourBurns api={api} />
+      </BurnProvider>,
+    )
+
+  it('is asked for again after joining one', async () => {
+    const reload = vi.fn()
+    const joinEvent = vi.fn<YourBurnsApi['joinEvent']>(() => Promise.resolve({ attendance: anAttendance() }))
+    renderWithBurns(stub({ joinEvent }, { coming: [aBurn('e-1', 'Summer')], past: [] }), reload)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'I am coming' }))
+
+    await waitFor(() => expect(joinEvent).toHaveBeenCalledWith('e-1'))
+    expect(reload).toHaveBeenCalled()
+  })
+
+  it('is asked for again after withdrawing from one', async () => {
+    const reload = vi.fn()
+    const leaveEvent = vi.fn<YourBurnsApi['leaveEvent']>(() => Promise.resolve(undefined))
+    renderWithBurns(
+      stub({ leaveEvent }, { coming: [aBurn('e-1', 'Summer', anAttendance())], past: [] }),
+      reload,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'I cannot come after all' }))
+
+    await waitFor(() => expect(leaveEvent).toHaveBeenCalledWith('e-1'))
+    expect(reload).toHaveBeenCalled()
+  })
+
+  it('leaves it alone when the join was refused', async () => {
+    // The passing sibling. A refresh fired before the write resolves would say the
+    // list had changed when it had not.
+    const reload = vi.fn()
+    renderWithBurns(
+      stub(
+        { joinEvent: () => Promise.reject(apiError(404, 'not_found', 'gone')) },
+        { coming: [aBurn('e-1', 'Summer')], past: [] },
+      ),
+      reload,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'I am coming' }))
+
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    expect(reload).not.toHaveBeenCalled()
   })
 })

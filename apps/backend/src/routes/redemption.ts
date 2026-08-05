@@ -11,7 +11,7 @@ import type { Config } from '../config.ts'
 import type { Database } from '../db/index.ts'
 
 import { hashPassword } from '../auth/password.ts'
-import { account, accountRole, inviteToken } from '../db/schema.ts'
+import { account, accountRole, application, inviteToken } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 import { cookieHeader } from './auth.ts'
 
@@ -46,8 +46,15 @@ export const registerRedemptionRoutes = (
     void noStore(reply)
 
     const [invite] = await db
-      .select({ expires_at: inviteToken.expires_at, used_at: inviteToken.used_at })
+      .select({
+        expires_at: inviteToken.expires_at,
+        used_at: inviteToken.used_at,
+        applicant_name: application.applicant_name,
+      })
       .from(inviteToken)
+      // Left: an admin's direct invite has no application behind it, and is still a
+      // perfectly good invite. Those simply start the form blank.
+      .leftJoin(application, eq(application.id, inviteToken.application_id))
       .where(eq(inviteToken.token_hash, digestOf(request.params.token)))
       .limit(1)
 
@@ -58,8 +65,13 @@ export const registerRedemptionRoutes = (
     // and there is nothing to enumerate, the token being 256 bits of CSPRNG.
     // What the uniform shape buys is one code path for the page rather than a
     // status the fetch layer turns into an error.
+    const status = invite === undefined ? 'unknown' : inviteStatusOf(invite, now())
+
     return {
-      status: invite === undefined ? 'unknown' : inviteStatusOf(invite, now()),
+      status,
+      // Only while it is outstanding. A spent or expired link has no form to fill,
+      // so naming its applicant would be disclosure bought for nothing.
+      name: status === 'outstanding' ? (invite?.applicant_name ?? null) : null,
     } satisfies InviteState
   })
 
