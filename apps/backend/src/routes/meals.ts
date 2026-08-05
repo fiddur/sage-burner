@@ -3,11 +3,13 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
 import {
   errorResponse,
+  mealCreateSchema,
   mealIdeaUpdateSchema,
   mealIntroUpdateSchema,
   mealLeadSchema,
   mealSlotCreateSchema,
   mealSlotUpdateSchema,
+  mealUpdateSchema,
 } from '@sage-burner/shared'
 import { and, asc, eq, inArray } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
@@ -18,7 +20,7 @@ import type { Database } from '../db/index.ts'
 import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
-import { account, attendance, event, mealNote, mealRole, mealSlot } from '../db/schema.ts'
+import { account, attendance, event, meal, mealRole, mealSlot } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 import { attendanceFor } from './attendance.ts'
 
@@ -27,36 +29,32 @@ export interface MealDeps extends GuardDeps {
 }
 
 type Person = NonNullable<Meal['lead']>
+type MealRow = typeof meal.$inferSelect
+type Burn = typeof event.$inferSelect
 
 /** The two roles anybody may put themselves on. The lead is one person, elsewhere. */
 const STANDING = ['helper', 'cleanup'] as const
 
 /**
- * Every date a slot at `at` produces a sitting on.
+ * Every date a sitting at `at` belongs on.
  *
  * The burn's own hours decide it, not its dates: a 13:00 lunch on a day the gates
- * open at 16:00 is not a meal anyone eats, and the last day ends when it ends. Both
- * comparisons are on fixed-width strings, which is sound for the reason the CHECKs
- * rely on — `09:00` cannot also arrive as `9:00`.
+ * open at 16:00 is not a meal anyone eats, and the last day ends when it ends — which
+ * is why the spreadsheet's plan starts at a Sunday dinner and ends at a Sunday lunch.
+ *
+ * Both comparisons are on fixed-width strings, sound for the reason the CHECKs rely
+ * on: `09:00` cannot also arrive as `9:00`.
  */
-export const sittingDates = (
-  {
-    start_date,
-    end_date,
-    start_time,
-    end_time,
-  }: Record<'start_date' | 'end_date' | 'start_time' | 'end_time', string>,
-  at: string,
-): string[] => {
+export const sittingDates = (burn: Burn, at: string): string[] => {
   const dates: string[] = []
-  const day = new Date(`${start_date}T00:00:00Z`)
-  const last = new Date(`${end_date}T00:00:00Z`)
+  const day = new Date(`${burn.start_date}T00:00:00Z`)
+  const last = new Date(`${burn.end_date}T00:00:00Z`)
   if (Number.isNaN(day.getTime()) || Number.isNaN(last.getTime())) return dates
 
   while (day <= last) {
     const date = day.toISOString().slice(0, 10)
-    const tooEarly = date === start_date && at < start_time
-    const tooLate = date === end_date && at > end_time
+    const tooEarly = date === burn.start_date && at < burn.start_time
+    const tooLate = date === burn.end_date && at > burn.end_time
     if (!tooEarly && !tooLate) dates.push(date)
     day.setUTCDate(day.getUTCDate() + 1)
   }
@@ -72,127 +70,97 @@ const slotsFor = (db: Database, eventId: string): Promise<MealSlot[]> =>
     .orderBy(asc(mealSlot.at), asc(mealSlot.order), asc(mealSlot.id))
 
 /**
- * The sittings a burn's slots produce, with whoever has signed up for each.
+ * A burn's meals in the order the table shows them, with everyone signed up.
  *
- * One query for every role on every slot rather than one per sitting: a burn is a
- * handful of days and a handful of slots, and the page reads the lot at once.
+ * One query for every role on every meal rather than one per row: a burn is a handful
+ * of days and a handful of sittings, and the page reads the lot at once. `rolesFor` in
+ * the lead-roles register is shaped the same way.
  */
-const mealsFor = async (
-  db: Database,
-  burn: typeof event.$inferSelect,
-  slots: readonly MealSlot[],
-): Promise<Meal[]> => {
-  const signups =
-    slots.length === 0
-      ? []
-      : await db
-          .select({
-            slot_id: mealRole.slot_id,
-            date: mealRole.date,
-            role: mealRole.role,
-            account_id: account.id,
-            name: account.name,
-          })
-          .from(mealRole)
-          .innerJoin(attendance, eq(attendance.id, mealRole.attendance_id))
-          .innerJoin(account, eq(account.id, attendance.account_id))
-          .where(
-            inArray(
-              mealRole.slot_id,
-              slots.map((slot) => slot.id),
-            ),
-          )
-          .orderBy(asc(account.name), asc(account.id))
+const mealsFor = async (db: Database, eventId: string): Promise<Meal[]> => {
+  const rows = await db
+    .select()
+    .from(meal)
+    .where(eq(meal.event_id, eventId))
+    .orderBy(asc(meal.date), asc(meal.at), asc(meal.label))
 
-  const ideas =
-    slots.length === 0
-      ? []
-      : await db
-          .select()
-          .from(mealNote)
-          .where(
-            inArray(
-              mealNote.slot_id,
-              slots.map((slot) => slot.id),
-            ),
-          )
+  if (rows.length === 0) return []
 
-  const key = (slotId: string, date: string) => `${slotId} ${date}`
-  const idea = new Map(ideas.map((row) => [key(row.slot_id, row.date), row.food_idea]))
+  const signups = await db
+    .select({ meal_id: mealRole.meal_id, role: mealRole.role, account_id: account.id, name: account.name })
+    .from(mealRole)
+    .innerJoin(attendance, eq(attendance.id, mealRole.attendance_id))
+    .innerJoin(account, eq(account.id, attendance.account_id))
+    .where(
+      inArray(
+        mealRole.meal_id,
+        rows.map((row) => row.id),
+      ),
+    )
+    .orderBy(asc(account.name), asc(account.id))
+
   const lead = new Map<string, Person>()
   const helpers = new Map<string, Person[]>()
   const cleanup = new Map<string, Person[]>()
 
   for (const row of signups) {
     const person = { account_id: row.account_id, name: row.name }
-    const at = key(row.slot_id, row.date)
-    if (row.role === 'lead') lead.set(at, person)
-    if (row.role === 'helper') helpers.set(at, [...(helpers.get(at) ?? []), person])
-    if (row.role === 'cleanup') cleanup.set(at, [...(cleanup.get(at) ?? []), person])
+    if (row.role === 'lead') lead.set(row.meal_id, person)
+    if (row.role === 'helper') helpers.set(row.meal_id, [...(helpers.get(row.meal_id) ?? []), person])
+    if (row.role === 'cleanup') cleanup.set(row.meal_id, [...(cleanup.get(row.meal_id) ?? []), person])
   }
 
-  return slots.flatMap((slot) =>
-    sittingDates(burn, slot.at).map((date) => ({
-      slot_id: slot.id,
-      date,
-      label: slot.label,
-      at: slot.at,
-      kind: slot.kind,
-      food_idea: idea.get(key(slot.id, date)) ?? '',
-      lead: lead.get(key(slot.id, date)) ?? null,
-      helpers: helpers.get(key(slot.id, date)) ?? [],
-      cleanup: cleanup.get(key(slot.id, date)) ?? [],
-    })),
-  )
+  // Field by field rather than a spread, like `asMemberEntry`: a spread is exempt from
+  // excess-property checking, so a column added to `meal` would reach every reader
+  // without anybody naming it here.
+  return rows.map((row) => ({
+    id: row.id,
+    event_id: row.event_id,
+    date: row.date,
+    at: row.at,
+    label: row.label,
+    kind: row.kind,
+    food_idea: row.food_idea,
+    lead: lead.get(row.id) ?? null,
+    helpers: helpers.get(row.id) ?? [],
+    cleanup: cleanup.get(row.id) ?? [],
+  }))
 }
 
-interface Refusal {
-  code: 404
-  error: 'not_found'
+const oneMeal = async (db: Database, id: string) => {
+  const [row] = await db.select({ event_id: meal.event_id }).from(meal).where(eq(meal.id, id)).limit(1)
+  if (row === undefined) return undefined
+
+  return (await mealsFor(db, row.event_id)).find((found) => found.id === id)
 }
 
-interface Sitting {
-  slot: MealSlot
-  burn: typeof event.$inferSelect
-}
-
-const burnOr404 = async (db: Database, eventId: string) => {
+const burnFor = async (db: Database, eventId: string) => {
   const [row] = await db.select().from(event).where(eq(event.id, eventId)).limit(1)
   return row
 }
 
 /**
- * Meals — who cooks, who helps and who washes up, per sitting.
+ * Meals — who cooks, who helps and who washes up.
  *
  * `requireApproved` throughout, including the removals: this replaces a tab of a
- * spreadsheet everyone could edit, and the lead-roles register made the same call
- * for the same reason. What stays admin's is the burn's shape — the slots and the
- * kitchen — which is why those live under `/api/admin/`.
+ * spreadsheet everyone could edit, and the lead-roles register made the same call for
+ * the same reason. What stays admin's is the plan itself — the slots, and adding,
+ * moving or dropping a sitting — which is why those live under `/api/admin/`.
  */
 export const registerMealRoutes = (app: FastifyInstance, { db, sessions }: MealDeps) => {
   const { requireApproved } = createGuards({ db, sessions })
 
-  /** The slot and its burn, or the answer to give instead. */
-  const sittingFor = async (
-    request: FastifyRequest<{ Params: { slotId: string; date: string } }>,
-  ): Promise<Refusal | Sitting> => {
-    const [slot] = await db.select().from(mealSlot).where(eq(mealSlot.id, request.params.slotId)).limit(1)
-    if (slot === undefined) return { code: 404, error: 'not_found' }
-
-    const burn = await burnOr404(db, slot.event_id)
-    if (burn === undefined) return { code: 404, error: 'not_found' }
-
-    // A date the slot does not produce is not a sitting, however well-formed it
-    // looks — otherwise a signup could be filed against a day the burn never ran.
-    if (!sittingDates(burn, slot.at).includes(request.params.date)) {
-      return { code: 404, error: 'not_found' }
-    }
-
-    return { slot, burn }
+  const mealOr404 = async (id: string): Promise<MealRow | undefined> => {
+    const [row] = await db.select().from(meal).where(eq(meal.id, id)).limit(1)
+    return row
   }
 
-  const answerWith = async (slot: MealSlot, burn: typeof event.$inferSelect, date: string) =>
-    (await mealsFor(db, burn, [slot])).find((meal) => meal.date === date)
+  const answer = async (reply: FastifyReply, id: string) => {
+    const found = await oneMeal(db, id)
+
+    return found === undefined
+      ? reply.code(404).send(errorResponse('not_found'))
+      : ({ meal: found } satisfies MealResponse)
+  }
 
   app.get<{ Params: { eventId: string } }>(
     '/api/events/:eventId/meals',
@@ -200,15 +168,13 @@ export const registerMealRoutes = (app: FastifyInstance, { db, sessions }: MealD
     async (request, reply) => {
       void noStore(reply)
 
-      const burn = await burnOr404(db, request.params.eventId)
+      const burn = await burnFor(db, request.params.eventId)
       if (burn === undefined) return reply.code(404).send(errorResponse('not_found'))
-
-      const slots = await slotsFor(db, burn.id)
 
       return {
         intro_markdown: burn.meal_intro_markdown,
-        slots,
-        meals: await mealsFor(db, burn, slots),
+        slots: await slotsFor(db, burn.id),
+        meals: await mealsFor(db, burn.id),
       } satisfies MealsResponse
     },
   )
@@ -223,13 +189,11 @@ export const registerMealRoutes = (app: FastifyInstance, { db, sessions }: MealD
       const parsed = mealIntroUpdateSchema.safeParse(request.body)
       if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
 
-      const updated = await db
+      const [row] = await db
         .update(event)
         .set({ meal_intro_markdown: parsed.data.meal_intro_markdown })
         .where(eq(event.id, request.params.eventId))
         .returning({ intro: event.meal_intro_markdown })
-
-      const [row] = updated
 
       return row === undefined
         ? reply.code(404).send(errorResponse('not_found'))
@@ -238,14 +202,14 @@ export const registerMealRoutes = (app: FastifyInstance, { db, sessions }: MealD
   )
 
   /**
-   * Taking a sitting's lead, handing it to somebody, or vacating it.
+   * Taking a meal's lead, handing it to somebody, or vacating it.
    *
    * One route for all three, like the lead-roles register: they differ only in whose
-   * id is in the body, and `null` vacates. The unique index is what makes "one lead"
-   * true, so the write deletes whoever held it first rather than trusting a read.
+   * id is in the body, and `null` vacates. Whoever held it is deleted first, so the
+   * unique index is never the thing that has to be worked around.
    */
-  app.put<{ Params: { slotId: string; date: string } }>(
-    '/api/meals/:slotId/:date/lead',
+  app.put<{ Params: { id: string } }>(
+    '/api/meals/:id/lead',
     { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)
@@ -253,77 +217,56 @@ export const registerMealRoutes = (app: FastifyInstance, { db, sessions }: MealD
       const parsed = mealLeadSchema.safeParse(request.body)
       if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
 
-      const found = await sittingFor(request)
-      if ('code' in found) return reply.code(found.code).send(errorResponse(found.error))
+      const existing = await mealOr404(request.params.id)
+      if (existing === undefined) return reply.code(404).send(errorResponse('not_found'))
 
       let taking: string | undefined
       if (parsed.data.account_id !== null) {
-        taking = await attendanceFor(db, found.slot.event_id, parsed.data.account_id)
+        taking = await attendanceFor(db, existing.event_id, parsed.data.account_id)
 
         // Not coming to this burn. A 400 rather than a 404: the account may well
         // exist, and what is wrong is the pairing.
         if (taking === undefined) return reply.code(400).send(errorResponse('bad_request'))
       }
 
-      await db
-        .delete(mealRole)
-        .where(
-          and(
-            eq(mealRole.slot_id, found.slot.id),
-            eq(mealRole.date, request.params.date),
-            eq(mealRole.role, 'lead'),
-          ),
-        )
+      await db.delete(mealRole).where(and(eq(mealRole.meal_id, existing.id), eq(mealRole.role, 'lead')))
 
       if (taking !== undefined) {
-        await db.insert(mealRole).values({
-          slot_id: found.slot.id,
-          date: request.params.date,
-          attendance_id: taking,
-          role: 'lead',
-        })
+        await db.insert(mealRole).values({ meal_id: existing.id, attendance_id: taking, role: 'lead' })
       }
 
-      const meal = await answerWith(found.slot, found.burn, request.params.date)
-
-      return meal === undefined
-        ? reply.code(404).send(errorResponse('not_found'))
-        : ({ meal } satisfies MealResponse)
+      return answer(reply, existing.id)
     },
   )
 
   /**
-   * Putting yourself on a sitting's helpers or its cleanup crew, and taking yourself
-   * off. `/me`: this is one person speaking for themselves.
+   * Putting yourself on a meal's helpers or its cleanup crew, and taking yourself off.
    *
    * One handler for both verbs — they differ by an insert against a delete, and
-   * splitting them would be the same nine lines of resolution written twice.
+   * splitting them would be the same resolution written twice.
    */
   const stand =
     (joining: boolean) =>
-    async (
-      request: FastifyRequest<{ Params: { slotId: string; date: string; role: string } }>,
-      reply: FastifyReply,
-    ) => {
+    async (request: FastifyRequest<{ Params: { id: string; role: string } }>, reply: FastifyReply) => {
       void noStore(reply)
 
-      // Only the two open-ended roles, and matched against the vocabulary rather than
-      // compared away from it: excluding two literals from `string` narrows nothing,
-      // so the row would go in with `role: string`. The lead has its own route, where
-      // handing it over is a thing you may do to somebody else.
+      // Matched against the vocabulary rather than compared away from it: excluding
+      // two literals from `string` narrows nothing, so the row would go in with
+      // `role: string`. The lead has its own route, where handing it over is a thing
+      // you may do to somebody else.
       const role = STANDING.find((candidate) => candidate === request.params.role)
       if (role === undefined) return reply.code(404).send(errorResponse('not_found'))
 
-      const found = await sittingFor(request)
-      if ('code' in found) return reply.code(found.code).send(errorResponse(found.error))
+      const existing = await mealOr404(request.params.id)
+      if (existing === undefined) return reply.code(404).send(errorResponse('not_found'))
 
       const viewer = await viewerFor(request, { db, sessions })
       if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
 
-      const mine = await attendanceFor(db, found.slot.event_id, viewer.account_id)
+      const mine = await attendanceFor(db, existing.event_id, viewer.account_id)
       if (mine === undefined) return reply.code(400).send(errorResponse('bad_request'))
 
-      const row = { slot_id: found.slot.id, date: request.params.date, attendance_id: mine, role }
+      const row = { meal_id: existing.id, attendance_id: mine, role }
 
       if (joining) {
         // Standing twice is standing once, which is what a double click sends.
@@ -333,30 +276,33 @@ export const registerMealRoutes = (app: FastifyInstance, { db, sessions }: MealD
           .delete(mealRole)
           .where(
             and(
-              eq(mealRole.slot_id, row.slot_id),
-              eq(mealRole.date, row.date),
+              eq(mealRole.meal_id, row.meal_id),
               eq(mealRole.attendance_id, row.attendance_id),
               eq(mealRole.role, role),
             ),
           )
       }
 
-      const meal = await answerWith(found.slot, found.burn, request.params.date)
-
-      return meal === undefined
-        ? reply.code(404).send(errorResponse('not_found'))
-        : ({ meal } satisfies MealResponse)
+      return answer(reply, existing.id)
     }
+
+  app.put<{ Params: { id: string; role: string } }>(
+    '/api/meals/:id/:role/me',
+    { preHandler: requireApproved },
+    stand(true),
+  )
+  app.delete<{ Params: { id: string; role: string } }>(
+    '/api/meals/:id/:role/me',
+    { preHandler: requireApproved },
+    stand(false),
+  )
 
   /**
    * What somebody thought of cooking. Anyone may write it, and the lead is not bound
    * by it — the sheet's own header calls the column "Not needed".
-   *
-   * An empty string removes the note rather than storing one, so there is a row only
-   * where there is something to say.
    */
-  app.put<{ Params: { slotId: string; date: string } }>(
-    '/api/meals/:slotId/:date/idea',
+  app.put<{ Params: { id: string } }>(
+    '/api/meals/:id/idea',
     { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)
@@ -364,49 +310,25 @@ export const registerMealRoutes = (app: FastifyInstance, { db, sessions }: MealD
       const parsed = mealIdeaUpdateSchema.safeParse(request.body)
       if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
 
-      const found = await sittingFor(request)
-      if ('code' in found) return reply.code(found.code).send(errorResponse(found.error))
+      const [row] = await db
+        .update(meal)
+        .set({ food_idea: parsed.data.food_idea.trim() })
+        .where(eq(meal.id, request.params.id))
+        .returning({ id: meal.id })
 
-      const idea = parsed.data.food_idea.trim()
-
-      if (idea === '') {
-        await db
-          .delete(mealNote)
-          .where(and(eq(mealNote.slot_id, found.slot.id), eq(mealNote.date, request.params.date)))
-      } else {
-        await db
-          .insert(mealNote)
-          .values({ slot_id: found.slot.id, date: request.params.date, food_idea: idea })
-          .onConflictDoUpdate({ target: [mealNote.slot_id, mealNote.date], set: { food_idea: idea } })
-      }
-
-      const meal = await answerWith(found.slot, found.burn, request.params.date)
-
-      return meal === undefined
-        ? reply.code(404).send(errorResponse('not_found'))
-        : ({ meal } satisfies MealResponse)
+      return row === undefined ? reply.code(404).send(errorResponse('not_found')) : answer(reply, row.id)
     },
-  )
-
-  app.put<{ Params: { slotId: string; date: string; role: string } }>(
-    '/api/meals/:slotId/:date/:role/me',
-    { preHandler: requireApproved },
-    stand(true),
-  )
-  app.delete<{ Params: { slotId: string; date: string; role: string } }>(
-    '/api/meals/:slotId/:date/:role/me',
-    { preHandler: requireApproved },
-    stand(false),
   )
 }
 
 /**
- * Configuring the slots — the burn's shape, so admin's.
+ * The plan itself — the slot templates, and adding, moving or dropping a sitting.
  *
- * Under `/api/admin/`, which is guarded by one `onRequest` hook with no per-route
- * opt-out. Opening one of these would mean moving it out from under the prefix.
+ * Under `/api/admin/`, which one `onRequest` hook guards with no per-route opt-out.
+ * Opening any of these would mean moving it out from under the prefix, never
+ * exempting it here.
  */
-export const registerMealSlotRoutes = (app: FastifyInstance, { db }: MealDeps) => {
+export const registerMealAdminRoutes = (app: FastifyInstance, { db }: MealDeps) => {
   const answerSlots = async (eventId: string): Promise<MealSlotsResponse> => ({
     slots: await slotsFor(db, eventId),
   })
@@ -458,21 +380,127 @@ export const registerMealSlotRoutes = (app: FastifyInstance, { db }: MealDeps) =
       await db.update(mealSlot).set(parsed.data).where(eq(mealSlot.id, request.params.id))
     }
 
+    // The meals already generated are left alone. A slot is a template, and a rename
+    // that reached back through everything it had made would undo whatever an
+    // organiser had since changed by hand.
     return answerSlots(existing.event_id)
   })
 
   app.delete<{ Params: { id: string } }>('/api/admin/meal-slots/:id', async (request, reply) => {
     void noStore(reply)
 
-    const deleted = await db
+    const [row] = await db
       .delete(mealSlot)
       .where(eq(mealSlot.id, request.params.id))
       .returning({ event_id: mealSlot.event_id })
 
-    const [row] = deleted
-
-    // Everybody's signups go with it — `meal_role` cascades. That is the point of
-    // letting a slot be removed at all: the slot is the thing, not the sign-ups.
+    // The meals it made stay, for the same reason a rename does not reach them.
     return row === undefined ? reply.code(404).send(errorResponse('not_found')) : reply.code(204).send()
+  })
+
+  /**
+   * Fill the burn's days in from its slots.
+   *
+   * **Adds what is missing and touches nothing else**, so it is safe to run again
+   * after adding a slot or extending the dates. Never deletes: a meal somebody has
+   * already signed up to cook is not something a button should be able to take away.
+   *
+   * A sitting already exists when the burn has one that day with that name. Moving
+   * Saturday's dinner to 19:00 therefore survives regenerating, which is the whole
+   * reason meals are rows.
+   */
+  app.post<{ Params: { eventId: string } }>(
+    '/api/admin/events/:eventId/meals/generate',
+    async (request, reply) => {
+      void noStore(reply)
+
+      const burn = await burnFor(db, request.params.eventId)
+      if (burn === undefined) return reply.code(404).send(errorResponse('not_found'))
+
+      const slots = await slotsFor(db, burn.id)
+      const existing = await db
+        .select({ date: meal.date, label: meal.label })
+        .from(meal)
+        .where(eq(meal.event_id, burn.id))
+
+      const already = new Set(existing.map((row) => `${row.date} ${row.label}`))
+
+      const wanted = slots.flatMap((slot) =>
+        sittingDates(burn, slot.at)
+          .filter((date) => !already.has(`${date} ${slot.label}`))
+          .map((date) => ({
+            id: randomUUID(),
+            event_id: burn.id,
+            date,
+            at: slot.at,
+            label: slot.label,
+            kind: slot.kind,
+            food_idea: '',
+          })),
+      )
+
+      if (wanted.length > 0) await db.insert(meal).values(wanted)
+
+      return reply.code(201).send({ meals: await mealsFor(db, burn.id) })
+    },
+  )
+
+  app.post<{ Params: { eventId: string } }>('/api/admin/events/:eventId/meals', async (request, reply) => {
+    void noStore(reply)
+
+    const parsed = mealCreateSchema.safeParse(request.body)
+    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+
+    const id = randomUUID()
+
+    try {
+      await db.insert(meal).values({ ...parsed.data, id, event_id: request.params.eventId, food_idea: '' })
+    } catch (failure) {
+      if (isForeignKeyViolation(failure)) return reply.code(404).send(errorResponse('not_found'))
+      // A second sitting of the same name on the same day, which the unique index
+      // refuses. A 409 rather than a 400: the body is well formed and the burn simply
+      // already has one.
+      return reply.code(409).send(errorResponse('conflict'))
+    }
+
+    const created = await oneMeal(db, id)
+
+    return created === undefined
+      ? reply.code(404).send(errorResponse('not_found'))
+      : reply.code(201).send({ meal: created } satisfies MealResponse)
+  })
+
+  app.patch<{ Params: { id: string } }>('/api/admin/meals/:id', async (request, reply) => {
+    void noStore(reply)
+
+    const parsed = mealUpdateSchema.safeParse(request.body)
+    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+
+    const [existing] = await db.select().from(meal).where(eq(meal.id, request.params.id)).limit(1)
+    if (existing === undefined) return reply.code(404).send(errorResponse('not_found'))
+
+    if (Object.keys(parsed.data).length > 0) {
+      try {
+        await db.update(meal).set(parsed.data).where(eq(meal.id, request.params.id))
+      } catch {
+        return reply.code(409).send(errorResponse('conflict'))
+      }
+    }
+
+    const updated = await oneMeal(db, request.params.id)
+
+    return updated === undefined
+      ? reply.code(404).send(errorResponse('not_found'))
+      : ({ meal: updated } satisfies MealResponse)
+  })
+
+  app.delete<{ Params: { id: string } }>('/api/admin/meals/:id', async (request, reply) => {
+    void noStore(reply)
+
+    const deleted = await db.delete(meal).where(eq(meal.id, request.params.id)).returning({ id: meal.id })
+
+    // Everyone signed up goes with it — `meal_role` cascades. That is what dropping a
+    // sitting means, and why it is not something any member may do.
+    return deleted.length === 0 ? reply.code(404).send(errorResponse('not_found')) : reply.code(204).send()
   })
 }

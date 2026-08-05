@@ -1,17 +1,22 @@
 -- Meal planning (#210).
 --
--- `meal_slot` is the burn's configuration — Lunch at 13:00, Dinner at 18:00, and
--- for some burns a Morning cleanup at 09:00, which is why a slot carries a kind.
+-- `meal_slot` is the template an organiser sets once per burn — Lunch at 13:00,
+-- Dinner at 18:00, and for some burns a Morning cleanup at 09:00, which is why a slot
+-- carries a kind. `meal` is what generating from those templates writes.
 --
--- **There is no meal table.** A meal is a slot on a date, and both already exist:
--- the slot is configured and the date comes from the burn's own span. Storing them
--- would mean reconciling every time either changed, so `meal_role` references the
--- slot and carries the date instead.
+-- **Generated, not derived.** A derived meal is identical to its template forever:
+-- there would be no postponing Saturday's dinner, no dropping lunch on the day
+-- everybody leaves, no adding a late supper. Rows can be changed one at a time, and
+-- every change is then a visible edit rather than a rule that has to be read to be
+-- understood.
 --
--- The kitchen is **not** a place. It is a lane the schedule draws itself, from the
--- slots, and nothing else can be put in it — which is the point: the kitchen is for
--- cooking, fetching food and washing up, and a lane anybody could drop a dream into
--- would not stay that way. A burn with no slots gets no lane.
+-- The slot's values are copied and there is no link back. Renaming a slot leaves the
+-- meals it already made alone — the same call the repeatable dream makes about its
+-- copies.
+--
+-- The kitchen is deliberately **not** a place. It is a lane the schedule draws itself,
+-- so nothing but cooking, fetching food and washing up can be put in it, and a burn
+-- with no meals gets no lane.
 ALTER TABLE `event` ADD `meal_intro_markdown` text DEFAULT '' NOT NULL;--> statement-breakpoint
 CREATE TABLE `meal_slot` (
 	`id` text PRIMARY KEY NOT NULL,
@@ -28,28 +33,36 @@ CREATE TABLE `meal_slot` (
 );
 --> statement-breakpoint
 CREATE INDEX `meal_slot_event_idx` ON `meal_slot` (`event_id`,`order`);--> statement-breakpoint
-CREATE TABLE `meal_role` (
-	`slot_id` text NOT NULL,
+CREATE TABLE `meal` (
+	`id` text PRIMARY KEY NOT NULL,
+	`event_id` text NOT NULL,
 	`date` text NOT NULL,
-	`attendance_id` text NOT NULL,
-	`role` text NOT NULL,
-	CONSTRAINT `meal_role_pk` PRIMARY KEY(`slot_id`, `date`, `attendance_id`, `role`),
-	CONSTRAINT `fk_meal_role_slot_id_meal_slot_id_fk` FOREIGN KEY (`slot_id`) REFERENCES `meal_slot`(`id`) ON DELETE CASCADE,
-	CONSTRAINT `fk_meal_role_attendance_id_attendance_id_fk` FOREIGN KEY (`attendance_id`) REFERENCES `attendance`(`id`) ON DELETE CASCADE,
-	CONSTRAINT "meal_role_role_check" CHECK("role" in ('lead', 'helper', 'cleanup')),
-	CONSTRAINT "meal_role_date_check" CHECK("date" glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]')
+	`at` text NOT NULL,
+	`label` text NOT NULL,
+	`kind` text NOT NULL,
+	`food_idea` text DEFAULT '' NOT NULL,
+	CONSTRAINT `fk_meal_event_id_event_id_fk` FOREIGN KEY (`event_id`) REFERENCES `event`(`id`) ON DELETE CASCADE,
+	CONSTRAINT "meal_label_check" CHECK(length(trim("label")) > 0),
+	CONSTRAINT "meal_at_check" CHECK("at" glob '[0-2][0-9]:[0-5][0-9]' and cast(substr("at", 1, 2) as integer) < 24),
+	CONSTRAINT "meal_kind_check" CHECK("kind" in ('meal', 'chore')),
+	CONSTRAINT "meal_date_check" CHECK("date" glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]')
 );
 --> statement-breakpoint
--- One lead per sitting. The other two are unbounded: nothing runs out of people
--- willing to wash up, and a cap would only be something for an organiser to raise.
-CREATE UNIQUE INDEX `meal_role_lead_idx` ON `meal_role` (`slot_id`,`date`) WHERE "role" = 'lead';--> statement-breakpoint
--- The sheet's "Food idea?" column, whose own header says "Not needed". A row only
--- where somebody wrote one — most sittings never get an idea.
-CREATE TABLE `meal_note` (
-	`slot_id` text NOT NULL,
-	`date` text NOT NULL,
-	`food_idea` text NOT NULL,
-	CONSTRAINT `meal_note_pk` PRIMARY KEY(`slot_id`, `date`),
-	CONSTRAINT `fk_meal_note_slot_id_meal_slot_id_fk` FOREIGN KEY (`slot_id`) REFERENCES `meal_slot`(`id`) ON DELETE CASCADE,
-	CONSTRAINT "meal_note_date_check" CHECK("date" glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]')
+CREATE INDEX `meal_event_idx` ON `meal` (`event_id`,`date`,`at`);--> statement-breakpoint
+-- What makes generating safe to run again: it fills in what is missing and touches
+-- nothing else, so adding a slot or extending the burn is one click and never a
+-- duplicate. Two lunches on one day is a mistake, not a plan.
+CREATE UNIQUE INDEX `meal_event_date_label_idx` ON `meal` (`event_id`,`date`,`label`);--> statement-breakpoint
+CREATE TABLE `meal_role` (
+	`meal_id` text NOT NULL,
+	`attendance_id` text NOT NULL,
+	`role` text NOT NULL,
+	CONSTRAINT `meal_role_pk` PRIMARY KEY(`meal_id`, `attendance_id`, `role`),
+	CONSTRAINT `fk_meal_role_meal_id_meal_id_fk` FOREIGN KEY (`meal_id`) REFERENCES `meal`(`id`) ON DELETE CASCADE,
+	CONSTRAINT `fk_meal_role_attendance_id_attendance_id_fk` FOREIGN KEY (`attendance_id`) REFERENCES `attendance`(`id`) ON DELETE CASCADE,
+	CONSTRAINT "meal_role_role_check" CHECK("role" in ('lead', 'helper', 'cleanup'))
 );
+--> statement-breakpoint
+-- One lead per meal. The other two are unbounded: nothing runs out of people willing
+-- to wash up, and a cap would only be something for an organiser to raise.
+CREATE UNIQUE INDEX `meal_role_lead_idx` ON `meal_role` (`meal_id`) WHERE "role" = 'lead';

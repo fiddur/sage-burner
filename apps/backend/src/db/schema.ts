@@ -834,13 +834,51 @@ export const mealSlot = sqliteTable(
 )
 
 /**
- * Somebody on one meal — its lead, a helper, or on the cleanup crew.
+ * One sitting — Monday's lunch, Saturday's dinner.
  *
- * **A meal has no row of its own.** It is a slot on a date, and both of those already
- * exist: the slot is configured, the date comes from the burn's own span. Storing
- * meals would mean reconciling them every time either changed — moving dinner half an
- * hour, or shortening the burn — and a reconciliation job is exactly the thing that
- * goes wrong quietly. So this references the slot and carries the date.
+ * **Generated from the slots, not derived from them.** A derived meal is identical to
+ * its template forever: no postponing Saturday's dinner an hour, no dropping lunch on
+ * the day everybody leaves, no adding a late supper. Generating writes rows an
+ * organiser can then change one at a time, and every change is a visible edit rather
+ * than a rule somewhere that has to be read to be understood.
+ *
+ * The slot's values are **copied**, and there is no link back to it. Renaming a slot
+ * afterwards leaves the meals it already made alone, which is the same call the
+ * repeatable dream makes about its copies — an instance edited on its own is the
+ * point, and a parent link would only be something to keep consistent.
+ */
+export const meal = sqliteTable(
+  'meal',
+  {
+    id: text('id').notNull(),
+    event_id: text('event_id')
+      .notNull()
+      .references(() => event.id, { onDelete: 'cascade' }),
+    /** `YYYY-MM-DD`. */
+    date: text('date').notNull(),
+    /** `HH:MM`, fixed width, so the CHECK and the sort can both treat it as a string. */
+    at: text('at').notNull(),
+    label: text('label').notNull(),
+    kind: text('kind', { enum: mealSlotKinds }).notNull(),
+    /** The sheet's "Food idea?", whose own header says "Not needed". */
+    food_idea: text('food_idea').notNull().default(''),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    index('meal_event_idx').on(table.event_id, table.date, table.at),
+    // What makes generating safe to run again: it fills in what is missing and
+    // touches nothing else, so adding a slot or extending the burn is one click and
+    // never a duplicate. Two lunches on one day is a mistake, not a plan.
+    uniqueIndex('meal_event_date_label_idx').on(table.event_id, table.date, table.label),
+    check('meal_label_check', sql`length(trim(${table.label})) > 0`),
+    check('meal_at_check', isClockTime(table.at)),
+    check('meal_kind_check', oneOf(table.kind, mealSlotKinds)),
+    check('meal_date_check', sql`${table.date} glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'`),
+  ],
+)
+
+/**
+ * Somebody on one meal — its lead, a helper, or on the cleanup crew.
  *
  * An `attendance` for the reason a role's team is one: only somebody coming can cook,
  * and withdrawing takes them off everything they had signed up for.
@@ -851,50 +889,22 @@ export const mealSlot = sqliteTable(
 export const mealRole = sqliteTable(
   'meal_role',
   {
-    slot_id: text('slot_id')
+    meal_id: text('meal_id')
       .notNull()
-      .references(() => mealSlot.id, { onDelete: 'cascade' }),
-    /** `YYYY-MM-DD`, which day's sitting this is. */
-    date: text('date').notNull(),
+      .references(() => meal.id, { onDelete: 'cascade' }),
     attendance_id: text('attendance_id')
       .notNull()
       .references(() => attendance.id, { onDelete: 'cascade' }),
     role: text('role', { enum: mealRoles }).notNull(),
   },
   (table) => [
-    primaryKey({ columns: [table.slot_id, table.date, table.attendance_id, table.role] }),
+    primaryKey({ columns: [table.meal_id, table.attendance_id, table.role] }),
     check('meal_role_role_check', oneOf(table.role, mealRoles)),
-    check('meal_role_date_check', sql`${table.date} glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'`),
-    // One lead per sitting. The other two roles are unbounded — nothing runs out of
-    // people willing to wash up, and a cap would be an organiser's job to raise.
+    // One lead per meal. The other two are unbounded — nothing runs out of people
+    // willing to wash up, and a cap would only be something for an organiser to raise.
     uniqueIndex('meal_role_lead_idx')
-      .on(table.slot_id, table.date)
+      .on(table.meal_id)
       .where(sql`${table.role} = 'lead'`),
-  ],
-)
-
-/**
- * What somebody thought of cooking at one sitting — the sheet's "Food idea?" column.
- *
- * A row only where somebody has written one, which is why this is a side table rather
- * than a column on a meal: most sittings never get an idea, and there is still no meal
- * row to hang it off. `(slot, date)` is the key, the same identity `meal_role` uses.
- *
- * Optional in the sheet too — the header says "Not needed" under it. The lead decides
- * what to cook from what is in; this is a note, not a plan anyone is held to.
- */
-export const mealNote = sqliteTable(
-  'meal_note',
-  {
-    slot_id: text('slot_id')
-      .notNull()
-      .references(() => mealSlot.id, { onDelete: 'cascade' }),
-    date: text('date').notNull(),
-    food_idea: text('food_idea').notNull(),
-  },
-  (table) => [
-    primaryKey({ columns: [table.slot_id, table.date] }),
-    check('meal_note_date_check', sql`${table.date} glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'`),
   ],
 )
 
