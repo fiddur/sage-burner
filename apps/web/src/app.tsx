@@ -20,6 +20,7 @@ import { Dreams } from './pages/Dreams.tsx'
 import { Home } from './pages/Home.tsx'
 import { Invite } from './pages/Invite.tsx'
 import { Login } from './pages/Login.tsx'
+import { Meals } from './pages/Meals.tsx'
 import { Members } from './pages/Members.tsx'
 import { NotFound } from './pages/NotFound.tsx'
 import { Options } from './pages/Options.tsx'
@@ -83,6 +84,20 @@ export type RoutesApi = Pick<
   | 'joinLeadRoleTeam'
   | 'leaveLeadRoleTeam'
   | 'copyLeadRoles'
+  | 'getMeals'
+  | 'setMealLead'
+  | 'joinMealCrew'
+  | 'leaveMealCrew'
+  | 'setMealIdea'
+  | 'updateMealIntro'
+  | 'getMealSlots'
+  | 'addMealSlot'
+  | 'updateMealSlot'
+  | 'deleteMealSlot'
+  | 'generateMeals'
+  | 'addMeal'
+  | 'deleteMeal'
+  | 'updateMeal'
   | 'getSessions'
   | 'offerSession'
   | 'updateSession'
@@ -155,6 +170,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
   const DreamsRoute = useMemo(() => () => <Dreams api={api} />, [api])
   const ScheduleRoute = useMemo(() => () => <Schedule api={api} />, [api])
   const RolesRoute = useMemo(() => () => <Roles api={api} />, [api])
+  const MealsRoute = useMemo(() => () => <Meals api={api} />, [api])
   const ProfileRoute = useMemo(() => () => <ProfilePage api={api} />, [api])
   const ApplyRoute = useMemo(() => () => <Apply api={api} />, [api])
   // The token arrives as a prop from the route pattern, so this one takes props
@@ -170,6 +186,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
       <Route path="/" component={HomeRoute} />
       <Route path="/apply" component={ApplyRoute} />
       <Route path="/members" component={MembersRoute} />
+      <Route path="/meals" component={MealsRoute} />
       <Route path="/dreams" component={DreamsRoute} />
       <Route path="/schedule" component={ScheduleRoute} />
       <Route path="/roles" component={RolesRoute} />

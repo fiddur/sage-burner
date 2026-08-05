@@ -821,3 +821,36 @@ a:hover {
   border: 1px dashed var(--line);
   border-radius: 0.5rem;
 }
+
+/* The meal plan's table — the spreadsheet tab it replaces, minus the merged cells. */
+.meal-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.meal-table th,
+.meal-table td {
+  border: 1px solid var(--line);
+  padding: 0.3rem 0.5rem;
+  text-align: start;
+  vertical-align: top;
+}
+
+.meal-table th[scope='row'] {
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.meal-crew {
+  margin: 0;
+  padding-inline-start: 1rem;
+}
+
+.meal-idea {
+  width: 100%;
+  min-width: 8rem;
+}
+
+.meal-intro {
+  margin-block-end: 1rem;
+}
