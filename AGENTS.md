@@ -36,8 +36,14 @@ type definitions. All layers import from it — never duplicate a schema.
 - Web imports **no Zod**. Types always; runtime values only from modules that do
   not pull Zod in — today `enums.ts` (the vocabularies and `tickBoxRequired`),
   `answers.ts` (`answerProblems`, `isTickBox`, the application form's `MAX_*`
-  limits), and `limits.ts` (bounds the schemas and the forms share). Nothing under
-  `schemas/`.
+  limits), `limits.ts` (bounds the schemas and the forms share), and `routes.ts`
+  (`apiRoutes`, every endpoint's path and verb). Nothing under `schemas/`.
+- **Every endpoint lives in `routes.ts` and nowhere else.** The client builds its
+  path from it and the route file registers `fastify` from it, so the two spellings
+  of one endpoint cannot drift; `routes.test.ts` checks that each built path routes
+  to its own registration. The `/api` prefix and the per-segment encoding belong
+  there too — encoding was a per-call-site chore in 61 places, which is 61 chances
+  to leave one off. Adding a route means adding it there first.
 - Field names are `snake_case` everywhere: schemas, REST API, DB columns, JSON
   keys, frontend types.
 

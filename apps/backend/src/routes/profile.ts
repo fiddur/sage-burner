@@ -2,7 +2,7 @@ import type { AttendanceUpdate, ProfileResponse } from '@sage-burner/shared'
 import type { SQL } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 
-import { attendanceUpdateSchema, errorResponse, profileUpdateSchema } from '@sage-burner/shared'
+import { apiRoutes, attendanceUpdateSchema, errorResponse, profileUpdateSchema } from '@sage-burner/shared'
 import { and, eq, ne, sql } from 'drizzle-orm'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -187,7 +187,7 @@ export const registerProfileRoutes = (
     return row
   }
 
-  app.get('/api/me/profile', { preHandler: requireMember }, async (request, reply) => {
+  app.get(apiRoutes.getMyProfile.fastify, { preHandler: requireMember }, async (request, reply) => {
     void noStore(reply)
 
     const viewer = await viewerFor(request, { db, sessions })
@@ -199,7 +199,7 @@ export const registerProfileRoutes = (
     return { profile } satisfies ProfileResponse
   })
 
-  app.patch('/api/me/profile', { preHandler: requireMember }, async (request, reply) => {
+  app.patch(apiRoutes.updateMyProfile.fastify, { preHandler: requireMember }, async (request, reply) => {
     void noStore(reply)
 
     const parsed = profileUpdateSchema.safeParse(request.body)
@@ -221,7 +221,7 @@ export const registerProfileRoutes = (
   })
 
   app.patch<{ Params: { eventId: string } }>(
-    '/api/events/:eventId/attendance/me',
+    apiRoutes.updateMyStay.fastify,
     { preHandler: requireMember },
     async (request, reply) => {
       void noStore(reply)

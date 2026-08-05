@@ -16,7 +16,7 @@ const respondWith = (body: unknown, init: ResponseInit = {}) =>
   )
 
 describe('createApiClient', () => {
-  it('prefixes /api so callers never carry a base url', async () => {
+  it('sends the path the manifest built, which already carries /api', async () => {
     const doFetch = respondWith({ build_sha: 'abc123' })
 
     await createApiClient(doFetch).getVersion()

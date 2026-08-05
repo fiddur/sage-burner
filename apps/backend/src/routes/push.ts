@@ -1,7 +1,7 @@
 import type { PushKeyResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { errorResponse, pushSubscriptionCreateSchema } from '@sage-burner/shared'
+import { apiRoutes, errorResponse, pushSubscriptionCreateSchema } from '@sage-burner/shared'
 
 import type { GuardDeps } from '../auth/guards.ts'
 import type { PushDeps } from '../push/push.ts'
@@ -40,7 +40,7 @@ export const registerPushRoutes = (app: FastifyInstance, { db, sessions, push }:
    * sufficient and leaves nothing to configure. Behind the guard, so minting is
    * never something a stranger can trigger.
    */
-  app.get('/api/push/key', { preHandler: requireApproved }, async (_request, reply) => {
+  app.get(apiRoutes.getPushKey.fastify, { preHandler: requireApproved }, async (_request, reply) => {
     void noStore(reply)
 
     const keys = await vapidKeysFor(push)
@@ -48,7 +48,7 @@ export const registerPushRoutes = (app: FastifyInstance, { db, sessions, push }:
     return { public_key: keys?.publicKey ?? null } satisfies PushKeyResponse
   })
 
-  app.post('/api/push/subscriptions', { preHandler: requireApproved }, async (request, reply) => {
+  app.post(apiRoutes.subscribeToPush.fastify, { preHandler: requireApproved }, async (request, reply) => {
     void noStore(reply)
 
     const parsed = pushSubscriptionCreateSchema.safeParse(request.body)
@@ -74,14 +74,18 @@ export const registerPushRoutes = (app: FastifyInstance, { db, sessions, push }:
    * and scoping it would leave a shared laptop's stale row undeletable by the
    * person actually sitting at it.
    */
-  app.delete('/api/push/subscriptions', { preHandler: requireApproved }, async (request, reply) => {
-    void noStore(reply)
+  app.delete(
+    apiRoutes.unsubscribeFromPush.fastify,
+    { preHandler: requireApproved },
+    async (request, reply) => {
+      void noStore(reply)
 
-    const parsed = pushSubscriptionCreateSchema.pick({ endpoint: true }).safeParse(request.body)
-    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+      const parsed = pushSubscriptionCreateSchema.pick({ endpoint: true }).safeParse(request.body)
+      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
 
-    await forgetSubscription(push, parsed.data.endpoint)
+      await forgetSubscription(push, parsed.data.endpoint)
 
-    return reply.code(204).send()
-  })
+      return reply.code(204).send()
+    },
+  )
 }

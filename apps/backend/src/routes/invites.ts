@@ -1,7 +1,7 @@
 import type { AdminInvitesResponse, InviteResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { errorResponse, inviteCreateSchema, inviteStatusOf } from '@sage-burner/shared'
+import { apiRoutes, errorResponse, inviteCreateSchema, inviteStatusOf } from '@sage-burner/shared'
 import { and, desc, eq, isNull } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
@@ -27,7 +27,7 @@ export const registerInviteRoutes = (
   app: FastifyInstance,
   { db, sessions, now = () => new Date() }: InviteRouteDeps,
 ) => {
-  app.get('/api/admin/invites', async (_request, reply) => {
+  app.get(apiRoutes.getInvites.fastify, async (_request, reply) => {
     void noStore(reply)
 
     const rows = await db
@@ -47,7 +47,7 @@ export const registerInviteRoutes = (
     } satisfies AdminInvitesResponse
   })
 
-  app.post('/api/admin/invites', async (request, reply) => {
+  app.post(apiRoutes.createInvite.fastify, async (request, reply) => {
     void noStore(reply)
 
     const parsed = inviteCreateSchema.safeParse(request.body ?? {})
@@ -76,7 +76,7 @@ export const registerInviteRoutes = (
     return reply.code(201).send({ invite: { token, expires_at } } satisfies InviteResponse)
   })
 
-  app.delete<{ Params: { id: string } }>('/api/admin/invites/:id', async (request, reply) => {
+  app.delete<{ Params: { id: string } }>(apiRoutes.revokeInvite.fastify, async (request, reply) => {
     void noStore(reply)
 
     // Only an unredeemed direct invite. A redeemed one is the record of how

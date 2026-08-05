@@ -1,7 +1,7 @@
 import type { InstallationResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { errorResponse, installationUpdateSchema } from '@sage-burner/shared'
+import { apiRoutes, errorResponse, installationUpdateSchema } from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -28,7 +28,7 @@ export const registerInstallationRoutes = (app: FastifyInstance, { db }: GuardDe
     return row
   }
 
-  app.get('/api/installation', async (_request, reply) => {
+  app.get(apiRoutes.getInstallation.fastify, async (_request, reply) => {
     // `no-cache` rather than `no-store`: the title is public, but it is in the
     // header of every page, so a rename sitting invisible in a browser cache
     // would look exactly like the edit not having worked. Same reasoning as
@@ -41,7 +41,7 @@ export const registerInstallationRoutes = (app: FastifyInstance, { db }: GuardDe
     return { installation: found } satisfies InstallationResponse
   })
 
-  app.patch('/api/admin/installation', async (request, reply) => {
+  app.patch(apiRoutes.updateInstallation.fastify, async (request, reply) => {
     void noStore(reply)
 
     const parsed = installationUpdateSchema.safeParse(request.body)

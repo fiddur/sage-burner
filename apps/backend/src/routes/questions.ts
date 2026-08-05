@@ -2,6 +2,7 @@ import type { FormQuestion, FormQuestionResponse, FormQuestionsResponse } from '
 import type { FastifyInstance } from 'fastify'
 
 import {
+  apiRoutes,
   errorResponse,
   formQuestionCreateSchema,
   formQuestionOrderSchema,
@@ -76,7 +77,7 @@ export const questionsFor = (db: Database): Promise<FormQuestion[]> =>
   db.select().from(formQuestion).orderBy(asc(formQuestion.order), asc(formQuestion.id))
 
 export const registerQuestionRoutes = (app: FastifyInstance, { db }: GuardDeps) => {
-  app.get('/api/questions', async (_request, reply) => {
+  app.get(apiRoutes.getQuestions.fastify, async (_request, reply) => {
     // Same reasoning as the active event: public, but an edit has to show up
     // without waiting out a heuristic freshness window.
     void reply.header('cache-control', 'no-cache')
@@ -84,7 +85,7 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db }: GuardDeps) 
     return { questions: await questionsFor(db) } satisfies FormQuestionsResponse
   })
 
-  app.post('/api/admin/questions', async (request, reply) => {
+  app.post(apiRoutes.addQuestion.fastify, async (request, reply) => {
     void noStore(reply)
 
     const parsed = formQuestionCreateSchema.safeParse(request.body)
@@ -119,7 +120,7 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db }: GuardDeps) 
     return reply.code(201).send({ question: row } satisfies FormQuestionResponse)
   })
 
-  app.patch<{ Params: { id: string } }>('/api/admin/questions/:id', async (request, reply) => {
+  app.patch<{ Params: { id: string } }>(apiRoutes.updateQuestion.fastify, async (request, reply) => {
     void noStore(reply)
 
     const parsed = formQuestionUpdateSchema.safeParse(request.body)
@@ -189,7 +190,7 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db }: GuardDeps) 
     return { question: row } satisfies FormQuestionResponse
   })
 
-  app.delete<{ Params: { id: string } }>('/api/admin/questions/:id', async (request, reply) => {
+  app.delete<{ Params: { id: string } }>(apiRoutes.deleteQuestion.fastify, async (request, reply) => {
     void noStore(reply)
 
     // A hard delete, and safe to keep as one: `application.answers` stores each
@@ -213,7 +214,7 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db }: GuardDeps) 
     return reply.code(204).send()
   })
 
-  app.put('/api/admin/questions/order', async (request, reply) => {
+  app.put(apiRoutes.reorderQuestions.fastify, async (request, reply) => {
     void noStore(reply)
 
     const parsed = formQuestionOrderSchema.safeParse(request.body)

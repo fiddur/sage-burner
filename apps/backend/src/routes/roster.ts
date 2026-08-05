@@ -6,7 +6,7 @@ import type {
 } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { errorResponse, paymentUpdateSchema, withPlaces } from '@sage-burner/shared'
+import { apiRoutes, errorResponse, paymentUpdateSchema, withPlaces } from '@sage-burner/shared'
 import { and, eq } from 'drizzle-orm'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -70,7 +70,7 @@ export const registerRosterRoutes = (
 ) => {
   const { requireApproved } = createGuards({ db, sessions })
 
-  app.get<{ Params: { eventId: string } }>('/api/admin/events/:eventId/roster', async (request, reply) => {
+  app.get<{ Params: { eventId: string } }>(apiRoutes.adminRoster.fastify, async (request, reply) => {
     void noStore(reply)
 
     const { eventId } = request.params
@@ -83,7 +83,7 @@ export const registerRosterRoutes = (
     } satisfies RosterResponse
   })
 
-  app.get('/api/admin/events/active/roster', async (_request, reply) => {
+  app.get(apiRoutes.getActiveRoster.fastify, async (_request, reply) => {
     void noStore(reply)
 
     const open = await activeEvent(db, todayIso(now))
@@ -95,7 +95,7 @@ export const registerRosterRoutes = (
   })
 
   app.get<{ Params: { eventId: string } }>(
-    '/api/events/:eventId/members',
+    apiRoutes.getMembers.fastify,
     { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)
@@ -112,7 +112,7 @@ export const registerRosterRoutes = (
   )
 
   app.patch<{ Params: { eventId: string; accountId: string } }>(
-    '/api/admin/events/:eventId/attendance/:accountId/payment',
+    apiRoutes.setPayment.fastify,
     async (request, reply) => {
       void noStore(reply)
 

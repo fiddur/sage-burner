@@ -2,6 +2,7 @@ import type { EventOption, EventOptionTaken, EventOptionsResponse } from '@sage-
 import type { FastifyInstance } from 'fastify'
 
 import {
+  apiRoutes,
   errorResponse,
   eventOptionCreateSchema,
   eventOptionOrderSchema,
@@ -53,14 +54,14 @@ const optionsFor = async (db: Database, eventId: string): Promise<EventOptionTak
 export const registerEventOptionRoutes = (app: FastifyInstance, { db, sessions }: GuardDeps) => {
   const { requireApproved } = createGuards({ db, sessions })
 
-  app.get<{ Params: { eventId: string } }>('/api/events/:eventId/options', async (request, reply) => {
+  app.get<{ Params: { eventId: string } }>(apiRoutes.getEventOptions.fastify, async (request, reply) => {
     void reply.header('cache-control', 'no-cache')
 
     return { options: await optionsFor(db, request.params.eventId) } satisfies EventOptionsResponse
   })
 
   app.post<{ Params: { eventId: string } }>(
-    '/api/events/:eventId/options',
+    apiRoutes.addEventOption.fastify,
     { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)
@@ -106,7 +107,7 @@ export const registerEventOptionRoutes = (app: FastifyInstance, { db, sessions }
   )
 
   app.patch<{ Params: { id: string } }>(
-    '/api/event-options/:id',
+    apiRoutes.updateEventOption.fastify,
     { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)
@@ -138,7 +139,7 @@ export const registerEventOptionRoutes = (app: FastifyInstance, { db, sessions }
   )
 
   app.delete<{ Params: { id: string } }>(
-    '/api/event-options/:id',
+    apiRoutes.deleteEventOption.fastify,
     { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)
@@ -165,7 +166,7 @@ export const registerEventOptionRoutes = (app: FastifyInstance, { db, sessions }
   )
 
   app.put<{ Params: { eventId: string; kind: string } }>(
-    '/api/events/:eventId/options/:kind/order',
+    apiRoutes.reorderEventOptions.fastify,
     { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)

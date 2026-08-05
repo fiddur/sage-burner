@@ -1,7 +1,7 @@
 import type { MeResponse, Viewer } from '@sage-burner/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
-import { errorResponse, loginRequestSchema } from '@sage-burner/shared'
+import { apiRoutes, errorResponse, loginRequestSchema } from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 
 import type { Gate } from '../auth/gate.ts'
@@ -149,7 +149,7 @@ export const registerAuthRoutes = (app: FastifyInstance, { db, config, sessions,
     } satisfies MeResponse)
   }
 
-  app.post('/api/auth/login', async (request, reply) => {
+  app.post(apiRoutes.login.fastify, async (request, reply) => {
     void noStore(reply)
 
     // Taken before any work, so the bound cannot depend on what the database
@@ -169,7 +169,7 @@ export const registerAuthRoutes = (app: FastifyInstance, { db, config, sessions,
     }
   })
 
-  app.post('/api/auth/logout', async (_request, reply: FastifyReply) => {
+  app.post(apiRoutes.logout.fastify, async (_request, reply: FastifyReply) => {
     void noStore(reply)
     // Max-Age=0 rather than omitting the cookie: the browser has to be told to
     // drop it. The token itself stays valid until it expires — sessions are
@@ -179,7 +179,7 @@ export const registerAuthRoutes = (app: FastifyInstance, { db, config, sessions,
     return reply.code(200).send({ viewer: null } satisfies MeResponse)
   })
 
-  app.get('/api/auth/me', async (request, reply) => {
+  app.get(apiRoutes.getMe.fastify, async (request, reply) => {
     void noStore(reply)
 
     // 200 with a null viewer, not 401: an anonymous visitor loading the public
