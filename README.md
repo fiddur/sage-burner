@@ -1222,6 +1222,51 @@ Folding counts **octets, not characters**, per RFC 5545: a place emoji is four
 bytes, so a line that looks short can be well over the 75-octet limit, and a fold
 in the middle of a multi-byte sequence corrupts it.
 
+## Avatars
+
+The circle in the corner, and on a schedule chip, may be a picture instead of initials
+(#222).
+
+**In the database**, in its own table. The container has no writable path but the data
+volume and `docker compose up` has to stay sufficient, which is the same argument that
+keeps the VAPID keys here — a bind mount for uploads would be a second thing to back
+up and a second thing a restore could miss, leaving every avatar a broken image with
+no error anywhere. Deleting an account cascades the picture away; with files that
+would be a sweeper to write and orphans to accumulate silently.
+
+Its own table rather than a column on `account`, because avatars are tens of kilobytes
+and `select().from(account)` is on the path of nearly every request: a blob there would
+be read by all of them to be used by almost none.
+
+Serving goes through the app either way — an avatar is member data and needs
+`requireApproved`, the same as the name beside it — so the one real advantage files
+would have had is unavailable. **The threshold to revisit this** is roughly 100 KB per
+blob or a few hundred megabytes in total; a 256-pixel avatar is nowhere near either,
+and meal photos or a gallery would be.
+
+**Nothing on the server decodes an image.** There is no image library in this process
+and no appetite for one, so the browser cuts the picture to a square and sizes it down
+to 256 px before sending. The consequences are worth stating rather than discovering:
+
+- The content type is what the caller **claims**, and those bytes are served back with
+  it. Only three types are storable — a CHECK as well as a route check — and
+  `X-Content-Type-Options: nosniff` stops a browser deciding for itself that a PNG is
+  really something to run.
+- Half a megabyte is the cap, enforced by Fastify before the body is read. A resized
+  avatar is tens of kilobytes, so the cap is generous for a client that skipped the
+  resize and cheap against one that means harm.
+
+**`avatar` is a version, not a flag** — when the picture last changed. It rides with
+the viewer and with the attendee list, and it goes in the URL, so a new picture is a
+new URL. That is what makes a week-long `private, max-age` safe on data everything
+else here sends `no-store` for: no cache can show a stale one. Null means initials,
+and spares every account without a picture a request that would only 404.
+
+The crop is `squareCrop`, and it takes the **middle**: a portrait cut from the centre
+keeps the face far more often than one squashed to fit. The resize itself is not
+unit-tested and cannot usefully be — happy-dom has no canvas that draws, so a test
+would assert against a stub of the thing under test.
+
 ## Meals
 
 Who cooks, who helps and who washes up — the spreadsheet's Meal tab (#210).

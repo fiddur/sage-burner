@@ -118,7 +118,12 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
       // nav still offers "Log in" to someone holding a valid session. `Login.tsx`
       // does the same thing after its own sign-in.
       if (signedIn !== null) {
-        setViewer({ id: signedIn.account_id, name: signedIn.name, roles: signedIn.roles })
+        setViewer({
+          id: signedIn.account_id,
+          name: signedIn.name,
+          avatar: signedIn.avatar,
+          roles: signedIn.roles,
+        })
       }
       setDone(true)
     } catch (failure) {

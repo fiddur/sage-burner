@@ -43,7 +43,7 @@ const renderHome = (
 
 const asRoles = (roles: ('admin' | 'member')[]): Viewer => ({
   status: 'signed-in',
-  account: { id: 'a-1', name: null, roles },
+  account: { id: 'a-1', name: null, avatar: null, roles },
 })
 
 describe('Home', () => {
@@ -131,7 +131,10 @@ describe('Home', () => {
   })
 
   it('does not offer Apply to someone who is already a member', async () => {
-    renderHome(summer, { status: 'signed-in', account: { id: 'a-1', name: null, roles: ['member'] } })
+    renderHome(summer, {
+      status: 'signed-in',
+      account: { id: 'a-1', name: null, avatar: null, roles: ['member'] },
+    })
 
     await screen.findByRole('heading', { name: 'Summer Burn 2026', level: 2 })
     expect(screen.queryByRole('link', { name: 'Apply to join' })).toBeNull()

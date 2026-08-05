@@ -1,9 +1,9 @@
 import type { ComponentChildren } from 'preact'
 
 import { useBurns } from '../burn.tsx'
-import { initials } from '../initials.ts'
 import { useInstallationTitle } from '../installation.tsx'
 import { isAdmin, isApproved, isMember, useViewer } from '../viewer.tsx'
+import { Avatar } from './Avatar.tsx'
 
 /**
  * The frame every page sits in.
@@ -81,8 +81,12 @@ export const Layout = ({ children }: { children: ComponentChildren }) => {
           )}
 
           {isMember(viewer) && (
-            <a class="avatar" href="/profile" aria-label="Your details" title="Your details">
-              <span aria-hidden="true">{initials(viewer.account?.name)}</span>
+            <a class="avatar-link" href="/profile" aria-label="Your details" title="Your details">
+              <Avatar
+                accountId={viewer.account?.id ?? ''}
+                name={viewer.account?.name ?? null}
+                avatar={viewer.account?.avatar ?? null}
+              />
             </a>
           )}
         </nav>

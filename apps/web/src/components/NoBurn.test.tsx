@@ -10,8 +10,14 @@ import { NoBurn } from './NoBurn.tsx'
 
 afterEach(cleanup)
 
-const MEMBER: Viewer = { status: 'signed-in', account: { id: 'a-1', name: null, roles: ['member'] } }
-const ORGANISER: Viewer = { status: 'signed-in', account: { id: 'a-2', name: null, roles: ['admin'] } }
+const MEMBER: Viewer = {
+  status: 'signed-in',
+  account: { id: 'a-1', name: null, avatar: null, roles: ['member'] },
+}
+const ORGANISER: Viewer = {
+  status: 'signed-in',
+  account: { id: 'a-2', name: null, avatar: null, roles: ['admin'] },
+}
 
 const renderIt = (choice: BurnChoice, viewer: Viewer = MEMBER) =>
   render(

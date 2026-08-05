@@ -116,7 +116,7 @@ describe('ViewerProvider', () => {
 
 describe('role helpers', () => {
   const withRoles = (roles: ('admin' | 'member')[]) =>
-    ({ status: 'signed-in', account: { id: 'a-1', name: null, roles } }) as const
+    ({ status: 'signed-in', account: { id: 'a-1', name: null, avatar: null, roles } }) as const
 
   it('reads admin and member independently', () => {
     expect(isAdmin(withRoles(['admin']))).toBe(true)

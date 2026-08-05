@@ -12,8 +12,14 @@ import { Admin } from './Admin.tsx'
 
 afterEach(cleanup)
 
-const ADMIN: Viewer = { status: 'signed-in', account: { id: 'a-1', name: null, roles: ['admin'] } }
-const MEMBER: Viewer = { status: 'signed-in', account: { id: 'a-2', name: null, roles: ['member'] } }
+const ADMIN: Viewer = {
+  status: 'signed-in',
+  account: { id: 'a-1', name: null, avatar: null, roles: ['admin'] },
+}
+const MEMBER: Viewer = {
+  status: 'signed-in',
+  account: { id: 'a-2', name: null, avatar: null, roles: ['member'] },
+}
 
 const renderAdmin = (
   getAdminAccounts: AdminApi['getAdminAccounts'],
@@ -169,7 +175,10 @@ describe('Admin', () => {
 
   it('offers an account with no roles nothing at all', async () => {
     const getAdminAccounts = vi.fn(never)
-    renderAdmin(getAdminAccounts, { status: 'signed-in', account: { id: 'a-9', name: null, roles: [] } })
+    renderAdmin(getAdminAccounts, {
+      status: 'signed-in',
+      account: { id: 'a-9', name: null, avatar: null, roles: [] },
+    })
 
     expect(await screen.findByText(/for organisers/)).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'Places' })).toBeNull()

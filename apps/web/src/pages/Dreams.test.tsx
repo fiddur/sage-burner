@@ -13,7 +13,10 @@ import { Dreams } from './Dreams.tsx'
 
 afterEach(cleanup)
 
-const MEMBER: Viewer = { status: 'signed-in', account: { id: 'a-1', name: null, roles: ['member'] } }
+const MEMBER: Viewer = {
+  status: 'signed-in',
+  account: { id: 'a-1', name: null, avatar: null, roles: ['member'] },
+}
 
 const BURN = {
   id: 'e-1',

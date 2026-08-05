@@ -55,7 +55,10 @@ const CHOSEN: MyBurn = {
   attendance: null,
 }
 
-const MEMBER: Viewer = { status: 'signed-in', account: { id: 'a-1', name: null, roles: ['member'] } }
+const MEMBER: Viewer = {
+  status: 'signed-in',
+  account: { id: 'a-1', name: null, avatar: null, roles: ['member'] },
+}
 
 // `null`, not `undefined`: passing `undefined` to a parameter with a default gets
 // the default, so "no burn" written that way silently rendered the usual one.
@@ -140,7 +143,10 @@ describe('Members', () => {
     // An applicant with an account and no roles. Asking anyway renders a failure
     // where the explanation belongs, and spends a round trip on a certain 403.
     const getMembers = vi.fn(() => Promise.reject(new Error('should not be called')))
-    renderPage({ getMembers }, { status: 'signed-in', account: { id: 'a-9', name: null, roles: [] } })
+    renderPage(
+      { getMembers },
+      { status: 'signed-in', account: { id: 'a-9', name: null, avatar: null, roles: [] } },
+    )
 
     expect(await screen.findByText(/for members/)).toBeTruthy()
     expect(getMembers).not.toHaveBeenCalled()
@@ -149,7 +155,7 @@ describe('Members', () => {
   it('opens to an organiser holding admin without member', async () => {
     renderPage(stub(aRoster({ entries: [anEntry({ name: 'Ana' })] })), {
       status: 'signed-in',
-      account: { id: 'a-2', name: null, roles: ['admin'] },
+      account: { id: 'a-2', name: null, avatar: null, roles: ['admin'] },
     })
 
     expect(await screen.findByText('Ana')).toBeTruthy()

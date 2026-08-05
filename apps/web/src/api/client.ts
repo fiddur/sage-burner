@@ -367,6 +367,14 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
     deleteMeal: (id: string) =>
       request<undefined>(`/admin/meals/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
+    /**
+     * A picture for the circle. Raw bytes, already sized down by the browser — this
+     * process has no image library and wants none.
+     */
+    setMyAvatar: (image: Blob) => request<{ avatar: string }>('/me/avatar', { method: 'PUT', body: image }),
+
+    removeMyAvatar: () => request<undefined>('/me/avatar', { method: 'DELETE' }),
+
     /** Members only. Scheduled dreams first, then the ones only offered. */
     getSessions: (eventId: string, signal?: AbortSignal) =>
       request<SessionsResponse>(`/events/${encodeURIComponent(eventId)}/sessions`, { signal }),

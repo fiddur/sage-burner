@@ -38,8 +38,14 @@ const aBurn = (id: string, name: string, joined: boolean): MyBurn => ({
   attendance: joined ? anAttendance() : null,
 })
 
-const MEMBER: Viewer = { status: 'signed-in', account: { id: 'a-1', name: null, roles: ['member'] } }
-const ORGANISER: Viewer = { status: 'signed-in', account: { id: 'a-2', name: null, roles: ['admin'] } }
+const MEMBER: Viewer = {
+  status: 'signed-in',
+  account: { id: 'a-1', name: null, avatar: null, roles: ['member'] },
+}
+const ORGANISER: Viewer = {
+  status: 'signed-in',
+  account: { id: 'a-2', name: null, avatar: null, roles: ['admin'] },
+}
 
 /** Renders the choice as text, so a test can read it without a page. */
 const Shown = () => {
@@ -102,7 +108,7 @@ describe('the burn choice', () => {
   it('asks nothing at all for somebody with no roles', async () => {
     const getMyBurns = renderChoice([], {
       status: 'signed-in',
-      account: { id: 'a-9', name: null, roles: [] },
+      account: { id: 'a-9', name: null, avatar: null, roles: [] },
     })
 
     await screen.findByText(/^ready:/)

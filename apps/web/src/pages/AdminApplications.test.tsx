@@ -32,7 +32,7 @@ const stub = (over: Partial<ApplicationsApi> = {}): ApplicationsApi => ({
 
 const renderPage = (api: ApplicationsApi, roles: ('admin' | 'member')[] = ['admin']) =>
   render(
-    <ViewerProvider viewer={{ status: 'signed-in', account: { id: 'a-1', name: null, roles } }}>
+    <ViewerProvider viewer={{ status: 'signed-in', account: { id: 'a-1', name: null, avatar: null, roles } }}>
       <AdminApplications api={api} />
     </ViewerProvider>,
   )

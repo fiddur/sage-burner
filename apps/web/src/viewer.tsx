@@ -26,7 +26,13 @@ import type { ApiClient } from './api/client.ts'
  */
 export interface Viewer {
   status: 'loading' | 'signed-out' | 'signed-in'
-  account?: { id: string; name: string | null; roles: readonly AccountRole[] }
+  account?: {
+    id: string
+    name: string | null
+    /** When their picture last changed, or null for the initials. */
+    avatar: string | null
+    roles: readonly AccountRole[]
+  }
 }
 
 export type ViewerAccount = NonNullable<Viewer['account']>
@@ -108,6 +114,7 @@ export const FetchedViewerProvider = ({
                 account: {
                   id: response.viewer.account_id,
                   name: response.viewer.name,
+                  avatar: response.viewer.avatar,
                   roles: response.viewer.roles,
                 },
               },

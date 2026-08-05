@@ -13,7 +13,10 @@ import { Schedule } from './Schedule.tsx'
 
 afterEach(cleanup)
 
-const MEMBER: Viewer = { status: 'signed-in', account: { id: 'a-1', name: null, roles: ['member'] } }
+const MEMBER: Viewer = {
+  status: 'signed-in',
+  account: { id: 'a-1', name: null, avatar: null, roles: ['member'] },
+}
 
 const BURN: Event = {
   id: 'e-1',
@@ -1328,5 +1331,48 @@ describe('a drag that was abandoned', () => {
     fireEvent.drop(cell('14:00', 2))
 
     await waitFor(() => expect(updateMeal).toHaveBeenCalledWith('m-1', { date: '2026-08-01', at: '14:00' }))
+  })
+})
+
+describe('a chore in the kitchen', () => {
+  const aChore = (): Meal => ({
+    id: 'm-2',
+    event_id: 'e-1',
+    date: '2026-08-01',
+    at: '09:00',
+    label: 'Morning cleanup',
+    kind: 'chore',
+    food_idea: '',
+    lead: null,
+    helpers: [],
+    cleanup: [],
+  })
+
+  it('asks for cleaners and nothing else', async () => {
+    // Nothing is cooked at a morning cleanup, so it has nobody leading the cooking
+    // and nobody helping with it. The API refuses both as well.
+    renderPage(
+      stub({ getMeals: () => Promise.resolve({ intro_markdown: '', slots: [], meals: [aChore()] }) }),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Morning cleanup' }))
+    const panel = await screen.findByRole('dialog', { name: 'Morning cleanup' })
+
+    expect(within(panel).queryByLabelText('Lead for Morning cleanup')).toBeNull()
+    expect(within(panel).queryByText('Helping cook')).toBeNull()
+    expect(within(panel).getByText('Washing up')).toBeTruthy()
+  })
+
+  it('still asks for all three on an ordinary meal', async () => {
+    // The passing sibling: hiding them everywhere would satisfy the test above.
+    const meal: Meal = { ...aChore(), id: 'm-1', label: 'Dinner', at: '18:00', kind: 'meal' }
+    renderPage(stub({ getMeals: () => Promise.resolve({ intro_markdown: '', slots: [], meals: [meal] }) }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Dinner' }))
+    const panel = await screen.findByRole('dialog', { name: 'Dinner' })
+
+    expect(within(panel).getByLabelText('Lead for Dinner')).toBeTruthy()
+    expect(within(panel).getByText('Helping cook')).toBeTruthy()
+    expect(within(panel).getByText('Washing up')).toBeTruthy()
   })
 })

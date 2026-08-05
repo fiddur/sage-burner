@@ -30,7 +30,7 @@ const stub = (over: Partial<InvitesApi> = {}): InvitesApi => ({
 
 const renderPage = (api: InvitesApi, roles: ('admin' | 'member')[] = ['admin']) =>
   render(
-    <ViewerProvider viewer={{ status: 'signed-in', account: { id: 'a-1', name: null, roles } }}>
+    <ViewerProvider viewer={{ status: 'signed-in', account: { id: 'a-1', name: null, avatar: null, roles } }}>
       <AdminInvites api={api} />
     </ViewerProvider>,
   )
