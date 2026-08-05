@@ -129,6 +129,39 @@ describe('PATCH /api/events/:id/welcome', () => {
     }
   })
 
+  it('refuses rewriting a burn that has ended, however approved the member', async () => {
+    // #218. This was the one member-facing write keyed by a bare id that never looked
+    // at `end_date`, so any approved member could rewrite a finished burn's welcome
+    // text indefinitely — years later, on the page a past burn's link still opens.
+    const server = await build('2026-09-01')
+    const over = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
+    const cookie = await givenAccount(['member', 'admin'])
+
+    const response = await setWelcome(server, cookie, over, { welcome_markdown: 'rewritten' })
+
+    expect(response.statusCode).toBe(404)
+    const [row] = await db().select().from(event).where(eq(event.id, over))
+    expect(row?.welcome_markdown).toBe('')
+  })
+
+  it('still rewrites one that has not ended, including while it is running', async () => {
+    // The passing sibling, and it pins the boundary that matters: the guard is
+    // `openEvent`, so a burn in progress is still editable. A check against
+    // `start_date` would pass the refusal above and break the burn everyone is at.
+    const server = await build('2026-08-03')
+    const running = await givenEvent({
+      slug: 'summer-2026',
+      start_date: '2026-08-01',
+      end_date: '2026-08-05',
+    })
+    const cookie = await givenAccount(['member'])
+
+    const response = await setWelcome(server, cookie, running, { welcome_markdown: 'still ours' })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().event.welcome_markdown).toBe('still ours')
+  })
+
   it('refuses a stranger and an account with no roles', async () => {
     const server = await build()
     const id = await givenEvent({ slug: 'summer-2026', start_date: '2026-08-01', end_date: '2026-08-05' })
