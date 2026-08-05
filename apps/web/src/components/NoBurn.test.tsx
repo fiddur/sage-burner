@@ -30,8 +30,26 @@ const renderIt = (choice: BurnChoice, viewer: Viewer = MEMBER) =>
 
 const LOADING: BurnChoice = { status: 'loading', burns: [], selected: undefined }
 const NONE: BurnChoice = { status: 'ready', burns: [], selected: undefined }
+const FAILED: BurnChoice = { status: 'failed', burns: [], selected: undefined }
 
 describe('NoBurn', () => {
+  it('says the fetch failed rather than telling a member they are coming to nothing', () => {
+    // #193. A failed fetch and "you have joined no burn" both left the selector empty,
+    // so the copy made a claim about the *reader* that was false whenever the request
+    // was the thing that broke — and sent them to a page that could not help.
+    renderIt(FAILED)
+
+    expect(screen.getByRole('alert').textContent).toContain('Could not load your burns')
+    expect(screen.queryByText(/not coming to a burn/)).toBeNull()
+  })
+
+  it('says the same to an organiser, the failure not being about who is reading it', () => {
+    renderIt(FAILED, ORGANISER)
+
+    expect(screen.getByRole('alert').textContent).toContain('Could not load your burns')
+    expect(screen.queryByText(/no burn planned/)).toBeNull()
+  })
+
   it('waits rather than claiming there is no burn while the burns are still arriving', async () => {
     // The bug this component was extracted for. The burns are fetched once for the
     // whole session, so a page mounted before they land saw no selected burn and

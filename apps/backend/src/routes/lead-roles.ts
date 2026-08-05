@@ -23,6 +23,7 @@ import { account, attendance, event, leadRole, leadRoleMember } from '../db/sche
 import { noStore } from '../http.ts'
 import { attendanceFor } from './attendance.ts'
 import { copySourcesFor } from './copy-sources.ts'
+import { openEvent, todayIso } from './events.ts'
 
 export interface LeadRoleDeps extends GuardDeps {
   now?: () => Date
@@ -117,7 +118,7 @@ const rolesFor = async (db: Database, eventId: string): Promise<LeadRole[]> => {
   }))
 }
 
-const roleOr404 = async (db: Database, id: string) => {
+const roleRow = async (db: Database, id: string) => {
   const [row] = await db.select().from(leadRole).where(eq(leadRole.id, id)).limit(1)
   return row
 }
@@ -134,6 +135,25 @@ const roleOr404 = async (db: Database, id: string) => {
 export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps) => {
   const { db, sessions, now = () => new Date(), notify = async () => undefined } = deps
   const { requireApproved } = createGuards({ db, sessions })
+
+  /**
+   * The role, if its burn has not ended.
+   *
+   * The rule every member-facing write keyed by a bare id is scoped by, resolved from
+   * the row — `openEvent`, not `activeEvent`, because the register is filled in months
+   * ahead. A finished burn's register is the record of who looked after what, and an
+   * id noted while it was current should not still be a way to rewrite it.
+   *
+   * The README said this was already so (#219). It was not: the register was the one
+   * bare-id family with no such check, while `places.ts`, `sessions.ts` and `meals.ts`
+   * all had one.
+   */
+  const openRole = async (id: string) => {
+    const row = await roleRow(db, id)
+    if (row === undefined) return undefined
+
+    return (await openEvent(db, todayIso(now), row.event_id)) === undefined ? undefined : row
+  }
 
   /**
    * Tell somebody, unless they did it themselves.
@@ -212,7 +232,7 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
       const parsed = leadRoleUpdateSchema.safeParse(request.body)
       if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
 
-      const existing = await roleOr404(db, request.params.id)
+      const existing = await openRole(request.params.id)
       if (existing === undefined) return reply.code(404).send(errorResponse('not_found'))
 
       // `set({})` is not valid SQL, so an empty body reads instead of writing. A
@@ -234,6 +254,13 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
     { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)
+
+      // Read before the delete purely for the scope check: this route had no lookup
+      // at all, deleting straight from the id, so it was the one write here that the
+      // `openRole` sweep could not reach by replacing a call.
+      if ((await openRole(request.params.id)) === undefined) {
+        return reply.code(404).send(errorResponse('not_found'))
+      }
 
       const deleted = await db
         .delete(leadRole)
@@ -261,7 +288,7 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
       const parsed = leadRoleLeadSchema.safeParse(request.body)
       if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
 
-      const existing = await roleOr404(db, request.params.id)
+      const existing = await openRole(request.params.id)
       if (existing === undefined) return reply.code(404).send(errorResponse('not_found'))
 
       let leadAttendanceId: string | null = null
@@ -311,7 +338,7 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
       const parsed = leadRoleTeamSchema.safeParse(request.body)
       if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
 
-      const existing = await roleOr404(db, request.params.id)
+      const existing = await openRole(request.params.id)
       if (existing === undefined) return reply.code(404).send(errorResponse('not_found'))
 
       const attendanceId = await attendanceFor(db, existing.event_id, parsed.data.account_id)
@@ -345,7 +372,7 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
     async (request, reply) => {
       void noStore(reply)
 
-      const existing = await roleOr404(db, request.params.id)
+      const existing = await openRole(request.params.id)
       if (existing === undefined) return reply.code(404).send(errorResponse('not_found'))
 
       const attendanceId = await attendanceFor(db, existing.event_id, request.params.accountId)

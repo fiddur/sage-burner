@@ -115,9 +115,12 @@ describe('the burn choice', () => {
     expect(getMyBurns).not.toHaveBeenCalled()
   })
 
-  it('is ready rather than stuck when the fetch fails', async () => {
-    // Each page reports its own failure to load; the bar showing an empty selector
-    // forever would be a second, worse way of saying the same thing.
+  it('settles on failed rather than on ready with nothing, when the fetch fails', async () => {
+    // #193. It settled on `ready` with an empty list, which is indistinguishable from
+    // somebody who has joined no burn — so `NoBurn` told them "you are not coming to a
+    // burn yet", a claim about *them*, and pointed them at a page that would not help.
+    // Still settled rather than stuck: sitting on "loading" forever would leave every
+    // burn-scoped page saying nothing at all.
     render(
       <ViewerProvider viewer={MEMBER}>
         <FetchedBurnProvider api={{ getMyBurns: () => Promise.reject(new Error('nope')) }}>
@@ -126,7 +129,7 @@ describe('the burn choice', () => {
       </ViewerProvider>,
     )
 
-    await waitFor(() => expect(screen.getByText(/^ready:/).textContent).toBe('ready::none'))
+    await waitFor(() => expect(screen.getByText(/^failed:/).textContent).toBe('failed::none'))
   })
 
   it('offers an organiser a burn nobody has joined', async () => {

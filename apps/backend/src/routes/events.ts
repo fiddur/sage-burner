@@ -152,6 +152,14 @@ export const registerEventRoutes = (
       const parsed = eventWelcomeUpdateSchema.safeParse(request.body)
       if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
 
+      // Scoped like every other member-facing write keyed by a bare id (#218). Without
+      // it any approved member could rewrite a finished burn's welcome text
+      // indefinitely — the one route in this family that took an id and never looked
+      // at `end_date`.
+      if ((await openEvent(db, todayIso(now), request.params.id)) === undefined) {
+        return reply.code(404).send(errorResponse('not_found'))
+      }
+
       const [updated] = await db
         .update(event)
         .set(parsed.data)

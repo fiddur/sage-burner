@@ -1049,6 +1049,36 @@ describe('Schedule', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
 
+  it('stops asking to withdraw once you detour through edit', async () => {
+    // #208: `confirming` is local state and nothing reset it, so 🗑️ then ✏️ then
+    // Cancel came back to a "Withdraw it?" nobody was still asking — one click from
+    // taking a dream off the grid, with its helpers and hearts.
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Withdraw Cacao ceremony' }))
+    expect(screen.getByRole('button', { name: 'Really withdraw Cacao ceremony' })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Cacao ceremony' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.queryByRole('button', { name: 'Really withdraw Cacao ceremony' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Withdraw Cacao ceremony' })).toBeTruthy()
+  })
+
+  it('still asks before withdrawing when nobody detoured anywhere', async () => {
+    // The passing sibling: resetting on every render would pass the test above and
+    // make the confirmation unreachable.
+    const withdrawSession = vi.fn<ScheduleApi['withdrawSession']>(() => Promise.resolve(undefined))
+    renderPage(stub({ withdrawSession }, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Withdraw Cacao ceremony' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Really withdraw Cacao ceremony' }))
+
+    await waitFor(() => expect(withdrawSession).toHaveBeenCalledWith('s-1'))
+  })
+
   it('keeps a refused edit open, with the edits still in the fields', async () => {
     renderPage(
       stub({ updateSession: () => Promise.reject(apiError(400, 'bad_request', 'That will not do.')) }, [

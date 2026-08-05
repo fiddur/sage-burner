@@ -1009,8 +1009,10 @@ are about. Everything a signed-in member looks at names its burn in the path —
 the selector in the bar is what supplies the id.
 
 The routes that take a bare id instead (`/api/places/:id`, `/api/sessions/:id`,
-`/api/roles/:id`) resolve the burn from the row and refuse one that has **ended**,
-through `openEvent`. Not `activeEvent`: the selector offers every burn still to
+`/api/roles/:id`, `/api/meals/:id`) resolve the burn from the row and refuse one that
+has **ended**, through `openEvent`. So does `/api/events/:id/welcome`, which is keyed
+by the burn itself. The register and the welcome text were the two this sentence
+described before they did it (#218, #219). Not `activeEvent`: the selector offers every burn still to
 come, so a dream can be offered for the one after next and a grid laid out months
 ahead. What is closed is the archive.
 

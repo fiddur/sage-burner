@@ -33,7 +33,10 @@ import {
  */
 
 const SECRET = 's'.repeat(40)
-const NOW = '2026-08-04T00:00:00.000Z'
+// Before the default burn rather than after it. The fixture's burn ran 2026-08-01 and
+// the clock said the 4th, so every write test in this file was writing to a burn that
+// had already ended — which nothing refused until #219 added the guard.
+const NOW = '2026-07-02T00:00:00.000Z'
 
 let handle: DbHandle | undefined
 let app: FastifyInstance | undefined
@@ -832,5 +835,65 @@ describe('telling somebody a role moved', () => {
 
     expect(response.statusCode).toBe(200)
     expect(response.json().role.lead?.account_id).toBe(ada.id)
+  })
+})
+
+describe('a burn that has ended', () => {
+  /** A burn whose last day is behind the clock, with a role already on its register. */
+  const setUp = async () => {
+    const server = await build()
+    const over = await givenEvent('Last summer', '2026-06-01')
+    const ada = await givenAccount(['member'], 'Ada')
+    await givenComing(over, ada.id)
+    const id = (await add(server, ada.cookie, over)).json().role.id
+
+    return { server, over, ada, id }
+  }
+
+  it('still lets the register be added to — only the bare-id writes are scoped', async () => {
+    // The passing sibling for the refusals below, and it names the limit of the fix:
+    // `POST /events/:eventId/roles` is keyed by the burn rather than by a role, and
+    // #219 was about the four routes that resolve the burn from a row. Adding to a
+    // finished burn's register is its own question (#218's family), not this one.
+    const { server, over, ada } = await setUp()
+
+    expect((await add(server, ada.cookie, over, { title: 'Another' })).statusCode).toBe(201)
+  })
+
+  it('refuses every write keyed by the role itself', async () => {
+    // The README said this was already so. It was not — the register was the one
+    // bare-id family with no `openEvent` check, so a finished burn's record of who
+    // looked after what stayed rewritable by anybody with a role id.
+    const { server, ada, id } = await setUp()
+
+    expect((await edit(server, ada.cookie, id, { title: 'Renamed' })).statusCode).toBe(404)
+    expect((await setLead(server, ada.cookie, id, { account_id: ada.id })).statusCode).toBe(404)
+    expect((await joinTeam(server, ada.cookie, id, ada.id)).statusCode).toBe(404)
+    expect((await remove(server, ada.cookie, id)).statusCode).toBe(404)
+  })
+
+  it('leaves the record alone when a write is refused', async () => {
+    const { server, ada, id } = await setUp()
+
+    await edit(server, ada.cookie, id, { title: 'Renamed' })
+    await remove(server, ada.cookie, id)
+
+    const [row] = await db().select().from(leadRole).where(eq(leadRole.id, id))
+    expect(row?.title).not.toBe('Renamed')
+  })
+
+  it('takes all four on a burn that has not ended', async () => {
+    // The other half of the sibling rule: a guard that refused everything would pass
+    // the refusals above and break the app.
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAccount(['member'], 'Ada')
+    await givenComing(eventId, ada.id)
+    const id = (await add(server, ada.cookie, eventId)).json().role.id
+
+    expect((await edit(server, ada.cookie, id, { title: 'Renamed' })).statusCode).toBe(200)
+    expect((await setLead(server, ada.cookie, id, { account_id: ada.id })).statusCode).toBe(200)
+    expect((await joinTeam(server, ada.cookie, id, ada.id)).statusCode).toBe(200)
+    expect((await remove(server, ada.cookie, id)).statusCode).toBe(204)
   })
 })
