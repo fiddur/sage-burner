@@ -14,10 +14,10 @@ import type { GuardDeps } from '../auth/guards.ts'
 import type { Database } from '../db/index.ts'
 
 import { createGuards } from '../auth/guards.ts'
+import { viewerFor } from '../auth/viewer.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
 import { place, session } from '../db/schema.ts'
 import { noStore } from '../http.ts'
-import { viewerFor } from './auth.ts'
 import { openEvent, todayIso } from './events.ts'
 
 export interface SessionDeps extends GuardDeps {

@@ -7,9 +7,9 @@ import type { GuardDeps } from '../auth/guards.ts'
 import type { PushDeps } from '../push/push.ts'
 
 import { createGuards } from '../auth/guards.ts'
+import { viewerFor } from '../auth/viewer.ts'
 import { noStore } from '../http.ts'
 import { forgetSubscription, rememberSubscription, vapidKeysFor } from '../push/push.ts'
-import { viewerFor } from './auth.ts'
 
 export interface PushRouteDeps extends GuardDeps {
   push: PushDeps

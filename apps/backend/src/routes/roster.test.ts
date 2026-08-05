@@ -8,10 +8,10 @@ import type { DbHandle } from '../db/index.ts'
 
 import { createApp } from '../app.ts'
 import { createSessions } from '../auth/session.ts'
+import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, accountRole, attendance, attendanceHelping, event, eventOption } from '../db/schema.ts'
-import { SESSION_COOKIE } from './auth.ts'
 
 /**
  * The organiser's list of who is coming, and recording that they have paid.

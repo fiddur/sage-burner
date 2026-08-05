@@ -7,10 +7,10 @@ import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
 
+import { viewerFor } from '../auth/viewer.ts'
 import { application, inviteToken } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 import { defaultExpiry, mintToken } from '../invites.ts'
-import { viewerFor } from './auth.ts'
 
 export interface ApplicationReviewDeps extends GuardDeps {
   now?: () => Date
