@@ -234,6 +234,34 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
     move(dream.id, { time_slot_end: end })
   }
 
+  /**
+   * Exactly one thing is being dragged, so starting either drag ends the other.
+   *
+   * They were two independent states, and nothing cleared either when a drag was
+   * abandoned — dropping outside every target fires no `drop`. So an abandoned dream
+   * drag left `dragged` set, and the next meal dropped in a lane found it and moved
+   * the *dream* there instead. The kitchen's rule held only for a first drag.
+   */
+  const dragDream = (id: string) => {
+    setDragged(id)
+    setDraggedMeal(undefined)
+  }
+
+  const dragMeal = (block: MealBlock) => {
+    setDraggedMeal(block)
+    setDragged(undefined)
+  }
+
+  // `dragend` fires on the source whether the drag ended in a drop or was abandoned,
+  // so nothing stale survives to be found by a drop that has nothing to do with it —
+  // text dragged in from elsewhere, say. Bound on each chip rather than on the grid:
+  // it does not reach an ancestor here, which a probe established rather than the
+  // spec, so the placement is load-bearing.
+  const endDrag = () => {
+    setDragged(undefined)
+    setDraggedMeal(undefined)
+  }
+
   const blocks = meals.flatMap((meal) => mealBlocks(meal))
   const shownMeal = meals.find((meal) => meal.id === openedMeal)
 
@@ -290,7 +318,8 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
           dreams={unscheduled}
           names={names}
           busy={busy}
-          onDragStart={setDragged}
+          onDragStart={dragDream}
+          onDragEnd={endDrag}
           onOpen={(id) => setOpened({ kind: 'dream', id, editing: false })}
           onOffer={() =>
             setOpened({ kind: 'new', place_id: null, time_slot_start: null, time_slot_end: null })
@@ -310,7 +339,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
           places={places}
           blocks={blocks}
           onOpenMeal={setOpenedMeal}
-          onDragMeal={setDraggedMeal}
+          onDragMeal={dragMeal}
           onDropInKitchen={(row) => {
             const to = draggedMeal && mealMovedTo(draggedMeal.part, row)
             setDraggedMeal(undefined)
@@ -319,7 +348,8 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
           dreams={sessions}
           names={names}
           busy={busy}
-          onDragStart={setDragged}
+          onDragStart={dragDream}
+          onDragEnd={endDrag}
           onOpen={(id) => setOpened({ kind: 'dream', id, editing: false })}
           onOfferAt={(row, placeId) =>
             setOpened({
@@ -478,6 +508,7 @@ const Chip = ({
   busy,
   resizable,
   onDragStart,
+  onDragEnd,
   onOpen,
   onSupport,
   onResize,
@@ -488,6 +519,7 @@ const Chip = ({
   /** Only in the grid: there are no rows to pull against in the pool. */
   resizable: boolean
   onDragStart: (id: string) => void
+  onDragEnd: () => void
   onOpen: (id: string) => void
   onSupport: (id: string, supporting: boolean) => void
   onResize: (dream: Session, byRows: number) => void
@@ -522,6 +554,7 @@ const Chip = ({
         dragEvent.dataTransfer?.setData('text/plain', dream.id)
         onDragStart(dream.id)
       }}
+      onDragEnd={onDragEnd}
       onClick={() => {
         if (dragging.current) return
         onOpen(dream.id)
@@ -645,6 +678,7 @@ const Pool = ({
   names,
   busy,
   onDragStart,
+  onDragEnd,
   onOpen,
   onOffer,
   onSupport,
@@ -655,6 +689,7 @@ const Pool = ({
   names: ReadonlyMap<string, string | null>
   busy: boolean
   onDragStart: (id: string) => void
+  onDragEnd: () => void
   onOpen: (id: string) => void
   onOffer: () => void
   onSupport: (id: string, supporting: boolean) => void
@@ -686,6 +721,7 @@ const Pool = ({
           busy={busy}
           resizable={false}
           onDragStart={onDragStart}
+          onDragEnd={onDragEnd}
           onOpen={onOpen}
           onSupport={onSupport}
           onResize={onResize}
@@ -709,6 +745,7 @@ const Timetable = ({
   busy,
   blocks,
   onDragStart,
+  onDragEnd,
   onOpen,
   onOfferAt,
   onOpenMeal,
@@ -725,6 +762,7 @@ const Timetable = ({
   names: ReadonlyMap<string, string | null>
   busy: boolean
   onDragStart: (id: string) => void
+  onDragEnd: () => void
   onOpen: (id: string) => void
   onOfferAt: (row: string, placeId: string) => void
   onOpenMeal: (mealId: string) => void
@@ -811,6 +849,7 @@ const Timetable = ({
                               busy={busy}
                               resizable
                               onDragStart={onDragStart}
+                              onDragEnd={onDragEnd}
                               onOpen={onOpen}
                               onSupport={onSupport}
                               onResize={onResize}
@@ -830,6 +869,7 @@ const Timetable = ({
                   busy={busy}
                   onOpenMeal={onOpenMeal}
                   onDragMeal={onDragMeal}
+                  onDragEnd={onDragEnd}
                   onDrop={() => onDropInKitchen(row)}
                 />
               )}
@@ -903,6 +943,7 @@ const KitchenCell = ({
   busy,
   onOpenMeal,
   onDragMeal,
+  onDragEnd,
   onDrop,
 }: {
   cell: LaneCell | undefined
@@ -910,6 +951,7 @@ const KitchenCell = ({
   busy: boolean
   onOpenMeal: (mealId: string) => void
   onDragMeal: (block: MealBlock) => void
+  onDragEnd: () => void
   onDrop: () => void
 }) => {
   if (cell === undefined || cell.kind === 'covered') return null
@@ -940,6 +982,7 @@ const KitchenCell = ({
                   dragEvent.dataTransfer?.setData('text/plain', block.id)
                   onDragMeal(block)
                 }}
+                onDragEnd={onDragEnd}
               >
                 <button
                   type="button"

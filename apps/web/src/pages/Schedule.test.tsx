@@ -1235,3 +1235,97 @@ describe('the kitchen', () => {
     expect(screen.queryByRole('button', { name: /Change how long/ })).toBeNull()
   })
 })
+
+describe('a drag that was abandoned', () => {
+  const aMeal = (): Meal => ({
+    id: 'm-1',
+    event_id: 'e-1',
+    date: '2026-08-01',
+    at: '18:00',
+    label: 'Dinner',
+    kind: 'meal',
+    food_idea: '',
+    lead: null,
+    helpers: [],
+    cleanup: [],
+  })
+
+  const both = (over: Partial<ScheduleApi>) =>
+    stub({ getMeals: () => Promise.resolve({ intro_markdown: '', slots: [], meals: [aMeal()] }), ...over }, [
+      aDream({ id: 's-1', title: 'Sunrise yoga' }),
+    ])
+
+  /**
+   * Dropping outside every target fires no `drop`, so an abandoned drag used to
+   * leave its id behind. The next drop of the *other* kind then found it: a meal
+   * dropped in a lane moved the abandoned dream instead, which is the kitchen's own
+   * rule failing on the second drag rather than the first.
+   */
+  it('does not let an abandoned dream drag be moved by a later meal drop', async () => {
+    const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'x' }) }),
+    )
+    const updateMeal = vi.fn<ScheduleApi['updateMeal']>(() => Promise.resolve({ meal: aMeal() }))
+    renderPage(both({ updateSession, updateMeal }))
+
+    fireEvent.dragStart(await screen.findByLabelText('Move Sunrise yoga'))
+    fireEvent.dragStart(screen.getByLabelText('Move Dinner'))
+    fireEvent.drop(cell('10:00', 0))
+
+    expect(updateSession).not.toHaveBeenCalled()
+    expect(updateMeal).not.toHaveBeenCalled()
+  })
+
+  it('does not let an abandoned meal drag be moved by a later dream drop', async () => {
+    const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'x' }) }),
+    )
+    const updateMeal = vi.fn<ScheduleApi['updateMeal']>(() => Promise.resolve({ meal: aMeal() }))
+    renderPage(both({ updateSession, updateMeal }))
+
+    fireEvent.dragStart(await screen.findByLabelText('Move Dinner'))
+    fireEvent.dragStart(screen.getByLabelText('Move Sunrise yoga'))
+    fireEvent.drop(cell('10:00', 2))
+
+    expect(updateMeal).not.toHaveBeenCalled()
+    expect(updateSession).not.toHaveBeenCalled()
+  })
+
+  it('forgets a drag that ended without a drop', async () => {
+    const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'x' }) }),
+    )
+    renderPage(both({ updateSession }))
+
+    const chip = await screen.findByLabelText('Move Sunrise yoga')
+    fireEvent.dragStart(chip)
+    fireEvent.dragEnd(chip)
+    fireEvent.drop(cell('10:00', 0))
+
+    expect(updateSession).not.toHaveBeenCalled()
+  })
+
+  it('still moves a dream on an ordinary drag and drop', async () => {
+    // The passing sibling for all three: clearing too eagerly would make the grid
+    // undraggable while satisfying every test above.
+    const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'x' }) }),
+    )
+    renderPage(both({ updateSession }))
+
+    fireEvent.dragStart(await screen.findByLabelText('Move Sunrise yoga'))
+    fireEvent.drop(cell('10:00', 0))
+
+    await waitFor(() => expect(updateSession).toHaveBeenCalled())
+  })
+
+  it('still moves a meal on an ordinary drag and drop', async () => {
+    const updateMeal = vi.fn<ScheduleApi['updateMeal']>(() => Promise.resolve({ meal: aMeal() }))
+    renderPage(both({ updateMeal }))
+
+    fireEvent.dragStart(await screen.findByLabelText('Move Dinner'))
+    fireEvent.drop(cell('14:00', 2))
+
+    await waitFor(() => expect(updateMeal).toHaveBeenCalledWith('m-1', { date: '2026-08-01', at: '14:00' }))
+  })
+})
