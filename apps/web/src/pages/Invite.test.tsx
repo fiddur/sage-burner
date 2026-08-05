@@ -1,4 +1,4 @@
-import type { InviteState } from '@sage-burner/shared'
+import type { Attendance, Event, EventOptionTaken, InviteState } from '@sage-burner/shared'
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -12,11 +12,55 @@ import { Invite } from './Invite.tsx'
 
 afterEach(cleanup)
 
+const aBurn = (over: Partial<Event> = {}): Event => ({
+  id: 'e-1',
+  name: 'Summer burn',
+  slug: 'summer-burn',
+  start_date: '2026-08-01',
+  end_date: '2026-08-03',
+  start_time: '16:00',
+  end_time: '12:00',
+  welcome_markdown: '',
+  member_cap: 42,
+  created_at: '2026-07-02T00:00:00.000Z',
+  ...over,
+})
+
+const anAttendance = (over: Partial<Attendance> = {}): Attendance => ({
+  id: 'att-1',
+  event_id: 'e-1',
+  account_id: 'a-1',
+  joined_at: '2026-07-02T00:00:00.000Z',
+  arrival_date: '2026-08-01',
+  departure_date: '2026-08-03',
+  lodging_option_id: null,
+  helping_option_ids: [],
+  helping_other: null,
+  notes: null,
+  payment_status: 'unpaid',
+  payment_date: null,
+  ...over,
+})
+
+/**
+ * No burn on offer by default, so the tests that predate #224 see the form they were
+ * written against. `withBurn` is what turns the checkbox and the stay questions on.
+ */
 const stub = (over: Partial<InviteApi> = {}): InviteApi => ({
   getInviteState: () => Promise.resolve({ status: 'outstanding', name: null }),
   redeemInvite: () => Promise.reject(new Error('redeemInvite is not stubbed here')),
+  getActiveEvent: () => Promise.resolve({ event: null }),
+  getEventOptions: () => Promise.resolve({ options: [] }),
+  updateMyStay: () => Promise.reject(new Error('updateMyStay is not stubbed here')),
   ...over,
 })
+
+const withBurn = (over: Partial<InviteApi> = {}, options: EventOptionTaken[] = []): InviteApi =>
+  stub({
+    getActiveEvent: () => Promise.resolve({ event: aBurn() }),
+    getEventOptions: () => Promise.resolve({ options }),
+    ...over,
+  })
 
 /** Renders the shared viewer's state, so a test can see it change. */
 const ViewerProbe = () => <p data-testid="viewer">{useViewer().status}</p>
@@ -52,7 +96,7 @@ describe('Invite', () => {
   })
 
   it('sends what was filled in', async () => {
-    const redeemInvite = vi.fn(() => Promise.resolve({ viewer: null }))
+    const redeemInvite = vi.fn(() => Promise.resolve({ viewer: null, attendance: null }))
     renderPage(stub({ redeemInvite }))
 
     await screen.findByRole('button', { name: 'Join' })
@@ -66,6 +110,8 @@ describe('Invite', () => {
         password: 'a-password',
         name: 'Fredrik',
         allergies_notes: 'peanuts',
+        // No burn on offer, so nothing to join — said explicitly rather than left off.
+        join_event_id: null,
       }),
     )
   })
@@ -73,7 +119,7 @@ describe('Invite', () => {
   it('sends null rather than an empty string when allergies are left blank', async () => {
     // The column is nullable and "not said" has one representation; an empty
     // string would read as "asked and answered nothing".
-    const redeemInvite = vi.fn(() => Promise.resolve({ viewer: null }))
+    const redeemInvite = vi.fn(() => Promise.resolve({ viewer: null, attendance: null }))
     renderPage(stub({ redeemInvite }))
 
     await screen.findByRole('button', { name: 'Join' })
@@ -89,7 +135,7 @@ describe('Invite', () => {
   })
 
   it('confirms once they are in', async () => {
-    renderPage(stub({ redeemInvite: () => Promise.resolve({ viewer: null }) }))
+    renderPage(stub({ redeemInvite: () => Promise.resolve({ viewer: null, attendance: null }) }))
 
     await screen.findByRole('button', { name: 'Join' })
     complete()
@@ -108,6 +154,7 @@ describe('Invite', () => {
         redeemInvite: () =>
           Promise.resolve({
             viewer: { account_id: 'a-1', name: null, avatar: null, roles: ['member' as const] },
+            attendance: null,
           }),
       }),
     )
@@ -135,7 +182,7 @@ describe('Invite', () => {
   }
 
   it('takes a password of any shape, since what makes a good one is theirs to decide', async () => {
-    const redeemInvite = vi.fn(() => Promise.resolve({ viewer: null }))
+    const redeemInvite = vi.fn(() => Promise.resolve({ viewer: null, attendance: null }))
     renderPage(stub({ redeemInvite }))
 
     await screen.findByRole('button', { name: 'Join' })
@@ -149,7 +196,7 @@ describe('Invite', () => {
   })
 
   it('asks for a password, a blank one being no password at all', async () => {
-    const redeemInvite = vi.fn(() => Promise.resolve({ viewer: null }))
+    const redeemInvite = vi.fn(() => Promise.resolve({ viewer: null, attendance: null }))
     renderPage(stub({ redeemInvite }))
 
     await screen.findByRole('button', { name: 'Join' })
@@ -162,7 +209,7 @@ describe('Invite', () => {
   })
 
   it('never asks how to reach them, the email it just took being the answer', async () => {
-    const redeemInvite = vi.fn(() => Promise.resolve({ viewer: null }))
+    const redeemInvite = vi.fn(() => Promise.resolve({ viewer: null, attendance: null }))
     renderPage(stub({ redeemInvite }))
 
     await screen.findByRole('button', { name: 'Join' })
@@ -238,7 +285,7 @@ describe('Invite', () => {
   })
 
   it('refuses a blank name', async () => {
-    const redeemInvite = vi.fn(() => Promise.resolve({ viewer: null }))
+    const redeemInvite = vi.fn(() => Promise.resolve({ viewer: null, attendance: null }))
     renderPage(stub({ redeemInvite }))
 
     await screen.findByRole('button', { name: 'Join' })
@@ -367,5 +414,182 @@ describe('the name the applicant already gave', () => {
     })
 
     expect(screen.getByLabelText('Your name', { exact: false })).toHaveProperty('value', 'Ada Lovelace')
+  })
+})
+
+/**
+ * #224. Almost everybody spending an invite is joining the burn that is coming, so
+ * the form says so — and asks for the stay details in the same breath, rather than
+ * leaving a new member to find a second page.
+ */
+describe('joining the upcoming burn from the form', () => {
+  it('offers it by name, already ticked', async () => {
+    renderPage(withBurn())
+
+    const box = await screen.findByLabelText(/I am coming to Summer burn/)
+    expect(box).toHaveProperty('checked', true)
+  })
+
+  it('asks nothing about a burn when there is none coming', async () => {
+    // A fresh installation, or the gap after the last one ends. `activeEvent` is
+    // deliberately null there rather than falling back to a past burn.
+    renderPage(stub())
+
+    await screen.findByRole('button', { name: 'Join' })
+    expect(screen.queryByLabelText(/I am coming to/)).toBeNull()
+    expect(screen.queryByLabelText('Arriving')).toBeNull()
+  })
+
+  it('sends the burn and the stay together', async () => {
+    const redeemInvite = vi.fn(() => Promise.resolve({ viewer: null, attendance: anAttendance() }))
+    const updateMyStay = vi.fn(() => Promise.resolve({ attendance: anAttendance() }))
+    renderPage(withBurn({ redeemInvite, updateMyStay }))
+
+    await screen.findByRole('button', { name: 'Join' })
+    complete()
+    fill('Anything else', 'arriving by train')
+    join()
+
+    await waitFor(() =>
+      expect(redeemInvite).toHaveBeenCalledWith('a-token', expect.objectContaining({ join_event_id: 'e-1' })),
+    )
+    await waitFor(() =>
+      expect(updateMyStay).toHaveBeenCalledWith(
+        'e-1',
+        expect.objectContaining({ notes: 'arriving by train' }),
+      ),
+    )
+  })
+
+  it('starts the stay at the whole burn, which is what almost everybody means', async () => {
+    renderPage(withBurn())
+
+    expect(await screen.findByLabelText('Arriving')).toHaveProperty('value', '2026-08-01')
+    expect(screen.getByLabelText('Leaving')).toHaveProperty('value', '2026-08-03')
+  })
+
+  it('asks nothing about the stay once the box is unticked', async () => {
+    // An organiser who is setting the burn up without attending it.
+    const redeemInvite = vi.fn(() => Promise.resolve({ viewer: null, attendance: null }))
+    renderPage(withBurn({ redeemInvite }))
+
+    fireEvent.click(await screen.findByLabelText(/I am coming to Summer burn/))
+    expect(screen.queryByLabelText('Arriving')).toBeNull()
+
+    complete()
+    join()
+
+    await waitFor(() =>
+      expect(redeemInvite).toHaveBeenCalledWith('a-token', expect.objectContaining({ join_event_id: null })),
+    )
+  })
+
+  it('saves nothing about a stay the server did not create', async () => {
+    // The burn ended while the form was open. The account is made, the join is
+    // skipped, and a stay update against a burn nobody joined would only 404.
+    const updateMyStay = vi.fn(() => Promise.resolve({ attendance: anAttendance() }))
+    renderPage(
+      withBurn({ redeemInvite: () => Promise.resolve({ viewer: null, attendance: null }), updateMyStay }),
+    )
+
+    await screen.findByRole('button', { name: 'Join' })
+    complete()
+    join()
+
+    expect((await screen.findByRole('status')).textContent).toContain('which burn you are coming to')
+    expect(updateMyStay).not.toHaveBeenCalled()
+    // And quietly: not reaching for `attendance.event_id` at all. Dropping the null
+    // guard still calls nothing — it throws on the property first — so a test that
+    // only counted calls would pass against it and report a failure to the reader.
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('says they are in even when the details did not save', async () => {
+    // The token is spent and cannot be spent again, so the second write failing must
+    // not read as a signup that failed.
+    renderPage(
+      withBurn({
+        redeemInvite: () => Promise.resolve({ viewer: null, attendance: anAttendance() }),
+        updateMyStay: () => Promise.reject(apiError(500, 'internal_error', 'nope')),
+      }),
+    )
+
+    await screen.findByRole('button', { name: 'Join' })
+    complete()
+    join()
+
+    expect((await screen.findByRole('status')).textContent).toContain('on the list')
+    expect((await screen.findByRole('alert')).textContent).toContain('did not save')
+  })
+
+  it('refuses a departure before the arrival without spending the invite', async () => {
+    const redeemInvite = vi.fn(() => Promise.resolve({ viewer: null, attendance: anAttendance() }))
+    renderPage(withBurn({ redeemInvite }))
+
+    await screen.findByRole('button', { name: 'Join' })
+    complete()
+    fireEvent.input(screen.getByLabelText('Leaving'), { target: { value: '2026-07-30' } })
+    join()
+
+    expect((await screen.findByRole('alert')).textContent).toContain('before your arrival')
+    expect(redeemInvite).not.toHaveBeenCalled()
+  })
+
+  it('still signs them up when the burn cannot be fetched at all', async () => {
+    // The invite is what this page is for. Somebody who cannot be offered a burn can
+    // still become a member and pick one afterwards.
+    const redeemInvite = vi.fn(() => Promise.resolve({ viewer: null, attendance: null }))
+    renderPage(
+      stub({ getActiveEvent: () => Promise.reject(apiError(500, 'internal_error', 'nope')), redeemInvite }),
+    )
+
+    await screen.findByRole('button', { name: 'Join' })
+    expect(screen.queryByLabelText(/I am coming to/)).toBeNull()
+    complete()
+    join()
+
+    await waitFor(() => expect(redeemInvite).toHaveBeenCalled())
+  })
+
+  it('shows the lodging list, and marks a full one full', async () => {
+    renderPage(
+      withBurn({}, [
+        {
+          id: 'o-1',
+          event_id: 'e-1',
+          kind: 'lodging',
+          order: 0,
+          label: 'Temple mattress',
+          capacity: 2,
+          taken: 2,
+        },
+        {
+          id: 'o-2',
+          event_id: 'e-1',
+          kind: 'lodging',
+          order: 1,
+          label: 'Own tent',
+          capacity: null,
+          taken: 0,
+        },
+        { id: 'o-3', event_id: 'e-1', kind: 'helping', order: 0, label: 'Sauna', capacity: null, taken: 0 },
+      ]),
+    )
+
+    const sleeping = await screen.findByLabelText(/Where are you sleeping/)
+    expect(sleeping.textContent).toContain('Temple mattress — full')
+    expect(sleeping.textContent).toContain('Own tent')
+    // The helping list is checkboxes, not options in the sleeping select.
+    expect(sleeping.textContent).not.toContain('Sauna')
+    expect(screen.getByLabelText('Sauna')).toBeTruthy()
+  })
+
+  it('offers no link to the lodging list, which nobody here can reach yet', async () => {
+    // The account does not exist while this form is on screen, so `/options` is a
+    // page the reader would be bounced off.
+    renderPage(withBurn())
+
+    await screen.findByLabelText(/Where are you sleeping/)
+    expect(screen.queryByText(/edit lodging alternatives/)).toBeNull()
   })
 })

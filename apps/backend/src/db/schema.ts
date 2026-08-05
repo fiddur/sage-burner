@@ -929,6 +929,9 @@ export const mealRole = sqliteTable(
  * `select().from(account)` is on the path of nearly every request. A blob there would
  * be read by all of them to be used by none.
  *
+ * Sparse — an account without a picture has no row here, and the circle falls back to
+ * initials. Every read of it is therefore a `leftJoin`.
+ *
  * `updated_at` is what the URL carries as a version, so a new picture is a new URL and
  * no cache has to be persuaded. Sized down in the browser before it is sent, so
  * nothing here decodes an image — there is no image library in this process and no

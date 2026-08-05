@@ -2,9 +2,37 @@ import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
+import { isApiError } from '../api/client.ts'
 import { AVATAR_TYPE, resizedAvatar } from '../avatar.ts'
 import { useSetViewer, useViewer } from '../viewer.tsx'
 import { Avatar } from './Avatar.tsx'
+
+/**
+ * Why the picture did not go up.
+ *
+ * The format advice is only right for a failure that is actually about the file, and
+ * it is expensive to get wrong: it sends somebody with a perfectly good photo off to
+ * re-export it, and the second attempt fails the same way.
+ *
+ * Anything that is not an `ApiError` never reached the network — `resizedAvatar`
+ * throws when the browser cannot decode what was chosen, which is the one case the
+ * format advice fits. `415` is the server saying the same thing about the bytes it
+ * received.
+ *
+ * Exported to be tested: a component test cannot reach these branches, because
+ * `resizedAvatar` throws in happy-dom before any request is made.
+ */
+export const messageForFailure = (failure: unknown): string => {
+  if (!isApiError(failure)) return 'Could not read that picture. A JPEG, PNG or WebP works best.'
+  if (failure.status === 415) return 'That is not a picture we can use. A JPEG, PNG or WebP works best.'
+  if (failure.status === 401) return 'You have been signed out. Sign in again and have another go.'
+  if (failure.status === 413) return 'That picture is too large to send.'
+  // Its own message already says to check the connection, and that advice belongs
+  // here and nowhere else — every other branch is answering a response that arrived.
+  if (failure.code === 'network') return failure.message
+
+  return 'Could not save that picture. Please try again.'
+}
 
 /**
  * Choosing a picture for the circle, or going back to initials.
@@ -35,8 +63,8 @@ export const AvatarField = ({ api }: { api: Pick<ApiClient, 'removeMyAvatar' | '
     try {
       const { avatar } = await api.setMyAvatar(await resizedAvatar(file))
       withAvatar(avatar)
-    } catch {
-      setError('Could not use that picture. A JPEG, PNG or WebP works best.')
+    } catch (failure) {
+      setError(messageForFailure(failure))
     } finally {
       setBusy(false)
     }
@@ -48,8 +76,12 @@ export const AvatarField = ({ api }: { api: Pick<ApiClient, 'removeMyAvatar' | '
     try {
       await api.removeMyAvatar()
       withAvatar(null)
-    } catch {
-      setError('Could not remove that picture.')
+    } catch (failure) {
+      setError(
+        isApiError(failure) && failure.status === 401
+          ? 'You have been signed out. Sign in again and have another go.'
+          : 'Could not remove that picture. Please try again.',
+      )
     } finally {
       setBusy(false)
     }

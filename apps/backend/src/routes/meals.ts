@@ -19,7 +19,7 @@ import type { Database } from '../db/index.ts'
 
 import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
-import { isForeignKeyViolation } from '../db/errors.ts'
+import { isForeignKeyViolation, isUniqueViolation } from '../db/errors.ts'
 import { account, attendance, event, meal, mealRole, mealSlot } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 import { attendanceFor } from './attendance.ts'
@@ -232,8 +232,17 @@ export const registerMealRoutes = (
    * Taking a meal's lead, handing it to somebody, or vacating it.
    *
    * One route for all three, like the lead-roles register: they differ only in whose
-   * id is in the body, and `null` vacates. Whoever held it is deleted first, so the
-   * unique index is never the thing that has to be worked around.
+   * id is in the body, and `null` vacates.
+   *
+   * The delete and the insert are one synchronous transaction, so `meal_role_lead_idx`
+   * is never the thing a caller has to work around. Awaited separately (#214) there
+   * was a window between them, and a second request arriving inside it would insert a
+   * lead the first had not yet replaced.
+   *
+   * Untested, and stated as a window rather than an observation: six concurrent
+   * handovers through `inject` do not reproduce it, so a test asserting the fix would
+   * pass against the code it exists to reject. The transaction closes the window at
+   * no cost; that is the whole of the claim.
    */
   app.put<{ Params: { id: string } }>(
     '/api/meals/:id/lead',
@@ -266,11 +275,16 @@ export const registerMealRoutes = (
         if (taking === undefined) return reply.code(400).send(errorResponse('bad_request'))
       }
 
-      await db.delete(mealRole).where(and(eq(mealRole.meal_id, existing.id), eq(mealRole.role, 'lead')))
+      const handedTo = taking
+      db.transaction((tx) => {
+        tx.delete(mealRole)
+          .where(and(eq(mealRole.meal_id, existing.id), eq(mealRole.role, 'lead')))
+          .run()
 
-      if (taking !== undefined) {
-        await db.insert(mealRole).values({ meal_id: existing.id, attendance_id: taking, role: 'lead' })
-      }
+        if (handedTo !== undefined) {
+          tx.insert(mealRole).values({ meal_id: existing.id, attendance_id: handedTo, role: 'lead' }).run()
+        }
+      })
 
       return answer(reply, existing.id)
     },
@@ -361,12 +375,28 @@ export const registerMealRoutes = (
       const existing = await openMeal(request.params.id)
       if (existing === undefined) return reply.code(404).send(errorResponse('not_found'))
 
+      // A sitting the burn does not cover disappears from the schedule, whose rows
+      // span the burn's own hours, while still showing on the Meals page — two views
+      // disagreeing about whether it exists. Dreams may sit outside the grid because
+      // the pool holds whatever it does not draw; meals have no pool.
+      if (parsed.data.date !== undefined) {
+        const burn = await burnFor(db, existing.event_id)
+        if (burn === undefined) return reply.code(404).send(errorResponse('not_found'))
+        if (parsed.data.date < burn.start_date || parsed.data.date > burn.end_date) {
+          return reply.code(400).send(errorResponse('bad_request'))
+        }
+      }
+
       if (Object.keys(parsed.data).length > 0) {
         try {
           await db.update(meal).set(parsed.data).where(eq(meal.id, request.params.id))
-        } catch {
+        } catch (failure) {
           // Onto a day that already has one by that name, which the unique index
           // refuses. A 409: the body is well formed and the burn already has one.
+          // Anything else is ours, and saying "there is already one of those" about a
+          // database that fell over would send the caller after the wrong thing.
+          if (!isUniqueViolation(failure)) throw failure
+
           return reply.code(409).send(errorResponse('conflict'))
         }
       }
@@ -415,7 +445,14 @@ export const registerMealAdminRoutes = (app: FastifyInstance, { db }: MealDeps) 
     async (request, reply) => {
       void noStore(reply)
 
-      return answerSlots(request.params.eventId)
+      // Looked up rather than selected straight by `event_id`, which answered
+      // `200 {slots: []}` for any id at all — including one that had never existed.
+      // Its siblings 404, and whoever reads one route to learn how the others behave
+      // should not be told something different by each.
+      const burn = await burnFor(db, request.params.eventId)
+      if (burn === undefined) return reply.code(404).send(errorResponse('not_found'))
+
+      return answerSlots(burn.id)
     },
   )
 
@@ -537,6 +574,8 @@ export const registerMealAdminRoutes = (app: FastifyInstance, { db }: MealDeps) 
       // A second sitting of the same name on the same day, which the unique index
       // refuses. A 409 rather than a 400: the body is well formed and the burn simply
       // already has one.
+      if (!isUniqueViolation(failure)) throw failure
+
       return reply.code(409).send(errorResponse('conflict'))
     }
 

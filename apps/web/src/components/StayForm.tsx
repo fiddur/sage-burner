@@ -1,12 +1,13 @@
 import type { Attendance, EventOption } from '@sage-burner/shared'
 
-import { MAX_NOTES, MAX_OPTION_LABEL } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
+import { stayFromAttendance, stayProblem, stayUpdate } from '../stay.ts'
 import { FormError, useFormError } from './FormError.tsx'
+import { StayFields } from './StayFields.tsx'
 
 /**
  * The details that belong to one burn rather than to the person.
@@ -36,38 +37,24 @@ export const StayForm = ({
   taken?: Readonly<Record<string, number>>
   onSaved: (saved: Attendance) => void
 }) => {
-  const [arrival, setArrival] = useState(attendance.arrival_date ?? '')
-  const [departure, setDeparture] = useState(attendance.departure_date ?? '')
-  const [lodging, setLodging] = useState(attendance.lodging_option_id ?? '')
-  const [helping, setHelping] = useState<readonly string[]>(attendance.helping_option_ids)
-  const [helpingOther, setHelpingOther] = useState(attendance.helping_other ?? '')
-  const [notes, setNotes] = useState(attendance.notes ?? '')
+  const [draft, setDraft] = useState(() => stayFromAttendance(attendance))
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useFormError()
 
-  const blankToNull = (value: string) => (value.trim() === '' ? null : value.trim())
-
   const save = async () => {
     setError(undefined)
     setSaved(false)
-    // Checked here as well as server-side, so the message names the problem
-    // rather than arriving as a bare 400.
-    if (arrival !== '' && departure !== '' && departure < arrival) {
-      setError('Your departure is before your arrival.')
+
+    const problem = stayProblem(draft)
+    if (problem !== undefined) {
+      setError(problem)
       return
     }
 
     setSaving(true)
     try {
-      const { attendance: updated } = await api.updateMyStay(eventId, {
-        arrival_date: blankToNull(arrival),
-        departure_date: blankToNull(departure),
-        lodging_option_id: lodging === '' ? null : lodging,
-        helping_option_ids: [...helping],
-        helping_other: blankToNull(helpingOther),
-        notes: blankToNull(notes),
-      })
+      const { attendance: updated } = await api.updateMyStay(eventId, stayUpdate(draft))
       onSaved(updated)
       setSaved(true)
     } catch (failure) {
@@ -89,119 +76,15 @@ export const StayForm = ({
         void save()
       }}
     >
-      <label class="field">
-        <span>Arriving</span>
-        <input
-          type="date"
-          name="arrival_date"
-          // Bound to its partner so the picker cannot offer an inverted range at
-          // all. The server still refuses one — a `max` is a hint a keyboard can
-          // walk straight past — but this is the difference between being told
-          // afterwards and never being able to say it.
-          max={departure === '' ? undefined : departure}
-          value={arrival}
-          onInput={(inputEvent) => setArrival(inputEvent.currentTarget.value)}
-        />
-      </label>
-
-      <label class="field">
-        <span>Leaving</span>
-        <input
-          type="date"
-          name="departure_date"
-          min={arrival === '' ? undefined : arrival}
-          value={departure}
-          onInput={(inputEvent) => setDeparture(inputEvent.currentTarget.value)}
-        />
-      </label>
-
-      <label class="field">
-        <span>Where are you sleeping?</span>
-        <select
-          name="lodging_option_id"
-          value={lodging}
-          onChange={(changeEvent) => setLodging(changeEvent.currentTarget.value)}
-        >
-          <option value="">Not decided yet</option>
-          {lodgingOptions.map((option) => {
-            // Disabled once it is full — unless it is the one they already have,
-            // which would otherwise be unselectable and silently reset to "not
-            // decided" the next time this form is saved.
-            //
-            // Compared against what is *saved*, not what is currently picked:
-            // against the live value, clicking away from a full option and back
-            // would find it disabled, and a native select will not let you choose
-            // a disabled option. You would be stuck until you reloaded.
-            const full = option.capacity !== null && (taken[option.id] ?? 0) >= option.capacity
-            const theirs = option.id === attendance.lodging_option_id
-
-            return (
-              <option key={option.id} value={option.id} disabled={full && !theirs}>
-                {option.label}
-                {option.capacity === null
-                  ? ''
-                  : full
-                    ? ' — full'
-                    : ` — ${option.capacity - (taken[option.id] ?? 0)} left`}
-              </option>
-            )
-          })}
-        </select>
-      </label>
-
-      {/* The list itself is the burn's shared furniture, so the way to change it sits
-          beside the question it answers rather than on a page of its own. Offered to
-          everyone here, because everyone here may edit it — the page refuses anyone
-          who may not, and so does the API. */}
-      <p class="form-note">
-        <a href="/options">(edit lodging alternatives)</a>
-      </p>
-
-      <fieldset class="field">
-        <legend>What would you like to help with?</legend>
-
-        {helpingOptions.length === 0 && (
-          <p class="form-note">Nothing listed yet — write it in below if you already know.</p>
-        )}
-
-        {helpingOptions.map((option) => (
-          <label key={option.id} class="field-inline">
-            <input
-              type="checkbox"
-              checked={helping.includes(option.id)}
-              onChange={(changeEvent) =>
-                setHelping(
-                  changeEvent.currentTarget.checked
-                    ? [...helping, option.id]
-                    : helping.filter((id) => id !== option.id),
-                )
-              }
-            />
-            <span>{option.label}</span>
-          </label>
-        ))}
-
-        <label class="field">
-          <span>Something else</span>
-          <input
-            type="text"
-            name="helping_other"
-            maxLength={MAX_OPTION_LABEL}
-            value={helpingOther}
-            onInput={(inputEvent) => setHelpingOther(inputEvent.currentTarget.value)}
-          />
-        </label>
-      </fieldset>
-
-      <label class="field">
-        <span>Anything else we should know?</span>
-        <textarea
-          name="notes"
-          maxLength={MAX_NOTES}
-          value={notes}
-          onInput={(inputEvent) => setNotes(inputEvent.currentTarget.value)}
-        />
-      </label>
+      <StayFields
+        draft={draft}
+        onChange={setDraft}
+        lodgingOptions={lodgingOptions}
+        helpingOptions={helpingOptions}
+        lodgingTaken={taken}
+        heldLodging={attendance.lodging_option_id}
+        offerListEditing
+      />
 
       {saved && (
         <p class="form-note" role="status">

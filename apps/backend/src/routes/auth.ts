@@ -99,7 +99,6 @@ export const registerAuthRoutes = (app: FastifyInstance, { db, config, sessions,
         password_hash: account.password_hash,
       })
       .from(account)
-      // Left: most accounts have no picture, and the circle falls back to initials.
       .leftJoin(accountAvatar, eq(accountAvatar.account_id, account.id))
       .where(eq(account.email, parsed.data.email))
       .limit(1)

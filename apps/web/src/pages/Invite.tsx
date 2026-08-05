@@ -1,17 +1,32 @@
-import type { InviteState } from '@sage-burner/shared'
+import type { Event, EventOptionTaken, InviteState } from '@sage-burner/shared'
 
 import { MAX_NOTES, MAX_PERSON_NAME } from '@sage-burner/shared'
 import { useEffect, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
+import type { StayDraft } from '../stay.ts'
 
 import { isApiError } from '../api/client.ts'
 import { FormError, useFormError } from '../components/FormError.tsx'
+import { StayFields } from '../components/StayFields.tsx'
+import { stayForBurn, stayProblem, stayUpdate } from '../stay.ts'
 import { useSetViewer, useViewer } from '../viewer.tsx'
 
-export type InviteApi = Pick<ApiClient, 'getInviteState' | 'redeemInvite'>
+export type InviteApi = Pick<
+  ApiClient,
+  'getActiveEvent' | 'getEventOptions' | 'getInviteState' | 'redeemInvite' | 'updateMyStay'
+>
 
-type Loaded = { status: 'loading' } | { status: 'ready'; state: InviteState } | { status: 'failed' }
+/** The burn the form offers to join, and the two lists its stay questions need. */
+interface Upcoming {
+  event: Event
+  options: readonly EventOptionTaken[]
+}
+
+type Loaded =
+  | { status: 'loading' }
+  | { status: 'ready'; state: InviteState; upcoming: Upcoming | undefined }
+  | { status: 'failed' }
 
 /**
  * The failures redeeming can produce, each wanting different behaviour.
@@ -66,22 +81,50 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
   const [allergies, setAllergies] = useState('')
+  const [coming, setComing] = useState(true)
+  const [stay, setStay] = useState<StayDraft | undefined>(undefined)
   const [error, setError] = useFormError()
   const [sending, setSending] = useState(false)
-  const [done, setDone] = useState(false)
+  const [done, setDone] = useState<'joined' | 'member' | undefined>(undefined)
 
   useEffect(() => {
     const controller = new AbortController()
 
-    api
-      .getInviteState(token, controller.signal)
-      .then((state) => {
+    /**
+     * The burn to offer, or nothing.
+     *
+     * `/events/active` and its options are both public — the second for the reason
+     * the places are, that nothing in it is about a person — so the form can name the
+     * burn and draw its lodging list without this page's unauthenticated route
+     * learning to hand out anything new.
+     *
+     * Its own failure is swallowed rather than failing the page: the invite is what
+     * this page is for, and somebody who cannot be offered a burn can still become a
+     * member and pick one afterwards.
+     */
+    const upcomingBurn = async (): Promise<Upcoming | undefined> => {
+      try {
+        const { event } = await api.getActiveEvent(controller.signal)
+        if (event === null) return undefined
+
+        const { options } = await api.getEventOptions(event.id, controller.signal)
+        return { event, options }
+      } catch {
+        return undefined
+      }
+    }
+
+    Promise.all([api.getInviteState(token, controller.signal), upcomingBurn()])
+      .then(([state, upcoming]) => {
         if (controller.signal.aborted) return
 
-        setLoaded({ status: 'ready', state })
+        setLoaded({ status: 'ready', state, upcoming })
         // What they typed on the application. Asked for it twice, a form reads as
         // one that was not listening the first time.
         if (state.name !== null) setName(state.name)
+        if (upcoming !== undefined) {
+          setStay(stayForBurn(upcoming.event.start_date, upcoming.event.end_date))
+        }
       })
       .catch(() => {
         if (!controller.signal.aborted) setLoaded({ status: 'failed' })
@@ -90,28 +133,32 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
     return () => controller.abort()
   }, [api, token])
 
+  const offered = loaded.status === 'ready' ? loaded.upcoming : undefined
+
+  const joining = offered !== undefined && coming
+
+  /** What is wrong with the form, in words, or nothing — nothing being the signal to send. */
+  const problem = (): string | undefined => {
+    if (email.trim() === '') return 'Please give us an email address — it becomes your login.'
+    if (name.trim() === '') return 'Please tell us your name.'
+    if (password === '') return 'Please choose a password.'
+
+    return joining && stay !== undefined ? stayProblem(stay) : undefined
+  }
+
   const submit = async () => {
-    setError(undefined)
-    if (email.trim() === '') {
-      setError('Please give us an email address — it becomes your login.')
-      return
-    }
-    if (name.trim() === '') {
-      setError('Please tell us your name.')
-      return
-    }
-    if (password === '') {
-      setError('Please choose a password.')
-      return
-    }
+    const wrong = problem()
+    setError(wrong)
+    if (wrong !== undefined) return
 
     setSending(true)
     try {
-      const { viewer: signedIn } = await api.redeemInvite(token, {
+      const { viewer: signedIn, attendance } = await api.redeemInvite(token, {
         email,
         password,
         name: name.trim(),
         allergies_notes: allergies.trim() === '' ? null : allergies.trim(),
+        join_event_id: joining ? offered.event.id : null,
       })
       // The cookie is set server-side, but the shared viewer is populated once on
       // mount and not refetched on client-side navigation — so without this the
@@ -125,7 +172,21 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
           roles: signedIn.roles,
         })
       }
-      setDone(true)
+
+      // A second write, and deliberately not part of the redemption: that one spends
+      // a token which cannot be spent again, so nothing optional may be able to roll
+      // it back. Its failure is reported where it happens and leaves somebody signed
+      // in and on the list — the details are the one thing here they can come back
+      // and change.
+      if (attendance !== null && stay !== undefined) {
+        try {
+          await api.updateMyStay(attendance.event_id, stayUpdate(stay))
+        } catch {
+          setError('You are in, but those burn details did not save. You can set them on your own page.')
+        }
+      }
+
+      setDone(attendance === null ? 'member' : 'joined')
     } catch (failure) {
       setError(messageForFailure(failure))
     } finally {
@@ -133,14 +194,18 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
     }
   }
 
-  if (done) {
+  if (done !== undefined) {
     return (
       <section class="page">
         <h1>Welcome</h1>
         <p role="status">
-          You are in, and signed in. Next you can say which burn you are coming to, and fill in the details
-          for it.
+          {done === 'joined'
+            ? 'You are in, signed in, and on the list. Everything you just filled in can be changed later on your own page.'
+            : 'You are in, and signed in. Next you can say which burn you are coming to, and fill in the details for it.'}
         </p>
+
+        <FormError error={error} />
+
         <p class="home-actions">
           <a href="/">Go to the start page</a>
         </p>
@@ -271,6 +336,37 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
         <p class="form-note">
           We cook together, so this is read by whoever plans the meals. You can change it later.
         </p>
+
+        {offered !== undefined && (
+          <>
+            <hr />
+
+            {/* Ticked, because almost everybody spending an invite is coming to the
+                burn that is next — but offered rather than assumed: being on the list
+                is a commitment, and an organiser setting a burn up need not be
+                attending it. */}
+            <label class="field-inline">
+              <input
+                type="checkbox"
+                checked={coming}
+                onChange={(event) => setComing(event.currentTarget.checked)}
+              />
+              <span>
+                I am coming to {offered.event.name} ({offered.event.start_date} → {offered.event.end_date})
+              </span>
+            </label>
+
+            {coming && stay !== undefined && (
+              <StayFields
+                draft={stay}
+                onChange={setStay}
+                lodgingOptions={offered.options.filter((option) => option.kind === 'lodging')}
+                helpingOptions={offered.options.filter((option) => option.kind === 'helping')}
+                lodgingTaken={Object.fromEntries(offered.options.map((option) => [option.id, option.taken]))}
+              />
+            )}
+          </>
+        )}
 
         <FormError error={error} />
 

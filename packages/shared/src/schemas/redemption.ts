@@ -2,8 +2,9 @@ import { z } from 'zod'
 
 import { inviteStatuses } from '../enums.ts'
 import { MAX_CONTACT, MAX_NOTES, MAX_PERSON_NAME } from '../limits.ts'
-import { emailSchema, newPasswordSchema } from './auth.ts'
-import { nonEmptyText, optionalText } from './common.ts'
+import { emailSchema, meResponseSchema, newPasswordSchema } from './auth.ts'
+import { idSchema, nonEmptyText, optionalText } from './common.ts'
+import { attendanceSchema } from './membership.ts'
 
 /**
  * What a visitor may do with an invite before it is spent.
@@ -58,11 +59,37 @@ export const redeemRequestSchema = z
     // but still requires the key, and the point here is a form that never asks.
     contact: optionalText(MAX_CONTACT).optional(),
     allergies_notes: optionalText(MAX_NOTES),
+    /**
+     * The burn they ticked on the form, if there was one to tick.
+     *
+     * Almost everybody spending an invite is joining the burn that is coming, so the
+     * form offers it rather than leaving them to find their way to a second page
+     * (#224). An id rather than a flag, so what the form named is what gets joined —
+     * the server resolving "the upcoming one" a second time could pick a different
+     * burn from the one somebody read.
+     *
+     * Failing to join never fails the redemption: the token is spent and cannot be
+     * spent again, so a half-finished signup strands somebody with no way to finish.
+     * The response says which happened.
+     */
+    join_event_id: idSchema.nullable().optional(),
   })
   .strict()
 
+/**
+ * What redeeming produced: the viewer, and the burn they joined if they joined one.
+ *
+ * `attendance` is null for an unticked box and for a burn that ended while the form
+ * was open — the page tells those apart by whether it offered one, and says something
+ * different for each.
+ */
+export const redeemResponseSchema = meResponseSchema.extend({
+  attendance: attendanceSchema.nullable(),
+})
+
 export type InviteState = z.infer<typeof inviteStateSchema>
 export type RedeemRequest = z.infer<typeof redeemRequestSchema>
+export type RedeemResponse = z.infer<typeof redeemResponseSchema>
 
 /**
  * What a *client* may send. `contact` is optional here and present-but-nullable

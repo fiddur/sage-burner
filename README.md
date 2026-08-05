@@ -1284,8 +1284,14 @@ which is worse than the rows it would be excepting.
 Generating **adds what is missing and touches nothing else**, so it is safe to press
 again after adding a slot or moving the dates. It **never removes** one: somebody may
 already have signed up to cook it. A sitting already exists when the burn has one that
-day with that name, which a unique index says too — so a meal that has been moved
-stays moved.
+day with that name, which a unique index says too — so a sitting moved to another
+**time** stays put when generating runs again.
+
+Moved to another **day** it does not, and that follows from the same rule rather than
+working around it: dragging Saturday's dinner to Sunday leaves Saturday without one,
+and the slot still says Saturday has a dinner, so the next run makes it. Recognising a
+sitting wherever it went would mean carrying the slot id on the meal — the link back
+that "copied with no link back" below deliberately does without.
 
 The slot's values are **copied with no link back**. Renaming a slot leaves what it has
 already made alone, the same call the repeatable dream makes about its copies.
@@ -2136,8 +2142,27 @@ could not usefully do otherwise. It is that the client has nothing to do with th
 difference at this point — the page has already read the status, and by the time
 it POSTs all three mean the same thing, that this link cannot be spent.
 
-**No `attendance` row is created.** Redeeming makes you a member of the community;
-saying which burn you are coming to is a separate act, and #76 owns it.
+**The form offers the upcoming burn, ticked** (#224). Almost everybody spending an
+invite is coming to the burn that is next, so the form says so by name and asks for
+the stay — arrival, lodging, helping — in the same breath, rather than leaving a new
+member to find a second page. Offered rather than assumed: being on the list is a
+commitment, and an organiser setting a burn up need not be attending it, so the box
+unticks and the stay questions go with it. No burn coming, no checkbox.
+
+It needs no new disclosure to do this. `/api/events/active` and
+`/api/events/:eventId/options` are **already public** — the second for the reason the
+places are, that nothing in it is about a person — so an unauthenticated form can name
+the burn and draw its lodging list without the invite route learning to hand out
+anything new. Both reads fail soft: somebody who cannot be offered a burn can still
+become a member and pick one afterwards.
+
+**Joining happens after the transaction, never inside it.** That transaction spends a
+token which cannot be spent again, so nothing optional may be given the power to roll
+it back. A burn that ended while the form was open leaves the account made and the
+response's `attendance` null, and the page says which happened. The stay details are a
+second write for the same reason — their failure reads "you are in, but…" rather than
+as a signup that failed. Redeeming with the box unticked still creates no `attendance`
+at all: being a member and coming to a particular burn stay separate acts.
 
 A signed-in visitor is not offered the form — redeeming would create a second
 account for the same human, and the page cannot tell whether that was meant.

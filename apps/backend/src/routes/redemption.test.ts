@@ -13,7 +13,7 @@ import { verifyPassword } from '../auth/password.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, application, attendance, inviteToken } from '../db/schema.ts'
+import { account, application, attendance, event, inviteToken } from '../db/schema.ts'
 
 /**
  * Redeeming an invite: the single funnel both membership paths converge on.
@@ -99,6 +99,24 @@ const givenInvite = async (
       created_by: admin,
     })
   return token
+}
+
+const givenBurn = async (over: { end_date?: string; start_date?: string } = {}) => {
+  const id = randomUUID()
+  await db()
+    .insert(event)
+    .values({
+      id,
+      name: 'Summer burn',
+      slug: `summer-${id}`,
+      start_date: over.start_date ?? '2026-08-01',
+      end_date: over.end_date ?? '2026-08-03',
+      start_time: '16:00',
+      end_time: '12:00',
+      member_cap: 42,
+      created_at: NOW,
+    })
+  return id
 }
 
 const applicant = {
@@ -542,13 +560,89 @@ describe('redeeming', () => {
     expect(row).toBeDefined()
   })
 
-  it('does not create an attendance — coming to a burn is a separate act', async () => {
+  it('does not create an attendance when the form offered no burn to tick', async () => {
+    const server = await build()
+    await givenBurn()
+    const token = await givenInvite()
+
+    const response = await redeem(server, token)
+
+    expect(response.json().attendance).toBeNull()
+    expect(await db().select().from(attendance)).toHaveLength(0)
+  })
+})
+
+/**
+ * #224. Almost everybody spending an invite is joining the burn that is coming, so
+ * the form offers it — and the redemption may not be put at risk by the offer.
+ */
+describe('joining the ticked burn while redeeming', () => {
+  it('puts them on the list for it, and says so', async () => {
+    const server = await build()
+    const burn = await givenBurn()
+    const token = await givenInvite()
+
+    const response = await redeem(server, token, { ...applicant, join_event_id: burn })
+
+    expect(response.statusCode).toBe(201)
+    expect(response.json().attendance).toMatchObject({ event_id: burn, payment_status: 'unpaid' })
+    expect(await db().select().from(attendance)).toHaveLength(1)
+  })
+
+  it('books the whole burn, the same as the button on the details page', async () => {
+    // One helper behind both doors, so the two cannot write differently shaped rows.
+    const server = await build()
+    const burn = await givenBurn()
+    const token = await givenInvite()
+
+    const response = await redeem(server, token, { ...applicant, join_event_id: burn })
+
+    expect(response.json().attendance).toMatchObject({
+      arrival_date: '2026-08-01',
+      departure_date: '2026-08-03',
+    })
+  })
+
+  it('still makes the account when the burn ended while the form was open', async () => {
+    // The token is spent and cannot be spent again, so refusing here would strand
+    // somebody with no way to finish. The account is made, the join is skipped, and
+    // `attendance: null` is what the page reads to say which happened.
+    const server = await build()
+    const over = await givenBurn({ start_date: '2026-06-01', end_date: '2026-06-03' })
+    const token = await givenInvite()
+
+    const response = await redeem(server, token, { ...applicant, join_event_id: over })
+
+    expect(response.statusCode).toBe(201)
+    expect(response.json().attendance).toBeNull()
+    expect(await db().select().from(account)).toHaveLength(2)
+    expect(await db().select().from(attendance)).toHaveLength(0)
+  })
+
+  it('still makes the account when the id names no burn at all', async () => {
     const server = await build()
     const token = await givenInvite()
 
-    await redeem(server, token)
+    const response = await redeem(server, token, {
+      ...applicant,
+      join_event_id: '2b1f0a9c-0000-4000-8000-000000000000',
+    })
 
-    expect(await db().select().from(attendance)).toHaveLength(0)
+    expect(response.statusCode).toBe(201)
+    expect(response.json().attendance).toBeNull()
+    expect(await db().select().from(account)).toHaveLength(2)
+  })
+
+  it('spends nothing on a burn id that is not an id, and leaves the token alone', async () => {
+    const server = await build()
+    const token = await givenInvite()
+
+    const response = await redeem(server, token, { ...applicant, join_event_id: 'the-summer-one' })
+
+    expect(response.statusCode).toBe(400)
+    expect(await db().select().from(account)).toHaveLength(1)
+    const [invite] = await db().select().from(inviteToken)
+    expect(invite?.used_at).toBeNull()
   })
 })
 
