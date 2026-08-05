@@ -604,9 +604,9 @@ export const session = sqliteTable(
     /**
      * Who runs it — a person, not one of their stays. Null until somebody is handed it.
      *
-     * An `account` rather than an `attendance`, unlike the two tables below, so it
-     * survives a withdrawal for somebody to notice; the routes check they are coming.
-     * No `onDelete`, matching `invite_token.created_by`: #35 owns account deletion.
+     * An `account` rather than an `attendance`, unlike the two tables below: a
+     * withdrawal leaves the name here for somebody to notice. The routes are what
+     * check they are coming. No `onDelete` — #35 owns account deletion.
      */
     facilitator_account_id: text('facilitator_account_id').references(() => account.id),
     description: text('description').notNull().default(''),

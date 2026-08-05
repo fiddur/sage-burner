@@ -41,7 +41,8 @@ const peopleFor = async (db: Database, ids: string[], mine: string | undefined):
   const helpers = new Map<string, Session['helpers']>()
   const support = new Map<string, { count: number; mine: boolean }>()
 
-  // SQLite refuses the `in ()` an empty `inArray` renders to.
+  // Two queries that can only answer nothing. Drizzle renders the empty `inArray`
+  // harmlessly — this skips the round trips, it does not prevent an error.
   if (ids.length === 0) return { helpers, support }
 
   const helperRows = await db

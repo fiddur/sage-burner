@@ -245,6 +245,28 @@ describe('foreign keys', () => {
     expect(handle.db.select().from(session).all()).toHaveLength(1)
   })
 
+  it('keeps a dream’s facilitator when they withdraw from the burn', () => {
+    // A regression guard, not a proof: nothing links the column to an attendance, so
+    // no mutation of the schema kills this. It is here because the obvious "fix" for
+    // a stale facilitator is to make it cascade, and a dream left without whoever was
+    // going to run it is something somebody has to notice rather than tidy away.
+    seedAttendance(ids.attendance, ids.account)
+    handle.db
+      .insert(session)
+      .values({
+        id: 's1',
+        event_id: ids.event,
+        title: 'Cacao ceremony',
+        facilitator_account_id: ids.account,
+        description: '',
+      })
+      .run()
+
+    handle.db.delete(attendance).where(eq(attendance.id, ids.attendance)).run()
+
+    expect(handle.db.select().from(session).all()[0]?.facilitator_account_id).toBe(ids.account)
+  })
+
   it('refuses a second heart from the same person, which is what makes the count sound', () => {
     // The count is derived by reading rows, so "one each" has to hold against a write
     // that skips the API as well as against `onConflictDoNothing`.
