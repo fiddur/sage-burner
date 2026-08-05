@@ -353,7 +353,7 @@ describe('Schedule', () => {
   it('says so when no burn is open, rather than drawing an empty grid', async () => {
     renderPage(stub({}, [], [TEMPLE]), MEMBER, null)
 
-    expect(await screen.findByText(/no burn scheduled/)).toBeTruthy()
+    expect(await screen.findByText(/not coming to a burn yet/)).toBeTruthy()
     expect(document.querySelector('.schedule-grid')).toBeNull()
   })
 

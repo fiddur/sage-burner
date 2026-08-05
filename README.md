@@ -845,6 +845,19 @@ they join one.
 It is hidden when there is nothing to choose between — one burn is the ordinary
 case and a select with a single option is furniture.
 
+**Every burn-scoped page says the same thing when it has no burn**, through `NoBurn`,
+and it says a different thing to each persona because that is what decided the list
+is empty. An organiser is offered every coming burn, so empty means none is planned
+and the fix is theirs — a link to Events. A member is offered the ones they have
+joined, so empty usually means they have not joined one, and the fix is on their own
+page. The old copy said "there is no burn open at the moment" to both, which is a
+claim about the world where only one of them needed a claim about themselves.
+
+It renders "Loading…" while the burns are still arriving, which is the state that
+made this shared rather than copied: the burns are fetched once for the session, so a
+page mounted before they land sees no selected burn and used to state that as fact,
+then correct itself. A flash of a wrong claim is worse than a wait.
+
 The choice is **not persisted**. A reload landing on the soonest burn is the right
 default every time, and a remembered choice would leave somebody looking at last
 month's grid with nothing on screen to say why.

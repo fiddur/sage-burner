@@ -280,6 +280,14 @@ export const memberRosterEntrySchema = rosterEntrySchema.omit({
 })
 
 export const memberRosterResponseSchema = z.object({
+  /**
+   * Nullable for the client, not for the route.
+   *
+   * `GET /api/events/:eventId/members` answers 404 for a burn that is not there, so
+   * the server never sends a null. The page reuses this shape for "no burn selected"
+   * — which the selector decides, not the API — and that is the only thing the
+   * nullability is for.
+   */
   event: eventFields.pick({ id: true, name: true, member_cap: true }).nullable(),
   entries: z.array(memberRosterEntrySchema),
 })

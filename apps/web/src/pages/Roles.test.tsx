@@ -353,7 +353,7 @@ describe('Roles', () => {
   it('says there is nothing to look after when no burn is coming up', async () => {
     renderPage(stub(), ADA, null)
 
-    expect(await screen.findByText(/no burn coming up yet/)).toBeTruthy()
+    expect(await screen.findByText(/not coming to a burn yet/)).toBeTruthy()
   })
 
   it('shows the server’s message when a change is refused', async () => {

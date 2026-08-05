@@ -255,25 +255,27 @@ describe('Options', () => {
     await waitFor(() => expect(reorderEventOptions).toHaveBeenCalledWith('e-1', 'lodging', ['o-2', 'o-1']))
   })
 
-  it('says so when no burn is open, since the lists belong to one', async () => {
+  it('tells an organiser to make a burn, since these lists belong to one', async () => {
     renderPage(stub({}, []), ADMIN, null)
 
-    expect(await screen.findByText(/no burn open/)).toBeTruthy()
+    expect(await screen.findByText(/no burn planned yet/)).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Events' })).toBeTruthy()
     expect(screen.queryByLabelText('New lodging name')).toBeNull()
   })
 
-  it('sends a member to a person rather than to a page they cannot use', async () => {
-    // Creating a burn is admin-only, so the link an admin gets here would answer
-    // "This is an admin page." to a member — a dead end reachable only because
-    // this page was opened to them.
+  it('sends a member to their own page rather than to a page they cannot use', async () => {
+    // Creating a burn is admin-only, so the link an organiser gets here would answer
+    // "This is for organisers." to a member — a dead end. And with the selector, a
+    // member seeing this usually has not joined a burn rather than there being none,
+    // so their own page is both the likelier fix and one they can do themselves.
     renderPage(
       stub({}, []),
       { status: 'signed-in', account: { id: 'a-2', name: null, roles: ['member'] } },
       null,
     )
 
-    expect(await screen.findByText(/Ask someone with admin/)).toBeTruthy()
+    expect(await screen.findByText(/not coming to a burn yet/)).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Your details' })).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'Events' })).toBeNull()
   })
 

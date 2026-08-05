@@ -147,19 +147,23 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
   /**
    * Tell somebody, unless they did it themselves.
    *
-   * Taking a role you want is the common case, and a notification for your own
-   * click is noise that teaches people to ignore the channel. Awaited rather than
-   * fired and forgotten: an unawaited rejection would escape as an unhandled
-   * promise rejection, and `notify` already swallows delivery failure.
+   * Taking a role you want is the common case, and a notification for your own click
+   * is noise that teaches people to ignore the channel. Awaited rather than fired and
+   * forgotten: an unawaited rejection would escape as an unhandled promise rejection,
+   * and `notify` already swallows delivery failure.
+   *
+   * Takes the caller's account id rather than the request, so a handover — which
+   * notifies both ends — resolves the viewer once instead of once per notification.
    */
-  const tell = async (request: FastifyRequest, accountId: string | undefined, message: string) => {
-    if (accountId === undefined) return
-
-    const viewer = await viewerFor(request, { db, sessions })
-    if (viewer?.account_id === accountId) return
+  const tell = async (by: string, accountId: string | undefined, message: string) => {
+    if (accountId === undefined || accountId === by) return
 
     await notify(accountId, message)
   }
+
+  /** Who is asking, for `tell`. Undefined never matches an account id, so it notifies. */
+  const callerId = async (request: FastifyRequest) =>
+    (await viewerFor(request, { db, sessions }))?.account_id ?? ''
 
   app.get<{ Params: { eventId: string } }>(
     '/api/events/:eventId/roles',
@@ -284,17 +288,19 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
         .where(eq(leadRole.id, request.params.id))
 
       // Both ends of the handover, since one write can move a role off one person
-      // and onto another and each of them wants to know.
+      // and onto another and each of them wants to know. The caller is resolved once
+      // for the pair rather than once per notification.
+      const by = await callerId(request)
       const before =
         existing.lead_attendance_id === null
           ? undefined
           : await accountForAttendance(db, existing.lead_attendance_id)
 
       if (before !== undefined && before !== parsed.data.account_id) {
-        await tell(request, before, `You are no longer ${existing.title} lead.`)
+        await tell(by, before, `You are no longer ${existing.title} lead.`)
       }
       if (parsed.data.account_id !== null && parsed.data.account_id !== before) {
-        await tell(request, parsed.data.account_id, `You are now ${existing.title} lead.`)
+        await tell(by, parsed.data.account_id, `You are now ${existing.title} lead.`)
       }
 
       const roles = await rolesFor(db, existing.event_id)
@@ -328,7 +334,11 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
         .values({ role_id: request.params.id, attendance_id: attendanceId })
         .onConflictDoNothing()
 
-      await tell(request, parsed.data.account_id, `You have been added to the ${existing.title} team.`)
+      await tell(
+        await callerId(request),
+        parsed.data.account_id,
+        `You have been added to the ${existing.title} team.`,
+      )
 
       const roles = await rolesFor(db, existing.event_id)
       const role = roles.find((candidate) => candidate.id === request.params.id)
@@ -363,7 +373,11 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
         // somebody who was never on the team is a 204 — and telling them they have
         // been taken off something they were not on is worse than saying nothing.
         if (removed.length > 0) {
-          await tell(request, request.params.accountId, `You have been taken off the ${existing.title} team.`)
+          await tell(
+            await callerId(request),
+            request.params.accountId,
+            `You have been taken off the ${existing.title} team.`,
+          )
         }
       }
 
