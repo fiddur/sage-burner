@@ -204,11 +204,6 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
     // the caller, and reporting it as "could not reach the server" sends whoever
     // reads that to check their wifi.
     // A Blob goes as itself, with its own type. Everything else is JSON.
-    //
-    // Without the distinction an avatar arrived as the string `{}` under a JSON
-    // content type and was refused with 415 — and nothing caught it, because the
-    // backend tests inject raw bytes and the web tests stub the client, so the one
-    // seam where the two meet was tested from neither side.
     const binary = body instanceof Blob
     const payload = body === undefined ? undefined : binary ? body : JSON.stringify(body)
     const contentType = binary ? body.type : 'application/json'

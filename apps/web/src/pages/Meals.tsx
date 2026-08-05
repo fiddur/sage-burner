@@ -235,8 +235,10 @@ const MealTable = ({
             <FoodIdea meal={meal} busy={busy} onIdea={onIdea} />
           </td>
           <td>
-            {/* A chore has nobody cooking, so it has nobody leading the cooking. */}
-            {meal.kind === 'chore' ? (
+            {/* A chore has nobody cooking — unless one is still recorded from before the
+                slot became one, who then needs a way off. The API allows exactly that:
+                vacating stays open where handing over is refused. */}
+            {meal.kind === 'chore' && meal.lead === null ? (
               <span class="form-note">—</span>
             ) : (
               <select
@@ -254,11 +256,12 @@ const MealTable = ({
                       {nameOf(meal.lead)} — no longer coming
                     </option>
                   )}
-                {attendees.map((who) => (
-                  <option key={who.account_id} value={who.account_id}>
-                    {nameOf(who)}
-                  </option>
-                ))}
+                {meal.kind !== 'chore' &&
+                  attendees.map((who) => (
+                    <option key={who.account_id} value={who.account_id}>
+                      {nameOf(who)}
+                    </option>
+                  ))}
               </select>
             )}
           </td>
@@ -269,9 +272,16 @@ const MealTable = ({
               <span class="form-note">—</span>
             </td>
           ) : (
-            <Crew meal={meal} role="helper" viewerId={viewerId} busy={busy} onStand={onStand} />
+            <Crew
+              meal={meal}
+              role="helper"
+              viewerId={viewerId}
+              busy={busy}
+              joinable={meal.kind !== 'chore'}
+              onStand={onStand}
+            />
           )}
-          <Crew meal={meal} role="cleanup" viewerId={viewerId} busy={busy} onStand={onStand} />
+          <Crew meal={meal} role="cleanup" viewerId={viewerId} busy={busy} joinable onStand={onStand} />
         </tr>
       ))}
     </tbody>
@@ -314,12 +324,15 @@ const Crew = ({
   role,
   viewerId,
   busy,
+  joinable,
   onStand,
 }: {
   meal: Meal
   role: 'cleanup' | 'helper'
   viewerId: string | undefined
   busy: boolean
+  /** False for a chore's cooks: whoever is on it may leave, nobody new may join. */
+  joinable: boolean
   onStand: (id: string, role: 'cleanup' | 'helper', joining: boolean) => void
 }) => {
   const crew = role === 'helper' ? meal.helpers : meal.cleanup
@@ -333,15 +346,17 @@ const Crew = ({
           <li key={who.account_id}>{nameOf(who)}</li>
         ))}
       </ul>
-      <button
-        type="button"
-        class="link-button"
-        disabled={busy}
-        aria-label={`${standing ? 'Do not' : 'Help'} ${what} at ${meal.label} on ${meal.date}`}
-        onClick={() => onStand(meal.id, role, !standing)}
-      >
-        {standing ? 'Not me after all' : `I can ${what}`}
-      </button>
+      {(joinable || standing) && (
+        <button
+          type="button"
+          class="link-button"
+          disabled={busy}
+          aria-label={`${standing ? 'Do not' : 'Help'} ${what} at ${meal.label} on ${meal.date}`}
+          onClick={() => onStand(meal.id, role, !standing)}
+        >
+          {standing ? 'Not me after all' : `I can ${what}`}
+        </button>
+      )}
     </td>
   )
 }

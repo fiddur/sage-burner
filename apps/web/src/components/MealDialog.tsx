@@ -105,37 +105,59 @@ export const MealDialog = ({
         />
       </label>
 
-      {(meal.kind !== 'chore' || meal.helpers.length > 0) && (
-        <>
-          <label class="field">
-            <span>Meal lead</span>
-            <select
-              aria-label={`Lead for ${meal.label}`}
-              disabled={busy}
-              value={meal.lead?.account_id ?? ''}
-              onChange={(changeEvent) => onLead(changeEvent.currentTarget.value || null)}
-            >
-              <option value="">Nobody yet</option>
-              {meal.lead !== null &&
-                !attendees.some((who) => who.account_id === meal.lead?.account_id) && (
-                  // They have withdrawn since taking it on. Named rather than left out, or
-                  // the control reads as vacant while somebody is still on it.
-                  <option value={meal.lead.account_id} disabled>
-                    {nameOf(meal.lead)} — no longer coming
-                  </option>
-                )}
-              {attendees.map((who) => (
+      {/*
+        A chore has nobody cooking, so it offers no lead and no cooks — **unless one
+        is still recorded** from before the slot became a chore. Then the control
+        appears so they can get off, which is what the API allows: vacating and
+        standing down stay open where handing over and joining are refused.
+
+        The two are gated separately, deliberately. Tied together, a chore with
+        leftover helpers showed a lead select whose only affirmative action answers
+        400, and a chore with a lead and no helpers offered no way to vacate at all.
+      */}
+      {(meal.kind !== 'chore' || meal.lead !== null) && (
+        <label class="field">
+          <span>Meal lead</span>
+          <select
+            aria-label={`Lead for ${meal.label}`}
+            disabled={busy}
+            value={meal.lead?.account_id ?? ''}
+            onChange={(changeEvent) => onLead(changeEvent.currentTarget.value || null)}
+          >
+            <option value="">Nobody yet</option>
+            {meal.lead !== null &&
+              !attendees.some((who) => who.account_id === meal.lead?.account_id) && (
+                // They have withdrawn since taking it on. Named rather than left out, or
+                // the control reads as vacant while somebody is still on it.
+                <option value={meal.lead.account_id} disabled>
+                  {nameOf(meal.lead)} — no longer coming
+                </option>
+              )}
+            {meal.kind !== 'chore' &&
+              attendees.map((who) => (
                 <option key={who.account_id} value={who.account_id}>
                   {nameOf(who)}
                 </option>
               ))}
-            </select>
-          </label>
-
-          <Crew meal={meal} role="helper" viewerId={viewerId} busy={busy} onStand={onStand} />
-        </>
+          </select>
+          {meal.kind === 'chore' && (
+            <span class="form-note">Nothing is cooked here, so this can only be vacated.</span>
+          )}
+        </label>
       )}
-      <Crew meal={meal} role="cleanup" viewerId={viewerId} busy={busy} onStand={onStand} />
+
+      {(meal.kind !== 'chore' || meal.helpers.length > 0) && (
+        <Crew
+          meal={meal}
+          role="helper"
+          viewerId={viewerId}
+          busy={busy}
+          joinable={meal.kind !== 'chore'}
+          onStand={onStand}
+        />
+      )}
+
+      <Crew meal={meal} role="cleanup" viewerId={viewerId} busy={busy} joinable onStand={onStand} />
 
       <p class="row">
         <button type="button" class="link-button" onClick={onClose}>
@@ -154,12 +176,15 @@ const Crew = ({
   role,
   viewerId,
   busy,
+  joinable,
   onStand,
 }: {
   meal: Meal
   role: 'cleanup' | 'helper'
   viewerId: string | undefined
   busy: boolean
+  /** False for a chore's cooks: whoever is on it may leave, nobody new may join. */
+  joinable: boolean
   onStand: (role: 'cleanup' | 'helper', joining: boolean) => void
 }) => {
   const crew = role === 'helper' ? meal.helpers : meal.cleanup
@@ -178,11 +203,13 @@ const Crew = ({
           ))}
         </ul>
       )}
-      <p class="row">
-        <button type="button" disabled={busy} onClick={() => onStand(role, !standing)}>
-          {standing ? 'Not me after all' : `I can ${what}`}
-        </button>
-      </p>
+      {(joinable || standing) && (
+        <p class="row">
+          <button type="button" disabled={busy} onClick={() => onStand(role, !standing)}>
+            {standing ? 'Not me after all' : `I can ${what}`}
+          </button>
+        </p>
+      )}
     </>
   )
 }

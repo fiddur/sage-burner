@@ -163,3 +163,63 @@ describe('the meal plan', () => {
     )
   })
 })
+
+describe('a chore that still has somebody on it', () => {
+  /**
+   * The slot changed under them. The API keeps both escape hatches open — a lead may
+   * vacate, a cook may stand down — so the page has to offer them, or the promise in
+   * the route's own comment is one nothing can act on.
+   */
+  const chore = (over: Partial<Meal> = {}) =>
+    aMeal({ label: 'Morning cleanup', at: '09:00', kind: 'chore', ...over })
+
+  it('shows a stranded lead, and lets them be vacated', async () => {
+    const setMealLead = vi.fn<MealsApi['setMealLead']>(() => Promise.resolve({ meal: chore() }))
+    renderPage(stub({ setMealLead }, [chore({ lead: { account_id: 'a-1', name: 'Ada' } })]))
+
+    const select = await screen.findByLabelText('Lead for Morning cleanup on 2026-08-01')
+    fireEvent.change(select, { target: { value: '' } })
+
+    await waitFor(() => expect(setMealLead).toHaveBeenCalledWith('m-1', { account_id: null }))
+  })
+
+  it('offers nobody else to hand it to, since the API would refuse', async () => {
+    renderPage(stub({}, [chore({ lead: { account_id: 'a-1', name: 'Ada' } })]))
+
+    const select = await screen.findByLabelText('Lead for Morning cleanup on 2026-08-01')
+
+    // Only "Nobody yet" and the person already on it.
+    expect(select.querySelectorAll('option')).toHaveLength(1)
+  })
+
+  it('lets a stranded cook stand down, and offers nobody the chance to join', async () => {
+    const leaveMealCrew = vi.fn<MealsApi['leaveMealCrew']>(() => Promise.resolve({ meal: chore() }))
+    renderPage(stub({ leaveMealCrew }, [chore({ helpers: [{ account_id: 'a-1', name: 'Ada' }] })]))
+
+    fireEvent.click(await screen.findByLabelText('Do not cook at Morning cleanup on 2026-08-01'))
+
+    await waitFor(() => expect(leaveMealCrew).toHaveBeenCalledWith('m-1', 'helper'))
+  })
+
+  it('offers nobody else the chance to start cooking at one', async () => {
+    // The viewer is not on this crew. Without the distinction, a chore that had one
+    // stranded cook would invite everybody else to join it — which the API answers
+    // with 400.
+    renderPage(stub({}, [chore({ helpers: [{ account_id: 'a-9', name: 'Someone else' }] })]))
+
+    await screen.findByText('Someone else')
+
+    expect(screen.queryByLabelText('Help cook at Morning cleanup on 2026-08-01')).toBeNull()
+  })
+
+  it('offers nothing at all on a chore nobody is on', async () => {
+    // The passing sibling: showing the controls whenever the kind is a chore would
+    // satisfy the three above while putting back the thing they exist to prevent.
+    renderPage(stub({}, [chore()]))
+
+    await screen.findByText('Morning cleanup')
+
+    expect(screen.queryByLabelText('Lead for Morning cleanup on 2026-08-01')).toBeNull()
+    expect(screen.queryByLabelText('Help cook at Morning cleanup on 2026-08-01')).toBeNull()
+  })
+})
