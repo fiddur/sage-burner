@@ -385,8 +385,14 @@ const RoleRow = ({
       <td data-label={COLUMNS.after}>{EFFORT_LABEL[role.effort_after]}</td>
 
       <td data-label="Actions" class="lead-actions">
-        <button type="button" class="link-button" disabled={busy} onClick={onEdit}>
-          Edit
+        <button
+          type="button"
+          class="link-button"
+          disabled={busy}
+          aria-label={`Edit ${role.title}`}
+          onClick={onEdit}
+        >
+          ✏️
         </button>
 
         {confirming ? (

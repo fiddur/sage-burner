@@ -391,6 +391,25 @@ export const createApp = async ({
 
   registerAdminPrefixGuard(app, { db, sessions })
 
+  // One `PushDeps` for the routes that manage subscriptions and the route that
+  // sends. `deliver` is the only part that talks to a push service, and it is
+  // injectable so the suite never does.
+  const push = { db, deliver, now, mintKeys }
+
+  /**
+   * One notification for the three places a pair of hands gets signed up (#247).
+   *
+   * Logged here rather than inside `notifyAccount`, which has no logger and is the
+   * more testable for it, and only when something went wrong.
+   */
+  const tellAccount = async (accountId: string, message: string) => {
+    const counts = await notifyAccount(push, accountId, JSON.stringify({ body: message }))
+
+    if (counts.failed > 0 || counts.gone > 0) app.log.warn({ ...counts }, 'notifying a member')
+
+    return counts
+  }
+
   registerAuthRoutes(app, { db, config, sessions, gate })
   registerPasskeyRoutes(app, { db, config, sessions, now })
   registerAdminRoutes(app, { db, sessions })
@@ -400,17 +419,14 @@ export const createApp = async ({
   registerQuestionRoutes(app, { db, sessions })
   registerPlaceRoutes(app, { db, sessions, now })
   registerAvatarRoutes(app, { db, sessions, now })
-  registerMealRoutes(app, { db, sessions, now })
+  registerMealRoutes(app, { db, sessions, now, notify: tellAccount })
   // Separate registration, not a separate guard: the plan lives under `/api/admin/`,
   // where the prefix hook is the only thing that lets it through. The member-facing
   // meal routes above are outside it.
   registerMealAdminRoutes(app, { db, sessions, now })
-  // One `PushDeps` for the routes that manage subscriptions and the route that
-  // sends. `deliver` is the only part that talks to a push service, and it is
-  // injectable so the suite never does.
-  const push = { db, deliver, now, mintKeys }
 
   registerPushRoutes(app, { db, sessions, push })
+
   registerApplicationRoutes(app, {
     db,
     now,
@@ -431,19 +447,8 @@ export const createApp = async ({
   registerAttendanceRoutes(app, { db, sessions, now })
   registerProfileRoutes(app, { db, sessions, now })
   registerRosterRoutes(app, { db, sessions, now })
-  registerLeadRoleRoutes(app, {
-    db,
-    sessions,
-    now,
-    notify: async (accountId, message) => {
-      const counts = await notifyAccount(push, accountId, JSON.stringify({ body: message }))
-
-      if (counts.failed > 0 || counts.gone > 0) app.log.warn({ ...counts }, 'notifying a member')
-
-      return counts
-    },
-  })
-  registerSessionRoutes(app, { db, sessions, now })
+  registerLeadRoleRoutes(app, { db, sessions, now, notify: tellAccount })
+  registerSessionRoutes(app, { db, sessions, now, notify: tellAccount })
   registerScheduleRoutes(app, { db, now })
 
   const webRoot = config.web_root

@@ -137,12 +137,12 @@ const givenAttending = async (eventId: string, roles: ('admin' | 'member')[] = [
   return who
 }
 
-/** `POST` or `DELETE` on `/api/sessions/:id/helpers/me` or `/support/me`. */
+/** `POST` or `DELETE` on `/api/sessions/:id/support/me`. A heart is always your own. */
 const selfService = (
   server: FastifyInstance,
   cookie: string | undefined,
   id: string,
-  what: 'helpers' | 'support',
+  what: 'support',
   method: 'POST' | 'DELETE',
 ) =>
   server.inject({
@@ -150,6 +150,27 @@ const selfService = (
     url: `/api/sessions/${id}/${what}/me`,
     headers: cookie === undefined ? {} : { cookie },
   })
+
+/**
+ * Offering hands, or taking them back. `about` names somebody other than the
+ * caller — which is the whole of what changed in #247.
+ */
+const helping = (
+  server: FastifyInstance,
+  who: { cookie: string; id: string } | undefined,
+  id: string,
+  method: 'POST' | 'DELETE',
+  about?: string,
+) => {
+  const accountId = about ?? who?.id ?? ''
+
+  return server.inject({
+    method,
+    url: method === 'POST' ? `/api/sessions/${id}/helpers` : `/api/sessions/${id}/helpers/${accountId}`,
+    headers: who === undefined ? {} : { cookie: who.cookie },
+    ...(method === 'POST' ? { payload: { account_id: accountId } } : {}),
+  })
+}
 
 describe('dreams', () => {
   it('is empty before anyone offers one', async () => {
@@ -677,11 +698,11 @@ describe('helping with a dream', () => {
     await db().update(account).set({ name: 'Ada' }).where(eq(account.id, ada.id))
     const id = (await offer(server, ada.cookie, { title: 'Sunrise yoga' })).json().session.id
 
-    const joined = await selfService(server, ada.cookie, id, 'helpers', 'POST')
+    const joined = await helping(server, ada, id, 'POST')
     expect(joined.statusCode).toBe(200)
     expect(joined.json().session.helpers).toEqual([{ account_id: ada.id, name: 'Ada' }])
 
-    const left = await selfService(server, ada.cookie, id, 'helpers', 'DELETE')
+    const left = await helping(server, ada, id, 'DELETE')
     expect(left.statusCode).toBe(200)
     expect(left.json().session.helpers).toEqual([])
   })
@@ -692,7 +713,7 @@ describe('helping with a dream', () => {
     const eventId = await givenEvent()
     const ada = await givenAttending(eventId)
     const id = (await offer(server, ada.cookie, { title: 'Sunrise yoga' })).json().session.id
-    await selfService(server, ada.cookie, id, 'helpers', 'POST')
+    await helping(server, ada, id, 'POST')
 
     await db().update(account).set({ name: 'Ada Lovelace' }).where(eq(account.id, ada.id))
 
@@ -707,8 +728,8 @@ describe('helping with a dream', () => {
     const ada = await givenAttending(eventId)
     const id = (await offer(server, ada.cookie, { title: 'Sunrise yoga' })).json().session.id
 
-    await selfService(server, ada.cookie, id, 'helpers', 'POST')
-    const again = await selfService(server, ada.cookie, id, 'helpers', 'POST')
+    await helping(server, ada, id, 'POST')
+    const again = await helping(server, ada, id, 'POST')
 
     expect(again.statusCode).toBe(200)
     expect(again.json().session.helpers).toHaveLength(1)
@@ -720,7 +741,7 @@ describe('helping with a dream', () => {
     const ada = await givenAttending(eventId)
     const id = (await offer(server, ada.cookie, { title: 'Sunrise yoga' })).json().session.id
 
-    const response = await selfService(server, ada.cookie, id, 'helpers', 'DELETE')
+    const response = await helping(server, ada, id, 'DELETE')
 
     expect(response.statusCode).toBe(200)
     expect(response.json().session.helpers).toEqual([])
@@ -734,7 +755,7 @@ describe('helping with a dream', () => {
     const coming = await givenAttending(OPEN_BURN)
     const id = (await offer(server, coming.cookie, { title: 'Sunrise yoga' })).json().session.id
 
-    expect((await selfService(server, elsewhere.cookie, id, 'helpers', 'POST')).statusCode).toBe(400)
+    expect((await helping(server, elsewhere, id, 'POST')).statusCode).toBe(400)
     expect((await selfService(server, elsewhere.cookie, id, 'support', 'POST')).statusCode).toBe(400)
   })
 
@@ -746,8 +767,8 @@ describe('helping with a dream', () => {
     const old = randomUUID()
     await db().insert(session).values({ id: old, event_id: ended, title: 'Last summer' })
 
-    expect((await selfService(server, ada.cookie, randomUUID(), 'helpers', 'POST')).statusCode).toBe(404)
-    expect((await selfService(server, ada.cookie, old, 'helpers', 'POST')).statusCode).toBe(404)
+    expect((await helping(server, ada, randomUUID(), 'POST')).statusCode).toBe(404)
+    expect((await helping(server, ada, old, 'POST')).statusCode).toBe(404)
     expect((await selfService(server, ada.cookie, old, 'support', 'POST')).statusCode).toBe(404)
   })
 
@@ -757,7 +778,7 @@ describe('helping with a dream', () => {
     const ada = await givenAttending(eventId)
     const id = (await offer(server, ada.cookie, { title: 'Sunrise yoga' })).json().session.id
 
-    expect((await selfService(server, undefined, id, 'helpers', 'POST')).statusCode).toBe(401)
+    expect((await helping(server, undefined, id, 'POST')).statusCode).toBe(401)
     expect((await selfService(server, undefined, id, 'support', 'POST')).statusCode).toBe(401)
   })
 })
@@ -826,7 +847,7 @@ describe('supporting a dream', () => {
     const eventId = await givenEvent()
     const ada = await givenAttending(eventId)
     const id = (await offer(server, ada.cookie, { title: 'Sunrise yoga' })).json().session.id
-    await selfService(server, ada.cookie, id, 'helpers', 'POST')
+    await helping(server, ada, id, 'POST')
     await selfService(server, ada.cookie, id, 'support', 'POST')
 
     const renamed = await editDream(server, ada.cookie, id, { title: 'Sunrise stretching' })

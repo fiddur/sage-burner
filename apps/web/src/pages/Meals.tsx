@@ -129,9 +129,12 @@ export const Meals = ({ api }: { api: MealsApi }) => {
               onLead={(id, accountId) =>
                 run(() => api.setMealLead(id, { account_id: accountId }), 'Could not save that.')
               }
-              onStand={(id, role, joining) =>
+              onStand={(id, role, joining, accountId) =>
                 run(
-                  () => (joining ? api.joinMealCrew(id, role) : api.leaveMealCrew(id, role)),
+                  () =>
+                    joining
+                      ? api.joinMealCrew(id, role, { account_id: accountId })
+                      : api.leaveMealCrew(id, role, accountId),
                   'Could not save that.',
                 )
               }
@@ -200,7 +203,7 @@ const MealTable = ({
   viewerId: string | undefined
   busy: boolean
   onLead: (id: string, accountId: string | null) => void
-  onStand: (id: string, role: 'cleanup' | 'helper', joining: boolean) => void
+  onStand: (id: string, role: 'cleanup' | 'helper', joining: boolean, accountId: string) => void
   onIdea: (id: string, idea: string) => void
 }) => (
   <table class="meal-table">
@@ -341,7 +344,7 @@ const Crew = ({
   busy: boolean
   /** False for a chore's cooks: whoever is on it may leave, nobody new may join. */
   joinable: boolean
-  onStand: (id: string, role: 'cleanup' | 'helper', joining: boolean) => void
+  onStand: (id: string, role: 'cleanup' | 'helper', joining: boolean, accountId: string) => void
 }) => {
   const crew = role === 'helper' ? meal.helpers : meal.cleanup
   const standing = crew.some((who) => who.account_id === viewerId)
@@ -360,7 +363,7 @@ const Crew = ({
           class="link-button"
           disabled={busy}
           aria-label={`${standing ? 'Do not' : 'Help'} ${what} at ${meal.label} on ${meal.date}`}
-          onClick={() => onStand(meal.id, role, !standing)}
+          onClick={() => viewerId !== undefined && onStand(meal.id, role, !standing, viewerId)}
         >
           {standing ? 'Not me after all' : `I can ${what}`}
         </button>

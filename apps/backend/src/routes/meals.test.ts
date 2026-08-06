@@ -375,13 +375,15 @@ describe('signing up for a meal', () => {
   it('stands for helping and for cleaning, which are separate', async () => {
     const { server, ada, meal } = await setUp()
 
-    await send(server, 'PUT', `/api/meals/${meal.id}/helper/me`, ada.cookie)
-    const both = await send(server, 'PUT', `/api/meals/${meal.id}/cleanup/me`, ada.cookie)
+    await send(server, 'PUT', `/api/meals/${meal.id}/crew/helper`, ada.cookie, { account_id: ada.id })
+    const both = await send(server, 'PUT', `/api/meals/${meal.id}/crew/cleanup`, ada.cookie, {
+      account_id: ada.id,
+    })
 
     expect(both.json().meal.helpers).toHaveLength(1)
     expect(both.json().meal.cleanup).toHaveLength(1)
 
-    const off = await send(server, 'DELETE', `/api/meals/${meal.id}/helper/me`, ada.cookie)
+    const off = await send(server, 'DELETE', `/api/meals/${meal.id}/crew/helper/${ada.id}`, ada.cookie)
     expect(off.json().meal.helpers).toEqual([])
     expect(off.json().meal.cleanup).toHaveLength(1)
   })
@@ -389,8 +391,10 @@ describe('signing up for a meal', () => {
   it('is the same after two clicks as after one', async () => {
     const { server, ada, meal } = await setUp()
 
-    await send(server, 'PUT', `/api/meals/${meal.id}/helper/me`, ada.cookie)
-    const again = await send(server, 'PUT', `/api/meals/${meal.id}/helper/me`, ada.cookie)
+    await send(server, 'PUT', `/api/meals/${meal.id}/crew/helper`, ada.cookie, { account_id: ada.id })
+    const again = await send(server, 'PUT', `/api/meals/${meal.id}/crew/helper`, ada.cookie, {
+      account_id: ada.id,
+    })
 
     expect(again.json().meal.helpers).toHaveLength(1)
   })
@@ -398,16 +402,23 @@ describe('signing up for a meal', () => {
   it('knows no role called lead here, since one person holds it', async () => {
     const { server, ada, meal } = await setUp()
 
-    expect((await send(server, 'PUT', `/api/meals/${meal.id}/lead/me`, ada.cookie)).statusCode).toBe(404)
+    expect(
+      (await send(server, 'PUT', `/api/meals/${meal.id}/crew/lead`, ada.cookie, { account_id: ada.id }))
+        .statusCode,
+    ).toBe(404)
   })
 
   it('refuses somebody who is not coming to that burn', async () => {
     const { server, meal } = await setUp()
     const elsewhere = await givenAccount(['member'])
 
-    expect((await send(server, 'PUT', `/api/meals/${meal.id}/helper/me`, elsewhere.cookie)).statusCode).toBe(
-      400,
-    )
+    expect(
+      (
+        await send(server, 'PUT', `/api/meals/${meal.id}/crew/helper`, elsewhere.cookie, {
+          account_id: elsewhere.id,
+        })
+      ).statusCode,
+    ).toBe(400)
   })
 })
 
@@ -560,7 +571,7 @@ describe('the plan itself', () => {
   it('drops one, and everybody signed up for it', async () => {
     const { server, organiser, meal } = await setUp()
     const ada = await givenAttending()
-    await send(server, 'PUT', `/api/meals/${meal.id}/helper/me`, ada.cookie)
+    await send(server, 'PUT', `/api/meals/${meal.id}/crew/helper`, ada.cookie, { account_id: ada.id })
 
     expect((await send(server, 'DELETE', `/api/admin/meals/${meal.id}`, organiser.cookie)).statusCode).toBe(
       204,
@@ -647,11 +658,16 @@ describe('a burn that has ended', () => {
         })
       ).statusCode,
     ).toBe(404)
-    expect((await send(server, 'PUT', `/api/meals/${meal.id}/helper/me`, organiser.cookie)).statusCode).toBe(
-      404,
-    )
     expect(
-      (await send(server, 'DELETE', `/api/meals/${meal.id}/cleanup/me`, organiser.cookie)).statusCode,
+      (
+        await send(server, 'PUT', `/api/meals/${meal.id}/crew/helper`, organiser.cookie, {
+          account_id: organiser.id,
+        })
+      ).statusCode,
+    ).toBe(404)
+    expect(
+      (await send(server, 'DELETE', `/api/meals/${meal.id}/crew/cleanup/${organiser.id}`, organiser.cookie))
+        .statusCode,
     ).toBe(404)
     expect(
       (await send(server, 'PUT', `/api/meals/${meal.id}/idea`, organiser.cookie, { food_idea: 'x' }))
@@ -704,10 +720,13 @@ describe('a burn that has ended', () => {
       (await send(server, 'PUT', `/api/meals/${meal.id}/lead`, ada.cookie, { account_id: ada.id }))
         .statusCode,
     ).toBe(200)
-    expect((await send(server, 'PUT', `/api/meals/${meal.id}/helper/me`, ada.cookie)).statusCode).toBe(200)
-    expect((await send(server, 'DELETE', `/api/meals/${meal.id}/cleanup/me`, ada.cookie)).statusCode).toBe(
-      200,
-    )
+    expect(
+      (await send(server, 'PUT', `/api/meals/${meal.id}/crew/helper`, ada.cookie, { account_id: ada.id }))
+        .statusCode,
+    ).toBe(200)
+    expect(
+      (await send(server, 'DELETE', `/api/meals/${meal.id}/crew/cleanup/${ada.id}`, ada.cookie)).statusCode,
+    ).toBe(200)
     expect(
       (await send(server, 'PUT', `/api/meals/${meal.id}/idea`, ada.cookie, { food_idea: 'Tacos' }))
         .statusCode,
@@ -756,13 +775,18 @@ describe('a chore', () => {
   it('takes nobody to help cook, because nothing is cooked', async () => {
     const { server, ada, chore } = await setUp()
 
-    expect((await send(server, 'PUT', `/api/meals/${chore.id}/helper/me`, ada.cookie)).statusCode).toBe(400)
+    expect(
+      (await send(server, 'PUT', `/api/meals/${chore.id}/crew/helper`, ada.cookie, { account_id: ada.id }))
+        .statusCode,
+    ).toBe(400)
   })
 
   it('takes cleaners, which is the whole of what it wants', async () => {
     const { server, ada, chore } = await setUp()
 
-    const response = await send(server, 'PUT', `/api/meals/${chore.id}/cleanup/me`, ada.cookie)
+    const response = await send(server, 'PUT', `/api/meals/${chore.id}/crew/cleanup`, ada.cookie, {
+      account_id: ada.id,
+    })
 
     expect(response.statusCode).toBe(200)
     expect(response.json().meal.cleanup).toHaveLength(1)
@@ -777,17 +801,20 @@ describe('a chore', () => {
       (await send(server, 'PUT', `/api/meals/${meal.id}/lead`, ada.cookie, { account_id: ada.id }))
         .statusCode,
     ).toBe(200)
-    expect((await send(server, 'PUT', `/api/meals/${meal.id}/helper/me`, ada.cookie)).statusCode).toBe(200)
+    expect(
+      (await send(server, 'PUT', `/api/meals/${meal.id}/crew/helper`, ada.cookie, { account_id: ada.id }))
+        .statusCode,
+    ).toBe(200)
   })
 
   it('lets somebody stand down from helping even after the slot became a chore', async () => {
     // Only joining is refused. A sitting changed to a chore under somebody who had
     // already put their name to it must not trap them there.
     const { server, ada, meal } = await setUp()
-    await send(server, 'PUT', `/api/meals/${meal.id}/helper/me`, ada.cookie)
+    await send(server, 'PUT', `/api/meals/${meal.id}/crew/helper`, ada.cookie, { account_id: ada.id })
     await db().update(mealTable).set({ kind: 'chore' }).where(eq(mealTable.id, meal.id))
 
-    const response = await send(server, 'DELETE', `/api/meals/${meal.id}/helper/me`, ada.cookie)
+    const response = await send(server, 'DELETE', `/api/meals/${meal.id}/crew/helper/${ada.id}`, ada.cookie)
 
     expect(response.statusCode).toBe(200)
     expect(response.json().meal.helpers).toEqual([])

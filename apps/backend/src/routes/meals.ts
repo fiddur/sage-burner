@@ -4,6 +4,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import {
   apiRoutes,
   errorResponse,
+  helperSchema,
   mealCreateSchema,
   mealIdeaUpdateSchema,
   mealIntroUpdateSchema,
@@ -28,6 +29,8 @@ import { openEvent, todayIso } from './events.ts'
 
 export interface MealDeps extends GuardDeps {
   now?: () => Date
+  /** Told when somebody is put on a crew, or taken off one, by anybody but themselves. */
+  notify?: (accountId: string, message: string) => Promise<unknown>
 }
 
 type Person = NonNullable<Meal['lead']>
@@ -153,9 +156,16 @@ const burnFor = async (db: Database, eventId: string) => {
  */
 export const registerMealRoutes = (
   app: FastifyInstance,
-  { db, sessions, now = () => new Date() }: MealDeps,
+  { db, sessions, now = () => new Date(), notify = async () => undefined }: MealDeps,
 ) => {
   const { requireApproved } = createGuards({ db, sessions })
+
+  /** Tell somebody, unless they did it themselves. Same rule as the register. */
+  const tell = async (by: string, accountId: string, message: string) => {
+    if (accountId === by) return
+
+    await notify(accountId, message)
+  }
 
   /**
    * The sitting, if its burn has not ended.
@@ -299,7 +309,10 @@ export const registerMealRoutes = (
    */
   const stand =
     (joining: boolean) =>
-    async (request: FastifyRequest<{ Params: { id: string; role: string } }>, reply: FastifyReply) => {
+    async (
+      request: FastifyRequest<{ Params: { id: string; role: string; accountId?: string } }>,
+      reply: FastifyReply,
+    ) => {
       void noStore(reply)
 
       // Matched against the vocabulary rather than compared away from it: excluding
@@ -322,7 +335,15 @@ export const registerMealRoutes = (
       const viewer = await viewerFor(request, { db, sessions })
       if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
 
-      const mine = await attendanceFor(db, existing.event_id, viewer.account_id)
+      // Whose hands: the body when joining, the path when standing down. Both name a
+      // person rather than meaning the caller (#247) — 🙋 sends the caller's own id.
+      const whose = joining ? helperSchema.safeParse(request.body) : undefined
+      if (whose !== undefined && !whose.success) return reply.code(400).send(errorResponse('bad_request'))
+
+      const accountId = whose?.data.account_id ?? request.params.accountId
+      if (accountId === undefined) return reply.code(400).send(errorResponse('bad_request'))
+
+      const mine = await attendanceFor(db, existing.event_id, accountId)
       if (mine === undefined) return reply.code(400).send(errorResponse('bad_request'))
 
       const row = { meal_id: existing.id, attendance_id: mine, role }
@@ -330,6 +351,7 @@ export const registerMealRoutes = (
       if (joining) {
         // Standing twice is standing once, which is what a double click sends.
         await db.insert(mealRole).values(row).onConflictDoNothing()
+        await tell(viewer.account_id, accountId, `You are on ${role} for ${existing.label}`)
       } else {
         await db
           .delete(mealRole)
@@ -340,6 +362,7 @@ export const registerMealRoutes = (
               eq(mealRole.role, role),
             ),
           )
+        await tell(viewer.account_id, accountId, `You are off ${role} for ${existing.label}`)
       }
 
       return answer(reply, existing.id)
@@ -350,7 +373,7 @@ export const registerMealRoutes = (
     { preHandler: requireApproved },
     stand(true),
   )
-  app.delete<{ Params: { id: string; role: string } }>(
+  app.delete<{ Params: { id: string; role: string; accountId: string } }>(
     apiRoutes.leaveMealCrew.fastify,
     { preHandler: requireApproved },
     stand(false),

@@ -4,6 +4,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify'
 import {
   apiRoutes,
   errorResponse,
+  helperSchema,
   hasValidTimeSlot,
   sessionCreateSchema,
   sessionUpdateSchema,
@@ -24,6 +25,13 @@ import { openEvent, todayIso } from './events.ts'
 
 export interface SessionDeps extends GuardDeps {
   now?: () => Date
+  /**
+   * Told when somebody is put on a dream, or taken off one, by anybody but
+   * themselves. Optional and swallowing its own failures, like the lead-roles
+   * register: offering a pair of hands is the point and the notification is a
+   * courtesy, so a push service being down must not fail the write.
+   */
+  notify?: (accountId: string, message: string) => Promise<unknown>
 }
 
 type DreamRow = typeof session.$inferSelect
@@ -128,6 +136,8 @@ interface Refusal {
 interface Attending {
   dream: DreamRow
   attendanceId: string
+  /** Who is asking, so a write on somebody else's behalf can tell them. */
+  callerId: string | undefined
 }
 
 /**
@@ -174,7 +184,7 @@ const facilitatorIsComing = async (db: Database, eventId: string, accountId: str
  */
 export const registerSessionRoutes = (
   app: FastifyInstance,
-  { db, sessions, now = () => new Date() }: SessionDeps,
+  { db, sessions, now = () => new Date(), notify = async () => undefined }: SessionDeps,
 ) => {
   const { requireMember } = createGuards({ db, sessions })
 
@@ -183,6 +193,13 @@ export const registerSessionRoutes = (
     const viewer = await viewerFor(request, { db, sessions })
 
     return viewer === undefined ? undefined : await attendanceFor(db, eventId, viewer.account_id)
+  }
+
+  /** Tell somebody, unless they did it themselves. Same rule as the register. */
+  const tell = async (by: string | undefined, accountId: string, message: string) => {
+    if (accountId === by) return
+
+    await notify(accountId, message)
   }
 
   app.get<{ Params: { eventId: string } }>(
@@ -355,15 +372,22 @@ export const registerSessionRoutes = (
     const attendanceId = await mineAt(request, dream.event_id)
     if (attendanceId === undefined) return { code: 400, error: 'bad_request' }
 
-    return { dream, attendanceId }
+    const viewer = await viewerFor(request, { db, sessions })
+
+    return { dream, attendanceId, callerId: viewer?.account_id }
   }
 
   /**
-   * Offering to help run a dream, and taking the offer back.
+   * Offering a pair of hands, and taking the offer back — yours or somebody
+   * else's (#247).
    *
-   * `/me` rather than an account id in a body: this is one person speaking for
-   * themselves. Signing somebody else up for work is what the lead-roles register
-   * is for, and it asks first.
+   * It names a person rather than being `/me`, like the lead-roles register: at 42
+   * people who all know each other, "I will put you down for that" is a thing said
+   * out loud, and the register has worked that way from the start. What keeps it
+   * civil is that the person is told, which is what `tell` is for.
+   *
+   * The **caller** still has to be coming to the burn, and so does whoever they
+   * name — a dream is run by people who are there.
    */
   app.post<{ Params: { id: string } }>(
     apiRoutes.helpWithSession.fastify,
@@ -371,19 +395,27 @@ export const registerSessionRoutes = (
     async (request, reply) => {
       void noStore(reply)
 
+      const parsed = helperSchema.safeParse(request.body)
+      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+
       const found = await asAttendee(request)
       if ('code' in found) return reply.code(found.code).send(errorResponse(found.error))
 
+      const theirs = await attendanceFor(db, found.dream.event_id, parsed.data.account_id)
+      if (theirs === undefined) return reply.code(400).send(errorResponse('bad_request'))
+
       await db
         .insert(sessionHelper)
-        .values({ session_id: found.dream.id, attendance_id: found.attendanceId })
+        .values({ session_id: found.dream.id, attendance_id: theirs })
         .onConflictDoNothing()
+
+      await tell(found.callerId, parsed.data.account_id, `You are helping with ${found.dream.title}`)
 
       return { session: await oneDream(db, found.dream, found.attendanceId) } satisfies SessionResponse
     },
   )
 
-  app.delete<{ Params: { id: string } }>(
+  app.delete<{ Params: { id: string; accountId: string } }>(
     apiRoutes.stopHelpingWithSession.fastify,
     { preHandler: requireMember },
     async (request, reply) => {
@@ -392,14 +424,23 @@ export const registerSessionRoutes = (
       const found = await asAttendee(request)
       if ('code' in found) return reply.code(found.code).send(errorResponse(found.error))
 
-      await db
+      const theirs = await attendanceFor(db, found.dream.event_id, request.params.accountId)
+      if (theirs === undefined) return reply.code(400).send(errorResponse('bad_request'))
+
+      const gone = await db
         .delete(sessionHelper)
-        .where(
-          and(
-            eq(sessionHelper.session_id, found.dream.id),
-            eq(sessionHelper.attendance_id, found.attendanceId),
-          ),
+        .where(and(eq(sessionHelper.session_id, found.dream.id), eq(sessionHelper.attendance_id, theirs)))
+        .returning()
+
+      // Only when a row actually went: taking somebody off a dream they were never
+      // on would otherwise tell them they had been dropped from it.
+      if (gone.length > 0) {
+        await tell(
+          found.callerId,
+          request.params.accountId,
+          `You are no longer helping with ${found.dream.title}`,
         )
+      }
 
       return { session: await oneDream(db, found.dream, found.attendanceId) } satisfies SessionResponse
     },

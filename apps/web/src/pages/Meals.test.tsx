@@ -104,7 +104,7 @@ describe('the meal plan', () => {
 
     fireEvent.click(await screen.findByLabelText('Help clean up at Dinner on 2026-08-01'))
 
-    await waitFor(() => expect(joinMealCrew).toHaveBeenCalledWith('m-1', 'cleanup'))
+    await waitFor(() => expect(joinMealCrew).toHaveBeenCalledWith('m-1', 'cleanup', { account_id: 'a-1' }))
   })
 
   it('writes a food idea when the field is left, not on every keystroke', async () => {
@@ -219,7 +219,7 @@ describe('a chore that still has somebody on it', () => {
 
     fireEvent.click(await screen.findByLabelText('Do not cook at Morning cleanup on 2026-08-01'))
 
-    await waitFor(() => expect(leaveMealCrew).toHaveBeenCalledWith('m-1', 'helper'))
+    await waitFor(() => expect(leaveMealCrew).toHaveBeenCalledWith('m-1', 'helper', 'a-1'))
   })
 
   it('offers nobody else the chance to start cooking at one', async () => {

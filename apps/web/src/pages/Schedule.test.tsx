@@ -780,7 +780,7 @@ describe('Schedule', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
     fireEvent.click(screen.getByRole('button', { name: 'I want to help out' }))
 
-    await waitFor(() => expect(helpWithSession).toHaveBeenCalledWith('s-1'))
+    await waitFor(() => expect(helpWithSession).toHaveBeenCalledWith('s-1', { account_id: 'a-1' }))
   })
 
   it('says “I cannot help after all” to somebody already on the list', async () => {
@@ -803,7 +803,7 @@ describe('Schedule', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'I cannot help after all' }))
 
-    await waitFor(() => expect(stopHelpingWithSession).toHaveBeenCalledWith('s-1'))
+    await waitFor(() => expect(stopHelpingWithSession).toHaveBeenCalledWith('s-1', 'a-1'))
   })
 
   it('offers to help when somebody else is on the list, rather than reading the list as mine', async () => {

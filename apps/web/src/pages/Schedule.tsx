@@ -267,8 +267,14 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
   const blocks = meals.flatMap((meal) => mealBlocks(meal))
   const shownMeal = meals.find((meal) => meal.id === openedMeal)
 
-  const help = (id: string, helping: boolean) => {
-    run(() => (helping ? api.helpWithSession(id) : api.stopHelpingWithSession(id)), 'Could not save that.')
+  const help = (id: string, helping: boolean, accountId: string) => {
+    run(
+      () =>
+        helping
+          ? api.helpWithSession(id, { account_id: accountId })
+          : api.stopHelpingWithSession(id, accountId),
+      'Could not save that.',
+    )
   }
 
   /**
@@ -435,7 +441,7 @@ const Opened = ({
   onEdit: (id: string) => void
   onCancelEdit: (id: string) => void
   onClose: () => void
-  onHelp: (id: string, helping: boolean) => void
+  onHelp: (id: string, helping: boolean, accountId: string) => void
   onSupport: (id: string, supporting: boolean) => void
   onSave: (id: string, changes: SessionUpdate) => void
   onOffer: (fields: SessionUpdate) => void
@@ -489,7 +495,7 @@ const Opened = ({
       onEdit={() => onEdit(dream.id)}
       onCancelEdit={() => onCancelEdit(dream.id)}
       onClose={onClose}
-      onHelp={(helping) => onHelp(dream.id, helping)}
+      onHelp={(helping, accountId) => onHelp(dream.id, helping, accountId)}
       onSupport={(supporting) => onSupport(dream.id, supporting)}
       onSave={(changes) => onSave(dream.id, changes)}
       onRemove={() => onRemove(dream.id)}
@@ -941,9 +947,12 @@ const OpenedMeal = ({
       onLead={(accountId) =>
         run(() => api.setMealLead(meal.id, { account_id: accountId }), 'Could not save that.')
       }
-      onStand={(role, joining) =>
+      onStand={(role, joining, accountId) =>
         run(
-          () => (joining ? api.joinMealCrew(meal.id, role) : api.leaveMealCrew(meal.id, role)),
+          () =>
+            joining
+              ? api.joinMealCrew(meal.id, role, { account_id: accountId })
+              : api.leaveMealCrew(meal.id, role, accountId),
           'Could not save that.',
         )
       }

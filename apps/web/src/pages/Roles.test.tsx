@@ -283,7 +283,7 @@ describe('Roles', () => {
       ]),
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Sauna' }))
     fireEvent.change(await screen.findByLabelText('Effort during Sauna'), { target: { value: 'high' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
@@ -298,7 +298,7 @@ describe('Roles', () => {
     const updateLeadRole = vi.fn(() => Promise.resolve({ role: aRole({ id: 'r-1', title: 'Sauna' }) }))
     renderPage(stub({ updateLeadRole }, [aRole({ id: 'r-1', title: 'Sauna', team_size_wanted: 3 })]))
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Sauna' }))
     fireEvent.input(await screen.findByLabelText('Team wanted for Sauna'), { target: { value: '' } })
     fireEvent.change(screen.getByLabelText('Effort during Sauna'), { target: { value: 'high' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -313,7 +313,7 @@ describe('Roles', () => {
     const updateLeadRole = vi.fn(() => Promise.resolve({ role: aRole({ id: 'r-1', title: 'Sauna' }) }))
     renderPage(stub({ updateLeadRole }, [aRole({ id: 'r-1', title: 'Sauna', team_size_wanted: 3 })]))
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Sauna' }))
     fireEvent.input(await screen.findByLabelText('Team wanted for Sauna'), { target: { value: '5' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 

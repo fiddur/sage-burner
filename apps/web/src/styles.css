@@ -476,7 +476,6 @@ a:hover {
   background: none;
   color: inherit;
   font: inherit;
-  text-decoration: underline;
   cursor: pointer;
 }
 
@@ -965,6 +964,11 @@ a:hover {
 
 .lead-actions {
   white-space: nowrap;
+}
+
+/* The actions run together without it — two emoji read as one control. */
+.lead-actions > * + * {
+  margin-inline-start: 0.6rem;
 }
 
 /* Narrow: one card per role, each cell labelled with the heading the table hides. */

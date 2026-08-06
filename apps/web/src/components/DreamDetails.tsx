@@ -47,7 +47,7 @@ export const DreamDetails = ({
   onCancelEdit: () => void
   onClose: () => void
   /** `true` to offer, `false` to take the offer back. */
-  onHelp: (helping: boolean) => void
+  onHelp: (helping: boolean, accountId: string) => void
   onSupport: (supporting: boolean) => void
   onSave: (changes: SessionUpdate) => void
   onRemove: () => void
@@ -129,9 +129,11 @@ export const DreamDetails = ({
           )}
 
           <p class="row">
-            <button type="button" disabled={busy} onClick={() => onHelp(!helping)}>
-              {helping ? 'I cannot help after all' : 'I want to help out'}
-            </button>
+            {viewerId !== undefined && (
+              <button type="button" disabled={busy} onClick={() => onHelp(!helping, viewerId)}>
+                {helping ? 'I cannot help after all' : 'I want to help out'}
+              </button>
+            )}
             <button
               type="button"
               class="link-button"
