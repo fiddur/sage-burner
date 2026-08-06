@@ -203,6 +203,9 @@ These are member records, so treat them as such:
   account". Challenges are rows and the statement that reads one deletes it;
   single-use is what a challenge is for, and a signed cookie cannot give it.
   Removing the last passkey off an account with no password is refused.
+- **A notification is a row; a push is a copy of it** (#248). The bell needs history
+  and a push does not have any. Written before the push, so an unreachable push
+  service cannot cost somebody the record. A muted category is not written at all.
 - **Any role somebody else can change tells the person it happened to** (#247). One
   control everywhere several people sign up — 🙋 takes the spot, 👉 appoints somebody
   else, ✕ takes them off — and every route behind it notifies, on being _given_ a job

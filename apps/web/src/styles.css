@@ -1277,3 +1277,69 @@ img.avatar {
 .dream-supporter .avatar {
   outline: 2px solid var(--paper);
 }
+
+/* The bell, and what it drops down. */
+.bell-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.bell {
+  position: relative;
+  padding: 0.2rem 0.3rem;
+  border: 0;
+  background: none;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  /* Grey until something has happened, which is the whole signal. */
+  filter: grayscale(1);
+  opacity: 0.55;
+}
+
+.bell.has-unseen {
+  filter: none;
+  opacity: 1;
+}
+
+.bell-count {
+  position: absolute;
+  top: -0.25rem;
+  inset-inline-end: -0.35rem;
+  min-width: 1.05rem;
+  padding: 0 0.2rem;
+  border-radius: 1rem;
+  background: #dc2626;
+  color: #fff;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.7rem;
+  line-height: 1.05rem;
+  text-align: center;
+}
+
+.bell-panel {
+  position: absolute;
+  top: 100%;
+  inset-inline-end: 0;
+  z-index: 30;
+  width: min(22rem, 80vw);
+  margin-top: 0.4rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 18%);
+}
+
+.bell-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.bell-list li.is-new {
+  font-weight: 600;
+}

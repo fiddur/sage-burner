@@ -683,9 +683,28 @@ page behind the initials circle, **and on ⚙️ → Settings** — an organiser
 `admin` without `member` is refused from the details page, and application
 notifications go precisely to admins.
 
+A notification is a **record**, and a push is a copy of it (#248). The bell in the
+header carries what happened while you were away and whether you have looked; a push
+message is gone the moment it is dismissed, which is why the row is the notification
+rather than the other way round. A member with no browser subscribed still gets the
+bell, which is the ordinary case.
+
+Six categories, each switchable off under **Your details → Notifications**. Only the
+switched-**off** ones are stored, so every box starts ticked and a new account needs
+nothing seeded. Switching one off silences both channels — the setting says "notify
+me", and a bell filling with things somebody asked not to hear about is the same
+noise in a quieter place.
+
 Anything somebody else can put you on or take you off notifies you — a dream's
 helpers, a meal's crew, a meal's lead, a lead role and its team, a dream's
 facilitator. Never for your own click.
+
+Two of the six are different in kind: **the waiting-list ones are not caused by an
+action taken against the person told.** Somebody else pays, the burn gets fuller, and
+an unpaid member's standing changes without anybody touching their row — which is
+exactly why they are worth sending, and why they run outside the payment's
+transaction. Recording that somebody paid must not fail because a bell could not be
+rung.
 
 Three things notify today:
 

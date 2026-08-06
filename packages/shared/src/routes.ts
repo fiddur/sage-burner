@@ -29,6 +29,7 @@ import type {
   Helper,
   MealSlotUpdate,
   MealUpdate,
+  NotificationSettings,
   PasskeyLogin,
   PasskeyRegistration,
   PaymentUpdate,
@@ -276,6 +277,16 @@ export const apiRoutes = {
     fastify: '/api/events/mine',
     path: () => '/api/events/mine',
   },
+  getMyNotifications: {
+    method: 'GET',
+    fastify: '/api/me/notifications',
+    path: () => '/api/me/notifications',
+  },
+  getMyNotificationSettings: {
+    method: 'GET',
+    fastify: '/api/me/notification-settings',
+    path: () => '/api/me/notification-settings',
+  },
   getMyPasskeys: {
     method: 'GET',
     fastify: '/api/me/passkeys',
@@ -363,6 +374,11 @@ export const apiRoutes = {
     method: 'POST',
     fastify: '/api/auth/logout',
     path: () => '/api/auth/logout',
+  },
+  markNotificationsSeen: {
+    method: 'POST',
+    fastify: '/api/me/notifications/seen',
+    path: () => '/api/me/notifications/seen',
   },
   offerSession: {
     method: 'POST',
@@ -527,6 +543,11 @@ export const apiRoutes = {
     fastify: '/api/admin/meal-slots/:id',
     path: (id: string) => `/api/admin/meal-slots/${encodeURIComponent(id)}`,
   },
+  updateMyNotificationSettings: {
+    method: 'PUT',
+    fastify: '/api/me/notification-settings',
+    path: () => '/api/me/notification-settings',
+  },
   updateMyProfile: {
     method: 'PATCH',
     fastify: '/api/me/profile',
@@ -625,6 +646,7 @@ export interface RouteBodies {
   updateMeal: MealUpdate
   updateMealIntro: MealIntroUpdate
   updateMealSlot: MealSlotUpdate
+  updateMyNotificationSettings: NotificationSettings
   updateMyProfile: ProfileUpdate
   updateMyStay: AttendanceUpdate
   updatePlace: PlaceUpdate

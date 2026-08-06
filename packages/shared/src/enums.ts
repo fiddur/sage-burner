@@ -154,3 +154,33 @@ export const isEffortLevel = (value: unknown): value is EffortLevel => isOneOf(e
 export const paymentStatuses = ['unpaid', 'paid'] as const
 export type PaymentStatus = (typeof paymentStatuses)[number]
 export const isPaymentStatus = (value: unknown): value is PaymentStatus => isOneOf(paymentStatuses, value)
+
+/**
+ * What a notification can be about (#248).
+ *
+ * The vocabulary is here, Zod-free, because the settings table on the web renders a
+ * row per category and must not pull Zod into the bundle to do it.
+ *
+ * A category is what somebody switches off, so the split is by *what happened to
+ * them* rather than by which route wrote it: being put on a meal and being taken off
+ * one are one line in the settings, because nobody wants one without the other.
+ */
+export const notificationCategories = [
+  'meal_role',
+  'dream_role',
+  'lead_role',
+  'payment',
+  'waiting_list_near',
+  'waiting_list_pushed',
+] as const
+export type NotificationCategory = (typeof notificationCategories)[number]
+
+/** What the settings table calls each one. Where the bell *sends* you is the route's. */
+export const notificationCategoryLabels: Record<NotificationCategory, string> = {
+  meal_role: 'Put on or taken off a meal',
+  dream_role: 'Put on or taken off a dream',
+  lead_role: 'Given or taken off a lead role',
+  payment: 'Your payment recorded',
+  waiting_list_near: 'The burn is nearly full and you have not paid',
+  waiting_list_pushed: 'The burn filled up and you are on the waiting list',
+}

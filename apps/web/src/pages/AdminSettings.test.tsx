@@ -21,6 +21,9 @@ const stub = (over: Partial<AdminSettingsApi> = {}): AdminSettingsApi => ({
   updateInstallation: () => Promise.reject(new Error('updateInstallation is not stubbed here')),
   // The toggle mounted here has its own tests; these keep it from reaching the API
   // when the page under test is about the title.
+  getMyNotificationSettings: () => Promise.resolve({ muted: [] }),
+  updateMyNotificationSettings: () =>
+    Promise.reject(new Error('updateMyNotificationSettings is not stubbed here')),
   getPushKey: () => Promise.resolve({ public_key: null }),
   subscribeToPush: () => Promise.reject(new Error('subscribeToPush is not stubbed here')),
   unsubscribeFromPush: () => Promise.reject(new Error('unsubscribeFromPush is not stubbed here')),

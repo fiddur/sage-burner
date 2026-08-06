@@ -15,6 +15,7 @@ import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
 import type { Database } from '../db/index.ts'
+import type { Notifier } from '../push/notify.ts'
 
 import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
@@ -36,7 +37,7 @@ export interface LeadRoleDeps extends GuardDeps {
    * refused to hand out a role because delivery was unavailable would be worse
    * than a quiet one.
    */
-  notify?: (accountId: string, message: string) => Promise<unknown>
+  notify?: Notifier
 }
 
 /**
@@ -158,7 +159,7 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
   const tell = async (by: string, accountId: string | undefined, message: string) => {
     if (accountId === undefined || accountId === by) return
 
-    await notify(accountId, message)
+    await notify(accountId, { category: 'lead_role', body: message, link: '/roles' })
   }
 
   /** Who is asking, for `tell`. Undefined never matches an account id, so it notifies. */

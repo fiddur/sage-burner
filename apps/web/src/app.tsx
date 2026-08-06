@@ -2,6 +2,7 @@ import { LocationProvider, Route, Router } from 'preact-iso'
 import { useMemo } from 'preact/hooks'
 
 import type { ApiClient } from './api/client.ts'
+import type { BellApi } from './components/NotificationBell.tsx'
 import type { Viewer } from './viewer.tsx'
 
 import { createApiClient } from './api/client.ts'
@@ -58,6 +59,8 @@ export type RoutesApi = Pick<
   | 'getInviteState'
   | 'redeemInvite'
   | 'getMyProfile'
+  | 'getMyNotificationSettings'
+  | 'updateMyNotificationSettings'
   | 'getMyPasskeys'
   | 'addPasskey'
   | 'removePasskey'
@@ -141,7 +144,7 @@ export type RoutesApi = Pick<
  * What the whole app reaches for: the route table, plus what the providers and
  * the layout need — the viewer they resolve on mount, and signing out.
  */
-export type AppApi = RoutesApi & Pick<ApiClient, 'getMe' | 'logout' | 'getVersion'>
+export type AppApi = RoutesApi & BellApi & Pick<ApiClient, 'getMe' | 'logout' | 'getVersion'>
 
 /**
  * The route table.
@@ -247,7 +250,7 @@ export const App = ({ viewer, title, api }: { viewer?: Viewer; title?: string; a
   // burn-scoped page below it reads the same choice.
   const framed = (
     <FetchedBurnProvider api={client}>
-      <Layout>
+      <Layout api={client}>
         {/* Above the page rather than in the layout's chrome: it is about the tab,
             not about the burn, and it has to survive whatever route is open. */}
         <NewVersion api={client} />

@@ -1,9 +1,12 @@
 import type { ComponentChildren } from 'preact'
 
+import type { BellApi } from './NotificationBell.tsx'
+
 import { useBurns } from '../burn.tsx'
 import { useInstallationTitle } from '../installation.tsx'
 import { isAdmin, isApproved, isMember, useViewer } from '../viewer.tsx'
 import { Avatar } from './Avatar.tsx'
+import { NotificationBell } from './NotificationBell.tsx'
 
 /**
  * The frame every page sits in.
@@ -18,10 +21,13 @@ import { Avatar } from './Avatar.tsx'
  * question it answers. An organiser who is not attending reaches both from ⚙️.
  *
  * Every entry here is a **place**, which is why signing out is not among them: it is
- * an action, and it lives beside the sentence naming the account it ends. That also
- * leaves this frame needing no API client at all.
+ * an action, and it lives beside the sentence naming the account it ends.
+ *
+ * The one thing here that is not a link is the bell, which is why the frame takes an
+ * API client (#248): it belongs in the bar because it is about the whole session
+ * rather than any page, and it has to be reachable from all of them.
  */
-export const Layout = ({ children }: { children: ComponentChildren }) => {
+export const Layout = ({ api, children }: { api: BellApi; children: ComponentChildren }) => {
   const viewer = useViewer()
   const { burns, selected, select } = useBurns()
   const title = useInstallationTitle()
@@ -75,6 +81,9 @@ export const Layout = ({ children }: { children: ComponentChildren }) => {
               <a href="/meals">Meals</a>
             </>
           )}
+
+          {/* Signed in is the whole guard, so it sits outside the approved block. */}
+          {viewer.account !== undefined && <NotificationBell api={api} />}
 
           {isAdmin(viewer) && (
             <a href="/admin" aria-label="Organise" title="Organise">

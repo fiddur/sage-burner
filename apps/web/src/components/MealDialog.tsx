@@ -4,10 +4,9 @@ import { MAX_OPTION_LABEL } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
 import { DreamPanel } from './DreamPanel.tsx'
+import { HelperStrip } from './HelperStrip.tsx'
 
 type Person = EventAttendeesResponse['attendees'][number]
-
-const nameOf = (person: { name: string | null }) => person.name ?? 'Someone without a name yet'
 
 /**
  * One sitting, opened from the kitchen lane.
@@ -42,10 +41,6 @@ export const MealDialog = ({
   const [renaming, setRenaming] = useState(false)
   const [label, setLabel] = useState(meal.label)
   const [idea, setIdea] = useState(meal.food_idea)
-
-  // Nobody may be handed a chore's lead, so nobody is offered for it. Whoever is
-  // already on one still gets an option, or the control would show blank.
-  const offered = meal.kind === 'chore' ? [] : attendees
 
   return (
     <DreamPanel label={meal.label} error={error} onClose={onClose}>
@@ -120,44 +115,28 @@ export const MealDialog = ({
         400, and a chore with a lead and no helpers offered no way to vacate at all.
       */}
       {(meal.kind !== 'chore' || meal.lead !== null) && (
-        <label class="field">
-          <span>Meal lead</span>
-          <select
-            aria-label={`Lead for ${meal.label}`}
-            disabled={busy}
-            value={meal.lead?.account_id ?? ''}
-            onChange={(changeEvent) => onLead(changeEvent.currentTarget.value || null)}
-          >
-            <option value="">Nobody yet</option>
-            {meal.lead !== null &&
-              !offered.some((who) => who.account_id === meal.lead?.account_id) && (
-                // Whenever the list below does not hold them — because they have withdrawn,
-                // or because this is a chore and the list is empty. Without it nothing
-                // matches the control's value and it reads as vacant while somebody is
-                // still on it.
-                <option value={meal.lead.account_id} disabled>
-                  {nameOf(meal.lead)}
-                  {attendees.some((who) => who.account_id === meal.lead?.account_id)
-                    ? ''
-                    : ' — no longer coming'}
-                </option>
-              )}
-            {offered.map((who) => (
-              <option key={who.account_id} value={who.account_id}>
-                {nameOf(who)}
-              </option>
-            ))}
-          </select>
-          {meal.kind === 'chore' && (
-            <span class="form-note">Nothing is cooked here, so this can only be vacated.</span>
-          )}
-        </label>
+        <>
+          <h3>Meal lead</h3>
+          <HelperStrip
+            label={meal.label}
+            people={meal.lead === null ? [] : [meal.lead]}
+            max={1}
+            // A chore takes no new lead, so it offers nobody — whoever is still on one
+            // keeps their ✕, which is what the API allows.
+            candidates={meal.kind === 'chore' ? [] : attendees}
+            viewerId={viewerId}
+            busy={busy}
+            onAdd={onLead}
+            onRemove={() => onLead(null)}
+          />
+        </>
       )}
 
       {(meal.kind !== 'chore' || meal.helpers.length > 0) && (
         <Crew
           meal={meal}
           role="helper"
+          attendees={attendees}
           viewerId={viewerId}
           busy={busy}
           joinable={meal.kind !== 'chore'}
@@ -165,7 +144,15 @@ export const MealDialog = ({
         />
       )}
 
-      <Crew meal={meal} role="cleanup" viewerId={viewerId} busy={busy} joinable onStand={onStand} />
+      <Crew
+        meal={meal}
+        role="cleanup"
+        attendees={attendees}
+        viewerId={viewerId}
+        busy={busy}
+        joinable
+        onStand={onStand}
+      />
 
       <p class="row">
         <button type="button" class="link-button" onClick={onClose}>
@@ -182,6 +169,7 @@ export const MealDialog = ({
 const Crew = ({
   meal,
   role,
+  attendees,
   viewerId,
   busy,
   joinable,
@@ -189,39 +177,30 @@ const Crew = ({
 }: {
   meal: Meal
   role: 'cleanup' | 'helper'
+  attendees: readonly Person[]
   viewerId: string | undefined
   busy: boolean
   /** False for a chore's cooks: whoever is on it may leave, nobody new may join. */
   joinable: boolean
   onStand: (role: 'cleanup' | 'helper', joining: boolean, accountId: string) => void
-}) => {
-  const crew = role === 'helper' ? meal.helpers : meal.cleanup
-  const standing = crew.some((who) => who.account_id === viewerId)
-  const what = role === 'helper' ? 'cook' : 'clean up'
-
-  return (
-    <>
-      <h3>{role === 'helper' ? 'Helping cook' : 'Washing up'}</h3>
-      {crew.length === 0 ? (
-        <p class="form-note">Nobody yet.</p>
-      ) : (
-        <ul class="meal-crew">
-          {crew.map((who) => (
-            <li key={who.account_id}>{nameOf(who)}</li>
-          ))}
-        </ul>
-      )}
-      {(joinable || standing) && (
-        <p class="row">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => viewerId !== undefined && onStand(role, !standing, viewerId)}
-          >
-            {standing ? 'Not me after all' : `I can ${what}`}
-          </button>
-        </p>
-      )}
-    </>
-  )
-}
+}) => (
+  <>
+    <h3>{role === 'helper' ? 'Helping cook' : 'Washing up'}</h3>
+    <HelperStrip
+      label={`${role === 'helper' ? 'cooking' : 'cleanup'} at ${meal.label}`}
+      people={role === 'helper' ? meal.helpers : meal.cleanup}
+      // The lead is already cooking it, so they are not offered a second pair of
+      // hands for the same thing — and may still wash up, which is why this is per
+      // role. A chore's cooks take nobody at all.
+      candidates={
+        joinable
+          ? attendees.filter((who) => role === 'cleanup' || who.account_id !== meal.lead?.account_id)
+          : []
+      }
+      viewerId={viewerId}
+      busy={busy}
+      onAdd={(accountId) => onStand(role, true, accountId)}
+      onRemove={(accountId) => onStand(role, false, accountId)}
+    />
+  </>
+)
