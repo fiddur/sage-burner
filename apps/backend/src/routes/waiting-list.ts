@@ -1,4 +1,4 @@
-import { and, eq, ne } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 
 import type { Database } from '../db/index.ts'
 import type { Notifier } from '../push/notify.ts'
@@ -8,9 +8,11 @@ import { attendance, event } from '../db/schema.ts'
 /**
  * How close to full is close enough to warn somebody (#248).
  *
- * Four places, which is the sketch's number and a reasonable one: enough that
- * somebody who meant to pay this week still can, few enough that it is not sent
- * every time anybody pays.
+ * Four places, which is the sketch's number. Inside that window every genuine
+ * payment does warn every unpaid member again — so on a cap of 42 somebody who has
+ * not paid hears it as payments 38 through 41 land. That is a countdown rather than
+ * a repeat, and it is the point: the number of places left is what changed. Outside
+ * the window nothing is sent at all.
  */
 const NEARLY_FULL = 4
 
@@ -71,20 +73,4 @@ export const tellAboutTheWaitingList = async (
       link: '/members',
     })
   }
-}
-
-/** Whether this burn already holds a paid attendance for somebody else. */
-export const someoneElseHasPaid = async (db: Database, eventId: string, accountId: string) => {
-  const rows = await db
-    .select({ id: attendance.id })
-    .from(attendance)
-    .where(
-      and(
-        eq(attendance.event_id, eventId),
-        eq(attendance.payment_status, 'paid'),
-        ne(attendance.account_id, accountId),
-      ),
-    )
-
-  return rows.length > 0
 }

@@ -155,20 +155,21 @@ export const registerRosterRoutes = (
 
       if (updated === undefined) return reply.code(404).send(errorResponse('not_found'))
 
-      // Only on the transition. Re-saving 'paid' over 'paid' — which the roster's
-      // checkbox does on a double click — would otherwise say it again.
+      // Both only on the transition. Re-saving 'paid' over 'paid' — which the
+      // roster's checkbox does on a double click — changes no count and must not
+      // say anything, least of all to *everybody* who has not paid.
       if (updated.payment_status === 'paid' && before?.payment_status !== 'paid') {
         await notify(accountId, {
           category: 'payment',
           body: 'Your payment has been recorded.',
           link: '/members',
         })
-      }
 
-      // And what that payment did to everybody who has not made one. Not in the
-      // write's transaction: recording a payment must not fail because a bell could
-      // not be rung.
-      await tellAboutTheWaitingList(db, eventId, notify)
+        // And what that payment did to everybody who has not made one. Not in the
+        // write's transaction: recording a payment must not fail because a bell
+        // could not be rung.
+        await tellAboutTheWaitingList(db, eventId, notify)
+      }
 
       return { attendance: await withHelping(updated) }
     },

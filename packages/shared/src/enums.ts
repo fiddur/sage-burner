@@ -175,7 +175,7 @@ export const notificationCategories = [
 ] as const
 export type NotificationCategory = (typeof notificationCategories)[number]
 
-/** What the settings table calls each one, and where the bell sends you. */
+/** What the settings table calls each one. Where the bell *sends* you is the route's. */
 export const notificationCategoryLabels: Record<NotificationCategory, string> = {
   meal_role: 'Put on or taken off a meal',
   dream_role: 'Put on or taken off a dream',

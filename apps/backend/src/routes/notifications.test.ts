@@ -300,6 +300,24 @@ describe('the waiting list', () => {
     expect((await list(server, unpaid.cookie)).json().notifications).toHaveLength(0)
   })
 
+  it('warns nobody again when a payment is re-saved over itself', async () => {
+    // The roster's checkbox does this on a double click. It changes no count, so it
+    // must say nothing — least of all to *everybody* who has not paid.
+    const server = await build()
+    await givenBurn(5)
+    const organiser = await givenAccount(['admin'])
+    const paid = await givenAccount()
+    const unpaid = await givenAccount()
+    await givenComing(paid.id)
+    await givenComing(unpaid.id)
+    await setPaid(server, organiser.cookie, paid.id)
+    const first = (await list(server, unpaid.cookie)).json().notifications.length
+
+    await setPaid(server, organiser.cookie, paid.id)
+
+    expect((await list(server, unpaid.cookie)).json().notifications).toHaveLength(first)
+  })
+
   it('records a payment once, not on every re-save', async () => {
     const server = await build()
     await givenBurn(20)

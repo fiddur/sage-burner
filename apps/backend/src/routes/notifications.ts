@@ -70,11 +70,14 @@ export const registerNotificationRoutes = (
   app.put(apiRoutes.updateMyNotificationSettings.fastify, async (request, reply) => {
     void noStore(reply)
 
-    const parsed = notificationSettingsSchema.safeParse(request.body)
-    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
-
+    // Who before what, like the three above: a signed-out caller with a malformed
+    // body should hear the same 401 as one with a good body, not a 400 telling them
+    // about a route they may not use.
     const accountId = await mine(request)
     if (accountId === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
+
+    const parsed = notificationSettingsSchema.safeParse(request.body)
+    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
 
     // The whole set, not a delta — the form sends every tick it is showing, and a
     // delta would need the client to know what it had before to say what changed.
