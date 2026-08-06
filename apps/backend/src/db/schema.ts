@@ -163,6 +163,8 @@ export const event = sqliteTable(
     welcome_markdown: text('welcome_markdown').notNull().default(''),
     /** How to pay for this burn. Shown to whoever has not, on the Members page. */
     payment_info_markdown: text('payment_info_markdown').notNull().default(''),
+    /** What replaces it once the burn is full — how a place is handed over (#23). */
+    transfer_info_markdown: text('transfer_info_markdown').notNull().default(''),
     /** What the Meal page says above its table. Markdown, and any member may rewrite it. */
     meal_intro_markdown: text('meal_intro_markdown').notNull().default(''),
     member_cap: integer('member_cap').notNull(),
@@ -658,13 +660,20 @@ export const session = sqliteTable(
       .references(() => event.id, { onDelete: 'cascade' }),
     title: text('title').notNull(),
     /**
-     * Who runs it — a person, not one of their stays. Null until somebody is handed it.
+     * Who runs it. Null until somebody is handed it, which is how most start.
      *
-     * An `account` rather than an `attendance`, unlike the two tables below: a
-     * withdrawal leaves the name here for somebody to notice. The routes are what
-     * check they are coming. No `onDelete` — #35 owns account deletion.
+     * An `attendance` like the two tables below, and for the same reason: only
+     * somebody coming can run it, and leaving the burn empties the spot here without
+     * any route having to remember to. It was an `account` until #23, where the rule
+     * became that leaving takes you off everything — a facilitator left behind was
+     * the one place that did not hold.
+     *
+     * `set null` rather than cascade: the dream survives its facilitator going, and
+     * the vacancy is takeable from the schedule.
      */
-    facilitator_account_id: text('facilitator_account_id').references(() => account.id),
+    facilitator_attendance_id: text('facilitator_attendance_id').references(() => attendance.id, {
+      onDelete: 'set null',
+    }),
     description: text('description').notNull().default(''),
     /**
      * Whether placing it in the grid leaves it behind to place again.

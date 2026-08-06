@@ -34,6 +34,7 @@ import type {
   PasskeyRegistration,
   PaymentUpdate,
   PlaceCreate,
+  PlaceTransfer,
   PlaceOrder,
   PlaceUpdate,
   ProfileUpdate,
@@ -503,6 +504,11 @@ export const apiRoutes = {
     fastify: '/api/sessions/:id/support/me',
     path: (id: string) => `/api/sessions/${encodeURIComponent(id)}/support/me`,
   },
+  transferMyPlace: {
+    method: 'POST',
+    fastify: '/api/events/:eventId/attendance/me/transfer',
+    path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/attendance/me/transfer`,
+  },
   unsubscribeFromPush: {
     method: 'DELETE',
     fastify: '/api/push/subscriptions',
@@ -638,6 +644,7 @@ export interface RouteBodies {
   setPayment: PaymentUpdate
   submitApplication: ApplicationCreate
   subscribeToPush: PushSubscriptionCreate
+  transferMyPlace: PlaceTransfer
   unsubscribeFromPush: Pick<PushSubscriptionCreate, 'endpoint'>
   updateEvent: EventUpdate
   updateEventOption: EventOptionUpdate

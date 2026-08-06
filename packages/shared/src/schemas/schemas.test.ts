@@ -12,7 +12,13 @@ import {
 } from '../limits.ts'
 import { applicationCreateSchema, applicationSchema } from './application.ts'
 import { slugSchema } from './common.ts'
-import { eventFields, eventSchema, withEventDateOrder } from './event.ts'
+import {
+  DEFAULT_TRANSFER_INFO,
+  eventCreateSchema,
+  eventFields,
+  eventSchema,
+  withEventDateOrder,
+} from './event.ts'
 import { formQuestionSchema } from './form-question.ts'
 import {
   attendanceFields,
@@ -44,6 +50,7 @@ const anEvent = {
   end_time: '12:00',
   welcome_markdown: '# Welcome!',
   payment_info_markdown: '',
+  transfer_info_markdown: '',
   member_cap: 42,
   created_at: '2026-07-28T10:00:00Z',
 }
@@ -495,6 +502,25 @@ describe('deriving schemas', () => {
     expect(createEvent.safeParse(backwards).success).toBe(false)
     // Without the wrapper the invariant is silently gone — this is the trap.
     expect(eventFields.omit({ id: true, created_at: true }).safeParse(backwards).success).toBe(true)
+  })
+
+  it('defaults the transfer text so a new burn already has something to say when full', () => {
+    // Keys deleted rather than set undefined: the create schema is `.strict()`, so
+    // an `id: undefined` is an unknown key and the parse fails for the wrong reason.
+    const { id: _id, created_at: _created, transfer_info_markdown: _text, ...body } = anEvent
+
+    const parsed = eventCreateSchema.safeParse(body)
+
+    expect(parsed.success && parsed.data.transfer_info_markdown).toBe(DEFAULT_TRANSFER_INFO)
+  })
+
+  it('keeps what an admin wrote over the default', () => {
+    // The passing sibling: always answering the default would satisfy the test above.
+    const { id: _id, created_at: _created, ...body } = anEvent
+
+    const parsed = eventCreateSchema.safeParse({ ...body, transfer_info_markdown: 'Ask Ada.' })
+
+    expect(parsed.success && parsed.data.transfer_info_markdown).toBe('Ask Ada.')
   })
 
   it('derives an attendance patch body that still enforces the stay order', () => {

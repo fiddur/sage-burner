@@ -1,10 +1,12 @@
 import type { RosterEntry } from '@sage-burner/shared'
 
+import { Fragment } from 'preact'
 import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
 import { GuardedPage } from '../components/GuardedPage.tsx'
+import { WaitingListLine, startsTheWaitingList } from '../components/WaitingListLine.tsx'
 import { toCsv } from '../csv.ts'
 import { useAction, useLoad } from '../load.ts'
 import { isAdmin, useViewer } from '../viewer.tsx'
@@ -131,35 +133,38 @@ export const AdminRoster = ({ api }: { api: RosterApi }) => {
                 </tr>
               </thead>
               <tbody>
-                {roster.entries.map((entry) => (
-                  <tr key={entry.id} class={entry.waiting ? 'waiting' : undefined}>
-                    <td>
-                      {entry.name ?? entry.email}
-                      {entry.waiting && <span class="form-note"> · waiting</span>}
-                      <br />
-                      <span class="form-note">{entry.contact ?? entry.email}</span>
-                    </td>
-                    <td>{entry.allergies_notes ?? '—'}</td>
-                    <td>
-                      {entry.arrival_date ?? '?'} → {entry.departure_date ?? '?'}
-                      <br />
-                      <span class="form-note">{entry.lodging ?? 'no lodging said'}</span>
-                    </td>
-                    <td>
-                      <label class="field-inline">
-                        <input
-                          type="checkbox"
-                          checked={entry.payment_status === 'paid'}
-                          disabled={recording === entry.account_id}
-                          aria-label={`Paid — ${entry.name ?? entry.email}`}
-                          onChange={(changeEvent) =>
-                            void record(roster.event?.id ?? '', entry, changeEvent.currentTarget.checked)
-                          }
-                        />
-                        <span>{entry.payment_date ?? ''}</span>
-                      </label>
-                    </td>
-                  </tr>
+                {roster.entries.map((entry, index) => (
+                  <Fragment key={entry.id}>
+                    {startsTheWaitingList(roster.entries, index) && <WaitingListLine columns={4} />}
+                    <tr class={entry.waiting ? 'waiting' : undefined}>
+                      <td>
+                        {entry.name ?? entry.email}
+                        {entry.waiting && <span class="form-note"> · waiting</span>}
+                        <br />
+                        <span class="form-note">{entry.contact ?? entry.email}</span>
+                      </td>
+                      <td>{entry.allergies_notes ?? '—'}</td>
+                      <td>
+                        {entry.arrival_date ?? '?'} → {entry.departure_date ?? '?'}
+                        <br />
+                        <span class="form-note">{entry.lodging ?? 'no lodging said'}</span>
+                      </td>
+                      <td>
+                        <label class="field-inline">
+                          <input
+                            type="checkbox"
+                            checked={entry.payment_status === 'paid'}
+                            disabled={recording === entry.account_id}
+                            aria-label={`Paid — ${entry.name ?? entry.email}`}
+                            onChange={(changeEvent) =>
+                              void record(roster.event?.id ?? '', entry, changeEvent.currentTarget.checked)
+                            }
+                          />
+                          <span>{entry.payment_date ?? ''}</span>
+                        </label>
+                      </td>
+                    </tr>
+                  </Fragment>
                 ))}
               </tbody>
             </table>

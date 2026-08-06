@@ -34,7 +34,13 @@ const anEntry = (over: Partial<MemberRosterEntry> = {}): MemberRosterEntry => ({
 })
 
 const aRoster = (over: Partial<MemberRosterResponse> = {}): MemberRosterResponse => ({
-  event: { id: 'e-1', name: 'Summer burn', member_cap: 2, payment_info_markdown: '' },
+  event: {
+    id: 'e-1',
+    name: 'Summer burn',
+    member_cap: 2,
+    payment_info_markdown: '',
+    transfer_info_markdown: '',
+  },
   entries: [],
   ...over,
 })
@@ -177,7 +183,13 @@ describe('how to pay', () => {
     renderPage(
       stub(
         aRoster({
-          event: { id: 'e-1', name: 'Summer burn', member_cap: 2, payment_info_markdown: '**Swish** 123' },
+          event: {
+            id: 'e-1',
+            name: 'Summer burn',
+            member_cap: 2,
+            payment_info_markdown: '**Swish** 123',
+            transfer_info_markdown: '',
+          },
           entries: [paying()],
         }),
       ),
@@ -192,7 +204,13 @@ describe('how to pay', () => {
     renderPage(
       stub(
         aRoster({
-          event: { id: 'e-1', name: 'Summer burn', member_cap: 2, payment_info_markdown: '**Swish** 123' },
+          event: {
+            id: 'e-1',
+            name: 'Summer burn',
+            member_cap: 2,
+            payment_info_markdown: '**Swish** 123',
+            transfer_info_markdown: '',
+          },
           entries: [paying({ payment_status: 'paid' })],
         }),
       ),
@@ -207,5 +225,79 @@ describe('how to pay', () => {
 
     await screen.findByText('Summer burn')
     expect(document.querySelector('.notice')).toBeNull()
+  })
+})
+
+describe('where the places run out', () => {
+  const full = (over: Partial<MemberRosterResponse['event']> = {}) =>
+    aRoster({
+      event: {
+        id: 'e-1',
+        name: 'Summer burn',
+        member_cap: 2,
+        payment_info_markdown: '**Swish** 123',
+        transfer_info_markdown: 'Ask on the waiting list.',
+        ...over,
+      },
+      entries: [
+        anEntry({ name: 'Ada', payment_status: 'paid' }),
+        anEntry({ name: 'Bea', payment_status: 'paid' }),
+        anEntry({ name: 'Cyd', account_id: 'a-1', waiting: true }),
+        anEntry({ name: 'Dee', waiting: true }),
+      ],
+    })
+
+  it('draws one waiting-list line, above the first person past the cap', async () => {
+    renderPage(stub(full()))
+
+    const lines = await screen.findAllByText('Waiting list')
+    expect(lines).toHaveLength(1)
+
+    // The row order is the answer to who has a place, so the line's position is it.
+    const rows = [...document.querySelectorAll('tbody tr')]
+    expect(rows.findIndex((row) => row.textContent?.includes('Waiting list'))).toBe(2)
+  })
+
+  it('draws none at all while there is room', async () => {
+    // The passing sibling: a line drawn unconditionally would satisfy the test above.
+    renderPage(
+      stub(
+        aRoster({
+          entries: [anEntry({ name: 'Ada' }), anEntry({ name: 'Bea' })],
+        }),
+      ),
+    )
+
+    await screen.findByText('Ada')
+    expect(screen.queryByText('Waiting list')).toBeNull()
+  })
+
+  it('says how a place changes hands, not how to pay, once the burn is full', async () => {
+    // Paying no longer gets anybody in, so the payment instructions are the wrong
+    // thing to leave up in front of somebody who has not paid.
+    renderPage(stub(full()))
+
+    expect(await screen.findByText('Ask on the waiting list.')).toBeTruthy()
+    expect(screen.queryByText(/Swish/)).toBeNull()
+  })
+
+  it('still says how to pay while places are left', async () => {
+    renderPage(
+      stub(
+        aRoster({
+          event: {
+            id: 'e-1',
+            name: 'Summer burn',
+            member_cap: 42,
+            payment_info_markdown: '**Swish** 123',
+            transfer_info_markdown: 'Ask on the waiting list.',
+          },
+          entries: [anEntry({ name: 'Cyd', account_id: 'a-1' })],
+        }),
+      ),
+    )
+
+    expect(await screen.findByText(/Swish/)).toBeTruthy()
+    expect(screen.queryByText('Ask on the waiting list.')).toBeNull()
   })
 })

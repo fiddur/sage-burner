@@ -1,8 +1,11 @@
+import { Fragment } from 'preact'
+
 import type { ApiClient } from '../api/client.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
+import { WaitingListLine, startsTheWaitingList } from '../components/WaitingListLine.tsx'
 import { useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
 import { isApproved, useViewer } from '../viewer.tsx'
@@ -60,7 +63,13 @@ export const Members = ({ api }: { api: MembersApi }) => {
           </p>
 
           <HowToPay
-            info={roster.event.payment_info_markdown}
+            info={
+              // Once every place is taken, how to pay is the wrong thing to say: paying
+              // does not get anybody in any more, and what changes hands is a place.
+              confirmed >= roster.event.member_cap
+                ? roster.event.transfer_info_markdown
+                : roster.event.payment_info_markdown
+            }
             owed={roster.entries.some(
               (entry) => entry.account_id === viewer.account?.id && entry.payment_status !== 'paid',
             )}
@@ -80,35 +89,38 @@ export const Members = ({ api }: { api: MembersApi }) => {
                 </tr>
               </thead>
               <tbody>
-                {roster.entries.map((entry) => (
-                  <tr key={entry.id} class={entry.waiting ? 'waiting' : undefined}>
-                    <td>
-                      {/* No fallback to the email address the way the organiser's
+                {roster.entries.map((entry, index) => (
+                  <Fragment key={entry.id}>
+                    {startsTheWaitingList(roster.entries, index) && <WaitingListLine columns={5} />}
+                    <tr class={entry.waiting ? 'waiting' : undefined}>
+                      <td>
+                        {/* No fallback to the email address the way the organiser's
                           list has, because the response does not carry one. */}
-                      {entry.name ?? 'Name not filled in yet'}
-                      {entry.waiting && <span class="form-note"> · waiting</span>}
-                      <br />
-                      <span class="form-note">{entry.contact ?? 'no contact given'}</span>
-                    </td>
-                    <td>{entry.allergies_notes ?? '—'}</td>
-                    <td>
-                      {entry.arrival_date ?? '?'} → {entry.departure_date ?? '?'}
-                      <br />
-                      <span class="form-note">{entry.lodging ?? 'no lodging said'}</span>
-                    </td>
-                    <td>
-                      {entry.helping ?? '—'}
-                      {entry.helping_other !== null && (
-                        <>
-                          <br />
-                          <span class="form-note">{entry.helping_other}</span>
-                        </>
-                      )}
-                    </td>
-                    {/* A word, not a tick: a checkbox reads as something to click,
+                        {entry.name ?? 'Name not filled in yet'}
+                        {entry.waiting && <span class="form-note"> · waiting</span>}
+                        <br />
+                        <span class="form-note">{entry.contact ?? 'no contact given'}</span>
+                      </td>
+                      <td>{entry.allergies_notes ?? '—'}</td>
+                      <td>
+                        {entry.arrival_date ?? '?'} → {entry.departure_date ?? '?'}
+                        <br />
+                        <span class="form-note">{entry.lodging ?? 'no lodging said'}</span>
+                      </td>
+                      <td>
+                        {entry.helping ?? '—'}
+                        {entry.helping_other !== null && (
+                          <>
+                            <br />
+                            <span class="form-note">{entry.helping_other}</span>
+                          </>
+                        )}
+                      </td>
+                      {/* A word, not a tick: a checkbox reads as something to click,
                         and this is the one column here nobody may change. */}
-                    <td>{entry.payment_status === 'paid' ? 'yes' : 'not yet'}</td>
-                  </tr>
+                      <td>{entry.payment_status === 'paid' ? 'yes' : 'not yet'}</td>
+                    </tr>
+                  </Fragment>
                 ))}
               </tbody>
             </table>

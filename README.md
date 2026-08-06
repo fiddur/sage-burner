@@ -1438,10 +1438,19 @@ anyone could make by hand. Offering something for another member to run is exact
 that edit, and it is what was wanted, so the field was renamed and opened.
 
 It is **nullable**: a dream can be offered before anyone has said they will run it,
-which is how most of them start. The routes check that whoever is named is **coming
-to this burn** — the same rule the lead-roles register applies to a lead, and the
-same picker feed, `GET /api/events/:eventId/attendees`. A 400 rather than a 404: the
-account exists, the pairing is what is wrong.
+which is how most of them start. Whoever is named must be **coming to this burn** —
+the same rule the lead-roles register applies to a lead, and the same picker feed,
+`GET /api/events/:eventId/attendees`. A 400 rather than a 404: the account exists,
+the pairing is what is wrong.
+
+Since #23 the **column is an `attendance`**, `facilitator_attendance_id`, with
+`ON DELETE SET NULL`. Leaving a burn takes you off everything you signed up for
+there; every other role already held that by foreign key, and the facilitator was
+the one exception — the old column named an `account` and its comment said a
+withdrawal "leaves the name here for somebody to notice", which #247's take-it
+control made unnecessary. The wire field is still `facilitator_account_id`: every
+reader wants the person, so `dreamColumns` in `sessions.ts` joins back through
+`attendance` and is the only place that knows the difference.
 
 The rename was a table rebuild rather than `ALTER TABLE … RENAME COLUMN`, because the
 column also lost `NOT NULL` and SQLite cannot drop a constraint in place. Every
@@ -2382,6 +2391,45 @@ anyone paid, and the whole rule is that paying re-sorts the list. `withPlaces` i
 #79's member-facing list has to give the same answer, and two pages telling
 someone different things about where they stand is worse than one of them being
 absent.
+
+Both lists **draw the line where the places run out** (#23), as a row inside the
+one table rather than a second table below it: the order is the answer to who has
+a place, so splitting it in two would be two chances to disagree about that.
+
+**Ordered by `joined_at` within each group, not by payment time.** #23's sketch
+said payment timestamp; `payment_date` is written as `todayIso(now)` — a date, not
+a timestamp — so an organiser recording a batch in one sitting gives every one of
+them the same key and the tie breaks on nothing.
+
+### Handing a place over
+
+Withdrawing is refused once you have paid, because what a refund means is #31's
+question. That left a paid member who could not come with no way out and their
+place unreachable by the waiting list, so `POST
+/api/events/:eventId/attendance/me/transfer` is the exit: it moves the payment to
+somebody unpaid at that burn and **deletes the giver's attendance row**.
+
+One-sided and immediate — the money is settled between the two of them offline,
+which is what the burn's transfer text tells them to do, so an accept step would
+only let a place sit in limbo. The taker is notified; the giver is not, having
+clicked it themselves.
+
+**Leaving takes you off everything you signed up for there.** The row's foreign
+keys do it: helping ticks, meal shifts, lead-role teams and dream helpers cascade,
+a `lead_attendance_id` is set null, and since #23 so is the dream you were
+facilitating — that column named an `account` until then and was the one role a
+withdrawal left behind. The dream itself stays, vacant, and #247's control is what
+lets somebody pick it up.
+
+The payment date is **carried over rather than restamped**: the burn received one
+payment, on that date, and the place changing hands is not a second one.
+
+Once `member_cap` paid members are in, the Members page shows the burn's
+`transfer_info_markdown` in place of `payment_info_markdown` — telling somebody
+how to pay when paying no longer gets them in is the wrong thing to leave up. Both
+are per-burn and admin-editable; the transfer text defaults to
+`DEFAULT_TRANSFER_INFO` rather than being blank, so a burn always has something to
+say there.
 
 Recording a payment sends **the status and nothing else** — an organiser
 recording money received has no business rewriting an arrival date in the same

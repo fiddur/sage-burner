@@ -200,6 +200,7 @@ export const registerRosterRoutes = (
         name: event.name,
         member_cap: event.member_cap,
         payment_info_markdown: event.payment_info_markdown,
+        transfer_info_markdown: event.transfer_info_markdown,
       })
       .from(event)
       .where(eq(event.id, eventId))

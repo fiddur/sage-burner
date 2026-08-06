@@ -1,12 +1,13 @@
 import type { EventAttendeesResponse, MyBurn, MyBurnsResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { apiRoutes, attendanceCreateSchema, errorResponse } from '@sage-burner/shared'
+import { apiRoutes, attendanceCreateSchema, errorResponse, placeTransferSchema } from '@sage-burner/shared'
 import { and, asc, eq, gte, isNotNull, or } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
 import type { Database } from '../db/index.ts'
+import type { Notifier } from '../push/notify.ts'
 
 import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
@@ -117,6 +118,8 @@ export const attendanceFor = async (db: Database, eventId: string, accountId: st
 
 export interface AttendanceDeps extends GuardDeps {
   now?: () => Date
+  /** Told when a place is handed to them — the one person here who did not click. */
+  notify?: Notifier
 }
 
 /**
@@ -136,7 +139,7 @@ export interface AttendanceDeps extends GuardDeps {
  */
 export const registerAttendanceRoutes = (
   app: FastifyInstance,
-  { db, sessions, now = () => new Date() }: AttendanceDeps,
+  { db, sessions, now = () => new Date(), notify = async () => undefined }: AttendanceDeps,
 ) => {
   const { requireApproved, requireMember } = createGuards({ db, sessions })
 
@@ -261,6 +264,78 @@ export const registerAttendanceRoutes = (
       return existing === undefined
         ? reply.code(404).send(errorResponse('not_found'))
         : reply.code(409).send(errorResponse('conflict'))
+    },
+  )
+
+  /**
+   * Handing your paid place to somebody who has not paid (#23).
+   *
+   * The exit that was missing. Withdrawing is refused once you have paid — what a
+   * refund means is #31's question — so a paid member who cannot come had no way out
+   * and their place could not reach the waiting list. This moves the payment and
+   * then leaves.
+   *
+   * **One-sided and immediate.** The money is settled between the two of them
+   * offline, which is what the burn's transfer text tells them to do, so an accept
+   * step would only let a place sit in limbo.
+   *
+   * **The giver leaves the burn**, rather than staying on unpaid. Everything they
+   * had signed up for there goes with the row — helping ticks, meal shifts, lead
+   * teams, dream helpers, and since this issue the dream they were facilitating,
+   * which empties rather than disappearing.
+   *
+   * Refusals are deliberately different: a taker who is not coming to this burn is a
+   * **404** because there is no such place to hand over, while a giver with nothing
+   * paid and a taker who has already paid are **409** — the rows exist and the
+   * request contradicts them.
+   *
+   * Naming yourself as the taker needs no check of its own: giving requires having
+   * paid, so the taker is then the same already-paid row, and the check below
+   * refuses it. A guard for it was written, and a mutation showed it could never
+   * fire.
+   */
+  app.post<{ Params: { eventId: string } }>(
+    apiRoutes.transferMyPlace.fastify,
+    { preHandler: requireMember },
+    async (request, reply) => {
+      void noStore(reply)
+
+      const viewer = await viewerFor(request, { db, sessions })
+      if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
+
+      const parsed = placeTransferSchema.safeParse(request.body)
+      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+
+      const open = await openEvent(db, todayIso(now), request.params.eventId)
+      if (open === undefined) return reply.code(404).send(errorResponse('not_found'))
+
+      const mine = await stayAt(db, open.id, viewer.account_id)
+      if (mine === undefined) return reply.code(404).send(errorResponse('not_found'))
+      if (mine.payment_status !== 'paid') return reply.code(409).send(errorResponse('conflict'))
+
+      const theirs = await stayAt(db, open.id, parsed.data.to_account_id)
+      if (theirs === undefined) return reply.code(404).send(errorResponse('not_found'))
+      if (theirs.payment_status === 'paid') return reply.code(409).send(errorResponse('conflict'))
+
+      // One transaction: a place that vanished without arriving, or arrived while
+      // still held, would both be worse than the request failing.
+      db.transaction((tx) => {
+        tx.update(attendance)
+          .set({ payment_status: 'paid', payment_date: mine.payment_date })
+          .where(eq(attendance.id, theirs.id))
+          .run()
+        tx.delete(attendance).where(eq(attendance.id, mine.id)).run()
+      })
+
+      // Outside it, and only to the taker: the giver did this themselves. A push
+      // service being down must not undo a place changing hands.
+      await notify(parsed.data.to_account_id, {
+        category: 'payment',
+        body: `Your place at ${open.name} is paid — somebody transferred theirs to you.`,
+        link: '/members',
+      })
+
+      return reply.code(204).send()
     },
   )
 

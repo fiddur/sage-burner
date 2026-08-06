@@ -431,6 +431,16 @@ a:hover {
   color: var(--muted);
 }
 
+/* The line itself. Left-aligned across the whole width, so it reads as a heading
+   for what follows rather than as a row with an empty first cell. */
+.waiting-line th {
+  text-align: left;
+  padding: 0.75rem 0.5rem 0.25rem;
+  color: var(--muted);
+  font-size: 0.95rem;
+  border-top: 2px solid color-mix(in srgb, var(--sage) 45%, transparent);
+}
+
 /* The question builder, on its own admin page. */
 .questions {
   margin-top: 1.5rem;
@@ -470,14 +480,6 @@ a:hover {
 
 /* A control, not a link — it performs an action rather than navigating —
    styled to sit with the nav links beside it. */
-/* Directly under the page heading, so it reads as part of it rather than as content. */
-.calendar-feed {
-  display: flex;
-  gap: 0.75rem;
-  align-items: baseline;
-  margin: -0.5rem 0 1rem;
-}
-
 .link-button {
   padding: 0;
   border: none;
@@ -485,6 +487,14 @@ a:hover {
   color: inherit;
   font: inherit;
   cursor: pointer;
+}
+
+/* Directly under the page heading, so it reads as part of it rather than as content. */
+.calendar-feed {
+  display: flex;
+  gap: 0.75rem;
+  align-items: baseline;
+  margin: -0.5rem 0 1rem;
 }
 
 .place-list {

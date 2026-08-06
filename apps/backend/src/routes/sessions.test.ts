@@ -572,9 +572,7 @@ describe('dreams', () => {
         created_at: NOW,
       })
     const old = randomUUID()
-    await db()
-      .insert(session)
-      .values({ id: old, event_id: finished, title: 'Last year', facilitator_account_id: member.id })
+    await db().insert(session).values({ id: old, event_id: finished, title: 'Last year' })
 
     expect((await editDream(server, member.cookie, old, { title: 'Rewritten' })).statusCode).toBe(404)
     expect((await drop(server, member.cookie, old)).statusCode).toBe(404)
@@ -683,12 +681,7 @@ describe('a dream belongs to the burn it names', () => {
     await givenEvent({ id: ENDED, start_date: '2025-08-01', end_date: '2025-08-05' })
     const member = await givenAccount(['member'])
     const id = randomUUID()
-    await db().insert(session).values({
-      id,
-      event_id: ENDED,
-      title: 'Last summer',
-      facilitator_account_id: member.id,
-    })
+    await db().insert(session).values({ id, event_id: ENDED, title: 'Last summer' })
 
     expect((await offer(server, member.cookie, { title: 'x' }, ENDED)).statusCode).toBe(404)
     expect((await editDream(server, member.cookie, id, { title: 'Rewritten' })).statusCode).toBe(404)
@@ -700,12 +693,7 @@ describe('a dream belongs to the burn it names', () => {
     const server = await build()
     await givenEvent({ id: ENDED, start_date: '2025-08-01', end_date: '2025-08-05' })
     const member = await givenAccount(['member'])
-    await db().insert(session).values({
-      id: randomUUID(),
-      event_id: ENDED,
-      title: 'Last summer',
-      facilitator_account_id: member.id,
-    })
+    await db().insert(session).values({ id: randomUUID(), event_id: ENDED, title: 'Last summer' })
 
     const response = await list(server, member.cookie, ENDED)
 

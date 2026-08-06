@@ -305,7 +305,18 @@ export const memberRosterResponseSchema = z.object({
    * — which the selector decides, not the API — and that is the only thing the
    * nullability is for.
    */
-  event: eventFields.pick({ id: true, name: true, member_cap: true, payment_info_markdown: true }).nullable(),
+  event: eventFields
+    .pick({
+      id: true,
+      name: true,
+      member_cap: true,
+      payment_info_markdown: true,
+      // What the page shows instead once the burn is full (#23) — both, so the
+      // swap is the page's decision from data it already has rather than a second
+      // request at the moment the burn fills.
+      transfer_info_markdown: true,
+    })
+    .nullable(),
   entries: z.array(memberRosterEntrySchema),
 })
 
@@ -327,6 +338,17 @@ export const paymentUpdateSchema = z
   .object({ payment_status: z.enum(paymentStatuses) })
   .partial()
   .strict()
+
+/**
+ * Handing a paid place to somebody who has not paid (#23).
+ *
+ * One field, and the giver is the session rather than the body: a route that took
+ * both ends could be asked to move somebody else's place. `.strict()` so a
+ * misspelled key is a 400 rather than a transfer to nobody.
+ */
+export const placeTransferSchema = z.object({ to_account_id: idSchema }).strict()
+
+export type PlaceTransfer = z.infer<typeof placeTransferSchema>
 
 export type RosterEntry = z.infer<typeof rosterEntrySchema>
 export type RosterResponse = z.infer<typeof rosterResponseSchema>

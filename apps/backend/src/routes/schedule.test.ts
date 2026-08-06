@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 
 import { publicSessionSchema } from '@sage-burner/shared'
+import { and, eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it } from 'vitest'
 
@@ -78,6 +79,27 @@ const givenHost = async () => {
   return id
 }
 
+/**
+ * The host's place at the burn, made once.
+ *
+ * A dream's facilitator is an `attendance` since #23, and one host may offer several
+ * dreams at the same burn — where a second row would hit the one-per-person index.
+ */
+const comingTo = async (eventId: string, accountId: string) => {
+  const [existing] = await db()
+    .select({ id: attendance.id })
+    .from(attendance)
+    .where(and(eq(attendance.event_id, eventId), eq(attendance.account_id, accountId)))
+    .limit(1)
+
+  if (existing !== undefined) return existing.id
+
+  const id = randomUUID()
+  await db().insert(attendance).values({ id, event_id: eventId, account_id: accountId, joined_at: NOW })
+
+  return id
+}
+
 const givenDream = async (
   eventId: string,
   hostId: string,
@@ -96,7 +118,7 @@ const givenDream = async (
       id,
       event_id: eventId,
       title: over.title ?? 'Cacao ceremony',
-      facilitator_account_id: hostId,
+      facilitator_attendance_id: await comingTo(eventId, hostId),
       description: over.description ?? 'Bring a cup.',
       // `in` rather than `??`: a deliberate null is the whole point of the
       // unscheduled case, and `null ?? default` quietly schedules it again.
@@ -227,17 +249,20 @@ describe('the public calendar feed', () => {
     const host = await givenHost()
     const temple = await givenPlace(eventId)
     await givenDream(eventId, host, { place_id: temple })
-    await db().insert(attendance).values({
-      id: randomUUID(),
-      event_id: eventId,
-      account_id: host,
-      joined_at: NOW,
-      payment_status: 'paid',
-      payment_date: '2026-07-01',
-      lodging_option_id: null,
-      helping_other: 'Sauna tending',
-      notes: 'arriving late',
-    })
+
+    // Filled in rather than inserted: a facilitator *is* an attendance since #23, so
+    // offering the dream already made the row. This is everything on it a feed must
+    // never repeat.
+    await db()
+      .update(attendance)
+      .set({
+        payment_status: 'paid',
+        payment_date: '2026-07-01',
+        lodging_option_id: null,
+        helping_other: 'Sauna tending',
+        notes: 'arriving late',
+      })
+      .where(and(eq(attendance.event_id, eventId), eq(attendance.account_id, host)))
 
     const body = (await feed(server, eventId)).body
 

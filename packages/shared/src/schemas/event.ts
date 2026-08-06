@@ -58,6 +58,19 @@ export const hasOrderedRange = (range: Required<DateRange>) => hasOrderedDates(r
  * update bodies from this rather than re-declaring the shape — and wrap the
  * result in `withEventDateOrder` so the derived schema keeps the invariant.
  */
+/**
+ * What a burn says about handing a place over, until somebody rewrites it.
+ *
+ * The migration that added the column wrote this same sentence into every existing
+ * row, and that copy is frozen history — this is the living one, used for burns made
+ * from here on. Deliberately not a fallback for an empty field: an admin who clears
+ * it means to say nothing, and a default that reappeared would be unclearable.
+ */
+export const DEFAULT_TRANSFER_INFO =
+  'A paid member can transfer their membership to someone else. To transfer yours, ' +
+  'contact the members on the waiting list and settle the payment between you. Then ' +
+  'hand the place over from your own page.'
+
 export const eventFields = z.object({
   id: idSchema,
   name: nonEmptyText(MAX_TITLE),
@@ -81,6 +94,15 @@ export const eventFields = z.object({
    * next one. Markdown, like every longer field somebody else reads.
    */
   payment_info_markdown: z.string().max(MAX_WELCOME_LENGTH),
+  /**
+   * What replaces the payment instructions once the burn is full (#23).
+   *
+   * At that point "here is how to pay" is the wrong thing to tell somebody who has
+   * not: paying does not get them in any more, and what they need to know is that a
+   * place can be handed over. Per burn and admin-editable, because how a handover is
+   * arranged is a decision about one gathering.
+   */
+  transfer_info_markdown: z.string().max(MAX_WELCOME_LENGTH),
   /** Membership cap, e.g. 42. Approvals past this go to the waiting list. */
   member_cap: z.int().positive(),
   created_at: dateTimeSchema,
@@ -107,6 +129,7 @@ export const eventCreateSchema = withEventDateOrder(
     .extend({
       welcome_markdown: eventFields.shape.welcome_markdown.default(''),
       payment_info_markdown: eventFields.shape.payment_info_markdown.default(''),
+      transfer_info_markdown: eventFields.shape.transfer_info_markdown.default(DEFAULT_TRANSFER_INFO),
       // Defaulted so an organiser naming dates and a cap is not stopped by two
       // fields they may not have decided yet. The whole day, which is what the
       // grid did before the hours existed.
