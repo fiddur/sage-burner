@@ -24,7 +24,7 @@ import { viewerFor } from '../auth/viewer.ts'
 import { isForeignKeyViolation, isUniqueViolation } from '../db/errors.ts'
 import { account, attendance, event, meal, mealRole, mealSlot } from '../db/schema.ts'
 import { noStore } from '../http.ts'
-import { attendanceFor } from './attendance.ts'
+import { accountForAttendance, attendanceFor } from './attendance.ts'
 import { openEvent, todayIso } from './events.ts'
 
 export interface MealDeps extends GuardDeps {
@@ -286,6 +286,15 @@ export const registerMealRoutes = (
         if (taking === undefined) return reply.code(400).send(errorResponse('bad_request'))
       }
 
+      // Whoever holds it now, read before the write takes it off them.
+      const [current] = await db
+        .select({ attendance_id: mealRole.attendance_id })
+        .from(mealRole)
+        .where(and(eq(mealRole.meal_id, existing.id), eq(mealRole.role, 'lead')))
+        .limit(1)
+
+      const held = current === undefined ? undefined : await accountForAttendance(db, current.attendance_id)
+
       const handedTo = taking
       db.transaction((tx) => {
         tx.delete(mealRole)
@@ -296,6 +305,19 @@ export const registerMealRoutes = (
           tx.insert(mealRole).values({ meal_id: existing.id, attendance_id: handedTo, role: 'lead' }).run()
         }
       })
+
+      // Both ends, since one write can move the lead off one person and onto
+      // another — and vacating is how every handover starts now, so being taken off
+      // has to be told as well as being given it.
+      const viewer = await viewerFor(request, { db, sessions })
+      const by = viewer?.account_id ?? ''
+
+      if (held !== undefined && held !== parsed.data.account_id) {
+        await tell(by, held, `You are no longer leading ${existing.label}`)
+      }
+      if (parsed.data.account_id !== null && parsed.data.account_id !== held) {
+        await tell(by, parsed.data.account_id, `You are leading ${existing.label}`)
+      }
 
       return answer(reply, existing.id)
     },

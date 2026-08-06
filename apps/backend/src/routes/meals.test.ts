@@ -2,9 +2,10 @@ import type { FastifyInstance } from 'fastify'
 
 import { eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { DbHandle } from '../db/index.ts'
+import type { Delivery } from '../push/push.ts'
 
 import { createApp } from '../app.ts'
 import { createSessions } from '../auth/session.ts'
@@ -12,7 +13,7 @@ import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { isForeignKeyViolation, isUniqueViolation } from '../db/errors.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, attendance, event, meal as mealTable } from '../db/schema.ts'
+import { account, accountRole, attendance, event, meal as mealTable, pushSubscription } from '../db/schema.ts'
 import { sittingDates } from './meals.ts'
 
 const SECRET = 's'.repeat(40)
@@ -29,16 +30,39 @@ afterEach(async () => {
   handle = undefined
 })
 
-const build = async () => {
+const build = async (deliver: Delivery = () => Promise.resolve('sent')) => {
   handle = createDb({ url: ':memory:' })
   runMigrations(handle)
   app = await createApp({
     db: handle.db,
     config: createConfig({ LOG_LEVEL: 'silent', SESSION_SECRET: SECRET }),
     now: () => new Date(NOW),
+    deliver,
+    mintKeys: () => ({ publicKey: 'a-public-key', privateKey: 'a-private-key' }),
   })
   return app
 }
+
+/** One browser opted in, so there is somewhere for a notification to go. */
+const givenSubscribed = async (accountId: string) => {
+  await db()
+    .insert(pushSubscription)
+    .values({
+      id: randomUUID(),
+      endpoint: `https://push.example.org/${randomUUID()}`,
+      account_id: accountId,
+      p256dh: 'a-key',
+      auth: 'a-secret',
+      created_at: NOW,
+    })
+}
+
+/** What was pushed, as the strings a person would read. */
+const messagesFrom = (deliver: ReturnType<typeof vi.fn<Delivery>>) =>
+  deliver.mock.calls.map((call) => {
+    const parsed: unknown = JSON.parse(String(call[1]))
+    return typeof parsed === 'object' && parsed !== null && 'body' in parsed ? String(parsed.body) : ''
+  })
 
 const db = () => {
   const found = handle?.db
@@ -846,5 +870,78 @@ describe('a lead stranded by a slot becoming a chore', () => {
     })
     expect(vacated.statusCode).toBe(200)
     expect(vacated.json().meal.lead).toBeNull()
+  })
+})
+
+describe('telling somebody a meal role moved', () => {
+  const setUp = async (deliver: Delivery) => {
+    const server = await build(deliver)
+    await givenBurn()
+    const organiser = await givenAccount(['admin'])
+    await addSlot(server, organiser.cookie, { label: 'Dinner', at: '18:00' })
+    await generate(server, organiser.cookie)
+    const ada = await givenAttending('Ada')
+    const [meal] = (await listMeals(server, ada.cookie)).meals
+
+    return { server, organiser, ada, meal }
+  }
+
+  it('tells the one handed the lead, and the one it came off', async () => {
+    // Vacating is how every handover starts now, so being taken off has to be told
+    // as well as being given it. A third person moves it, or the one who did it
+    // would be the one not told — which is the next test.
+    const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
+    const { server, organiser, ada, meal } = await setUp(deliver)
+    const bea = await givenAttending('Bea')
+    await givenSubscribed(ada.id)
+    await givenSubscribed(bea.id)
+    await send(server, 'PUT', `/api/meals/${meal.id}/lead`, ada.cookie, { account_id: ada.id })
+    deliver.mockClear()
+
+    await send(server, 'PUT', `/api/meals/${meal.id}/lead`, organiser.cookie, { account_id: bea.id })
+
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(2))
+    expect(messagesFrom(deliver).toSorted()).toEqual([
+      'You are leading Dinner',
+      'You are no longer leading Dinner',
+    ])
+  })
+
+  it('says nothing to somebody who took it themselves', async () => {
+    // Taking a job you want is the common case, and a notification for your own
+    // click is what teaches people to ignore the channel.
+    const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
+    const { server, ada, meal } = await setUp(deliver)
+    await givenSubscribed(ada.id)
+
+    await send(server, 'PUT', `/api/meals/${meal.id}/lead`, ada.cookie, { account_id: ada.id })
+
+    expect(deliver).not.toHaveBeenCalled()
+  })
+
+  it('tells somebody put on a crew by anybody but themselves', async () => {
+    const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
+    const { server, ada, meal } = await setUp(deliver)
+    const bea = await givenAttending('Bea')
+    await givenSubscribed(bea.id)
+
+    await send(server, 'PUT', `/api/meals/${meal.id}/crew/helper`, ada.cookie, { account_id: bea.id })
+
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1))
+    expect(messagesFrom(deliver)).toEqual(['You are on helper for Dinner'])
+  })
+
+  it('tells somebody taken off a crew by anybody but themselves', async () => {
+    const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
+    const { server, ada, meal } = await setUp(deliver)
+    const bea = await givenAttending('Bea')
+    await givenSubscribed(bea.id)
+    await send(server, 'PUT', `/api/meals/${meal.id}/crew/helper`, bea.cookie, { account_id: bea.id })
+    deliver.mockClear()
+
+    await send(server, 'DELETE', `/api/meals/${meal.id}/crew/helper/${bea.id}`, ada.cookie)
+
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1))
+    expect(messagesFrom(deliver)).toEqual(['You are off helper for Dinner'])
   })
 })

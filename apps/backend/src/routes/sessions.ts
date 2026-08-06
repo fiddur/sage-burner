@@ -195,6 +195,25 @@ export const registerSessionRoutes = (
     return viewer === undefined ? undefined : await attendanceFor(db, eventId, viewer.account_id)
   }
 
+  /**
+   * Facilitating is a role somebody else can put you in or take you out of, so it is
+   * told like the rest. Only when the field was sent *and* moved — a PATCH fixing a
+   * typo in the title must not announce anything.
+   */
+  const facilitatorMoved = async (
+    request: FastifyRequest,
+    before: { title: string; facilitator_account_id: string | null },
+    after: string | null | undefined,
+  ) => {
+    if (after === undefined || after === before.facilitator_account_id) return
+
+    const viewer = await viewerFor(request, { db, sessions })
+    const was = before.facilitator_account_id
+
+    if (was !== null) await tell(viewer?.account_id, was, `You are no longer facilitating ${before.title}`)
+    if (after !== null) await tell(viewer?.account_id, after, `You are facilitating ${before.title}`)
+  }
+
   /** Tell somebody, unless they did it themselves. Same rule as the register. */
   const tell = async (by: string | undefined, accountId: string, message: string) => {
     if (accountId === by) return
@@ -321,6 +340,8 @@ export const registerSessionRoutes = (
       }
 
       const [row] = updated
+
+      await facilitatorMoved(request, existing, parsed.data.facilitator_account_id)
 
       return row === undefined
         ? reply.code(404).send(errorResponse('not_found'))

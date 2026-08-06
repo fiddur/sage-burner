@@ -21,7 +21,7 @@ import { viewerFor } from '../auth/viewer.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
 import { account, attendance, event, leadRole, leadRoleMember } from '../db/schema.ts'
 import { noStore } from '../http.ts'
-import { attendanceFor } from './attendance.ts'
+import { accountForAttendance, attendanceFor } from './attendance.ts'
 import { copySourcesFor } from './copy-sources.ts'
 import { openEvent, todayIso } from './events.ts'
 
@@ -37,17 +37,6 @@ export interface LeadRoleDeps extends GuardDeps {
    * than a quiet one.
    */
   notify?: (accountId: string, message: string) => Promise<unknown>
-}
-
-/** Whose account holds an attendance, for telling somebody they have been taken off a role. */
-const accountForAttendance = async (db: Database, attendanceId: string) => {
-  const [row] = await db
-    .select({ account_id: attendance.account_id })
-    .from(attendance)
-    .where(eq(attendance.id, attendanceId))
-    .limit(1)
-
-  return row?.account_id
 }
 
 /**
