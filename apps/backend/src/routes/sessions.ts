@@ -368,11 +368,13 @@ export const registerSessionRoutes = (
 
       const [row] = updated
 
+      // After the 404, not before: a concurrent withdrawal between the pre-read and
+      // the UPDATE would otherwise announce a change to a dream that no longer exists.
+      if (row === undefined) return reply.code(404).send(errorResponse('not_found'))
+
       await facilitatorMoved(request, existing, parsed.data.facilitator_account_id)
 
-      return row === undefined
-        ? reply.code(404).send(errorResponse('not_found'))
-        : ({ session: await oneDream(db, row, mine) } satisfies SessionResponse)
+      return { session: await oneDream(db, row, mine) } satisfies SessionResponse
     },
   )
 
@@ -452,12 +454,17 @@ export const registerSessionRoutes = (
       const theirs = await attendanceFor(db, found.dream.event_id, parsed.data.account_id)
       if (theirs === undefined) return reply.code(400).send(errorResponse('bad_request'))
 
-      await db
+      const added = await db
         .insert(sessionHelper)
         .values({ session_id: found.dream.id, attendance_id: theirs })
         .onConflictDoNothing()
+        .returning()
 
-      await tell(found.callerId, parsed.data.account_id, `You are helping with ${found.dream.title}`)
+      // Only when a row actually went in, like the removal below: a second tab, or a
+      // repeated 👉, would otherwise push the same person the same line twice.
+      if (added.length > 0) {
+        await tell(found.callerId, parsed.data.account_id, `You are helping with ${found.dream.title}`)
+      }
 
       return { session: await oneDream(db, found.dream, found.attendanceId) } satisfies SessionResponse
     },

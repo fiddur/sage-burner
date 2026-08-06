@@ -950,6 +950,21 @@ describe('telling somebody a dream role moved', () => {
     expect(deliver).not.toHaveBeenCalled()
   })
 
+  it('says nothing the second time somebody is put on', async () => {
+    // A repeated 👉, or a second tab. `.onConflictDoNothing()` makes the write
+    // idempotent; without `.returning()` the notification is not.
+    const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
+    const { server, ada, bea, id } = await setUp(deliver)
+    await givenSubscribed(bea.id)
+    await helping(server, ada, id, 'POST', bea.id)
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1))
+    deliver.mockClear()
+
+    await helping(server, ada, id, 'POST', bea.id)
+
+    expect(deliver).not.toHaveBeenCalled()
+  })
+
   it('tells somebody taken off by anybody but themselves', async () => {
     const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
     const { server, ada, bea, id } = await setUp(deliver)
