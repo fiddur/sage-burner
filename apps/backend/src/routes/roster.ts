@@ -10,15 +10,19 @@ import { apiRoutes, errorResponse, paymentUpdateSchema, withPlaces } from '@sage
 import { and, eq } from 'drizzle-orm'
 
 import type { GuardDeps } from '../auth/guards.ts'
+import type { Notifier } from '../push/notify.ts'
 
 import { createGuards } from '../auth/guards.ts'
 import { account, attendance, event, eventOption } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 import { activeEvent, todayIso } from './events.ts'
 import { helpingIdsFor, helpingLabelsFor } from './helping.ts'
+import { tellAboutTheWaitingList } from './waiting-list.ts'
 
 export interface RosterDeps extends GuardDeps {
   now?: () => Date
+  /** Told when their payment is recorded, and when somebody else's fills the burn. */
+  notify?: Notifier
 }
 
 /**
@@ -66,7 +70,7 @@ const asMemberEntry = (entry: RosterEntry): MemberRosterEntry => ({
  */
 export const registerRosterRoutes = (
   app: FastifyInstance,
-  { db, sessions, now = () => new Date() }: RosterDeps,
+  { db, sessions, now = () => new Date(), notify = async () => undefined }: RosterDeps,
 ) => {
   const { requireApproved } = createGuards({ db, sessions })
 
@@ -132,6 +136,12 @@ export const registerRosterRoutes = (
           : { attendance: await withHelping(row) }
       }
 
+      const [before] = await db
+        .select({ payment_status: attendance.payment_status })
+        .from(attendance)
+        .where(and(eq(attendance.event_id, eventId), eq(attendance.account_id, accountId)))
+        .limit(1)
+
       const [updated] = await db
         .update(attendance)
         .set({
@@ -143,9 +153,24 @@ export const registerRosterRoutes = (
         .where(and(eq(attendance.event_id, eventId), eq(attendance.account_id, accountId)))
         .returning()
 
-      return updated === undefined
-        ? reply.code(404).send(errorResponse('not_found'))
-        : { attendance: await withHelping(updated) }
+      if (updated === undefined) return reply.code(404).send(errorResponse('not_found'))
+
+      // Only on the transition. Re-saving 'paid' over 'paid' — which the roster's
+      // checkbox does on a double click — would otherwise say it again.
+      if (updated.payment_status === 'paid' && before?.payment_status !== 'paid') {
+        await notify(accountId, {
+          category: 'payment',
+          body: 'Your payment has been recorded.',
+          link: '/members',
+        })
+      }
+
+      // And what that payment did to everybody who has not made one. Not in the
+      // write's transaction: recording a payment must not fail because a bell could
+      // not be rung.
+      await tellAboutTheWaitingList(db, eventId, notify)
+
+      return { attendance: await withHelping(updated) }
     },
   )
 

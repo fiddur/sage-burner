@@ -5,6 +5,7 @@ import type { AnySQLiteColumn, SQLiteColumn } from 'drizzle-orm/sqlite-core'
 import {
   accountRoles,
   applicationStatuses,
+  notificationCategories,
   effortLevels,
   eventOptionKinds,
   formQuestionTypes,
@@ -1003,3 +1004,52 @@ export const accountAvatar = sqliteTable(
 // with: ... })`). We use explicit joins instead: the queries here are small,
 // joins make the emitted SQL obvious, and it keeps our dependency on Drizzle's
 // still-moving 1.0 API surface to the parts we actually need.
+
+/**
+ * One thing that happened to somebody (#248).
+ *
+ * A record rather than only a push message: the bell has to say what happened while
+ * you were away and whether you have looked, and a push is gone the moment it is
+ * dismissed. The push is a copy of this, not the other way round.
+ */
+export const notification = sqliteTable(
+  'notification',
+  {
+    id: text('id').notNull(),
+    account_id: text('account_id')
+      .notNull()
+      .references(() => account.id, { onDelete: 'cascade' }),
+    category: text('category', { enum: notificationCategories }).notNull(),
+    body: text('body').notNull(),
+    /** Where clicking it goes. Null for anything with no page of its own. */
+    link: text('link'),
+    created_at: text('created_at').notNull(),
+    /** Null until the bell has been opened. What makes it go grey again. */
+    seen_at: text('seen_at'),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    index('notification_account_idx').on(table.account_id, table.created_at),
+    check('notification_category_check', oneOf(table.category, notificationCategories)),
+  ],
+)
+
+/**
+ * A category somebody has switched **off**.
+ *
+ * Only the off ones, so "default all ticked" needs no seeding — and an account made
+ * tomorrow gets the same defaults without a migration teaching it to.
+ */
+export const notificationMute = sqliteTable(
+  'notification_mute',
+  {
+    account_id: text('account_id')
+      .notNull()
+      .references(() => account.id, { onDelete: 'cascade' }),
+    category: text('category', { enum: notificationCategories }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.account_id, table.category] }),
+    check('notification_mute_category_check', oneOf(table.category, notificationCategories)),
+  ],
+)

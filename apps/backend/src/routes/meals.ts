@@ -18,6 +18,7 @@ import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
 import type { Database } from '../db/index.ts'
+import type { Notifier } from '../push/notify.ts'
 
 import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
@@ -30,7 +31,7 @@ import { openEvent, todayIso } from './events.ts'
 export interface MealDeps extends GuardDeps {
   now?: () => Date
   /** Told when somebody is put on a crew, or taken off one, by anybody but themselves. */
-  notify?: (accountId: string, message: string) => Promise<unknown>
+  notify?: Notifier
 }
 
 type Person = NonNullable<Meal['lead']>
@@ -164,7 +165,7 @@ export const registerMealRoutes = (
   const tell = async (by: string, accountId: string, message: string) => {
     if (accountId === by) return
 
-    await notify(accountId, message)
+    await notify(accountId, { category: 'meal_role', body: message, link: '/meals' })
   }
 
   /**

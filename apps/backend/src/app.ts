@@ -18,7 +18,8 @@ import { createGate, SCRYPT_GATE } from './auth/gate.ts'
 import { createGuards } from './auth/guards.ts'
 import { createSessions } from './auth/session.ts'
 import { clientErrorHandler, frameworkErrorHandler, registerErrorHandler } from './errors.ts'
-import { notifyAccount, notifyAdmins } from './push/push.ts'
+import { recordAndPush } from './push/notify.ts'
+import { notifyAdmins } from './push/push.ts'
 import { deliverWithWebPush, DEFAULT_PUSH_CONTACT, generateVAPIDKeys } from './push/web-push.ts'
 import { registerAdminRoutes } from './routes/admin.ts'
 import { registerApplicationReviewRoutes } from './routes/application-review.ts'
@@ -32,6 +33,7 @@ import { registerInstallationRoutes } from './routes/installation.ts'
 import { registerInviteRoutes } from './routes/invites.ts'
 import { registerLeadRoleRoutes } from './routes/lead-roles.ts'
 import { registerMealAdminRoutes, registerMealRoutes } from './routes/meals.ts'
+import { registerNotificationRoutes } from './routes/notifications.ts'
 import { registerPasskeyRoutes } from './routes/passkeys.ts'
 import { registerPlaceRoutes } from './routes/places.ts'
 import { registerProfileRoutes } from './routes/profile.ts'
@@ -397,18 +399,15 @@ export const createApp = async ({
   const push = { db, deliver, now, mintKeys }
 
   /**
-   * One notification for the three places a pair of hands gets signed up (#247).
+   * One notifier for every place something happens to somebody (#248).
    *
-   * Logged here rather than inside `notifyAccount`, which has no logger and is the
-   * more testable for it, and only when something went wrong.
+   * Records the row and pushes a copy, in that order. Logged here rather than inside
+   * it, which has no logger and is the more testable for it, and only when something
+   * went wrong.
    */
-  const tellAccount = async (accountId: string, message: string) => {
-    const counts = await notifyAccount(push, accountId, JSON.stringify({ body: message }))
-
-    if (counts.failed > 0 || counts.gone > 0) app.log.warn({ ...counts }, 'notifying a member')
-
-    return counts
-  }
+  const tellAccount = recordAndPush(push, now, (counts) => {
+    app.log.warn({ ...counts }, 'notifying a member')
+  })
 
   registerAuthRoutes(app, { db, config, sessions, gate })
   registerPasskeyRoutes(app, { db, config, sessions, now })
@@ -426,6 +425,7 @@ export const createApp = async ({
   registerMealAdminRoutes(app, { db, sessions, now })
 
   registerPushRoutes(app, { db, sessions, push })
+  registerNotificationRoutes(app, { db, sessions, now })
 
   registerApplicationRoutes(app, {
     db,
@@ -446,7 +446,7 @@ export const createApp = async ({
   registerRedemptionRoutes(app, { db, config, sessions, now, hash, gate })
   registerAttendanceRoutes(app, { db, sessions, now })
   registerProfileRoutes(app, { db, sessions, now })
-  registerRosterRoutes(app, { db, sessions, now })
+  registerRosterRoutes(app, { db, sessions, now, notify: tellAccount })
   registerLeadRoleRoutes(app, { db, sessions, now, notify: tellAccount })
   registerSessionRoutes(app, { db, sessions, now, notify: tellAccount })
   registerScheduleRoutes(app, { db, now })

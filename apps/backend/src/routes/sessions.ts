@@ -14,6 +14,7 @@ import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
 import type { Database } from '../db/index.ts'
+import type { Notifier } from '../push/notify.ts'
 
 import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
@@ -39,7 +40,7 @@ export interface SessionDeps extends GuardDeps {
    * register: offering a pair of hands is the point and the notification is a
    * courtesy, so a push service being down must not fail the write.
    */
-  notify?: (accountId: string, message: string) => Promise<unknown>
+  notify?: Notifier
 }
 
 type DreamRow = typeof session.$inferSelect
@@ -239,7 +240,7 @@ export const registerSessionRoutes = (
   const tell = async (by: string | undefined, accountId: string, message: string) => {
     if (accountId === by) return
 
-    await notify(accountId, message)
+    await notify(accountId, { category: 'dream_role', body: message, link: '/dreams' })
   }
 
   app.get<{ Params: { eventId: string } }>(
