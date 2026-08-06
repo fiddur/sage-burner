@@ -203,6 +203,13 @@ These are member records, so treat them as such:
   account". Challenges are rows and the statement that reads one deletes it;
   single-use is what a challenge is for, and a signed cookie cannot give it.
   Removing the last passkey off an account with no password is refused.
+- **Any role somebody else can change tells the person it happened to** (#247). One
+  control everywhere several people sign up — 🙋 takes the spot, 👉 appoints somebody
+  else, ✕ takes them off — and every route behind it notifies, on being _given_ a job
+  and on being taken off one. A filled one-person spot offers only ✕, so a handover is
+  two steps and both ends hear about it. Never for your own click: taking a job you
+  want is the common case, and a notification for that teaches people to ignore the
+  channel. The write must not fail because a push service did.
 - **Push is any approved member's**, not admin's (#184). The routes are
   `/api/push/…`, moved out from under the admin prefix rather than exempted inside
   it. `notifyAdmins` and `notifyAccount` share one delivery loop; the lead-roles

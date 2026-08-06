@@ -365,12 +365,18 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
     setMealLead: (id: string, body: BodyOf<'setMealLead'>) =>
       request<MealResponse>(apiRoutes.setMealLead.path(id), { method: apiRoutes.setMealLead.method, body }),
 
-    /** Standing for a meal's helpers or its cleanup crew, and standing down. */
-    joinMealCrew: (id: string, role: 'cleanup' | 'helper') =>
-      request<MealResponse>(apiRoutes.joinMealCrew.path(id, role), { method: apiRoutes.joinMealCrew.method }),
+    /**
+     * Putting somebody on a meal's helpers or its cleanup crew, and taking them
+     * off. Yours or anybody else's — they are told either way, unless it is them.
+     */
+    joinMealCrew: (id: string, role: 'cleanup' | 'helper', body: BodyOf<'joinMealCrew'>) =>
+      request<MealResponse>(apiRoutes.joinMealCrew.path(id, role), {
+        method: apiRoutes.joinMealCrew.method,
+        body,
+      }),
 
-    leaveMealCrew: (id: string, role: 'cleanup' | 'helper') =>
-      request<MealResponse>(apiRoutes.leaveMealCrew.path(id, role), {
+    leaveMealCrew: (id: string, role: 'cleanup' | 'helper', accountId: string) =>
+      request<MealResponse>(apiRoutes.leaveMealCrew.path(id, role, accountId), {
         method: apiRoutes.leaveMealCrew.method,
       }),
 
@@ -452,14 +458,18 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
     withdrawSession: (id: string) =>
       request<undefined>(apiRoutes.withdrawSession.path(id), { method: apiRoutes.withdrawSession.method }),
 
-    /** Offering to help run a dream, and taking the offer back. Both are idempotent. */
-    helpWithSession: (id: string) =>
+    /**
+     * Offering a pair of hands for a dream, and taking the offer back — yours or
+     * anybody else's. Both are idempotent.
+     */
+    helpWithSession: (id: string, body: BodyOf<'helpWithSession'>) =>
       request<SessionResponse>(apiRoutes.helpWithSession.path(id), {
         method: apiRoutes.helpWithSession.method,
+        body,
       }),
 
-    stopHelpingWithSession: (id: string) =>
-      request<SessionResponse>(apiRoutes.stopHelpingWithSession.path(id), {
+    stopHelpingWithSession: (id: string, accountId: string) =>
+      request<SessionResponse>(apiRoutes.stopHelpingWithSession.path(id, accountId), {
         method: apiRoutes.stopHelpingWithSession.method,
       }),
 

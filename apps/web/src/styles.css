@@ -476,7 +476,6 @@ a:hover {
   background: none;
   color: inherit;
   font: inherit;
-  text-decoration: underline;
   cursor: pointer;
 }
 
@@ -742,9 +741,19 @@ a:hover {
   height: 3.2rem;
 }
 
+/*
+  Separate borders do not collapse, so a plain `border-top` here would stack on the
+  row above's `border-bottom` and paint a 3px band. The row above gives its edge up
+  instead.
+*/
 .schedule-daybreak th,
 .schedule-daybreak td {
-  border-top: 2px solid currentColor;
+  border-top: 2px solid currentcolor;
+}
+
+.schedule-grid tr:has(+ .schedule-daybreak) th,
+.schedule-grid tr:has(+ .schedule-daybreak) td {
+  border-bottom: 0;
 }
 
 .schedule-cell {
@@ -946,10 +955,14 @@ a:hover {
   min-width: 18ch;
 }
 
-.lead-table td:nth-child(5),
+/*
+  The three effort verdicts, which are a word each. Positional, so check them against
+  the cell order after adding or moving a column — the team count used to be among
+  them and held a sentence `nowrap` would not break.
+*/
+.lead-table td:nth-child(6),
 .lead-table td:nth-child(7),
-.lead-table td:nth-child(8),
-.lead-table td:nth-child(9) {
+.lead-table td:nth-child(8) {
   white-space: nowrap;
   font-size: 0.9rem;
   opacity: 0.85;
@@ -965,6 +978,11 @@ a:hover {
 
 .lead-actions {
   white-space: nowrap;
+}
+
+/* The actions run together without it — two emoji read as one control. */
+.lead-actions > * + * {
+  margin-inline-start: 0.6rem;
 }
 
 /* Narrow: one card per role, each cell labelled with the heading the table hides. */
@@ -1164,4 +1182,77 @@ img.avatar {
   gap: 0.5rem;
   align-items: baseline;
   padding: 0.15rem 0;
+}
+
+/*
+  Whoever is on something, and what is still wanted. One control in three places.
+
+  A list rather than wrapping chips: in a table cell the chips wrapped
+  unpredictably and the vacancies were invisible among them. Down the page, a
+  vacancy is a row like a person is.
+*/
+.helpers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.helpers li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 1.9rem;
+}
+
+.helper-taken > span {
+  padding: 0.1rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  font-size: 0.9rem;
+}
+
+.helper-vacancy > span:first-child {
+  font-size: 0.85rem;
+  font-style: italic;
+  /* Holds the row's height when the word is absent, so the buttons do not shift. */
+  min-width: 4rem;
+}
+
+.helper-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/*
+  Thumb-sized, and spaced. These are the two most-pressed controls on the page and
+  the page is read on a phone at a burn — 44px is the floor a thumb reliably hits.
+*/
+.helper-actions button {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  background: none;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.helper-picker {
+  flex-wrap: wrap;
+}
+
+/* The app has been redeployed under this tab. Not dismissible — see the component. */
+.new-version {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+  padding: 0.6rem 0.8rem;
+  border-left: 3px solid var(--ember);
+  background: color-mix(in srgb, var(--ember) 10%, transparent);
 }

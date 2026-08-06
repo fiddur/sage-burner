@@ -35,7 +35,7 @@ export const MealDialog = ({
   error: string | undefined
   onClose: () => void
   onLead: (accountId: string | null) => void
-  onStand: (role: 'cleanup' | 'helper', joining: boolean) => void
+  onStand: (role: 'cleanup' | 'helper', joining: boolean, accountId: string) => void
   onIdea: (idea: string) => void
   onRename: (changes: MealUpdate) => void
 }) => {
@@ -193,7 +193,7 @@ const Crew = ({
   busy: boolean
   /** False for a chore's cooks: whoever is on it may leave, nobody new may join. */
   joinable: boolean
-  onStand: (role: 'cleanup' | 'helper', joining: boolean) => void
+  onStand: (role: 'cleanup' | 'helper', joining: boolean, accountId: string) => void
 }) => {
   const crew = role === 'helper' ? meal.helpers : meal.cleanup
   const standing = crew.some((who) => who.account_id === viewerId)
@@ -213,7 +213,11 @@ const Crew = ({
       )}
       {(joinable || standing) && (
         <p class="row">
-          <button type="button" disabled={busy} onClick={() => onStand(role, !standing)}>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => viewerId !== undefined && onStand(role, !standing, viewerId)}
+          >
             {standing ? 'Not me after all' : `I can ${what}`}
           </button>
         </p>

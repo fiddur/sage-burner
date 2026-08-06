@@ -2,9 +2,10 @@ import type { FastifyInstance } from 'fastify'
 
 import { eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { DbHandle } from '../db/index.ts'
+import type { Delivery } from '../push/push.ts'
 
 import { createApp } from '../app.ts'
 import { createSessions } from '../auth/session.ts'
@@ -12,7 +13,7 @@ import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { isForeignKeyViolation, isUniqueViolation } from '../db/errors.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, attendance, event, meal as mealTable } from '../db/schema.ts'
+import { account, accountRole, attendance, event, meal as mealTable, pushSubscription } from '../db/schema.ts'
 import { sittingDates } from './meals.ts'
 
 const SECRET = 's'.repeat(40)
@@ -29,16 +30,39 @@ afterEach(async () => {
   handle = undefined
 })
 
-const build = async () => {
+const build = async (deliver: Delivery = () => Promise.resolve('sent')) => {
   handle = createDb({ url: ':memory:' })
   runMigrations(handle)
   app = await createApp({
     db: handle.db,
     config: createConfig({ LOG_LEVEL: 'silent', SESSION_SECRET: SECRET }),
     now: () => new Date(NOW),
+    deliver,
+    mintKeys: () => ({ publicKey: 'a-public-key', privateKey: 'a-private-key' }),
   })
   return app
 }
+
+/** One browser opted in, so there is somewhere for a notification to go. */
+const givenSubscribed = async (accountId: string) => {
+  await db()
+    .insert(pushSubscription)
+    .values({
+      id: randomUUID(),
+      endpoint: `https://push.example.org/${randomUUID()}`,
+      account_id: accountId,
+      p256dh: 'a-key',
+      auth: 'a-secret',
+      created_at: NOW,
+    })
+}
+
+/** What was pushed, as the strings a person would read. */
+const messagesFrom = (deliver: ReturnType<typeof vi.fn<Delivery>>) =>
+  deliver.mock.calls.map((call) => {
+    const parsed: unknown = JSON.parse(String(call[1]))
+    return typeof parsed === 'object' && parsed !== null && 'body' in parsed ? String(parsed.body) : ''
+  })
 
 const db = () => {
   const found = handle?.db
@@ -375,13 +399,15 @@ describe('signing up for a meal', () => {
   it('stands for helping and for cleaning, which are separate', async () => {
     const { server, ada, meal } = await setUp()
 
-    await send(server, 'PUT', `/api/meals/${meal.id}/helper/me`, ada.cookie)
-    const both = await send(server, 'PUT', `/api/meals/${meal.id}/cleanup/me`, ada.cookie)
+    await send(server, 'PUT', `/api/meals/${meal.id}/crew/helper`, ada.cookie, { account_id: ada.id })
+    const both = await send(server, 'PUT', `/api/meals/${meal.id}/crew/cleanup`, ada.cookie, {
+      account_id: ada.id,
+    })
 
     expect(both.json().meal.helpers).toHaveLength(1)
     expect(both.json().meal.cleanup).toHaveLength(1)
 
-    const off = await send(server, 'DELETE', `/api/meals/${meal.id}/helper/me`, ada.cookie)
+    const off = await send(server, 'DELETE', `/api/meals/${meal.id}/crew/helper/${ada.id}`, ada.cookie)
     expect(off.json().meal.helpers).toEqual([])
     expect(off.json().meal.cleanup).toHaveLength(1)
   })
@@ -389,8 +415,10 @@ describe('signing up for a meal', () => {
   it('is the same after two clicks as after one', async () => {
     const { server, ada, meal } = await setUp()
 
-    await send(server, 'PUT', `/api/meals/${meal.id}/helper/me`, ada.cookie)
-    const again = await send(server, 'PUT', `/api/meals/${meal.id}/helper/me`, ada.cookie)
+    await send(server, 'PUT', `/api/meals/${meal.id}/crew/helper`, ada.cookie, { account_id: ada.id })
+    const again = await send(server, 'PUT', `/api/meals/${meal.id}/crew/helper`, ada.cookie, {
+      account_id: ada.id,
+    })
 
     expect(again.json().meal.helpers).toHaveLength(1)
   })
@@ -398,16 +426,23 @@ describe('signing up for a meal', () => {
   it('knows no role called lead here, since one person holds it', async () => {
     const { server, ada, meal } = await setUp()
 
-    expect((await send(server, 'PUT', `/api/meals/${meal.id}/lead/me`, ada.cookie)).statusCode).toBe(404)
+    expect(
+      (await send(server, 'PUT', `/api/meals/${meal.id}/crew/lead`, ada.cookie, { account_id: ada.id }))
+        .statusCode,
+    ).toBe(404)
   })
 
   it('refuses somebody who is not coming to that burn', async () => {
     const { server, meal } = await setUp()
     const elsewhere = await givenAccount(['member'])
 
-    expect((await send(server, 'PUT', `/api/meals/${meal.id}/helper/me`, elsewhere.cookie)).statusCode).toBe(
-      400,
-    )
+    expect(
+      (
+        await send(server, 'PUT', `/api/meals/${meal.id}/crew/helper`, elsewhere.cookie, {
+          account_id: elsewhere.id,
+        })
+      ).statusCode,
+    ).toBe(400)
   })
 })
 
@@ -560,7 +595,7 @@ describe('the plan itself', () => {
   it('drops one, and everybody signed up for it', async () => {
     const { server, organiser, meal } = await setUp()
     const ada = await givenAttending()
-    await send(server, 'PUT', `/api/meals/${meal.id}/helper/me`, ada.cookie)
+    await send(server, 'PUT', `/api/meals/${meal.id}/crew/helper`, ada.cookie, { account_id: ada.id })
 
     expect((await send(server, 'DELETE', `/api/admin/meals/${meal.id}`, organiser.cookie)).statusCode).toBe(
       204,
@@ -647,11 +682,16 @@ describe('a burn that has ended', () => {
         })
       ).statusCode,
     ).toBe(404)
-    expect((await send(server, 'PUT', `/api/meals/${meal.id}/helper/me`, organiser.cookie)).statusCode).toBe(
-      404,
-    )
     expect(
-      (await send(server, 'DELETE', `/api/meals/${meal.id}/cleanup/me`, organiser.cookie)).statusCode,
+      (
+        await send(server, 'PUT', `/api/meals/${meal.id}/crew/helper`, organiser.cookie, {
+          account_id: organiser.id,
+        })
+      ).statusCode,
+    ).toBe(404)
+    expect(
+      (await send(server, 'DELETE', `/api/meals/${meal.id}/crew/cleanup/${organiser.id}`, organiser.cookie))
+        .statusCode,
     ).toBe(404)
     expect(
       (await send(server, 'PUT', `/api/meals/${meal.id}/idea`, organiser.cookie, { food_idea: 'x' }))
@@ -704,10 +744,13 @@ describe('a burn that has ended', () => {
       (await send(server, 'PUT', `/api/meals/${meal.id}/lead`, ada.cookie, { account_id: ada.id }))
         .statusCode,
     ).toBe(200)
-    expect((await send(server, 'PUT', `/api/meals/${meal.id}/helper/me`, ada.cookie)).statusCode).toBe(200)
-    expect((await send(server, 'DELETE', `/api/meals/${meal.id}/cleanup/me`, ada.cookie)).statusCode).toBe(
-      200,
-    )
+    expect(
+      (await send(server, 'PUT', `/api/meals/${meal.id}/crew/helper`, ada.cookie, { account_id: ada.id }))
+        .statusCode,
+    ).toBe(200)
+    expect(
+      (await send(server, 'DELETE', `/api/meals/${meal.id}/crew/cleanup/${ada.id}`, ada.cookie)).statusCode,
+    ).toBe(200)
     expect(
       (await send(server, 'PUT', `/api/meals/${meal.id}/idea`, ada.cookie, { food_idea: 'Tacos' }))
         .statusCode,
@@ -756,13 +799,18 @@ describe('a chore', () => {
   it('takes nobody to help cook, because nothing is cooked', async () => {
     const { server, ada, chore } = await setUp()
 
-    expect((await send(server, 'PUT', `/api/meals/${chore.id}/helper/me`, ada.cookie)).statusCode).toBe(400)
+    expect(
+      (await send(server, 'PUT', `/api/meals/${chore.id}/crew/helper`, ada.cookie, { account_id: ada.id }))
+        .statusCode,
+    ).toBe(400)
   })
 
   it('takes cleaners, which is the whole of what it wants', async () => {
     const { server, ada, chore } = await setUp()
 
-    const response = await send(server, 'PUT', `/api/meals/${chore.id}/cleanup/me`, ada.cookie)
+    const response = await send(server, 'PUT', `/api/meals/${chore.id}/crew/cleanup`, ada.cookie, {
+      account_id: ada.id,
+    })
 
     expect(response.statusCode).toBe(200)
     expect(response.json().meal.cleanup).toHaveLength(1)
@@ -777,17 +825,20 @@ describe('a chore', () => {
       (await send(server, 'PUT', `/api/meals/${meal.id}/lead`, ada.cookie, { account_id: ada.id }))
         .statusCode,
     ).toBe(200)
-    expect((await send(server, 'PUT', `/api/meals/${meal.id}/helper/me`, ada.cookie)).statusCode).toBe(200)
+    expect(
+      (await send(server, 'PUT', `/api/meals/${meal.id}/crew/helper`, ada.cookie, { account_id: ada.id }))
+        .statusCode,
+    ).toBe(200)
   })
 
   it('lets somebody stand down from helping even after the slot became a chore', async () => {
     // Only joining is refused. A sitting changed to a chore under somebody who had
     // already put their name to it must not trap them there.
     const { server, ada, meal } = await setUp()
-    await send(server, 'PUT', `/api/meals/${meal.id}/helper/me`, ada.cookie)
+    await send(server, 'PUT', `/api/meals/${meal.id}/crew/helper`, ada.cookie, { account_id: ada.id })
     await db().update(mealTable).set({ kind: 'chore' }).where(eq(mealTable.id, meal.id))
 
-    const response = await send(server, 'DELETE', `/api/meals/${meal.id}/helper/me`, ada.cookie)
+    const response = await send(server, 'DELETE', `/api/meals/${meal.id}/crew/helper/${ada.id}`, ada.cookie)
 
     expect(response.statusCode).toBe(200)
     expect(response.json().meal.helpers).toEqual([])
@@ -819,5 +870,91 @@ describe('a lead stranded by a slot becoming a chore', () => {
     })
     expect(vacated.statusCode).toBe(200)
     expect(vacated.json().meal.lead).toBeNull()
+  })
+})
+
+describe('telling somebody a meal role moved', () => {
+  const setUp = async (deliver: Delivery) => {
+    const server = await build(deliver)
+    await givenBurn()
+    const organiser = await givenAccount(['admin'])
+    await addSlot(server, organiser.cookie, { label: 'Dinner', at: '18:00' })
+    await generate(server, organiser.cookie)
+    const ada = await givenAttending('Ada')
+    const [meal] = (await listMeals(server, ada.cookie)).meals
+
+    return { server, organiser, ada, meal }
+  }
+
+  it('tells the one handed the lead, and the one it came off', async () => {
+    // Vacating is how every handover starts now, so being taken off has to be told
+    // as well as being given it. A third person moves it, or the one who did it
+    // would be the one not told — which is the next test.
+    const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
+    const { server, organiser, ada, meal } = await setUp(deliver)
+    const bea = await givenAttending('Bea')
+    await givenSubscribed(ada.id)
+    await givenSubscribed(bea.id)
+    await send(server, 'PUT', `/api/meals/${meal.id}/lead`, ada.cookie, { account_id: ada.id })
+    deliver.mockClear()
+
+    await send(server, 'PUT', `/api/meals/${meal.id}/lead`, organiser.cookie, { account_id: bea.id })
+
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(2))
+    expect(messagesFrom(deliver).toSorted()).toEqual([
+      'You are leading Dinner',
+      'You are no longer leading Dinner',
+    ])
+  })
+
+  it('says nothing to somebody who took it themselves', async () => {
+    // Taking a job you want is the common case, and a notification for your own
+    // click is what teaches people to ignore the channel.
+    const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
+    const { server, ada, meal } = await setUp(deliver)
+    await givenSubscribed(ada.id)
+
+    await send(server, 'PUT', `/api/meals/${meal.id}/lead`, ada.cookie, { account_id: ada.id })
+
+    expect(deliver).not.toHaveBeenCalled()
+  })
+
+  it('tells somebody put on a crew by anybody but themselves', async () => {
+    const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
+    const { server, ada, meal } = await setUp(deliver)
+    const bea = await givenAttending('Bea')
+    await givenSubscribed(bea.id)
+
+    await send(server, 'PUT', `/api/meals/${meal.id}/crew/helper`, ada.cookie, { account_id: bea.id })
+
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1))
+    expect(messagesFrom(deliver)).toEqual(['You are on helper for Dinner'])
+  })
+
+  it('says nothing when nobody was actually taken off', async () => {
+    // Bea was never on it. Without the guard she is told she has been dropped from
+    // something she never joined — which a second tab makes ordinary.
+    const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
+    const { server, ada, meal } = await setUp(deliver)
+    const bea = await givenAttending('Bea')
+    await givenSubscribed(bea.id)
+
+    await send(server, 'DELETE', `/api/meals/${meal.id}/crew/helper/${bea.id}`, ada.cookie)
+
+    expect(deliver).not.toHaveBeenCalled()
+  })
+
+  it('tells somebody taken off a crew by anybody but themselves', async () => {
+    const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
+    const { server, ada, meal } = await setUp(deliver)
+    const bea = await givenAttending('Bea')
+    await givenSubscribed(bea.id)
+    await send(server, 'PUT', `/api/meals/${meal.id}/crew/helper`, bea.cookie, { account_id: bea.id })
+    deliver.mockClear()
+
+    await send(server, 'DELETE', `/api/meals/${meal.id}/crew/helper/${bea.id}`, ada.cookie)
+
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1))
+    expect(messagesFrom(deliver)).toEqual(['You are off helper for Dinner'])
   })
 })

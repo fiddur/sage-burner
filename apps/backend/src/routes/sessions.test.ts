@@ -2,16 +2,17 @@ import type { FastifyInstance } from 'fastify'
 
 import { eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { DbHandle } from '../db/index.ts'
+import type { Delivery } from '../push/push.ts'
 
 import { createApp } from '../app.ts'
 import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, attendance, event, place, session } from '../db/schema.ts'
+import { account, accountRole, attendance, event, place, pushSubscription, session } from '../db/schema.ts'
 
 const SECRET = 's'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
@@ -27,16 +28,39 @@ afterEach(async () => {
   handle = undefined
 })
 
-const build = async () => {
+const build = async (deliver: Delivery = () => Promise.resolve('sent')) => {
   handle = createDb({ url: ':memory:' })
   runMigrations(handle)
   app = await createApp({
     db: handle.db,
     config: createConfig({ LOG_LEVEL: 'silent', SESSION_SECRET: SECRET }),
     now: () => new Date(NOW),
+    deliver,
+    mintKeys: () => ({ publicKey: 'a-public-key', privateKey: 'a-private-key' }),
   })
   return app
 }
+
+/** One browser opted in, so there is somewhere for a notification to go. */
+const givenSubscribed = async (accountId: string) => {
+  await db()
+    .insert(pushSubscription)
+    .values({
+      id: randomUUID(),
+      endpoint: `https://push.example.org/${randomUUID()}`,
+      account_id: accountId,
+      p256dh: 'a-key',
+      auth: 'a-secret',
+      created_at: NOW,
+    })
+}
+
+/** What was pushed, as the strings a person would read. */
+const messagesFrom = (deliver: ReturnType<typeof vi.fn<Delivery>>) =>
+  deliver.mock.calls.map((call) => {
+    const parsed: unknown = JSON.parse(String(call[1]))
+    return typeof parsed === 'object' && parsed !== null && 'body' in parsed ? String(parsed.body) : ''
+  })
 
 const db = () => {
   const found = handle?.db
@@ -137,12 +161,12 @@ const givenAttending = async (eventId: string, roles: ('admin' | 'member')[] = [
   return who
 }
 
-/** `POST` or `DELETE` on `/api/sessions/:id/helpers/me` or `/support/me`. */
+/** `POST` or `DELETE` on `/api/sessions/:id/support/me`. A heart is always your own. */
 const selfService = (
   server: FastifyInstance,
   cookie: string | undefined,
   id: string,
-  what: 'helpers' | 'support',
+  what: 'support',
   method: 'POST' | 'DELETE',
 ) =>
   server.inject({
@@ -150,6 +174,27 @@ const selfService = (
     url: `/api/sessions/${id}/${what}/me`,
     headers: cookie === undefined ? {} : { cookie },
   })
+
+/**
+ * Offering hands, or taking them back. `about` names somebody other than the
+ * caller — which is the whole of what changed in #247.
+ */
+const helping = (
+  server: FastifyInstance,
+  who: { cookie: string; id: string } | undefined,
+  id: string,
+  method: 'POST' | 'DELETE',
+  about?: string,
+) => {
+  const accountId = about ?? who?.id ?? ''
+
+  return server.inject({
+    method,
+    url: method === 'POST' ? `/api/sessions/${id}/helpers` : `/api/sessions/${id}/helpers/${accountId}`,
+    headers: who === undefined ? {} : { cookie: who.cookie },
+    ...(method === 'POST' ? { payload: { account_id: accountId } } : {}),
+  })
+}
 
 describe('dreams', () => {
   it('is empty before anyone offers one', async () => {
@@ -677,11 +722,11 @@ describe('helping with a dream', () => {
     await db().update(account).set({ name: 'Ada' }).where(eq(account.id, ada.id))
     const id = (await offer(server, ada.cookie, { title: 'Sunrise yoga' })).json().session.id
 
-    const joined = await selfService(server, ada.cookie, id, 'helpers', 'POST')
+    const joined = await helping(server, ada, id, 'POST')
     expect(joined.statusCode).toBe(200)
     expect(joined.json().session.helpers).toEqual([{ account_id: ada.id, name: 'Ada' }])
 
-    const left = await selfService(server, ada.cookie, id, 'helpers', 'DELETE')
+    const left = await helping(server, ada, id, 'DELETE')
     expect(left.statusCode).toBe(200)
     expect(left.json().session.helpers).toEqual([])
   })
@@ -692,7 +737,7 @@ describe('helping with a dream', () => {
     const eventId = await givenEvent()
     const ada = await givenAttending(eventId)
     const id = (await offer(server, ada.cookie, { title: 'Sunrise yoga' })).json().session.id
-    await selfService(server, ada.cookie, id, 'helpers', 'POST')
+    await helping(server, ada, id, 'POST')
 
     await db().update(account).set({ name: 'Ada Lovelace' }).where(eq(account.id, ada.id))
 
@@ -707,8 +752,8 @@ describe('helping with a dream', () => {
     const ada = await givenAttending(eventId)
     const id = (await offer(server, ada.cookie, { title: 'Sunrise yoga' })).json().session.id
 
-    await selfService(server, ada.cookie, id, 'helpers', 'POST')
-    const again = await selfService(server, ada.cookie, id, 'helpers', 'POST')
+    await helping(server, ada, id, 'POST')
+    const again = await helping(server, ada, id, 'POST')
 
     expect(again.statusCode).toBe(200)
     expect(again.json().session.helpers).toHaveLength(1)
@@ -720,7 +765,7 @@ describe('helping with a dream', () => {
     const ada = await givenAttending(eventId)
     const id = (await offer(server, ada.cookie, { title: 'Sunrise yoga' })).json().session.id
 
-    const response = await selfService(server, ada.cookie, id, 'helpers', 'DELETE')
+    const response = await helping(server, ada, id, 'DELETE')
 
     expect(response.statusCode).toBe(200)
     expect(response.json().session.helpers).toEqual([])
@@ -734,7 +779,7 @@ describe('helping with a dream', () => {
     const coming = await givenAttending(OPEN_BURN)
     const id = (await offer(server, coming.cookie, { title: 'Sunrise yoga' })).json().session.id
 
-    expect((await selfService(server, elsewhere.cookie, id, 'helpers', 'POST')).statusCode).toBe(400)
+    expect((await helping(server, elsewhere, id, 'POST')).statusCode).toBe(400)
     expect((await selfService(server, elsewhere.cookie, id, 'support', 'POST')).statusCode).toBe(400)
   })
 
@@ -746,8 +791,8 @@ describe('helping with a dream', () => {
     const old = randomUUID()
     await db().insert(session).values({ id: old, event_id: ended, title: 'Last summer' })
 
-    expect((await selfService(server, ada.cookie, randomUUID(), 'helpers', 'POST')).statusCode).toBe(404)
-    expect((await selfService(server, ada.cookie, old, 'helpers', 'POST')).statusCode).toBe(404)
+    expect((await helping(server, ada, randomUUID(), 'POST')).statusCode).toBe(404)
+    expect((await helping(server, ada, old, 'POST')).statusCode).toBe(404)
     expect((await selfService(server, ada.cookie, old, 'support', 'POST')).statusCode).toBe(404)
   })
 
@@ -757,7 +802,7 @@ describe('helping with a dream', () => {
     const ada = await givenAttending(eventId)
     const id = (await offer(server, ada.cookie, { title: 'Sunrise yoga' })).json().session.id
 
-    expect((await selfService(server, undefined, id, 'helpers', 'POST')).statusCode).toBe(401)
+    expect((await helping(server, undefined, id, 'POST')).statusCode).toBe(401)
     expect((await selfService(server, undefined, id, 'support', 'POST')).statusCode).toBe(401)
   })
 })
@@ -826,7 +871,7 @@ describe('supporting a dream', () => {
     const eventId = await givenEvent()
     const ada = await givenAttending(eventId)
     const id = (await offer(server, ada.cookie, { title: 'Sunrise yoga' })).json().session.id
-    await selfService(server, ada.cookie, id, 'helpers', 'POST')
+    await helping(server, ada, id, 'POST')
     await selfService(server, ada.cookie, id, 'support', 'POST')
 
     const renamed = await editDream(server, ada.cookie, id, { title: 'Sunrise stretching' })
@@ -850,5 +895,94 @@ describe('supporting a dream', () => {
 
     expect(unchanged.statusCode).toBe(200)
     expect(unchanged.json().session).toMatchObject({ support_count: 1, supported_by_me: true })
+  })
+})
+
+describe('telling somebody a dream role moved', () => {
+  const setUp = async (deliver: Delivery) => {
+    const server = await build(deliver)
+    await givenEvent()
+    const ada = await givenAttending(OPEN_BURN)
+    const bea = await givenAttending(OPEN_BURN)
+    const id = (await offer(server, ada.cookie, { title: 'Sunrise yoga' })).json().session.id
+
+    return { server, ada, bea, id }
+  }
+
+  it('tells somebody put on a dream by anybody but themselves', async () => {
+    const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
+    const { server, ada, bea, id } = await setUp(deliver)
+    await givenSubscribed(bea.id)
+
+    await helping(server, ada, id, 'POST', bea.id)
+
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1))
+    expect(messagesFrom(deliver)).toEqual(['You are helping with Sunrise yoga'])
+  })
+
+  it('says nothing to somebody who put their own hand up', async () => {
+    const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
+    const { server, ada, id } = await setUp(deliver)
+    await givenSubscribed(ada.id)
+
+    await helping(server, ada, id, 'POST')
+
+    expect(deliver).not.toHaveBeenCalled()
+  })
+
+  it('tells somebody taken off by anybody but themselves', async () => {
+    const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
+    const { server, ada, bea, id } = await setUp(deliver)
+    await givenSubscribed(bea.id)
+    await helping(server, bea, id, 'POST')
+    deliver.mockClear()
+
+    await helping(server, ada, id, 'DELETE', bea.id)
+
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1))
+    expect(messagesFrom(deliver)).toEqual(['You are no longer helping with Sunrise yoga'])
+  })
+
+  it('says nothing when nobody was actually taken off', async () => {
+    // Bea was never on it. Without the guard she is told she has been dropped from
+    // something she never joined — which is what a second tab makes ordinary.
+    const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
+    const { server, ada, bea, id } = await setUp(deliver)
+    await givenSubscribed(bea.id)
+
+    await helping(server, ada, id, 'DELETE', bea.id)
+
+    expect(deliver).not.toHaveBeenCalled()
+  })
+
+  it('tells both ends when the facilitator moves', async () => {
+    const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
+    const { server, ada, bea, id } = await setUp(deliver)
+    const cai = await givenAttending(OPEN_BURN)
+    await givenSubscribed(bea.id)
+    await givenSubscribed(cai.id)
+    await editDream(server, ada.cookie, id, { facilitator_account_id: bea.id })
+    deliver.mockClear()
+
+    await editDream(server, ada.cookie, id, { facilitator_account_id: cai.id })
+
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(2))
+    expect(messagesFrom(deliver).toSorted()).toEqual([
+      'You are facilitating Sunrise yoga',
+      'You are no longer facilitating Sunrise yoga',
+    ])
+  })
+
+  it('announces nothing when the facilitator was not what changed', async () => {
+    // The field is set through the general PATCH, so a rename must stay silent.
+    const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
+    const { server, ada, bea, id } = await setUp(deliver)
+    await givenSubscribed(bea.id)
+    await editDream(server, ada.cookie, id, { facilitator_account_id: bea.id })
+    deliver.mockClear()
+
+    await editDream(server, ada.cookie, id, { title: 'Sunset yoga' })
+
+    expect(deliver).not.toHaveBeenCalled()
   })
 })

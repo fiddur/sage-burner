@@ -9,6 +9,7 @@ import type { Loaded } from '../load.ts'
 import { useSelectedBurn } from '../burn.tsx'
 import { CopyFrom } from '../components/CopyFrom.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
+import { HelperStrip } from '../components/HelperStrip.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
 import { useAction, useLoad } from '../load.ts'
@@ -47,13 +48,6 @@ const EFFORT_LABEL: Record<EffortLevel, string> = {
   high: 'a lot',
 }
 
-const nameOf = (person: Person) => person.name ?? 'Someone without a name yet'
-
-const teamCount = (role: LeadRole) =>
-  role.team_size_wanted === 0
-    ? `${role.team.length} on the team, none asked for`
-    : `${role.team.length} of ${role.team_size_wanted} wanted`
-
 /**
  * The header row and, as each cell's `data-label`, what the narrow layout shows in
  * place of the header it hides. Keyed rather than a list so a cell names the one it
@@ -64,7 +58,6 @@ const COLUMNS = {
   purpose: 'Purpose',
   lead: 'Lead',
   tasks: 'Tasks include',
-  teamSize: 'Team size',
   team: 'Team',
   before: 'Effort before',
   during: 'Effort during',
@@ -313,9 +306,6 @@ const RoleRow = ({
   onLeave: (accountId: string) => void
 }) => {
   const [confirming, setConfirming] = useState(false)
-  const onTeam = new Set(role.team.map((person) => person.account_id))
-  const canJoin = viewerId !== undefined && attendees.some((person) => person.account_id === viewerId)
-
   return (
     <tr>
       <th scope="row">{role.title}</th>
@@ -325,58 +315,32 @@ const RoleRow = ({
       </td>
 
       <td data-label={COLUMNS.lead}>
-        <select
-          aria-label={`Lead of ${role.title}`}
-          disabled={busy}
-          value={role.lead?.account_id ?? ''}
-          onChange={(changeEvent) => onLead(changeEvent.currentTarget.value || null)}
-        >
-          <option value="">Nobody yet</option>
-          {attendees.map((person) => (
-            <option key={person.account_id} value={person.account_id}>
-              {nameOf(person)}
-            </option>
-          ))}
-        </select>
+        <HelperStrip
+          label={`${role.title} lead`}
+          people={role.lead === null ? [] : [role.lead]}
+          max={1}
+          candidates={attendees}
+          viewerId={viewerId}
+          busy={busy}
+          onAdd={(accountId) => onLead(accountId)}
+          onRemove={() => onLead(null)}
+        />
       </td>
 
       <td data-label={COLUMNS.tasks}>
         <Prose markdown={role.tasks} />
       </td>
 
-      <td data-label={COLUMNS.teamSize}>{teamCount(role)}</td>
-
       <td data-label={COLUMNS.team}>
-        <ul class="role-team">
-          {role.team.map((person) => (
-            <li key={person.account_id}>
-              {nameOf(person)}
-              <button
-                type="button"
-                class="link-button"
-                disabled={busy}
-                aria-label={`Take ${nameOf(person)} off ${role.title}`}
-                onClick={() => onLeave(person.account_id)}
-              >
-                🗑️
-              </button>
-            </li>
-          ))}
-        </ul>
-
-        {canJoin && !onTeam.has(viewerId) && role.lead?.account_id !== viewerId && (
-          <button type="button" disabled={busy} onClick={() => onJoin(viewerId)}>
-            Join the team
-          </button>
-        )}
-
-        <AddToTeam
-          role={role}
-          attendees={attendees.filter(
-            (person) => !onTeam.has(person.account_id) && person.account_id !== viewerId,
-          )}
+        <HelperStrip
+          label={role.title}
+          people={role.team}
+          wanted={role.team_size_wanted}
+          candidates={attendees}
+          viewerId={viewerId}
           busy={busy}
-          onJoin={onJoin}
+          onAdd={onJoin}
+          onRemove={onLeave}
         />
       </td>
 
@@ -385,8 +349,14 @@ const RoleRow = ({
       <td data-label={COLUMNS.after}>{EFFORT_LABEL[role.effort_after]}</td>
 
       <td data-label="Actions" class="lead-actions">
-        <button type="button" class="link-button" disabled={busy} onClick={onEdit}>
-          Edit
+        <button
+          type="button"
+          class="link-button"
+          disabled={busy}
+          aria-label={`Edit ${role.title}`}
+          onClick={onEdit}
+        >
+          ✏️
         </button>
 
         {confirming ? (
@@ -417,54 +387,6 @@ const RoleRow = ({
         )}
       </td>
     </tr>
-  )
-}
-
-const AddToTeam = ({
-  role,
-  attendees,
-  busy,
-  onJoin,
-}: {
-  role: LeadRole
-  attendees: readonly Person[]
-  busy: boolean
-  onJoin: (accountId: string) => void
-}) => {
-  const [chosen, setChosen] = useState('')
-
-  if (attendees.length === 0) return null
-
-  return (
-    <div>
-      <label class="field">
-        <span>Put somebody on it</span>
-        <select
-          aria-label={`Add somebody to ${role.title}`}
-          disabled={busy}
-          value={chosen}
-          onChange={(changeEvent) => setChosen(changeEvent.currentTarget.value)}
-        >
-          <option value="">Choose somebody</option>
-          {attendees.map((person) => (
-            <option key={person.account_id} value={person.account_id}>
-              {nameOf(person)}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <button
-        type="button"
-        disabled={busy || chosen === ''}
-        onClick={() => {
-          onJoin(chosen)
-          setChosen('')
-        }}
-      >
-        Add them
-      </button>
-    </div>
   )
 }
 

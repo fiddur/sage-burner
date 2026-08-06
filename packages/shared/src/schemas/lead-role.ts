@@ -4,6 +4,7 @@ import { effortLevels } from '../enums.ts'
 import { MAX_NOTES, MAX_TITLE } from '../limits.ts'
 import { idSchema, nonEmptyText } from './common.ts'
 import { copyFromSchema } from './copy.ts'
+import { helperSchema } from './membership.ts'
 
 /**
  * A lead role for one burn — the spreadsheet's roles tab.
@@ -87,8 +88,8 @@ export const leadRoleUpdateSchema = leadRoleEditableFields.partial().strict()
  */
 export const leadRoleLeadSchema = z.object({ account_id: idSchema.nullable() }).strict()
 
-/** Adding or removing a team member. */
-export const leadRoleTeamSchema = z.object({ account_id: idSchema }).strict()
+/** Adding or removing a team member. The same body the other two groups take. */
+export const leadRoleTeamSchema = helperSchema
 
 /**
  * Seeding a new burn's register from a previous burn's.

@@ -159,6 +159,16 @@ export type AttendanceUpdate = z.infer<typeof attendanceUpdateSchema>
 /** Who an organiser is adding to a burn on someone else's behalf. */
 export const attendanceCreateSchema = z.object({ account_id: idSchema }).strict()
 
+/**
+ * Whose hands — the body of every "put somebody on this" route.
+ *
+ * One schema for the dream's helpers, a meal's crew and a lead role's team,
+ * because they are one gesture: 🙋 sends the caller's own id, the picker sends
+ * somebody else's, and the route cannot tell them apart or want to.
+ */
+export const helperSchema = z.object({ account_id: idSchema }).strict()
+export type Helper = z.infer<typeof helperSchema>
+
 /** One burn on someone's own page, with their stay at it or nothing yet. */
 export const myBurnSchema = z.object({
   /**

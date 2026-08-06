@@ -4,6 +4,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import {
   apiRoutes,
   errorResponse,
+  helperSchema,
   mealCreateSchema,
   mealIdeaUpdateSchema,
   mealIntroUpdateSchema,
@@ -23,11 +24,13 @@ import { viewerFor } from '../auth/viewer.ts'
 import { isForeignKeyViolation, isUniqueViolation } from '../db/errors.ts'
 import { account, attendance, event, meal, mealRole, mealSlot } from '../db/schema.ts'
 import { noStore } from '../http.ts'
-import { attendanceFor } from './attendance.ts'
+import { accountForAttendance, attendanceFor } from './attendance.ts'
 import { openEvent, todayIso } from './events.ts'
 
 export interface MealDeps extends GuardDeps {
   now?: () => Date
+  /** Told when somebody is put on a crew, or taken off one, by anybody but themselves. */
+  notify?: (accountId: string, message: string) => Promise<unknown>
 }
 
 type Person = NonNullable<Meal['lead']>
@@ -151,11 +154,33 @@ const burnFor = async (db: Database, eventId: string) => {
  * the same reason. What stays admin's is the plan itself — the slots, and adding,
  * moving or dropping a sitting — which is why those live under `/api/admin/`.
  */
+/**
+ * Whose hands: the body when joining, the path when standing down. Both name a person
+ * rather than meaning the caller (#247) — 🙋 sends the caller's own id.
+ */
+const whoseHands = (
+  joining: boolean,
+  request: FastifyRequest<{ Params: { id: string; role: string; accountId?: string } }>,
+): string | undefined => {
+  if (!joining) return request.params.accountId
+
+  const parsed = helperSchema.safeParse(request.body)
+
+  return parsed.success ? parsed.data.account_id : undefined
+}
+
 export const registerMealRoutes = (
   app: FastifyInstance,
-  { db, sessions, now = () => new Date() }: MealDeps,
+  { db, sessions, now = () => new Date(), notify = async () => undefined }: MealDeps,
 ) => {
   const { requireApproved } = createGuards({ db, sessions })
+
+  /** Tell somebody, unless they did it themselves. Same rule as the register. */
+  const tell = async (by: string, accountId: string, message: string) => {
+    if (accountId === by) return
+
+    await notify(accountId, message)
+  }
 
   /**
    * The sitting, if its burn has not ended.
@@ -276,6 +301,15 @@ export const registerMealRoutes = (
         if (taking === undefined) return reply.code(400).send(errorResponse('bad_request'))
       }
 
+      // Whoever holds it now, read before the write takes it off them.
+      const [current] = await db
+        .select({ attendance_id: mealRole.attendance_id })
+        .from(mealRole)
+        .where(and(eq(mealRole.meal_id, existing.id), eq(mealRole.role, 'lead')))
+        .limit(1)
+
+      const held = current === undefined ? undefined : await accountForAttendance(db, current.attendance_id)
+
       const handedTo = taking
       db.transaction((tx) => {
         tx.delete(mealRole)
@@ -286,6 +320,19 @@ export const registerMealRoutes = (
           tx.insert(mealRole).values({ meal_id: existing.id, attendance_id: handedTo, role: 'lead' }).run()
         }
       })
+
+      // Both ends, since one write can move the lead off one person and onto
+      // another — and vacating is how every handover starts now, so being taken off
+      // has to be told as well as being given it.
+      const viewer = await viewerFor(request, { db, sessions })
+      const by = viewer?.account_id ?? ''
+
+      if (held !== undefined && held !== parsed.data.account_id) {
+        await tell(by, held, `You are no longer leading ${existing.label}`)
+      }
+      if (parsed.data.account_id !== null && parsed.data.account_id !== held) {
+        await tell(by, parsed.data.account_id, `You are leading ${existing.label}`)
+      }
 
       return answer(reply, existing.id)
     },
@@ -299,7 +346,10 @@ export const registerMealRoutes = (
    */
   const stand =
     (joining: boolean) =>
-    async (request: FastifyRequest<{ Params: { id: string; role: string } }>, reply: FastifyReply) => {
+    async (
+      request: FastifyRequest<{ Params: { id: string; role: string; accountId?: string } }>,
+      reply: FastifyReply,
+    ) => {
       void noStore(reply)
 
       // Matched against the vocabulary rather than compared away from it: excluding
@@ -322,7 +372,10 @@ export const registerMealRoutes = (
       const viewer = await viewerFor(request, { db, sessions })
       if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
 
-      const mine = await attendanceFor(db, existing.event_id, viewer.account_id)
+      const accountId = whoseHands(joining, request)
+      if (accountId === undefined) return reply.code(400).send(errorResponse('bad_request'))
+
+      const mine = await attendanceFor(db, existing.event_id, accountId)
       if (mine === undefined) return reply.code(400).send(errorResponse('bad_request'))
 
       const row = { meal_id: existing.id, attendance_id: mine, role }
@@ -330,8 +383,9 @@ export const registerMealRoutes = (
       if (joining) {
         // Standing twice is standing once, which is what a double click sends.
         await db.insert(mealRole).values(row).onConflictDoNothing()
+        await tell(viewer.account_id, accountId, `You are on ${role} for ${existing.label}`)
       } else {
-        await db
+        const gone = await db
           .delete(mealRole)
           .where(
             and(
@@ -340,6 +394,13 @@ export const registerMealRoutes = (
               eq(mealRole.role, role),
             ),
           )
+          .returning()
+
+        // Only when a row actually went, like both siblings: taking somebody off a
+        // crew they were never on would tell them they had been dropped from it.
+        if (gone.length > 0) {
+          await tell(viewer.account_id, accountId, `You are off ${role} for ${existing.label}`)
+        }
       }
 
       return answer(reply, existing.id)
@@ -350,7 +411,7 @@ export const registerMealRoutes = (
     { preHandler: requireApproved },
     stand(true),
   )
-  app.delete<{ Params: { id: string; role: string } }>(
+  app.delete<{ Params: { id: string; role: string; accountId: string } }>(
     apiRoutes.leaveMealCrew.fastify,
     { preHandler: requireApproved },
     stand(false),

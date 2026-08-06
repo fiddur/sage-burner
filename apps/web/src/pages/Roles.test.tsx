@@ -93,24 +93,22 @@ describe('Roles', () => {
     expect(await screen.findByText(/No roles yet/)).toBeTruthy()
   })
 
-  it('shows a vacant role as vacant rather than blank', async () => {
-    // The Lead column is the select itself rather than a sentence beside it: the
-    // register is a table now, and two spellings of who leads in one cell is one
-    // more than the column has room for.
+  it('shows a vacant role as a spot anybody can take', async () => {
     renderPage(stub({}, [aRole({ id: 'r-1', title: 'Sauna' })]))
 
     expect(await screen.findByText('Sauna')).toBeTruthy()
-    const lead = await screen.findByLabelText('Lead of Sauna')
-    expect(lead instanceof HTMLSelectElement && lead.value).toBe('')
-    expect(screen.getByRole('option', { name: 'Nobody yet', selected: true })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Take the spot on Sauna lead' })).toBeTruthy()
   })
 
-  it('names the lead when somebody holds it', async () => {
+  it('names the lead when somebody holds it, and offers only to take them off', async () => {
+    // A held spot shows its holder and ✕ and nothing else: handing over is unassign
+    // then assign, which is two gestures and two people told.
     renderPage(stub({}, [aRole({ id: 'r-1', title: 'Sauna', lead: { account_id: 'a-2', name: 'Bea' } })]))
 
-    const lead = await screen.findByLabelText('Lead of Sauna')
-    expect(lead instanceof HTMLSelectElement && lead.value).toBe('a-2')
-    expect(screen.getByRole('option', { name: 'Bea', selected: true })).toBeTruthy()
+    expect(await screen.findByText('Bea')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Take Bea off Sauna lead' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Take the spot on Sauna lead' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Appoint someone to Sauna lead' })).toBeNull()
   })
 
   it('shows how many the team wants without ever refusing another', async () => {
@@ -129,8 +127,11 @@ describe('Roles', () => {
       ]),
     )
 
-    const join = await screen.findByRole('button', { name: 'Join the team' })
-    expect(screen.getByText('1 of 1 wanted')).toBeTruthy()
+    // The one wanted place is filled, so this row is the extra one — the offer that
+    // outlives the count, which is the whole of what this is about. It carries the
+    // buttons and *not* the word "wanted", since nothing more is asked for.
+    const join = await screen.findByRole('button', { name: 'Take the spot on Kitchen' })
+    expect(screen.queryByText('wanted')).toBeNull()
     expect(join.hasAttribute('disabled')).toBe(false)
 
     fireEvent.click(join)
@@ -170,7 +171,7 @@ describe('Roles', () => {
     const row = (await screen.findByText('Build')).closest('tr')
     const cells = [...(row?.querySelectorAll('td') ?? [])].map((cell) => cell.textContent)
 
-    expect(cells.slice(5, 8)).toEqual(['a lot', 'a little', 'none'])
+    expect(cells.slice(4, 7)).toEqual(['a lot', 'a little', 'none'])
   })
 
   it('labels every cell with the heading of its own column', async () => {
@@ -223,15 +224,19 @@ describe('Roles', () => {
       ]),
     )
 
-    const lead = await screen.findByLabelText('Lead of Sauna')
-    fireEvent.change(lead, { target: { value: 'a-1' } })
+    // The two halves of the handover, each from its own render: the stub answers
+    // with the same list every time, so one render cannot show both states.
+    fireEvent.click(await screen.findByRole('button', { name: 'Take Bea off Sauna lead' }))
     await waitFor(() => {
-      expect(setLeadRoleLead).toHaveBeenCalledWith('r-1', 'a-1')
+      expect(setLeadRoleLead).toHaveBeenCalledWith('r-1', null)
     })
 
-    fireEvent.change(await screen.findByLabelText('Lead of Sauna'), { target: { value: '' } })
+    cleanup()
+    renderPage(stub({ setLeadRoleLead }, [aRole({ id: 'r-1', title: 'Sauna' })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Take the spot on Sauna lead' }))
     await waitFor(() => {
-      expect(setLeadRoleLead).toHaveBeenLastCalledWith('r-1', null)
+      expect(setLeadRoleLead).toHaveBeenLastCalledWith('r-1', 'a-1')
     })
   })
 
@@ -283,7 +288,7 @@ describe('Roles', () => {
       ]),
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Sauna' }))
     fireEvent.change(await screen.findByLabelText('Effort during Sauna'), { target: { value: 'high' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
@@ -298,7 +303,7 @@ describe('Roles', () => {
     const updateLeadRole = vi.fn(() => Promise.resolve({ role: aRole({ id: 'r-1', title: 'Sauna' }) }))
     renderPage(stub({ updateLeadRole }, [aRole({ id: 'r-1', title: 'Sauna', team_size_wanted: 3 })]))
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Sauna' }))
     fireEvent.input(await screen.findByLabelText('Team wanted for Sauna'), { target: { value: '' } })
     fireEvent.change(screen.getByLabelText('Effort during Sauna'), { target: { value: 'high' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -313,7 +318,7 @@ describe('Roles', () => {
     const updateLeadRole = vi.fn(() => Promise.resolve({ role: aRole({ id: 'r-1', title: 'Sauna' }) }))
     renderPage(stub({ updateLeadRole }, [aRole({ id: 'r-1', title: 'Sauna', team_size_wanted: 3 })]))
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Sauna' }))
     fireEvent.input(await screen.findByLabelText('Team wanted for Sauna'), { target: { value: '5' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
@@ -341,8 +346,9 @@ describe('Roles', () => {
     const joinLeadRoleTeam = vi.fn(() => Promise.resolve({ role: aRole({ id: 'r-1', title: 'Sauna' }) }))
     renderPage(stub({ joinLeadRoleTeam }, [aRole({ id: 'r-1', title: 'Sauna' })]))
 
-    fireEvent.change(await screen.findByLabelText('Add somebody to Sauna'), { target: { value: 'a-2' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Add them' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Appoint someone to Sauna' }))
+    fireEvent.change(screen.getByLabelText('Who to appoint to Sauna'), { target: { value: 'a-2' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Appoint' }))
 
     await waitFor(() => {
       expect(joinLeadRoleTeam).toHaveBeenCalledWith('r-1', 'a-2')
@@ -355,7 +361,7 @@ describe('Roles', () => {
     renderPage(stub({}, [aRole({ id: 'r-1', title: 'Sauna' })]), ORGANISER)
 
     expect(await screen.findByText('Sauna')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Join the team' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Take the spot on Sauna' })).toBeNull()
   })
 
   it('offers a previous burn only while the register is empty', async () => {

@@ -6,6 +6,7 @@ import { toLocalInput } from '../datetime.ts'
 import { renderMarkdown } from '../markdown.ts'
 import { DreamFields } from './DreamFields.tsx'
 import { DreamPanel } from './DreamPanel.tsx'
+import { HelperStrip } from './HelperStrip.tsx'
 
 /**
  * One dream, opened from the grid — read, edited or withdrawn without leaving it.
@@ -47,7 +48,7 @@ export const DreamDetails = ({
   onCancelEdit: () => void
   onClose: () => void
   /** `true` to offer, `false` to take the offer back. */
-  onHelp: (helping: boolean) => void
+  onHelp: (helping: boolean, accountId: string) => void
   onSupport: (supporting: boolean) => void
   onSave: (changes: SessionUpdate) => void
   onRemove: () => void
@@ -62,10 +63,6 @@ export const DreamDetails = ({
     setConfirmingFor(editing)
     setConfirming(false)
   }
-
-  // Read off the list rather than carried as its own field. `supported_by_me` exists
-  // only because the supporters are a count and nothing more.
-  const helping = dream.helpers.some((person) => person.account_id === viewerId)
 
   const place = places.find((lane) => lane.id === dream.place_id)
 
@@ -118,20 +115,19 @@ export const DreamDetails = ({
 
           <h3>Helping out</h3>
 
-          {dream.helpers.length === 0 ? (
-            <p class="form-note">Nobody has offered to help yet.</p>
-          ) : (
-            <ul class="dream-helpers">
-              {dream.helpers.map((person) => (
-                <li key={person.account_id}>{person.name ?? 'Someone without a name yet'}</li>
-              ))}
-            </ul>
-          )}
+          {/* The facilitator is running it, so they are not offered as a pair of
+              hands for it — the one exclusion a dream has. */}
+          <HelperStrip
+            label={dream.title}
+            people={dream.helpers}
+            candidates={attendees.filter((person) => person.account_id !== dream.facilitator_account_id)}
+            viewerId={viewerId}
+            busy={busy}
+            onAdd={(accountId) => onHelp(true, accountId)}
+            onRemove={(accountId) => onHelp(false, accountId)}
+          />
 
           <p class="row">
-            <button type="button" disabled={busy} onClick={() => onHelp(!helping)}>
-              {helping ? 'I cannot help after all' : 'I want to help out'}
-            </button>
             <button
               type="button"
               class="link-button"

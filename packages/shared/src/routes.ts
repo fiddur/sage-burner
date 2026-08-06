@@ -26,6 +26,7 @@ import type {
   MealIntroUpdate,
   MealLead,
   MealSlotCreateInput,
+  Helper,
   MealSlotUpdate,
   MealUpdate,
   PasskeyLogin,
@@ -317,8 +318,8 @@ export const apiRoutes = {
   },
   helpWithSession: {
     method: 'POST',
-    fastify: '/api/sessions/:id/helpers/me',
-    path: (id: string) => `/api/sessions/${encodeURIComponent(id)}/helpers/me`,
+    fastify: '/api/sessions/:id/helpers',
+    path: (id: string) => `/api/sessions/${encodeURIComponent(id)}/helpers`,
   },
   joinEvent: {
     method: 'POST',
@@ -332,8 +333,9 @@ export const apiRoutes = {
   },
   joinMealCrew: {
     method: 'PUT',
-    fastify: '/api/meals/:id/:role/me',
-    path: (id: string, role: string) => `/api/meals/${encodeURIComponent(id)}/${encodeURIComponent(role)}/me`,
+    fastify: '/api/meals/:id/crew/:role',
+    path: (id: string, role: string) =>
+      `/api/meals/${encodeURIComponent(id)}/crew/${encodeURIComponent(role)}`,
   },
   leaveEvent: {
     method: 'DELETE',
@@ -348,8 +350,9 @@ export const apiRoutes = {
   },
   leaveMealCrew: {
     method: 'DELETE',
-    fastify: '/api/meals/:id/:role/me',
-    path: (id: string, role: string) => `/api/meals/${encodeURIComponent(id)}/${encodeURIComponent(role)}/me`,
+    fastify: '/api/meals/:id/crew/:role/:accountId',
+    path: (id: string, role: string, accountId: string) =>
+      `/api/meals/${encodeURIComponent(id)}/crew/${encodeURIComponent(role)}/${encodeURIComponent(accountId)}`,
   },
   login: {
     method: 'POST',
@@ -465,8 +468,9 @@ export const apiRoutes = {
   },
   stopHelpingWithSession: {
     method: 'DELETE',
-    fastify: '/api/sessions/:id/helpers/me',
-    path: (id: string) => `/api/sessions/${encodeURIComponent(id)}/helpers/me`,
+    fastify: '/api/sessions/:id/helpers/:accountId',
+    path: (id: string, accountId: string) =>
+      `/api/sessions/${encodeURIComponent(id)}/helpers/${encodeURIComponent(accountId)}`,
   },
   submitApplication: {
     method: 'POST',
@@ -596,7 +600,9 @@ export interface RouteBodies {
   createEvent: EventCreateInput
   createInvite: InviteCreate
   finishPasskeyLogin: PasskeyLogin
+  helpWithSession: Helper
   joinLeadRoleTeam: LeadRoleTeam
+  joinMealCrew: Helper
   login: LoginRequest
   offerSession: SessionCreateInput
   redeemInvite: RedeemRequestInput

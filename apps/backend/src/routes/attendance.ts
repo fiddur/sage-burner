@@ -41,6 +41,17 @@ export const stayAt = async (db: Database, eventId: string, accountId: string) =
   return row === undefined ? undefined : { ...row, helping_option_ids: await helpingIdsFor(db, row.id) }
 }
 
+/** Whose account holds an attendance — for telling somebody their role changed. */
+export const accountForAttendance = async (db: Database, attendanceId: string) => {
+  const [row] = await db
+    .select({ account_id: attendance.account_id })
+    .from(attendance)
+    .where(eq(attendance.id, attendanceId))
+    .limit(1)
+
+  return row?.account_id
+}
+
 /**
  * Saying somebody is coming to a burn.
  *

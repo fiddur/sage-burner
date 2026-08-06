@@ -67,6 +67,9 @@ const clientWith = (
   getMyPasskeys: () => Promise.reject(new Error('getMyPasskeys is not stubbed in this file')),
   removePasskey: () => Promise.reject(new Error('removePasskey is not stubbed in this file')),
   adminAddAttendance: () => Promise.reject(new Error('adminAddAttendance is not stubbed in this file')),
+  // Resolves rather than rejecting: the version watcher runs on every route in this
+  // file, and a rejection is swallowed anyway — being offline is not a new version.
+  getVersion: () => Promise.resolve({ build_sha: 'the-one-this-page-loaded' }),
   startPasskeyLogin: () => Promise.reject(new Error('startPasskeyLogin is not stubbed in this file')),
   finishPasskeyLogin: () => Promise.reject(new Error('finishPasskeyLogin is not stubbed in this file')),
   getEvents: () => Promise.reject(new Error('getEvents is not stubbed in this file')),
