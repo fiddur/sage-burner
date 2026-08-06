@@ -13,6 +13,7 @@ import type { GuardDeps } from '../auth/guards.ts'
 import type { Notifier } from '../push/notify.ts'
 
 import { createGuards } from '../auth/guards.ts'
+import { viewerFor } from '../auth/viewer.ts'
 import { account, attendance, event, eventOption } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 import { activeEvent, todayIso } from './events.ts'
@@ -159,11 +160,17 @@ export const registerRosterRoutes = (
       // roster's checkbox does on a double click — changes no count and must not
       // say anything, least of all to *everybody* who has not paid.
       if (updated.payment_status === 'paid' && before?.payment_status !== 'paid') {
-        await notify(accountId, {
-          category: 'payment',
-          body: 'Your payment has been recorded.',
-          link: '/members',
-        })
+        // Never for your own click, like every other category: an admin ticking
+        // their own box already knows they ticked it. The fan-out below still runs
+        // — it is about everybody else, and they did not do anything.
+        const actor = (await viewerFor(request, { db, sessions }))?.account_id
+        if (actor !== accountId) {
+          await notify(accountId, {
+            category: 'payment',
+            body: 'Your payment has been recorded.',
+            link: '/members',
+          })
+        }
 
         // And what that payment did to everybody who has not made one. Not in the
         // write's transaction: recording a payment must not fail because a bell

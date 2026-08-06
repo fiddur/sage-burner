@@ -50,9 +50,15 @@ export const tellAboutTheWaitingList = async (
   const paid = rows.filter((row) => row.payment_status === 'paid').length
   const unpaid = rows.filter((row) => row.payment_status !== 'paid')
 
-  // Full, or past it. Paid members come first, so an unpaid one is now behind the
-  // line whatever order they joined in.
-  if (paid >= burn.member_cap) {
+  // Past the cap the line says nothing new — it is already full and stays full.
+  // Every call follows exactly one transition to paid, so the count landing *on*
+  // the cap is the crossing, and a jump that skips the value costs one message
+  // rather than repeating it to everybody.
+  if (paid > burn.member_cap) return
+
+  // Just full. Paid members come first, so an unpaid one is now behind the line
+  // whatever order they joined in.
+  if (paid === burn.member_cap) {
     for (const row of unpaid) {
       await notify(row.account_id, {
         category: 'waiting_list_pushed',
