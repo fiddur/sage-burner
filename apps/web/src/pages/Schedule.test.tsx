@@ -778,12 +778,12 @@ describe('Schedule', () => {
     renderPage(stub({ helpWithSession }, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
 
     fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
-    fireEvent.click(screen.getByRole('button', { name: 'I want to help out' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Take the spot on Cacao ceremony' }))
 
     await waitFor(() => expect(helpWithSession).toHaveBeenCalledWith('s-1', { account_id: 'a-1' }))
   })
 
-  it('says “I cannot help after all” to somebody already on the list', async () => {
+  it('offers to come off it to somebody already on the list', async () => {
     const stopHelpingWithSession = vi.fn<ScheduleApi['stopHelpingWithSession']>(() =>
       Promise.resolve({ session: aDream({ id: 's-1', title: 'Cacao ceremony' }) }),
     )
@@ -801,7 +801,8 @@ describe('Schedule', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
     expect(screen.getByRole('dialog').textContent).toContain('Ada Lovelace')
 
-    fireEvent.click(screen.getByRole('button', { name: 'I cannot help after all' }))
+    // Their own chip's ✕, which is the same gesture as taking anybody else off.
+    fireEvent.click(screen.getByRole('button', { name: 'Take Ada Lovelace off Cacao ceremony' }))
 
     await waitFor(() => expect(stopHelpingWithSession).toHaveBeenCalledWith('s-1', 'a-1'))
   })
@@ -821,7 +822,7 @@ describe('Schedule', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
 
-    expect(screen.getByRole('button', { name: 'I want to help out' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Take the spot on Cacao ceremony' })).toBeTruthy()
   })
 
   it('lengthens and shortens a placed dream from the keyboard', async () => {
