@@ -683,7 +683,11 @@ page behind the initials circle, **and on ⚙️ → Settings** — an organiser
 `admin` without `member` is refused from the details page, and application
 notifications go precisely to admins.
 
-Two things notify today:
+Anything somebody else can put you on or take you off notifies you — a dream's
+helpers, a meal's crew, a meal's lead, a lead role and its team, a dream's
+facilitator. Never for your own click.
+
+Three things notify today:
 
 - **Being handed a lead role, or taken off one** — the lead column and the team
   both, and only the person it happened _to_. Not when they did it themselves:
