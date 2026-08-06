@@ -31,8 +31,6 @@ type Person = { account_id: string; name: string | null }
 /** Null rather than a fourth status: "no burn is selected" is data, not a load outcome. */
 type Plan = (MealsResponse & { eventId: string; attendees: readonly Person[] }) | null
 
-const nameOf = (person: Person) => person.name ?? 'Someone without a name yet'
-
 /**
  * The meal plan — who cooks, who helps and who washes up.
  *

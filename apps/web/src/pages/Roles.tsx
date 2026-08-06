@@ -48,8 +48,6 @@ const EFFORT_LABEL: Record<EffortLevel, string> = {
   high: 'a lot',
 }
 
-const nameOf = (person: Person) => person.name ?? 'Someone without a name yet'
-
 /**
  * The header row and, as each cell's `data-label`, what the narrow layout shows in
  * place of the header it hides. Keyed rather than a list so a cell names the one it
