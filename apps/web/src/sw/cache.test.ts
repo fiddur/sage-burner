@@ -11,6 +11,7 @@ import {
   SHELL_CACHE,
   stamped,
   trim,
+  worthStoring,
 } from './cache.ts'
 
 const ORIGIN = 'https://burn.example'
@@ -67,6 +68,45 @@ describe('what the worker does with a request', () => {
 
   it('has nowhere to put the requests it skips', () => {
     expect(cacheFor('skip')).toBeUndefined()
+  })
+})
+
+const answered = (contentType: string, init: { status?: number } = {}) =>
+  new Response('body', { status: init.status ?? 200, headers: { 'content-type': contentType } })
+
+describe('what is worth keeping', () => {
+  it('refuses a navigation that did not answer with the app', () => {
+    // The ICS feed is a plain link in the page, so clicking it is a `navigate` fetch
+    // that answers `text/calendar`. Stored under the shell's key, it would make every
+    // offline open of the app render a calendar file until some later online
+    // navigation overwrote it.
+    expect(worthStoring('navigate', answered('text/calendar; charset=utf-8'))).toBe(false)
+    expect(worthStoring('navigate', answered('application/json'))).toBe(false)
+    expect(worthStoring('navigate', answered('image/svg+xml'))).toBe(false)
+  })
+
+  it('keeps a navigation that did', () => {
+    // The passing sibling: refusing every navigation would satisfy the test above
+    // while leaving the app with no offline shell at all, which is the feature.
+    expect(worthStoring('navigate', answered('text/html; charset=utf-8'))).toBe(true)
+  })
+
+  it('does not ask what type the others are', () => {
+    // An asset is whatever Vite emitted and an API read is JSON; only a navigation
+    // can be answered by something that is not what was asked for.
+    expect(worthStoring('asset', answered('text/css'))).toBe(true)
+    expect(worthStoring('api', answered('application/json'))).toBe(true)
+    expect(worthStoring('app', answered('application/manifest+json'))).toBe(true)
+  })
+
+  it('never keeps a failure, whatever it is about', () => {
+    expect(worthStoring('navigate', answered('text/html', { status: 503 }))).toBe(false)
+    expect(worthStoring('api', answered('application/json', { status: 404 }))).toBe(false)
+    expect(worthStoring('asset', answered('text/css', { status: 500 }))).toBe(false)
+  })
+
+  it('has nowhere to put a skipped request', () => {
+    expect(worthStoring('skip', answered('text/html'))).toBe(false)
   })
 })
 

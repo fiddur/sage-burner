@@ -1143,6 +1143,15 @@ assets are cache-first, since their names change with their bytes. `/api/version
 is never cached — a stale answer there is the one reply that makes the redeploy
 check pointless. Nothing cross-origin is touched.
 
+**A navigation is only stored if it answered with HTML.** Not every same-origin
+navigation returns the app: the ICS feed is a plain `<a href>` in the page, so
+clicking it is a `mode: 'navigate'` fetch answering `text/calendar`. Without the
+check the worker would store the calendar as the shell, and every offline open of
+the app would render an ICS file until some later online navigation overwrote it.
+A content type rather than a list of paths to skip — a list is a thing to keep in
+step with the routes, and the route it goes stale against is the one that breaks
+the app offline.
+
 ### Saying how old it is
 
 Every answer served from the cache is stamped `x-cached-at`, and the page reads

@@ -1,3 +1,5 @@
+import type { CachePlan } from './cache.ts'
+
 import {
   API_CACHE,
   ASSET_LIMIT,
@@ -8,6 +10,7 @@ import {
   SHELL_KEY,
   stamped,
   trim,
+  worthStoring,
 } from './cache.ts'
 
 /**
@@ -104,13 +107,11 @@ const fromCache = async (cacheName: string, key: Request | string) => {
  * screen should be what the server has whenever that is reachable at all. The stored
  * copy is a floor under being offline, not a way of being faster.
  */
-const freshFirst = async (event: SwFetchEvent, cacheName: string, key: Request | string) => {
+const freshFirst = async (event: SwFetchEvent, plan: CachePlan, cacheName: string, key: Request | string) => {
   try {
     const response = await fetch(event.request)
 
-    // Only a real answer is worth keeping. A 404 or a 500 cached here would be served
-    // back for as long as the entry lived, long after the server stopped saying it.
-    if (response.ok) {
+    if (worthStoring(plan, response)) {
       const keep = cacheName === API_CACHE ? await stamped(response, new Date().toISOString()) : response
       event.waitUntil(put(cacheName, key, keep.clone()))
       return keep
@@ -129,14 +130,16 @@ const cacheFirst = async (event: SwFetchEvent) => {
   if (stored !== undefined) return stored
 
   const response = await fetch(event.request)
-  if (response.ok) event.waitUntil(put(SHELL_CACHE, event.request, response.clone()))
+  if (worthStoring('asset', response)) {
+    event.waitUntil(put(SHELL_CACHE, event.request, response.clone()))
+  }
 
   return response
 }
 
 const navigation = async (event: SwFetchEvent) => {
   try {
-    return await freshFirst(event, SHELL_CACHE, SHELL_KEY)
+    return await freshFirst(event, 'navigate', SHELL_CACHE, SHELL_KEY)
   } catch {
     return new Response(OFFLINE_PAGE, {
       status: 503,
@@ -153,7 +156,7 @@ self.addEventListener('fetch', (event) => {
   if (plan === 'asset') return event.respondWith(cacheFirst(event))
 
   const cacheName = cacheFor(plan)
-  if (cacheName !== undefined) event.respondWith(freshFirst(event, cacheName, event.request))
+  if (cacheName !== undefined) event.respondWith(freshFirst(event, plan, cacheName, event.request))
 })
 
 self.addEventListener('push', (event) => {
