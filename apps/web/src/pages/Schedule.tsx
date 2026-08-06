@@ -799,9 +799,8 @@ const Timetable = ({
       <table class="schedule-grid" style={{ '--lanes': columns }}>
         {/*
           Fixed layout, so the lanes share what is left equally rather than sizing
-          themselves to whichever happens to hold the longest title. The time column
-          is `17ch`: the widest label it holds is `2026-10-03 00:00` on the daybreak
-          rows, which is sixteen mostly-numeric characters, plus one for slack.
+          themselves to whichever happens to hold the longest title. The time column's
+          own width is in `.schedule-time-col`, which says what decides it.
         */}
         <colgroup>
           <col class="schedule-time-col" />
@@ -827,15 +826,8 @@ const Timetable = ({
         <tbody>
           {rows.map((row, index) => (
             <tr key={row} class={label(row) === '00:00' ? 'schedule-daybreak' : undefined}>
-              {/*
-                The day is named on the first row as well as at each midnight, so the
-                top of the grid says which day it starts on — a burn opens at 16:00,
-                so the first row is a new day without being a midnight.
-
-                Stacked above the time rather than beside it: spelling out
-                `2026-10-03 00:00` is what made this column sixteen characters wide,
-                for a label four rows in twenty-four ever used.
-              */}
+              {/* The first row too, not only midnights: a burn opens at 16:00, so it
+                  starts a day without starting at one. */}
               <th scope="row">
                 {index === 0 || dayOf(row) !== dayOf(rows[index - 1] ?? row) ? (
                   <span class="schedule-day">{dayName(dayOf(row), 'short')}</span>

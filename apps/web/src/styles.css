@@ -305,17 +305,7 @@ a:hover {
   gap: 0.5rem;
 }
 
-/*
-  A markdown field: Write / Preview above one framed box, after aurboda's editor.
-
-  The frame is the point. The tabs and the textarea used to be two loose things
-  stacked under a label, so nothing said the buttons belonged to the box below
-  them; putting a border round the pair and letting the current tab break that
-  border is what makes it read as one control.
-
-  Aurboda's palette is hardcoded greys and a violet accent. This uses the app's
-  own variables instead — same shape, this burn's colours.
-*/
+/* A markdown field: Write / Preview above one framed box, after aurboda's editor. */
 .md-field {
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -331,8 +321,7 @@ a:hover {
 .md-field-tab {
   padding: 0.4rem 0.9rem;
   border: 0;
-  /* Transparent rather than absent, so the current tab's accent does not shift
-     the text by the two pixels it adds. */
+  /* Transparent rather than absent, so the current tab's accent adds no shift. */
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
   background: none;
@@ -346,11 +335,7 @@ a:hover {
   color: var(--ink);
 }
 
-/*
-  Weight as well as colour, deliberately. Colour alone is the one signal a
-  colour-blind reader may not get, and `aria-pressed` is not one a sighted reader
-  gets at all.
-*/
+/* Weight as well as colour: colour alone is the signal some readers do not get. */
 .md-field-tab.is-current {
   color: var(--ember);
   border-bottom-color: var(--ember);
@@ -373,7 +358,6 @@ a:hover {
   color: var(--ink);
 }
 
-/* The frame already draws the focus boundary; a second ring inside it doubles up. */
 .md-field-write:focus {
   outline: none;
 }
@@ -720,12 +704,8 @@ a:hover {
 }
 
 /*
-  Both edges stay put while the middle scrolls under them.
-
-  The backgrounds are load-bearing rather than decoration: a sticky cell is still in
-  normal flow as far as painting goes, so without one the rows would show straight
-  through it. The corner is sticky on both axes and has to sit above both, or the
-  lane it overlaps would paint over it.
+  Both edges stay put while the middle scrolls under them. The backgrounds are
+  load-bearing: without one the rows show straight through a sticky cell.
 */
 .schedule-grid thead th {
   position: sticky;
@@ -743,7 +723,6 @@ a:hover {
   opacity: 0.6;
   font-size: 0.8rem;
   white-space: nowrap;
-  /* The hour label sits against the middle of its two lines, not the top. */
   vertical-align: middle;
 }
 
@@ -759,7 +738,6 @@ a:hover {
   opacity: 0.9;
 }
 
-/* Two lines an hour, so an hour is a slot somebody can read something in. */
 .schedule-cell {
   height: 3.2rem;
 }
@@ -934,13 +912,7 @@ a:hover {
   border-radius: 0.5rem;
 }
 
-/*
-  The leads register, laid out as the spreadsheet tab it replaces.
-
-  Wide, and deliberately allowed to be: `Purpose` and `Tasks include` are prose a
-  member wrote, and squeezing them into a share of the viewport is what made the
-  card version tall enough to lose the effort columns off the bottom.
-*/
+/* The leads register, laid out as the spreadsheet tab it replaces. */
 .lead-table-wrap {
   overflow-x: auto;
   margin: 1rem 0;
@@ -995,12 +967,7 @@ a:hover {
   white-space: nowrap;
 }
 
-/*
-  Narrow: one card per role, each cell labelled with the heading the table hides.
-
-  The same rows either way — `data-label` comes from the same `COLUMNS` list the
-  header row is built from, so there is no second rendering to keep in step.
-*/
+/* Narrow: one card per role, each cell labelled with the heading the table hides. */
 @media (max-width: 60rem) {
   .lead-table,
   .lead-table tbody,
@@ -1040,8 +1007,6 @@ a:hover {
     opacity: 0.6;
   }
 
-  /* Its label is for screen readers only, and repeating it above the buttons
-     would be the one heading that names a control rather than a value. */
   .lead-table td.lead-actions::before {
     content: none;
   }
@@ -1079,14 +1044,7 @@ a:hover {
   border-radius: 0.5rem;
 }
 
-/*
-  The shared table: the members list, the roster, the accounts list and the invites.
-
-  It had no rule at all — four pages asked for `class="table"` and nothing ever
-  matched it, so all four rendered on the browser's defaults, which give a cell no
-  padding whatsoever. That is why the members list looked cramped on a desktop and
-  fine on a phone, where nothing has room to look otherwise.
-*/
+/* The shared table: the members list, the roster, the accounts list, the invites. */
 .table {
   border-collapse: collapse;
   width: 100%;

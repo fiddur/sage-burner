@@ -30,24 +30,17 @@ export const fromLocalInput = (local: string): string | null => {
 }
 
 /**
- * Weekday names, in English, because the app is.
- *
  * Written out rather than taken from `toLocaleDateString`, which follows the
- * browser: a Swedish laptop would read `lör` on a page that says "Saturday" in
- * every sentence around it. Fredrik's call, and seven strings is a cheaper thing
- * to keep than a page that changes language halfway down.
- *
- * `getDay()` is 0-based from Sunday, which is what indexes this.
+ * browser: a Swedish laptop would read `lör` on a page that is English in every
+ * sentence around it. Indexed by `getDay()`, so Sunday first.
  */
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const
 
 /**
  * `Saturday 3` — a day of the burn, as the meal plan's "When?" column names it.
  *
- * Local, and that is the whole difficulty. `date` is a calendar day, so it has no
- * instant of its own; parsing it as one lands on midnight UTC, which is the
- * *previous* day for anybody west of Greenwich and the wrong side of a DST change
- * for everybody. Noon has no such edge in any real zone.
+ * Parsed at noon: a calendar day has no instant of its own, and taking it as
+ * midnight UTC lands on the previous day for anybody west of Greenwich.
  */
 export const dayName = (date: string, length: 'long' | 'short' = 'long'): string => {
   const at = new Date(`${date}T12:00:00`)

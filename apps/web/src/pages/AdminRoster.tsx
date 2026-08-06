@@ -171,15 +171,10 @@ export const AdminRoster = ({ api }: { api: RosterApi }) => {
 }
 
 /**
- * Putting somebody on the burn who did not say so when they signed up (#242).
+ * Putting somebody on the burn who did not say so when they signed up.
  *
- * The accounts are fetched here rather than with the roster, so a page that only
- * ever records payments does not pay for the list — and so a failure to load it
- * costs the picker rather than the roster.
- *
- * Whoever is already coming is filtered out. The route is idempotent and would
- * answer their existing stay, but offering a name that does nothing reads as the
- * button being broken.
+ * Fetched here rather than with the roster so a failure to load the accounts costs
+ * the picker rather than the page.
  */
 const AddToBurn = ({
   eventId,

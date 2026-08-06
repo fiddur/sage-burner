@@ -55,11 +55,8 @@ const teamCount = (role: LeadRole) =>
     : `${role.team.length} of ${role.team_size_wanted} wanted`
 
 /**
- * The columns, in the order the spreadsheet had them.
- *
- * One list, used for the header row and for the `data-label` each cell carries —
- * which is what the narrow layout shows in place of the header it hides, so the
- * two spellings of a column name cannot drift.
+ * The header row and, as each cell's `data-label`, what the narrow layout shows in
+ * place of the header it hides. One list, so the two cannot drift.
  */
 const COLUMNS = [
   'Title',
@@ -75,11 +72,6 @@ const COLUMNS = [
 
 /**
  * The lead-roles register — who is looking after what at this burn.
- *
- * Laid out as the spreadsheet tab it replaces, because that is the shape people
- * already read it in: one row per role, effort split across three columns rather
- * than folded into a sentence. Below `--fold` the table becomes one card per role
- * with each cell labelled — the same rows, not a second rendering to keep in step.
  *
  * Two things here would otherwise look like oversights. **The removal button asks
  * first** because any member may remove any role and nothing undoes it. **"Join the
@@ -166,9 +158,6 @@ export const Roles = ({ api }: { api: RolesApi }) => {
               {ready.roles.map((role) =>
                 editing === role.id ? (
                   <tr key={role.id}>
-                    {/* One cell across the lot: an edit form has nothing to do with the
-                        columns, and splitting it over them would put each field under a
-                        heading that does not describe it. */}
                     <td colSpan={COLUMNS.length + 1}>
                       <RoleFields
                         role={role}
@@ -295,8 +284,7 @@ const Prose = ({ markdown }: { markdown: string }) =>
   markdown.trim() === '' ? (
     <span class="form-note">—</span>
   ) : (
-    // Safe by construction: `renderMarkdown` escapes raw HTML rather than filtering
-    // it, which is why a member may author this. `markdown.ts` says why.
+    // Safe by construction: `renderMarkdown` escapes raw HTML rather than filtering it.
     <div class="markdown-preview" dangerouslySetInnerHTML={{ __html: renderMarkdown(markdown) }} />
   )
 
@@ -327,9 +315,7 @@ const RoleRow = ({
 
   return (
     <tr>
-      <th scope="row" data-label="Title">
-        {role.title}
-      </th>
+      <th scope="row">{role.title}</th>
 
       <td data-label="Purpose">
         <Prose markdown={role.purpose} />

@@ -103,7 +103,7 @@ export const DreamFields = ({
 
       <MarkdownField
         label="Tell people about it"
-        describedAs={`Description of ${subject}`}
+        accessibleName={`Description of ${subject}`}
         value={description}
         maxLength={MAX_DESCRIPTION}
         onInput={setDescription}
