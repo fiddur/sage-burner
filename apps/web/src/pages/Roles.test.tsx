@@ -129,7 +129,9 @@ describe('Roles', () => {
       ]),
     )
 
-    const join = await screen.findByRole('button', { name: 'Join the team' })
+    // The wanted slot is filled, so the ghost 🙋 is the extra one — the offer that
+    // outlives the count, which is the whole of what this is about.
+    const join = await screen.findByRole('button', { name: 'Put me on Kitchen' })
     expect(screen.getByText('1 of 1 wanted')).toBeTruthy()
     expect(join.hasAttribute('disabled')).toBe(false)
 
@@ -170,7 +172,7 @@ describe('Roles', () => {
     const row = (await screen.findByText('Build')).closest('tr')
     const cells = [...(row?.querySelectorAll('td') ?? [])].map((cell) => cell.textContent)
 
-    expect(cells.slice(5, 8)).toEqual(['a lot', 'a little', 'none'])
+    expect(cells.slice(4, 7)).toEqual(['a lot', 'a little', 'none'])
   })
 
   it('labels every cell with the heading of its own column', async () => {
@@ -341,7 +343,8 @@ describe('Roles', () => {
     const joinLeadRoleTeam = vi.fn(() => Promise.resolve({ role: aRole({ id: 'r-1', title: 'Sauna' }) }))
     renderPage(stub({ joinLeadRoleTeam }, [aRole({ id: 'r-1', title: 'Sauna' })]))
 
-    fireEvent.change(await screen.findByLabelText('Add somebody to Sauna'), { target: { value: 'a-2' } })
+    fireEvent.click(await screen.findByRole('button', { name: 'Put somebody else on Sauna' }))
+    fireEvent.change(screen.getByLabelText('Who to put on Sauna'), { target: { value: 'a-2' } })
     fireEvent.click(screen.getByRole('button', { name: 'Add them' }))
 
     await waitFor(() => {
@@ -355,7 +358,7 @@ describe('Roles', () => {
     renderPage(stub({}, [aRole({ id: 'r-1', title: 'Sauna' })]), ORGANISER)
 
     expect(await screen.findByText('Sauna')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Join the team' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Put me on Sauna' })).toBeNull()
   })
 
   it('offers a previous burn only while the register is empty', async () => {

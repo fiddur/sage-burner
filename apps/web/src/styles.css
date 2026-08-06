@@ -1169,3 +1169,55 @@ img.avatar {
   align-items: baseline;
   padding: 0.15rem 0;
 }
+
+/* Whoever is on something, and what is still wanted. One control in three places. */
+.helpers {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.helper-chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.helper-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  font-size: 0.9rem;
+}
+
+/* A place still wanted. Dashed, so an empty one reads as waiting rather than broken. */
+.helper-slot button,
+.helper-slot > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  padding: 0.15rem 0.4rem;
+  border: 1px dashed var(--line);
+  border-radius: 1rem;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.helper-slot > span {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.helper-count {
+  margin: 0;
+  font-size: 0.85rem;
+}
