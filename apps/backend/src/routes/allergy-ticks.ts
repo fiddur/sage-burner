@@ -33,23 +33,6 @@ export const allergyTicksFor = async (db: Database, accountIds: readonly string[
 export const allergyTickIdsFor = async (db: Database, accountId: string) =>
   (await allergyTicksFor(db, [accountId])).get(accountId) ?? []
 
-/**
- * Whether every id is a real item.
- *
- * Asked before anything is written, like `areHelpingOptions`: the profile form sends
- * the ticks and the columns in one PATCH, so rejecting them afterwards would answer
- * 400 with the name already saved.
- */
-export const areAllergyItems = async (db: Database, itemIds: readonly string[]): Promise<boolean> => {
-  const wanted = [...new Set(itemIds)]
-  if (wanted.length === 0) return true
-
-  const real = await db.select({ id: allergyItem.id }).from(allergyItem)
-  const allowed = new Set(real.map((row) => row.id))
-
-  return wanted.every((id) => allowed.has(id))
-}
-
 /** Enough of a handle to write with, so a transaction can be passed in as one. */
 type Writer = Pick<Database, 'delete' | 'insert'>
 

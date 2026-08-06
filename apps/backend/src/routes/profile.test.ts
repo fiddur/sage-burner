@@ -30,6 +30,8 @@ const NOW = '2026-07-02T00:00:00.000Z'
 let handle: DbHandle | undefined
 let app: FastifyInstance | undefined
 
+import { writeAllergyTicks } from './allergy-ticks.ts'
+
 afterEach(async () => {
   await app?.close()
   handle?.close()
@@ -808,5 +810,37 @@ describe('the allergy ticks on a profile', () => {
     await patchProfile(server, ada.cookie, { allergy_item_ids: [LACTOSE] })
 
     expect((await getProfile(server, bea.cookie)).json().profile.allergy_item_ids).toEqual([])
+  })
+})
+
+describe('an allergy item deleted while somebody is saving', () => {
+  it('is a foreign key violation, which is why the write needs catching', () => {
+    // The window the pre-check cannot close: an admin removes the item between
+    // the request arrives and the write. This is what reaches the route when that
+    // happens — `updateMyStay` answers 400 for the identical race.
+    return build().then(async () => {
+      const ada = await givenMember()
+
+      expect(() =>
+        db().transaction((tx) => {
+          writeAllergyTicks(tx, ada.id, [randomUUID()])
+        }),
+      ).toThrowError(/FOREIGN KEY/i)
+    })
+  })
+
+  it('rolls the name back when the ticks are refused', async () => {
+    // Both halves are one transaction, so neither survives being told no — which is
+    // also why catching the violation and answering 400 saves nothing either.
+    const server = await build()
+    const ada = await givenMember({ name: 'Ada' })
+
+    const answer = await patchProfile(server, ada.cookie, {
+      name: 'Someone Else',
+      allergy_item_ids: [randomUUID()],
+    })
+
+    expect(answer.statusCode).toBe(400)
+    expect((await getProfile(server, ada.cookie)).json().profile.name).toBe('Ada')
   })
 })
