@@ -1,6 +1,6 @@
 import type { Notification, NotificationCategory } from '@sage-burner/shared'
 
-import { and, desc, eq, isNull } from 'drizzle-orm'
+import { and, count, desc, eq, isNull } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { Database } from '../db/index.ts'
@@ -77,9 +77,16 @@ export const notificationsFor = async (db: Database, accountId: string) => {
     .orderBy(desc(notification.created_at))
     .limit(50)
 
+  // Counted across the whole table rather than the page above, so the bubble stays
+  // right for somebody who has been away long enough to pass the limit.
+  const [tally] = await db
+    .select({ unseen: count() })
+    .from(notification)
+    .where(and(eq(notification.account_id, accountId), isNull(notification.seen_at)))
+
   return {
     notifications: rows satisfies Notification[],
-    unseen: rows.filter((row) => row.seen_at === null).length,
+    unseen: tally?.unseen ?? 0,
   }
 }
 

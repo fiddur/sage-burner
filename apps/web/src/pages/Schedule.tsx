@@ -8,6 +8,7 @@ import type { LaneCell, MealBlock } from '../schedule.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
 import { Avatar } from '../components/Avatar.tsx'
+import { CalendarFeed } from '../components/CalendarFeed.tsx'
 import { DreamDetails } from '../components/DreamDetails.tsx'
 import { DreamFields } from '../components/DreamFields.tsx'
 import { DreamPanel } from '../components/DreamPanel.tsx'
@@ -310,7 +311,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
   }
 
   return (
-    <Framed>
+    <Framed eventId={event.id}>
       {error !== undefined &&
         opened === undefined &&
         shownMeal === undefined && (
@@ -503,9 +504,10 @@ const Opened = ({
   )
 }
 
-const Framed = ({ children }: { children: ComponentChildren }) => (
+const Framed = ({ eventId, children }: { eventId?: string; children: ComponentChildren }) => (
   <section class="page">
     <h1>Schedule</h1>
+    {eventId !== undefined && <CalendarFeed eventId={eventId} />}
     {children}
   </section>
 )

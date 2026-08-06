@@ -1254,6 +1254,12 @@ which is [#14]'s half of the work.
 `GET /events/:eventId/schedule.ics` is the programme as a calendar subscription,
 so people can put it in their phone rather than reloading a page.
 
+The **Schedule page carries the link**, for the burn selected in the bar, with a
+copy button beside it (#258). The button is the part that works: following the link
+downloads a snapshot in most browsers, where the point is a subscription that keeps
+up. Until then nothing in `apps/web` referenced the feed at all, so it existed and
+was reachable only by typing a URL with a UUID in it.
+
 **Unauthenticated**, because a calendar client cannot hold a session — subscribing
 is a URL a phone re-fetches on its own. The event id is a UUID, so the URL is
 unguessable, but it is not a secret beyond that: **do not post it anywhere outside

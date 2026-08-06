@@ -331,4 +331,80 @@ describe('the waiting list', () => {
     const theirs = await db().select().from(notification)
     expect(theirs.filter((one) => one.category === 'payment')).toHaveLength(1)
   })
+
+  it('says it is full on the crossing, not again on every payment after it', async () => {
+    // Inside the nearly-full window the repetition is a countdown and the number of
+    // places left changes each time. Past the cap it carries nothing new.
+    const server = await build()
+    await givenBurn(1)
+    const organiser = await givenAccount(['admin'])
+    const first = await givenAccount()
+    const second = await givenAccount()
+    const waiting = await givenAccount()
+    await givenComing(first.id)
+    await givenComing(second.id)
+    await givenComing(waiting.id)
+
+    await setPaid(server, organiser.cookie, first.id)
+    await setPaid(server, organiser.cookie, second.id)
+
+    const theirs = (await list(server, waiting.cookie)).json().notifications
+    expect(theirs.filter((one: { category: string }) => one.category === 'waiting_list_pushed')).toHaveLength(
+      1,
+    )
+  })
+})
+
+describe('a payment recorded against oneself', () => {
+  it('sends no receipt to the admin who recorded it', async () => {
+    // Every other category follows "never for your own click", and an admin ticking
+    // their own box already knows they ticked it.
+    const server = await build()
+    await givenBurn(20)
+    const organiser = await givenAccount(['admin', 'member'])
+    await givenComing(organiser.id)
+
+    await setPaid(server, organiser.cookie, organiser.id)
+
+    const theirs = (await list(server, organiser.cookie)).json().notifications
+    expect(theirs.map((one: { category: string }) => one.category)).not.toContain('payment')
+  })
+
+  it('still sends one when the admin records somebody else’s', async () => {
+    // The passing sibling: suppressing every receipt would satisfy the test above.
+    const server = await build()
+    await givenBurn(20)
+    const organiser = await givenAccount(['admin'])
+    const ada = await givenAccount()
+    await givenComing(ada.id)
+
+    await setPaid(server, organiser.cookie, ada.id)
+
+    const theirs = (await list(server, ada.cookie)).json().notifications
+    expect(theirs.map((one: { category: string }) => one.category)).toContain('payment')
+  })
+})
+
+describe('the unseen count', () => {
+  it('counts every unseen one, not only those on the first page', async () => {
+    const server = await build()
+    const ada = await givenAccount()
+    for (let index = 0; index < 55; index += 1) {
+      await db()
+        .insert(notification)
+        .values({
+          id: randomUUID(),
+          account_id: ada.id,
+          category: 'payment',
+          body: `number ${index}`,
+          link: null,
+          created_at: new Date(Date.parse(NOW) + index * 1000).toISOString(),
+        })
+    }
+
+    const body = (await list(server, ada.cookie)).json()
+
+    expect(body.notifications).toHaveLength(50)
+    expect(body.unseen).toBe(55)
+  })
 })

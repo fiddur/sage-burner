@@ -13,6 +13,32 @@ export type PushApi = Pick<ApiClient, 'getPushKey' | 'subscribeToPush' | 'unsubs
   NotificationSettingsApi
 
 /**
+ * How long to wait for a service worker to activate before calling push unavailable.
+ *
+ * `navigator.serviceWorker.ready` resolves once a registration covering the page has
+ * an **active** worker, and if activation never happens it simply never settles —
+ * `register()` rejecting is a different thing, already handled. Without a deadline
+ * the toggle sits there with nothing that can be pressed, and no error either.
+ * Far longer than activation takes, far shorter than forever.
+ */
+export const ACTIVATION_LIMIT_MS = 5000
+
+const registerWithin = async (browser: PushBrowser, limitMs: number) => {
+  let timer: ReturnType<typeof setTimeout> | undefined
+
+  try {
+    return await Promise.race([
+      browser.register(),
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error('the service worker never activated')), limitMs)
+      }),
+    ])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/**
  * Being told when something happens to you, per browser rather than per person.
  *
  * A subscription belongs to the browser it was made in, so this reads as "notify me
@@ -34,7 +60,13 @@ export const PushToggle = ({
   // below would re-register the worker and re-derive state after each one rather
   // than on mount.
   const browser = useMemo(() => supplied ?? browserPush(), [supplied])
-  const [state, setState] = useState<PushState | 'working'>(browser === undefined ? 'unsupported' : 'off')
+  // 'checking' rather than 'off' until the effect below has read the browser: an
+  // admin who presses a live button first can have `turnOn` finish and then be
+  // overwritten by the effect's own answer, leaving the toggle saying the opposite
+  // of what it just did.
+  const [state, setState] = useState<PushState | 'working' | 'checking'>(
+    browser === undefined ? 'unsupported' : 'checking',
+  )
   const [error, setError] = useFormError()
 
   useEffect(() => {
@@ -58,8 +90,7 @@ export const PushToggle = ({
     // arrive, fixable only by pressing Stop and then Start. `rememberSubscription`
     // is an upsert keyed on the endpoint, so saying it again costs one request on
     // the settings page and heals that.
-    void browser
-      .register()
+    void registerWithin(browser, ACTIVATION_LIMIT_MS)
       .then((manager) => manager.getSubscription())
       .then(async (existing) => {
         setState(existing === null ? 'off' : 'on')
@@ -101,7 +132,7 @@ export const PushToggle = ({
         return
       }
 
-      const manager = await browser.register()
+      const manager = await registerWithin(browser, ACTIVATION_LIMIT_MS)
       const subscription = await manager.subscribe({
         // Required by Chrome, and honest: every notification this sends is shown.
         userVisibleOnly: true,
@@ -142,7 +173,7 @@ export const PushToggle = ({
     setState('working')
     setError(undefined)
     try {
-      const manager = await browser.register()
+      const manager = await registerWithin(browser, ACTIVATION_LIMIT_MS)
       const existing = await manager.getSubscription()
 
       if (existing !== null) {
@@ -186,7 +217,7 @@ export const PushToggle = ({
         </p>
       )}
 
-      {(state === 'off' || state === 'on' || state === 'working') && (
+      {(state === 'off' || state === 'on' || state === 'working' || state === 'checking') && (
         <>
           <p class="form-note">
             Tells you when somebody hands you a lead role or takes you off one — and, if you organise, when
@@ -197,10 +228,10 @@ export const PushToggle = ({
 
           <button
             type="button"
-            disabled={state === 'working'}
+            disabled={state === 'working' || state === 'checking'}
             onClick={() => void (state === 'on' ? turnOff() : turnOn())}
           >
-            {state === 'working'
+            {state === 'working' || state === 'checking'
               ? 'One moment…'
               : state === 'on'
                 ? 'Stop notifying me here'

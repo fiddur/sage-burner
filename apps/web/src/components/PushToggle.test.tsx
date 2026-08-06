@@ -6,7 +6,7 @@ import type { PushApi } from './PushToggle.tsx'
 
 import { apiError } from '../api/client.ts'
 import { decodeVapidKey, subscriptionBody } from '../push.ts'
-import { PushToggle } from './PushToggle.tsx'
+import { ACTIVATION_LIMIT_MS, PushToggle } from './PushToggle.tsx'
 
 afterEach(cleanup)
 
@@ -433,5 +433,83 @@ describe('PushToggle', () => {
     )
 
     expect(await screen.findByText(/cannot show notifications/)).toBeTruthy()
+  })
+})
+
+describe('the two edges before the browser has answered', () => {
+  /** A `register()` the test decides when to settle, so the mount effect can be caught mid-flight. */
+  const suspendingBrowser = () => {
+    let settle = (): void => undefined
+    const browser = aBrowser({
+      register: () =>
+        new Promise((resolve) => {
+          settle = () =>
+            resolve({
+              getSubscription: () => Promise.resolve(null),
+              subscribe: () => Promise.resolve(aSubscription()),
+            })
+        }),
+    })
+
+    return { browser, settle: () => settle() }
+  }
+
+  it('offers nothing to press until it knows what this browser already has', async () => {
+    // Live from the initial state, `turnOn` could finish and then be overwritten by
+    // the effect's own answer — leaving the button saying the opposite of what it did.
+    const { browser, settle } = suspendingBrowser()
+    render(<PushToggle api={stub()} browser={browser} />)
+
+    expect(screen.getByRole('button', { name: 'One moment…' }).hasAttribute('disabled')).toBe(true)
+
+    settle()
+
+    expect(await screen.findByRole('button', { name: 'Notify me here' })).toBeTruthy()
+  })
+
+  it('gives up on a worker that never activates, rather than waiting for one forever', async () => {
+    // `navigator.serviceWorker.ready` never rejects: if activation does not happen it
+    // simply never settles, and the toggle would sit on its initial state for good.
+    vi.useFakeTimers()
+    try {
+      render(<PushToggle api={stub()} browser={aBrowser({ register: () => new Promise(() => undefined) })} />)
+
+      await vi.advanceTimersByTimeAsync(ACTIVATION_LIMIT_MS + 1)
+
+      expect(screen.getByText(/cannot show notifications/)).toBeTruthy()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('drops its deadline once the worker answers, leaving no timer behind', async () => {
+    vi.useFakeTimers()
+    try {
+      const { browser, settle } = suspendingBrowser()
+      render(<PushToggle api={stub()} browser={browser} />)
+      settle()
+      await vi.advanceTimersByTimeAsync(0)
+
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('waits out a worker that is merely slow', async () => {
+    // The passing sibling: a deadline of zero would satisfy the test above.
+    vi.useFakeTimers()
+    try {
+      const { browser, settle } = suspendingBrowser()
+      render(<PushToggle api={stub()} browser={browser} />)
+
+      await vi.advanceTimersByTimeAsync(ACTIVATION_LIMIT_MS - 1)
+      settle()
+      await vi.advanceTimersByTimeAsync(0)
+
+      expect(screen.getByRole('button', { name: 'Notify me here' })).toBeTruthy()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
