@@ -1,7 +1,7 @@
 import type { MeResponse, PasskeysResponse } from '@sage-burner/shared'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 
-import { apiRoutes, passkeyLoginSchema, passkeyRegistrationSchema } from '@sage-burner/shared'
+import { apiRoutes, errorResponse, passkeyLoginSchema, passkeyRegistrationSchema } from '@sage-burner/shared'
 import {
   generateAuthenticationOptions,
   generateRegistrationOptions,
@@ -311,20 +311,20 @@ export const registerPasskeyRoutes = (
     void noStore(reply)
 
     const parsed = passkeyLoginSchema.safeParse(request.body)
-    if (!parsed.success) return sendError(reply, 401)
+    if (!parsed.success) return reply.code(401).send(errorResponse('invalid_credentials'))
 
     const party = partyFor(request)
-    if (party === undefined) return sendError(reply, 401)
+    if (party === undefined) return reply.code(401).send(errorResponse('invalid_credentials'))
 
     const challenge = challengeOf(parsed.data.response.response.clientDataJSON)
-    if (challenge === undefined) return sendError(reply, 401)
+    if (challenge === undefined) return reply.code(401).send(errorResponse('invalid_credentials'))
 
     const spent = await spendChallenge(challenge)
     // A registration challenge is not a login challenge. The ceremony type in
     // `clientDataJSON` differs too and the library checks it, so this is the
     // second of two — but it is the one that is ours to make.
     if (spent === undefined || spent.account_id !== null) {
-      return sendError(reply, 401)
+      return reply.code(401).send(errorResponse('invalid_credentials'))
     }
 
     const [found] = await db
@@ -333,7 +333,7 @@ export const registerPasskeyRoutes = (
       .where(eq(passkey.credential_id, parsed.data.response.id))
       .limit(1)
 
-    if (found === undefined) return sendError(reply, 401)
+    if (found === undefined) return reply.code(401).send(errorResponse('invalid_credentials'))
 
     let verified
     try {
@@ -351,13 +351,13 @@ export const registerPasskeyRoutes = (
       })
     } catch (failure) {
       request.log.info({ err: failure }, 'passkey login rejected')
-      return sendError(reply, 401)
+      return reply.code(401).send(errorResponse('invalid_credentials'))
     }
 
-    if (!verified.verified) return sendError(reply, 401)
+    if (!verified.verified) return reply.code(401).send(errorResponse('invalid_credentials'))
 
     const viewer = await viewerOf(db, found.account_id)
-    if (viewer === undefined) return sendError(reply, 401)
+    if (viewer === undefined) return reply.code(401).send(errorResponse('invalid_credentials'))
 
     await db
       .update(passkey)

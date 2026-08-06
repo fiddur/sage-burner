@@ -151,9 +151,7 @@ export const codeFor = (status: number): ErrorCode => {
   if (status === 409) return 'conflict'
   // Its own slug rather than falling into `bad_request` below, which is the reason
   // `rate_limited` exists: a shed request is worth retrying and a malformed one is
-  // not, and the status alone does not tell a caller which. Missing here until #138,
-  // because the two routes that shed wrote the pair out themselves — so the mapping
-  // this function claims to own had a hole exactly where nobody was using it.
+  // not, and the status alone does not tell a caller which.
   if (status === 429) return 'rate_limited'
   if (status >= 400 && status < 500) return 'bad_request'
   return 'internal_error'

@@ -50,16 +50,12 @@ export type ClientStatus = 400 | 401 | 403 | 404 | 409 | 415 | 429
  * wrong pairing unrepresentable rather than merely unlikely.
  *
  * **Not every refusal goes through here**, and the exceptions are the point rather
- * than leftovers. A login answers 401 with `invalid_credentials` — deliberately
- * distinguishable from a missing session, which is a fact about the route and not
- * about the status. `sessions.ts` and `profile.ts` carry a status and slug together
- * out of a discriminated union. Those keep `errorResponse` explicitly, which reads
- * as "this one is different" precisely because everything else no longer does.
- *
- * Converting the routes found a hole in `codeFor` itself: nothing mapped 429, so it
- * fell through to `bad_request` while the two shedding routes wrote `rate_limited`
- * by hand. The mapping this function claims to own was wrong exactly where nobody
- * went through it.
+ * than leftovers. Both logins — password and passkey — answer 401 with
+ * `invalid_credentials`, which is deliberately distinguishable from a missing
+ * session and is a fact about the route rather than about the status.
+ * `sessions.ts` and `profile.ts` carry a status and slug together out of a
+ * discriminated union. Those keep `errorResponse` explicitly, which reads as "this
+ * one is different" precisely because everything else no longer does.
  */
 export const sendError = (reply: FastifyReply, status: ClientStatus) =>
   reply.code(status).send(errorResponse(codeFor(status)))
