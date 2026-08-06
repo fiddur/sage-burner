@@ -33,6 +33,8 @@ import type {
   MeResponse,
   MemberRosterResponse,
   MyBurnsResponse,
+  NotificationSettings,
+  NotificationsResponse,
   PasskeysResponse,
   Place,
   PlaceOrder,
@@ -251,6 +253,31 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
     updateInstallation: (body: BodyOf<'updateInstallation'>) =>
       request<InstallationResponse>(apiRoutes.updateInstallation.path(), {
         method: apiRoutes.updateInstallation.method,
+        body,
+      }),
+
+    /**
+     * The bell's list, newest first, with what the red bubble counts (#248).
+     *
+     * Signed in, any account — these are somebody's own records, and an account with
+     * no role yet still has some.
+     */
+    getMyNotifications: (signal?: AbortSignal) =>
+      request<NotificationsResponse>(apiRoutes.getMyNotifications.path(), { signal }),
+
+    /** Answers the list back, since the bell has just changed. */
+    markNotificationsSeen: () =>
+      request<NotificationsResponse>(apiRoutes.markNotificationsSeen.path(), {
+        method: apiRoutes.markNotificationsSeen.method,
+      }),
+
+    getMyNotificationSettings: (signal?: AbortSignal) =>
+      request<NotificationSettings>(apiRoutes.getMyNotificationSettings.path(), { signal }),
+
+    /** The whole set of muted categories, not a delta. */
+    updateMyNotificationSettings: (body: BodyOf<'updateMyNotificationSettings'>) =>
+      request<NotificationSettings>(apiRoutes.updateMyNotificationSettings.path(), {
+        method: apiRoutes.updateMyNotificationSettings.method,
         body,
       }),
 

@@ -17,7 +17,7 @@ const renderNav = (viewer: Viewer) =>
   render(
     <InstallationProvider title="Sage Burner">
       <ViewerProvider viewer={viewer}>
-        <Layout>
+        <Layout api={noBell}>
           <p>the page</p>
         </Layout>
       </ViewerProvider>
@@ -44,6 +44,15 @@ const expectLinks = (present: string[], absent: string[]) => {
   const shown = links()
   for (const label of present) expect(shown, `${label} should be offered`).toContain(label)
   for (const label of absent) expect(shown, `${label} should not be offered`).not.toContain(label)
+}
+
+/**
+ * The bell asks on mount wherever the layout is drawn. Resolving with nothing keeps
+ * these tests about the nav rather than about what has happened to anybody.
+ */
+const noBell = {
+  getMyNotifications: () => Promise.resolve({ notifications: [], unseen: 0 }),
+  markNotificationsSeen: () => Promise.reject(new Error('markNotificationsSeen is not stubbed here')),
 }
 
 describe('the nav', () => {
@@ -157,7 +166,7 @@ describe('the burn selector', () => {
       <InstallationProvider title="Sage Burner">
         <ViewerProvider viewer={signedInAs('member')}>
           <BurnProvider value={{ status: 'ready', burns, selected: burns[0], select }}>
-            <Layout>
+            <Layout api={noBell}>
               <p>the page</p>
             </Layout>
           </BurnProvider>

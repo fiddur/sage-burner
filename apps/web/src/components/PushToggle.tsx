@@ -2,12 +2,15 @@ import { useEffect, useMemo, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 import type { PushBrowser, PushState } from '../push.ts'
+import type { NotificationSettingsApi } from './NotificationSettingsField.tsx'
 
 import { isApiError } from '../api/client.ts'
 import { browserPush, decodeVapidKey, subscriptionBody } from '../push.ts'
 import { FormError, useFormError } from './FormError.tsx'
+import { NotificationSettingsField } from './NotificationSettingsField.tsx'
 
-export type PushApi = Pick<ApiClient, 'getPushKey' | 'subscribeToPush' | 'unsubscribeFromPush'>
+export type PushApi = Pick<ApiClient, 'getPushKey' | 'subscribeToPush' | 'unsubscribeFromPush'> &
+  NotificationSettingsApi
 
 /**
  * Being told when something happens to you, per browser rather than per person.
@@ -205,6 +208,12 @@ export const PushToggle = ({
           </button>
         </>
       )}
+
+      {/* Below the per-browser toggle, and always shown: what a category is switched
+          off for is the bell as much as the push, so this applies with no browser
+          subscribed at all. */}
+      <h3>What to tell me about</h3>
+      <NotificationSettingsField api={api} />
     </section>
   )
 }

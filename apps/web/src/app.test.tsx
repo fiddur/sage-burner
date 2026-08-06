@@ -70,6 +70,12 @@ const clientWith = (
   // Resolves rather than rejecting: the version watcher runs on every route in this
   // file, and a rejection is swallowed anyway — being offline is not a new version.
   getVersion: () => Promise.resolve({ build_sha: 'the-one-this-page-loaded' }),
+  getMyNotifications: () => Promise.resolve({ notifications: [], unseen: 0 }),
+  getMyNotificationSettings: () => Promise.resolve({ muted: [] }),
+  updateMyNotificationSettings: () =>
+    Promise.reject(new Error('updateMyNotificationSettings is not stubbed here')),
+  markNotificationsSeen: () => Promise.reject(new Error('markNotificationsSeen is not stubbed in this file')),
+
   startPasskeyLogin: () => Promise.reject(new Error('startPasskeyLogin is not stubbed in this file')),
   finishPasskeyLogin: () => Promise.reject(new Error('finishPasskeyLogin is not stubbed in this file')),
   getEvents: () => Promise.reject(new Error('getEvents is not stubbed in this file')),

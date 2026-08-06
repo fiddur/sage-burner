@@ -1,9 +1,12 @@
 import type { ComponentChildren } from 'preact'
 
+import type { BellApi } from './NotificationBell.tsx'
+
 import { useBurns } from '../burn.tsx'
 import { useInstallationTitle } from '../installation.tsx'
 import { isAdmin, isApproved, isMember, useViewer } from '../viewer.tsx'
 import { Avatar } from './Avatar.tsx'
+import { NotificationBell } from './NotificationBell.tsx'
 
 /**
  * The frame every page sits in.
@@ -21,7 +24,7 @@ import { Avatar } from './Avatar.tsx'
  * an action, and it lives beside the sentence naming the account it ends. That also
  * leaves this frame needing no API client at all.
  */
-export const Layout = ({ children }: { children: ComponentChildren }) => {
+export const Layout = ({ api, children }: { api: BellApi; children: ComponentChildren }) => {
   const viewer = useViewer()
   const { burns, selected, select } = useBurns()
   const title = useInstallationTitle()
@@ -75,6 +78,9 @@ export const Layout = ({ children }: { children: ComponentChildren }) => {
               <a href="/meals">Meals</a>
             </>
           )}
+
+          {/* Signed in is the whole guard, so it sits outside the approved block. */}
+          {viewer.account !== undefined && <NotificationBell api={api} />}
 
           {isAdmin(viewer) && (
             <a href="/admin" aria-label="Organise" title="Organise">

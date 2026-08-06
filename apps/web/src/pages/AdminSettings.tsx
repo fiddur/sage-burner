@@ -2,6 +2,7 @@ import { MAX_TITLE } from '@sage-burner/shared'
 import { useEffect, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
+import type { PushApi } from '../components/PushToggle.tsx'
 
 import { isApiError } from '../api/client.ts'
 import { GuardedPage } from '../components/GuardedPage.tsx'
@@ -10,15 +11,7 @@ import { PushToggle } from '../components/PushToggle.tsx'
 import { useSetInstallationTitle } from '../installation.tsx'
 import { isAdmin, useViewer } from '../viewer.tsx'
 
-export type AdminSettingsApi = Pick<
-  ApiClient,
-  | 'getInstallation'
-  | 'updateInstallation'
-  | 'getPushKey'
-  | 'subscribeToPush'
-  | 'unsubscribeFromPush'
-  | 'logout'
->
+export type AdminSettingsApi = PushApi & Pick<ApiClient, 'getInstallation' | 'updateInstallation' | 'logout'>
 
 type Loaded = { status: 'loading' } | { status: 'ready' } | { status: 'failed' }
 
