@@ -7,7 +7,7 @@ import { dateTimeSchema, idSchema } from './common.ts'
 /**
  * An account as an admin sees it.
  *
- * Includes the email, which `viewerSchema` deliberately omits — an organiser
+ * Includes the email, which `viewerSchema` deliberately omits — an admin
  * needs to know who they are looking at, and this response is behind the admin
  * guard. Never the password hash.
  */
@@ -28,10 +28,10 @@ export type AdminAccountsResponse = z.infer<typeof adminAccountsResponseSchema>
  * There is no other way to change one once it is set: redemption is where a
  * password is chosen, `admin:create` refuses to touch an existing one, and nothing
  * else writes the column except the silent rehash on login. So an account whose
- * owner has lost the password — or one an organiser made and did not write down —
+ * owner has lost the password — or one an admin made and did not write down —
  * had no way back at all.
  *
- * The **old** password is not asked for, because an organiser does not have it.
+ * The **old** password is not asked for, because an admin does not have it.
  * That is the whole point, and it is also what makes this the most dangerous route
  * in the app: it is admin taking over any account, including another admin's. At
  * 42 people who all know each other that is the same trust the role already

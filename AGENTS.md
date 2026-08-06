@@ -189,7 +189,7 @@ These are member records, so treat them as such:
   stay the person's own: nobody edits somebody else's name, contact or allergies.
 - `requireApproved` is the guard for that default, and counts `admin` as well as
   `member`. The roles are independent — the accounts table grants either on its
-  own, and an organiser who is not attending is coherent — so an account can hold
+  own, and somebody organising but not attending is coherent — so an account can hold
   `admin` and not `member`, and a `member`-only guard would lock them out of
   setting the burn up. Neither role implies the other anywhere else.
 - Everything under `/api/admin/` requires `admin` through one `onRequest` hook,
@@ -247,7 +247,7 @@ These are member records, so treat them as such:
   bookkeeping, and `email` is the login identity rather than a way of reaching
   somebody — `contact` is that. The projection is `asMemberEntry` in `roster.ts`,
   an object literal against
-  `MemberRosterEntry`, so a column added to the organiser's row reaches members only
+  `MemberRosterEntry`, so a column added to the admin's row reaches members only
   when somebody names it there; spreading the row and deleting keys would not have
   that property. The two views share one query, so the order — which decides who has
   a place — cannot come out differently on the two pages.

@@ -20,7 +20,7 @@ import { renderMarkdown } from '../markdown.ts'
  *
  * Nothing about the questions is hardcoded here — that is the whole point of
  * #12 storing them as rows. This renders whatever `GET /api/questions` returns,
- * in the order an organiser put them in, so adding a question never means a
+ * in the order an admin put them in, so adding a question never means a
  * deploy.
  *
  * The form is reachable without a session, because an applicant does not have

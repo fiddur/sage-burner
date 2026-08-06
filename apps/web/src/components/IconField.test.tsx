@@ -119,7 +119,7 @@ describe('what to tell an admin about a failure', () => {
     // The advice is expensive to get wrong: it sends them off to convert an image
     // that was never the problem, and the second attempt fails the same way.
     expect(messageForFailure(apiError(500, 'unknown', 'x'))).not.toContain('PNG or an SVG')
-    expect(messageForFailure(apiError(403, 'forbidden', 'x'))).toContain('organiser')
+    expect(messageForFailure(apiError(403, 'forbidden', 'x'))).toContain('admin')
   })
 
   it('keeps the client wording for a connection failure', () => {

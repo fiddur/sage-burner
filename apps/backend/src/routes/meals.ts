@@ -559,7 +559,7 @@ export const registerMealAdminRoutes = (app: FastifyInstance, { db }: MealDeps) 
 
     // The meals already generated are left alone. A slot is a template, and a rename
     // that reached back through everything it had made would undo whatever an
-    // organiser had since changed by hand.
+    // admin had since changed by hand.
     return answerSlots(existing.event_id)
   })
 

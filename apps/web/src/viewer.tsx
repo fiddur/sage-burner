@@ -166,7 +166,7 @@ export const isMember = (viewer: Viewer) => hasRole(viewer, 'member')
  * Anyone who is in — the mirror of the server's `requireApproved`.
  *
  * `admin` counts, and has to: the roles are independent, so an account can hold
- * `admin` without `member` — an organiser who is not attending. Hiding the page
+ * `admin` without `member` — somebody organising but not attending. Hiding the page
  * from them would hide the setup from someone allowed to do it.
  */
 export const isApproved = (viewer: Viewer) => isMember(viewer) || isAdmin(viewer)

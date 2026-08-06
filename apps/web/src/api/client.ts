@@ -371,7 +371,7 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
     /**
      * Admin only. The whole set the account should end up with, not a delta.
      *
-     * Throws ApiError(409, 'conflict') when it would leave no organiser at all.
+     * Throws ApiError(409, 'conflict') when it would leave no admin at all.
      */
     setAccountRoles: (accountId: string, body: BodyOf<'setAccountRoles'>) =>
       request<AdminAccountResponse>(apiRoutes.setAccountRoles.path(accountId), {
@@ -872,7 +872,7 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
 
     /**
      * Admin only. Returns the invite token once — it is never stored in the clear.
-     * An organiser who loses it calls `reissueInvite`, which replaces the token in
+     * An admin who loses it calls `reissueInvite`, which replaces the token in
      * the same row and kills the lost link doing so.
      *
      * Throws ApiError(409, 'conflict') when the application has already been

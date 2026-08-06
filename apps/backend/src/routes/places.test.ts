@@ -179,7 +179,7 @@ const givenLanes = (eventId: string, ...lanes: { name: string; emoji: string; co
   })
 
 describe('the places a dream can happen at', () => {
-  it('is empty before an organiser adds any', async () => {
+  it('is empty before an admin adds any', async () => {
     const server = await build()
     const eventId = await givenEvent()
 
@@ -251,7 +251,7 @@ describe('the places a dream can happen at', () => {
   })
 
   it('refuses a colour outside the palette, a blank name and a blank emoji', async () => {
-    // The palette is fixed so the grid stays legible — a lane the organiser
+    // The palette is fixed so the grid stays legible — a lane the admin
     // picked `#fefefe` for is one nothing in the app could correct.
     const server = await build()
     const eventId = await givenEvent()
@@ -364,7 +364,7 @@ describe('the places a dream can happen at', () => {
 
   it('lets any approved member write the lanes, admin or not', async () => {
     // A shared spreadsheet everyone could edit is what this replaces. The admin
-    // case is not redundant: `admin` does not imply `member`, so an organiser who
+    // case is not redundant: `admin` does not imply `member`, so an admin who
     // is not attending holds one and not the other.
     const server = await build()
     const eventId = await givenEvent()

@@ -72,7 +72,7 @@ const rolesOf = async (accountId: string) =>
     .map((row) => row.role)
     .sort()
 
-describe('an organiser editing who holds which role', () => {
+describe('an admin editing who holds which role', () => {
   it('grants a role an account did not have', async () => {
     // An account holding `admin` alone — granted here rather than bootstrapped,
     // since `admin:create` gives both — cannot reach its own profile or say it is
@@ -89,7 +89,7 @@ describe('an organiser editing who holds which role', () => {
 
   it('opens the member routes to them, which is the point of doing it', async () => {
     // Hiding the nav link was never what stopped them: `/api/me/profile` is
-    // behind `requireMember` and answered 403 to an organiser without the role.
+    // behind `requireMember` and answered 403 to an admin without the role.
     const server = await build()
     const admin = await givenAccount(['admin'])
     const profile = () =>
@@ -135,7 +135,7 @@ describe('an organiser editing who holds which role', () => {
     expect(await rolesOf(someone.id)).toEqual(['member'])
   })
 
-  it('refuses to remove the last organiser, which would lock everyone out', async () => {
+  it('refuses to remove the last admin, which would lock everyone out', async () => {
     const server = await build()
     const admin = await givenAccount(['admin'])
 
@@ -145,7 +145,7 @@ describe('an organiser editing who holds which role', () => {
     expect(await rolesOf(admin.id)).toEqual(['admin'])
   })
 
-  it('lets an organiser step down once there is another', async () => {
+  it('lets an admin step down once there is another', async () => {
     // The passing sibling: the guard must refuse the last one, not every one.
     const server = await build()
     const admin = await givenAccount(['admin'])
@@ -157,8 +157,8 @@ describe('an organiser editing who holds which role', () => {
     expect(await rolesOf(admin.id)).toEqual(['member'])
   })
 
-  it('keeps one organiser when two step down at the same moment', async () => {
-    // Two organisers stepping down together must still leave one. Removing the
+  it('keeps one admin when two step down at the same moment', async () => {
+    // Two admins stepping down together must still leave one. Removing the
     // last-admin guard fails this as well as the sequential case.
     const server = await build()
     const first = await givenAccount(['admin'])
@@ -196,7 +196,7 @@ describe('an organiser editing who holds which role', () => {
     expect(await rolesOf(someone.id)).toEqual(['member'])
   })
 
-  it('refuses anyone who is not an organiser', async () => {
+  it('refuses anyone who is not an admin', async () => {
     const server = await build()
     const member = await givenAccount(['member'])
     const someone = await givenAccount([])
@@ -223,7 +223,7 @@ describe('an organiser editing who holds which role', () => {
   })
 })
 
-describe('an organiser setting somebody’s password', () => {
+describe('an admin setting somebody’s password', () => {
   const setPassword = (
     server: FastifyInstance,
     cookie: string | undefined,
@@ -245,7 +245,7 @@ describe('an organiser setting somebody’s password', () => {
 
   it('lets them sign in with the new one', async () => {
     // The whole point: there is no other way to change a password once it is set,
-    // so an account whose owner lost it — or one an organiser made and did not write
+    // so an account whose owner lost it — or one an admin made and did not write
     // down — had no way back at all.
     const server = await build()
     const admin = await givenAccount(['admin'])
@@ -309,7 +309,7 @@ describe('an organiser setting somebody’s password', () => {
     ).toBe(400)
   })
 
-  it('will set another organiser’s, which is the trust the role already carries', async () => {
+  it('will set another admin’s, which is the trust the role already carries', async () => {
     const server = await build()
     const admin = await givenAccount(['admin'])
     const other = await givenAccount(['admin'])

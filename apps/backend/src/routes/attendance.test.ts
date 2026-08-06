@@ -19,7 +19,7 @@ import { handOverPlace, isAlreadyJoined } from './attendance.ts'
  *
  * Being in the community and coming to a burn are separate acts, so the
  * properties worth proving are that a community member can say it for
- * themselves, that saying it twice changes nothing, that an organiser can say it
+ * themselves, that saying it twice changes nothing, that an admin can say it
  * for someone, and that a stranger cannot say it at all.
  */
 
@@ -169,7 +169,7 @@ describe('a member saying they are coming', () => {
     expect(await db().select().from(attendance)).toHaveLength(1)
   })
 
-  it('is a no-op for two concurrent organiser adds too', async () => {
+  it('is a no-op for two concurrent admin adds too', async () => {
     // The admin route has the same check-then-insert, so it needs its own case:
     // pairing it with a member's join does not reliably interleave, and passed
     // whether or not the admin branch caught the violation.
@@ -267,15 +267,15 @@ describe('a member saying they are coming', () => {
     expect(await db().select().from(attendance)).toHaveLength(0)
   })
 
-  it('offers the burns to an organiser holding admin without member', async () => {
+  it('offers the burns to an account holding admin without member', async () => {
     // What fills the selector. That account has no attendance anywhere, so under
     // `requireMember` it got a 403 and faced an empty selector on the burn it was
     // setting up — the one case `choosableBurns(true, …)` exists for.
     const server = await build()
     const eventId = await givenEvent()
-    const organiser = await givenAccount(['admin'])
+    const admin = await givenAccount(['admin'])
 
-    const response = await myBurns(server, organiser.cookie)
+    const response = await myBurns(server, admin.cookie)
 
     expect(response.statusCode).toBe(200)
     expect(response.json().coming).toHaveLength(1)
@@ -354,7 +354,7 @@ describe('who may say it', () => {
   })
 })
 
-describe('an organiser saying it for someone', () => {
+describe('an admin saying it for someone', () => {
   const add = (server: FastifyInstance, cookie: string, eventId: string, accountId: string) =>
     server.inject({
       method: 'POST',
@@ -371,7 +371,7 @@ describe('an organiser saying it for someone', () => {
     })
 
   it('adds an account that never opted in', async () => {
-    // People ask over Discord, and an organiser should not have to talk them
+    // People ask over Discord, and an admin should not have to talk them
     // through a UI to say yes.
     const server = await build()
     const eventId = await givenEvent()
@@ -396,7 +396,7 @@ describe('an organiser saying it for someone', () => {
   })
 
   it('removes someone, even if they have paid', async () => {
-    // Unlike the member's own withdrawal: an organiser undoing a mistaken add
+    // Unlike the member's own withdrawal: an admin undoing a mistaken add
     // needs to be able to, and they are making the call deliberately.
     const server = await build()
     const eventId = await givenEvent()
@@ -534,7 +534,7 @@ describe('the dates a stay starts with', () => {
     })
   })
 
-  it('is the burn an organiser adds them to, too', async () => {
+  it('is the burn an admin adds them to, too', async () => {
     const server = await build()
     const eventId = await givenEvent()
     const admin = await givenAccount(['admin'])
@@ -633,15 +633,15 @@ describe('who is coming, by name', () => {
     expect(body).not.toContain('unpaid')
   })
 
-  it('is for approved accounts, and an admin who is not attending is one', async () => {
+  it('is for approved accounts, and somebody organising but not attending is one', async () => {
     const server = await build()
     const eventId = await givenEvent()
     const roleless = await givenAccount([])
-    const organiser = await givenAccount(['admin'], 'Organiser')
+    const admin = await givenAccount(['admin'], 'Admin')
 
     expect((await attendees(server, undefined, eventId)).statusCode).toBe(401)
     expect((await attendees(server, roleless.cookie, eventId)).statusCode).toBe(403)
-    expect((await attendees(server, organiser.cookie, eventId)).statusCode).toBe(200)
+    expect((await attendees(server, admin.cookie, eventId)).statusCode).toBe(200)
   })
 
   it('is empty for a burn nobody has joined, and for one that does not exist', async () => {

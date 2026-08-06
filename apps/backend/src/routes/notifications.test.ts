@@ -129,11 +129,11 @@ describe('the bell', () => {
   it('records what happened, and counts it unseen', async () => {
     const server = await build()
     await givenBurn()
-    const organiser = await givenAccount(['admin'])
+    const admin = await givenAccount(['admin'])
     const ada = await givenAccount()
     await givenComing(ada.id)
 
-    await setPaid(server, organiser.cookie, ada.id)
+    await setPaid(server, admin.cookie, ada.id)
 
     const body = list(server, ada.cookie)
     expect((await body).json().unseen).toBe(1)
@@ -143,10 +143,10 @@ describe('the bell', () => {
   it('goes grey once it has been opened', async () => {
     const server = await build()
     await givenBurn()
-    const organiser = await givenAccount(['admin'])
+    const admin = await givenAccount(['admin'])
     const ada = await givenAccount()
     await givenComing(ada.id)
-    await setPaid(server, organiser.cookie, ada.id)
+    await setPaid(server, admin.cookie, ada.id)
 
     const seen = await server.inject({
       method: 'POST',
@@ -162,11 +162,11 @@ describe('the bell', () => {
   it('shows nobody else theirs', async () => {
     const server = await build()
     await givenBurn()
-    const organiser = await givenAccount(['admin'])
+    const admin = await givenAccount(['admin'])
     const ada = await givenAccount()
     const bea = await givenAccount()
     await givenComing(ada.id)
-    await setPaid(server, organiser.cookie, ada.id)
+    await setPaid(server, admin.cookie, ada.id)
 
     expect((await list(server, bea.cookie)).json().notifications).toHaveLength(0)
   })
@@ -205,13 +205,13 @@ describe('what somebody has switched on', () => {
     const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
     const server = await build(deliver)
     await givenBurn()
-    const organiser = await givenAccount(['admin'])
+    const admin = await givenAccount(['admin'])
     const ada = await givenAccount()
     await givenComing(ada.id)
     await givenSubscribed(ada.id)
     await mute(server, ada.cookie, ['payment'])
 
-    await setPaid(server, organiser.cookie, ada.id)
+    await setPaid(server, admin.cookie, ada.id)
 
     expect((await list(server, ada.cookie)).json().notifications).toHaveLength(0)
     expect(deliver).not.toHaveBeenCalled()
@@ -221,12 +221,12 @@ describe('what somebody has switched on', () => {
     // The passing sibling: muting everything would satisfy the test above.
     const server = await build()
     await givenBurn()
-    const organiser = await givenAccount(['admin'])
+    const admin = await givenAccount(['admin'])
     const ada = await givenAccount()
     await givenComing(ada.id)
     await mute(server, ada.cookie, ['lead_role'])
 
-    await setPaid(server, organiser.cookie, ada.id)
+    await setPaid(server, admin.cookie, ada.id)
 
     expect((await list(server, ada.cookie)).json().notifications).toHaveLength(1)
   })
@@ -293,13 +293,13 @@ describe('the waiting list', () => {
     // somebody else pays, and an unpaid member's standing changes.
     const server = await build()
     await givenBurn(5)
-    const organiser = await givenAccount(['admin'])
+    const admin = await givenAccount(['admin'])
     const paid = await givenAccount()
     const unpaid = await givenAccount()
     await givenComing(paid.id)
     await givenComing(unpaid.id)
 
-    await setPaid(server, organiser.cookie, paid.id)
+    await setPaid(server, admin.cookie, paid.id)
 
     const theirs = (await list(server, unpaid.cookie)).json().notifications
     expect(theirs.map((one: { category: string }) => one.category)).toContain('waiting_list_near')
@@ -308,13 +308,13 @@ describe('the waiting list', () => {
   it('tells them when it actually filled', async () => {
     const server = await build()
     await givenBurn(1)
-    const organiser = await givenAccount(['admin'])
+    const admin = await givenAccount(['admin'])
     const paid = await givenAccount()
     const unpaid = await givenAccount()
     await givenComing(paid.id)
     await givenComing(unpaid.id)
 
-    await setPaid(server, organiser.cookie, paid.id)
+    await setPaid(server, admin.cookie, paid.id)
 
     const theirs = (await list(server, unpaid.cookie)).json().notifications
     expect(theirs.map((one: { category: string }) => one.category)).toContain('waiting_list_pushed')
@@ -323,13 +323,13 @@ describe('the waiting list', () => {
   it('says nothing to somebody who has paid', async () => {
     const server = await build()
     await givenBurn(1)
-    const organiser = await givenAccount(['admin'])
+    const admin = await givenAccount(['admin'])
     const first = await givenAccount()
     const second = await givenAccount()
     await givenComing(first.id, true)
     await givenComing(second.id)
 
-    await setPaid(server, organiser.cookie, second.id)
+    await setPaid(server, admin.cookie, second.id)
 
     const theirs = (await list(server, second.cookie)).json().notifications
     expect(theirs.map((one: { category: string }) => one.category)).not.toContain('waiting_list_pushed')
@@ -339,13 +339,13 @@ describe('the waiting list', () => {
     // The passing sibling: warning on every payment would satisfy the two above.
     const server = await build()
     await givenBurn(20)
-    const organiser = await givenAccount(['admin'])
+    const admin = await givenAccount(['admin'])
     const paid = await givenAccount()
     const unpaid = await givenAccount()
     await givenComing(paid.id)
     await givenComing(unpaid.id)
 
-    await setPaid(server, organiser.cookie, paid.id)
+    await setPaid(server, admin.cookie, paid.id)
 
     expect((await list(server, unpaid.cookie)).json().notifications).toHaveLength(0)
   })
@@ -355,15 +355,15 @@ describe('the waiting list', () => {
     // must say nothing — least of all to *everybody* who has not paid.
     const server = await build()
     await givenBurn(5)
-    const organiser = await givenAccount(['admin'])
+    const admin = await givenAccount(['admin'])
     const paid = await givenAccount()
     const unpaid = await givenAccount()
     await givenComing(paid.id)
     await givenComing(unpaid.id)
-    await setPaid(server, organiser.cookie, paid.id)
+    await setPaid(server, admin.cookie, paid.id)
     const first = (await list(server, unpaid.cookie)).json().notifications.length
 
-    await setPaid(server, organiser.cookie, paid.id)
+    await setPaid(server, admin.cookie, paid.id)
 
     expect((await list(server, unpaid.cookie)).json().notifications).toHaveLength(first)
   })
@@ -371,12 +371,12 @@ describe('the waiting list', () => {
   it('records a payment once, not on every re-save', async () => {
     const server = await build()
     await givenBurn(20)
-    const organiser = await givenAccount(['admin'])
+    const admin = await givenAccount(['admin'])
     const ada = await givenAccount()
     await givenComing(ada.id)
 
-    await setPaid(server, organiser.cookie, ada.id)
-    await setPaid(server, organiser.cookie, ada.id)
+    await setPaid(server, admin.cookie, ada.id)
+    await setPaid(server, admin.cookie, ada.id)
 
     const theirs = await db().select().from(notification)
     expect(theirs.filter((one) => one.category === 'payment')).toHaveLength(1)
@@ -387,7 +387,7 @@ describe('the waiting list', () => {
     // places left changes each time. Past the cap it carries nothing new.
     const server = await build()
     await givenBurn(1)
-    const organiser = await givenAccount(['admin'])
+    const admin = await givenAccount(['admin'])
     const first = await givenAccount()
     const second = await givenAccount()
     const waiting = await givenAccount()
@@ -395,8 +395,8 @@ describe('the waiting list', () => {
     await givenComing(second.id)
     await givenComing(waiting.id)
 
-    await setPaid(server, organiser.cookie, first.id)
-    await setPaid(server, organiser.cookie, second.id)
+    await setPaid(server, admin.cookie, first.id)
+    await setPaid(server, admin.cookie, second.id)
 
     const theirs = (await list(server, waiting.cookie)).json().notifications
     expect(theirs.filter((one: { category: string }) => one.category === 'waiting_list_pushed')).toHaveLength(
@@ -411,12 +411,12 @@ describe('a payment recorded against oneself', () => {
     // their own box already knows they ticked it.
     const server = await build()
     await givenBurn(20)
-    const organiser = await givenAccount(['admin', 'member'])
-    await givenComing(organiser.id)
+    const admin = await givenAccount(['admin', 'member'])
+    await givenComing(admin.id)
 
-    await setPaid(server, organiser.cookie, organiser.id)
+    await setPaid(server, admin.cookie, admin.id)
 
-    const theirs = (await list(server, organiser.cookie)).json().notifications
+    const theirs = (await list(server, admin.cookie)).json().notifications
     expect(theirs.map((one: { category: string }) => one.category)).not.toContain('payment')
   })
 
@@ -424,11 +424,11 @@ describe('a payment recorded against oneself', () => {
     // The passing sibling: suppressing every receipt would satisfy the test above.
     const server = await build()
     await givenBurn(20)
-    const organiser = await givenAccount(['admin'])
+    const admin = await givenAccount(['admin'])
     const ada = await givenAccount()
     await givenComing(ada.id)
 
-    await setPaid(server, organiser.cookie, ada.id)
+    await setPaid(server, admin.cookie, ada.id)
 
     const theirs = (await list(server, ada.cookie)).json().notifications
     expect(theirs.map((one: { category: string }) => one.category)).toContain('payment')

@@ -242,7 +242,7 @@ describe('StayForm', () => {
   })
 
   it('still offers the write-in when the list is empty', () => {
-    // A burn whose organiser has not set the list up yet still lets someone say
+    // A burn whose admin has not set the list up yet still lets someone say
     // what they are up for.
     render(
       <StayForm
@@ -339,7 +339,7 @@ describe('StayForm', () => {
   })
 
   it('offers no way to change the payment status', async () => {
-    // It is the organiser's to set; a control here would always fail.
+    // It is the admin's to set; a control here would always fail.
     render(
       <StayForm
         eventId="e-1"

@@ -4,8 +4,8 @@ Membership, application, and scheduling platform for small "burner"-style
 mini-events — up to ~42 members, a few times a year.
 
 It replaces the spreadsheet-plus-Discord workflow that these gatherings
-otherwise run on: people apply through a public form, organisers approve them
-and hand out invite links, members fill in their own camp details, organisers
+otherwise run on: people apply through a public form, admins approve them
+and hand out invite links, members fill in their own camp details, admins
 track payment, and the co-created programme of "dreams" (workshops, ceremonies,
 happenings) is scheduled and published as a calendar feed anyone can subscribe
 to.
@@ -356,7 +356,7 @@ address. Nothing else will stop it.
 `POST /api/applications` is unthrottled for the same reason and is worth a
 separate thought, because it is the only **unauthenticated write** in the app.
 The exposure is different in kind: nothing there grants access, approval is a
-deliberate human act, and the worst case is an organiser deleting junk out of the
+deliberate human act, and the worst case is an admin deleting junk out of the
 review list rather than anyone getting in. It is a nuisance, not a way through —
 but it is a nuisance a burst limiter on this vhost removes, and there is no
 in-app limit that will.
@@ -544,7 +544,7 @@ minutes after a merge.
 
 ### Creating the first admin
 
-`admin:create` makes the first organiser, or grants the roles to an account
+`admin:create` makes the first admin, or grants the roles to an account
 that already exists. Against a running container:
 
 ```sh
@@ -571,7 +571,7 @@ ADMIN_EMAIL=you@example.org ADMIN_PASSWORD="$ADMIN_PASSWORD" \
 ```
 
 Then log in at `/login`; the nav gains the **⚙️** link and the initials circle in
-the corner — `admin:create` grants `member` alongside `admin`, because an organiser
+the corner — `admin:create` grants `member` alongside `admin`, because an admin
 is almost always also coming. The circle shows a 👤 until a name is filled in, which
 is the state that account starts in.
 
@@ -584,16 +584,16 @@ Every row of ⚙️'s accounts list has a field for it (#211). It is the **only*
 password changes once it is set: redemption is where one is chosen, `admin:create`
 refuses to touch an existing one, and nothing else writes the column except a silent
 rehash on login when scrypt's parameters have moved on. Before this, an account whose
-owner had lost the password — or one an organiser made and did not write down — had
+owner had lost the password — or one an admin made and did not write down — had
 no way back at all.
 
-No old password is asked for, because an organiser does not have it. That is the
+No old password is asked for, because an admin does not have it. That is the
 point, and it also makes this the most powerful route in the app: admin taking over
-any account, another organiser's included. At 42 people who all know each other that
+any account, another admin's included. At 42 people who all know each other that
 is the trust the role already carries, and it is written here so nobody has to infer
 it.
 
-The field is deliberately **not** `type="password"`: an organiser is choosing a
+The field is deliberately **not** `type="password"`: an admin is choosing a
 password to read out or paste to somebody, and hiding it from the person choosing it
 helps nobody. Nothing is echoed back by the API — 204 and an empty body, because a
 password in a response is a password in somebody's network log — so it has to be
@@ -622,7 +622,7 @@ Two things it deliberately does not do:
 - **It never changes an existing password.** Given an address that is already
   here, it grants the roles and stops. Otherwise the bootstrap command would
   double as an offline password reset for any account, and anyone who could run
-  it could take over the organiser's login rather than merely create one. Run it
+  it could take over the admin's login rather than merely create one. Run it
   twice and the second run says so.
 - **It does not lowercase-and-hope.** The email goes through the same schema the
   API validates against, so `You@Example.org` finds the existing
@@ -679,7 +679,7 @@ worth testing.
 Any approved member can be told when something happens to them, per **browser**
 rather than per person: a subscription belongs to the browser it was made in, so
 somebody with a laptop and a phone turns it on in both. The toggle is on the details
-page behind the initials circle, **and on ⚙️ → Settings** — an organiser holding
+page behind the initials circle, **and on ⚙️ → Settings** — an account holding
 `admin` without `member` is refused from the details page, and application
 notifications go precisely to admins.
 
@@ -824,7 +824,7 @@ permissions — at this size they would be more to get wrong than to gain.
 
 They are separate concepts and neither implies the other. `admin` opens the
 organising pages; `member` opens a person's own details and saying they are
-coming to a burn. An organiser who is not attending is coherent, so `admin`
+coming to a burn. Somebody organising but not attending is coherent, so `admin`
 deliberately does not confer `member` — but the ordinary case is both, which is
 why `admin:create` grants both.
 
@@ -844,8 +844,8 @@ member — not admin:
 | Reading the roster, bar the payment date and email |                                                                                 |
 
 "Approved" means **`member` or `admin`**, and the second half is load-bearing.
-The roles are independent — the accounts table grants either on its own, and an
-organiser who is not attending is coherent — so an account can hold `admin` and
+The roles are independent — the accounts table grants either on its own, and
+somebody organising but not attending is coherent — so an account can hold `admin` and
 not `member`. A `member`-only guard would lock that person out of setting the burn
 up. That is `requireApproved` in `auth/guards.ts`.
 
@@ -873,7 +873,7 @@ this replaces. What stays admin's is _recording_ it, which is the `PATCH` and no
 read. The page prints a word rather than a tick, since a checkbox reads as something
 to click and this is the one column here nobody may change.
 
-Two columns come off the organiser's row:
+Two columns come off the admin's row:
 
 - **`payment_date`**, because when a transfer landed is bookkeeping. The status
   answers "are they in"; the date answers a question only whoever reconciles the
@@ -881,18 +881,18 @@ Two columns come off the organiser's row:
 - **`email`**, which is the login identity rather than a way of reaching somebody.
   `profileUpdateSchema` refuses to change it for that reason, and `contact` is the
   field a person fills in to be contacted. The member page has no fallback to it,
-  where the organiser's shows it when a name is missing.
+  where the admin's shows it when a name is missing.
 
 `waiting` stays, because a waiting list is only any use to the people on it.
 
 The projection is `asMemberEntry` in `roster.ts`, written out field by field. That
 is the safety property, not tidiness: it is an object literal against
-`MemberRosterEntry`, so a column added to the organiser's row reaches members only
+`MemberRosterEntry`, so a column added to the admin's row reaches members only
 when somebody names it there, and one removed from the member schema stops compiling
 rather than quietly still being sent. Both views run the same `rosterFor`, so the
 order — which decides who has a place — cannot come out differently on the two pages.
 
-The organiser's roster keeps its own route, its payment control and its CSV.
+The admin's roster keeps its own route, its payment control and its CSV.
 
 What a member reads elsewhere, more narrowly, is **who is coming, by name**:
 `GET /api/events/:eventId/attendees` returns account ids and display names and
@@ -912,7 +912,7 @@ to "since Edit was pressed" — that is the difference that matters for a field
 forty-odd people now share, and it does not close it. Closing it properly means
 versioning the field and answering 409, which is more machinery than four burns a
 year justifies. The admin `PATCH` under Organise → Events is partial per field, so
-two organisers touching different fields there do not collide; this one is a single
+two admins touching different fields there do not collide; this one is a single
 field, so they always do.
 
 And deleting a helping option takes every member's ticks for it with it — `attendance_helping` cascades — so a
@@ -959,10 +959,10 @@ express "add admin, forget to remove member".
 
 Removing the last `admin` is refused with **409**. The count is taken inside the
 transaction, after the write, so the rule is decided against the state the write
-actually produced; a `throw` rolls it back. Two organisers stepping down at the
+actually produced; a `throw` rolls it back. Two admins stepping down at the
 same moment leave one, and a test asserts it.
 
-Nothing stops an organiser removing their _own_ `admin` while another exists —
+Nothing stops an admin removing their _own_ `admin` while another exists —
 that is stepping down, not a lockout.
 
 **The viewer is resolved once per request.** A guard answers 401/403 from it and
@@ -1000,7 +1000,7 @@ they want it.
 Leftmost is the **burn selector**, because everything to the right of it is about
 the burn it names. It lists the burns a member has said they are coming to, and
 defaults to the soonest — the list arrives soonest-first, so that is the first
-entry rather than a rule applied twice. **An organiser holding `admin` sees every
+entry rather than a rule applied twice. **An account holding `admin` sees every
 burn still to come**: one without `member` has no attendance anywhere and would
 otherwise face an empty selector on the burn they are setting up. Somebody coming
 to none gets no selector and no burn-scoped content; their details page is where
@@ -1011,7 +1011,7 @@ case and a select with a single option is furniture.
 
 **Every burn-scoped page says the same thing when it has no burn**, through `NoBurn`,
 and it says a different thing to each persona because that is what decided the list
-is empty. An organiser is offered every coming burn, so empty means none is planned
+is empty. An admin is offered every coming burn, so empty means none is planned
 and the fix is theirs — a link to Events. A member is offered the ones they have
 joined, so empty usually means they have not joined one, and the fix is on their own
 page. The old copy said "there is no burn open at the moment" to both, which is a
@@ -1038,7 +1038,7 @@ month's grid with nothing on screen to say why.
   same activity, and two entries for it is what the restructure undid.
 - **Places** is reached from Schedule too: the lanes are what the grid draws.
 - **Signing out** is on the details page, under the line naming the account it ends,
-  and on ⚙️ → Settings for the organiser the details page refuses. Every entry in the
+  and on ⚙️ → Settings for the admin the details page refuses. Every entry in the
   bar is a _place_; this is an action, and it was the only one there.
 - **The initials circle** is the details page: who you are, then a section per burn
   still to come — join it, or fill in your stay at it — then past burns behind
@@ -1049,7 +1049,7 @@ month's grid with nothing on screen to say why.
 - **⚙️** is admin's alone. It used to be `Organise` and open to any approved member,
   because it was the only way to reach the two lists above; now those have their own
   way in, and what is left behind ⚙️ — the burn's shape, who gets in, payment, the
-  installation — is admin's. It still links to both lists, since an organiser
+  installation — is admin's. It still links to both lists, since an admin
   holding `admin` without `member` has no details page to reach the lodging list from.
 
 **Pages are full width.** `--measure` is a reading width and only the two pages that
@@ -1259,7 +1259,7 @@ Consequences worth knowing:
 - An event **ending today is still active**, until UTC midnight. The comparison
   is in UTC rather than a configured timezone: the only thing it decides is when
   an event stops being the active one, and a few hours either way on the closing
-  day is not something an organiser would notice. A timezone setting would be a
+  day is not something an admin would notice. A timezone setting would be a
   config knob, a migration and a test matrix bought for that.
 - Once **every** event has ended there is no active event. The endpoint answers
   `{ "event": null }`, and it deliberately does not fall back to the most recent
@@ -1282,7 +1282,7 @@ The public homepage renders it: name, dates and the welcome markdown, with
 the same renderer, so what it shows is what a visitor gets.
 
 A slug collision answers **409** rather than a generic failure — the slug appears
-in URLs, so it is something the organiser fixes by choosing another.
+in URLs, so it is something the admin fixes by choosing another.
 
 Four more things the write routes do, for anyone writing a second client:
 
@@ -1298,11 +1298,11 @@ Four more things the write routes do, for anyone writing a second client:
   sending the whole thing back is therefore a 400 on `id` and `created_at`.
 - **A date move that would invert the range answers 400**, not a 500 from the
   database. That holds for a body carrying one date as well as two — the check for
-  a one-sided move rides in the `UPDATE` itself, so a second organiser moving the
+  a one-sided move rides in the `UPDATE` itself, so a second admin moving the
   other date concurrently cannot slip between a read and a write.
 
 A PATCH responds with the event **as written**, not with the body merged onto what
-was read a moment earlier — so if another organiser's change landed in between, the
+was read a moment earlier — so if another admin's change landed in between, the
 response reflects it rather than reporting a value nobody stored.
 
 A row that disappears before the `UPDATE` reaches it answers **404**, the same as
@@ -1316,7 +1316,7 @@ else has just deleted does not come back as "check the dates".
 `form_question` rows, never code — and **one central set**, not one per burn.
 Someone applies to join the community once, the way they would be let into the
 Discord server; attending a particular burn is a separate act afterwards (#76).
-Organisers retune the questions between burns, so adding, editing, reordering or
+Admins retune the questions between burns, so adding, editing, reordering or
 removing one must never need a redeploy, and the web app renders whatever it is
 handed rather than knowing the questions.
 
@@ -1326,7 +1326,7 @@ checkbox, and _agreement_ — a checkbox that must be ticked to submit.
 Two rules that are the server's, not the browser's:
 
 - **`order` is assigned by the server.** A new question goes last; a client
-  cannot pick a position. Two organisers adding at once would otherwise collide
+  cannot pick a position. Two admins adding at once would otherwise collide
   over a number neither of them chose, so the read and the insert run in one
   transaction.
 - **Reordering sends the complete list of ids**, in the order wanted, and a
@@ -1505,7 +1505,7 @@ would assert against a stub of the thing under test.
 
 Who cooks, who helps and who washes up — the spreadsheet's Meal tab (#210).
 
-**`meal_slot` is a template, `meal` is a sitting.** An organiser sets the times once
+**`meal_slot` is a template, `meal` is a sitting.** An admin sets the times once
 per burn — Lunch 13:00, Dinner 18:00, and for some burns a Morning cleanup at 09:00,
 which is why a slot carries a **kind**. Generating from those writes the rows.
 
@@ -1806,10 +1806,10 @@ actually open** — `start_date`/`start_time` through `end_date`/`end_time`. A b
 that opens midday Friday and closes midday Sunday is 49 rows, not three whole
 days of mostly-empty grid.
 
-Those hours are the organiser's, set on the event form beside the dates. They
+Those hours are the admin's, set on the event form beside the dates. They
 replaced a guess: the grid used to run 00:00 on the first day through the last
 hour of the day _after_ `end_date`, the extra day being a stand-in for a last
-night that carries past midnight. An organiser who can say "ends 04:00 on the
+night that carries past midnight. An admin who can say "ends 04:00 on the
 6th" does not need the app inventing anything.
 
 Rows are walked by adding an hour to an instant rather than by setting hours on a
@@ -1838,7 +1838,7 @@ was misread. The rows underneath must then render no cell at all, or the whole
 column shifts sideways; `laneCells` returns `covered` for those. Two dreams
 starting in the same hour share a cell, and one starting inside another's block
 joins it rather than disappearing, because an overlap in one lane is an
-organiser's mistake to see.
+admin's mistake to see.
 
 Each chip also carries its own `18:00–21:00`, so the length is readable without
 counting rows.
@@ -1854,10 +1854,10 @@ outside the days on show, and guessing "unplaced means a null field" left that o
 in neither the grid nor the pool — gone from the page while still fine on
 `/dreams`. Deriving it means nothing can vanish whatever the date.
 
-The grid runs from the burn's own `start_time` to its `end_time`, so an organiser
+The grid runs from the burn's own `start_time` to its `end_time`, so an admin
 who says midday Friday to midday Sunday gets 49 rows rather than three whole days.
 A burn whose last night carries into the small hours says so by ending at 02:00 on
-the day after, which is a date the organiser types rather than a day the grid adds.
+the day after, which is a date the admin types rather than a day the grid adds.
 
 Dragging an already-scheduled dream to another lane **keeps the length it had**.
 Forcing an hour would quietly shorten a two-hour session for the crime of being
@@ -1946,7 +1946,7 @@ doing depends on the year.
 `/options` — **Lodging and helping**, for the burn the selector is pointing at.
 Setting them up before that burn is the next one works because the selector offers
 every burn still to come. Reached from **(edit lodging alternatives)** on the details page,
-beside the question the list answers, and from ⚙️ as well — an organiser holding
+beside the question the list answers, and from ⚙️ as well — an account holding
 `admin` without `member` has no details page to reach it from.
 
 A lodging entry can carry a number of spaces — "Temple mattress: 9" — or leave it
@@ -1957,7 +1957,7 @@ confusingly.
 
 Free text became a reference, and the migration folds whatever was already typed
 into `notes` rather than dropping it — "hammock in the barn" is not an id, so
-there is nothing to map it onto, but an organiser still reads notes. Truncated to
+there is nothing to map it onto, but an admin still reads notes. Truncated to
 2000 there, which is what the schema allows.
 
 A member picks one lodging option on **your burn**, and the select disables the
@@ -1967,7 +1967,7 @@ is sent, so `PATCH /api/events/:eventId/attendance/me` counts the takers and ans
 
 The count is a plain read-and-compare, not race protection. Two people taking the
 last mattress in the same millisecond can both succeed; at forty-odd people that
-is an organiser moving one of them, not something to build machinery against.
+is an admin moving one of them, not something to build machinery against.
 
 The option a member already holds is never disabled for them, even when it reads
 as full — their own bed counts towards the total, so disabling it would make the
@@ -1978,7 +1978,7 @@ to tell a member the Temple is full without showing them who is sleeping in it.
 
 A member ticks **as many helping-out options as they like**, and can write in one
 the list does not have. The ticks are rows in `attendance_helping`, not a JSON
-array: the whole reason the list exists is so an organiser can count who is up for
+array: the whole reason the list exists is so an admin can count who is up for
 the kitchen, and counting inside a JSON column is the thing that gets rewritten
 later. The write-in sits beside them rather than instead of them — the point of
 the list is counting, the point of the write-in is that a list is never complete.
@@ -1989,7 +1989,7 @@ an option deleted in the moment between it and the write rolls the column write
 back too, rather than answering an error over a half-saved stay.
 
 Both sides of that join cascade. Withdrawing from a burn takes the ticks with it,
-and so does an organiser removing an option — **unlike lodging**, where a bed
+and so does an admin removing an option — **unlike lodging**, where a bed
 someone is in must not vanish underneath them. Nobody is displaced by "kitchen"
 ceasing to be offered.
 
@@ -2032,7 +2032,7 @@ glance in the scheduling grid (#20) and what the ICS feed will carry alongside
 the location (#21).
 
 The colour is a **name from a fixed palette** — `red`, `orange`, `yellow`,
-`green`, `blue`, `purple`, `pink`, `grey` — not free hex. An organiser who
+`green`, `blue`, `purple`, `pink`, `grey` — not free hex. An admin who
 picked `#fefefe` for a lane would produce unreadable text that nothing in the
 app could correct, and naming the colour rather than valuing it lets light and
 dark themes each choose their own shade. A CHECK generated from the same
@@ -2139,7 +2139,7 @@ attacker-controlled, so two things are true by construction:
 `{ question_id, label, type, value }`: the id so a reviewer can line the same
 question up across applications, and the wording exactly as that applicant saw
 it. A bare reference does not survive the form changing, and the form is meant to
-change — questions are rows precisely so organisers can retune them between
+change — questions are rows precisely so admins can retune them between
 burns. Without the snapshot, editing a question would silently re-file every past
 answer under wording nobody was shown, and deleting one would leave answers that
 cannot be labelled at all. Neither is recoverable afterwards, which is why the
@@ -2151,7 +2151,7 @@ absent optional text answer stores `""`.
 
 **"Asked" means the form said so, not that the question exists now.** The
 submission carries `asked` — the ids the page actually rendered — and only those
-get an entry. Without it, a question an organiser added while someone was filling
+get an entry. Without it, a question an admin added while someone was filling
 the form in was stored against them as `""` or `false`, which reads as "asked and
 declined" about a question they never saw.
 
@@ -2223,7 +2223,7 @@ applicant waiting for a message that will never arrive.
 ### Reviewing applications
 
 `GET /api/admin/applications` lists everything sent in, newest first, with the
-answers as stored — the question wording included, so an organiser reads what the
+answers as stored — the question wording included, so an admin reads what the
 applicant was actually asked rather than what the form says today.
 
 Approving and rejecting are the same shape, and the shape is the point:
@@ -2236,19 +2236,19 @@ Zero affected rows means someone already decided it, which is answered `409`
 rather than silently re-deciding. The decision and the guard against
 re-deciding are **one statement**, so there is no window between them — a
 double-clicked Approve mints one invite, not two. `invite_token_application_idx`
-is the backstop underneath that, and the page tells the organiser to reload
+is the backstop underneath that, and the page tells the admin to reload
 rather than to try again, since retrying cannot help.
 
 **Approval mints the invite.** 32 CSPRNG bytes, base64url, valid 30 days. Only
 the SHA-256 digest is stored, so the raw token exists in that one response and
 nowhere else — a leaked backup or a stray copy of the volume hands out no
-invites. The organiser copies it into Discord or Messenger themselves; there is
+invites. The admin copies it into Discord or Messenger themselves; there is
 no email.
 
 **A lost link is re-issued, not worked around.**
 `POST /api/admin/applications/:id/invite` mints a replacement and shows it once,
 the same way approving does. The link is shown in a paragraph that vanishes on
-reload and the organiser has to paste it into Discord before navigating away, so
+reload and the admin has to paste it into Discord before navigating away, so
 losing it is a realistic accident rather than carelessness.
 
 **The row is updated, not replaced**, which is what makes this safe. One invite per
@@ -2292,7 +2292,7 @@ a separate decision each time.
 For people already known — returning members, partners — who should skip the form
 entirely. `POST /api/admin/invites` mints the **same** token an approval does, so
 both kinds redeem through one path: CSPRNG bytes, digest stored, raw value
-returned once. The default is 30 days; an organiser can set `expires_at`, and one
+returned once. The default is 30 days; an admin can set `expires_at`, and one
 already in the past is refused rather than stored, since it would be a link
 nobody could use.
 
@@ -2315,7 +2315,7 @@ refused with `409`, for different reasons:
   gets them in; what cannot be recovered is the tie back to what they wrote, and
   #91 owns re-issuing against the application itself.
 
-The organiser UI offers Revoke on exactly those — every unredeemed direct invite,
+The admin UI offers Revoke on exactly those — every unredeemed direct invite,
 **expired ones included**, since an expired link is still a row worth clearing
 out and the route deletes it happily.
 
@@ -2389,7 +2389,7 @@ it POSTs all three mean the same thing, that this link cannot be spent.
 invite is coming to the burn that is next, so the form says so by name and asks for
 the stay — arrival, lodging, helping — in the same breath, rather than leaving a new
 member to find a second page. Offered rather than assumed: being on the list is a
-commitment, and an organiser setting a burn up need not be attending it, so the box
+commitment, and an admin setting a burn up need not be attending it, so the box
 unticks and the stay questions go with it. No burn coming, no checkbox.
 
 It needs no new disclosure to do this. `/api/events/active` and
@@ -2441,10 +2441,10 @@ could not say yes to it. All three refuse a burn that has **ended**, and answer 
 for that and for an id that never existed alike, so an id cannot be probed for
 existence.
 
-An organiser can do it for someone, because people ask over Discord and an
-organiser should not have to talk them through a UI:
+An admin can do it for someone, because people ask over Discord and an
+admin should not have to talk them through a UI:
 `POST|DELETE /api/admin/events/:eventId/attendance`. The admin delete carries **no
-payment guard** — undoing a mistaken add has to be possible, and an organiser
+payment guard** — undoing a mistaken add has to be possible, and an admin
 doing it is making the call deliberately.
 
 **Being able to sign in is not being a member.** These routes are behind
@@ -2458,11 +2458,11 @@ taken away afterwards.
 
 Joining writes `arrival_date` and `departure_date` from the event, rather than
 leaving them null for everyone to type in what the event already knows. The
-organiser adding someone gets the same default.
+admin adding someone gets the same default.
 
 Written on join, not merely prefilled in the form. Prefilling keeps "never said"
 distinguishable from "said the whole burn", but it leaves the roster showing
-blanks for almost everyone — which is the column an organiser is reading it for.
+blanks for almost everyone — which is the column an admin is reading it for.
 The people arriving late or leaving early are the ones who should have to change
 something.
 
@@ -2546,7 +2546,7 @@ a place, so splitting it in two would be two chances to disagree about that.
 
 **Ordered by `joined_at` within each group, not by payment time.** #23's sketch
 said payment timestamp; `payment_date` is written as `todayIso(now)` — a date, not
-a timestamp — so an organiser recording a batch in one sitting gives every one of
+a timestamp — so an admin recording a batch in one sitting gives every one of
 them the same key and the tie breaks on nothing.
 
 ### Handing a place over
@@ -2589,7 +2589,7 @@ exactly what the members above the line need. The first version of this counted
 non-waiting entries and got it backwards; `HowToPay` owns the decision now, so
 there is one place that knows the rule.
 
-Recording a payment sends **the status and nothing else** — an organiser
+Recording a payment sends **the status and nothing else** — an admin
 recording money received has no business rewriting an arrival date in the same
 request. `payment_date` is not accepted at all: it is derived from the status and
 the server's clock in the same statement that writes the status, the way
@@ -2602,7 +2602,7 @@ used to be neither: the schema was `.partial()` over both columns, so
 alone recorded a payment the status denied. Nothing enforced it and no `CHECK`
 linked the columns — it held because the one caller always sent both.
 
-**Backdating is deliberately not supported.** An organiser recording a transfer
+**Backdating is deliberately not supported.** An admin recording a transfer
 that landed last week is a real need, and the answer to it is a field with the
 status validated against it, not one the server silently overrides. Sending
 `payment_date` is a `400` rather than an ignored key, so nobody can believe they
@@ -2782,7 +2782,7 @@ routes that emit it, rather than being listed in advance and left unreachable.
 `unauthenticated` and `forbidden` are separate because 401 and 403 are the one
 distinction a client cannot safely collapse — signing in fixes the first and
 does nothing for the second. `conflict` exists because a duplicate event slug is
-something an organiser fixes by choosing another, which a generic `bad_request`
+something an admin fixes by choosing another, which a generic `bad_request`
 would not convey.
 
 `invalid_credentials` covers a wrong password and an unknown address alike:

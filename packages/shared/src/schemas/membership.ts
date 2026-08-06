@@ -103,7 +103,7 @@ export const attendanceFields = z.object({
    * Which `event_option` they picked to sleep in, or null for not said.
    *
    * A reference rather than the free text this used to be. The options still
-   * differ per event and per site, and organisers still add one without a
+   * differ per event and per site, and admins still add one without a
    * deploy — they are rows now — but an id is what lets anyone count who is
    * sleeping where.
    */
@@ -112,7 +112,7 @@ export const attendanceFields = z.object({
    * Which helping-out options they ticked, as ids.
    *
    * A set, because people help with more than one thing, and references rather
-   * than text so an organiser can count who is up for the kitchen. Stored as rows
+   * than text so an admin can count who is up for the kitchen. Stored as rows
    * in `attendance_helping`; a field here only on the way in and out.
    */
   helping_option_ids: z.array(idSchema),
@@ -144,7 +144,7 @@ export const attendanceSchema = withStayOrder(attendanceFields)
  * What a member may change about their own stay.
  *
  * `payment_status` and `payment_date` are omitted deliberately: they are the
- * organiser's to set, and a member who could write them could mark themselves
+ * admin's to set, and a member who could write them could mark themselves
  * paid. `event_id` and `account_id` are omitted for the same reason in a
  * different direction — they identify whose row it is, and the route derives
  * both from the session rather than the body.
@@ -174,7 +174,7 @@ export type Attendance = z.infer<typeof attendanceSchema>
 export type ProfileUpdate = z.infer<typeof profileUpdateSchema>
 export type AttendanceUpdate = z.infer<typeof attendanceUpdateSchema>
 
-/** Who an organiser is adding to a burn on someone else's behalf. */
+/** Who an admin is adding to a burn on someone else's behalf. */
 export const attendanceCreateSchema = z.object({ account_id: idSchema }).strict()
 
 /**
@@ -255,7 +255,7 @@ export type MyBurnsResponse = z.infer<typeof myBurnsResponseSchema>
 export type EventAttendeesResponse = z.infer<typeof eventAttendeesResponseSchema>
 
 /**
- * One person on a burn's list, as an organiser sees them.
+ * One person on a burn's list, as an admin sees them.
  *
  * The person-level fields are joined in from `account` rather than duplicated,
  * so an allergy corrected on the profile page is corrected here too.
@@ -277,7 +277,7 @@ export const rosterEntrySchema = attendanceFields.extend({
   /**
    * The lodging option's label, resolved at read time.
    *
-   * A projection beside the id, not a second place to store it: the organiser
+   * A projection beside the id, not a second place to store it: the admin
    * reading this wants "Temple mattress", and a CSV of UUIDs is no use to
    * anybody.
    */
@@ -286,7 +286,7 @@ export const rosterEntrySchema = attendanceFields.extend({
    * The ticked helping options' labels, resolved at read time and joined.
    *
    * A projection beside the ids, for the same reason `lodging` is one: an
-   * organiser reading the roster or its CSV wants "Sauna, Kitchen", and a column
+   * admin reading the roster or its CSV wants "Sauna, Kitchen", and a column
    * of UUIDs is no use to anybody.
    */
   helping: optionalText(MAX_NOTES),
@@ -302,7 +302,7 @@ export const rosterResponseSchema = z.object({
 /**
  * The same list as a member sees it (#159).
  *
- * Derived by subtraction from the organiser's entry so the two cannot drift into
+ * Derived by subtraction from the admin's entry so the two cannot drift into
  * describing different people. Two fields come off, and **`payment_status` is not
  * one of them**: having paid is the definite mark of somebody actually joining, and
  * it was a column everyone could read in the spreadsheet this replaces. What stays
@@ -346,7 +346,7 @@ export const memberRosterResponseSchema = z.object({
 })
 
 /**
- * What an organiser may set on someone's attendance. The status, and nothing else.
+ * What an admin may set on someone's attendance. The status, and nothing else.
  *
  * `payment_date` is derived from the status and the clock rather than taken from
  * the caller, the way `joined_at` already is. Accepting both let them disagree:
@@ -355,7 +355,7 @@ export const memberRosterResponseSchema = z.object({
  * stated the invariant as a property of the system when it was in fact a habit of
  * the single caller.
  *
- * Backdating a transfer that landed last week is a real thing an organiser wants,
+ * Backdating a transfer that landed last week is a real thing an admin wants,
  * and this deliberately does not do it. It wants a field of its own with the
  * status validated against it — not one the server silently overrides.
  */

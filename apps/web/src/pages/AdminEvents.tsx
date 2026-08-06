@@ -35,9 +35,9 @@ type Editable = Pick<
 /**
  * The fields that differ from the event as loaded.
  *
- * Sending the whole event means an organiser fixing the cap overwrites the
+ * Sending the whole event means an admin fixing the cap overwrites the
  * welcome text someone else edited in between — `eventUpdateSchema` is
- * `.partial()` precisely so that does not happen. Two organisers editing the
+ * `.partial()` precisely so that does not happen. Two admins editing the
  * *same* field still last-writer-wins; this is only about the ones they did not
  * touch.
  */
@@ -54,7 +54,7 @@ const BLANK = {
   start_date: '',
   end_date: '',
   // The whole of both days, which is what the schedule assumed before the hours
-  // existed. An organiser who knows the gate times narrows it.
+  // existed. An admin who knows the gate times narrows it.
   start_time: '00:00',
   end_time: '23:59',
   member_cap: '42',

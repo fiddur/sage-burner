@@ -33,7 +33,7 @@ export const submittedAnswersSchema = z.partialRecord(idSchema, answerValueSchem
 /**
  * What is stored: the question as it was worded when asked, beside the answer.
  *
- * A reference alone does not survive the questions changing. Organisers retune
+ * A reference alone does not survive the questions changing. Admins retune
  * the form between burns — that is the whole reason the questions are rows
  * rather than code — so an answer keyed only by id means one of two bad things
  * later: the question was edited and the stored answer now reads as a reply to

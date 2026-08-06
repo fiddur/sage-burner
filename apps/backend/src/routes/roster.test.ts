@@ -14,7 +14,7 @@ import { createDb, runMigrations } from '../db/index.ts'
 import { account, accountRole, attendance, attendanceHelping, event, eventOption } from '../db/schema.ts'
 
 /**
- * The organiser's list of who is coming, and recording that they have paid.
+ * The admin's list of who is coming, and recording that they have paid.
  *
  * The ordering is the load-bearing part: it decides who has a place, so the
  * cases worth proving are that paying re-sorts the list and that the cut is
@@ -256,7 +256,7 @@ describe('recording a payment', () => {
 
   it('refuses a date from the caller rather than quietly preferring its own', async () => {
     // `.strict()` is what makes the field gone rather than ignored: stripped, the
-    // organiser would believe they had backdated a transfer that in fact reads as
+    // admin would believe they had backdated a transfer that in fact reads as
     // today. Backdating is a real need — it wants a deliberate design, not a
     // field the server silently overrides.
     const server = await build()
@@ -306,7 +306,7 @@ describe('recording a payment', () => {
   })
 
   it('refuses anything that is not payment', async () => {
-    // An organiser recording a payment has no business rewriting someone's
+    // An admin recording a payment has no business rewriting someone's
     // arrival date in the same request.
     const server = await build()
     const admin = await givenAccount('Org', ['admin'])
@@ -430,7 +430,7 @@ describe('what the roster says about helping out', () => {
 
     const entry = (await roster(server, admin.cookie, eventId)).json().entries[0]
 
-    // The organiser's order, not the order they happened to be ticked in.
+    // The admin's order, not the order they happened to be ticked in.
     expect(entry.helping).toBe('Sauna, Kitchen')
     expect([...entry.helping_option_ids].sort()).toEqual([sauna, kitchen].sort())
   })
@@ -496,7 +496,7 @@ describe('the same list as a member sees it', () => {
 
   it('gives a member the details whoever is cooking needs', async () => {
     // The reason allergies live on the account at all: somebody has to read them,
-    // and that somebody is not necessarily an organiser.
+    // and that somebody is not necessarily an admin.
     const server = await build()
     const eventId = await givenEvent()
     const ana = await givenAccount('Ana')
@@ -563,7 +563,7 @@ describe('the same list as a member sees it', () => {
     expect(names(await members(server, reader.cookie, eventId))).toEqual(['First', 'Second (waiting)'])
   })
 
-  it('orders it the way the organiser sees it, so no two pages disagree', async () => {
+  it('orders it the way the admin sees it, so no two pages disagree', async () => {
     const server = await build()
     const eventId = await givenEvent()
     const early = await givenAccount('Early')
@@ -575,12 +575,12 @@ describe('the same list as a member sees it', () => {
     expect(names(await members(server, reader.cookie, eventId))).toEqual(['Payer', 'Early'])
   })
 
-  it('opens to an organiser holding admin without member, like the rest of the shared pages', async () => {
+  it('opens to an account holding admin without member, like the rest of the shared pages', async () => {
     const server = await build()
     const eventId = await givenEvent()
-    const organiser = await givenAccount('Org', ['admin'])
+    const admin = await givenAccount('Org', ['admin'])
 
-    expect((await members(server, organiser.cookie, eventId)).statusCode).toBe(200)
+    expect((await members(server, admin.cookie, eventId)).statusCode).toBe(200)
   })
 
   it('refuses an anonymous caller and an account still waiting on a decision', async () => {

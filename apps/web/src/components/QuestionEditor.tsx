@@ -44,7 +44,7 @@ const BLANK = { label: '', type: 'textarea' as FormQuestionType, help_text: '', 
 
 /**
  * `required` is decided by the type for the two tick-box types, not by the
- * organiser. The rule itself comes from `tickBoxRequired` in the shared package,
+ * admin. The rule itself comes from `tickBoxRequired` in the shared package,
  * so this control cannot drift from what the API and the database enforce — which
  * is what happened when the rule was written out separately in each place.
  */
@@ -73,7 +73,7 @@ const toQuestionType = (value: string, fallback: FormQuestionType) =>
 /**
  * The application form's questions — one central set, not one per burn.
  *
- * These are rows rather than code precisely so an organiser can retune them
+ * These are rows rather than code precisely so an admin can retune them
  * between burns without a deploy — so everything here writes through the API
  * and re-reads, rather than keeping a clever local model that could disagree
  * with what the public form will actually render.
@@ -132,7 +132,7 @@ export const QuestionEditor = ({ api }: { api: QuestionsApi }) => {
     } catch (failure) {
       setError(messageFor(failure, fallback))
       // Re-read on failure too, or the one error the API deliberately produces
-      // becomes a dead end: another organiser adds a question, this list is now
+      // becomes a dead end: another admin adds a question, this list is now
       // stale, every ↑/↓ rebuilds the same short id list, and `sameSet` answers
       // 400 forever. Reloading the page was the only way out, and the message
       // did not say so. One request on an error path buys recovery.

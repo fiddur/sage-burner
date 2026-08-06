@@ -19,7 +19,7 @@ import { account, accountRole, formQuestion } from '../db/schema.ts'
  * The application form's questions.
  *
  * The property that matters most is the one #12 exists for: the questions are
- * data, so an organiser changes them without a deploy and the public form
+ * data, so an admin changes them without a deploy and the public form
  * reflects it. Everything here is written against that.
  */
 

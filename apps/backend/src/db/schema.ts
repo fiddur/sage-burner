@@ -261,7 +261,7 @@ export const eventOption = sqliteTable(
 /**
  * The application form's questions — **one central set**, not one per event.
  *
- * Rows, not code: organisers retune these between burns, so adding, editing or
+ * Rows, not code: admins retune these between burns, so adding, editing or
  * reordering a question must never require a redeploy.
  *
  * Someone applies to join the community once, the way they would be admitted to a
@@ -394,7 +394,7 @@ export const application = sqliteTable(
      * The questions as they were worded when asked, each beside its answer.
      *
      * A snapshot rather than references, because the questions are rows an
-     * organiser edits between burns: an answer keyed only by `form_question.id`
+     * admin edits between burns: an answer keyed only by `form_question.id`
      * either ends up filed under wording nobody was shown, or under a question
      * that has since been deleted and cannot be labelled at all.
      *
@@ -667,7 +667,7 @@ export const attendance = sqliteTable(
      * Which `event_option` they picked to sleep in, or null for not said.
      *
      * Free text until the per-event lists existed. The options still differ per
-     * event and per site and an organiser still adds one without a deploy — they
+     * event and per site and an admin still adds one without a deploy — they
      * are rows now — and an id is what lets anyone count who is sleeping where.
      *
      * No `onDelete`: removing somewhere people are already sleeping is refused
@@ -708,11 +708,11 @@ export const attendance = sqliteTable(
  * What one member ticked on the helping-out list.
  *
  * A row per choice rather than a JSON array on `attendance`: the whole reason the
- * list exists is so an organiser can count who is up for the kitchen, and counting
+ * list exists is so an admin can count who is up for the kitchen, and counting
  * inside a JSON column is the thing that gets rewritten later.
  *
  * Both sides cascade. Withdrawing from a burn takes the ticks with it, and so does
- * an organiser removing an option — unlike lodging, where a bed someone is in must
+ * an admin removing an option — unlike lodging, where a bed someone is in must
  * not vanish underneath them. Nobody is displaced by "kitchen" ceasing to be
  * offered.
  */
@@ -776,7 +776,7 @@ export const session = sqliteTable(
      *
      * No `onDelete`, so SQLite refuses to remove a place that still has dreams
      * in it rather than quietly unscheduling them — `places.ts` turns that into
-     * a 409 the organiser can act on.
+     * a 409 the admin can act on.
      */
     place_id: text('place_id').references(() => place.id),
   },
@@ -987,7 +987,7 @@ export const mealSlot = sqliteTable(
  * **Generated from the slots, not derived from them.** A derived meal is identical to
  * its template forever: no postponing Saturday's dinner an hour, no dropping lunch on
  * the day everybody leaves, no adding a late supper. Generating writes rows an
- * organiser can then change one at a time, and every change is a visible edit rather
+ * admin can then change one at a time, and every change is a visible edit rather
  * than a rule somewhere that has to be read to be understood.
  *
  * The slot's values are **copied**, and there is no link back to it. Renaming a slot
@@ -1049,7 +1049,7 @@ export const mealRole = sqliteTable(
     primaryKey({ columns: [table.meal_id, table.attendance_id, table.role] }),
     check('meal_role_role_check', oneOf(table.role, mealRoles)),
     // One lead per meal. The other two are unbounded — nothing runs out of people
-    // willing to wash up, and a cap would only be something for an organiser to raise.
+    // willing to wash up, and a cap would only be something for an admin to raise.
     uniqueIndex('meal_role_lead_idx')
       .on(table.meal_id)
       .where(sql`${table.role} = 'lead'`),

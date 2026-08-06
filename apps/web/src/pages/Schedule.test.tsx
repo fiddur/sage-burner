@@ -152,7 +152,7 @@ describe('Schedule', () => {
     expect(await screen.findByRole('columnheader', { name: /Temple/ })).toBeTruthy()
     expect(screen.getByRole('columnheader', { name: /Sauna/ })).toBeTruthy()
     // Two whole days, 24 rows each. The burn's own hours decide this now — an
-    // organiser who says 12:00 to 12:00 gets a grid that starts and stops there.
+    // admin who says 12:00 to 12:00 gets a grid that starts and stops there.
     expect(document.querySelectorAll('.schedule-grid th[scope="row"]')).toHaveLength(48)
   })
 

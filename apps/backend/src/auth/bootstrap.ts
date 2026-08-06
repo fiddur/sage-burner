@@ -30,8 +30,8 @@ export interface EnsureAdminResult {
  * Make sure an admin exists, so a fresh deploy has someone who can approve
  * anything.
  *
- * Grants `member` alongside `admin`. The roles stay separate concepts — an
- * organiser who is not attending is coherent — but `member` is what gates a
+ * Grants `member` alongside `admin`. The roles stay separate concepts —
+ * somebody organising but not attending is coherent — but `member` is what gates a
  * person's own profile and saying they are coming, so admin alone left the
  * account every installation starts with unable to use half the app, with no
  * way to fix it from inside (#110). Granting both is the ordinary case; the
@@ -40,7 +40,7 @@ export interface EnsureAdminResult {
  * **Never touches an existing account's password.** If the address is already
  * here, this grants the roles and stops. Otherwise the bootstrap command would
  * double as an offline password reset for any account — anyone who can run it
- * could take over the organiser's login rather than merely create one, and the
+ * could take over the admin's login rather than merely create one, and the
  * operator running it a second time with a different password would think it
  * had changed when it had not. Granting is idempotent; resetting would not be.
  *

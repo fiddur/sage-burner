@@ -16,7 +16,7 @@ import { isAdmin, useViewer } from '../viewer.tsx'
  * (#193).
  *
  * The remaining two split the same way `choosableBurns` does, because that is what
- * decided the list is empty. An **organiser** is offered every burn still to come,
+ * decided the list is empty. An **admin** is offered every burn still to come,
  * so an empty selector means none is planned, and the fix is theirs. A **member** is
  * offered the ones they have joined, so an empty selector usually means they have
  * not joined one — and the fix is on their own page, not a person to ask.

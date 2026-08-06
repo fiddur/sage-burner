@@ -64,7 +64,7 @@ describe('AdminApplications', () => {
 
   it('does not say "Copied" when the copy failed', async () => {
     // The token is shown once and cannot be shown again, so a false "Copied" is
-    // how an organiser loses this applicant's invite — recoverable only by
+    // how an admin loses this applicant's invite — recoverable only by
     // minting a direct one, which drops the tie to their application (#91).
     const writeText = vi.fn(() => Promise.reject(new Error('denied')))
     vi.stubGlobal('navigator', { clipboard: { writeText } })
@@ -234,7 +234,7 @@ describe('AdminApplications', () => {
     const getApplications = vi.fn(() => Promise.resolve({ applications: [] }))
     renderPage(stub({ getApplications }), ['member'])
 
-    expect(screen.getByText(/for organisers/)).toBeTruthy()
+    expect(screen.getByText(/for admins/)).toBeTruthy()
     expect(getApplications).not.toHaveBeenCalled()
   })
 

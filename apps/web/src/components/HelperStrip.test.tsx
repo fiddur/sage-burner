@@ -82,7 +82,7 @@ describe('HelperStrip', () => {
   })
 
   it('offers no hand to somebody who could not be appointed either', () => {
-    // An organiser holding `admin` without `member`: these are held by an
+    // An account holding `admin` without `member`: these are held by an
     // attendance, so somebody not coming has nothing to put a hand up for. The
     // caller filters them out of `candidates`, and that decides both.
     strip({ viewerId: 'a-9' })

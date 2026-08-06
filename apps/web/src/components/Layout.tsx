@@ -18,7 +18,7 @@ import { NotificationBell } from './NotificationBell.tsx'
  * The bar carries one entry per thing rather than one per page. Dreams is reached
  * from Schedule, which is where a dream is placed; Places from Schedule too, since
  * the lanes are what the grid draws; the lodging list from Your burn, beside the
- * question it answers. An organiser who is not attending reaches both from ⚙️.
+ * question it answers. Somebody organising but not attending reaches both from ⚙️.
  *
  * Every entry here is a **place**, which is why signing out is not among them: it is
  * an action, and it lives beside the sentence naming the account it ends.
@@ -68,7 +68,7 @@ export const Layout = ({ api, children }: { api: BellApi; children: ComponentChi
             </>
           )}
 
-          {/* Open to `approved`, so an organiser holding `admin` alone reaches them
+          {/* Open to `approved`, so an account holding `admin` alone reaches them
               from the nav rather than by typing the URL — which is what the pages
               themselves allow. */}
           {isApproved(viewer) && (

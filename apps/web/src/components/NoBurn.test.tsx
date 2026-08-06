@@ -14,7 +14,7 @@ const MEMBER: Viewer = {
   status: 'signed-in',
   account: { id: 'a-1', name: null, avatar: null, roles: ['member'] },
 }
-const ORGANISER: Viewer = {
+const ADMIN: Viewer = {
   status: 'signed-in',
   account: { id: 'a-2', name: null, avatar: null, roles: ['admin'] },
 }
@@ -43,8 +43,8 @@ describe('NoBurn', () => {
     expect(screen.queryByText(/not coming to a burn/)).toBeNull()
   })
 
-  it('says the same to an organiser, the failure not being about who is reading it', () => {
-    renderIt(FAILED, ORGANISER)
+  it('says the same to an admin, the failure not being about who is reading it', () => {
+    renderIt(FAILED, ADMIN)
 
     expect(screen.getByRole('alert').textContent).toContain('Could not load your burns')
     expect(screen.queryByText(/no burn planned/)).toBeNull()
@@ -62,10 +62,10 @@ describe('NoBurn', () => {
     expect(screen.queryByText(/not coming to a burn/)).toBeNull()
   })
 
-  it('tells an organiser none is planned, and where to make one', async () => {
+  it('tells an admin none is planned, and where to make one', async () => {
     // They are offered every burn still to come, so an empty selector means there
     // is none — and the fix is theirs.
-    renderIt(NONE, ORGANISER)
+    renderIt(NONE, ADMIN)
 
     expect(await screen.findByText(/no burn planned yet/)).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Events' }).getAttribute('href')).toBe('/admin/events')

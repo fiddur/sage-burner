@@ -133,7 +133,7 @@ export const AdminSettings = ({ api }: { api: AdminSettingsApi }) => {
       {loaded.status === 'ready' && <IconField api={api} />}
 
       {/* Also on the details page, which is where a member finds it. Kept here for
-          the same reason ⚙️ keeps the Places and lodging links: an organiser holding
+          the same reason ⚙️ keeps the Places and lodging links: an admin holding
           `admin` without `member` is refused from that page, and application
           notifications go precisely to admins. */}
       <PushToggle api={api} />

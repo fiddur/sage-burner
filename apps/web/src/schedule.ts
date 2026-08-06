@@ -4,7 +4,7 @@ import { toLocalInput } from './datetime.ts'
  * The rows of the timetable: every hour the burn is open, as local wall-clock
  * time.
  *
- * The organiser's own hours, not a guess. The first row is the hour the start
+ * The admin's own hours, not a guess. The first row is the hour the start
  * time falls in — arriving at 15:30 means the 15:00 row — and the last is the
  * hour containing the end. A burn that runs midday Friday to midday Sunday is
  * 49 rows rather than three whole days.
@@ -144,7 +144,7 @@ export interface Placed {
  * `rowSpan` means the rows underneath must render no cell at all, or the whole
  * column shifts sideways. Hence `covered`. Two dreams starting in the same hour
  * share a cell; one starting inside another's block joins the block rather than
- * being dropped, because an overlap is an organiser's mistake to see, not the
+ * being dropped, because an overlap is an admin's mistake to see, not the
  * app's to hide.
  */
 export const laneCells = (rows: readonly string[], dreams: readonly Placed[]): LaneCell[] => {

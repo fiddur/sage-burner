@@ -100,7 +100,7 @@ describe('direct invites', () => {
     expect((await create(server, cookie)).json().invite.expires_at).toBe('2026-08-01T00:00:00.000Z')
   })
 
-  it('takes an expiry when the organiser sets one', async () => {
+  it('takes an expiry when the admin sets one', async () => {
     const server = await build()
     const { cookie } = await givenAdmin()
 

@@ -37,7 +37,7 @@ type Plan = (MealsResponse & { eventId: string; attendees: readonly Person[] }) 
  * The spreadsheet tab this replaces was open to everyone, and so is this: any
  * approved member may take a lead, hand one over, stand for a crew, write a food
  * idea, or rewrite the words at the top. The plan itself — which sittings exist —
- * is the organisers', under Events.
+ * is the admins', under Events.
  */
 export const Meals = ({ api }: { api: MealsApi }) => {
   const viewer = useViewer()
@@ -116,8 +116,8 @@ export const Meals = ({ api }: { api: MealsApi }) => {
           {plan.meals.length === 0 ? (
             <p class="form-note">
               {plan.slots.length === 0
-                ? 'Nobody has set up meal times for this burn yet. Organisers do that under Events.'
-                : 'The meal times are set, but the days have not been filled in yet. Organisers do that under Events.'}
+                ? 'Nobody has set up meal times for this burn yet. Admins do that under Events.'
+                : 'The meal times are set, but the days have not been filled in yet. Admins do that under Events.'}
             </p>
           ) : (
             <MealTable

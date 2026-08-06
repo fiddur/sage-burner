@@ -81,7 +81,7 @@ describe('what this installation calls itself', () => {
     expect(response.json().installation.title).toBe('Sage Burner')
   })
 
-  it('is the software name until an organiser says otherwise', async () => {
+  it('is the software name until an admin says otherwise', async () => {
     // A fresh volume has to render something, and the migration seeds it rather
     // than every read having to know a fallback.
     const server = await build()
@@ -89,7 +89,7 @@ describe('what this installation calls itself', () => {
     expect((await readTitle(server)).json().installation.title).toBe('Sage Burner')
   })
 
-  it('is renamed by an organiser, and the public read reflects it', async () => {
+  it('is renamed by an admin, and the public read reflects it', async () => {
     const server = await build()
     const admin = await givenAccount(['admin'])
 
@@ -145,7 +145,7 @@ describe('what this installation calls itself', () => {
     expect(response.json().installation.title).toBe('Sage Burner')
   })
 
-  it('refuses anyone who is not an organiser', async () => {
+  it('refuses anyone who is not an admin', async () => {
     const server = await build()
     const member = await givenAccount(['member'])
 

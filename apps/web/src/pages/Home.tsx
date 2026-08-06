@@ -21,7 +21,7 @@ export type HomeApi = Pick<ApiClient, 'getActiveEvent' | 'updateWelcome'>
  *
  * Almost nothing here is written by us. Everything below the title comes from
  * `welcome_markdown` on the active event, because copy that lives in this file
- * is copy an organiser cannot change without a deploy — which is the whole
+ * is copy an admin cannot change without a deploy — which is the whole
  * point of #11 and this page.
  *
  * Reachable signed out; `getActiveEvent` needs no session.

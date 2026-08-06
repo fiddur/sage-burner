@@ -61,7 +61,7 @@ describe('GuardedPage', () => {
 
   it('names what the page is for, so the refusal says which access is missing', () => {
     const { unmount } = renderShell('admin', signedInAs('member'))
-    expect(screen.getByText(/for organisers/)).toBeTruthy()
+    expect(screen.getByText(/for admins/)).toBeTruthy()
     unmount()
 
     renderShell('member', signedInAs())
@@ -80,7 +80,7 @@ describe('GuardedPage', () => {
       { require: 'admin', roles: ['member'], allowed: false },
       { require: 'member', roles: ['member'], allowed: true },
       { require: 'member', roles: ['admin'], allowed: false },
-      // The one that matters: an organiser who is not attending holds `admin`
+      // The one that matters: somebody organising but not attending holds `admin`
       // alone, and `requireApproved` on the API lets them in — so this must too, or
       // the page would refuse somebody the server would serve.
       { require: 'approved', roles: ['admin'], allowed: true },

@@ -23,7 +23,7 @@ import { helpingFor, helpingIdsFor } from './helping.ts'
  *
  * Exported because it is the only part of the race that is testable here:
  * `inject` serialises two requests to the admin route, so that catch never fires
- * under test even though two organisers clicking at once over HTTP will reach it.
+ * under test even though two admins clicking at once over HTTP will reach it.
  * `attendance.test.ts` pins this predicate against a real violation instead, so
  * at least the message it matches cannot drift unnoticed.
  */
@@ -88,7 +88,7 @@ export const joinBurn = async (db: Database, eventId: string, accountId: string,
       joined_at: now().toISOString(),
       payment_status: 'unpaid',
       // The whole burn, which is what almost everyone means by coming to it.
-      // Written rather than left null and prefilled in the form: an organiser
+      // Written rather than left null and prefilled in the form: an admin
       // reading the roster wants the common answer already there, and the people
       // arriving late or leaving early are the ones who should have to change
       // something.
@@ -123,7 +123,7 @@ export const attendanceFor = async (db: Database, eventId: string, accountId: st
  *
  * The route checks that the giver has paid and the taker has not, several awaits
  * before these run. Both are re-stated in the WHERE clauses rather than trusted: two
- * givers naming the same taker, or a transfer racing an organiser recording a
+ * givers naming the same taker, or a transfer racing an admin recording a
  * payment, would otherwise destroy a paid place, since the taker was already paid
  * and the giver's row is deleted regardless. Nothing can interleave under the
  * synchronous driver today, but that is the driver's property rather than this
@@ -169,7 +169,7 @@ export interface AttendanceDeps extends GuardDeps {
 }
 
 /**
- * Saying you are coming to a burn — and an organiser saying it for you.
+ * Saying you are coming to a burn — and an admin saying it for you.
  *
  * Being in the community and coming to a particular burn are separate acts:
  * approval admits you once, and then you decide burn by burn. This is that
@@ -203,7 +203,7 @@ export const registerAttendanceRoutes = (
    * came to is not their history.
    *
    * `requireApproved`, unlike the writes below. This is what fills the burn selector,
-   * and an organiser holding `admin` without `member` has to be able to choose the
+   * and an account holding `admin` without `member` has to be able to choose the
    * burn they are setting up — they get every coming burn with `attendance: null` on
    * each and an empty `past`, which is exactly what `choosableBurns` expects. Under
    * `requireMember` that account got a 403, the provider swallowed it, and they faced
@@ -444,7 +444,7 @@ export const registerAttendanceRoutes = (
         account_id: parsed.data.account_id,
         joined_at: now().toISOString(),
         payment_status: 'unpaid',
-        // The same default an organiser would otherwise type in for them.
+        // The same default an admin would otherwise type in for them.
         arrival_date: burn?.start_date ?? null,
         departure_date: burn?.end_date ?? null,
       })
@@ -455,7 +455,7 @@ export const registerAttendanceRoutes = (
       // as a 500 rather than as a confident 404.
       if (isForeignKeyViolation(error)) return reply.code(404).send(errorResponse('not_found'))
       // The same race the member route has, and one it shares with it: an
-      // organiser adding someone at the moment they add themselves.
+      // admin adding someone at the moment they add themselves.
       if (!isAlreadyJoined(error)) throw error
 
       return { attendance: await joinedRow(request.params.eventId, parsed.data.account_id) }
@@ -471,7 +471,7 @@ export const registerAttendanceRoutes = (
     async (request, reply) => {
       void noStore(reply)
 
-      // No payment guard here, unlike the member's own withdrawal: an organiser
+      // No payment guard here, unlike the member's own withdrawal: an admin
       // removing someone who has paid is a decision they are making deliberately,
       // and refusing it would leave them no way to correct a mistaken add.
       const removed = await db

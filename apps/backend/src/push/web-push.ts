@@ -22,7 +22,7 @@ import type { Delivery, VapidKeys } from './push.ts'
  *
  * A push service is meant to use this before blocking a misbehaving sender, and
  * this one cannot receive mail — a deliberate trade. Configuring it would make
- * `docker compose up` insufficient, and defaulting it to a real organiser's
+ * `docker compose up` insufficient, and defaulting it to a real admin's
  * address would publish that address to Google and Mozilla. Nobody has been
  * blocked yet; if that changes, this is the line to revisit.
  */

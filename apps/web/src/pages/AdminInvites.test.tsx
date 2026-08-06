@@ -86,7 +86,7 @@ describe('AdminInvites', () => {
 
   it('offers Revoke for exactly the invites the route accepts', async () => {
     // Which is every unredeemed direct one, expired included — an expired link
-    // is still a row an organiser wants out of the list, and the route deletes
+    // is still a row an admin wants out of the list, and the route deletes
     // it happily. Only `used` and application-backed invites are refused.
     renderPage(
       stub({
@@ -127,7 +127,7 @@ describe('AdminInvites', () => {
 
   it('does not still say Copied after a second invite is minted', async () => {
     // The link is shown once and cannot be shown again, so a stale "Copied"
-    // is how an organiser pastes the first token twice and loses the second.
+    // is how an admin pastes the first token twice and loses the second.
     const writeText = vi.fn(() => Promise.resolve())
     vi.stubGlobal('navigator', { clipboard: { writeText } })
     const createInvite = vi
@@ -189,7 +189,7 @@ describe('AdminInvites', () => {
     const getInvites = vi.fn(() => Promise.resolve({ invites: [] }))
     renderPage(stub({ getInvites }), ['member'])
 
-    expect(screen.getByText(/for organisers/)).toBeTruthy()
+    expect(screen.getByText(/for admins/)).toBeTruthy()
     expect(getInvites).not.toHaveBeenCalled()
   })
 })

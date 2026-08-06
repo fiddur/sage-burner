@@ -8,7 +8,7 @@ import { idSchema, optionalText, nonEmptyText } from './common.ts'
  * One question on the application form.
  *
  * These are rows, not code, and there is **one set** rather than one per event:
- * an application is to the community, not to a burn. Organisers retune the
+ * an application is to the community, not to a burn. Admins retune the
  * questions between burns, so adding, editing or reordering one must never
  * require a redeploy — and the web app must render whatever it is given rather
  * than knowing the questions.
@@ -94,7 +94,7 @@ export const withTickBoxRules = <T extends z.ZodType<{ type?: string; required?:
  * `formQuestionSchema` instead, and says why.
  *
  * `id` and `order` are the server's, not the body's: a new question goes last, and
- * letting a client pick a position would make two organisers adding at once collide
+ * letting a client pick a position would make two admins adding at once collide
  * over a number neither of them chose.
  *
  * `.strict()` on both schemas below, for the reason `eventCreateSchema` and
@@ -147,7 +147,7 @@ export type FormQuestionUpdate = z.infer<typeof formQuestionUpdateSchema>
  * Reordering: the complete list of question ids, in the order wanted.
  *
  * The whole list rather than a move-this-one instruction, because the order is
- * what the organiser sees and dragging one question renumbers several. Sending
+ * what the admin sees and dragging one question renumbers several. Sending
  * all of them makes the request describe the end state, so a lost or reordered
  * request cannot leave the form half-renumbered.
  */

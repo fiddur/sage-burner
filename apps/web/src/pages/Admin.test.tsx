@@ -87,7 +87,7 @@ describe('Admin', () => {
   })
 
   it('grants a role, sending the whole set rather than a delta', async () => {
-    // An organiser holding `admin` alone cannot reach their own profile until this
+    // An account holding `admin` alone cannot reach their own profile until this
     // adds `member`. `admin:create` grants both, so that is an account someone was
     // given `admin` on, not the one the installation starts with.
     const accounts = livingRoster([
@@ -167,7 +167,7 @@ describe('Admin', () => {
     const getAdminAccounts = vi.fn(never)
     renderAdmin(getAdminAccounts, MEMBER)
 
-    expect(await screen.findByText(/for organisers/)).toBeTruthy()
+    expect(await screen.findByText(/for admins/)).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'Places' })).toBeNull()
     expect(screen.queryByRole('link', { name: 'Lodging and helping' })).toBeNull()
     expect(getAdminAccounts).not.toHaveBeenCalled()
@@ -180,13 +180,13 @@ describe('Admin', () => {
       account: { id: 'a-9', name: null, avatar: null, roles: [] },
     })
 
-    expect(await screen.findByText(/for organisers/)).toBeTruthy()
+    expect(await screen.findByText(/for admins/)).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'Places' })).toBeNull()
     expect(getAdminAccounts).not.toHaveBeenCalled()
   })
 
   it('points a signed-out visitor at the login form', async () => {
-    // Rather than "ask an existing organiser", which sends someone to a person
+    // Rather than "ask an existing admin", which sends someone to a person
     // when the thing they need is the form.
     const getAdminAccounts = vi.fn(never)
     renderAdmin(getAdminAccounts, { status: 'signed-out' })
@@ -196,8 +196,8 @@ describe('Admin', () => {
   })
 
   it('waits rather than refusing while the viewer is still loading', async () => {
-    // Rendering "this area is for organisers" during the first `getMe` would
-    // tell an actual organiser they are not one, for as long as the round trip
+    // Rendering "this area is for admins" during the first `getMe` would
+    // tell an actual admin they are not one, for as long as the round trip
     // takes.
     const getAdminAccounts = vi.fn(never)
     renderAdmin(getAdminAccounts, { status: 'loading' })

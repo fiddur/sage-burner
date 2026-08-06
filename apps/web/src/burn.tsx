@@ -64,7 +64,7 @@ const BurnContext = createContext<BurnContextValue>(EMPTY)
  *
  * A member sees the ones they have said they are coming to: the bar is for the burn
  * they are part of, and the rest are on their details page to join. **An admin sees
- * every burn still to come**, because an organiser holding `admin` without `member`
+ * every burn still to come**, because an account holding `admin` without `member`
  * has no attendance anywhere and would otherwise face an empty selector on the burn
  * they are setting up.
  */

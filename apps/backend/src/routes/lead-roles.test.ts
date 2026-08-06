@@ -725,19 +725,19 @@ describe('telling somebody a role moved', () => {
     const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
     const server = await build(deliver)
     const eventId = await givenEvent()
-    const organiser = await givenAccount(['member'], 'Org')
+    const admin = await givenAccount(['member'], 'Org')
     const before = await givenAccount(['member'], 'Bea')
     const after = await givenAccount(['member'], 'Ada')
-    await givenComing(eventId, organiser.id)
+    await givenComing(eventId, admin.id)
     await givenComing(eventId, before.id)
     await givenComing(eventId, after.id)
     await givenSubscribed(before.id)
     await givenSubscribed(after.id)
-    const roleId = (await add(server, organiser.cookie, eventId, { title: 'Sauna' })).json().role.id
-    await setLead(server, organiser.cookie, roleId, { account_id: before.id })
+    const roleId = (await add(server, admin.cookie, eventId, { title: 'Sauna' })).json().role.id
+    await setLead(server, admin.cookie, roleId, { account_id: before.id })
     deliver.mockClear()
 
-    await setLead(server, organiser.cookie, roleId, { account_id: after.id })
+    await setLead(server, admin.cookie, roleId, { account_id: after.id })
 
     await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(2))
     expect(messagesFrom(deliver).toSorted()).toEqual([
@@ -768,17 +768,17 @@ describe('telling somebody a role moved', () => {
     const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
     const server = await build(deliver)
     const eventId = await givenEvent()
-    const organiser = await givenAccount(['member'], 'Org')
+    const admin = await givenAccount(['member'], 'Org')
     const ada = await givenAccount(['member'], 'Ada')
-    await givenComing(eventId, organiser.id)
+    await givenComing(eventId, admin.id)
     await givenComing(eventId, ada.id)
     await givenSubscribed(ada.id)
-    const roleId = (await add(server, organiser.cookie, eventId, { title: 'Kitchen' })).json().role.id
+    const roleId = (await add(server, admin.cookie, eventId, { title: 'Kitchen' })).json().role.id
 
-    await joinTeam(server, organiser.cookie, roleId, ada.id)
+    await joinTeam(server, admin.cookie, roleId, ada.id)
     await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1))
 
-    await leaveTeam(server, organiser.cookie, roleId, ada.id)
+    await leaveTeam(server, admin.cookie, roleId, ada.id)
     await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(2))
 
     expect(messagesFrom(deliver)).toEqual([
@@ -793,14 +793,14 @@ describe('telling somebody a role moved', () => {
     const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
     const server = await build(deliver)
     const eventId = await givenEvent()
-    const organiser = await givenAccount(['member'], 'Org')
+    const admin = await givenAccount(['member'], 'Org')
     const ada = await givenAccount(['member'], 'Ada')
-    await givenComing(eventId, organiser.id)
+    await givenComing(eventId, admin.id)
     await givenComing(eventId, ada.id)
     await givenSubscribed(ada.id)
-    const roleId = (await add(server, organiser.cookie, eventId, { title: 'Kitchen' })).json().role.id
+    const roleId = (await add(server, admin.cookie, eventId, { title: 'Kitchen' })).json().role.id
 
-    expect((await leaveTeam(server, organiser.cookie, roleId, ada.id)).statusCode).toBe(204)
+    expect((await leaveTeam(server, admin.cookie, roleId, ada.id)).statusCode).toBe(204)
     expect(deliver).not.toHaveBeenCalled()
   })
 
@@ -808,13 +808,13 @@ describe('telling somebody a role moved', () => {
     const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
     const server = await build(deliver)
     const eventId = await givenEvent()
-    const organiser = await givenAccount(['member'], 'Org')
+    const admin = await givenAccount(['member'], 'Org')
     const ada = await givenAccount(['member'], 'Ada')
-    await givenComing(eventId, organiser.id)
+    await givenComing(eventId, admin.id)
     await givenComing(eventId, ada.id)
-    const roleId = (await add(server, organiser.cookie, eventId, { title: 'Kitchen' })).json().role.id
+    const roleId = (await add(server, admin.cookie, eventId, { title: 'Kitchen' })).json().role.id
 
-    expect((await joinTeam(server, organiser.cookie, roleId, ada.id)).statusCode).toBe(200)
+    expect((await joinTeam(server, admin.cookie, roleId, ada.id)).statusCode).toBe(200)
     expect(deliver).not.toHaveBeenCalled()
   })
 
@@ -824,14 +824,14 @@ describe('telling somebody a role moved', () => {
     const deliver = vi.fn<Delivery>(() => Promise.reject(new Error('push is down')))
     const server = await build(deliver)
     const eventId = await givenEvent()
-    const organiser = await givenAccount(['member'], 'Org')
+    const admin = await givenAccount(['member'], 'Org')
     const ada = await givenAccount(['member'], 'Ada')
-    await givenComing(eventId, organiser.id)
+    await givenComing(eventId, admin.id)
     await givenComing(eventId, ada.id)
     await givenSubscribed(ada.id)
-    const roleId = (await add(server, organiser.cookie, eventId, { title: 'Kitchen' })).json().role.id
+    const roleId = (await add(server, admin.cookie, eventId, { title: 'Kitchen' })).json().role.id
 
-    const response = await setLead(server, organiser.cookie, roleId, { account_id: ada.id })
+    const response = await setLead(server, admin.cookie, roleId, { account_id: ada.id })
 
     expect(response.statusCode).toBe(200)
     expect(response.json().role.lead?.account_id).toBe(ada.id)
