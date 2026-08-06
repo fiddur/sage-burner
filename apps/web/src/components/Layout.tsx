@@ -21,8 +21,11 @@ import { NotificationBell } from './NotificationBell.tsx'
  * question it answers. An organiser who is not attending reaches both from ⚙️.
  *
  * Every entry here is a **place**, which is why signing out is not among them: it is
- * an action, and it lives beside the sentence naming the account it ends. That also
- * leaves this frame needing no API client at all.
+ * an action, and it lives beside the sentence naming the account it ends.
+ *
+ * The one thing here that is not a link is the bell, which is why the frame takes an
+ * API client (#248): it belongs in the bar because it is about the whole session
+ * rather than any page, and it has to be reachable from all of them.
  */
 export const Layout = ({ api, children }: { api: BellApi; children: ComponentChildren }) => {
   const viewer = useViewer()
