@@ -154,6 +154,21 @@ const burnFor = async (db: Database, eventId: string) => {
  * the same reason. What stays admin's is the plan itself — the slots, and adding,
  * moving or dropping a sitting — which is why those live under `/api/admin/`.
  */
+/**
+ * Whose hands: the body when joining, the path when standing down. Both name a person
+ * rather than meaning the caller (#247) — 🙋 sends the caller's own id.
+ */
+const whoseHands = (
+  joining: boolean,
+  request: FastifyRequest<{ Params: { id: string; role: string; accountId?: string } }>,
+): string | undefined => {
+  if (!joining) return request.params.accountId
+
+  const parsed = helperSchema.safeParse(request.body)
+
+  return parsed.success ? parsed.data.account_id : undefined
+}
+
 export const registerMealRoutes = (
   app: FastifyInstance,
   { db, sessions, now = () => new Date(), notify = async () => undefined }: MealDeps,
@@ -357,12 +372,7 @@ export const registerMealRoutes = (
       const viewer = await viewerFor(request, { db, sessions })
       if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
 
-      // Whose hands: the body when joining, the path when standing down. Both name a
-      // person rather than meaning the caller (#247) — 🙋 sends the caller's own id.
-      const whose = joining ? helperSchema.safeParse(request.body) : undefined
-      if (whose !== undefined && !whose.success) return reply.code(400).send(errorResponse('bad_request'))
-
-      const accountId = whose?.data.account_id ?? request.params.accountId
+      const accountId = whoseHands(joining, request)
       if (accountId === undefined) return reply.code(400).send(errorResponse('bad_request'))
 
       const mine = await attendanceFor(db, existing.event_id, accountId)
@@ -375,7 +385,7 @@ export const registerMealRoutes = (
         await db.insert(mealRole).values(row).onConflictDoNothing()
         await tell(viewer.account_id, accountId, `You are on ${role} for ${existing.label}`)
       } else {
-        await db
+        const gone = await db
           .delete(mealRole)
           .where(
             and(
@@ -384,7 +394,13 @@ export const registerMealRoutes = (
               eq(mealRole.role, role),
             ),
           )
-        await tell(viewer.account_id, accountId, `You are off ${role} for ${existing.label}`)
+          .returning()
+
+        // Only when a row actually went, like both siblings: taking somebody off a
+        // crew they were never on would tell them they had been dropped from it.
+        if (gone.length > 0) {
+          await tell(viewer.account_id, accountId, `You are off ${role} for ${existing.label}`)
+        }
       }
 
       return answer(reply, existing.id)

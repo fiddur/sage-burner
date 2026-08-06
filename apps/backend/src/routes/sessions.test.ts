@@ -2,16 +2,17 @@ import type { FastifyInstance } from 'fastify'
 
 import { eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { DbHandle } from '../db/index.ts'
+import type { Delivery } from '../push/push.ts'
 
 import { createApp } from '../app.ts'
 import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, attendance, event, place, session } from '../db/schema.ts'
+import { account, accountRole, attendance, event, place, pushSubscription, session } from '../db/schema.ts'
 
 const SECRET = 's'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
@@ -27,16 +28,39 @@ afterEach(async () => {
   handle = undefined
 })
 
-const build = async () => {
+const build = async (deliver: Delivery = () => Promise.resolve('sent')) => {
   handle = createDb({ url: ':memory:' })
   runMigrations(handle)
   app = await createApp({
     db: handle.db,
     config: createConfig({ LOG_LEVEL: 'silent', SESSION_SECRET: SECRET }),
     now: () => new Date(NOW),
+    deliver,
+    mintKeys: () => ({ publicKey: 'a-public-key', privateKey: 'a-private-key' }),
   })
   return app
 }
+
+/** One browser opted in, so there is somewhere for a notification to go. */
+const givenSubscribed = async (accountId: string) => {
+  await db()
+    .insert(pushSubscription)
+    .values({
+      id: randomUUID(),
+      endpoint: `https://push.example.org/${randomUUID()}`,
+      account_id: accountId,
+      p256dh: 'a-key',
+      auth: 'a-secret',
+      created_at: NOW,
+    })
+}
+
+/** What was pushed, as the strings a person would read. */
+const messagesFrom = (deliver: ReturnType<typeof vi.fn<Delivery>>) =>
+  deliver.mock.calls.map((call) => {
+    const parsed: unknown = JSON.parse(String(call[1]))
+    return typeof parsed === 'object' && parsed !== null && 'body' in parsed ? String(parsed.body) : ''
+  })
 
 const db = () => {
   const found = handle?.db
@@ -871,5 +895,94 @@ describe('supporting a dream', () => {
 
     expect(unchanged.statusCode).toBe(200)
     expect(unchanged.json().session).toMatchObject({ support_count: 1, supported_by_me: true })
+  })
+})
+
+describe('telling somebody a dream role moved', () => {
+  const setUp = async (deliver: Delivery) => {
+    const server = await build(deliver)
+    await givenEvent()
+    const ada = await givenAttending(OPEN_BURN)
+    const bea = await givenAttending(OPEN_BURN)
+    const id = (await offer(server, ada.cookie, { title: 'Sunrise yoga' })).json().session.id
+
+    return { server, ada, bea, id }
+  }
+
+  it('tells somebody put on a dream by anybody but themselves', async () => {
+    const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
+    const { server, ada, bea, id } = await setUp(deliver)
+    await givenSubscribed(bea.id)
+
+    await helping(server, ada, id, 'POST', bea.id)
+
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1))
+    expect(messagesFrom(deliver)).toEqual(['You are helping with Sunrise yoga'])
+  })
+
+  it('says nothing to somebody who put their own hand up', async () => {
+    const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
+    const { server, ada, id } = await setUp(deliver)
+    await givenSubscribed(ada.id)
+
+    await helping(server, ada, id, 'POST')
+
+    expect(deliver).not.toHaveBeenCalled()
+  })
+
+  it('tells somebody taken off by anybody but themselves', async () => {
+    const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
+    const { server, ada, bea, id } = await setUp(deliver)
+    await givenSubscribed(bea.id)
+    await helping(server, bea, id, 'POST')
+    deliver.mockClear()
+
+    await helping(server, ada, id, 'DELETE', bea.id)
+
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1))
+    expect(messagesFrom(deliver)).toEqual(['You are no longer helping with Sunrise yoga'])
+  })
+
+  it('says nothing when nobody was actually taken off', async () => {
+    // Bea was never on it. Without the guard she is told she has been dropped from
+    // something she never joined — which is what a second tab makes ordinary.
+    const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
+    const { server, ada, bea, id } = await setUp(deliver)
+    await givenSubscribed(bea.id)
+
+    await helping(server, ada, id, 'DELETE', bea.id)
+
+    expect(deliver).not.toHaveBeenCalled()
+  })
+
+  it('tells both ends when the facilitator moves', async () => {
+    const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
+    const { server, ada, bea, id } = await setUp(deliver)
+    const cai = await givenAttending(OPEN_BURN)
+    await givenSubscribed(bea.id)
+    await givenSubscribed(cai.id)
+    await editDream(server, ada.cookie, id, { facilitator_account_id: bea.id })
+    deliver.mockClear()
+
+    await editDream(server, ada.cookie, id, { facilitator_account_id: cai.id })
+
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(2))
+    expect(messagesFrom(deliver).toSorted()).toEqual([
+      'You are facilitating Sunrise yoga',
+      'You are no longer facilitating Sunrise yoga',
+    ])
+  })
+
+  it('announces nothing when the facilitator was not what changed', async () => {
+    // The field is set through the general PATCH, so a rename must stay silent.
+    const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
+    const { server, ada, bea, id } = await setUp(deliver)
+    await givenSubscribed(bea.id)
+    await editDream(server, ada.cookie, id, { facilitator_account_id: bea.id })
+    deliver.mockClear()
+
+    await editDream(server, ada.cookie, id, { title: 'Sunset yoga' })
+
+    expect(deliver).not.toHaveBeenCalled()
   })
 })

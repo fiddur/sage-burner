@@ -931,6 +931,19 @@ describe('telling somebody a meal role moved', () => {
     expect(messagesFrom(deliver)).toEqual(['You are on helper for Dinner'])
   })
 
+  it('says nothing when nobody was actually taken off', async () => {
+    // Bea was never on it. Without the guard she is told she has been dropped from
+    // something she never joined — which a second tab makes ordinary.
+    const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
+    const { server, ada, meal } = await setUp(deliver)
+    const bea = await givenAttending('Bea')
+    await givenSubscribed(bea.id)
+
+    await send(server, 'DELETE', `/api/meals/${meal.id}/crew/helper/${bea.id}`, ada.cookie)
+
+    expect(deliver).not.toHaveBeenCalled()
+  })
+
   it('tells somebody taken off a crew by anybody but themselves', async () => {
     const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
     const { server, ada, meal } = await setUp(deliver)
