@@ -3,7 +3,6 @@ import type { FastifyInstance } from 'fastify'
 
 import {
   apiRoutes,
-  errorResponse,
   eventOptionCreateSchema,
   eventOptionOrderSchema,
   eventOptionUpdateSchema,
@@ -18,7 +17,7 @@ import type { Database } from '../db/index.ts'
 import { createGuards } from '../auth/guards.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
 import { attendance, eventOption } from '../db/schema.ts'
-import { noStore } from '../http.ts'
+import { bodyOf, noStore, sendError } from '../http.ts'
 
 const optionsFor = async (db: Database, eventId: string): Promise<EventOptionTaken[]> => {
   const rows = await db
@@ -66,8 +65,8 @@ export const registerEventOptionRoutes = (app: FastifyInstance, { db, sessions }
     async (request, reply) => {
       void noStore(reply)
 
-      const parsed = eventOptionCreateSchema.safeParse(request.body)
-      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+      const body = bodyOf(eventOptionCreateSchema, request)
+      if (body === undefined) return sendError(reply, 400)
 
       const { eventId } = request.params
       const id = randomUUID()
@@ -81,14 +80,14 @@ export const registerEventOptionRoutes = (app: FastifyInstance, { db, sessions }
           const [last] = tx
             .select({ order: eventOption.order })
             .from(eventOption)
-            .where(and(eq(eventOption.event_id, eventId), eq(eventOption.kind, parsed.data.kind)))
+            .where(and(eq(eventOption.event_id, eventId), eq(eventOption.kind, body.kind)))
             .orderBy(desc(eventOption.order))
             .limit(1)
             .all()
 
           const next = last === undefined ? 0 : last.order + 1
           tx.insert(eventOption)
-            .values({ ...parsed.data, id, event_id: eventId, order: next })
+            .values({ ...body, id, event_id: eventId, order: next })
             .run()
 
           return next
@@ -96,12 +95,12 @@ export const registerEventOptionRoutes = (app: FastifyInstance, { db, sessions }
       } catch (failure) {
         // No pre-read of the event: the foreign key already rejects a missing
         // one, and asking first would be a second query saying the same thing.
-        if (isForeignKeyViolation(failure)) return reply.code(404).send(errorResponse('not_found'))
+        if (isForeignKeyViolation(failure)) return sendError(reply, 404)
         throw failure
       }
 
       return reply.code(201).send({
-        option: { ...parsed.data, id, event_id: eventId, order } satisfies EventOption,
+        option: { ...body, id, event_id: eventId, order } satisfies EventOption,
       })
     },
   )
@@ -112,29 +111,27 @@ export const registerEventOptionRoutes = (app: FastifyInstance, { db, sessions }
     async (request, reply) => {
       void noStore(reply)
 
-      const parsed = eventOptionUpdateSchema.safeParse(request.body)
-      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+      const body = bodyOf(eventOptionUpdateSchema, request)
+      if (body === undefined) return sendError(reply, 400)
 
       // `set({})` is not valid SQL.
-      if (Object.keys(parsed.data).length === 0) {
+      if (Object.keys(body).length === 0) {
         const [existing] = await db
           .select()
           .from(eventOption)
           .where(eq(eventOption.id, request.params.id))
           .limit(1)
 
-        return existing === undefined
-          ? reply.code(404).send(errorResponse('not_found'))
-          : { option: existing }
+        return existing === undefined ? sendError(reply, 404) : { option: existing }
       }
 
       const [updated] = await db
         .update(eventOption)
-        .set(parsed.data)
+        .set(body)
         .where(eq(eventOption.id, request.params.id))
         .returning()
 
-      return updated === undefined ? reply.code(404).send(errorResponse('not_found')) : { option: updated }
+      return updated === undefined ? sendError(reply, 404) : { option: updated }
     },
   )
 
@@ -155,11 +152,11 @@ export const registerEventOptionRoutes = (app: FastifyInstance, { db, sessions }
           .where(eq(eventOption.id, request.params.id))
           .returning({ id: eventOption.id })
       } catch (failure) {
-        if (isForeignKeyViolation(failure)) return reply.code(409).send(errorResponse('conflict'))
+        if (isForeignKeyViolation(failure)) return sendError(reply, 409)
         throw failure
       }
 
-      if (deleted.length === 0) return reply.code(404).send(errorResponse('not_found'))
+      if (deleted.length === 0) return sendError(reply, 404)
 
       return reply.code(204).send()
     },
@@ -172,18 +169,18 @@ export const registerEventOptionRoutes = (app: FastifyInstance, { db, sessions }
       void noStore(reply)
 
       const { eventId, kind } = request.params
-      if (!isEventOptionKind(kind)) return reply.code(404).send(errorResponse('not_found'))
+      if (!isEventOptionKind(kind)) return sendError(reply, 404)
 
-      const parsed = eventOptionOrderSchema.safeParse(request.body)
-      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+      const body = bodyOf(eventOptionOrderSchema, request)
+      if (body === undefined) return sendError(reply, 400)
 
       const existing = (await optionsFor(db, eventId)).filter((row) => row.kind === kind)
-      const wanted = parsed.data.ids
+      const wanted = body.ids
 
       // Exactly this kind's options, no more and no fewer. A partial list would
       // renumber some and leave the rest on stale positions.
       const sameSet = wanted.length === existing.length && existing.every((row) => wanted.includes(row.id))
-      if (!sameSet) return reply.code(400).send(errorResponse('bad_request'))
+      if (!sameSet) return sendError(reply, 400)
 
       db.transaction((tx) => {
         wanted.forEach((id, index) => {

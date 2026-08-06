@@ -1,14 +1,14 @@
 import type { PushKeyResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { apiRoutes, errorResponse, pushSubscriptionCreateSchema } from '@sage-burner/shared'
+import { apiRoutes, pushSubscriptionCreateSchema } from '@sage-burner/shared'
 
 import type { GuardDeps } from '../auth/guards.ts'
 import type { PushDeps } from '../push/push.ts'
 
 import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
-import { noStore } from '../http.ts'
+import { bodyOf, noStore, sendError } from '../http.ts'
 import { forgetSubscription, rememberSubscription, vapidKeysFor } from '../push/push.ts'
 
 export interface PushRouteDeps extends GuardDeps {
@@ -51,16 +51,16 @@ export const registerPushRoutes = (app: FastifyInstance, { db, sessions, push }:
   app.post(apiRoutes.subscribeToPush.fastify, { preHandler: requireApproved }, async (request, reply) => {
     void noStore(reply)
 
-    const parsed = pushSubscriptionCreateSchema.safeParse(request.body)
-    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+    const body = bodyOf(pushSubscriptionCreateSchema, request)
+    if (body === undefined) return sendError(reply, 400)
 
     // The guard has already resolved this, so the viewer is present. Read rather
     // than trusted from the body: whose browser it is follows from the session, so
     // there is no account id to tamper with.
     const viewer = await viewerFor(request, { db, sessions })
-    if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
+    if (viewer === undefined) return sendError(reply, 401)
 
-    await rememberSubscription(push, viewer.account_id, parsed.data)
+    await rememberSubscription(push, viewer.account_id, body)
 
     return reply.code(204).send()
   })
@@ -81,7 +81,7 @@ export const registerPushRoutes = (app: FastifyInstance, { db, sessions, push }:
       void noStore(reply)
 
       const parsed = pushSubscriptionCreateSchema.pick({ endpoint: true }).safeParse(request.body)
-      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+      if (!parsed.success) return sendError(reply, 400)
 
       await forgetSubscription(push, parsed.data.endpoint)
 

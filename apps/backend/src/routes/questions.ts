@@ -3,7 +3,6 @@ import type { FastifyInstance } from 'fastify'
 
 import {
   apiRoutes,
-  errorResponse,
   formQuestionCreateSchema,
   formQuestionOrderSchema,
   formQuestionTypes,
@@ -17,7 +16,7 @@ import type { GuardDeps } from '../auth/guards.ts'
 import type { Database } from '../db/index.ts'
 
 import { formQuestion } from '../db/schema.ts'
-import { noStore } from '../http.ts'
+import { bodyOf, noStore, sendError } from '../http.ts'
 
 /**
  * The tick-box rule as SQL, for a PATCH carrying only one of the two keys — or
@@ -88,8 +87,8 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db }: GuardDeps) 
   app.post(apiRoutes.addQuestion.fastify, async (request, reply) => {
     void noStore(reply)
 
-    const parsed = formQuestionCreateSchema.safeParse(request.body)
-    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+    const body = bodyOf(formQuestionCreateSchema, request)
+    if (body === undefined) return sendError(reply, 400)
 
     const id = randomUUID()
 
@@ -109,13 +108,13 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db }: GuardDeps) 
 
       const next = last === undefined ? 0 : last.order + 1
       tx.insert(formQuestion)
-        .values({ ...parsed.data, id, order: next })
+        .values({ ...body, id, order: next })
         .run()
 
       return next
     })
 
-    const row: FormQuestion = { ...parsed.data, id, order }
+    const row: FormQuestion = { ...body, id, order }
 
     return reply.code(201).send({ question: row } satisfies FormQuestionResponse)
   })
@@ -123,8 +122,8 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db }: GuardDeps) 
   app.patch<{ Params: { id: string } }>(apiRoutes.updateQuestion.fastify, async (request, reply) => {
     void noStore(reply)
 
-    const parsed = formQuestionUpdateSchema.safeParse(request.body)
-    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+    const body = bodyOf(formQuestionUpdateSchema, request)
+    if (body === undefined) return sendError(reply, 400)
 
     // The only body that never reaches the `UPDATE`, and so the only one that
     // needs a read of its own. An unrecognised key is a 400 from `.strict()`
@@ -137,7 +136,7 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db }: GuardDeps) 
     // re-read below answers a vanished one, an unconditional pre-read only spends
     // a third query to produce a 404 the write path produces anyway — and leaves
     // the handler holding a pre-write snapshot to be tempted by.
-    if (Object.keys(parsed.data).length === 0) {
+    if (Object.keys(body).length === 0) {
       const [existing] = await db
         .select()
         .from(formQuestion)
@@ -145,7 +144,7 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db }: GuardDeps) 
         .limit(1)
 
       return existing === undefined
-        ? reply.code(404).send(errorResponse('not_found'))
+        ? sendError(reply, 404)
         : ({ question: existing } satisfies FormQuestionResponse)
     }
 
@@ -154,7 +153,7 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db }: GuardDeps) 
     // — but a read-then-check here is a race (see `tickBoxCondition`), and a JS
     // fail-fast would also pre-empt the statement in every non-racing case, so
     // nothing would exercise the condition that does the real work.
-    const where = and(eq(formQuestion.id, request.params.id), tickBoxCondition(parsed.data))
+    const where = and(eq(formQuestion.id, request.params.id), tickBoxCondition(body))
     if (where === undefined) throw new Error('refusing an unfiltered UPDATE on form_question')
 
     // `.returning()` rather than reading `changes`, for the reasons `events.ts`
@@ -163,7 +162,7 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db }: GuardDeps) 
     // changed — two admins patching the same question, one sending `help_text`
     // and one `label`, would otherwise each be told their own change landed and
     // the other's did not.
-    const updated = await db.update(formQuestion).set(parsed.data).where(where).returning()
+    const updated = await db.update(formQuestion).set(body).where(where).returning()
 
     const [row] = updated
     if (row === undefined) {
@@ -182,9 +181,7 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db }: GuardDeps) 
         .where(eq(formQuestion.id, request.params.id))
         .limit(1)
 
-      return stillThere === undefined
-        ? reply.code(404).send(errorResponse('not_found'))
-        : reply.code(400).send(errorResponse('bad_request'))
+      return stillThere === undefined ? sendError(reply, 404) : sendError(reply, 400)
     }
 
     return { question: row } satisfies FormQuestionResponse
@@ -206,7 +203,7 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db }: GuardDeps) 
       .where(eq(formQuestion.id, request.params.id))
       .returning({ id: formQuestion.id })
 
-    if (deleted.length === 0) return reply.code(404).send(errorResponse('not_found'))
+    if (deleted.length === 0) return sendError(reply, 404)
 
     // Deliberately does not renumber the survivors. `order` only has to sort,
     // not be contiguous, and renumbering here would fight a concurrent
@@ -217,11 +214,11 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db }: GuardDeps) 
   app.put(apiRoutes.reorderQuestions.fastify, async (request, reply) => {
     void noStore(reply)
 
-    const parsed = formQuestionOrderSchema.safeParse(request.body)
-    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+    const body = bodyOf(formQuestionOrderSchema, request)
+    if (body === undefined) return sendError(reply, 400)
 
     const existing = await questionsFor(db)
-    const wanted = parsed.data.ids
+    const wanted = body.ids
 
     // The request must name exactly the questions that exist, no more and no
     // fewer. A partial list would renumber some rows and leave others on stale
@@ -232,7 +229,7 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db }: GuardDeps) 
     // leaves no room for a duplicate. Testing it separately would have been a
     // conjunct that can never be the one that decides.
     const sameSet = wanted.length === existing.length && existing.every((row) => wanted.includes(row.id))
-    if (!sameSet) return reply.code(400).send(errorResponse('bad_request'))
+    if (!sameSet) return sendError(reply, 400)
 
     // One statement per question, but inside a transaction: a half-applied
     // reorder is an order the admin never chose, and this is the one write

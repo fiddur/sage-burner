@@ -3,7 +3,6 @@ import type { FastifyInstance } from 'fastify'
 
 import {
   apiRoutes,
-  errorResponse,
   placeCopySchema,
   placeCreateSchema,
   placeOrderSchema,
@@ -18,7 +17,7 @@ import type { Database } from '../db/index.ts'
 import { createGuards } from '../auth/guards.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
 import { event, place } from '../db/schema.ts'
-import { noStore } from '../http.ts'
+import { bodyOf, noStore, sendError } from '../http.ts'
 import { copySourcesFor } from './copy-sources.ts'
 import { todayIso } from './events.ts'
 
@@ -100,14 +99,14 @@ export const registerPlaceRoutes = (
     async (request, reply) => {
       void noStore(reply)
 
-      const parsed = placeCreateSchema.safeParse(request.body)
-      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+      const body = bodyOf(placeCreateSchema, request)
+      if (body === undefined) return sendError(reply, 400)
 
       const id = randomUUID()
       const event_id = request.params.eventId
 
       if (!(await burnIsOpen(db, todayIso(now), event_id))) {
-        return reply.code(404).send(errorResponse('not_found'))
+        return sendError(reply, 404)
       }
 
       // Read and insert in one transaction, or "the server assigns `order`" is not
@@ -132,7 +131,7 @@ export const registerPlaceRoutes = (
 
           const next = last === undefined ? 0 : last.order + 1
           tx.insert(place)
-            .values({ ...parsed.data, id, event_id, order: next })
+            .values({ ...body, id, event_id, order: next })
             .run()
 
           return next
@@ -141,11 +140,11 @@ export const registerPlaceRoutes = (
         // A burn deleted between the check above and this insert. The check reads
         // `end_date`, which the foreign key cannot see; the key covers existence,
         // which the check can only report as of a moment ago.
-        if (isForeignKeyViolation(failure)) return reply.code(404).send(errorResponse('not_found'))
+        if (isForeignKeyViolation(failure)) return sendError(reply, 404)
         throw failure
       }
 
-      return reply.code(201).send({ place: { ...parsed.data, id, event_id, order } satisfies Place })
+      return reply.code(201).send({ place: { ...body, id, event_id, order } satisfies Place })
     },
   )
 
@@ -155,23 +154,19 @@ export const registerPlaceRoutes = (
     async (request, reply) => {
       void noStore(reply)
 
-      const parsed = placeUpdateSchema.safeParse(request.body)
-      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+      const body = bodyOf(placeUpdateSchema, request)
+      if (body === undefined) return sendError(reply, 400)
 
       // One read answering both "is it there" and "is its burn still open", so the
       // two cases cannot answer differently. `set({})` is not valid SQL, so the one
       // body that never reaches the UPDATE returns this row instead.
       const existing = await openLane(db, todayIso(now), request.params.id)
-      if (existing === undefined) return reply.code(404).send(errorResponse('not_found'))
-      if (Object.keys(parsed.data).length === 0) return { place: existing }
+      if (existing === undefined) return sendError(reply, 404)
+      if (Object.keys(body).length === 0) return { place: existing }
 
-      const [updated] = await db
-        .update(place)
-        .set(parsed.data)
-        .where(eq(place.id, request.params.id))
-        .returning()
+      const [updated] = await db.update(place).set(body).where(eq(place.id, request.params.id)).returning()
 
-      return updated === undefined ? reply.code(404).send(errorResponse('not_found')) : { place: updated }
+      return updated === undefined ? sendError(reply, 404) : { place: updated }
     },
   )
 
@@ -182,7 +177,7 @@ export const registerPlaceRoutes = (
       void noStore(reply)
 
       if ((await openLane(db, todayIso(now), request.params.id)) === undefined) {
-        return reply.code(404).send(errorResponse('not_found'))
+        return sendError(reply, 404)
       }
 
       // A dream sitting in this lane holds the row: `session.place_id` has no
@@ -201,11 +196,11 @@ export const registerPlaceRoutes = (
       try {
         deleted = await db.delete(place).where(eq(place.id, request.params.id)).returning({ id: place.id })
       } catch (failure) {
-        if (isForeignKeyViolation(failure)) return reply.code(409).send(errorResponse('conflict'))
+        if (isForeignKeyViolation(failure)) return sendError(reply, 409)
         throw failure
       }
 
-      if (deleted.length === 0) return reply.code(404).send(errorResponse('not_found'))
+      if (deleted.length === 0) return sendError(reply, 404)
 
       // Deliberately does not renumber the survivors: `order` only has to sort,
       // not be contiguous, and renumbering here would fight a concurrent
@@ -220,15 +215,15 @@ export const registerPlaceRoutes = (
     async (request, reply) => {
       void noStore(reply)
 
-      const parsed = placeOrderSchema.safeParse(request.body)
-      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+      const body = bodyOf(placeOrderSchema, request)
+      if (body === undefined) return sendError(reply, 400)
 
       if (!(await burnIsOpen(db, todayIso(now), request.params.eventId))) {
-        return reply.code(404).send(errorResponse('not_found'))
+        return sendError(reply, 404)
       }
 
       const existing = await placesFor(db, request.params.eventId)
-      const wanted = parsed.data.ids
+      const wanted = body.ids
 
       // Exactly the places this burn has, no more and no fewer. A partial list
       // would renumber some rows and leave the rest on stale positions, producing an
@@ -237,7 +232,7 @@ export const registerPlaceRoutes = (
       // exactly `existing.length` slots and must contain every existing id, and
       // those are distinct because `id` is the primary key.
       const sameSet = wanted.length === existing.length && existing.every((row) => wanted.includes(row.id))
-      if (!sameSet) return reply.code(400).send(errorResponse('bad_request'))
+      if (!sameSet) return sendError(reply, 400)
 
       // One statement per place, but in a transaction: a half-applied reorder is
       // an order the admin never chose. Scoped by event as well as id, so an id
@@ -291,10 +286,10 @@ export const registerPlaceRoutes = (
     async (request, reply) => {
       void noStore(reply)
 
-      const parsed = placeCopySchema.safeParse(request.body)
-      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
-      if (parsed.data.from_event_id === request.params.eventId) {
-        return reply.code(400).send(errorResponse('bad_request'))
+      const body = bodyOf(placeCopySchema, request)
+      if (body === undefined) return sendError(reply, 400)
+      if (body.from_event_id === request.params.eventId) {
+        return sendError(reply, 400)
       }
 
       const today = todayIso(now)
@@ -322,7 +317,7 @@ export const registerPlaceRoutes = (
         const [from] = tx
           .select({ id: event.id })
           .from(event)
-          .where(eq(event.id, parsed.data.from_event_id))
+          .where(eq(event.id, body.from_event_id))
           .limit(1)
           .all()
 
@@ -340,7 +335,7 @@ export const registerPlaceRoutes = (
         const source = tx
           .select()
           .from(place)
-          .where(eq(place.event_id, parsed.data.from_event_id))
+          .where(eq(place.event_id, body.from_event_id))
           .orderBy(asc(place.order), asc(place.id))
           .all()
 
@@ -362,8 +357,8 @@ export const registerPlaceRoutes = (
         return 'copied' as const
       })
 
-      if (seeded === 'not_found') return reply.code(404).send(errorResponse('not_found'))
-      if (seeded === 'conflict') return reply.code(409).send(errorResponse('conflict'))
+      if (seeded === 'not_found') return sendError(reply, 404)
+      if (seeded === 'conflict') return sendError(reply, 409)
 
       return reply
         .code(201)

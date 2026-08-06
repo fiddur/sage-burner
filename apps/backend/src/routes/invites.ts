@@ -1,7 +1,7 @@
 import type { AdminInvitesResponse, InviteResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { apiRoutes, errorResponse, inviteCreateSchema, inviteStatusOf } from '@sage-burner/shared'
+import { apiRoutes, inviteCreateSchema, inviteStatusOf } from '@sage-burner/shared'
 import { and, desc, eq, isNull } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
@@ -9,7 +9,7 @@ import type { GuardDeps } from '../auth/guards.ts'
 
 import { viewerFor } from '../auth/viewer.ts'
 import { application, inviteToken } from '../db/schema.ts'
-import { noStore } from '../http.ts'
+import { noStore, sendError } from '../http.ts'
 import { defaultExpiry, mintToken } from '../invites.ts'
 
 export interface InviteRouteDeps extends GuardDeps {
@@ -51,17 +51,17 @@ export const registerInviteRoutes = (
     void noStore(reply)
 
     const parsed = inviteCreateSchema.safeParse(request.body ?? {})
-    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+    if (!parsed.success) return sendError(reply, 400)
 
     const expires_at = parsed.data.expires_at ?? defaultExpiry(now())
     // An invite that is already dead is a link an admin would send and
     // nobody could use, so it is refused rather than stored.
     if (Date.parse(expires_at) <= now().getTime()) {
-      return reply.code(400).send(errorResponse('bad_request'))
+      return sendError(reply, 400)
     }
 
     const viewer = await viewerFor(request, { db, sessions })
-    if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
+    if (viewer === undefined) return sendError(reply, 401)
 
     const { token, token_hash } = mintToken()
     await db.insert(inviteToken).values({
@@ -104,8 +104,6 @@ export const registerInviteRoutes = (
       .where(eq(inviteToken.id, request.params.id))
       .limit(1)
 
-    return existing === undefined
-      ? reply.code(404).send(errorResponse('not_found'))
-      : reply.code(409).send(errorResponse('conflict'))
+    return existing === undefined ? sendError(reply, 404) : sendError(reply, 409)
   })
 }

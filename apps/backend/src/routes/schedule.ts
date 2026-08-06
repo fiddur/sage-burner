@@ -1,12 +1,13 @@
 import type { FastifyInstance } from 'fastify'
 
-import { apiRoutes, errorResponse, publicSessionSchema } from '@sage-burner/shared'
+import { apiRoutes, publicSessionSchema } from '@sage-burner/shared'
 import { asc, eq } from 'drizzle-orm'
 
 import type { Database } from '../db/index.ts'
 import type { CalendarEvent } from '../ics.ts'
 
 import { event, place, session } from '../db/schema.ts'
+import { sendError } from '../http.ts'
 import { renderCalendar } from '../ics.ts'
 
 export interface ScheduleDeps {
@@ -43,7 +44,7 @@ export const registerScheduleRoutes = (
       .where(eq(event.id, request.params.eventId))
       .limit(1)
 
-    if (found === undefined) return reply.code(404).send(errorResponse('not_found'))
+    if (found === undefined) return sendError(reply, 404)
 
     const rows = await db
       .select({

@@ -1,7 +1,7 @@
 import type { EventAttendeesResponse, MyBurn, MyBurnsResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { apiRoutes, attendanceCreateSchema, errorResponse, placeTransferSchema } from '@sage-burner/shared'
+import { apiRoutes, attendanceCreateSchema, placeTransferSchema } from '@sage-burner/shared'
 import { TransactionRollbackError, and, asc, eq, gte, isNotNull, ne, or } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
@@ -13,7 +13,7 @@ import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
 import { account, accountAvatar, attendance, event } from '../db/schema.ts'
-import { noStore } from '../http.ts'
+import { bodyOf, noStore, sendError } from '../http.ts'
 import { displayName, notifyAttendees } from '../push/notify.ts'
 import { openEvent, todayIso } from './events.ts'
 import { helpingFor, helpingIdsFor } from './helping.ts'
@@ -213,7 +213,7 @@ export const registerAttendanceRoutes = (
     void noStore(reply)
 
     const viewer = await viewerFor(request, { db, sessions })
-    if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
+    if (viewer === undefined) return sendError(reply, 401)
 
     const today = todayIso(now)
     const mine = and(eq(attendance.event_id, event.id), eq(attendance.account_id, viewer.account_id))
@@ -268,10 +268,10 @@ export const registerAttendanceRoutes = (
       void noStore(reply)
 
       const viewer = await viewerFor(request, { db, sessions })
-      if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
+      if (viewer === undefined) return sendError(reply, 401)
 
       const joined = await joinBurn(db, request.params.eventId, viewer.account_id, now)
-      if (joined === undefined) return reply.code(404).send(errorResponse('not_found'))
+      if (joined === undefined) return sendError(reply, 404)
 
       // Only on the way in. Saying you are coming when you already were is a no-op,
       // and announcing it again would make a double click look like two arrivals.
@@ -300,10 +300,10 @@ export const registerAttendanceRoutes = (
       void noStore(reply)
 
       const viewer = await viewerFor(request, { db, sessions })
-      if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
+      if (viewer === undefined) return sendError(reply, 401)
 
       const found = await openEvent(db, todayIso(now), request.params.eventId)
-      if (found === undefined) return reply.code(404).send(errorResponse('not_found'))
+      if (found === undefined) return sendError(reply, 404)
 
       // Refused once anything has been paid, rather than guessed at: what a refund
       // means is a real decision and #31 owns it. Deleting the row here would
@@ -323,9 +323,7 @@ export const registerAttendanceRoutes = (
 
       const existing = await joinedRow(found.id, viewer.account_id)
 
-      return existing === undefined
-        ? reply.code(404).send(errorResponse('not_found'))
-        : reply.code(409).send(errorResponse('conflict'))
+      return existing === undefined ? sendError(reply, 404) : sendError(reply, 409)
     },
   )
 
@@ -363,27 +361,27 @@ export const registerAttendanceRoutes = (
       void noStore(reply)
 
       const viewer = await viewerFor(request, { db, sessions })
-      if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
+      if (viewer === undefined) return sendError(reply, 401)
 
-      const parsed = placeTransferSchema.safeParse(request.body)
-      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+      const body = bodyOf(placeTransferSchema, request)
+      if (body === undefined) return sendError(reply, 400)
 
       const open = await openEvent(db, todayIso(now), request.params.eventId)
-      if (open === undefined) return reply.code(404).send(errorResponse('not_found'))
+      if (open === undefined) return sendError(reply, 404)
 
       const mine = await stayAt(db, open.id, viewer.account_id)
-      if (mine === undefined) return reply.code(404).send(errorResponse('not_found'))
-      if (mine.payment_status !== 'paid') return reply.code(409).send(errorResponse('conflict'))
+      if (mine === undefined) return sendError(reply, 404)
+      if (mine.payment_status !== 'paid') return sendError(reply, 409)
 
-      const theirs = await stayAt(db, open.id, parsed.data.to_account_id)
-      if (theirs === undefined) return reply.code(404).send(errorResponse('not_found'))
-      if (theirs.payment_status === 'paid') return reply.code(409).send(errorResponse('conflict'))
+      const theirs = await stayAt(db, open.id, body.to_account_id)
+      if (theirs === undefined) return sendError(reply, 404)
+      if (theirs.payment_status === 'paid') return sendError(reply, 409)
 
-      if (!handOverPlace(db, mine, theirs.id)) return reply.code(409).send(errorResponse('conflict'))
+      if (!handOverPlace(db, mine, theirs.id)) return sendError(reply, 409)
 
       // Outside it, and only to the taker: the giver did this themselves. A push
       // service being down must not undo a place changing hands.
-      await notify(parsed.data.to_account_id, {
+      await notify(body.to_account_id, {
         category: 'payment',
         body: `Your place at ${open.name} is paid — somebody transferred theirs to you.`,
         link: '/members',
@@ -423,10 +421,10 @@ export const registerAttendanceRoutes = (
   app.post<{ Params: { eventId: string } }>(apiRoutes.adminAddAttendance.fastify, async (request, reply) => {
     void noStore(reply)
 
-    const parsed = attendanceCreateSchema.safeParse(request.body)
-    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+    const body = bodyOf(attendanceCreateSchema, request)
+    if (body === undefined) return sendError(reply, 400)
 
-    const existing = await joinedRow(request.params.eventId, parsed.data.account_id)
+    const existing = await joinedRow(request.params.eventId, body.account_id)
     if (existing !== undefined) return { attendance: existing }
 
     // Only for the dates. A missing event is still the foreign key's to
@@ -441,7 +439,7 @@ export const registerAttendanceRoutes = (
       await db.insert(attendance).values({
         id: randomUUID(),
         event_id: request.params.eventId,
-        account_id: parsed.data.account_id,
+        account_id: body.account_id,
         joined_at: now().toISOString(),
         payment_status: 'unpaid',
         // The same default an admin would otherwise type in for them.
@@ -453,17 +451,15 @@ export const registerAttendanceRoutes = (
       // event or account, and asking first would be a second query that says
       // the same thing. Narrowed to those failures so a real bug still surfaces
       // as a 500 rather than as a confident 404.
-      if (isForeignKeyViolation(error)) return reply.code(404).send(errorResponse('not_found'))
+      if (isForeignKeyViolation(error)) return sendError(reply, 404)
       // The same race the member route has, and one it shares with it: an
       // admin adding someone at the moment they add themselves.
       if (!isAlreadyJoined(error)) throw error
 
-      return { attendance: await joinedRow(request.params.eventId, parsed.data.account_id) }
+      return { attendance: await joinedRow(request.params.eventId, body.account_id) }
     }
 
-    return reply
-      .code(201)
-      .send({ attendance: await joinedRow(request.params.eventId, parsed.data.account_id) })
+    return reply.code(201).send({ attendance: await joinedRow(request.params.eventId, body.account_id) })
   })
 
   app.delete<{ Params: { eventId: string; accountId: string } }>(
@@ -484,7 +480,7 @@ export const registerAttendanceRoutes = (
         )
         .returning({ id: attendance.id })
 
-      return removed.length > 0 ? reply.code(204).send() : reply.code(404).send(errorResponse('not_found'))
+      return removed.length > 0 ? reply.code(204).send() : sendError(reply, 404)
     },
   )
 }

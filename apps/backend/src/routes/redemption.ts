@@ -1,7 +1,7 @@
 import type { InviteState, RedeemResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { apiRoutes, errorResponse, inviteStatusOf, redeemRequestSchema } from '@sage-burner/shared'
+import { apiRoutes, inviteStatusOf, redeemRequestSchema } from '@sage-burner/shared'
 import { and, eq, isNull } from 'drizzle-orm'
 import { createHash, randomUUID } from 'node:crypto'
 
@@ -12,7 +12,7 @@ import type { Database } from '../db/index.ts'
 
 import { hashPassword } from '../auth/password.ts'
 import { account, accountRole, application, inviteToken } from '../db/schema.ts'
-import { noStore } from '../http.ts'
+import { bodyOf, noStore, sendError } from '../http.ts'
 import { joinBurn } from './attendance.ts'
 import { cookieHeader } from './auth.ts'
 
@@ -79,8 +79,8 @@ export const registerRedemptionRoutes = (
   app.post<{ Params: { token: string } }>(apiRoutes.redeemInvite.fastify, async (request, reply) => {
     void noStore(reply)
 
-    const parsed = redeemRequestSchema.safeParse(request.body)
-    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+    const body = bodyOf(redeemRequestSchema, request)
+    if (body === undefined) return sendError(reply, 400)
 
     const digest = digestOf(request.params.token)
     const [invite] = await db.select().from(inviteToken).where(eq(inviteToken.token_hash, digest)).limit(1)
@@ -91,7 +91,7 @@ export const registerRedemptionRoutes = (
     // status; by the time it POSTs, every one of the three means the same thing:
     // this link cannot be spent.
     if (invite === undefined || inviteStatusOf(invite, now()) !== 'outstanding') {
-      return reply.code(409).send(errorResponse('conflict'))
+      return sendError(reply, 409)
     }
 
     // Before the taken-address check, and gated, so a refusal costs what a success
@@ -105,12 +105,12 @@ export const registerRedemptionRoutes = (
     if (!admission.ok) {
       void reply.header('retry-after', gate.retryAfter(admission.reason))
       request.log.warn({ ...gate.stats(), reason: admission.reason }, 'redemption shed')
-      return reply.code(429).send(errorResponse('rate_limited'))
+      return sendError(reply, 429)
     }
 
     let password_hash: string
     try {
-      password_hash = await hash(parsed.data.password)
+      password_hash = await hash(body.password)
     } finally {
       admission.release()
     }
@@ -122,9 +122,9 @@ export const registerRedemptionRoutes = (
     const [taken] = await db
       .select({ id: account.id })
       .from(account)
-      .where(eq(account.email, parsed.data.email))
+      .where(eq(account.email, body.email))
       .limit(1)
-    if (taken !== undefined) return reply.code(409).send(errorResponse('conflict'))
+    if (taken !== undefined) return sendError(reply, 409)
     const accountId = randomUUID()
 
     // One transaction for the account, its role and the stamp. Half a redemption
@@ -162,13 +162,13 @@ export const registerRedemptionRoutes = (
           tx.insert(account)
             .values({
               id: accountId,
-              email: parsed.data.email,
+              email: body.email,
               password_hash,
-              name: parsed.data.name,
+              name: body.name,
               // The email is a way to reach them, so nobody has to answer "how
               // can we reach you?" on the form where they just typed it.
-              contact: parsed.data.contact ?? parsed.data.email,
-              allergies_notes: parsed.data.allergies_notes,
+              contact: body.contact ?? body.email,
+              allergies_notes: body.allergies_notes,
               invite_token_id: invite.id,
               created_at: now().toISOString(),
             })
@@ -186,7 +186,7 @@ export const registerRedemptionRoutes = (
       }
     })()
 
-    if (!claimed) return reply.code(409).send(errorResponse('conflict'))
+    if (!claimed) return sendError(reply, 409)
 
     void reply.header(
       'set-cookie',
@@ -198,7 +198,7 @@ export const registerRedemptionRoutes = (
     // re-sent — so nothing optional may be given the power to roll it back. A burn
     // that ended while the form was open, or an id that names nothing, leaves the
     // account made and the box unticked; the page reads `attendance` and says so.
-    const wanted = parsed.data.join_event_id ?? undefined
+    const wanted = body.join_event_id ?? undefined
     const joined = wanted === undefined ? undefined : await joinBurn(db, wanted, accountId, now)
 
     return reply.code(201).send({
@@ -206,7 +206,7 @@ export const registerRedemptionRoutes = (
       // `undefined` is not `null` to a control comparing against it.
       viewer: {
         account_id: accountId,
-        name: parsed.data.name,
+        name: body.name,
         avatar: null,
         roles: ['member'],
       },

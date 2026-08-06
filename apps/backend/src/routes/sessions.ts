@@ -29,7 +29,7 @@ import {
   sessionHelper,
   sessionSupport,
 } from '../db/schema.ts'
-import { noStore } from '../http.ts'
+import { bodyOf, noStore, sendError } from '../http.ts'
 import { displayName, notifyAttendees } from '../push/notify.ts'
 import { attendanceFor } from './attendance.ts'
 import { openEvent, todayIso } from './events.ts'
@@ -307,22 +307,22 @@ export const registerSessionRoutes = (
     async (request, reply) => {
       void noStore(reply)
 
-      const parsed = sessionCreateSchema.safeParse(request.body)
-      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+      const body = bodyOf(sessionCreateSchema, request)
+      if (body === undefined) return sendError(reply, 400)
 
       const viewer = await viewerFor(request, { db, sessions })
-      if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
+      if (viewer === undefined) return sendError(reply, 401)
 
       const open = await openEvent(db, todayIso(now), request.params.eventId)
-      if (open === undefined) return reply.code(404).send(errorResponse('not_found'))
+      if (open === undefined) return sendError(reply, 404)
 
-      if (!(await placeIsOnThisBurn(db, open.id, parsed.data.place_id))) {
-        return reply.code(400).send(errorResponse('bad_request'))
+      if (!(await placeIsOnThisBurn(db, open.id, body.place_id))) {
+        return sendError(reply, 400)
       }
-      const spot = await facilitatorSpot(db, open.id, parsed.data.facilitator_account_id)
-      if (!spot.ok) return reply.code(400).send(errorResponse('bad_request'))
+      const spot = await facilitatorSpot(db, open.id, body.facilitator_account_id)
+      if (!spot.ok) return sendError(reply, 400)
 
-      const { facilitator_account_id: wanted, ...fields } = parsed.data
+      const { facilitator_account_id: wanted, ...fields } = body
       const row: DreamRow = {
         ...fields,
         id: randomUUID(),
@@ -343,7 +343,7 @@ export const registerSessionRoutes = (
           facilitator_attendance_id: spot.attendanceId ?? null,
         })
       } catch (failure) {
-        if (isForeignKeyViolation(failure)) return reply.code(400).send(errorResponse('bad_request'))
+        if (isForeignKeyViolation(failure)) return sendError(reply, 400)
         throw failure
       }
 
@@ -381,8 +381,8 @@ export const registerSessionRoutes = (
     async (request, reply) => {
       void noStore(reply)
 
-      const parsed = sessionUpdateSchema.safeParse(request.body)
-      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+      const body = bodyOf(sessionUpdateSchema, request)
+      if (body === undefined) return sendError(reply, 400)
 
       const [existing] = await dreamRows(db, eq(session.id, request.params.id)).limit(1)
 
@@ -393,12 +393,12 @@ export const registerSessionRoutes = (
       // for the one after next.
       const open = existing === undefined ? undefined : await openEvent(db, todayIso(now), existing.event_id)
       if (existing === undefined || open === undefined) {
-        return reply.code(404).send(errorResponse('not_found'))
+        return sendError(reply, 404)
       }
 
       const mine = await mineAt(request, existing.event_id)
 
-      if (Object.keys(parsed.data).length === 0) {
+      if (Object.keys(body).length === 0) {
         return { session: await oneDream(db, existing, mine) } satisfies SessionResponse
       }
 
@@ -407,24 +407,24 @@ export const registerSessionRoutes = (
       // same check the schema makes when both ends are present. Not composed
       // into the WHERE: these are ISO instants, and comparing them as SQL
       // strings is wrong when the ends differ in fractional-second precision.
-      if (!hasValidTimeSlot({ ...existing, ...parsed.data })) {
-        return reply.code(400).send(errorResponse('bad_request'))
+      if (!hasValidTimeSlot({ ...existing, ...body })) {
+        return sendError(reply, 400)
       }
 
-      if (!(await placeIsOnThisBurn(db, existing.event_id, parsed.data.place_id))) {
-        return reply.code(400).send(errorResponse('bad_request'))
+      if (!(await placeIsOnThisBurn(db, existing.event_id, body.place_id))) {
+        return sendError(reply, 400)
       }
-      const spot = await facilitatorSpot(db, existing.event_id, parsed.data.facilitator_account_id)
-      if (!spot.ok) return reply.code(400).send(errorResponse('bad_request'))
+      const spot = await facilitatorSpot(db, existing.event_id, body.facilitator_account_id)
+      if (!spot.ok) return sendError(reply, 400)
 
-      const { facilitator_account_id: _wanted, ...fields } = parsed.data
+      const { facilitator_account_id: _wanted, ...fields } = body
       const patch =
         spot.attendanceId === undefined ? fields : { ...fields, facilitator_attendance_id: spot.attendanceId }
 
       try {
         await db.update(session).set(patch).where(eq(session.id, request.params.id))
       } catch (failure) {
-        if (isForeignKeyViolation(failure)) return reply.code(400).send(errorResponse('bad_request'))
+        if (isForeignKeyViolation(failure)) return sendError(reply, 400)
         throw failure
       }
 
@@ -435,9 +435,9 @@ export const registerSessionRoutes = (
 
       // After the 404, not before: a concurrent withdrawal between the pre-read and
       // the UPDATE would otherwise announce a change to a dream that no longer exists.
-      if (row === undefined) return reply.code(404).send(errorResponse('not_found'))
+      if (row === undefined) return sendError(reply, 404)
 
-      await facilitatorMoved(request, existing, parsed.data.facilitator_account_id)
+      await facilitatorMoved(request, existing, body.facilitator_account_id)
 
       return { session: await oneDream(db, row, mine) } satisfies SessionResponse
     },
@@ -456,14 +456,14 @@ export const registerSessionRoutes = (
         .limit(1)
 
       const open = existing === undefined ? undefined : await openEvent(db, todayIso(now), existing.event_id)
-      if (open === undefined) return reply.code(404).send(errorResponse('not_found'))
+      if (open === undefined) return sendError(reply, 404)
 
       const deleted = await db
         .delete(session)
         .where(and(eq(session.id, request.params.id), eq(session.event_id, open.id)))
         .returning({ id: session.id })
 
-      if (deleted.length === 0) return reply.code(404).send(errorResponse('not_found'))
+      if (deleted.length === 0) return sendError(reply, 404)
 
       return reply.code(204).send()
     },
@@ -510,14 +510,14 @@ export const registerSessionRoutes = (
     async (request, reply) => {
       void noStore(reply)
 
-      const parsed = helperSchema.safeParse(request.body)
-      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+      const body = bodyOf(helperSchema, request)
+      if (body === undefined) return sendError(reply, 400)
 
       const found = await asAttendee(request)
       if ('code' in found) return reply.code(found.code).send(errorResponse(found.error))
 
-      const theirs = await attendanceFor(db, found.dream.event_id, parsed.data.account_id)
-      if (theirs === undefined) return reply.code(400).send(errorResponse('bad_request'))
+      const theirs = await attendanceFor(db, found.dream.event_id, body.account_id)
+      if (theirs === undefined) return sendError(reply, 400)
 
       const added = await db
         .insert(sessionHelper)
@@ -528,7 +528,7 @@ export const registerSessionRoutes = (
       // Only when a row actually went in, like the removal below: a second tab, or a
       // repeated 👉, would otherwise push the same person the same line twice.
       if (added.length > 0) {
-        await tell(found.callerId, parsed.data.account_id, `You are helping with ${found.dream.title}`)
+        await tell(found.callerId, body.account_id, `You are helping with ${found.dream.title}`)
       }
 
       return { session: await oneDream(db, found.dream, found.attendanceId) } satisfies SessionResponse
@@ -545,7 +545,7 @@ export const registerSessionRoutes = (
       if ('code' in found) return reply.code(found.code).send(errorResponse(found.error))
 
       const theirs = await attendanceFor(db, found.dream.event_id, request.params.accountId)
-      if (theirs === undefined) return reply.code(400).send(errorResponse('bad_request'))
+      if (theirs === undefined) return sendError(reply, 400)
 
       const gone = await db
         .delete(sessionHelper)

@@ -1,7 +1,7 @@
 import type { MeResponse, PasskeysResponse } from '@sage-burner/shared'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 
-import { apiRoutes, errorResponse, passkeyLoginSchema, passkeyRegistrationSchema } from '@sage-burner/shared'
+import { apiRoutes, passkeyLoginSchema, passkeyRegistrationSchema } from '@sage-burner/shared'
 import {
   generateAuthenticationOptions,
   generateRegistrationOptions,
@@ -20,7 +20,7 @@ import { viewerFor, viewerOf } from '../auth/viewer.ts'
 import { knownTransports, relyingParty } from '../auth/webauthn.ts'
 import { isUniqueViolation } from '../db/errors.ts'
 import { account, INSTALLATION_ID, installation, passkey, webauthnChallenge } from '../db/schema.ts'
-import { noStore } from '../http.ts'
+import { bodyOf, noStore, sendError } from '../http.ts'
 import { cookieHeader } from './auth.ts'
 
 export interface PasskeyDeps {
@@ -121,10 +121,10 @@ export const registerPasskeyRoutes = (
     void noStore(reply)
 
     const viewer = await viewerFor(request, { db, sessions })
-    if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
+    if (viewer === undefined) return sendError(reply, 401)
 
     const party = partyFor(request)
-    if (party === undefined) return reply.code(400).send(errorResponse('bad_request'))
+    if (party === undefined) return sendError(reply, 400)
 
     const [holder] = await db
       .select({ email: account.email })
@@ -132,7 +132,7 @@ export const registerPasskeyRoutes = (
       .where(eq(account.id, viewer.account_id))
       .limit(1)
 
-    if (holder === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
+    if (holder === undefined) return sendError(reply, 401)
 
     const [named] = await db
       .select({ title: installation.title })
@@ -174,30 +174,30 @@ export const registerPasskeyRoutes = (
     void noStore(reply)
 
     const viewer = await viewerFor(request, { db, sessions })
-    if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
+    if (viewer === undefined) return sendError(reply, 401)
 
-    const parsed = passkeyRegistrationSchema.safeParse(request.body)
-    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+    const body = bodyOf(passkeyRegistrationSchema, request)
+    if (body === undefined) return sendError(reply, 400)
 
     const party = partyFor(request)
-    if (party === undefined) return reply.code(400).send(errorResponse('bad_request'))
+    if (party === undefined) return sendError(reply, 400)
 
-    const challenge = challengeOf(parsed.data.response.response.clientDataJSON)
-    if (challenge === undefined) return reply.code(400).send(errorResponse('bad_request'))
+    const challenge = challengeOf(body.response.response.clientDataJSON)
+    if (challenge === undefined) return sendError(reply, 400)
 
     // Spent before it is verified, so a rejected response cannot be retried with a
     // second guess at the same challenge — and the account check is here rather
     // than in the query so that another member's challenge is spent too.
     const spent = await spendChallenge(challenge)
     if (spent === undefined || spent.account_id !== viewer.account_id) {
-      return reply.code(400).send(errorResponse('bad_request'))
+      return sendError(reply, 400)
     }
 
     const response = {
-      ...parsed.data.response,
+      ...body.response,
       response: {
-        ...parsed.data.response.response,
-        transports: knownTransports(parsed.data.response.response.transports),
+        ...body.response.response,
+        transports: knownTransports(body.response.response.transports),
       },
     }
 
@@ -214,10 +214,10 @@ export const registerPasskeyRoutes = (
       // returns `verified: false` for one it accepts as unverified. Both are the
       // same thing to the member: that did not work, try again.
       request.log.info({ err: failure }, 'passkey registration rejected')
-      return reply.code(400).send(errorResponse('bad_request'))
+      return sendError(reply, 400)
     }
 
-    if (!verified.verified) return reply.code(400).send(errorResponse('bad_request'))
+    if (!verified.verified) return sendError(reply, 400)
 
     const { credential } = verified.registrationInfo
 
@@ -229,13 +229,13 @@ export const registerPasskeyRoutes = (
         public_key: isoBase64URL.fromBuffer(credential.publicKey),
         counter: credential.counter,
         transports: credential.transports?.join(',') ?? null,
-        label: parsed.data.label,
+        label: body.label,
         created_at: now().toISOString(),
       })
     } catch (failure) {
       // `excludeCredentials` asks the browser to refuse this, and a browser that
       // does not is not a reason to answer 500.
-      if (isUniqueViolation(failure)) return reply.code(409).send(errorResponse('conflict'))
+      if (isUniqueViolation(failure)) return sendError(reply, 409)
       throw failure
     }
 
@@ -246,7 +246,7 @@ export const registerPasskeyRoutes = (
     void noStore(reply)
 
     const viewer = await viewerFor(request, { db, sessions })
-    if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
+    if (viewer === undefined) return sendError(reply, 401)
 
     return reply.code(200).send(await listFor(viewer.account_id))
   })
@@ -255,7 +255,7 @@ export const registerPasskeyRoutes = (
     void noStore(reply)
 
     const viewer = await viewerFor(request, { db, sessions })
-    if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
+    if (viewer === undefined) return sendError(reply, 401)
 
     const [mine] = await db
       .select({ id: passkey.id })
@@ -265,7 +265,7 @@ export const registerPasskeyRoutes = (
 
     // Somebody else's is a 404 rather than a 403: whether a given id exists is not
     // something a member has any business learning about another's devices.
-    if (mine === undefined) return reply.code(404).send(errorResponse('not_found'))
+    if (mine === undefined) return sendError(reply, 404)
 
     const [holder] = await db
       .select({ password_hash: account.password_hash })
@@ -282,7 +282,7 @@ export const registerPasskeyRoutes = (
     // last passkey from an account with no password locks its owner out for good,
     // and there is no mail service to send a reset through (#30).
     if (remaining.length <= 1 && holder?.password_hash == null) {
-      return reply.code(409).send(errorResponse('conflict'))
+      return sendError(reply, 409)
     }
 
     await db.delete(passkey).where(eq(passkey.id, mine.id))
@@ -294,7 +294,7 @@ export const registerPasskeyRoutes = (
     void noStore(reply)
 
     const party = partyFor(request)
-    if (party === undefined) return reply.code(400).send(errorResponse('bad_request'))
+    if (party === undefined) return sendError(reply, 400)
 
     // No `allowCredentials`, which is what makes this usernameless: the browser
     // offers whatever discoverable credentials it holds for this domain. Naming
@@ -311,20 +311,20 @@ export const registerPasskeyRoutes = (
     void noStore(reply)
 
     const parsed = passkeyLoginSchema.safeParse(request.body)
-    if (!parsed.success) return reply.code(401).send(errorResponse('invalid_credentials'))
+    if (!parsed.success) return sendError(reply, 401)
 
     const party = partyFor(request)
-    if (party === undefined) return reply.code(401).send(errorResponse('invalid_credentials'))
+    if (party === undefined) return sendError(reply, 401)
 
     const challenge = challengeOf(parsed.data.response.response.clientDataJSON)
-    if (challenge === undefined) return reply.code(401).send(errorResponse('invalid_credentials'))
+    if (challenge === undefined) return sendError(reply, 401)
 
     const spent = await spendChallenge(challenge)
     // A registration challenge is not a login challenge. The ceremony type in
     // `clientDataJSON` differs too and the library checks it, so this is the
     // second of two — but it is the one that is ours to make.
     if (spent === undefined || spent.account_id !== null) {
-      return reply.code(401).send(errorResponse('invalid_credentials'))
+      return sendError(reply, 401)
     }
 
     const [found] = await db
@@ -333,7 +333,7 @@ export const registerPasskeyRoutes = (
       .where(eq(passkey.credential_id, parsed.data.response.id))
       .limit(1)
 
-    if (found === undefined) return reply.code(401).send(errorResponse('invalid_credentials'))
+    if (found === undefined) return sendError(reply, 401)
 
     let verified
     try {
@@ -351,13 +351,13 @@ export const registerPasskeyRoutes = (
       })
     } catch (failure) {
       request.log.info({ err: failure }, 'passkey login rejected')
-      return reply.code(401).send(errorResponse('invalid_credentials'))
+      return sendError(reply, 401)
     }
 
-    if (!verified.verified) return reply.code(401).send(errorResponse('invalid_credentials'))
+    if (!verified.verified) return sendError(reply, 401)
 
     const viewer = await viewerOf(db, found.account_id)
-    if (viewer === undefined) return reply.code(401).send(errorResponse('invalid_credentials'))
+    if (viewer === undefined) return sendError(reply, 401)
 
     await db
       .update(passkey)

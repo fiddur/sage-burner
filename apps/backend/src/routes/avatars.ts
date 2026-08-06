@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 
-import { apiRoutes, errorResponse } from '@sage-burner/shared'
+import { apiRoutes } from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -8,7 +8,7 @@ import type { GuardDeps } from '../auth/guards.ts'
 import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
 import { accountAvatar } from '../db/schema.ts'
-import { noStore } from '../http.ts'
+import { noStore, sendError } from '../http.ts'
 
 export interface AvatarDeps extends GuardDeps {
   now?: () => Date
@@ -60,14 +60,14 @@ export const registerAvatarRoutes = (
     void noStore(reply)
 
     const type = AVATAR_TYPES.find((candidate) => candidate === request.headers['content-type'])
-    if (type === undefined) return reply.code(415).send(errorResponse('bad_request'))
+    if (type === undefined) return sendError(reply, 415)
 
     if (!Buffer.isBuffer(request.body) || request.body.length === 0) {
-      return reply.code(400).send(errorResponse('bad_request'))
+      return sendError(reply, 400)
     }
 
     const viewer = await viewerFor(request, { db, sessions })
-    if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
+    if (viewer === undefined) return sendError(reply, 401)
 
     const updated_at = now().toISOString()
 
@@ -88,7 +88,7 @@ export const registerAvatarRoutes = (
     void noStore(reply)
 
     const viewer = await viewerFor(request, { db, sessions })
-    if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
+    if (viewer === undefined) return sendError(reply, 401)
 
     await db.delete(accountAvatar).where(eq(accountAvatar.account_id, viewer.account_id))
 
@@ -118,7 +118,7 @@ export const registerAvatarRoutes = (
 
       if (row === undefined) {
         void noStore(reply)
-        return reply.code(404).send(errorResponse('not_found'))
+        return sendError(reply, 404)
       }
 
       return (

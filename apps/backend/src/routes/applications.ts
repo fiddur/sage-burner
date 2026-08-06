@@ -1,19 +1,13 @@
 import type { Application, ApplicationResponse, StoredAnswers } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import {
-  answerProblems,
-  apiRoutes,
-  applicationCreateSchema,
-  errorResponse,
-  isTickBox,
-} from '@sage-burner/shared'
+import { answerProblems, apiRoutes, applicationCreateSchema, isTickBox } from '@sage-burner/shared'
 import { randomUUID } from 'node:crypto'
 
 import type { Database } from '../db/index.ts'
 
 import { application } from '../db/schema.ts'
-import { noStore } from '../http.ts'
+import { bodyOf, noStore, sendError } from '../http.ts'
 import { questionsFor } from './questions.ts'
 
 export interface ApplicationRouteDeps {
@@ -62,8 +56,8 @@ export const registerApplicationRoutes = (
   app.post(apiRoutes.submitApplication.fastify, async (request, reply) => {
     void noStore(reply)
 
-    const parsed = applicationCreateSchema.safeParse(request.body)
-    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+    const body = bodyOf(applicationCreateSchema, request)
+    if (body === undefined) return sendError(reply, 400)
 
     const questions = await questionsFor(db)
 
@@ -71,15 +65,15 @@ export const registerApplicationRoutes = (
     // the same questions, not that a client-complete submission is
     // server-complete: the form ran them against the questions as they were when
     // the page loaded, and this is the side that decides.
-    if (answerProblems(questions, parsed.data.answers).length > 0) {
-      return reply.code(400).send(errorResponse('bad_request'))
+    if (answerProblems(questions, body.answers).length > 0) {
+      return sendError(reply, 400)
     }
 
     // An answer to something the form says it never showed is a body disagreeing
     // with itself, and dropping it silently would lose what someone typed.
-    const asked = new Set(parsed.data.asked)
-    if (Object.keys(parsed.data.answers).some((id) => !asked.has(id))) {
-      return reply.code(400).send(errorResponse('bad_request'))
+    const asked = new Set(body.asked)
+    if (Object.keys(body.answers).some((id) => !asked.has(id))) {
+      return sendError(reply, 400)
     }
 
     // A question in `asked` that is no longer in `questions` — deleted while the
@@ -101,15 +95,15 @@ export const registerApplicationRoutes = (
         question_id: question.id,
         label: question.label,
         type: question.type,
-        value: parsed.data.answers[question.id] ?? (isTickBox(question.type) ? false : ''),
+        value: body.answers[question.id] ?? (isTickBox(question.type) ? false : ''),
       }))
 
     const row = {
       id: randomUUID(),
       answers,
       status: 'pending',
-      applicant_name: parsed.data.applicant_name,
-      applicant_contact: parsed.data.applicant_contact,
+      applicant_name: body.applicant_name,
+      applicant_contact: body.applicant_contact,
       submitted_at: now().toISOString(),
       decided_at: null,
     } satisfies Application

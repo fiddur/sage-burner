@@ -1,11 +1,10 @@
 import type { AccountRole } from '@sage-burner/shared'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 
-import { errorResponse } from '@sage-burner/shared'
-
 import type { Database } from '../db/index.ts'
 import type { Sessions } from './session.ts'
 
+import { sendError } from '../http.ts'
 import { viewerFor } from './viewer.ts'
 
 export interface GuardDeps {
@@ -35,9 +34,9 @@ export const createGuards = ({ db, sessions }: GuardDeps) => {
     async (request: FastifyRequest, reply: FastifyReply) => {
       const viewer = await viewerFor(request, { db, sessions })
 
-      if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
+      if (viewer === undefined) return sendError(reply, 401)
       if (!roles.some((role) => viewer.roles.includes(role))) {
-        return reply.code(403).send(errorResponse('forbidden'))
+        return sendError(reply, 403)
       }
 
       return undefined

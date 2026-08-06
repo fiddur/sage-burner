@@ -1,7 +1,7 @@
 import type { ApplicationDecisionResponse, ApplicationsResponse, InviteResponse } from '@sage-burner/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
-import { apiRoutes, errorResponse } from '@sage-burner/shared'
+import { apiRoutes } from '@sage-burner/shared'
 import { and, desc, eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
@@ -9,7 +9,7 @@ import type { GuardDeps } from '../auth/guards.ts'
 
 import { viewerFor } from '../auth/viewer.ts'
 import { application, inviteToken } from '../db/schema.ts'
-import { noStore } from '../http.ts'
+import { noStore, sendError } from '../http.ts'
 import { defaultExpiry, mintToken } from '../invites.ts'
 
 export interface ApplicationReviewDeps extends GuardDeps {
@@ -48,7 +48,7 @@ export const registerApplicationReviewRoutes = (
       // the decision had committed — leaving exactly the orphan state the
       // transaction below exists to prevent.
       const viewer = await viewerFor(request, { db, sessions })
-      if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
+      if (viewer === undefined) return sendError(reply, 401)
 
       const { id } = request.params
       const minted = decision === 'approved' ? mintToken() : undefined
@@ -90,9 +90,7 @@ export const registerApplicationReviewRoutes = (
         // event PATCHes do it.
         const [existing] = await db.select().from(application).where(eq(application.id, id)).limit(1)
 
-        return existing === undefined
-          ? reply.code(404).send(errorResponse('not_found'))
-          : reply.code(409).send(errorResponse('conflict'))
+        return existing === undefined ? sendError(reply, 404) : sendError(reply, 409)
       }
 
       return {
@@ -131,7 +129,7 @@ export const registerApplicationReviewRoutes = (
     void noStore(reply)
 
     const viewer = await viewerFor(request, { db, sessions })
-    if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
+    if (viewer === undefined) return sendError(reply, 401)
 
     const { id } = request.params
     const minted = mintToken()
@@ -182,8 +180,8 @@ export const registerApplicationReviewRoutes = (
       return 'issued' as const
     })
 
-    if (outcome === 'not_found') return reply.code(404).send(errorResponse('not_found'))
-    if (outcome !== 'issued') return reply.code(409).send(errorResponse('conflict'))
+    if (outcome === 'not_found') return sendError(reply, 404)
+    if (outcome !== 'issued') return sendError(reply, 409)
 
     return { invite: { token: minted.token, expires_at } } satisfies InviteResponse
   })
