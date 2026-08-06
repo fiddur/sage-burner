@@ -43,6 +43,7 @@ const anEvent = {
   start_time: '15:00',
   end_time: '12:00',
   welcome_markdown: '# Welcome!',
+  payment_info_markdown: '',
   member_cap: 42,
   created_at: '2026-07-28T10:00:00Z',
 }
@@ -406,6 +407,7 @@ describe('sessionSchema', () => {
     // Read-only, and not columns on `session` — which is why the create and update
     // bodies derive from `sessionFields` rather than from `sessionSchema`.
     helpers: [{ account_id: ID, name: 'Ada' }],
+    supporters: [{ account_id: ID, name: 'Ada', avatar: null }],
     support_count: 3,
     supported_by_me: true,
   }

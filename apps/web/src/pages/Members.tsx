@@ -4,6 +4,7 @@ import { useSelectedBurn } from '../burn.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
 import { useLoad } from '../load.ts'
+import { renderMarkdown } from '../markdown.ts'
 import { isApproved, useViewer } from '../viewer.tsx'
 
 export type MembersApi = Pick<ApiClient, 'getMembers'>
@@ -58,6 +59,13 @@ export const Members = ({ api }: { api: MembersApi }) => {
             {roster.entries.length > confirmed ? `, ${roster.entries.length - confirmed} waiting` : ''}.
           </p>
 
+          <HowToPay
+            info={roster.event.payment_info_markdown}
+            owed={roster.entries.some(
+              (entry) => entry.account_id === viewer.account?.id && entry.payment_status !== 'paid',
+            )}
+          />
+
           {roster.entries.length === 0 ? (
             <p class="form-note">Nobody has said they are coming yet.</p>
           ) : (
@@ -108,5 +116,23 @@ export const Members = ({ api }: { api: MembersApi }) => {
         </>
       )}
     </GuardedPage>
+  )
+}
+
+/**
+ * How to pay, to whoever has not.
+ *
+ * Only to them: everybody else has done it, and a standing instruction to pay is
+ * noise on a page they read for the allergies. It is the one thing on this page
+ * addressed to the reader rather than about the burn.
+ */
+const HowToPay = ({ info, owed }: { info: string; owed: boolean }) => {
+  if (!owed || info.trim() === '') return null
+
+  return (
+    <div class="notice">
+      {/* Safe by construction: `renderMarkdown` escapes raw HTML rather than filtering it. */}
+      <div class="markdown-preview" dangerouslySetInnerHTML={{ __html: renderMarkdown(info) }} />
+    </div>
   )
 }

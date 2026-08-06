@@ -107,6 +107,18 @@ export const sessionFields = z.object({
 export const sessionSchema = withValidTimeSlot(
   sessionFields.extend({
     helpers: z.array(z.object({ account_id: idSchema, name: z.string().nullable() })),
+    /**
+     * Who has given it a ❤️‍🔥, by name (#251).
+     *
+     * Names rather than a bare count, so the grid can show whose faces they are.
+     * The count used to be all there was, and the reason it could be is that a
+     * heart said nothing about who — the page now says it, so the shape has to.
+     * Members only, like every other name here: the ICS feed's projection is a
+     * separate schema and does not have this.
+     */
+    supporters: z.array(
+      z.object({ account_id: idSchema, name: z.string().nullable(), avatar: z.string().nullable() }),
+    ),
     support_count: z.int().min(0),
     /** The reader's own answer, so one dream reads differently to two people. */
     supported_by_me: z.boolean(),

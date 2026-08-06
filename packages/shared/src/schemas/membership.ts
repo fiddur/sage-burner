@@ -305,7 +305,7 @@ export const memberRosterResponseSchema = z.object({
    * — which the selector decides, not the API — and that is the only thing the
    * nullability is for.
    */
-  event: eventFields.pick({ id: true, name: true, member_cap: true }).nullable(),
+  event: eventFields.pick({ id: true, name: true, member_cap: true, payment_info_markdown: true }).nullable(),
   entries: z.array(memberRosterEntrySchema),
 })
 

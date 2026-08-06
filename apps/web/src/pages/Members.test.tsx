@@ -34,7 +34,7 @@ const anEntry = (over: Partial<MemberRosterEntry> = {}): MemberRosterEntry => ({
 })
 
 const aRoster = (over: Partial<MemberRosterResponse> = {}): MemberRosterResponse => ({
-  event: { id: 'e-1', name: 'Summer burn', member_cap: 2 },
+  event: { id: 'e-1', name: 'Summer burn', member_cap: 2, payment_info_markdown: '' },
   entries: [],
   ...over,
 })
@@ -166,5 +166,46 @@ describe('Members', () => {
 
     expect(await screen.findByText(/not coming to a burn yet/)).toBeTruthy()
     expect(screen.queryByRole('table')).toBeNull()
+  })
+})
+
+describe('how to pay', () => {
+  const paying = (over: Partial<MemberRosterEntry> = {}) =>
+    anEntry({ account_id: 'a-1', payment_status: 'unpaid', ...over })
+
+  it('tells somebody who has not paid how to', async () => {
+    renderPage(
+      stub(
+        aRoster({
+          event: { id: 'e-1', name: 'Summer burn', member_cap: 2, payment_info_markdown: '**Swish** 123' },
+          entries: [paying()],
+        }),
+      ),
+    )
+
+    expect(await screen.findByText('Swish')).toBeTruthy()
+  })
+
+  it('says nothing to somebody who has', async () => {
+    // Everybody else has done it, and a standing instruction to pay is noise on a
+    // page they read for the allergies.
+    renderPage(
+      stub(
+        aRoster({
+          event: { id: 'e-1', name: 'Summer burn', member_cap: 2, payment_info_markdown: '**Swish** 123' },
+          entries: [paying({ payment_status: 'paid' })],
+        }),
+      ),
+    )
+
+    await screen.findByText('Summer burn')
+    expect(screen.queryByText('Swish')).toBeNull()
+  })
+
+  it('says nothing when no organiser has written any', async () => {
+    renderPage(stub(aRoster({ entries: [paying()] })))
+
+    await screen.findByText('Summer burn')
+    expect(document.querySelector('.notice')).toBeNull()
   })
 })

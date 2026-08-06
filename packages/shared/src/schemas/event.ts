@@ -72,6 +72,15 @@ export const eventFields = z.object({
    * before display. `MAX_WELCOME_LENGTH` is the limit the form shares.
    */
   welcome_markdown: z.string().max(MAX_WELCOME_LENGTH),
+  /**
+   * How to pay for this burn, written by an organiser and shown on the Members
+   * page to whoever has not paid yet (#250).
+   *
+   * Per burn rather than per installation: the amount, the account and the
+   * deadline are facts about one gathering, and last summer's are wrong for the
+   * next one. Markdown, like every longer field somebody else reads.
+   */
+  payment_info_markdown: z.string().max(MAX_WELCOME_LENGTH),
   /** Membership cap, e.g. 42. Approvals past this go to the waiting list. */
   member_cap: z.int().positive(),
   created_at: dateTimeSchema,
@@ -97,6 +106,7 @@ export const eventCreateSchema = withEventDateOrder(
     .omit({ id: true, created_at: true })
     .extend({
       welcome_markdown: eventFields.shape.welcome_markdown.default(''),
+      payment_info_markdown: eventFields.shape.payment_info_markdown.default(''),
       // Defaulted so an organiser naming dates and a cap is not stopped by two
       // fields they may not have decided yet. The whole day, which is what the
       // grid did before the hours existed.

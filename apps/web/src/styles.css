@@ -1256,3 +1256,24 @@ img.avatar {
   border-left: 3px solid var(--ember);
   background: color-mix(in srgb, var(--ember) 10%, transparent);
 }
+
+/* The faces of whoever gave a dream a ❤️‍🔥. Overlapped, like every stack of avatars. */
+.dream-supporters {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.dream-supporter {
+  display: inline-flex;
+  margin-inline-start: -0.35rem;
+}
+
+.dream-supporter:first-child {
+  margin-inline-start: 0;
+}
+
+/* So an overlapped circle reads as in front of the one behind it, not merged. */
+.dream-supporter .avatar {
+  outline: 2px solid var(--paper);
+}

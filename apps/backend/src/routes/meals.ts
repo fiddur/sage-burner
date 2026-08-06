@@ -154,21 +154,6 @@ const burnFor = async (db: Database, eventId: string) => {
  * the same reason. What stays admin's is the plan itself — the slots, and adding,
  * moving or dropping a sitting — which is why those live under `/api/admin/`.
  */
-/**
- * Whose hands: the body when joining, the path when standing down. Both name a person
- * rather than meaning the caller (#247) — 🙋 sends the caller's own id.
- */
-const whoseHands = (
-  joining: boolean,
-  request: FastifyRequest<{ Params: { id: string; role: string; accountId?: string } }>,
-): string | undefined => {
-  if (!joining) return request.params.accountId
-
-  const parsed = helperSchema.safeParse(request.body)
-
-  return parsed.success ? parsed.data.account_id : undefined
-}
-
 export const registerMealRoutes = (
   app: FastifyInstance,
   { db, sessions, now = () => new Date(), notify = async () => undefined }: MealDeps,
@@ -381,9 +366,14 @@ export const registerMealRoutes = (
       const row = { meal_id: existing.id, attendance_id: mine, role }
 
       if (joining) {
-        // Standing twice is standing once, which is what a double click sends.
-        await db.insert(mealRole).values(row).onConflictDoNothing()
-        await tell(viewer.account_id, accountId, `You are on ${role} for ${existing.label}`)
+        // Standing twice is standing once, which is what a double click sends — and
+        // `.returning()` is what tells the two apart, so the second click does not
+        // push somebody a duplicate.
+        const added = await db.insert(mealRole).values(row).onConflictDoNothing().returning()
+
+        if (added.length > 0) {
+          await tell(viewer.account_id, accountId, `You are on ${role} for ${existing.label}`)
+        }
       } else {
         const gone = await db
           .delete(mealRole)
@@ -491,12 +481,28 @@ export const registerMealRoutes = (
 }
 
 /**
+ * Whose hands: the body when joining, the path when standing down. Both name a person
+ * rather than meaning the caller (#247) — 🙋 sends the caller's own id.
+ */
+const whoseHands = (
+  joining: boolean,
+  request: FastifyRequest<{ Params: { id: string; role: string; accountId?: string } }>,
+): string | undefined => {
+  if (!joining) return request.params.accountId
+
+  const parsed = helperSchema.safeParse(request.body)
+
+  return parsed.success ? parsed.data.account_id : undefined
+}
+
+/**
  * The plan itself — the slot templates, and adding, moving or dropping a sitting.
  *
  * Under `/api/admin/`, which one `onRequest` hook guards with no per-route opt-out.
  * Opening any of these would mean moving it out from under the prefix, never
  * exempting it here.
  */
+
 export const registerMealAdminRoutes = (app: FastifyInstance, { db }: MealDeps) => {
   const answerSlots = async (eventId: string): Promise<MealSlotsResponse> => ({
     slots: await slotsFor(db, eventId),

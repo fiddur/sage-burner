@@ -931,6 +931,20 @@ describe('telling somebody a meal role moved', () => {
     expect(messagesFrom(deliver)).toEqual(['You are on helper for Dinner'])
   })
 
+  it('says nothing the second time somebody is put on a crew', async () => {
+    const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
+    const { server, ada, meal } = await setUp(deliver)
+    const bea = await givenAttending('Bea')
+    await givenSubscribed(bea.id)
+    await send(server, 'PUT', `/api/meals/${meal.id}/crew/helper`, ada.cookie, { account_id: bea.id })
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1))
+    deliver.mockClear()
+
+    await send(server, 'PUT', `/api/meals/${meal.id}/crew/helper`, ada.cookie, { account_id: bea.id })
+
+    expect(deliver).not.toHaveBeenCalled()
+  })
+
   it('says nothing when nobody was actually taken off', async () => {
     // Bea was never on it. Without the guard she is told she has been dropped from
     // something she never joined — which a second tab makes ordinary.
