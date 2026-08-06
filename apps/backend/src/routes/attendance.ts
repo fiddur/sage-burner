@@ -14,6 +14,7 @@ import { viewerFor } from '../auth/viewer.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
 import { account, accountAvatar, attendance, event } from '../db/schema.ts'
 import { noStore } from '../http.ts'
+import { displayName, notifyAttendees } from '../push/notify.ts'
 import { openEvent, todayIso } from './events.ts'
 import { helpingFor, helpingIdsFor } from './helping.ts'
 
@@ -271,6 +272,22 @@ export const registerAttendanceRoutes = (
 
       const joined = await joinBurn(db, request.params.eventId, viewer.account_id, now)
       if (joined === undefined) return reply.code(404).send(errorResponse('not_found'))
+
+      // Only on the way in. Saying you are coming when you already were is a no-op,
+      // and announcing it again would make a double click look like two arrivals.
+      if (joined.created) {
+        await notifyAttendees(
+          db,
+          notify,
+          joined.stay.event_id,
+          {
+            category: 'member_joined',
+            body: `${await displayName(db, viewer.account_id)} is coming.`,
+            link: '/members',
+          },
+          { except: viewer.account_id },
+        )
+      }
 
       return joined.created ? reply.code(201).send({ attendance: joined.stay }) : { attendance: joined.stay }
     },

@@ -1,3 +1,4 @@
+import { notificationCategories } from '@sage-burner/shared'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -8,57 +9,89 @@ import { NotificationSettingsField } from './NotificationSettingsField.tsx'
 
 afterEach(cleanup)
 
+/** What the server sends an account that has never saved: the six on by default. */
+const DEFAULTS = [
+  'meal_role',
+  'dream_role',
+  'lead_role',
+  'payment',
+  'waiting_list_near',
+  'waiting_list_pushed',
+] as const
+
 const stub = (over: Partial<NotificationSettingsApi> = {}): NotificationSettingsApi => ({
-  getMyNotificationSettings: () => Promise.resolve({ muted: [] }),
-  updateMyNotificationSettings: () => Promise.resolve({ muted: [] }),
+  getMyNotificationSettings: () => Promise.resolve({ on: [...DEFAULTS] }),
+  updateMyNotificationSettings: () => Promise.resolve({ on: [...DEFAULTS] }),
   ...over,
 })
 
 const MEAL = 'Put on or taken off a meal'
+const DREAM_OFFERED = 'Somebody offers a dream'
+
+const checked = (label: string) => {
+  const box = screen.getByLabelText(label)
+  return box instanceof HTMLInputElement && box.checked
+}
 
 describe('what to be told about', () => {
-  it('starts with every box ticked, which is what storing only the off ones means', async () => {
+  it('shows a row for every category, in two sections', async () => {
     render(<NotificationSettingsField api={stub()} />)
 
     const boxes = await screen.findAllByRole('checkbox')
-    expect(boxes).toHaveLength(6)
-    expect(boxes.every((box) => box instanceof HTMLInputElement && box.checked)).toBe(true)
+    expect(boxes).toHaveLength(notificationCategories.length)
+    expect(screen.getByText('What happens to you')).toBeTruthy()
+    expect(screen.getByText('What else is going on')).toBeTruthy()
   })
 
-  it('unticks the ones already switched off', async () => {
-    render(
-      <NotificationSettingsField
-        api={stub({ getMyNotificationSettings: () => Promise.resolve({ muted: ['meal_role'] }) })}
-      />,
-    )
+  it('ticks what happens to you and leaves the rest alone', async () => {
+    // The two halves default differently, which is the whole reason the wire carries
+    // what is on rather than what is off (#259).
+    render(<NotificationSettingsField api={stub()} />)
 
-    const box = await screen.findByLabelText(MEAL)
-    expect(box instanceof HTMLInputElement && box.checked).toBe(false)
+    await screen.findByLabelText(MEAL)
+    expect(checked(MEAL)).toBe(true)
+    expect(checked(DREAM_OFFERED)).toBe(false)
   })
 
-  it('mutes a category by unticking it', async () => {
-    const update = vi.fn(() => Promise.resolve({ muted: ['meal_role' as const] }))
-    render(<NotificationSettingsField api={stub({ updateMyNotificationSettings: update })} />)
-
-    fireEvent.click(await screen.findByLabelText(MEAL))
-
-    await waitFor(() => expect(update).toHaveBeenCalledWith({ muted: ['meal_role'] }))
-  })
-
-  it('unmutes by ticking it back', async () => {
-    const update = vi.fn(() => Promise.resolve({ muted: [] }))
+  it('does not invent a default of its own when the read fails', async () => {
+    // Nothing rather than everything: a table drawn with six ticks it did not get
+    // from the server would switch six categories off the moment one was touched.
     render(
       <NotificationSettingsField
         api={stub({
-          getMyNotificationSettings: () => Promise.resolve({ muted: ['meal_role'] }),
-          updateMyNotificationSettings: update,
+          getMyNotificationSettings: () => Promise.reject(apiError(500, 'internal_error', 'Nope.')),
         })}
       />,
     )
 
+    await screen.findByLabelText(MEAL)
+    expect(checked(MEAL)).toBe(false)
+  })
+
+  it('switches one off by unticking it', async () => {
+    const update = vi.fn(() => Promise.resolve({ on: [] }))
+    render(<NotificationSettingsField api={stub({ updateMyNotificationSettings: update })} />)
+
     fireEvent.click(await screen.findByLabelText(MEAL))
 
-    await waitFor(() => expect(update).toHaveBeenCalledWith({ muted: [] }))
+    await waitFor(() => {
+      expect(update).toHaveBeenCalledWith({
+        on: DEFAULTS.filter((category) => category !== 'meal_role'),
+      })
+    })
+  })
+
+  it('switches one on by ticking it', async () => {
+    // The passing sibling, and the case the old model could not express: this
+    // category is off until somebody asks for it.
+    const update = vi.fn(() => Promise.resolve({ on: [] }))
+    render(<NotificationSettingsField api={stub({ updateMyNotificationSettings: update })} />)
+
+    fireEvent.click(await screen.findByLabelText(DREAM_OFFERED))
+
+    await waitFor(() => {
+      expect(update).toHaveBeenCalledWith({ on: [...DEFAULTS, 'dream_offered'] })
+    })
   })
 
   it('puts the box back when the save is refused', async () => {
@@ -74,7 +107,6 @@ describe('what to be told about', () => {
     fireEvent.click(await screen.findByLabelText(MEAL))
 
     await screen.findByRole('alert')
-    const box = screen.getByLabelText(MEAL)
-    expect(box instanceof HTMLInputElement && box.checked).toBe(true)
+    expect(checked(MEAL)).toBe(true)
   })
 })

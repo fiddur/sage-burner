@@ -22,6 +22,7 @@ import { viewerFor } from '../auth/viewer.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
 import { account, attendance, event, leadRole, leadRoleMember } from '../db/schema.ts'
 import { noStore } from '../http.ts'
+import { displayName, notifyAttendees } from '../push/notify.ts'
 import { accountForAttendance, attendanceFor } from './attendance.ts'
 import { copySourcesFor } from './copy-sources.ts'
 import { openEvent, todayIso } from './events.ts'
@@ -204,6 +205,16 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
         throw failure
       }
 
+      // Everybody coming to that burn, minus whoever added it (#259). No name in the
+      // body: a new role is vacant, so there is nobody it is about yet.
+      await notifyAttendees(
+        db,
+        notify,
+        fields.event_id,
+        { category: 'lead_role_added', body: `A new lead role: ${fields.title}`, link: '/roles' },
+        { except: await callerId(request) },
+      )
+
       // Built from what was written rather than read back: a new role is vacant and
       // has no team by definition, so a re-read would only be a query that could
       // fail to find its own insert and need an impossible branch for it.
@@ -309,6 +320,24 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
       }
       if (parsed.data.account_id !== null && parsed.data.account_id !== before) {
         await tell(by, parsed.data.account_id, `You are now ${existing.title} lead.`)
+      }
+
+      // The burn-wide half, separate from the two personal notes above: those tell the
+      // people it happened *to*, this tells everyone who asked to follow the register
+      // filling up (#259). Only on a spot being taken — a role falling vacant is not
+      // news worth pushing to forty-two people, and whoever lost it is told directly.
+      if (parsed.data.account_id !== null && parsed.data.account_id !== before) {
+        await notifyAttendees(
+          db,
+          notify,
+          existing.event_id,
+          {
+            category: 'lead_role_filled',
+            body: `${await displayName(db, parsed.data.account_id)} is now ${existing.title} lead.`,
+            link: '/roles',
+          },
+          { except: by },
+        )
       }
 
       const roles = await rolesFor(db, existing.event_id)

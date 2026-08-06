@@ -41,7 +41,7 @@ const stub = (over: Partial<ProfileApi> = {}, profile = aProfile()): ProfileApi 
   // The toggle renders "not supported" without a browser push API, which happy-dom
   // has none of, so it never reaches these.
   getPushKey: () => Promise.reject(new Error('getPushKey is not stubbed here')),
-  getMyNotificationSettings: () => Promise.resolve({ muted: [] }),
+  getMyNotificationSettings: () => Promise.resolve({ on: [] }),
   updateMyNotificationSettings: () =>
     Promise.reject(new Error('updateMyNotificationSettings is not stubbed here')),
   subscribeToPush: () => Promise.reject(new Error('subscribeToPush is not stubbed here')),

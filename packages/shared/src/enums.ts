@@ -172,15 +172,71 @@ export const notificationCategories = [
   'payment',
   'waiting_list_near',
   'waiting_list_pushed',
+  'dream_offered',
+  'member_joined',
+  'lead_role_added',
+  'lead_role_filled',
+  'new_version',
 ] as const
 export type NotificationCategory = (typeof notificationCategories)[number]
 
-/** What the settings table calls each one. Where the bell *sends* you is the route's. */
-export const notificationCategoryLabels: Record<NotificationCategory, string> = {
-  meal_role: 'Put on or taken off a meal',
-  dream_role: 'Put on or taken off a dream',
-  lead_role: 'Given or taken off a lead role',
-  payment: 'Your payment recorded',
-  waiting_list_near: 'The burn is nearly full and you have not paid',
-  waiting_list_pushed: 'The burn filled up and you are on the waiting list',
+/**
+ * Everything the settings table needs to render one row, in one place (#259).
+ *
+ * One record rather than a `labels` map beside an `on` map beside an `about` map:
+ * three objects keyed by the same union are three things to keep in step, and the
+ * one that goes stale is silent. `satisfies` makes a missing category a type error,
+ * so adding one to the list above cannot compile until it is described here.
+ *
+ * - `label` — what the settings table calls it. Where the bell *sends* you is the
+ *   route's business.
+ * - `on` — whether it is on for somebody who has never said. **The two halves differ
+ *   deliberately.** What happens *to you* is on: being put on a meal is not noise,
+ *   and somebody who never opens the settings should still hear it. What happens
+ *   *around you* is off, because a burn where every dream and every arrival pings
+ *   forty-two people is a channel people learn to ignore (#259).
+ * - `about` — which of the two sections it belongs in. Not derived from `on`: that
+ *   they line up today is a coincidence, and the first category that breaks it would
+ *   land in the wrong section silently. `else` is "not about you personally", which
+ *   is a wider net than "about a burn" — a redeploy is neither.
+ */
+export interface NotificationCategoryInfo {
+  about: 'else' | 'you'
+  label: string
+  on: boolean
 }
+
+export const notificationCategoryInfo = {
+  meal_role: { label: 'Put on or taken off a meal', on: true, about: 'you' },
+  dream_role: { label: 'Put on or taken off a dream', on: true, about: 'you' },
+  lead_role: { label: 'Given or taken off a lead role', on: true, about: 'you' },
+  payment: { label: 'Your payment recorded', on: true, about: 'you' },
+  waiting_list_near: {
+    label: 'The burn is nearly full and you have not paid',
+    on: true,
+    about: 'you',
+  },
+  waiting_list_pushed: {
+    label: 'The burn filled up and you are on the waiting list',
+    on: true,
+    about: 'you',
+  },
+  dream_offered: { label: 'Somebody offers a dream', on: false, about: 'else' },
+  member_joined: { label: 'Somebody says they are coming', on: false, about: 'else' },
+  lead_role_added: { label: 'A lead role is added', on: false, about: 'else' },
+  lead_role_filled: { label: 'Somebody takes the lead of a role', on: false, about: 'else' },
+  new_version: { label: 'A new version of the app is out', on: false, about: 'else' },
+} as const satisfies Record<NotificationCategory, NotificationCategoryInfo>
+
+/** Whether a category is on for somebody who has never touched the settings. */
+export const notifiesByDefault = (category: NotificationCategory): boolean =>
+  notificationCategoryInfo[category].on
+
+/** The settings table's two sections, in the order it renders them. */
+export const notificationSections = [
+  { about: 'you', heading: 'What happens to you' },
+  { about: 'else', heading: 'What else is going on' },
+] as const satisfies readonly { about: NotificationCategoryInfo['about']; heading: string }[]
+
+export const categoriesAbout = (about: NotificationCategoryInfo['about']): NotificationCategory[] =>
+  notificationCategories.filter((category) => notificationCategoryInfo[category].about === about)

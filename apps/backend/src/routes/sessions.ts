@@ -30,6 +30,7 @@ import {
   sessionSupport,
 } from '../db/schema.ts'
 import { noStore } from '../http.ts'
+import { displayName, notifyAttendees } from '../push/notify.ts'
 import { attendanceFor } from './attendance.ts'
 import { openEvent, todayIso } from './events.ts'
 
@@ -345,6 +346,20 @@ export const registerSessionRoutes = (
         if (isForeignKeyViolation(failure)) return reply.code(400).send(errorResponse('bad_request'))
         throw failure
       }
+
+      // After the write, and never to the person who just offered it (#259). Off
+      // unless somebody asked for it, so on most installations this reaches nobody.
+      await notifyAttendees(
+        db,
+        notify,
+        open.id,
+        {
+          category: 'dream_offered',
+          body: `${await displayName(db, viewer.account_id)} offered a dream: ${row.title}`,
+          link: '/dreams',
+        },
+        { except: viewer.account_id },
+      )
 
       // Built from what was written rather than read back: a new dream has nobody
       // helping and no hearts by definition.

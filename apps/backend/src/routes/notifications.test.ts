@@ -172,16 +172,34 @@ describe('the bell', () => {
   })
 })
 
-describe('what somebody has switched off', () => {
-  const mute = (server: FastifyInstance, cookie: string, muted: string[]) =>
+describe('what somebody has switched on', () => {
+  /** The six that are on unless somebody says otherwise. */
+  const DEFAULTS = [
+    'meal_role',
+    'dream_role',
+    'lead_role',
+    'payment',
+    'waiting_list_near',
+    'waiting_list_pushed',
+  ]
+
+  const setOn = (server: FastifyInstance, cookie: string, on: string[]) =>
     server.inject({
       method: 'PUT',
       url: '/api/me/notification-settings',
       headers: { cookie },
-      payload: { muted },
+      payload: { on },
     })
 
-  it('records nothing at all for a muted category', async () => {
+  /** Everything on except the named ones — what unticking a box used to mean. */
+  const mute = (server: FastifyInstance, cookie: string, muted: string[]) =>
+    setOn(
+      server,
+      cookie,
+      DEFAULTS.filter((category) => !muted.includes(category)),
+    )
+
+  it('records nothing at all for a category switched off', async () => {
     // The setting says "notify me", so off means neither channel — a bell filling
     // with things somebody asked not to hear about is the same noise, quieter.
     const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
@@ -216,14 +234,14 @@ describe('what somebody has switched off', () => {
   it('answers the whole set, replacing what was there', async () => {
     const server = await build()
     const ada = await givenAccount()
-    await mute(server, ada.cookie, ['payment', 'lead_role'])
+    await setOn(server, ada.cookie, ['payment', 'lead_role'])
 
-    const back = await mute(server, ada.cookie, ['meal_role'])
+    const back = await setOn(server, ada.cookie, ['meal_role'])
 
-    expect(back.json().muted).toEqual(['meal_role'])
+    expect(back.json().on).toEqual(['meal_role'])
   })
 
-  it('defaults to nothing muted, with no row seeded for a new account', async () => {
+  it('defaults to what happens to you, with no row seeded for a new account', async () => {
     const server = await build()
     const ada = await givenAccount()
 
@@ -233,7 +251,39 @@ describe('what somebody has switched off', () => {
       headers: { cookie: ada.cookie },
     })
 
-    expect(settings.json().muted).toEqual([])
+    expect(settings.json().on).toEqual(DEFAULTS)
+  })
+
+  it('leaves what is going on around you off until it is asked for', async () => {
+    // The half the old shape could not express: absence used to mean on, so a
+    // category that is off by default had nowhere to live (#259).
+    const server = await build()
+    const ada = await givenAccount()
+
+    const settings = await server.inject({
+      method: 'GET',
+      url: '/api/me/notification-settings',
+      headers: { cookie: ada.cookie },
+    })
+
+    expect(settings.json().on).not.toContain('member_joined')
+    expect(settings.json().on).not.toContain('dream_offered')
+    expect(settings.json().on).not.toContain('new_version')
+  })
+
+  it('remembers one switched on, which absence alone could never say', async () => {
+    const server = await build()
+    const ada = await givenAccount()
+
+    await setOn(server, ada.cookie, [...DEFAULTS, 'member_joined'])
+
+    const settings = await server.inject({
+      method: 'GET',
+      url: '/api/me/notification-settings',
+      headers: { cookie: ada.cookie },
+    })
+
+    expect(settings.json().on).toContain('member_joined')
   })
 })
 

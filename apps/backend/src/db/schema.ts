@@ -139,6 +139,13 @@ export const installation = sqliteTable(
      */
     vapid_public_key: text('vapid_public_key'),
     vapid_private_key: text('vapid_private_key'),
+    /**
+     * The build this installation last booted on, so a redeploy can be noticed (#259).
+     *
+     * Null until the first boot that looks, which records without announcing: there is
+     * no previous version for it to be new against.
+     */
+    last_build_sha: text('last_build_sha'),
   },
   (table) => [
     primaryKey({ columns: [table.id] }),
@@ -1124,21 +1131,26 @@ export const notification = sqliteTable(
 )
 
 /**
- * A category somebody has switched **off**.
+ * A category somebody has explicitly chosen, either way.
  *
- * Only the off ones, so "default all ticked" needs no seeding — and an account made
- * tomorrow gets the same defaults without a migration teaching it to.
+ * Was `notification_mute`, which held only the off ones — sound while every category
+ * was on by default, and unable to say anything once #259 added five that are off by
+ * default. A row here means "this person said", and absence means "they have not",
+ * which is the only reading that works for both halves. The default lives in
+ * `notificationCategoryInfo` and nothing is seeded, so an account made tomorrow still
+ * gets today's defaults without a migration teaching it to.
  */
-export const notificationMute = sqliteTable(
-  'notification_mute',
+export const notificationSetting = sqliteTable(
+  'notification_setting',
   {
     account_id: text('account_id')
       .notNull()
       .references(() => account.id, { onDelete: 'cascade' }),
     category: text('category', { enum: notificationCategories }).notNull(),
+    enabled: integer('enabled', { mode: 'boolean' }).notNull(),
   },
   (table) => [
     primaryKey({ columns: [table.account_id, table.category] }),
-    check('notification_mute_category_check', oneOf(table.category, notificationCategories)),
+    check('notification_setting_category_check', oneOf(table.category, notificationCategories)),
   ],
 )
