@@ -190,7 +190,8 @@ const AddToBurn = ({
   const [chosen, setChosen] = useState('')
 
   const { loaded } = useLoad((signal) => api.getAdminAccounts(signal), {
-    fallback: 'Could not load the accounts, so there is nobody to choose from.',
+    // Never rendered: the picker returns null for every state but ready, on purpose.
+    fallback: 'unused — the picker hides itself when the accounts will not load',
   })
 
   const { busy, error, run } = useAction(() => {

@@ -741,9 +741,19 @@ a:hover {
   height: 3.2rem;
 }
 
+/*
+  Separate borders do not collapse, so a plain `border-top` here would stack on the
+  row above's `border-bottom` and paint a 3px band. The row above gives its edge up
+  instead.
+*/
 .schedule-daybreak th,
 .schedule-daybreak td {
-  border-top: 2px solid currentColor;
+  border-top: 2px solid currentcolor;
+}
+
+.schedule-grid tr:has(+ .schedule-daybreak) th,
+.schedule-grid tr:has(+ .schedule-daybreak) td {
+  border-bottom: 0;
 }
 
 .schedule-cell {
@@ -945,10 +955,14 @@ a:hover {
   min-width: 18ch;
 }
 
-.lead-table td:nth-child(5),
+/*
+  The three effort verdicts, which are a word each. Positional, so check them against
+  the cell order after adding or moving a column — the team count used to be among
+  them and held a sentence `nowrap` would not break.
+*/
+.lead-table td:nth-child(6),
 .lead-table td:nth-child(7),
-.lead-table td:nth-child(8),
-.lead-table td:nth-child(9) {
+.lead-table td:nth-child(8) {
   white-space: nowrap;
   font-size: 0.9rem;
   opacity: 0.85;

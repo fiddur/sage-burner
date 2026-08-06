@@ -44,8 +44,9 @@ const aRoster = (over: Partial<RosterResponse> = {}): RosterResponse => ({
 const stub = (over: Partial<RosterApi> = {}, roster = aRoster()): RosterApi => ({
   getActiveRoster: () => Promise.resolve(roster),
   setPayment: () => Promise.reject(new Error('setPayment is not stubbed here')),
-  // The picker renders nothing until this resolves, so an empty list is what keeps
-  // the tests below about the roster rather than about who could be added to it.
+  // Resolved and empty, so the picker renders its "everybody is already on this
+  // burn" note and no select — which is what keeps the tests below about the roster
+  // rather than about who could be added to it.
   getAdminAccounts: () => Promise.resolve({ accounts: [] }),
   adminAddAttendance: () => Promise.reject(new Error('adminAddAttendance is not stubbed here')),
   ...over,
