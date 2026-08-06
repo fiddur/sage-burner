@@ -1473,7 +1473,7 @@ describe('a chore in the kitchen', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Open Dinner' }))
     const panel = await screen.findByRole('dialog', { name: 'Dinner' })
 
-    expect(within(panel).getByLabelText('Lead for Dinner')).toBeTruthy()
+    expect(within(panel).getByText('Meal lead')).toBeTruthy()
     expect(within(panel).getByText('Helping cook')).toBeTruthy()
     expect(within(panel).getByText('Washing up')).toBeTruthy()
   })
@@ -1497,18 +1497,16 @@ describe('a chore’s lead, in the panel', () => {
     stub({ getMeals: () => Promise.resolve({ intro_markdown: '', slots: [], meals: [meal] }) })
 
   it('names whoever is on it, and offers nobody else', async () => {
-    // Without an option of their own nothing matches the control's value and it draws
-    // blank — vacant-looking while somebody is still on it.
+    // The holder is read off the meal, so a chore — which may take no new lead — still
+    // shows who is on it and still offers the ✕ that gets them off.
     renderPage(withMeal(stranded({ account_id: 'a-1', name: 'Ada Lovelace' })))
 
     fireEvent.click(await screen.findByRole('button', { name: 'Open Morning cleanup' }))
-    const select = await screen.findByLabelText('Lead for Morning cleanup')
+    const panel = await screen.findByRole('dialog', { name: 'Morning cleanup' })
 
-    expect([...select.querySelectorAll('option')].map((o) => o.textContent)).toEqual([
-      'Nobody yet',
-      'Ada Lovelace',
-    ])
-    expect(select).toHaveProperty('value', 'a-1')
+    expect(within(panel).getByText('Ada Lovelace')).toBeTruthy()
+    expect(within(panel).getByRole('button', { name: 'Take Ada Lovelace off Morning cleanup' })).toBeTruthy()
+    expect(within(panel).queryByRole('button', { name: 'Appoint someone to Morning cleanup' })).toBeNull()
   })
 
   it('vacates it, which is the one thing the API allows here', async () => {
@@ -1528,7 +1526,7 @@ describe('a chore’s lead, in the panel', () => {
     )
 
     fireEvent.click(await screen.findByRole('button', { name: 'Open Morning cleanup' }))
-    fireEvent.change(await screen.findByLabelText('Lead for Morning cleanup'), { target: { value: '' } })
+    fireEvent.click(await screen.findByRole('button', { name: 'Take Ada Lovelace off Morning cleanup' }))
 
     await waitFor(() => expect(setMealLead).toHaveBeenCalledWith('m-3', { account_id: null }))
   })
