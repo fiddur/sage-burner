@@ -53,6 +53,7 @@ const stub = (over: Partial<InviteApi> = {}): InviteApi => ({
   getActiveEvent: () => Promise.resolve({ event: null }),
   getEventOptions: () => Promise.resolve({ options: [] }),
   updateMyStay: () => Promise.reject(new Error('updateMyStay is not stubbed here')),
+  joinEvent: () => Promise.reject(new Error('joinEvent is not stubbed here')),
   ...over,
 })
 
@@ -497,7 +498,8 @@ describe('joining the upcoming burn from the form', () => {
     complete()
     join()
 
-    expect((await screen.findByRole('status')).textContent).toContain('which burn you are coming to')
+    // The member welcome, which offers the burn now rather than describing one.
+    expect(await screen.findByRole('button', { name: /Summer burn/ })).toBeTruthy()
     expect(updateMyStay).not.toHaveBeenCalled()
     // And quietly: not reaching for `attendance.event_id` at all. Dropping the null
     // guard still calls nothing — it throws on the property first — so a test that
@@ -592,5 +594,59 @@ describe('joining the upcoming burn from the form', () => {
 
     await screen.findByLabelText(/Where are you sleeping/)
     expect(screen.queryByText(/edit lodging alternatives/)).toBeNull()
+  })
+})
+
+describe('the welcome for somebody who did not join a burn', () => {
+  const redeemAsMemberOnly = { redeemInvite: () => Promise.resolve({ viewer: null, attendance: null }) }
+
+  const redeemWithoutJoining = async () => {
+    await screen.findByRole('button', { name: 'Join' })
+    complete()
+    fireEvent.click(screen.getByRole('checkbox'))
+    join()
+  }
+
+  it('offers the open burn in one click, rather than only a link to the start page', async () => {
+    const joinEvent = vi.fn(() => Promise.resolve({ attendance: anAttendance() }))
+    renderPage(withBurn({ ...redeemAsMemberOnly, joinEvent }))
+
+    await redeemWithoutJoining()
+    ;(await screen.findByRole('button', { name: /Summer burn/ })).click()
+
+    await waitFor(() => expect(joinEvent).toHaveBeenCalledWith('e-1'))
+  })
+
+  it('confirms once they are on the list', async () => {
+    renderPage(
+      withBurn({ ...redeemAsMemberOnly, joinEvent: () => Promise.resolve({ attendance: anAttendance() }) }),
+    )
+
+    await redeemWithoutJoining()
+    ;(await screen.findByRole('button', { name: /Summer burn/ })).click()
+
+    expect(await screen.findByText(/on the list for Summer burn/)).toBeTruthy()
+  })
+
+  it('says plainly there is none, rather than pointing at a burn that is not there', async () => {
+    // The passing sibling for the offer above: a page that always said this would
+    // satisfy neither, and one that always offered would leave a dead button here.
+    renderPage(stub(redeemAsMemberOnly))
+
+    await screen.findByRole('button', { name: 'Join' })
+    complete()
+    join()
+
+    expect(await screen.findByText(/no burn open to join just now/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Summer burn/ })).toBeNull()
+  })
+
+  it('says so when the join fails, rather than claiming a place', async () => {
+    renderPage(withBurn({ ...redeemAsMemberOnly, joinEvent: () => Promise.reject(new Error('nope')) }))
+
+    await redeemWithoutJoining()
+    ;(await screen.findByRole('button', { name: /Summer burn/ })).click()
+
+    expect(await screen.findByText(/Could not add you to that burn/)).toBeTruthy()
   })
 })

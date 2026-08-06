@@ -14,7 +14,7 @@ import { useSetViewer, useViewer } from '../viewer.tsx'
 
 export type InviteApi = Pick<
   ApiClient,
-  'getActiveEvent' | 'getEventOptions' | 'getInviteState' | 'redeemInvite' | 'updateMyStay'
+  'getActiveEvent' | 'getEventOptions' | 'getInviteState' | 'joinEvent' | 'redeemInvite' | 'updateMyStay'
 >
 
 /** The burn the form offers to join, and the two lists its stay questions need. */
@@ -62,6 +62,62 @@ const messageForFailure = (failure: unknown): string => {
   if (failure.code === 'network') return failure.message
 
   return 'Could not finish signing you up. Please try again.'
+}
+
+/**
+ * The burn this page used to only describe (#104).
+ *
+ * Somebody who has just joined the community is the person most likely to want the
+ * next burn, and this is the moment they are paying attention — so the welcome
+ * offers it rather than sending them to a start page to find their own way. Its own
+ * write, after the token is already spent, so a burn that will not take them costs
+ * them nothing they cannot come back for.
+ */
+const OpenBurnOffer = ({ api, burn }: { api: Pick<InviteApi, 'joinEvent'>; burn: Event | undefined }) => {
+  const [adding, setAdding] = useState(false)
+  const [added, setAdded] = useState(false)
+  const [failed, setFailed] = useState(false)
+
+  if (burn === undefined) {
+    return <p>There is no burn open to join just now — the next one will be here when it is announced.</p>
+  }
+
+  if (added) {
+    return (
+      <p role="status">
+        You are on the list for {burn.name}. Arrival and lodging are on your own page whenever you want them.
+      </p>
+    )
+  }
+
+  const join = async () => {
+    setAdding(true)
+    setFailed(false)
+    try {
+      await api.joinEvent(burn.id)
+      setAdded(true)
+    } catch {
+      setFailed(true)
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  return (
+    <>
+      {failed && (
+        <p class="form-error" role="alert">
+          Could not add you to that burn. You can join it from your own page.
+        </p>
+      )}
+
+      <p>
+        <button type="button" disabled={adding} onClick={() => void join()}>
+          {adding ? 'Adding you…' : `Join ${burn.name} (${burn.start_date} → ${burn.end_date})`}
+        </button>
+      </p>
+    </>
+  )
 }
 
 /**
@@ -201,8 +257,10 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
         <p role="status">
           {done === 'joined'
             ? 'You are in, signed in, and on the list. Everything you just filled in can be changed later on your own page.'
-            : 'You are in, and signed in. Next you can say which burn you are coming to, and fill in the details for it.'}
+            : 'You are in, and signed in.'}
         </p>
+
+        {done === 'member' && <OpenBurnOffer api={api} burn={offered?.event} />}
 
         <FormError error={error} />
 
