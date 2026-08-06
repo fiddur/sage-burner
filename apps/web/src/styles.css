@@ -1244,3 +1244,15 @@ img.avatar {
 .helper-picker {
   flex-wrap: wrap;
 }
+
+/* The app has been redeployed under this tab. Not dismissible — see the component. */
+.new-version {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+  padding: 0.6rem 0.8rem;
+  border-left: 3px solid var(--ember);
+  background: color-mix(in srgb, var(--ember) 10%, transparent);
+}

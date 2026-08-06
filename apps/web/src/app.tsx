@@ -7,6 +7,7 @@ import type { Viewer } from './viewer.tsx'
 import { createApiClient } from './api/client.ts'
 import { FetchedBurnProvider } from './burn.tsx'
 import { Layout } from './components/Layout.tsx'
+import { NewVersion } from './components/NewVersion.tsx'
 import { FetchedInstallationProvider, InstallationProvider } from './installation.tsx'
 import { Admin } from './pages/Admin.tsx'
 import { AdminApplications } from './pages/AdminApplications.tsx'
@@ -140,7 +141,7 @@ export type RoutesApi = Pick<
  * What the whole app reaches for: the route table, plus what the providers and
  * the layout need — the viewer they resolve on mount, and signing out.
  */
-export type AppApi = RoutesApi & Pick<ApiClient, 'getMe' | 'logout'>
+export type AppApi = RoutesApi & Pick<ApiClient, 'getMe' | 'logout' | 'getVersion'>
 
 /**
  * The route table.
@@ -247,6 +248,9 @@ export const App = ({ viewer, title, api }: { viewer?: Viewer; title?: string; a
   const framed = (
     <FetchedBurnProvider api={client}>
       <Layout>
+        {/* Above the page rather than in the layout's chrome: it is about the tab,
+            not about the burn, and it has to survive whatever route is open. */}
+        <NewVersion api={client} />
         <Routes api={client} />
       </Layout>
     </FetchedBurnProvider>
