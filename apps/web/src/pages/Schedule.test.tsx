@@ -28,6 +28,7 @@ const BURN: Event = {
   end_time: '23:59',
   welcome_markdown: '',
   payment_info_markdown: '',
+  transfer_info_markdown: '',
   member_cap: 42,
   created_at: '2026-07-02T00:00:00.000Z',
 }

@@ -7,11 +7,19 @@ import type { ApiClient } from '../api/client.ts'
 import { isApiError } from '../api/client.ts'
 import { useBurns } from '../burn.tsx'
 import { useAction, useLoad } from '../load.ts'
+import { useViewer } from '../viewer.tsx'
+import { HandOverPlace } from './HandOverPlace.tsx'
 import { StayForm } from './StayForm.tsx'
 
 export type YourBurnsApi = Pick<
   ApiClient,
-  'getMyBurns' | 'joinEvent' | 'leaveEvent' | 'updateMyStay' | 'getEventOptions'
+  | 'getMyBurns'
+  | 'joinEvent'
+  | 'leaveEvent'
+  | 'updateMyStay'
+  | 'getEventOptions'
+  | 'getMembers'
+  | 'transferMyPlace'
 >
 
 /**
@@ -43,6 +51,7 @@ type Loaded = { burns: readonly MyBurn[]; past: readonly MyBurn[]; options: Map<
  */
 export const YourBurns = ({ api }: { api: YourBurnsApi }) => {
   const [showPast, setShowPast] = useState(false)
+  const viewer = useViewer()
 
   // The bar's own list, which this page is the only thing that changes.
   const { reload: refreshBurns } = useBurns()
@@ -168,27 +177,41 @@ export const YourBurns = ({ api }: { api: YourBurnsApi }) => {
                   onSaved={reload}
                 />
 
-                <p class="row">
-                  <button
-                    type="button"
-                    class="link-button"
-                    disabled={busy}
-                    onClick={() =>
-                      act(
-                        async () => {
-                          await api.leaveEvent(burn.event.id)
-                          refreshBurns()
-                        },
-                        {
-                          409: 'You have already paid for this burn, so someone with admin needs to sort this one out with you.',
-                          404: 'That burn is over, so there is nothing left to withdraw from.',
-                        },
-                      )
-                    }
-                  >
-                    I cannot come after all
-                  </button>
-                </p>
+                {burn.attendance.payment_status === 'paid' ? (
+                  // The only way off a paid burn: withdrawing is refused once money has
+                  // changed hands, so handing the place on is what replaces it.
+                  <HandOverPlace
+                    api={api}
+                    eventId={burn.event.id}
+                    myAccountId={viewer.account?.id}
+                    onDone={() => {
+                      refreshBurns()
+                      reload()
+                    }}
+                  />
+                ) : (
+                  <p class="row">
+                    <button
+                      type="button"
+                      class="link-button"
+                      disabled={busy}
+                      onClick={() =>
+                        act(
+                          async () => {
+                            await api.leaveEvent(burn.event.id)
+                            refreshBurns()
+                          },
+                          {
+                            409: 'You have paid for this burn — hand your place to somebody else instead.',
+                            404: 'That burn is over, so there is nothing left to withdraw from.',
+                          },
+                        )
+                      }
+                    >
+                      I cannot come after all
+                    </button>
+                  </p>
+                )}
               </>
             )}
           </section>

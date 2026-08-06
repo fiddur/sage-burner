@@ -29,6 +29,7 @@ type Editable = Pick<
   | 'member_cap'
   | 'welcome_markdown'
   | 'payment_info_markdown'
+  | 'transfer_info_markdown'
 >
 
 /**
@@ -95,6 +96,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
   const original = useRef<Event | undefined>(undefined)
   const [welcome, setWelcome] = useState('')
   const [payment, setPayment] = useState('')
+  const [transfer, setTransfer] = useState('')
   const [details, setDetails] = useState({
     name: '',
     start_date: '',
@@ -142,9 +144,12 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
         end_time: draft.end_time,
         welcome_markdown: '',
         // Sent rather than left to the schema's default, like the welcome text and
-        // for the same reason: both are written after the burn exists, and a create
-        // body that names one and not the other invites a guess about why.
+        // for the same reason: both are written after the burn exists.
         payment_info_markdown: '',
+        // `transfer_info_markdown` is deliberately *not* sent. Its default is a real
+        // sentence rather than an empty string, and sending '' would override it —
+        // leaving every new burn with nothing to say at the moment it fills, which is
+        // the one moment this field exists for.
         member_cap: Number(draft.member_cap),
       })
       // Inserted in start-date order rather than appended, because that is how
@@ -174,6 +179,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
     original.current = row
     setWelcome(row.welcome_markdown)
     setPayment(row.payment_info_markdown)
+    setTransfer(row.transfer_info_markdown)
     setDetails({
       name: row.name,
       start_date: row.start_date,
@@ -208,6 +214,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
         member_cap: cap,
         welcome_markdown: welcome,
         payment_info_markdown: payment,
+        transfer_info_markdown: transfer,
       })
 
       const { event: updated } = await api.updateEvent(id, changes)
@@ -379,6 +386,20 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
                     rows={6}
                     onInput={(next) => {
                       setPayment(next)
+                      setSaved(false)
+                    }}
+                  />
+
+                  {/* What replaces the payment instructions once every place is
+                      taken: paying no longer gets anybody in, so what somebody
+                      unpaid needs is how a place changes hands. */}
+                  <MarkdownField
+                    label="When the burn is full (markdown)"
+                    value={transfer}
+                    maxLength={MAX_WELCOME_LENGTH}
+                    rows={6}
+                    onInput={(next) => {
+                      setTransfer(next)
                       setSaved(false)
                     }}
                   />

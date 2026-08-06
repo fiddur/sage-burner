@@ -1,4 +1,4 @@
-import type { Attendance, MyBurn, MyBurnsResponse } from '@sage-burner/shared'
+import type { Attendance, MemberRosterEntry, MyBurn, MyBurnsResponse } from '@sage-burner/shared'
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -46,6 +46,8 @@ const stub = (over: Partial<YourBurnsApi> = {}, burns: MyBurnsResponse = { comin
   joinEvent: () => Promise.reject(new Error('joinEvent is not stubbed here')),
   leaveEvent: () => Promise.reject(new Error('leaveEvent is not stubbed here')),
   updateMyStay: () => Promise.reject(new Error('updateMyStay is not stubbed here')),
+  getMembers: () => Promise.reject(new Error('getMembers is not stubbed here')),
+  transferMyPlace: () => Promise.reject(new Error('transferMyPlace is not stubbed here')),
   ...over,
 })
 
@@ -96,8 +98,10 @@ describe('YourBurns', () => {
     expect(getEventOptions).not.toHaveBeenCalled()
   })
 
-  it('explains a refused withdrawal rather than saying try again', async () => {
-    // A 409 means they have paid, and retrying cannot change that.
+  it('points a refused withdrawal at the hand-over, rather than saying try again', async () => {
+    // A 409 means they have paid, and retrying cannot change that. It reaches this
+    // page only when the payment landed after the list was fetched — a paid burn
+    // offers the hand-over and no withdraw button at all.
     const leaveEvent = vi.fn(() => Promise.reject(apiError(409, 'conflict', 'nope')))
     render(
       <YourBurns
@@ -107,7 +111,7 @@ describe('YourBurns', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'I cannot come after all' }))
 
-    expect((await screen.findByRole('alert')).textContent).toContain('already paid')
+    expect((await screen.findByRole('alert')).textContent).toContain('hand your place to somebody else')
   })
 
   it('says a burn is over rather than "try again" when joining it 404s', async () => {
@@ -213,5 +217,118 @@ describe('the bar’s list of burns', () => {
 
     expect(await screen.findByRole('alert')).toBeTruthy()
     expect(reload).not.toHaveBeenCalled()
+  })
+})
+
+describe('handing on a place that has been paid for', () => {
+  const paidBurn = () => ({
+    coming: [aBurn('e-1', 'Summer', anAttendance({ payment_status: 'paid', payment_date: '2026-07-01' }))],
+    past: [],
+  })
+
+  const waiting = (over: Partial<MemberRosterEntry> = {}): MemberRosterEntry => ({
+    id: 'att-2',
+    event_id: 'e-1',
+    account_id: 'a-2',
+    joined_at: '2026-07-02T00:00:00.000Z',
+    arrival_date: null,
+    departure_date: null,
+    lodging_option_id: null,
+    lodging: null,
+    helping: null,
+    helping_option_ids: [],
+    helping_other: null,
+    notes: null,
+    name: 'Bea',
+    contact: null,
+    allergies_notes: null,
+    payment_status: 'unpaid',
+    waiting: true,
+    ...over,
+  })
+
+  const roster = (entries: MemberRosterEntry[]) => ({
+    event: {
+      id: 'e-1',
+      name: 'Summer',
+      member_cap: 1,
+      payment_info_markdown: '',
+      transfer_info_markdown: '',
+    },
+    entries,
+  })
+
+  it('offers the hand-over instead of withdrawing, once they have paid', async () => {
+    // Withdrawing is refused after payment, so offering it would be a dead button.
+    render(<YourBurns api={stub({}, paidBurn())} />)
+
+    expect(await screen.findByRole('button', { name: 'Hand my place to somebody else' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'I cannot come after all' })).toBeNull()
+  })
+
+  it('offers withdrawing while nothing has been paid', async () => {
+    // The passing sibling: always offering the hand-over would satisfy the test above.
+    render(<YourBurns api={stub({}, { coming: [aBurn('e-1', 'Summer', anAttendance())], past: [] })} />)
+
+    expect(await screen.findByRole('button', { name: 'I cannot come after all' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Hand my place to somebody else' })).toBeNull()
+  })
+
+  it('offers only people who have not paid', async () => {
+    const getMembers = vi.fn(() =>
+      Promise.resolve(
+        roster([waiting(), waiting({ account_id: 'a-3', name: 'Cyd', payment_status: 'paid' })]),
+      ),
+    )
+    render(<YourBurns api={stub({ getMembers }, paidBurn())} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Hand my place to somebody else' }))
+
+    expect(await screen.findByRole('option', { name: 'Bea' })).toBeTruthy()
+    expect(screen.queryByRole('option', { name: 'Cyd' })).toBeNull()
+  })
+
+  it('hands it to whoever was chosen', async () => {
+    const transferMyPlace = vi.fn(() => Promise.resolve(undefined))
+    render(
+      <YourBurns
+        api={stub({ getMembers: () => Promise.resolve(roster([waiting()])), transferMyPlace }, paidBurn())}
+      />,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Hand my place to somebody else' }))
+    const picker = await screen.findByLabelText('Who takes it')
+    fireEvent.change(picker, { target: { value: 'a-2' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Hand it over' }))
+
+    await waitFor(() => expect(transferMyPlace).toHaveBeenCalledWith('e-1', { to_account_id: 'a-2' }))
+  })
+
+  it('says so when nobody is waiting, rather than an empty picker', async () => {
+    render(<YourBurns api={stub({ getMembers: () => Promise.resolve(roster([])) }, paidBurn())} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Hand my place to somebody else' }))
+
+    expect(await screen.findByText(/Nobody is waiting/)).toBeTruthy()
+  })
+
+  it('reports a hand-over the server refused, rather than looking done', async () => {
+    render(
+      <YourBurns
+        api={stub(
+          {
+            getMembers: () => Promise.resolve(roster([waiting()])),
+            transferMyPlace: () => Promise.reject(apiError(409, 'conflict', 'nope')),
+          },
+          paidBurn(),
+        )}
+      />,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Hand my place to somebody else' }))
+    fireEvent.change(await screen.findByLabelText('Who takes it'), { target: { value: 'a-2' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Hand it over' }))
+
+    expect(await screen.findByRole('alert')).toBeTruthy()
   })
 })

@@ -202,7 +202,7 @@ describe('foreign keys', () => {
         id: 's1',
         event_id: ids.event,
         title: 'Cacao ceremony',
-        facilitator_account_id: ids.account,
+        facilitator_attendance_id: ids.attendance,
         description: 'Bring a cup.',
       })
       .run()
@@ -246,11 +246,10 @@ describe('foreign keys', () => {
     expect(handle.db.select().from(session).all()).toHaveLength(1)
   })
 
-  it('keeps a dream’s facilitator when they withdraw from the burn', () => {
-    // A regression guard, not a proof: nothing links the column to an attendance, so
-    // no mutation of the schema kills this. It is here because the obvious "fix" for
-    // a stale facilitator is to make it cascade, and a dream left without whoever was
-    // going to run it is something somebody has to notice rather than tidy away.
+  it('empties a dream’s facilitator spot when they leave the burn', () => {
+    // Leaving takes you off everything you signed up for there (#23). This was the
+    // one role that did not hold, because the column named an account; it names an
+    // attendance now, so the foreign key does it and no route can forget.
     seedAttendance(ids.attendance, ids.account)
     handle.db
       .insert(session)
@@ -258,14 +257,34 @@ describe('foreign keys', () => {
         id: 's1',
         event_id: ids.event,
         title: 'Cacao ceremony',
-        facilitator_account_id: ids.account,
+        facilitator_attendance_id: ids.attendance,
         description: '',
       })
       .run()
 
     handle.db.delete(attendance).where(eq(attendance.id, ids.attendance)).run()
 
-    expect(handle.db.select().from(session).all()[0]?.facilitator_account_id).toBe(ids.account)
+    expect(handle.db.select().from(session).all()[0]?.facilitator_attendance_id).toBeNull()
+  })
+
+  it('leaves the dream itself standing, vacant rather than deleted', () => {
+    // `set null` and not cascade: the dream outlives whoever was going to run it, and
+    // #247's control is what lets somebody else pick it up.
+    seedAttendance(ids.attendance, ids.account)
+    handle.db
+      .insert(session)
+      .values({
+        id: 's1',
+        event_id: ids.event,
+        title: 'Cacao ceremony',
+        facilitator_attendance_id: ids.attendance,
+        description: '',
+      })
+      .run()
+
+    handle.db.delete(attendance).where(eq(attendance.id, ids.attendance)).run()
+
+    expect(handle.db.select().from(session).all()).toHaveLength(1)
   })
 
   it('refuses a second heart from the same person, which is what makes the count sound', () => {
@@ -782,7 +801,7 @@ describe('sessions', () => {
         id: 's2',
         event_id: ids.event,
         title: 'Something unplanned',
-        facilitator_account_id: ids.account,
+        facilitator_attendance_id: ids.attendance,
         description: '',
         time_slot_start: null,
         time_slot_end: null,
@@ -999,7 +1018,10 @@ describe('the facilitator rename', () => {
         )
         .run('s-1', 'e-1', 'a-1', 'Sunrise yoga', '')
 
-      runMigrations(fresh)
+      // Up to the attendance rebuild, not past it: that one turns this column into
+      // an `attendance` and would null a facilitator who never joined the burn,
+      // which is its rule and not this migration's to answer for.
+      runMigrations(fresh, stagedThrough(FACILITATOR_ATTENDANCE).staged)
 
       expect(columnsOf(fresh, 'session')).not.toContain('host_account_id')
       expect(
@@ -1025,8 +1047,8 @@ describe('the facilitator rename', () => {
         .run('s-1', 'e-1', 'Nobody yet', '')
 
       expect(
-        fresh.client.prepare('select facilitator_account_id from session where id = ?').get('s-1')
-          ?.facilitator_account_id,
+        fresh.client.prepare('select facilitator_attendance_id from session where id = ?').get('s-1')
+          ?.facilitator_attendance_id,
       ).toBeNull()
     } finally {
       fresh.close()
@@ -1058,6 +1080,109 @@ describe('the repeatable-dream column', () => {
       expect(fresh.client.prepare('select repeatable from session where id = ?').get('s-1')?.repeatable).toBe(
         0,
       )
+    } finally {
+      fresh.close()
+    }
+  })
+})
+
+const FACILITATOR_ATTENDANCE = '20260806150000_facilitator_attendance'
+
+describe('the facilitator-is-an-attendance migration', () => {
+  /**
+   * Staged the same way as the places rebuild above, and for the same reason: this
+   * one carries a backfill, and a backfill is only tested by running it over the old
+   * shape with rows in it.
+   */
+  const beforeTheFacilitatorRebuild = () => {
+    const fresh = createDb({ url: ':memory:' })
+    const { staged, kept } = stagedThrough(FACILITATOR_ATTENDANCE)
+
+    // Asserted, or a mistyped tag stages the rebuild too and these prove nothing.
+    expect(kept).not.toContain(FACILITATOR_ATTENDANCE)
+    expect(kept.length).toBeGreaterThan(0)
+
+    runMigrations(fresh, staged)
+    expect(columnsOf(fresh, 'session')).toContain('facilitator_account_id')
+
+    return fresh
+  }
+
+  const seed = (db: DbHandle) => {
+    anEvent(db, 'e-1', 'a-burn', '2026-01-01T00:00:00Z')
+    // A second burn, so that scoping the backfill to the dream's *own* event is
+    // load-bearing: `acc-away` attends this one and not the one their dream is at.
+    anEvent(db, 'e-2', 'another-burn', '2026-02-01T00:00:00Z')
+    const people: [string, string][] = [
+      ['acc-coming', 'coming@example.org'],
+      ['acc-away', 'away@example.org'],
+    ]
+
+    for (const [id, email] of people) {
+      db.client.prepare('insert into account (id, email, created_at) values (?, ?, ?)').run(id, email, NOW)
+    }
+    for (const [id, eventId, accountId] of [
+      ['att-1', 'e-1', 'acc-coming'],
+      ['att-elsewhere', 'e-2', 'acc-away'],
+    ] as [string, string, string][]) {
+      db.client
+        .prepare('insert into attendance (id, event_id, account_id, joined_at) values (?, ?, ?, ?)')
+        .run(id, eventId, accountId, NOW)
+    }
+
+    const dreams: [string, string, string | null][] = [
+      ['s-coming', 'Run by somebody attending', 'acc-coming'],
+      ['s-away', 'Run by somebody who never joined', 'acc-away'],
+      ['s-nobody', 'Offered by nobody in particular', null],
+    ]
+
+    for (const [id, title, who] of dreams) {
+      db.client
+        .prepare('insert into session (id, event_id, title, facilitator_account_id) values (?, ?, ?, ?)')
+        .run(id, 'e-1', title, who)
+    }
+  }
+
+  const facilitatorOf = (db: DbHandle, id: string) =>
+    db.client.prepare('select facilitator_attendance_id as a from session where id = ?').get(id)?.a
+
+  it('maps a facilitator to their attendance at that dream’s own burn', () => {
+    const fresh = beforeTheFacilitatorRebuild()
+    try {
+      seed(fresh)
+
+      runMigrations(fresh, migrationsFolder)
+
+      expect(facilitatorOf(fresh, 's-coming')).toBe('att-1')
+    } finally {
+      fresh.close()
+    }
+  })
+
+  it('drops a facilitator who was never attending, which is the new rule applied', () => {
+    // Not data lost: the column now means "somebody coming who runs this", and an
+    // account that never joined the burn was never that.
+    const fresh = beforeTheFacilitatorRebuild()
+    try {
+      seed(fresh)
+
+      runMigrations(fresh, migrationsFolder)
+
+      expect(facilitatorOf(fresh, 's-away')).toBeNull()
+    } finally {
+      fresh.close()
+    }
+  })
+
+  it('keeps every dream, including the ones nobody was running', () => {
+    const fresh = beforeTheFacilitatorRebuild()
+    try {
+      seed(fresh)
+
+      runMigrations(fresh, migrationsFolder)
+
+      expect(fresh.client.prepare('select count(*) as n from session').get()?.n).toBe(3)
+      expect(facilitatorOf(fresh, 's-nobody')).toBeNull()
     } finally {
       fresh.close()
     }

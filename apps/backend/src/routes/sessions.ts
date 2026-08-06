@@ -1,4 +1,5 @@
 import type { Session, SessionResponse, SessionsResponse } from '@sage-burner/shared'
+import type { SQL } from 'drizzle-orm'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 
 import {
@@ -43,7 +44,38 @@ export interface SessionDeps extends GuardDeps {
   notify?: Notifier
 }
 
-type DreamRow = typeof session.$inferSelect
+/**
+ * A dream as the routes handle it: the stored row, with the facilitator resolved
+ * back to an account id.
+ *
+ * The column is an `attendance`, so that leaving a burn empties the spot by foreign
+ * key rather than by a route remembering to. Every reader wants the person, though,
+ * and the wire field has always been an account id — `dreamColumns` is where the two
+ * meet, and it is the only place that knows the difference.
+ */
+type DreamRow = Omit<typeof session.$inferSelect, 'facilitator_attendance_id'> & {
+  facilitator_account_id: string | null
+}
+
+const dreamColumns = {
+  id: session.id,
+  event_id: session.event_id,
+  title: session.title,
+  facilitator_account_id: attendance.account_id,
+  description: session.description,
+  repeatable: session.repeatable,
+  time_slot_start: session.time_slot_start,
+  time_slot_end: session.time_slot_end,
+  place_id: session.place_id,
+}
+
+/** Left, so a dream nobody runs is still a dream. */
+const dreamRows = (db: Database, where: SQL) =>
+  db
+    .select(dreamColumns)
+    .from(session)
+    .leftJoin(attendance, eq(attendance.id, session.facilitator_attendance_id))
+    .where(where)
 
 interface People {
   helpers: ReadonlyMap<string, Session['helpers']>
@@ -130,10 +162,7 @@ const asDream = (row: DreamRow, { helpers, support }: People): Session => ({
 })
 
 const sessionsFor = async (db: Database, eventId: string, mine: string | undefined): Promise<Session[]> => {
-  const rows = await db
-    .select()
-    .from(session)
-    .where(eq(session.event_id, eventId))
+  const rows = await dreamRows(db, eq(session.event_id, eventId))
     // Unscheduled dreams last, then by when they happen. `asc` puts nulls first
     // in SQLite, so the null-ness is sorted on explicitly rather than relied on.
     .orderBy(asc(isNull(session.time_slot_start)), asc(session.time_slot_start), asc(session.title))
@@ -186,13 +215,26 @@ const placeIsOnThisBurn = async (db: Database, eventId: string, placeId: string 
 }
 
 /**
- * Whether a facilitator is coming to the burn their dream is at.
+ * The facilitator's place at the burn their dream is at, or a refusal.
  *
- * Somebody who is not there cannot run it, and the foreign key only knows the
- * account exists. `null` is always fine: most dreams start with nobody.
+ * Somebody who is not there cannot run it. `undefined` means the body did not
+ * mention the field and nothing should be written; `null` means a dream nobody runs,
+ * which is how most of them start.
  */
-const facilitatorIsComing = async (db: Database, eventId: string, accountId: string | null | undefined) =>
-  accountId == null || (await attendanceFor(db, eventId, accountId)) !== undefined
+type Spot = { ok: true; attendanceId: string | null | undefined } | { ok: false }
+
+const facilitatorSpot = async (
+  db: Database,
+  eventId: string,
+  accountId: string | null | undefined,
+): Promise<Spot> => {
+  if (accountId === undefined) return { ok: true, attendanceId: undefined }
+  if (accountId === null) return { ok: true, attendanceId: null }
+
+  const found = await attendanceFor(db, eventId, accountId)
+
+  return found === undefined ? { ok: false } : { ok: true, attendanceId: found }
+}
 
 /**
  * Dreams — the member-offered workshops, ceremonies and happenings.
@@ -276,14 +318,15 @@ export const registerSessionRoutes = (
       if (!(await placeIsOnThisBurn(db, open.id, parsed.data.place_id))) {
         return reply.code(400).send(errorResponse('bad_request'))
       }
-      if (!(await facilitatorIsComing(db, open.id, parsed.data.facilitator_account_id))) {
-        return reply.code(400).send(errorResponse('bad_request'))
-      }
+      const spot = await facilitatorSpot(db, open.id, parsed.data.facilitator_account_id)
+      if (!spot.ok) return reply.code(400).send(errorResponse('bad_request'))
 
+      const { facilitator_account_id: wanted, ...fields } = parsed.data
       const row: DreamRow = {
-        ...parsed.data,
+        ...fields,
         id: randomUUID(),
         event_id: open.id,
+        facilitator_account_id: wanted ?? null,
       }
 
       // Split deliberately. The foreign key is the authority on the place *existing*,
@@ -292,7 +335,12 @@ export const registerSessionRoutes = (
       // the direction that matters — no route moves a place between burns, since
       // `placeUpdateSchema` omits `event_id`.
       try {
-        await db.insert(session).values(row)
+        await db.insert(session).values({
+          ...fields,
+          id: row.id,
+          event_id: open.id,
+          facilitator_attendance_id: spot.attendanceId ?? null,
+        })
       } catch (failure) {
         if (isForeignKeyViolation(failure)) return reply.code(400).send(errorResponse('bad_request'))
         throw failure
@@ -321,7 +369,7 @@ export const registerSessionRoutes = (
       const parsed = sessionUpdateSchema.safeParse(request.body)
       if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
 
-      const [existing] = await db.select().from(session).where(eq(session.id, request.params.id)).limit(1)
+      const [existing] = await dreamRows(db, eq(session.id, request.params.id)).limit(1)
 
       // Scoped to a burn that has not ended, like every other member-facing write:
       // a dream from a finished burn is history, and an id noted while it was
@@ -351,23 +399,24 @@ export const registerSessionRoutes = (
       if (!(await placeIsOnThisBurn(db, existing.event_id, parsed.data.place_id))) {
         return reply.code(400).send(errorResponse('bad_request'))
       }
-      if (!(await facilitatorIsComing(db, existing.event_id, parsed.data.facilitator_account_id))) {
-        return reply.code(400).send(errorResponse('bad_request'))
-      }
+      const spot = await facilitatorSpot(db, existing.event_id, parsed.data.facilitator_account_id)
+      if (!spot.ok) return reply.code(400).send(errorResponse('bad_request'))
 
-      let updated: DreamRow[]
+      const { facilitator_account_id: _wanted, ...fields } = parsed.data
+      const patch =
+        spot.attendanceId === undefined ? fields : { ...fields, facilitator_attendance_id: spot.attendanceId }
+
       try {
-        updated = await db
-          .update(session)
-          .set(parsed.data)
-          .where(eq(session.id, request.params.id))
-          .returning()
+        await db.update(session).set(patch).where(eq(session.id, request.params.id))
       } catch (failure) {
         if (isForeignKeyViolation(failure)) return reply.code(400).send(errorResponse('bad_request'))
         throw failure
       }
 
-      const [row] = updated
+      // Read back rather than returned from the UPDATE: the facilitator leaves this
+      // route as an account id and is stored as an attendance, and one query knowing
+      // that mapping is better than two.
+      const [row] = await dreamRows(db, eq(session.id, request.params.id)).limit(1)
 
       // After the 404, not before: a concurrent withdrawal between the pre-read and
       // the UPDATE would otherwise announce a change to a dream that no longer exists.
@@ -414,7 +463,7 @@ export const registerSessionRoutes = (
   const asAttendee = async (
     request: FastifyRequest<{ Params: { id: string } }>,
   ): Promise<Refusal | Attending> => {
-    const [dream] = await db.select().from(session).where(eq(session.id, request.params.id)).limit(1)
+    const [dream] = await dreamRows(db, eq(session.id, request.params.id)).limit(1)
     if (dream === undefined) return { code: 404, error: 'not_found' }
 
     const open = await openEvent(db, todayIso(now), dream.event_id)

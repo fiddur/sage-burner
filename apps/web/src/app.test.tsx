@@ -49,6 +49,7 @@ const clientWith = (
   updateMyStay: () => Promise.reject(new Error('updateMyStay is not stubbed in this file')),
   joinEvent: () => Promise.reject(new Error('joinEvent is not stubbed in this file')),
   leaveEvent: () => Promise.reject(new Error('leaveEvent is not stubbed in this file')),
+  transferMyPlace: () => Promise.reject(new Error('transferMyPlace is not stubbed in this file')),
   getInviteState: () => Promise.reject(new Error('getInviteState is not stubbed in this file')),
   redeemInvite: () => Promise.reject(new Error('redeemInvite is not stubbed in this file')),
   getInvites: () => Promise.reject(new Error('getInvites is not stubbed in this file')),

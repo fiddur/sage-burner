@@ -26,6 +26,7 @@ const summer: Event = {
   end_time: '23:59',
   welcome_markdown: '# Hello',
   payment_info_markdown: '',
+  transfer_info_markdown: '',
   member_cap: 42,
   created_at: '2026-01-01T00:00:00.000Z',
 }
@@ -123,6 +124,9 @@ describe('AdminEvents', () => {
         end_time: '23:59',
         welcome_markdown: '',
         payment_info_markdown: '',
+        // No `transfer_info_markdown`: its schema default is a real sentence, and
+        // sending '' would override it. Pinned as an exact body, so adding the key
+        // back fails here rather than quietly blanking every new burn.
         member_cap: 42,
       })
     })

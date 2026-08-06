@@ -758,6 +758,18 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
     leaveEvent: (eventId: string) =>
       request<undefined>(apiRoutes.leaveEvent.path(eventId), { method: apiRoutes.leaveEvent.method }),
 
+    /**
+     * Hand your paid place to somebody who has not paid (#23).
+     *
+     * The one way out once you have paid — withdrawing is refused then, since what a
+     * refund means is undecided. Leaves you off the burn entirely.
+     */
+    transferMyPlace: (eventId: string, body: BodyOf<'transferMyPlace'>) =>
+      request<undefined>(apiRoutes.transferMyPlace.path(eventId), {
+        method: apiRoutes.transferMyPlace.method,
+        body,
+      }),
+
     /** Members only. `name` and `contact` may be null on an account never filled in. */
     getMyProfile: (signal?: AbortSignal) =>
       request<ProfileResponse>(apiRoutes.getMyProfile.path(), { signal }),

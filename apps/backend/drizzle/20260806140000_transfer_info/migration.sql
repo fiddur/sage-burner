@@ -1,0 +1,11 @@
+-- What a burn says once it is full, replacing the payment instructions (#23).
+--
+-- Telling somebody who has not paid *how* to pay is the wrong thing once every
+-- place is taken — paying does not get them in any more. What they need to know is
+-- that a paid member can hand a place over.
+--
+-- The default fills existing rows as well as new ones, so every burn already has
+-- something to say rather than a blank where the instructions used to be. This text
+-- is a frozen copy: `DEFAULT_TRANSFER_INFO` in `packages/shared` is the living one,
+-- and they are allowed to drift — this only ever ran once.
+ALTER TABLE `event` ADD `transfer_info_markdown` text DEFAULT 'A paid member can transfer their membership to someone else. To transfer yours, contact the members on the waiting list and settle the payment between you. Then hand the place over from your own page.' NOT NULL;

@@ -1,6 +1,6 @@
 import type { FastifyInstance, LightMyRequestResponse } from 'fastify'
 
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it } from 'vitest'
 
@@ -11,8 +11,8 @@ import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, attendance, event } from '../db/schema.ts'
-import { isAlreadyJoined } from './attendance.ts'
+import { account, accountRole, attendance, event, notification, session } from '../db/schema.ts'
+import { handOverPlace, isAlreadyJoined } from './attendance.ts'
 
 /**
  * Saying you are coming to a burn.
@@ -651,5 +651,233 @@ describe('who is coming, by name', () => {
 
     expect((await attendees(server, member.cookie, eventId)).json().attendees).toEqual([])
     expect((await attendees(server, member.cookie, randomUUID())).json().attendees).toEqual([])
+  })
+})
+
+describe('handing a paid place to somebody else', () => {
+  const transfer = (server: FastifyInstance, cookie: string, eventId: string, toAccountId: string) =>
+    server.inject({
+      method: 'POST',
+      url: `/api/events/${eventId}/attendance/me/transfer`,
+      headers: { cookie },
+      payload: { to_account_id: toAccountId },
+    })
+
+  const setPaid = (accountId: string, eventId: string) =>
+    db()
+      .update(attendance)
+      .set({ payment_status: 'paid', payment_date: '2026-07-01' })
+      .where(and(eq(attendance.event_id, eventId), eq(attendance.account_id, accountId)))
+
+  const rowFor = async (accountId: string, eventId: string) => {
+    const [row] = await db()
+      .select()
+      .from(attendance)
+      .where(and(eq(attendance.event_id, eventId), eq(attendance.account_id, accountId)))
+      .limit(1)
+
+    return row
+  }
+
+  /** A giver who has paid and a taker who has not, both coming to the same burn. */
+  const twoMembers = async (server: FastifyInstance) => {
+    const eventId = await givenEvent()
+    const giver = await givenAccount(['member'], 'Ada')
+    const taker = await givenAccount(['member'], 'Bea')
+    await join(server, giver.cookie, eventId)
+    await join(server, taker.cookie, eventId)
+    await setPaid(giver.id, eventId)
+
+    return { eventId, giver, taker }
+  }
+
+  it('marks the taker paid and takes the giver off the burn', async () => {
+    const server = await build()
+    const { eventId, giver, taker } = await twoMembers(server)
+
+    const answer = await transfer(server, giver.cookie, eventId, taker.id)
+
+    expect(answer.statusCode).toBe(204)
+    expect((await rowFor(taker.id, eventId))?.payment_status).toBe('paid')
+    expect(await rowFor(giver.id, eventId)).toBeUndefined()
+  })
+
+  it('carries the payment date over, the burn having been paid once', async () => {
+    const server = await build()
+    const { eventId, giver, taker } = await twoMembers(server)
+
+    await transfer(server, giver.cookie, eventId, taker.id)
+
+    expect((await rowFor(taker.id, eventId))?.payment_date).toBe('2026-07-01')
+  })
+
+  it('tells the taker, who did not click anything', async () => {
+    const server = await build()
+    const { eventId, giver, taker } = await twoMembers(server)
+
+    await transfer(server, giver.cookie, eventId, taker.id)
+
+    const told = await db().select().from(notification).where(eq(notification.account_id, taker.id))
+    expect(told).toHaveLength(1)
+    expect(told[0]?.category).toBe('payment')
+  })
+
+  it('says nothing to the giver, who did click', async () => {
+    const server = await build()
+    const { eventId, giver, taker } = await twoMembers(server)
+
+    await transfer(server, giver.cookie, eventId, taker.id)
+
+    expect(await db().select().from(notification).where(eq(notification.account_id, giver.id))).toEqual([])
+  })
+
+  it('refuses somebody who has not paid — there is no place to give', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const giver = await givenAccount(['member'])
+    const taker = await givenAccount(['member'])
+    await join(server, giver.cookie, eventId)
+    await join(server, taker.cookie, eventId)
+
+    expect((await transfer(server, giver.cookie, eventId, taker.id)).statusCode).toBe(409)
+    expect(await rowFor(giver.id, eventId)).toBeDefined()
+  })
+
+  it('refuses a taker who has already paid, which would lose a place', async () => {
+    const server = await build()
+    const { eventId, giver, taker } = await twoMembers(server)
+    await setPaid(taker.id, eventId)
+
+    expect((await transfer(server, giver.cookie, eventId, taker.id)).statusCode).toBe(409)
+    expect(await rowFor(giver.id, eventId)).toBeDefined()
+  })
+
+  it('refuses a taker who is not coming to this burn at all', async () => {
+    const server = await build()
+    const { eventId, giver } = await twoMembers(server)
+    const stranger = await givenAccount(['member'])
+
+    expect((await transfer(server, giver.cookie, eventId, stranger.id)).statusCode).toBe(404)
+    expect(await rowFor(giver.id, eventId)).toBeDefined()
+  })
+
+  it('refuses handing a place to yourself', async () => {
+    const server = await build()
+    const { eventId, giver } = await twoMembers(server)
+
+    expect((await transfer(server, giver.cookie, eventId, giver.id)).statusCode).toBe(409)
+    expect(await rowFor(giver.id, eventId)).toBeDefined()
+  })
+
+  it('refuses somebody who is not signed in', async () => {
+    const server = await build()
+    const { eventId, taker } = await twoMembers(server)
+
+    const answer = await server.inject({
+      method: 'POST',
+      url: `/api/events/${eventId}/attendance/me/transfer`,
+      payload: { to_account_id: taker.id },
+    })
+
+    expect(answer.statusCode).toBe(401)
+  })
+
+  it('empties the dream the giver was going to facilitate', async () => {
+    // Leaving takes you off everything, and the facilitator column is the one that
+    // used to hold on. The dream stays; the spot is vacant for somebody to take.
+    const server = await build()
+    const { eventId, giver, taker } = await twoMembers(server)
+    const mine = await rowFor(giver.id, eventId)
+    await db()
+      .insert(session)
+      .values({ id: 's-1', event_id: eventId, title: 'Cacao ceremony', facilitator_attendance_id: mine?.id })
+
+    await transfer(server, giver.cookie, eventId, taker.id)
+
+    const [dream] = await db().select().from(session).where(eq(session.id, 's-1'))
+    expect(dream?.facilitator_attendance_id).toBeNull()
+    expect(dream?.title).toBe('Cacao ceremony')
+  })
+})
+
+describe('the hand-over’s own guard, under the checks that precede it', () => {
+  /**
+   * `handOverPlace` is called directly, like `writeStay`'s rollback test: the route
+   * has already checked both invariants by the time it runs, so the window this
+   * closes cannot be opened through `inject`, which serialises requests.
+   */
+  const rowFor = async (accountId: string, eventId: string) => {
+    const [row] = await db()
+      .select()
+      .from(attendance)
+      .where(and(eq(attendance.event_id, eventId), eq(attendance.account_id, accountId)))
+      .limit(1)
+
+    return row
+  }
+
+  const twoStays = async (server: FastifyInstance) => {
+    const eventId = await givenEvent()
+    const giver = await givenAccount(['member'])
+    const taker = await givenAccount(['member'])
+    await join(server, giver.cookie, eventId)
+    await join(server, taker.cookie, eventId)
+    await db()
+      .update(attendance)
+      .set({ payment_status: 'paid', payment_date: '2026-07-01' })
+      .where(and(eq(attendance.event_id, eventId), eq(attendance.account_id, giver.id)))
+
+    return { eventId, giver, taker }
+  }
+
+  it('refuses, and keeps both rows, when the taker paid in the meantime', async () => {
+    const server = await build()
+    const { eventId, giver, taker } = await twoStays(server)
+    const mine = await rowFor(giver.id, eventId)
+    const theirs = await rowFor(taker.id, eventId)
+    // What the route's pre-read could not have seen.
+    await db()
+      .update(attendance)
+      .set({ payment_status: 'paid', payment_date: '2026-07-02' })
+      .where(eq(attendance.id, theirs?.id ?? ''))
+
+    const moved = handOverPlace(db(), { id: mine?.id ?? '', payment_date: '2026-07-01' }, theirs?.id ?? '')
+
+    expect(moved).toBe(false)
+    // Neither half landed: the giver keeps their place rather than losing it to a
+    // taker who no longer needed it.
+    expect(await rowFor(giver.id, eventId)).toBeDefined()
+    expect((await rowFor(taker.id, eventId))?.payment_date).toBe('2026-07-02')
+  })
+
+  it('refuses, and keeps both rows, when the giver stopped being paid', async () => {
+    const server = await build()
+    const { eventId, giver, taker } = await twoStays(server)
+    const mine = await rowFor(giver.id, eventId)
+    const theirs = await rowFor(taker.id, eventId)
+    await db()
+      .update(attendance)
+      .set({ payment_status: 'unpaid', payment_date: null })
+      .where(eq(attendance.id, mine?.id ?? ''))
+
+    const moved = handOverPlace(db(), { id: mine?.id ?? '', payment_date: '2026-07-01' }, theirs?.id ?? '')
+
+    expect(moved).toBe(false)
+    expect(await rowFor(giver.id, eventId)).toBeDefined()
+    expect((await rowFor(taker.id, eventId))?.payment_status).toBe('unpaid')
+  })
+
+  it('moves the place when both still hold', async () => {
+    // The passing sibling: refusing everything would satisfy the two above.
+    const server = await build()
+    const { eventId, giver, taker } = await twoStays(server)
+    const mine = await rowFor(giver.id, eventId)
+    const theirs = await rowFor(taker.id, eventId)
+
+    const moved = handOverPlace(db(), { id: mine?.id ?? '', payment_date: '2026-07-01' }, theirs?.id ?? '')
+
+    expect(moved).toBe(true)
+    expect(await rowFor(giver.id, eventId)).toBeUndefined()
+    expect((await rowFor(taker.id, eventId))?.payment_status).toBe('paid')
   })
 })
