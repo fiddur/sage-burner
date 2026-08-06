@@ -8,6 +8,7 @@ import type { ApiClient } from '../api/client.ts'
 import { useSelectedBurn } from '../burn.tsx'
 import { DreamFields } from '../components/DreamFields.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
+import { shortDayOf } from '../datetime.ts'
 import { useAction, useLoad } from '../load.ts'
 import { isMember, useViewer } from '../viewer.tsx'
 
@@ -22,14 +23,20 @@ const placeLabel = (places: readonly Place[], id: string | null) => {
   return found === undefined ? undefined : `${found.emoji} ${found.name}`
 }
 
-const when = (dream: Session) =>
-  dream.time_slot_start === null
-    ? undefined
-    : new Date(dream.time_slot_start).toLocaleString(undefined, {
-        weekday: 'short',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
+/** `Sat 14:30`. The weekday is ours and in English; the clock is the browser's. */
+const when = (dream: Session) => {
+  if (dream.time_slot_start === null) return undefined
+
+  const day = shortDayOf(dream.time_slot_start)
+  if (day === undefined) return undefined
+
+  const clock = new Date(dream.time_slot_start).toLocaleTimeString(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+
+  return `${day} ${clock}`
+}
 
 /**
  * Dreams — the workshops, ceremonies and happenings members offer each other.

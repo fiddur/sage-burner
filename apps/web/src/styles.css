@@ -305,18 +305,100 @@ a:hover {
   gap: 0.5rem;
 }
 
-/* Write / Preview on a markdown field. */
-.tabs {
-  display: flex;
-  gap: 0.75rem;
+/*
+  A markdown field: Write / Preview above one framed box, after aurboda's editor.
+
+  The frame is the point. The tabs and the textarea used to be two loose things
+  stacked under a label, so nothing said the buttons belonged to the box below
+  them; putting a border round the pair and letting the current tab break that
+  border is what makes it read as one control.
+
+  Aurboda's palette is hardcoded greys and a violet accent. This uses the app's
+  own variables instead — same shape, this burn's colours.
+*/
+.md-field {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
 }
 
-/* `.tabs`-qualified so it out-specifies `.link-button`, whose `font: inherit`
-   shorthand resets the weight and which comes later in the file. Without that,
-   the two tabs render identically and `aria-pressed` is the only signal — which
-   a sighted user does not get. */
-.tabs .tab-current {
+.md-field-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+}
+
+.md-field-tab {
+  padding: 0.4rem 0.9rem;
+  border: 0;
+  /* Transparent rather than absent, so the current tab's accent does not shift
+     the text by the two pixels it adds. */
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.md-field-tab:hover {
+  color: var(--ink);
+}
+
+/*
+  Weight as well as colour, deliberately. Colour alone is the one signal a
+  colour-blind reader may not get, and `aria-pressed` is not one a sighted reader
+  gets at all.
+*/
+.md-field-tab.is-current {
+  color: var(--ember);
+  border-bottom-color: var(--ember);
+  background: var(--paper);
   font-weight: 600;
+}
+
+.md-field-write {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.6rem 0.75rem;
+  border: 0;
+  border-radius: 0;
+  min-height: 5rem;
+  resize: vertical;
+  font: inherit;
+  line-height: 1.6;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/* The frame already draws the focus boundary; a second ring inside it doubles up. */
+.md-field-write:focus {
+  outline: none;
+}
+
+.md-field-write:focus-visible {
+  outline: 2px solid var(--ember);
+  outline-offset: -2px;
+}
+
+/* Same height as the textarea, so switching tabs does not resize the page. */
+.md-field-body {
+  padding: 0.6rem 0.75rem;
+  min-height: 5rem;
+}
+
+.md-field-body > .form-note {
+  margin: 0;
+}
+
+.md-field-body .markdown-preview > :first-child {
+  margin-top: 0;
+}
+
+.md-field-body .markdown-preview > :last-child {
+  margin-bottom: 0;
 }
 
 /* Was a class hook with no rules, so "Apply to join" and "Log in" touched. */
@@ -576,12 +658,38 @@ a:hover {
   font-size: 0.85rem;
 }
 
+/*
+  The grid scrolls itself, in both directions, rather than the page scrolling it.
+
+  That is what makes the two sticky edges possible at all, and it is forced rather
+  than chosen: if either axis of an element is not `visible`, the other computes to
+  `auto` — so `overflow-x: auto` alone already made this a scroll container on both
+  axes, and a sticky `thead` inside it would have pinned to a box that never scrolls
+  vertically and so never moved. Giving it a height means both edges stick against
+  the same box.
+
+  `70vh` rather than a fixed height so a phone in landscape and a desktop both get a
+  usable slab of hours, and the pool beside it stays reachable.
+*/
 .schedule-grid-wrap {
-  overflow-x: auto;
+  overflow: auto;
+  max-height: 70vh;
 }
 
 .schedule-grid {
-  border-collapse: collapse;
+  /*
+    `separate`, not `collapse`, and the sticky edges are why. A collapsed border
+    belongs to the *table* rather than to the cell, so it scrolls away from under a
+    stuck header and leaves it hanging with no line beneath it. Separate borders
+    belong to the cells, which is what keeps the header's own edge with it.
+
+    The cost is doubled lines where two cells meet, so each cell draws only its
+    right and bottom edge and the table draws the two outer ones.
+  */
+  border-collapse: separate;
+  border-spacing: 0;
+  border-top: 1px solid var(--line);
+  border-left: 1px solid var(--line);
   width: 100%;
   /* So the lanes share the remaining width equally. See the `colgroup`. */
   table-layout: fixed;
@@ -590,30 +698,70 @@ a:hover {
     which is what `min-width: 7rem` on the cells did before fixed layout stopped
     cells having any say in their column's width.
   */
-  min-width: calc(17ch + var(--lanes, 1) * 7rem);
+  min-width: calc(7ch + var(--lanes, 1) * 7rem);
 }
 
+/*
+  Wide enough for `00:00` and no wider — which is only true because the daybreak
+  label stacks the day above the time instead of spelling out the whole date beside
+  it. It was `17ch` for that one label.
+*/
 .schedule-time-col {
-  width: 17ch;
+  width: 7ch;
 }
 
 .schedule-grid th,
 .schedule-grid td {
-  border: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
   padding: 0.15rem 0.35rem;
   text-align: left;
   vertical-align: top;
 }
 
+/*
+  Both edges stay put while the middle scrolls under them.
+
+  The backgrounds are load-bearing rather than decoration: a sticky cell is still in
+  normal flow as far as painting goes, so without one the rows would show straight
+  through it. The corner is sticky on both axes and has to sit above both, or the
+  lane it overlaps would paint over it.
+*/
+.schedule-grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--paper);
+}
+
 .schedule-grid th[scope='row'] {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--paper);
   font-weight: normal;
   opacity: 0.6;
   font-size: 0.8rem;
   white-space: nowrap;
+  /* The hour label sits against the middle of its two lines, not the top. */
+  vertical-align: middle;
 }
 
+.schedule-grid thead th:first-child {
+  left: 0;
+  z-index: 3;
+}
+
+/* `Sat 3`, above the time rather than beside it. */
+.schedule-day {
+  display: block;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+/* Two lines an hour, so an hour is a slot somebody can read something in. */
 .schedule-cell {
-  height: 1.6rem;
+  height: 3.2rem;
 }
 
 .schedule-daybreak th,
@@ -778,15 +926,6 @@ a:hover {
   box-sizing: border-box;
 }
 
-.role-list {
-  list-style: none;
-  margin: 1rem 0;
-  padding: 0;
-  display: grid;
-  gap: 0.75rem;
-}
-
-.role-card,
 .role-edit {
   display: grid;
   gap: 0.5rem;
@@ -795,12 +934,119 @@ a:hover {
   border-radius: 0.5rem;
 }
 
-.role-card h3 {
-  margin: 0;
+/*
+  The leads register, laid out as the spreadsheet tab it replaces.
+
+  Wide, and deliberately allowed to be: `Purpose` and `Tasks include` are prose a
+  member wrote, and squeezing them into a share of the viewport is what made the
+  card version tall enough to lose the effort columns off the bottom.
+*/
+.lead-table-wrap {
+  overflow-x: auto;
+  margin: 1rem 0;
 }
 
-.role-lead,
-.role-effort,
+.lead-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.lead-table th,
+.lead-table td {
+  border: 1px solid var(--line);
+  padding: 0.5rem 0.65rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.lead-table thead th {
+  white-space: nowrap;
+  font-size: 0.85rem;
+}
+
+.lead-table th[scope='row'] {
+  min-width: 10ch;
+}
+
+/* Prose gets room; the effort verdicts and the count are a word each. */
+.lead-table td:nth-child(2),
+.lead-table td:nth-child(4) {
+  min-width: 18ch;
+}
+
+.lead-table td:nth-child(5),
+.lead-table td:nth-child(7),
+.lead-table td:nth-child(8),
+.lead-table td:nth-child(9) {
+  white-space: nowrap;
+  font-size: 0.9rem;
+  opacity: 0.85;
+}
+
+.lead-table .markdown-preview > :first-child {
+  margin-top: 0;
+}
+
+.lead-table .markdown-preview > :last-child {
+  margin-bottom: 0;
+}
+
+.lead-actions {
+  white-space: nowrap;
+}
+
+/*
+  Narrow: one card per role, each cell labelled with the heading the table hides.
+
+  The same rows either way — `data-label` comes from the same `COLUMNS` list the
+  header row is built from, so there is no second rendering to keep in step.
+*/
+@media (max-width: 60rem) {
+  .lead-table,
+  .lead-table tbody,
+  .lead-table tr,
+  .lead-table th,
+  .lead-table td {
+    display: block;
+  }
+
+  .lead-table thead {
+    display: none;
+  }
+
+  .lead-table tr {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .lead-table th,
+  .lead-table td {
+    border: 0;
+    padding: 0.25rem 0;
+    white-space: normal;
+    min-width: 0;
+  }
+
+  .lead-table th[scope='row'] {
+    font-size: 1.1rem;
+  }
+
+  .lead-table td::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 0.8rem;
+    opacity: 0.6;
+  }
+
+  /* Its label is for screen readers only, and repeating it above the buttons
+     would be the one heading that names a control rather than a value. */
+  .lead-table td.lead-actions::before {
+    content: none;
+  }
+}
+
 .role-team-count {
   margin: 0;
   opacity: 0.8;
@@ -831,6 +1077,32 @@ a:hover {
   padding: 0.75rem 1rem;
   border: 1px dashed var(--line);
   border-radius: 0.5rem;
+}
+
+/*
+  The shared table: the members list, the roster, the accounts list and the invites.
+
+  It had no rule at all — four pages asked for `class="table"` and nothing ever
+  matched it, so all four rendered on the browser's defaults, which give a cell no
+  padding whatsoever. That is why the members list looked cramped on a desktop and
+  fine on a phone, where nothing has room to look otherwise.
+*/
+.table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.table th,
+.table td {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--line);
+}
+
+.table thead th {
+  white-space: nowrap;
+  border-bottom-width: 2px;
 }
 
 /* The meal plan's table — the spreadsheet tab it replaces, minus the merged cells. */

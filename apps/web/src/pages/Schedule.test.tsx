@@ -96,10 +96,17 @@ const renderPage = (api: ScheduleApi, viewer: Viewer = MEMBER, burn: MyBurn | nu
     </ViewerProvider>,
   )
 
-/** The cell for a given hour row and place column. */
+/**
+ * The cell for a given hour row and place column.
+ *
+ * `endsWith` rather than equality, because a row that starts a day carries the day
+ * above the time — `Sat 1` then `00:00` — so its `textContent` is not the label
+ * alone. Every label is a fixed-width `HH:MM`, so on a row without a day this is
+ * still equality.
+ */
 const cell = (rowLabel: string, column: number) => {
-  const header = [...document.querySelectorAll('.schedule-grid th[scope="row"]')].find(
-    (node) => node.textContent === rowLabel,
+  const header = [...document.querySelectorAll('.schedule-grid th[scope="row"]')].find((node) =>
+    node.textContent?.endsWith(rowLabel),
   )
   const cells = header?.parentElement?.querySelectorAll('td')
 
@@ -107,6 +114,33 @@ const cell = (rowLabel: string, column: number) => {
 
   return cells[column]
 }
+
+describe('the time column', () => {
+  it('names the day at the top and at each midnight, and nowhere else', async () => {
+    // The burn runs 2026-08-01 into 2026-08-02 — a Saturday into a Sunday. The label
+    // used to spell out `2026-08-01 00:00`, which is what made this column sixteen
+    // characters wide for the sake of two rows in forty-eight.
+    renderPage(stub())
+
+    await screen.findByRole('columnheader', { name: /Temple/ })
+    const days = [...document.querySelectorAll('.schedule-day')].map((node) => node.textContent)
+
+    expect(days).toEqual(['Sat 1', 'Sun 2'])
+  })
+
+  it('keeps the hour on a row that does not start a day', async () => {
+    renderPage(stub())
+
+    await screen.findByRole('columnheader', { name: /Temple/ })
+    const headers = [...document.querySelectorAll('.schedule-grid th[scope="row"]')]
+    const oneAm = headers.find((node) => node.textContent === '01:00')
+
+    // Exactly the time, with no day smuggled in: the passing sibling to the test
+    // above, and the one that would fail if every row claimed to start a day.
+    expect(oneAm).toBeTruthy()
+    expect(oneAm?.querySelector('.schedule-day')).toBeNull()
+  })
+})
 
 describe('Schedule', () => {
   it('draws a lane per place and an hour per row for the whole burn', async () => {

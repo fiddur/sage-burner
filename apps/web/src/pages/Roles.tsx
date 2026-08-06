@@ -55,7 +55,31 @@ const teamCount = (role: LeadRole) =>
     : `${role.team.length} of ${role.team_size_wanted} wanted`
 
 /**
+ * The columns, in the order the spreadsheet had them.
+ *
+ * One list, used for the header row and for the `data-label` each cell carries —
+ * which is what the narrow layout shows in place of the header it hides, so the
+ * two spellings of a column name cannot drift.
+ */
+const COLUMNS = [
+  'Title',
+  'Purpose',
+  'Lead',
+  'Tasks include',
+  'Team size',
+  'Team',
+  'Effort before',
+  'Effort during',
+  'Effort after',
+] as const
+
+/**
  * The lead-roles register — who is looking after what at this burn.
+ *
+ * Laid out as the spreadsheet tab it replaces, because that is the shape people
+ * already read it in: one row per role, effort split across three columns rather
+ * than folded into a sentence. Below `--fold` the table becomes one card per role
+ * with each cell labelled — the same rows, not a second rendering to keep in step.
  *
  * Two things here would otherwise look like oversights. **The removal button asks
  * first** because any member may remove any role and nothing undoes it. **"Join the
@@ -95,8 +119,8 @@ export const Roles = ({ api }: { api: RolesApi }) => {
   const ready = loaded.status === 'ready' ? (loaded.data ?? undefined) : undefined
 
   return (
-    <GuardedPage title="Roles" require="approved">
-      <h1>Roles</h1>
+    <GuardedPage title="Leads" require="approved">
+      <h1>Leads</h1>
 
       <p class="form-note">
         Who is looking after what. Anyone can add a role, take one on, or put somebody else's name to one —
@@ -123,43 +147,70 @@ export const Roles = ({ api }: { api: RolesApi }) => {
         />
       )}
 
-      <ol class="role-list">
-        {(ready?.roles ?? []).map((role) => (
-          <li key={role.id}>
-            {editing === role.id ? (
-              <RoleFields
-                role={role}
-                busy={busy}
-                onCancel={() => setEditing(undefined)}
-                onSave={(changes) =>
-                  run(async () => {
-                    await api.updateLeadRole(role.id, changes)
-                    setEditing(undefined)
-                  }, 'Could not save that.')
-                }
-              />
-            ) : (
-              <RoleCard
-                role={role}
-                attendees={ready?.attendees ?? []}
-                viewerId={viewer.account?.id}
-                busy={busy}
-                onEdit={() => setEditing(role.id)}
-                onRemove={() => run(() => api.deleteLeadRole(role.id), 'Could not remove that role.')}
-                onLead={(accountId) =>
-                  run(() => api.setLeadRoleLead(role.id, accountId), 'Could not change the lead.')
-                }
-                onJoin={(accountId) =>
-                  run(() => api.joinLeadRoleTeam(role.id, accountId), 'Could not add them to the team.')
-                }
-                onLeave={(accountId) =>
-                  run(() => api.leaveLeadRoleTeam(role.id, accountId), 'Could not take them off the team.')
-                }
-              />
-            )}
-          </li>
-        ))}
-      </ol>
+      {ready !== undefined && ready.roles.length > 0 && (
+        <div class="lead-table-wrap">
+          <table class="lead-table">
+            <thead>
+              <tr>
+                {COLUMNS.map((column) => (
+                  <th key={column} scope="col">
+                    {column}
+                  </th>
+                ))}
+                <th scope="col">
+                  <span class="visually-hidden">Actions</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {ready.roles.map((role) =>
+                editing === role.id ? (
+                  <tr key={role.id}>
+                    {/* One cell across the lot: an edit form has nothing to do with the
+                        columns, and splitting it over them would put each field under a
+                        heading that does not describe it. */}
+                    <td colSpan={COLUMNS.length + 1}>
+                      <RoleFields
+                        role={role}
+                        busy={busy}
+                        onCancel={() => setEditing(undefined)}
+                        onSave={(changes) =>
+                          run(async () => {
+                            await api.updateLeadRole(role.id, changes)
+                            setEditing(undefined)
+                          }, 'Could not save that.')
+                        }
+                      />
+                    </td>
+                  </tr>
+                ) : (
+                  <RoleRow
+                    key={role.id}
+                    role={role}
+                    attendees={ready.attendees}
+                    viewerId={viewer.account?.id}
+                    busy={busy}
+                    onEdit={() => setEditing(role.id)}
+                    onRemove={() => run(() => api.deleteLeadRole(role.id), 'Could not remove that role.')}
+                    onLead={(accountId) =>
+                      run(() => api.setLeadRoleLead(role.id, accountId), 'Could not change the lead.')
+                    }
+                    onJoin={(accountId) =>
+                      run(() => api.joinLeadRoleTeam(role.id, accountId), 'Could not add them to the team.')
+                    }
+                    onLeave={(accountId) =>
+                      run(
+                        () => api.leaveLeadRoleTeam(role.id, accountId),
+                        'Could not take them off the team.',
+                      )
+                    }
+                  />
+                ),
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {ready !== undefined && (
         <AddRole
@@ -239,7 +290,17 @@ const AddRole = ({
   </form>
 )
 
-const RoleCard = ({
+/** Markdown a member wrote, or an em dash so an empty cell is deliberate. */
+const Prose = ({ markdown }: { markdown: string }) =>
+  markdown.trim() === '' ? (
+    <span class="form-note">—</span>
+  ) : (
+    // Safe by construction: `renderMarkdown` escapes raw HTML rather than filtering
+    // it, which is why a member may author this. `markdown.ts` says why.
+    <div class="markdown-preview" dangerouslySetInnerHTML={{ __html: renderMarkdown(markdown) }} />
+  )
+
+const RoleRow = ({
   role,
   attendees,
   viewerId,
@@ -265,33 +326,16 @@ const RoleCard = ({
   const canJoin = viewerId !== undefined && attendees.some((person) => person.account_id === viewerId)
 
   return (
-    <div class="role-card">
-      <h3>{role.title}</h3>
+    <tr>
+      <th scope="row" data-label="Title">
+        {role.title}
+      </th>
 
-      <p class="role-lead">
-        {role.lead === null ? 'Nobody has taken this on yet.' : `Led by ${nameOf(role.lead)}`}
-      </p>
+      <td data-label="Purpose">
+        <Prose markdown={role.purpose} />
+      </td>
 
-      {role.purpose.trim() !== '' && (
-        // Safe by construction: `renderMarkdown` escapes raw HTML rather than
-        // filtering it, which is why a member may author this. `markdown.ts` says why.
-        <div class="markdown-preview" dangerouslySetInnerHTML={{ __html: renderMarkdown(role.purpose) }} />
-      )}
-
-      {role.tasks.trim() !== '' && (
-        <details>
-          <summary>Tasks include</summary>
-          <div class="markdown-preview" dangerouslySetInnerHTML={{ __html: renderMarkdown(role.tasks) }} />
-        </details>
-      )}
-
-      <p class="role-effort">
-        Effort: {EFFORT_LABEL[role.effort_before]} before, {EFFORT_LABEL[role.effort_during]} during,{' '}
-        {EFFORT_LABEL[role.effort_after]} after
-      </p>
-
-      <label class="field">
-        <span>Lead</span>
+      <td data-label="Lead">
         <select
           aria-label={`Lead of ${role.title}`}
           disabled={busy}
@@ -305,68 +349,85 @@ const RoleCard = ({
             </option>
           ))}
         </select>
-      </label>
+      </td>
 
-      <p class="role-team-count">{teamCount(role)}</p>
+      <td data-label="Tasks include">
+        <Prose markdown={role.tasks} />
+      </td>
 
-      <ul class="role-team">
-        {role.team.map((person) => (
-          <li key={person.account_id}>
-            {nameOf(person)}
+      <td data-label="Team size">{teamCount(role)}</td>
+
+      <td data-label="Team">
+        <ul class="role-team">
+          {role.team.map((person) => (
+            <li key={person.account_id}>
+              {nameOf(person)}
+              <button
+                type="button"
+                class="link-button"
+                disabled={busy}
+                aria-label={`Take ${nameOf(person)} off ${role.title}`}
+                onClick={() => onLeave(person.account_id)}
+              >
+                🗑️
+              </button>
+            </li>
+          ))}
+        </ul>
+
+        {canJoin && !onTeam.has(viewerId) && role.lead?.account_id !== viewerId && (
+          <button type="button" disabled={busy} onClick={() => onJoin(viewerId)}>
+            Join the team
+          </button>
+        )}
+
+        <AddToTeam
+          role={role}
+          attendees={attendees.filter(
+            (person) => !onTeam.has(person.account_id) && person.account_id !== viewerId,
+          )}
+          busy={busy}
+          onJoin={onJoin}
+        />
+      </td>
+
+      <td data-label="Effort before">{EFFORT_LABEL[role.effort_before]}</td>
+      <td data-label="Effort during">{EFFORT_LABEL[role.effort_during]}</td>
+      <td data-label="Effort after">{EFFORT_LABEL[role.effort_after]}</td>
+
+      <td data-label="Actions" class="lead-actions">
+        <button type="button" class="link-button" disabled={busy} onClick={onEdit}>
+          Edit
+        </button>
+
+        {confirming ? (
+          <>
+            <span class="form-note">Remove {role.title} and everyone on it?</span>
             <button
               type="button"
-              class="link-button"
               disabled={busy}
-              aria-label={`Take ${nameOf(person)} off ${role.title}`}
-              onClick={() => onLeave(person.account_id)}
+              aria-label={`Really remove ${role.title}`}
+              onClick={onRemove}
             >
-              🗑️
+              Remove it
             </button>
-          </li>
-        ))}
-      </ul>
-
-      {canJoin && !onTeam.has(viewerId) && role.lead?.account_id !== viewerId && (
-        <button type="button" disabled={busy} onClick={() => onJoin(viewerId)}>
-          Join the team
-        </button>
-      )}
-
-      <AddToTeam
-        role={role}
-        attendees={attendees.filter(
-          (person) => !onTeam.has(person.account_id) && person.account_id !== viewerId,
+            <button type="button" class="link-button" disabled={busy} onClick={() => setConfirming(false)}>
+              Keep it
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            class="link-button"
+            disabled={busy}
+            aria-label={`Remove ${role.title}`}
+            onClick={() => setConfirming(true)}
+          >
+            🗑️
+          </button>
         )}
-        busy={busy}
-        onJoin={onJoin}
-      />
-
-      <button type="button" class="link-button" disabled={busy} onClick={onEdit}>
-        Edit
-      </button>
-
-      {confirming ? (
-        <>
-          <span class="form-note">Remove {role.title} and everyone on it?</span>
-          <button type="button" disabled={busy} aria-label={`Really remove ${role.title}`} onClick={onRemove}>
-            Remove it
-          </button>
-          <button type="button" class="link-button" disabled={busy} onClick={() => setConfirming(false)}>
-            Keep it
-          </button>
-        </>
-      ) : (
-        <button
-          type="button"
-          class="link-button"
-          disabled={busy}
-          aria-label={`Remove ${role.title}`}
-          onClick={() => setConfirming(true)}
-        >
-          🗑️
-        </button>
-      )}
-    </div>
+      </td>
+    </tr>
   )
 }
 

@@ -695,6 +695,19 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
      */
     getMyBurns: (signal?: AbortSignal) => request<MyBurnsResponse>(apiRoutes.getMyBurns.path(), { signal }),
 
+    /**
+     * Admin only. Put somebody on a burn who did not say so when they signed up.
+     *
+     * Idempotent like the member's own join: adding somebody already coming answers
+     * their existing stay rather than an error. Throws ApiError(404) for an account
+     * or a burn that does not exist.
+     */
+    adminAddAttendance: (eventId: string, body: BodyOf<'adminAddAttendance'>) =>
+      request<{ attendance: Attendance }>(apiRoutes.adminAddAttendance.path(eventId), {
+        method: apiRoutes.adminAddAttendance.method,
+        body,
+      }),
+
     /** Members only. Idempotent — saying it twice is the same statement. */
     joinEvent: (eventId: string) =>
       request<{ attendance: Attendance }>(apiRoutes.joinEvent.path(eventId), {

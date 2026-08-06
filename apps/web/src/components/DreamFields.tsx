@@ -8,6 +8,7 @@ import {
 import { useState } from 'preact/hooks'
 
 import { fromLocalInput, toLocalInput } from '../datetime.ts'
+import { MarkdownField } from './MarkdownField.tsx'
 
 /** What the form edits. A stored `Session` is one; so is a blank one being offered. */
 export interface DreamDraft {
@@ -100,15 +101,13 @@ export const DreamFields = ({
         />
       </label>
 
-      <label class="field">
-        <span>Tell people about it</span>
-        <textarea
-          maxLength={MAX_DESCRIPTION}
-          aria-label={`Description of ${subject}`}
-          value={description}
-          onInput={(inputEvent) => setDescription(inputEvent.currentTarget.value)}
-        />
-      </label>
+      <MarkdownField
+        label="Tell people about it"
+        describedAs={`Description of ${subject}`}
+        value={description}
+        maxLength={MAX_DESCRIPTION}
+        onInput={setDescription}
+      />
 
       {/* Only people coming to this burn: the API refuses anyone else, since
           somebody who is not there cannot run it. */}

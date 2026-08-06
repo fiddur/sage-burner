@@ -50,7 +50,7 @@ describe('the nav', () => {
   it('offers a signed-out visitor the way in, and none of the pages behind it', () => {
     renderNav({ status: 'signed-out' })
 
-    expectLinks(['Apply', 'Log in'], ['Members', 'Schedule', 'Roles', 'Your details', 'Organise'])
+    expectLinks(['Apply', 'Log in'], ['Members', 'Schedule', 'Leads', 'Your details', 'Organise'])
   })
 
   it('gives a member their own pages and the shared ones', () => {
@@ -59,7 +59,7 @@ describe('the nav', () => {
     // "Your burn" is not among them: the burns are sections of the details page
     // now, since more than one is planned at a time and the singular was from when
     // there was only ever the next one (#184).
-    expectLinks(['Members', 'Schedule', 'Roles', 'Your details'], ['Your burn'])
+    expectLinks(['Members', 'Schedule', 'Leads', 'Your details'], ['Your burn'])
   })
 
   it('keeps Organise from a member who is not an organiser', () => {
@@ -72,13 +72,13 @@ describe('the nav', () => {
   })
 
   it('reaches the shared pages for an organiser who holds admin alone', () => {
-    // Schedule and Roles are `requireApproved` server-side, so an organiser who is
+    // Schedule and Leads are `requireApproved` server-side, so an organiser who is
     // not attending may use them — and used to be able to only by typing the URL,
     // because the nav gated them on `member`. The personal pages stay behind
     // `member`, since somebody not attending has no stay to fill in.
     renderNav(signedInAs('admin'))
 
-    expectLinks(['Members', 'Schedule', 'Roles', 'Organise'], ['Your burn', 'Your details'])
+    expectLinks(['Members', 'Schedule', 'Leads', 'Organise'], ['Your burn', 'Your details'])
   })
 
   it('offers Dreams from the Schedule rather than from the bar', () => {
@@ -106,7 +106,7 @@ describe('the nav', () => {
     // this is the case where a leak would matter.
     renderNav(signedInAs())
 
-    expectLinks([], ['Your burn', 'Members', 'Dreams', 'Schedule', 'Roles', 'Your details', 'Organise'])
+    expectLinks([], ['Your burn', 'Members', 'Dreams', 'Schedule', 'Leads', 'Your details', 'Organise'])
   })
 })
 

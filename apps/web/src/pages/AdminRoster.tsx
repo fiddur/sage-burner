@@ -9,7 +9,10 @@ import { toCsv } from '../csv.ts'
 import { useAction, useLoad } from '../load.ts'
 import { isAdmin, useViewer } from '../viewer.tsx'
 
-export type RosterApi = Pick<ApiClient, 'getActiveRoster' | 'setPayment'>
+export type RosterApi = Pick<
+  ApiClient,
+  'getActiveRoster' | 'setPayment' | 'getAdminAccounts' | 'adminAddAttendance'
+>
 
 const COLUMNS = [
   'name',
@@ -108,6 +111,13 @@ export const AdminRoster = ({ api }: { api: RosterApi }) => {
             </button>
           </p>
 
+          <AddToBurn
+            eventId={roster.event.id}
+            api={api}
+            already={new Set(roster.entries.map((entry) => entry.account_id))}
+            onAdded={reload}
+          />
+
           {roster.entries.length === 0 ? (
             <p class="form-note">Nobody has said they are coming yet.</p>
           ) : (
@@ -157,5 +167,95 @@ export const AdminRoster = ({ api }: { api: RosterApi }) => {
         </>
       )}
     </GuardedPage>
+  )
+}
+
+/**
+ * Putting somebody on the burn who did not say so when they signed up (#242).
+ *
+ * The accounts are fetched here rather than with the roster, so a page that only
+ * ever records payments does not pay for the list — and so a failure to load it
+ * costs the picker rather than the roster.
+ *
+ * Whoever is already coming is filtered out. The route is idempotent and would
+ * answer their existing stay, but offering a name that does nothing reads as the
+ * button being broken.
+ */
+const AddToBurn = ({
+  eventId,
+  api,
+  already,
+  onAdded,
+}: {
+  eventId: string
+  api: RosterApi
+  already: ReadonlySet<string>
+  onAdded: () => void
+}) => {
+  const [chosen, setChosen] = useState('')
+
+  const { loaded } = useLoad((signal) => api.getAdminAccounts(signal), {
+    fallback: 'Could not load the accounts, so there is nobody to choose from.',
+  })
+
+  const { busy, error, run } = useAction(() => {
+    setChosen('')
+    onAdded()
+  })
+
+  if (loaded.status !== 'ready') return null
+
+  const missing = loaded.data.accounts.filter((account) => !already.has(account.id))
+
+  return (
+    <div class="copy-from">
+      <h3>Add somebody to this burn</h3>
+      <p class="form-note">
+        For somebody who joined but never said they were coming. They arrive on the burn&rsquo;s own dates,
+        unpaid, and can change the rest themselves.
+      </p>
+
+      {error !== undefined && (
+        <p class="form-error" role="alert">
+          {error}
+        </p>
+      )}
+
+      {missing.length === 0 ? (
+        <p class="form-note">Everybody with an account is already on this burn.</p>
+      ) : (
+        <p class="row">
+          <label class="field">
+            <span>Who?</span>
+            <select
+              aria-label="Who to add to this burn"
+              disabled={busy}
+              value={chosen}
+              onChange={(changeEvent) => setChosen(changeEvent.currentTarget.value)}
+            >
+              <option value="">Choose somebody</option>
+              {missing.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.email}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <button
+            type="button"
+            disabled={busy || chosen === ''}
+            onClick={() =>
+              run(
+                () => api.adminAddAttendance(eventId, { account_id: chosen }),
+                'Could not add them to the burn.',
+              )
+            }
+          >
+            Add them
+          </button>
+        </p>
+      )}
+    </div>
   )
 }

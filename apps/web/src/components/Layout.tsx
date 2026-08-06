@@ -69,7 +69,9 @@ export const Layout = ({ children }: { children: ComponentChildren }) => {
             <>
               <a href="/members">Members</a>
               <a href="/schedule">Schedule</a>
-              <a href="/roles">Roles</a>
+              {/* The path stays `/roles`: it is what any link already shared points at,
+                  and it is not what anybody reads. */}
+              <a href="/roles">Leads</a>
               <a href="/meals">Meals</a>
             </>
           )}

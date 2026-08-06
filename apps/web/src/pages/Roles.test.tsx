@@ -94,16 +94,23 @@ describe('Roles', () => {
   })
 
   it('shows a vacant role as vacant rather than blank', async () => {
+    // The Lead column is the select itself rather than a sentence beside it: the
+    // register is a table now, and two spellings of who leads in one cell is one
+    // more than the column has room for.
     renderPage(stub({}, [aRole({ id: 'r-1', title: 'Sauna' })]))
 
     expect(await screen.findByText('Sauna')).toBeTruthy()
-    expect(screen.getByText(/Nobody has taken this on yet/)).toBeTruthy()
+    const lead = await screen.findByLabelText('Lead of Sauna')
+    expect(lead instanceof HTMLSelectElement && lead.value).toBe('')
+    expect(screen.getByRole('option', { name: 'Nobody yet', selected: true })).toBeTruthy()
   })
 
   it('names the lead when somebody holds it', async () => {
     renderPage(stub({}, [aRole({ id: 'r-1', title: 'Sauna', lead: { account_id: 'a-2', name: 'Bea' } })]))
 
-    expect(await screen.findByText('Led by Bea')).toBeTruthy()
+    const lead = await screen.findByLabelText('Lead of Sauna')
+    expect(lead instanceof HTMLSelectElement && lead.value).toBe('a-2')
+    expect(screen.getByRole('option', { name: 'Bea', selected: true })).toBeTruthy()
   })
 
   it('shows how many the team wants without ever refusing another', async () => {
@@ -158,7 +165,13 @@ describe('Roles', () => {
       ]),
     )
 
-    expect(await screen.findByText(/a lot before, a little during, none after/)).toBeTruthy()
+    // Three columns now, as the spreadsheet had them, rather than one sentence.
+    // Read off the row so a page-wide `getByText('a lot')` cannot pass by finding
+    // the answer in the wrong column.
+    const row = (await screen.findByText('Build')).closest('tr')
+    const cells = [...(row?.querySelectorAll('td') ?? [])].map((cell) => cell.textContent)
+
+    expect(cells).toEqual(expect.arrayContaining(['a lot', 'a little', 'none']))
   })
 
   it('adds a role from its title alone', async () => {

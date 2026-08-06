@@ -13,7 +13,7 @@ import { DreamFields } from '../components/DreamFields.tsx'
 import { DreamPanel } from '../components/DreamPanel.tsx'
 import { MealDialog } from '../components/MealDialog.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
-import { fromLocalInput, toLocalInput } from '../datetime.ts'
+import { dayName, fromLocalInput, toLocalInput } from '../datetime.ts'
 import { useAction, useLoad } from '../load.ts'
 import {
   endFor,
@@ -827,7 +827,21 @@ const Timetable = ({
         <tbody>
           {rows.map((row, index) => (
             <tr key={row} class={label(row) === '00:00' ? 'schedule-daybreak' : undefined}>
-              <th scope="row">{label(row) === '00:00' ? `${dayOf(row)} 00:00` : label(row)}</th>
+              {/*
+                The day is named on the first row as well as at each midnight, so the
+                top of the grid says which day it starts on — a burn opens at 16:00,
+                so the first row is a new day without being a midnight.
+
+                Stacked above the time rather than beside it: spelling out
+                `2026-10-03 00:00` is what made this column sixteen characters wide,
+                for a label four rows in twenty-four ever used.
+              */}
+              <th scope="row">
+                {index === 0 || dayOf(row) !== dayOf(rows[index - 1] ?? row) ? (
+                  <span class="schedule-day">{dayName(dayOf(row), 'short')}</span>
+                ) : null}
+                {label(row)}
+              </th>
               {places.map((place) => {
                 const cell = lanes.get(place.id)?.[index]
                 // A covered row renders no cell at all: the `rowSpan` above is

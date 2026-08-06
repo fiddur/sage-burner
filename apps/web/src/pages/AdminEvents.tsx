@@ -8,8 +8,8 @@ import type { MealSlotsApi } from '../components/MealSlots.tsx'
 
 import { isApiError } from '../api/client.ts'
 import { GuardedPage } from '../components/GuardedPage.tsx'
+import { MarkdownField } from '../components/MarkdownField.tsx'
 import { MealSlots } from '../components/MealSlots.tsx'
-import { renderMarkdown } from '../markdown.ts'
 import { isAdmin, useViewer } from '../viewer.tsx'
 
 type Events =
@@ -67,10 +67,11 @@ const messageFor = (failure: unknown, fallback: string) => {
 /**
  * Create events and edit their welcome text.
  *
- * The welcome text gets a live preview because it is markdown written in a
- * textarea, and the alternative is publishing to the homepage to find out what
- * a heading looks like. The preview runs the same `renderMarkdown` the public
- * page will, so what it shows is what visitors get.
+ * The welcome text gets a preview because it is markdown, and the alternative is
+ * publishing to the homepage to find out what a heading looks like. It is
+ * `MarkdownField`'s own Preview tab rather than something this page draws, so it
+ * runs the same `renderMarkdown` the public page will — and so this stopped being
+ * one of the two markdown fields in the app that had a bare textarea.
  */
 export const AdminEvents = ({ api }: { api: EventsApi }) => {
   const viewer = useViewer()
@@ -346,28 +347,20 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
                     />
                   </label>
 
-                  <label class="field">
-                    <span>Welcome text (markdown)</span>
-                    <textarea
-                      rows={12}
-                      maxLength={MAX_WELCOME_LENGTH}
-                      value={welcome}
-                      onInput={(inputEvent) => {
-                        setWelcome(inputEvent.currentTarget.value)
-                        setSaved(false)
-                      }}
-                    />
-                  </label>
-
-                  <h3>Preview</h3>
                   {/*
-                    The same renderer the public page uses, so this is what a
-                    visitor sees. Raw HTML is escaped rather than filtered —
-                    see `markdown.ts` for why that is the safer of the two.
+                    The preview is the field's own tab now, rather than a second
+                    always-rendered copy below it — which was a second call to
+                    `renderMarkdown` on the page that had the most to preview.
                   */}
-                  <div
-                    class="markdown-preview"
-                    dangerouslySetInnerHTML={{ __html: renderMarkdown(welcome) }}
+                  <MarkdownField
+                    label="Welcome text (markdown)"
+                    value={welcome}
+                    maxLength={MAX_WELCOME_LENGTH}
+                    rows={12}
+                    onInput={(next) => {
+                      setWelcome(next)
+                      setSaved(false)
+                    }}
                   />
 
                   {saveError !== undefined && (
