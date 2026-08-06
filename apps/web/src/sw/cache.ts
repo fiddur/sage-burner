@@ -92,6 +92,32 @@ export const cacheFor = (plan: CachePlan): string | undefined => {
 }
 
 /**
+ * Whether an answer is worth keeping — the one decision, so the worker has none.
+ *
+ * A failure never is. A 404 or a 500 stored here would be served back for as long as
+ * the entry lived, long after the server stopped saying it.
+ *
+ * **A navigation additionally has to have answered with HTML**, and that is a real
+ * bug rather than caution. Not every same-origin navigation returns the app: the ICS
+ * feed is a plain `<a href>` in the page, and clicking it is a `mode: 'navigate'`
+ * fetch that answers `text/calendar`. Without this the worker would store the
+ * calendar under `SHELL_KEY`, and every offline open of the app from then on would
+ * render an ICS file instead of the app — until some later online navigation happened
+ * to overwrite it. Navigating straight to an `/api/…` URL does the same with JSON.
+ *
+ * A content type rather than a list of paths to skip: a list is a thing to keep in
+ * step with the routes, and the route it goes stale against is the one that breaks
+ * the app offline.
+ */
+export const worthStoring = (plan: CachePlan, response: Pick<Response, 'headers' | 'ok'>): boolean => {
+  if (!response.ok) return false
+  if (cacheFor(plan) === undefined) return false
+  if (plan !== 'navigate') return true
+
+  return (response.headers.get('content-type') ?? '').includes('text/html')
+}
+
+/**
  * The same response, carrying when it was stored.
  *
  * A copy rather than a mutation: `Response.headers` is immutable once the response
