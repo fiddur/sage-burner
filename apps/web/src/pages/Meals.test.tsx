@@ -102,7 +102,9 @@ describe('the meal plan', () => {
     const joinMealCrew = vi.fn<MealsApi['joinMealCrew']>(() => Promise.resolve({ meal: aMeal() }))
     renderPage(stub({ joinMealCrew }))
 
-    fireEvent.click(await screen.findByLabelText('Help clean up at Dinner on 2026-08-01'))
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Take the spot on cleanup at Dinner on 2026-08-01' }),
+    )
 
     await waitFor(() => expect(joinMealCrew).toHaveBeenCalledWith('m-1', 'cleanup', { account_id: 'a-1' }))
   })
@@ -128,8 +130,15 @@ describe('the meal plan', () => {
     await screen.findByText('Morning cleanup')
 
     expect(screen.queryByLabelText('Lead for Morning cleanup on 2026-08-01')).toBeNull()
-    expect(screen.queryByLabelText('Help cook at Morning cleanup on 2026-08-01')).toBeNull()
-    expect(screen.getByLabelText('Help clean up at Morning cleanup on 2026-08-01')).toBeTruthy()
+    // Nobody may be added to a chore's cooks, so neither button is offered there.
+    expect(
+      screen.queryByRole('button', { name: 'Take the spot on cooking at Morning cleanup on 2026-08-01' }),
+    ).toBeNull()
+    // Nothing is cooked, so there is nothing to have an idea about.
+    expect(screen.queryByLabelText('Food idea for Morning cleanup on 2026-08-01')).toBeNull()
+    expect(
+      screen.getByRole('button', { name: 'Take the spot on cleanup at Morning cleanup on 2026-08-01' }),
+    ).toBeTruthy()
   })
 
   it('asks an ordinary meal for all three', async () => {
@@ -137,8 +146,13 @@ describe('the meal plan', () => {
     renderPage(stub())
 
     expect(await screen.findByLabelText('Lead for Dinner on 2026-08-01')).toBeTruthy()
-    expect(screen.getByLabelText('Help cook at Dinner on 2026-08-01')).toBeTruthy()
-    expect(screen.getByLabelText('Help clean up at Dinner on 2026-08-01')).toBeTruthy()
+    expect(
+      screen.getByRole('button', { name: 'Take the spot on cooking at Dinner on 2026-08-01' }),
+    ).toBeTruthy()
+    expect(screen.getByLabelText('Food idea for Dinner on 2026-08-01')).toBeTruthy()
+    expect(
+      screen.getByRole('button', { name: 'Take the spot on cleanup at Dinner on 2026-08-01' }),
+    ).toBeTruthy()
   })
 
   it('says which kind of nothing it has, when it has none', async () => {
@@ -217,7 +231,10 @@ describe('a chore that still has somebody on it', () => {
     const leaveMealCrew = vi.fn<MealsApi['leaveMealCrew']>(() => Promise.resolve({ meal: chore() }))
     renderPage(stub({ leaveMealCrew }, [chore({ helpers: [{ account_id: 'a-1', name: 'Ada' }] })]))
 
-    fireEvent.click(await screen.findByLabelText('Do not cook at Morning cleanup on 2026-08-01'))
+    // Their own chip's ✕ — coming off is the same gesture as taking anybody else off.
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Take Ada off cooking at Morning cleanup on 2026-08-01' }),
+    )
 
     await waitFor(() => expect(leaveMealCrew).toHaveBeenCalledWith('m-1', 'helper', 'a-1'))
   })

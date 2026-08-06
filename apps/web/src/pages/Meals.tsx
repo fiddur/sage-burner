@@ -7,6 +7,7 @@ import type { ApiClient } from '../api/client.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
+import { HelperStrip } from '../components/HelperStrip.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
 import { dayName } from '../datetime.ts'
@@ -257,13 +258,22 @@ const MealTable = ({
             <Crew
               meal={meal}
               role="helper"
+              attendees={attendees}
               viewerId={viewerId}
               busy={busy}
               joinable={meal.kind !== 'chore'}
               onStand={onStand}
             />
           )}
-          <Crew meal={meal} role="cleanup" viewerId={viewerId} busy={busy} joinable onStand={onStand} />
+          <Crew
+            meal={meal}
+            role="cleanup"
+            attendees={attendees}
+            viewerId={viewerId}
+            busy={busy}
+            joinable
+            onStand={onStand}
+          />
         </tr>
       ))}
     </tbody>
@@ -311,6 +321,11 @@ const FoodIdea = ({
 }) => {
   const [draft, setDraft] = useState(meal.food_idea)
 
+  // Nothing is cooked at a chore, so there is nothing to have an idea about — the
+  // box offered one for a morning cleanup, which is the sheet's column applied to a
+  // row the sheet never had.
+  if (meal.kind === 'chore') return <span class="form-note">—</span>
+
   return (
     <input
       type="text"
@@ -333,6 +348,7 @@ const FoodIdea = ({
 const Crew = ({
   meal,
   role,
+  attendees,
   viewerId,
   busy,
   joinable,
@@ -340,6 +356,7 @@ const Crew = ({
 }: {
   meal: Meal
   role: 'cleanup' | 'helper'
+  attendees: readonly Person[]
   viewerId: string | undefined
   busy: boolean
   /** False for a chore's cooks: whoever is on it may leave, nobody new may join. */
@@ -347,27 +364,25 @@ const Crew = ({
   onStand: (id: string, role: 'cleanup' | 'helper', joining: boolean, accountId: string) => void
 }) => {
   const crew = role === 'helper' ? meal.helpers : meal.cleanup
-  const standing = crew.some((who) => who.account_id === viewerId)
-  const what = role === 'helper' ? 'cook' : 'clean up'
+
+  // The lead is already cooking it, so they are not offered as a pair of hands for
+  // the cooking — they may still wash up, which is why this is per role rather than
+  // per meal. Nobody at all may be added to a chore's cooks.
+  const offerable = joinable
+    ? attendees.filter((who) => role === 'cleanup' || who.account_id !== meal.lead?.account_id)
+    : []
 
   return (
     <td>
-      <ul class="meal-crew">
-        {crew.map((who) => (
-          <li key={who.account_id}>{nameOf(who)}</li>
-        ))}
-      </ul>
-      {(joinable || standing) && (
-        <button
-          type="button"
-          class="link-button"
-          disabled={busy}
-          aria-label={`${standing ? 'Do not' : 'Help'} ${what} at ${meal.label} on ${meal.date}`}
-          onClick={() => viewerId !== undefined && onStand(meal.id, role, !standing, viewerId)}
-        >
-          {standing ? 'Not me after all' : `I can ${what}`}
-        </button>
-      )}
+      <HelperStrip
+        label={`${role === 'helper' ? 'cooking' : 'cleanup'} at ${meal.label} on ${meal.date}`}
+        people={crew}
+        candidates={offerable}
+        viewerId={viewerId}
+        busy={busy}
+        onAdd={(accountId) => onStand(meal.id, role, true, accountId)}
+        onRemove={(accountId) => onStand(meal.id, role, false, accountId)}
+      />
     </td>
   )
 }
