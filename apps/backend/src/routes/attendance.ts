@@ -2,7 +2,7 @@ import type { EventAttendeesResponse, MyBurn, MyBurnsResponse } from '@sage-burn
 import type { FastifyInstance } from 'fastify'
 
 import { apiRoutes, attendanceCreateSchema, errorResponse, placeTransferSchema } from '@sage-burner/shared'
-import { and, asc, eq, gte, isNotNull, or } from 'drizzle-orm'
+import { TransactionRollbackError, and, asc, eq, gte, isNotNull, ne, or } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -114,6 +114,51 @@ export const attendanceFor = async (db: Database, eventId: string, accountId: st
     .limit(1)
 
   return row?.id
+}
+
+/**
+ * The two writes that move a place, as one — and only while what they were decided
+ * on still holds.
+ *
+ * The route checks that the giver has paid and the taker has not, several awaits
+ * before these run. Both are re-stated in the WHERE clauses rather than trusted: two
+ * givers naming the same taker, or a transfer racing an organiser recording a
+ * payment, would otherwise destroy a paid place, since the taker was already paid
+ * and the giver's row is deleted regardless. Nothing can interleave under the
+ * synchronous driver today, but that is the driver's property rather than this
+ * code's, and `joinBurn` above guards its identically-shaped window explicitly.
+ *
+ * Exported for the test that proves it, like `writeStay`: the window cannot be
+ * opened through `inject`, which serialises requests.
+ */
+export const handOverPlace = (
+  db: Database,
+  giver: { id: string; payment_date: string | null },
+  takerAttendanceId: string,
+): boolean => {
+  try {
+    db.transaction((tx) => {
+      const taken = tx
+        .update(attendance)
+        .set({ payment_status: 'paid', payment_date: giver.payment_date })
+        .where(and(eq(attendance.id, takerAttendanceId), ne(attendance.payment_status, 'paid')))
+        .returning({ id: attendance.id })
+        .all()
+
+      const given = tx
+        .delete(attendance)
+        .where(and(eq(attendance.id, giver.id), eq(attendance.payment_status, 'paid')))
+        .returning({ id: attendance.id })
+        .all()
+
+      if (taken.length === 0 || given.length === 0) tx.rollback()
+    })
+
+    return true
+  } catch (failure) {
+    if (failure instanceof TransactionRollbackError) return false
+    throw failure
+  }
 }
 
 export interface AttendanceDeps extends GuardDeps {
@@ -317,15 +362,7 @@ export const registerAttendanceRoutes = (
       if (theirs === undefined) return reply.code(404).send(errorResponse('not_found'))
       if (theirs.payment_status === 'paid') return reply.code(409).send(errorResponse('conflict'))
 
-      // One transaction: a place that vanished without arriving, or arrived while
-      // still held, would both be worse than the request failing.
-      db.transaction((tx) => {
-        tx.update(attendance)
-          .set({ payment_status: 'paid', payment_date: mine.payment_date })
-          .where(eq(attendance.id, theirs.id))
-          .run()
-        tx.delete(attendance).where(eq(attendance.id, mine.id)).run()
-      })
+      if (!handOverPlace(db, mine, theirs.id)) return reply.code(409).send(errorResponse('conflict'))
 
       // Outside it, and only to the taker: the giver did this themselves. A push
       // service being down must not undo a place changing hands.

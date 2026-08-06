@@ -1,3 +1,5 @@
+import type { MemberRosterEntry, MemberRosterResponse } from '@sage-burner/shared'
+
 import { Fragment } from 'preact'
 
 import type { ApiClient } from '../api/client.ts'
@@ -62,68 +64,12 @@ export const Members = ({ api }: { api: MembersApi }) => {
             {roster.entries.length > confirmed ? `, ${roster.entries.length - confirmed} waiting` : ''}.
           </p>
 
-          <HowToPay
-            info={
-              // Once every place is taken, how to pay is the wrong thing to say: paying
-              // does not get anybody in any more, and what changes hands is a place.
-              confirmed >= roster.event.member_cap
-                ? roster.event.transfer_info_markdown
-                : roster.event.payment_info_markdown
-            }
-            owed={roster.entries.some(
-              (entry) => entry.account_id === viewer.account?.id && entry.payment_status !== 'paid',
-            )}
-          />
+          <HowToPay event={roster.event} entries={roster.entries} me={viewer.account?.id} />
 
           {roster.entries.length === 0 ? (
             <p class="form-note">Nobody has said they are coming yet.</p>
           ) : (
-            <table class="table">
-              <thead>
-                <tr>
-                  <th scope="col">Who</th>
-                  <th scope="col">Allergies</th>
-                  <th scope="col">Staying</th>
-                  <th scope="col">Helping with</th>
-                  <th scope="col">Paid</th>
-                </tr>
-              </thead>
-              <tbody>
-                {roster.entries.map((entry, index) => (
-                  <Fragment key={entry.id}>
-                    {startsTheWaitingList(roster.entries, index) && <WaitingListLine columns={5} />}
-                    <tr class={entry.waiting ? 'waiting' : undefined}>
-                      <td>
-                        {/* No fallback to the email address the way the organiser's
-                          list has, because the response does not carry one. */}
-                        {entry.name ?? 'Name not filled in yet'}
-                        {entry.waiting && <span class="form-note"> · waiting</span>}
-                        <br />
-                        <span class="form-note">{entry.contact ?? 'no contact given'}</span>
-                      </td>
-                      <td>{entry.allergies_notes ?? '—'}</td>
-                      <td>
-                        {entry.arrival_date ?? '?'} → {entry.departure_date ?? '?'}
-                        <br />
-                        <span class="form-note">{entry.lodging ?? 'no lodging said'}</span>
-                      </td>
-                      <td>
-                        {entry.helping ?? '—'}
-                        {entry.helping_other !== null && (
-                          <>
-                            <br />
-                            <span class="form-note">{entry.helping_other}</span>
-                          </>
-                        )}
-                      </td>
-                      {/* A word, not a tick: a checkbox reads as something to click,
-                        and this is the one column here nobody may change. */}
-                      <td>{entry.payment_status === 'paid' ? 'yes' : 'not yet'}</td>
-                    </tr>
-                  </Fragment>
-                ))}
-              </tbody>
-            </table>
+            <RosterTable entries={roster.entries} />
           )}
         </>
       )}
@@ -132,13 +78,30 @@ export const Members = ({ api }: { api: MembersApi }) => {
 }
 
 /**
- * How to pay, to whoever has not.
+ * How to pay — or, once the burn is paid full, how a place changes hands.
  *
- * Only to them: everybody else has done it, and a standing instruction to pay is
- * noise on a page they read for the allergies. It is the one thing on this page
- * addressed to the reader rather than about the burn.
+ * Only to whoever has not paid: everybody else has done it, and a standing
+ * instruction to pay is noise on a page they read for the allergies. It is the one
+ * thing here addressed to the reader rather than about the burn.
+ *
+ * The count is of **paid** members, not of `waiting`. `withPlaces` sets `waiting` by
+ * position alone, so a full list is not a paid-full burn — and while places remain
+ * unpaid, paying still secures one, which makes the payment instructions exactly
+ * what the people above the line need.
  */
-const HowToPay = ({ info, owed }: { info: string; owed: boolean }) => {
+const HowToPay = ({
+  event,
+  entries,
+  me,
+}: {
+  event: NonNullable<MemberRosterResponse['event']>
+  entries: readonly MemberRosterEntry[]
+  me: string | undefined
+}) => {
+  const paidUp = entries.filter((entry) => entry.payment_status === 'paid').length
+  const info = paidUp >= event.member_cap ? event.transfer_info_markdown : event.payment_info_markdown
+  const owed = entries.some((entry) => entry.account_id === me && entry.payment_status !== 'paid')
+
   if (!owed || info.trim() === '') return null
 
   return (
@@ -148,3 +111,59 @@ const HowToPay = ({ info, owed }: { info: string; owed: boolean }) => {
     </div>
   )
 }
+
+/**
+ * Who is coming, in the order that decides who has a place.
+ *
+ * Its own component so the page above stays a page — the branching for loading,
+ * failure, no burn and no entries is what `Members` is about, and the table's rows
+ * were pushing that over the complexity ceiling.
+ */
+const RosterTable = ({ entries }: { entries: readonly MemberRosterEntry[] }) => (
+  <table class="table">
+    <thead>
+      <tr>
+        <th scope="col">Who</th>
+        <th scope="col">Allergies</th>
+        <th scope="col">Staying</th>
+        <th scope="col">Helping with</th>
+        <th scope="col">Paid</th>
+      </tr>
+    </thead>
+    <tbody>
+      {entries.map((entry, index) => (
+        <Fragment key={entry.id}>
+          {startsTheWaitingList(entries, index) && <WaitingListLine columns={5} />}
+          <tr class={entry.waiting ? 'waiting' : undefined}>
+            <td>
+              {/* No fallback to the email address the way the organiser's
+                      list has, because the response does not carry one. */}
+              {entry.name ?? 'Name not filled in yet'}
+              {entry.waiting && <span class="form-note"> · waiting</span>}
+              <br />
+              <span class="form-note">{entry.contact ?? 'no contact given'}</span>
+            </td>
+            <td>{entry.allergies_notes ?? '—'}</td>
+            <td>
+              {entry.arrival_date ?? '?'} → {entry.departure_date ?? '?'}
+              <br />
+              <span class="form-note">{entry.lodging ?? 'no lodging said'}</span>
+            </td>
+            <td>
+              {entry.helping ?? '—'}
+              {entry.helping_other !== null && (
+                <>
+                  <br />
+                  <span class="form-note">{entry.helping_other}</span>
+                </>
+              )}
+            </td>
+            {/* A word, not a tick: a checkbox reads as something to click,
+                    and this is the one column here nobody may change. */}
+            <td>{entry.payment_status === 'paid' ? 'yes' : 'not yet'}</td>
+          </tr>
+        </Fragment>
+      ))}
+    </tbody>
+  </table>
+)

@@ -12,7 +12,7 @@ import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, accountRole, attendance, event, notification, session } from '../db/schema.ts'
-import { isAlreadyJoined } from './attendance.ts'
+import { handOverPlace, isAlreadyJoined } from './attendance.ts'
 
 /**
  * Saying you are coming to a burn.
@@ -797,5 +797,87 @@ describe('handing a paid place to somebody else', () => {
     const [dream] = await db().select().from(session).where(eq(session.id, 's-1'))
     expect(dream?.facilitator_attendance_id).toBeNull()
     expect(dream?.title).toBe('Cacao ceremony')
+  })
+})
+
+describe('the hand-over’s own guard, under the checks that precede it', () => {
+  /**
+   * `handOverPlace` is called directly, like `writeStay`'s rollback test: the route
+   * has already checked both invariants by the time it runs, so the window this
+   * closes cannot be opened through `inject`, which serialises requests.
+   */
+  const rowFor = async (accountId: string, eventId: string) => {
+    const [row] = await db()
+      .select()
+      .from(attendance)
+      .where(and(eq(attendance.event_id, eventId), eq(attendance.account_id, accountId)))
+      .limit(1)
+
+    return row
+  }
+
+  const twoStays = async (server: FastifyInstance) => {
+    const eventId = await givenEvent()
+    const giver = await givenAccount(['member'])
+    const taker = await givenAccount(['member'])
+    await join(server, giver.cookie, eventId)
+    await join(server, taker.cookie, eventId)
+    await db()
+      .update(attendance)
+      .set({ payment_status: 'paid', payment_date: '2026-07-01' })
+      .where(and(eq(attendance.event_id, eventId), eq(attendance.account_id, giver.id)))
+
+    return { eventId, giver, taker }
+  }
+
+  it('refuses, and keeps both rows, when the taker paid in the meantime', async () => {
+    const server = await build()
+    const { eventId, giver, taker } = await twoStays(server)
+    const mine = await rowFor(giver.id, eventId)
+    const theirs = await rowFor(taker.id, eventId)
+    // What the route's pre-read could not have seen.
+    await db()
+      .update(attendance)
+      .set({ payment_status: 'paid', payment_date: '2026-07-02' })
+      .where(eq(attendance.id, theirs?.id ?? ''))
+
+    const moved = handOverPlace(db(), { id: mine?.id ?? '', payment_date: '2026-07-01' }, theirs?.id ?? '')
+
+    expect(moved).toBe(false)
+    // Neither half landed: the giver keeps their place rather than losing it to a
+    // taker who no longer needed it.
+    expect(await rowFor(giver.id, eventId)).toBeDefined()
+    expect((await rowFor(taker.id, eventId))?.payment_date).toBe('2026-07-02')
+  })
+
+  it('refuses, and keeps both rows, when the giver stopped being paid', async () => {
+    const server = await build()
+    const { eventId, giver, taker } = await twoStays(server)
+    const mine = await rowFor(giver.id, eventId)
+    const theirs = await rowFor(taker.id, eventId)
+    await db()
+      .update(attendance)
+      .set({ payment_status: 'unpaid', payment_date: null })
+      .where(eq(attendance.id, mine?.id ?? ''))
+
+    const moved = handOverPlace(db(), { id: mine?.id ?? '', payment_date: '2026-07-01' }, theirs?.id ?? '')
+
+    expect(moved).toBe(false)
+    expect(await rowFor(giver.id, eventId)).toBeDefined()
+    expect((await rowFor(taker.id, eventId))?.payment_status).toBe('unpaid')
+  })
+
+  it('moves the place when both still hold', async () => {
+    // The passing sibling: refusing everything would satisfy the two above.
+    const server = await build()
+    const { eventId, giver, taker } = await twoStays(server)
+    const mine = await rowFor(giver.id, eventId)
+    const theirs = await rowFor(taker.id, eventId)
+
+    const moved = handOverPlace(db(), { id: mine?.id ?? '', payment_date: '2026-07-01' }, theirs?.id ?? '')
+
+    expect(moved).toBe(true)
+    expect(await rowFor(giver.id, eventId)).toBeUndefined()
+    expect((await rowFor(taker.id, eventId))?.payment_status).toBe('paid')
   })
 })

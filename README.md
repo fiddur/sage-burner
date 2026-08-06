@@ -2424,12 +2424,19 @@ lets somebody pick it up.
 The payment date is **carried over rather than restamped**: the burn received one
 payment, on that date, and the place changing hands is not a second one.
 
-Once `member_cap` paid members are in, the Members page shows the burn's
+Once `member_cap` **paid** members are in, the Members page shows the burn's
 `transfer_info_markdown` in place of `payment_info_markdown` — telling somebody
 how to pay when paying no longer gets them in is the wrong thing to leave up. Both
 are per-burn and admin-editable; the transfer text defaults to
 `DEFAULT_TRANSFER_INFO` rather than being blank, so a burn always has something to
 say there.
+
+Counted on `payment_status`, not on `waiting`. `withPlaces` sets `waiting` by
+position alone, so a **full list is not a paid-full burn** — and while places
+remain unpaid, paying still secures one, which makes the payment instructions
+exactly what the members above the line need. The first version of this counted
+non-waiting entries and got it backwards; `HowToPay` owns the decision now, so
+there is one place that knows the rule.
 
 Recording a payment sends **the status and nothing else** — an organiser
 recording money received has no business rewriting an arrival date in the same

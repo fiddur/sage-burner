@@ -301,3 +301,33 @@ describe('where the places run out', () => {
     expect(screen.queryByText('Ask on the waiting list.')).toBeNull()
   })
 })
+
+describe('which text a burn shows when the list is full', () => {
+  it('still says how to pay while fewer than the cap have paid', async () => {
+    // The list being full is not the burn being paid full. Paying re-sorts you above
+    // every unpaid member, so while places remain unpaid it is still exactly what
+    // secures one — and the people above the line who have not paid are the ones the
+    // payment instructions are for.
+    renderPage(
+      stub(
+        aRoster({
+          event: {
+            id: 'e-1',
+            name: 'Summer burn',
+            member_cap: 2,
+            payment_info_markdown: '**Swish** 123',
+            transfer_info_markdown: 'Ask on the waiting list.',
+          },
+          entries: [
+            anEntry({ name: 'Ada', payment_status: 'paid' }),
+            anEntry({ name: 'Bea', account_id: 'a-1' }),
+            anEntry({ name: 'Cyd', waiting: true }),
+          ],
+        }),
+      ),
+    )
+
+    expect(await screen.findByText(/Swish/)).toBeTruthy()
+    expect(screen.queryByText('Ask on the waiting list.')).toBeNull()
+  })
+})
