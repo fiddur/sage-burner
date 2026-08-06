@@ -78,7 +78,7 @@ export const registerRosterRoutes = (
     if (found === undefined) return reply.code(404).send(errorResponse('not_found'))
 
     return {
-      event: found,
+      event: { id: found.id, name: found.name, member_cap: found.member_cap },
       entries: await rosterFor(eventId, found.member_cap),
     } satisfies RosterResponse
   })
@@ -162,7 +162,12 @@ export const registerRosterRoutes = (
 
   async function eventFor(eventId: string) {
     const [row] = await db
-      .select({ id: event.id, name: event.name, member_cap: event.member_cap })
+      .select({
+        id: event.id,
+        name: event.name,
+        member_cap: event.member_cap,
+        payment_info_markdown: event.payment_info_markdown,
+      })
       .from(event)
       .where(eq(event.id, eventId))
       .limit(1)

@@ -28,7 +28,7 @@ describe('MarkdownField', () => {
   it('renders the markdown under Preview', async () => {
     render(<MarkdownField label="Help text" value={PRINCIPLES} maxLength={2000} onInput={vi.fn()} />)
 
-    screen.getByRole('button', { name: 'Preview' }).click()
+    screen.getByRole('button', { name: 'Preview Help text' }).click()
 
     expect((await screen.findAllByRole('listitem')).map((item) => item.textContent)).toEqual([
       'Radical inclusion',
@@ -39,9 +39,9 @@ describe('MarkdownField', () => {
   it('goes back to writing', async () => {
     render(<MarkdownField label="Help text" value={PRINCIPLES} maxLength={2000} onInput={vi.fn()} />)
 
-    screen.getByRole('button', { name: 'Preview' }).click()
+    screen.getByRole('button', { name: 'Preview Help text' }).click()
     await screen.findAllByRole('listitem')
-    screen.getByRole('button', { name: 'Write' }).click()
+    screen.getByRole('button', { name: 'Write Help text' }).click()
 
     expect(await screen.findByLabelText('Help text')).toHaveProperty('value', PRINCIPLES)
   })
@@ -49,7 +49,7 @@ describe('MarkdownField', () => {
   it('says there is nothing to preview rather than showing a blank pane', async () => {
     render(<MarkdownField label="Help text" value="   " maxLength={2000} onInput={vi.fn()} />)
 
-    screen.getByRole('button', { name: 'Preview' }).click()
+    screen.getByRole('button', { name: 'Preview Help text' }).click()
 
     expect(await screen.findByText('Nothing to preview yet.')).toBeTruthy()
   })
@@ -64,7 +64,7 @@ describe('MarkdownField', () => {
       />,
     )
 
-    screen.getByRole('button', { name: 'Preview' }).click()
+    screen.getByRole('button', { name: 'Preview Help text' }).click()
 
     expect(await screen.findByText(/alert\(1\)/)).toBeTruthy()
     expect(document.querySelector('script')).toBeNull()
@@ -89,7 +89,7 @@ describe('MarkdownField', () => {
   it('drops the label association while previewing, when there is no field to name', async () => {
     render(<MarkdownField label="Help text" value="x" maxLength={2000} onInput={vi.fn()} />)
 
-    screen.getByRole('button', { name: 'Preview' }).click()
+    screen.getByRole('button', { name: 'Preview Help text' }).click()
 
     await waitFor(() => expect(screen.queryByLabelText('Help text')).toBeNull())
     expect(document.querySelector('label')?.getAttribute('for')).toBeNull()
@@ -101,13 +101,17 @@ describe('MarkdownField', () => {
     render(<MarkdownField label="Help text" value="x" maxLength={2000} onInput={vi.fn()} />)
 
     expect(screen.queryAllByRole('tab')).toHaveLength(0)
-    expect(screen.getByRole('button', { name: 'Write' }).getAttribute('aria-pressed')).toBe('true')
-    expect(screen.getByRole('button', { name: 'Preview' }).getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getByRole('button', { name: 'Write Help text' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Preview Help text' }).getAttribute('aria-pressed')).toBe(
+      'false',
+    )
 
-    screen.getByRole('button', { name: 'Preview' }).click()
+    screen.getByRole('button', { name: 'Preview Help text' }).click()
 
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Preview' }).getAttribute('aria-pressed')).toBe('true'),
+      expect(screen.getByRole('button', { name: 'Preview Help text' }).getAttribute('aria-pressed')).toBe(
+        'true',
+      ),
     )
   })
 

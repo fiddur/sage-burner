@@ -27,6 +27,7 @@ const BURN = {
   start_time: '16:00',
   end_time: '12:00',
   welcome_markdown: '',
+  payment_info_markdown: '',
   member_cap: 42,
   created_at: '2026-07-02T00:00:00.000Z',
 }

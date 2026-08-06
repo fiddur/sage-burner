@@ -43,6 +43,9 @@ export const MarkdownField = ({
           <button
             type="button"
             aria-pressed={!previewing}
+            // Named per field: a page with two markdown fields has two "Preview"
+            // buttons, and "Preview" alone says nothing about which.
+            aria-label={`Write ${label}`}
             class={previewing ? 'md-field-tab' : 'md-field-tab is-current'}
             onClick={() => setPreviewing(false)}
           >
@@ -51,6 +54,7 @@ export const MarkdownField = ({
           <button
             type="button"
             aria-pressed={previewing}
+            aria-label={`Preview ${label}`}
             class={previewing ? 'md-field-tab is-current' : 'md-field-tab'}
             onClick={() => setPreviewing(true)}
           >

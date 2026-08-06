@@ -80,6 +80,7 @@ const givenEvent = async (fields: { slug: string; start_date: string; end_date: 
       start_date: fields.start_date,
       end_date: fields.end_date,
       welcome_markdown: '',
+      payment_info_markdown: '',
       member_cap: 42,
       created_at: '2026-01-01T00:00:00.000Z',
     })

@@ -117,6 +117,7 @@ describe('createDb against a file', () => {
         start_date: '2026-10-02',
         end_date: '2026-10-04',
         welcome_markdown: '',
+        payment_info_markdown: '',
         member_cap: 42,
         created_at: '2026-07-28T10:00:00Z',
       })

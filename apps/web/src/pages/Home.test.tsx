@@ -21,6 +21,7 @@ const summer: Event = {
   start_time: '00:00',
   end_time: '23:59',
   welcome_markdown: '# Bring water\n\nAnd a [map](/map).',
+  payment_info_markdown: '',
   member_cap: 42,
   created_at: '2026-01-01T00:00:00.000Z',
 }

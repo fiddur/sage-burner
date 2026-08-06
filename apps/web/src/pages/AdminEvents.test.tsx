@@ -25,6 +25,7 @@ const summer: Event = {
   start_time: '00:00',
   end_time: '23:59',
   welcome_markdown: '# Hello',
+  payment_info_markdown: '',
   member_cap: 42,
   created_at: '2026-01-01T00:00:00.000Z',
 }
@@ -121,6 +122,7 @@ describe('AdminEvents', () => {
         start_time: '00:00',
         end_time: '23:59',
         welcome_markdown: '',
+        payment_info_markdown: '',
         member_cap: 42,
       })
     })
@@ -176,7 +178,7 @@ describe('AdminEvents', () => {
     await screen.findByLabelText('Welcome text (markdown)')
 
     fill('Welcome text (markdown)', '# Bring water')
-    screen.getByRole('button', { name: 'Preview' }).click()
+    screen.getByRole('button', { name: 'Preview Welcome text (markdown)' }).click()
 
     await waitFor(() => {
       // Level 2, matching what the public page renders — the preview is only
@@ -191,7 +193,7 @@ describe('AdminEvents', () => {
     await screen.findByLabelText('Welcome text (markdown)')
 
     fill('Welcome text (markdown)', '<script>alert(1)</script>')
-    screen.getByRole('button', { name: 'Preview' }).click()
+    screen.getByRole('button', { name: 'Preview Welcome text (markdown)' }).click()
 
     await waitFor(() => {
       expect(screen.getByText(/<script>alert\(1\)<\/script>/)).toBeTruthy()

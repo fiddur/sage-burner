@@ -21,7 +21,14 @@ export type EventsApi = MealSlotsApi & Pick<ApiClient, 'createEvent' | 'getEvent
 
 type Editable = Pick<
   Event,
-  'name' | 'start_date' | 'end_date' | 'start_time' | 'end_time' | 'member_cap' | 'welcome_markdown'
+  | 'name'
+  | 'start_date'
+  | 'end_date'
+  | 'start_time'
+  | 'end_time'
+  | 'member_cap'
+  | 'welcome_markdown'
+  | 'payment_info_markdown'
 >
 
 /**
@@ -87,6 +94,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
   // The row as loaded into the form, so a save can send only what differs.
   const original = useRef<Event | undefined>(undefined)
   const [welcome, setWelcome] = useState('')
+  const [payment, setPayment] = useState('')
   const [details, setDetails] = useState({
     name: '',
     start_date: '',
@@ -133,6 +141,10 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
         start_time: draft.start_time,
         end_time: draft.end_time,
         welcome_markdown: '',
+        // Sent rather than left to the schema's default, like the welcome text and
+        // for the same reason: both are written after the burn exists, and a create
+        // body that names one and not the other invites a guess about why.
+        payment_info_markdown: '',
         member_cap: Number(draft.member_cap),
       })
       // Inserted in start-date order rather than appended, because that is how
@@ -161,6 +173,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
     editingNow.current = row.id
     original.current = row
     setWelcome(row.welcome_markdown)
+    setPayment(row.payment_info_markdown)
     setDetails({
       name: row.name,
       start_date: row.start_date,
@@ -194,6 +207,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
         end_time: details.end_time,
         member_cap: cap,
         welcome_markdown: welcome,
+        payment_info_markdown: payment,
       })
 
       const { event: updated } = await api.updateEvent(id, changes)
@@ -352,6 +366,19 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
                     rows={12}
                     onInput={(next) => {
                       setWelcome(next)
+                      setSaved(false)
+                    }}
+                  />
+
+                  {/* Shown on the Members page to whoever has not paid, and to
+                      nobody else. */}
+                  <MarkdownField
+                    label="How to pay (markdown)"
+                    value={payment}
+                    maxLength={MAX_WELCOME_LENGTH}
+                    rows={6}
+                    onInput={(next) => {
+                      setPayment(next)
                       setSaved(false)
                     }}
                   />

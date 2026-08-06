@@ -160,6 +160,8 @@ export const event = sqliteTable(
     start_time: text('start_time').notNull().default('00:00'),
     end_time: text('end_time').notNull().default('23:59'),
     welcome_markdown: text('welcome_markdown').notNull().default(''),
+    /** How to pay for this burn. Shown to whoever has not, on the Members page. */
+    payment_info_markdown: text('payment_info_markdown').notNull().default(''),
     /** What the Meal page says above its table. Markdown, and any member may rewrite it. */
     meal_intro_markdown: text('meal_intro_markdown').notNull().default(''),
     member_cap: integer('member_cap').notNull(),

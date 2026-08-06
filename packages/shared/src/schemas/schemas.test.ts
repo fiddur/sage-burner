@@ -43,6 +43,7 @@ const anEvent = {
   start_time: '15:00',
   end_time: '12:00',
   welcome_markdown: '# Welcome!',
+  payment_info_markdown: '',
   member_cap: 42,
   created_at: '2026-07-28T10:00:00Z',
 }
