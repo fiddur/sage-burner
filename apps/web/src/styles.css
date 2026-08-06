@@ -470,6 +470,14 @@ a:hover {
 
 /* A control, not a link — it performs an action rather than navigating —
    styled to sit with the nav links beside it. */
+/* Directly under the page heading, so it reads as part of it rather than as content. */
+.calendar-feed {
+  display: flex;
+  gap: 0.75rem;
+  align-items: baseline;
+  margin: -0.5rem 0 1rem;
+}
+
 .link-button {
   padding: 0;
   border: none;

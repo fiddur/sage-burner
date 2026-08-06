@@ -1,6 +1,6 @@
 import type { Invite } from '@sage-burner/shared'
 
-import { useState } from 'preact/hooks'
+import { CopyButton } from './CopyButton.tsx'
 
 /**
  * An invite link, shown once.
@@ -11,8 +11,6 @@ import { useState } from 'preact/hooks'
 const urlFor = (invite: Invite) => `${window.location.origin}/invite/${invite.token}`
 
 export const InviteLink = ({ invite }: { invite: Invite | undefined }) => {
-  const [copied, setCopied] = useState(false)
-
   if (invite === undefined) return null
 
   const url = urlFor(invite)
@@ -24,24 +22,10 @@ export const InviteLink = ({ invite }: { invite: Invite | undefined }) => {
       <br />
       <code>{url}</code>
       <br />
-      <button
-        type="button"
-        class="link-button"
-        onClick={() => {
-          // Only on success. `writeText` rejects on a denied permission or an
-          // unfocused document, and `navigator.clipboard` is undefined entirely
-          // on a non-secure origin. For a token shown once and never shown
-          // again — only the digest is stored — a false "Copied" is how an
-          // organiser loses someone's invite; the URL above stays selectable by
-          // hand.
-          navigator.clipboard?.writeText(url).then(
-            () => setCopied(true),
-            () => undefined,
-          )
-        }}
-      >
-        {copied ? 'Copied' : 'Copy link'}
-      </button>
+      {/* The URL above stays selectable by hand, which is what makes a copy that
+          silently did nothing recoverable — this token is stored only as a digest
+          and cannot be shown a second time. */}
+      <CopyButton value={url} label="Copy link" />
     </p>
   )
 }

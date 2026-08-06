@@ -1542,3 +1542,32 @@ describe('a chore’s lead, in the panel', () => {
     expect(screen.queryByLabelText('Lead for Morning cleanup')).toBeNull()
   })
 })
+
+describe('the calendar feed', () => {
+  it('links the selected burn’s feed, which no page pointed at before', async () => {
+    renderPage(stub())
+
+    const link = await screen.findByRole('link', { name: /Calendar feed/ })
+    expect(link.getAttribute('href')).toBe(`${window.location.origin}/events/e-1/schedule.ics`)
+  })
+
+  it('follows the burn in the selector rather than whichever is active', async () => {
+    renderPage(stub(), MEMBER, { event: { ...BURN, id: 'e-2' }, attendance: null })
+
+    const link = await screen.findByRole('link', { name: /Calendar feed/ })
+    expect(link.getAttribute('href')).toContain('/events/e-2/schedule.ics')
+  })
+
+  it('offers the URL to copy, a click being a snapshot rather than a subscription', async () => {
+    renderPage(stub())
+
+    expect(await screen.findByRole('button', { name: 'Copy link' })).toBeTruthy()
+  })
+
+  it('says nothing about a feed when there is no burn to have one', async () => {
+    renderPage(stub(), MEMBER, null)
+
+    await screen.findByText(/there is no timetable to draw/)
+    expect(screen.queryByRole('link', { name: /Calendar feed/ })).toBeNull()
+  })
+})
