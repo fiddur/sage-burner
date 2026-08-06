@@ -53,9 +53,12 @@ describe('what to be told about', () => {
     expect(checked(DREAM_OFFERED)).toBe(false)
   })
 
-  it('does not invent a default of its own when the read fails', async () => {
-    // Nothing rather than everything: a table drawn with six ticks it did not get
-    // from the server would switch six categories off the moment one was touched.
+  it('draws no table at all when the read fails', async () => {
+    // Every save replaces the whole set, so an invented state is not a display bug —
+    // it is committed. An empty table is the worst of them: the first tick would send
+    // only that one and switch off the six this person never refused, losing payment
+    // and waiting-list notices silently. Drawing the defaults instead would be wrong
+    // for anybody who had saved settings. There is no state worth inventing.
     render(
       <NotificationSettingsField
         api={stub({
@@ -64,8 +67,29 @@ describe('what to be told about', () => {
       />,
     )
 
-    await screen.findByLabelText(MEAL)
-    expect(checked(MEAL)).toBe(false)
+    await screen.findByRole('alert')
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
+  })
+
+  it('cannot save anything after a failed read', async () => {
+    // The consequence, stated: with no boxes there is nothing to tick, so no save can
+    // be built out of a state nobody supplied.
+    let saves = 0
+    render(
+      <NotificationSettingsField
+        api={stub({
+          getMyNotificationSettings: () => Promise.reject(apiError(500, 'internal_error', 'Nope.')),
+          updateMyNotificationSettings: () => {
+            saves += 1
+            return Promise.resolve({ on: [] })
+          },
+        })}
+      />,
+    )
+
+    await screen.findByRole('alert')
+    expect(screen.queryByLabelText(MEAL)).toBeNull()
+    expect(saves).toBe(0)
   })
 
   it('switches one off by unticking it', async () => {

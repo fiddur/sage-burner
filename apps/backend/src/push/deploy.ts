@@ -41,10 +41,15 @@ export const announceDeploy = async (
   if (row === undefined) return 'unchanged'
   if (row.seen === buildSha) return 'unchanged'
 
+  // An `unknown` build is not recorded, which is stronger than merely not announcing
+  // it. Recording it would make the *next* boot a change — so a local `pnpm start`
+  // against the live volume, followed by the container coming back on the build it
+  // was already running, would announce a version nobody deployed.
+  if (buildSha === 'unknown') return 'unchanged'
+
   await db.update(installation).set({ last_build_sha: buildSha }).where(eq(installation.id, INSTALLATION_ID))
 
   if (row.seen === null) return 'first-boot'
-  if (buildSha === 'unknown') return 'unchanged'
 
   await notifyEveryone(db, notify, {
     category: 'new_version',

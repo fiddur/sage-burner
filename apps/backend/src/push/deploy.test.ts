@@ -136,15 +136,31 @@ describe('announcing a redeploy', () => {
     expect(heard.told).toEqual([])
   })
 
-  it('announces a real build arriving after an unknown one', async () => {
-    // The passing sibling: refusing every transition involving `unknown` would also
-    // silence the first real deploy after a hand-built image.
+  it('does not let an unknown build make the next boot look like a release', async () => {
+    // `unknown` is not recorded at all, which is stronger than not announcing it.
+    // Were it recorded, the container coming back on the build it was already
+    // running would announce a version nobody deployed.
     given()
     await givenAccount(true)
     const heard = collector()
+    await announceDeploy(db(), 'sha-one', heard.notify)
     await announceDeploy(db(), 'unknown', heard.notify)
 
-    expect(await announceDeploy(db(), 'sha-one', heard.notify)).toBe('announced')
+    expect(await announceDeploy(db(), 'sha-one', heard.notify)).toBe('unchanged')
+
+    expect(heard.told).toEqual([])
+  })
+
+  it('still announces a genuinely new build after an unknown one', async () => {
+    // The passing sibling: ignoring `unknown` entirely must not swallow the next
+    // real deploy, only the return to the one already running.
+    given()
+    await givenAccount(true)
+    const heard = collector()
+    await announceDeploy(db(), 'sha-one', heard.notify)
+    await announceDeploy(db(), 'unknown', heard.notify)
+
+    expect(await announceDeploy(db(), 'sha-two', heard.notify)).toBe('announced')
 
     expect(heard.told).toHaveLength(1)
   })

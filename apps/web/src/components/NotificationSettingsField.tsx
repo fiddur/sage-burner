@@ -19,8 +19,7 @@ export type NotificationSettingsApi = Pick<
  * Ticked means notify. **The defaults are not all the same**, which is why the wire
  * carries what is on rather than what is off: what happens to you is on unless you
  * refuse it, and what happens around you is off unless you ask (#259). The server
- * fills the defaults in, so nothing here has to know them — a second copy of a
- * default is a default that drifts.
+ * applies them, so this only ever renders an answer it was given.
  *
  * Two sections, from `notificationSections`. The split is a property of the category
  * and lives beside its label, so adding one cannot land it in the wrong half here.
@@ -31,6 +30,7 @@ export type NotificationSettingsApi = Pick<
  */
 export const NotificationSettingsField = ({ api }: { api: NotificationSettingsApi }) => {
   const [on, setOn] = useState<readonly NotificationCategory[] | undefined>(undefined)
+  const [unavailable, setUnavailable] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useFormError()
 
@@ -43,13 +43,29 @@ export const NotificationSettingsField = ({ api }: { api: NotificationSettingsAp
         if (!controller.signal.aborted) setOn(settings.on)
       })
       .catch(() => {
-        // Nothing rather than everything: a failed read must not draw a table of
-        // ticks that would switch six categories off the moment one is touched.
-        if (!controller.signal.aborted) setOn([])
+        if (!controller.signal.aborted) setUnavailable(true)
       })
 
     return () => controller.abort()
   }, [api])
+
+  /**
+   * No table at all when the read failed, rather than one drawn from a guess.
+   *
+   * Every save here replaces the whole set, so an invented state is not a display
+   * bug — it is committed. An empty table is the worst of them: the first tick after
+   * a failed read would send `{ on: [that one] }` and switch off the six categories
+   * this person never refused, losing payment and waiting-list notices silently.
+   * Drawing the defaults instead would be wrong for anybody who *had* saved
+   * settings. There is no state worth inventing, so there is none.
+   */
+  if (unavailable) {
+    return (
+      <p class="form-error" role="alert">
+        Could not load your notification settings. Please reload the page.
+      </p>
+    )
+  }
 
   if (on === undefined) return <p class="form-note">Loading…</p>
 
