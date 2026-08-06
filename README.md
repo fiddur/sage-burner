@@ -2429,7 +2429,10 @@ Once `member_cap` **paid** members are in, the Members page shows the burn's
 how to pay when paying no longer gets them in is the wrong thing to leave up. Both
 are per-burn and admin-editable; the transfer text defaults to
 `DEFAULT_TRANSFER_INFO` rather than being blank, so a burn always has something to
-say there.
+say there — which means the create form must **not** send the field at all, since
+`.default(…)` only applies to an absent key. `AdminEvents.tsx` sends
+`payment_info_markdown: ''` and deliberately omits this one; the exact-body
+assertion in its test is what stops the key coming back.
 
 Counted on `payment_status`, not on `waiting`. `withPlaces` sets `waiting` by
 position alone, so a **full list is not a paid-full burn** — and while places

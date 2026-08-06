@@ -58,19 +58,6 @@ export const hasOrderedRange = (range: Required<DateRange>) => hasOrderedDates(r
  * update bodies from this rather than re-declaring the shape — and wrap the
  * result in `withEventDateOrder` so the derived schema keeps the invariant.
  */
-/**
- * What a burn says about handing a place over, until somebody rewrites it.
- *
- * The migration that added the column wrote this same sentence into every existing
- * row, and that copy is frozen history — this is the living one, used for burns made
- * from here on. Deliberately not a fallback for an empty field: an admin who clears
- * it means to say nothing, and a default that reappeared would be unclearable.
- */
-export const DEFAULT_TRANSFER_INFO =
-  'A paid member can transfer their membership to someone else. To transfer yours, ' +
-  'contact the members on the waiting list and settle the payment between you. Then ' +
-  'hand the place over from your own page.'
-
 export const eventFields = z.object({
   id: idSchema,
   name: nonEmptyText(MAX_TITLE),
@@ -115,6 +102,19 @@ export const eventFields = z.object({
 export const eventSchema = withEventDateOrder(eventFields)
 
 export type Event = z.infer<typeof eventSchema>
+
+/**
+ * What a burn says about handing a place over, until somebody rewrites it.
+ *
+ * The migration that added the column wrote this same sentence into every existing
+ * row, and that copy is frozen history — this is the living one, used for burns made
+ * from here on. Deliberately not a fallback for an empty field: an admin who clears
+ * it means to say nothing, and a default that reappeared would be unclearable.
+ */
+export const DEFAULT_TRANSFER_INFO =
+  'A paid member can transfer their membership to someone else. To transfer yours, ' +
+  'contact the members on the waiting list and settle the payment between you. Then ' +
+  'hand the place over from your own page.'
 
 /**
  * Creating an event. `id` and `created_at` are the server's to assign.

@@ -144,10 +144,12 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
         end_time: draft.end_time,
         welcome_markdown: '',
         // Sent rather than left to the schema's default, like the welcome text and
-        // for the same reason: both are written after the burn exists, and a create
-        // body that names one and not the other invites a guess about why.
+        // for the same reason: both are written after the burn exists.
         payment_info_markdown: '',
-        transfer_info_markdown: '',
+        // `transfer_info_markdown` is deliberately *not* sent. Its default is a real
+        // sentence rather than an empty string, and sending '' would override it —
+        // leaving every new burn with nothing to say at the moment it fills, which is
+        // the one moment this field exists for.
         member_cap: Number(draft.member_cap),
       })
       // Inserted in start-date order rather than appended, because that is how
