@@ -1,0 +1,138 @@
+import { apiRoutes } from '@sage-burner/shared'
+import { describe, expect, it } from 'vitest'
+
+import {
+  API_CACHE,
+  ASSET_LIMIT,
+  cacheFor,
+  CACHED_AT,
+  cachedAt,
+  planFor,
+  SHELL_CACHE,
+  stamped,
+  trim,
+} from './cache.ts'
+
+const ORIGIN = 'https://burn.example'
+
+const asked = (path: string, extra: { method?: string; mode?: string; origin?: string } = {}) =>
+  planFor(
+    {
+      method: extra.method ?? 'GET',
+      mode: extra.mode,
+      url: `${extra.origin ?? ORIGIN}${path}`,
+    },
+    ORIGIN,
+  )
+
+describe('what the worker does with a request', () => {
+  it('serves a page load from the shell', () => {
+    expect(asked('/members', { mode: 'navigate' })).toBe('navigate')
+    expect(asked('/', { mode: 'navigate' })).toBe('navigate')
+  })
+
+  it('caches the API reads a member looks at', () => {
+    expect(asked(apiRoutes.getMembers.path('burn-1'))).toBe('api')
+    expect(asked(apiRoutes.getSessions.path('burn-1'))).toBe('api')
+    expect(cacheFor('api')).toBe(API_CACHE)
+  })
+
+  it('never caches a write', () => {
+    // Every plan begins with the method, so a POST to a path that reads well is
+    // still nothing to store.
+    expect(asked(apiRoutes.getMembers.path('burn-1'), { method: 'POST' })).toBe('skip')
+    expect(asked(apiRoutes.joinEvent.path('burn-1'), { method: 'PUT' })).toBe('skip')
+    expect(asked(apiRoutes.leaveEvent.path('burn-1'), { method: 'DELETE' })).toBe('skip')
+  })
+
+  it('never caches the redeploy check', () => {
+    // A cached answer here would say "the build you already have" for as long as the
+    // entry lived, which is the one reply that makes the check pointless.
+    expect(asked(apiRoutes.getVersion.path())).toBe('skip')
+  })
+
+  it('keeps the app itself apart from the data', () => {
+    // The shell cache survives a sign-out and the API cache does not, so which one a
+    // thing lands in is the whole of what stays on a device afterwards.
+    expect(cacheFor(asked('/assets/index-abc123.js'))).toBe(SHELL_CACHE)
+    expect(cacheFor(asked(apiRoutes.webManifest.path()))).toBe(SHELL_CACHE)
+    expect(cacheFor(asked(apiRoutes.getInstallationIcon.path()))).toBe(SHELL_CACHE)
+    expect(cacheFor(asked(apiRoutes.getMyProfile.path()))).toBe(API_CACHE)
+  })
+
+  it('leaves another origin alone', () => {
+    expect(asked('/api/events', { origin: 'https://elsewhere.example' })).toBe('skip')
+    expect(asked('/assets/index-abc123.js', { origin: 'https://elsewhere.example' })).toBe('skip')
+  })
+
+  it('has nowhere to put the requests it skips', () => {
+    expect(cacheFor('skip')).toBeUndefined()
+  })
+})
+
+describe('the stamp saying when an answer was true', () => {
+  it('survives on the way back out of the cache', async () => {
+    const response = new Response('{"ok":true}', { headers: { 'content-type': 'application/json' } })
+
+    const kept = await stamped(response, '2026-08-06T12:00:00.000Z')
+
+    expect(cachedAt(kept)).toBe('2026-08-06T12:00:00.000Z')
+    expect(kept.headers.get('content-type')).toBe('application/json')
+    expect(await kept.text()).toBe('{"ok":true}')
+  })
+
+  it('is absent on an answer that came straight off the network', () => {
+    expect(cachedAt(new Response('{}'))).toBeUndefined()
+  })
+
+  it('leaves the original readable', async () => {
+    // `stamped` has to clone rather than consume: the same response is handed to the
+    // page while the copy goes to the cache, and a body can only be read once.
+    const response = new Response('{"ok":true}')
+
+    await stamped(response, '2026-08-06T12:00:00.000Z')
+
+    expect(await response.text()).toBe('{"ok":true}')
+  })
+
+  it('names a header the page reads by the same constant', () => {
+    expect(CACHED_AT).toBe('x-cached-at')
+  })
+})
+
+/** Enough of `Cache` to exercise the trim, in insertion order like the real one. */
+const fakeCache = (urls: string[]) => {
+  const keys = urls.map((url) => new Request(`${ORIGIN}${url}`))
+
+  return {
+    kept: () => keys.map((request) => new URL(request.url).pathname),
+    keys: () => Promise.resolve([...keys]),
+    delete: (request: Request) => {
+      const at = keys.findIndex((held) => held.url === request.url)
+      if (at >= 0) keys.splice(at, 1)
+      return Promise.resolve(at >= 0)
+    },
+  }
+}
+
+describe('keeping the asset cache from growing forever', () => {
+  it('drops the oldest builds first', async () => {
+    const cache = fakeCache(['/assets/old.js', '/assets/mid.js', '/assets/new.js'])
+
+    expect(await trim(cache, 2)).toBe(1)
+    expect(cache.kept()).toEqual(['/assets/mid.js', '/assets/new.js'])
+  })
+
+  it('leaves a cache under the limit alone', async () => {
+    const cache = fakeCache(['/assets/one.js', '/assets/two.js'])
+
+    expect(await trim(cache, ASSET_LIMIT)).toBe(0)
+    expect(cache.kept()).toEqual(['/assets/one.js', '/assets/two.js'])
+  })
+
+  it('holds several builds at the limit it ships with', () => {
+    // The number matters: too tight and it evicts a chunk the current page is about
+    // to ask for, which offline means a blank screen rather than a slow one.
+    expect(ASSET_LIMIT).toBeGreaterThanOrEqual(20)
+  })
+})

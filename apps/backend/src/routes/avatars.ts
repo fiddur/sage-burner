@@ -28,6 +28,9 @@ export const AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const
  * The browser sizes the picture down to a couple of hundred pixels before sending, so
  * anything approaching this is either a client that did not or one that means harm.
  * Half a megabyte is generous for the former and cheap for the latter.
+ *
+ * Stated on the route rather than on the content-type parser, which is shared with
+ * the app icon and must therefore carry no limit of its own — see `image-body.ts`.
  */
 export const MAX_AVATAR_BYTES = 512 * 1024
 
@@ -51,18 +54,9 @@ export const registerAvatarRoutes = (
 ) => {
   const { requireApproved } = createGuards({ db, sessions })
 
-  // Raw bytes, for these three types only. It does not reopen the cross-site logout
-  // hole `removeContentTypeParser('text/plain')` closed: a form can only send the
-  // three form encodings, and none of them is an image type.
-  app.addContentTypeParser(
-    [...AVATAR_TYPES],
-    { parseAs: 'buffer', bodyLimit: MAX_AVATAR_BYTES },
-    (_request, body, done) => {
-      done(null, body)
-    },
-  )
+  const upload = { bodyLimit: MAX_AVATAR_BYTES, preHandler: requireApproved }
 
-  app.put(apiRoutes.setMyAvatar.fastify, { preHandler: requireApproved }, async (request, reply) => {
+  app.put(apiRoutes.setMyAvatar.fastify, upload, async (request, reply) => {
     void noStore(reply)
 
     const type = AVATAR_TYPES.find((candidate) => candidate === request.headers['content-type'])

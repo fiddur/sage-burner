@@ -11,5 +11,5 @@
     // Vite resolves the extensionless specifiers Preact's own types use.
     "rewriteRelativeImportExtensions": false
   },
-  "include": ["src", "vite.config.ts"]
+  "include": ["src", "vite.config.ts", "vite.sw.config.ts"]
 }

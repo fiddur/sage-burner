@@ -758,13 +758,17 @@ forever. Any other failure keeps it — a 500 from Google is not a
 reason to forget someone's phone. Subscriptions also cascade with the account, so
 a deleted account leaves none behind.
 
-The service worker is `apps/web/public/sw.js`, deliberately plain JavaScript and
-deliberately tiny: it is copied verbatim to the site root, which is where a worker
-has to live to claim `/` as its scope, and that puts it outside the type-check and
-the suite. It handles `push` and `notificationclick` and nothing else — no fetch
-handler, no caching — so there is nothing in it worth testing. `@fastify/static`
-serves everything outside `assets/` as `no-cache`, which is what lets a redeploy
-replace it.
+The service worker is built from `apps/web/src/sw/` to `dist/sw.js` — the site
+root, which is where a worker has to live to claim `/` as its scope.
+`@fastify/static` serves everything outside `assets/` as `no-cache`, which is what
+lets a redeploy replace it. It handles `push` and `notificationclick` here, and
+caching for [offline](#offline-and-installing); `main.ts` is wiring to browser
+events, and every decision worth asserting is in `cache.ts` beside its tests.
+
+It was hand-written plain JavaScript in `public/` while push was all it did,
+precisely because that put it outside the type-check and the suite — the argument
+being that offline behaviour must not live where nothing verifies it. #256 moved
+it rather than growing it there.
 
 **Delivery itself has no test**, and cannot have one here: it needs a real browser
 to produce a subscription and a real push service to accept it. What is tested is
@@ -1043,6 +1047,80 @@ mean injecting into the HTML at three separate entry points, which is not worth
 it for one frame. Until the fetch lands the header renders no name at all,
 rather than the software's — showing it and then replacing it is what would look
 like a bug.
+
+### The app icon
+
+Organise → **Settings** also takes the icon an installed copy wears on a home
+screen. `PUT /api/admin/installation/icon` takes raw bytes, `image/png` or
+`image/svg+xml`, up to half a megabyte; `DELETE` puts it back to the app's own
+flame. `GET /api/installation/icon` is **public** and always answers — the flame
+when nothing is stored — so the manifest and the shell can both name one URL
+unconditionally.
+
+An SVG is stored exactly as authored. Rasterising a logo to 512 pixels throws
+away the reason it was an SVG, so anything else is cut to a square and resized in
+the browser instead, which is what lets this process store what it is given
+without an image library. Nothing here decodes an image.
+
+**That means an admin can upload a file carrying script, and that is the settled
+trade** (#256): it is their own installation to break. Two things bound it. An
+SVG cannot execute as a manifest icon or inside an `<img>` — only as a top-level
+document — and that one remaining route is closed by serving the response
+`Content-Security-Policy: default-src 'none'; sandbox`, which gives such a
+document an opaque origin and no scripting. Uploading is admin-only. The tab's
+own favicon is deliberately _not_ this image: it is drawn as an SVG data URL so
+the notification badge can be composed into it, and a data URL cannot reference
+an external image to draw a dot on.
+
+The tab icon and the default app icon are one function, `flameIcon` in
+`@sage-burner/shared`, read by the backend to serve the default and by
+`favicon.ts` to draw the badged variant. Two copies of one emoji would be two
+things to keep in step for no gain.
+
+## Offline and installing
+
+The app is a PWA: installable, and readable with no connection.
+
+`GET /manifest.webmanifest` is served rather than shipped as a file, because it
+carries the installation's own name and icon — both rows an admin can change, and
+a static file would need a redeploy to stop saying `Sage Burner`. The icon `src`
+carries the stored `updated_at` as a version, so a new icon is a new URL rather
+than one an installed copy holds on to.
+
+Two caches, and the split is the whole of what stays on a device:
+
+- **`sage-burner-shell-v1`** — the HTML shell, the hashed bundles, the manifest,
+  the icon. None of it is anybody's data. Kept across a sign-out, because
+  dropping it would mean the next person to open the app offline gets nothing at
+  all. Trimmed to the 40 most recently stored entries, oldest first, so old
+  builds' chunks do not accumulate forever.
+- **`sage-burner-api-v1`** — every API read: the roster, the schedule, who you
+  are. **This is member data on disk, and signing out deletes the whole cache.**
+  Not entries picked from it by URL, which would be a list to keep in step with
+  the routes.
+
+Reads are network-first with the cache as a floor under being offline; hashed
+assets are cache-first, since their names change with their bytes. `/api/version`
+is never cached — a stale answer there is the one reply that makes the redeploy
+check pointless. Nothing cross-origin is touched.
+
+### Saying how old it is
+
+Every answer served from the cache is stamped `x-cached-at`, and the page reads
+it. Past **five minutes**, a bar says how old what is on screen is.
+
+The rule is deliberately literal — it is about the data, not about the network —
+and it is paired with the other half: the pages several people change at once
+(members, schedule, dreams, roles, meals) refetch every minute while the tab is
+watched, and again whenever it comes back to the front. So online the bar is
+nearly unreachable, and its appearing means a refresh genuinely could not land.
+That is exactly when somebody should not act on the roster in front of them.
+
+A background refetch that fails leaves what is on screen alone. Replacing a good
+roster with "could not load" because a poll nobody asked for missed would be
+worse than the page it started with — the staleness bar is what says so instead.
+Pressing reload still reports the failure, because a button that appears to do
+nothing is its own bug.
 
 ## Events
 

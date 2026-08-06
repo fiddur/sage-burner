@@ -122,7 +122,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
         meals: plan.meals,
       }
     },
-    { enabled: member, key: burn?.event.id ?? '', fallback: 'Could not load the schedule.' },
+    { enabled: member, key: burn?.event.id ?? '', fallback: 'Could not load the schedule.', live: true },
   )
 
   const { busy, error, run } = useAction(reload)

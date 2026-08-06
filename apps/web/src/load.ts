@@ -13,6 +13,15 @@ import { isApiError } from './api/client.ts'
  * double click.
  */
 
+/**
+ * How often a `live` page refetches while somebody is looking at it.
+ *
+ * A minute, which is the same beat `version.ts` checks for a redeploy on and well
+ * inside the five minutes past which the app calls what is on screen stale — so an
+ * open tab reaches that state only when a refresh could not land.
+ */
+export const REVALIDATE_EVERY_MS = 60_000
+
 export type Loaded<T> =
   | { status: 'loading' }
   | { status: 'ready'; data: T }
@@ -49,13 +58,27 @@ export const errorMessage = (failure: unknown, fallback: string) =>
  * Deliberately not a cache: every mutation re-reads. One extra request per change
  * buys "what is on screen is what the server has", including the values the server
  * assigned, and at this size there is nothing to gain by being cleverer.
+ *
+ * `live` is for the pages several people change at once — the grid, the roster, the
+ * lists of who is doing what. They refetch on a timer and whenever the tab comes
+ * back to the front, so what is on screen keeps up with whoever else is editing it
+ * (#256). Off by default: most pages are somebody's own record or an admin workflow,
+ * where a background refetch is a request for nothing.
  */
 export const useLoad = <T>(
   fetcher: (signal: AbortSignal) => Promise<T>,
-  { enabled = true, key = '', fallback }: { enabled?: boolean; key?: string; fallback: string },
+  {
+    enabled = true,
+    key = '',
+    fallback,
+    live = false,
+  }: { enabled?: boolean; fallback: string; key?: string; live?: boolean },
 ): { loaded: Loaded<T>; reload: () => void } => {
   const [loaded, setLoaded] = useState<Loaded<T>>({ status: 'loading' })
-  const [attempt, setAttempt] = useState(0)
+  // The kind travels with the count, so the effect that reacts to it knows whether a
+  // failure is worth replacing the page with. A ref would be read after the state
+  // that triggered the run had already changed it.
+  const [attempt, setAttempt] = useState({ count: 0, quiet: false })
 
   // Held in a ref so the effect does not re-run for a fetcher rebuilt on every
   // render. Callers write `() => api.getThing(signal)` inline, which is a new
@@ -76,9 +99,18 @@ export const useLoad = <T>(
         if (!controller.signal.aborted) setLoaded({ status: 'ready', data })
       })
       .catch((failure: unknown) => {
-        if (!controller.signal.aborted) {
-          setLoaded({ status: 'failed', message: errorMessage(failure, fallback) })
-        }
+        if (controller.signal.aborted) return
+
+        setLoaded((current) =>
+          // A refetch nobody asked for must not take the page away. Offline the
+          // worker answers most of these from its cache, but the first load after an
+          // install is not controlled by it yet — and replacing a good roster with
+          // "could not load" because a background poll missed would be a worse page
+          // than the one it started with. The staleness bar is what says so instead.
+          attempt.quiet && current.status === 'ready'
+            ? current
+            : { status: 'failed', message: errorMessage(failure, fallback) },
+        )
       })
 
     return () => {
@@ -86,7 +118,33 @@ export const useLoad = <T>(
     }
   }, [enabled, attempt, key, fallback])
 
-  return { loaded, reload: useCallback(() => setAttempt((count) => count + 1), []) }
+  useEffect(() => {
+    if (!live || !enabled) return undefined
+
+    const refresh = () => {
+      // A tab in the background is not being read, and a phone in a pocket polling
+      // every minute is somebody's battery.
+      if (globalThis.document?.visibilityState === 'hidden') return
+      setAttempt(({ count }) => ({ count: count + 1, quiet: true }))
+    }
+
+    const timer = setInterval(refresh, REVALIDATE_EVERY_MS)
+    // Coming back to the tab is what actually catches up after a while away; the
+    // interval only covers a tab somebody is sitting in front of.
+    globalThis.addEventListener('visibilitychange', refresh)
+    globalThis.addEventListener('focus', refresh)
+
+    return () => {
+      clearInterval(timer)
+      globalThis.removeEventListener('visibilitychange', refresh)
+      globalThis.removeEventListener('focus', refresh)
+    }
+  }, [live, enabled])
+
+  return {
+    loaded,
+    reload: useCallback(() => setAttempt(({ count }) => ({ count: count + 1, quiet: false })), []),
+  }
 }
 
 /**

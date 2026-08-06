@@ -66,7 +66,7 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
 
       return { sessions: dreams.sessions, places: places.places, attendees: attendees.attendees }
     },
-    { enabled: member, key: burn?.event.id ?? '', fallback: 'Could not load the dreams.' },
+    { enabled: member, key: burn?.event.id ?? '', fallback: 'Could not load the dreams.', live: true },
   )
 
   const { busy, error, setError, run } = useAction(reload)

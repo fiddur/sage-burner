@@ -36,8 +36,10 @@ type definitions. All layers import from it — never duplicate a schema.
 - Web imports **no Zod**. Types always; runtime values only from modules that do
   not pull Zod in — today `enums.ts` (the vocabularies and `tickBoxRequired`),
   `answers.ts` (`answerProblems`, `isTickBox`, the application form's `MAX_*`
-  limits), `limits.ts` (bounds the schemas and the forms share), and `routes.ts`
-  (`apiRoutes`, every endpoint's path and verb). Nothing under `schemas/`.
+  limits), `limits.ts` (bounds the schemas and the forms share), `media.ts`
+  (what an uploaded icon may be, and `flameIcon` — the app's own mark, which the
+  backend serves and the tab badges), and `routes.ts` (`apiRoutes`, every
+  endpoint's path and verb). Nothing under `schemas/`.
 - **Every endpoint lives in `routes.ts` and nowhere else.** The client builds its
   path from it and the route file registers `fastify` from it, so the two spellings
   of one endpoint cannot drift; `routes.test.ts` checks that each built path routes
@@ -241,6 +243,22 @@ These are member records, so treat them as such:
   when somebody names it there; spreading the row and deleting keys would not have
   that property. The two views share one query, so the order — which decides who has
   a place — cannot come out differently on the two pages.
+- **What the offline cache holds is a sign-out question** (#256). The service
+  worker keeps two caches, and the split is the whole of what stays on a device: the
+  shell, bundles, manifest and icon survive a sign-out because none of it is
+  anybody's data, and the cache holding every API read — the roster, the schedule,
+  who you are — is deleted whole on the way out. Whole rather than by URL: entries
+  picked out by path would be a list to keep in step with the routes, which is the
+  kind of list that goes one route stale. Deleted _before_ the logout request, since
+  that is the half that has to happen.
+- **The app icon is the admin's to break** (#256). An uploaded SVG is stored as
+  authored — rasterising a logo defeats uploading one — so it can carry script.
+  Bounded rather than sanitized: an SVG cannot execute as a manifest icon or in an
+  `<img>`, only as a top-level document, and that route is closed by serving the
+  icon `Content-Security-Policy: default-src 'none'; sandbox`. Uploading is
+  admin-only; reading is public, because a browser fetching an icon for a home
+  screen carries no cookies. Nothing in this process decodes an image, exactly as
+  with avatars.
 - Markdown is sanitized before rendering, and members author it too — any longer
   field shown to other people is markdown. `markdown.ts` escapes raw HTML rather
   than filtering it and allowlists link schemes, so untrusted authors are inside

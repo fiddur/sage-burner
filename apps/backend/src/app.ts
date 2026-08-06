@@ -30,6 +30,7 @@ import { registerAuthRoutes } from './routes/auth.ts'
 import { registerAvatarRoutes } from './routes/avatars.ts'
 import { registerEventOptionRoutes } from './routes/event-options.ts'
 import { registerEventRoutes } from './routes/events.ts'
+import { registerImageBodyParser } from './routes/image-body.ts'
 import { registerInstallationRoutes } from './routes/installation.ts'
 import { registerInviteRoutes } from './routes/invites.ts'
 import { registerLeadRoleRoutes } from './routes/lead-roles.ts'
@@ -39,6 +40,7 @@ import { registerPasskeyRoutes } from './routes/passkeys.ts'
 import { registerPlaceRoutes } from './routes/places.ts'
 import { registerProfileRoutes } from './routes/profile.ts'
 import { registerPushRoutes } from './routes/push.ts'
+import { registerPwaRoutes } from './routes/pwa.ts'
 import { registerQuestionRoutes } from './routes/questions.ts'
 import { registerRedemptionRoutes } from './routes/redemption.ts'
 import { registerRosterRoutes } from './routes/roster.ts'
@@ -379,6 +381,10 @@ export const createApp = async ({
   // fails CI rather than shipping.
   app.removeContentTypeParser('text/plain')
 
+  // Before any route that takes an image, and once for all of them: two routes accept
+  // `image/png` and Fastify throws on the second parser to claim a type.
+  registerImageBodyParser(app)
+
   app.decorate('db', db)
   app.decorate('config', config)
 
@@ -419,6 +425,7 @@ export const createApp = async ({
   registerQuestionRoutes(app, { db, sessions })
   registerPlaceRoutes(app, { db, sessions, now })
   registerAvatarRoutes(app, { db, sessions, now })
+  registerPwaRoutes(app, { db, sessions, now })
   registerMealRoutes(app, { db, sessions, now, notify: tellAccount })
   // Separate registration, not a separate guard: the plan lives under `/api/admin/`,
   // where the prefix hook is the only thing that lets it through. The member-facing

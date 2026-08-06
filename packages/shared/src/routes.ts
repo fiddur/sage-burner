@@ -246,6 +246,15 @@ export const apiRoutes = {
     fastify: '/api/installation',
     path: () => '/api/installation',
   },
+  /**
+   * Public, unlike `accountAvatar`: the browser fetches it for the home screen
+   * without the app's cookies, and it is a logo rather than anybody's face.
+   */
+  getInstallationIcon: {
+    method: 'GET',
+    fastify: '/api/installation/icon',
+    path: () => '/api/installation/icon',
+  },
   getInviteState: {
     method: 'GET',
     fastify: '/api/invites/:token',
@@ -424,6 +433,11 @@ export const apiRoutes = {
     fastify: '/api/admin/applications/:id/reject',
     path: (id: string) => `/api/admin/applications/${encodeURIComponent(id)}/reject`,
   },
+  removeInstallationIcon: {
+    method: 'DELETE',
+    fastify: '/api/admin/installation/icon',
+    path: () => '/api/admin/installation/icon',
+  },
   removeMyAvatar: {
     method: 'DELETE',
     fastify: '/api/me/avatar',
@@ -474,6 +488,11 @@ export const apiRoutes = {
     method: 'PUT',
     fastify: '/api/admin/accounts/:accountId/roles',
     path: (accountId: string) => `/api/admin/accounts/${encodeURIComponent(accountId)}/roles`,
+  },
+  setInstallationIcon: {
+    method: 'PUT',
+    fastify: '/api/admin/installation/icon',
+    path: () => '/api/admin/installation/icon',
   },
   setLeadRoleLead: {
     method: 'PUT',
@@ -626,6 +645,18 @@ export const apiRoutes = {
     method: 'DELETE',
     fastify: '/api/sessions/:id/support/me',
     path: (id: string) => `/api/sessions/${encodeURIComponent(id)}/support/me`,
+  },
+  /**
+   * The second endpoint outside `/api`, after the ICS feed, and for the same
+   * reason: a browser looking for a site's manifest looks at the site, not at
+   * its API. `index.html` has to name this path in a `<link>` it cannot import,
+   * so `apps/web`'s `shell.test.ts` reads the HTML and asserts the two spellings
+   * still agree.
+   */
+  webManifest: {
+    method: 'GET',
+    fastify: '/manifest.webmanifest',
+    path: () => '/manifest.webmanifest',
   },
 } as const satisfies Record<string, ApiRoute>
 

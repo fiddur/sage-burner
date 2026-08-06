@@ -5,6 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Sage Burner</title>
     <meta name="description" content="Membership and scheduling for a small co-created gathering." />
+
+    <!--
+      Installability (#256). The manifest is served by the backend rather than sitting
+      here as a file, because it carries the installation's own name and its icon —
+      both database rows an admin can change without a redeploy.
+
+      These three paths are also in `apiRoutes`, which is where the backend registers
+      them from. A `<link>` cannot import it, so `shell.test.ts` reads this file and
+      asserts the two spellings still agree.
+    -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/api/installation/icon" />
+    <meta name="theme-color" content="#c2410c" />
   </head>
   <body>
     <div id="app"></div>

@@ -55,7 +55,7 @@ export const Meals = ({ api }: { api: MealsApi }) => {
 
       return { ...plan, eventId: burn.event.id, attendees: attendees.attendees }
     },
-    { key: burn?.event.id ?? '', fallback: 'Could not load the meal plan.' },
+    { key: burn?.event.id ?? '', fallback: 'Could not load the meal plan.', live: true },
   )
 
   const { busy, error, run } = useAction(reload)

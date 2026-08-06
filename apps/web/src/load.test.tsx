@@ -20,14 +20,17 @@ const Loader = ({
   fetcher,
   enabled,
   loadKey,
+  live,
 }: {
   fetcher: (signal: AbortSignal) => Promise<string>
   enabled?: boolean
   loadKey?: string
+  live?: boolean
 }) => {
   const { loaded, reload } = useLoad(fetcher, {
     enabled,
     key: loadKey,
+    live,
     fallback: 'Could not load it.',
   })
 
@@ -362,6 +365,100 @@ describe('useAction', () => {
     await waitFor(() => {
       expect(screen.getByTestId('error').textContent).toBe('none')
     })
+  })
+})
+
+describe('a page others are changing under you', () => {
+  it('refetches when the tab comes back to the front', async () => {
+    let answered = 0
+    render(<Loader live fetcher={() => Promise.resolve(`load ${(answered += 1)}`)} />)
+    await waitFor(() => {
+      expect(screen.getByTestId('state').textContent).toBe('load 1')
+    })
+
+    fireEvent(window, new Event('focus'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('state').textContent).toBe('load 2')
+    })
+  })
+
+  it('does not, when it was not asked to', async () => {
+    // The passing sibling. Without it, a `live` that was ignored entirely would look
+    // the same as one that works, since every page also loads once on mount.
+    let answered = 0
+    render(<Loader fetcher={() => Promise.resolve(`load ${(answered += 1)}`)} />)
+    await waitFor(() => {
+      expect(screen.getByTestId('state').textContent).toBe('load 1')
+    })
+
+    fireEvent(window, new Event('focus'))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(screen.getByTestId('state').textContent).toBe('load 1')
+  })
+
+  it('keeps what is on screen when a background refresh fails', async () => {
+    // Offline the worker answers most of these from its cache, but not before it has
+    // taken control. Replacing a good roster with "could not load" because a poll
+    // nobody asked for missed would be worse than the page it started with.
+    let online = true
+    render(
+      <Loader
+        live
+        fetcher={() => (online ? Promise.resolve('the roster') : Promise.reject(new Error('offline')))}
+      />,
+    )
+    await waitFor(() => {
+      expect(screen.getByTestId('state').textContent).toBe('the roster')
+    })
+
+    online = false
+    fireEvent(window, new Event('focus'))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(screen.getByTestId('state').textContent).toBe('the roster')
+  })
+
+  it('still reports a failure the member asked for', async () => {
+    // The sibling to the one above, and the reason the two attempts are told apart:
+    // pressing Reload and getting silence would look like the button doing nothing.
+    let online = true
+    render(
+      <Loader
+        live
+        fetcher={() => (online ? Promise.resolve('the roster') : Promise.reject(new Error('offline')))}
+      />,
+    )
+    await waitFor(() => {
+      expect(screen.getByTestId('state').textContent).toBe('the roster')
+    })
+
+    online = false
+    fireEvent.click(screen.getByRole('button', { name: 'Reload' }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('state').textContent).toBe('Could not load it.')
+    })
+  })
+
+  it('leaves a hidden tab alone', async () => {
+    // A phone in a pocket polling every minute is somebody's battery.
+    const hidden = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+    try {
+      let answered = 0
+      render(<Loader live fetcher={() => Promise.resolve(`load ${(answered += 1)}`)} />)
+      await waitFor(() => {
+        expect(screen.getByTestId('state').textContent).toBe('load 1')
+      })
+
+      fireEvent(window, new Event('visibilitychange'))
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      expect(screen.getByTestId('state').textContent).toBe('load 1')
+    } finally {
+      hidden.mockRestore()
+    }
   })
 })
 

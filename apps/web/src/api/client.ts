@@ -176,13 +176,25 @@ export interface RequestOptions {
   signal?: AbortSignal
 }
 
+export interface ClientDeps {
+  /**
+   * Called for each successful read, with the response that answered it.
+   *
+   * How old what is on screen is can only be known where the reads happen, and the
+   * service worker's stamp is on the response rather than in the body. Reads only:
+   * a write that succeeds proves the server is reachable but refreshes nothing —
+   * this app re-reads after every mutation, so that GET is what says so.
+   */
+  onRead?: (response: Response) => void
+}
+
 /**
  * Perform a request against the API.
  *
  * `fetch` is injectable so tests exercise the real parsing and error handling
  * against crafted responses rather than mocking this module away.
  */
-export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
+export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRead }: ClientDeps = {}) => {
   const request = async <T>(path: string, options: RequestOptions = {}): Promise<T> => {
     const { method = 'GET', body, signal } = options
 
@@ -216,6 +228,8 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
       const code = await codeFrom(response)
       throw apiError(response.status, code, messageFor(response.status))
     }
+
+    if (method === 'GET') onRead?.(response)
 
     if (response.status === 204) return undefined as T
 
@@ -464,6 +478,18 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
 
     removeMyAvatar: () =>
       request<undefined>(apiRoutes.removeMyAvatar.path(), { method: apiRoutes.removeMyAvatar.method }),
+
+    /** Admin only. The icon an installed copy of the app wears (#256). */
+    setInstallationIcon: (image: Blob) =>
+      request<{ icon: string }>(apiRoutes.setInstallationIcon.path(), {
+        method: apiRoutes.setInstallationIcon.method,
+        body: image,
+      }),
+
+    removeInstallationIcon: () =>
+      request<undefined>(apiRoutes.removeInstallationIcon.path(), {
+        method: apiRoutes.removeInstallationIcon.method,
+      }),
 
     /** Members only. Scheduled dreams first, then the ones only offered. */
     getSessions: (eventId: string, signal?: AbortSignal) =>
