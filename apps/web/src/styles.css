@@ -367,7 +367,7 @@ a:hover {
   outline-offset: -2px;
 }
 
-/* Same height as the textarea, so switching tabs does not resize the page. */
+/* A floor, so switching to an empty preview does not collapse the box. */
 .md-field-body {
   padding: 0.6rem 0.75rem;
   min-height: 5rem;

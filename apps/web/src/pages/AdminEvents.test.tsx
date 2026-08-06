@@ -176,8 +176,6 @@ describe('AdminEvents', () => {
     await screen.findByLabelText('Welcome text (markdown)')
 
     fill('Welcome text (markdown)', '# Bring water')
-    // Its own tab now, rather than a second copy rendered under the box. The field
-    // is the same one every other markdown field in the app uses.
     screen.getByRole('button', { name: 'Preview' }).click()
 
     await waitFor(() => {

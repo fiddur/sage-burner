@@ -56,19 +56,22 @@ const teamCount = (role: LeadRole) =>
 
 /**
  * The header row and, as each cell's `data-label`, what the narrow layout shows in
- * place of the header it hides. One list, so the two cannot drift.
+ * place of the header it hides. Keyed rather than a list so a cell names the one it
+ * belongs to, and renaming a column reaches both.
  */
-const COLUMNS = [
-  'Title',
-  'Purpose',
-  'Lead',
-  'Tasks include',
-  'Team size',
-  'Team',
-  'Effort before',
-  'Effort during',
-  'Effort after',
-] as const
+const COLUMNS = {
+  title: 'Title',
+  purpose: 'Purpose',
+  lead: 'Lead',
+  tasks: 'Tasks include',
+  teamSize: 'Team size',
+  team: 'Team',
+  before: 'Effort before',
+  during: 'Effort during',
+  after: 'Effort after',
+} as const
+
+const HEADINGS = Object.values(COLUMNS)
 
 /**
  * The lead-roles register — who is looking after what at this burn.
@@ -144,9 +147,9 @@ export const Roles = ({ api }: { api: RolesApi }) => {
           <table class="lead-table">
             <thead>
               <tr>
-                {COLUMNS.map((column) => (
-                  <th key={column} scope="col">
-                    {column}
+                {HEADINGS.map((heading) => (
+                  <th key={heading} scope="col">
+                    {heading}
                   </th>
                 ))}
                 <th scope="col">
@@ -158,7 +161,7 @@ export const Roles = ({ api }: { api: RolesApi }) => {
               {ready.roles.map((role) =>
                 editing === role.id ? (
                   <tr key={role.id}>
-                    <td colSpan={COLUMNS.length + 1}>
+                    <td colSpan={HEADINGS.length + 1}>
                       <RoleFields
                         role={role}
                         busy={busy}
@@ -317,11 +320,11 @@ const RoleRow = ({
     <tr>
       <th scope="row">{role.title}</th>
 
-      <td data-label="Purpose">
+      <td data-label={COLUMNS.purpose}>
         <Prose markdown={role.purpose} />
       </td>
 
-      <td data-label="Lead">
+      <td data-label={COLUMNS.lead}>
         <select
           aria-label={`Lead of ${role.title}`}
           disabled={busy}
@@ -337,13 +340,13 @@ const RoleRow = ({
         </select>
       </td>
 
-      <td data-label="Tasks include">
+      <td data-label={COLUMNS.tasks}>
         <Prose markdown={role.tasks} />
       </td>
 
-      <td data-label="Team size">{teamCount(role)}</td>
+      <td data-label={COLUMNS.teamSize}>{teamCount(role)}</td>
 
-      <td data-label="Team">
+      <td data-label={COLUMNS.team}>
         <ul class="role-team">
           {role.team.map((person) => (
             <li key={person.account_id}>
@@ -377,9 +380,9 @@ const RoleRow = ({
         />
       </td>
 
-      <td data-label="Effort before">{EFFORT_LABEL[role.effort_before]}</td>
-      <td data-label="Effort during">{EFFORT_LABEL[role.effort_during]}</td>
-      <td data-label="Effort after">{EFFORT_LABEL[role.effort_after]}</td>
+      <td data-label={COLUMNS.before}>{EFFORT_LABEL[role.effort_before]}</td>
+      <td data-label={COLUMNS.during}>{EFFORT_LABEL[role.effort_during]}</td>
+      <td data-label={COLUMNS.after}>{EFFORT_LABEL[role.effort_after]}</td>
 
       <td data-label="Actions" class="lead-actions">
         <button type="button" class="link-button" disabled={busy} onClick={onEdit}>

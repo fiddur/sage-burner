@@ -69,9 +69,7 @@ const messageFor = (failure: unknown, fallback: string) => {
  *
  * The welcome text gets a preview because it is markdown, and the alternative is
  * publishing to the homepage to find out what a heading looks like. It is
- * `MarkdownField`'s own Preview tab rather than something this page draws, so it
- * runs the same `renderMarkdown` the public page will — and so this stopped being
- * one of the two markdown fields in the app that had a bare textarea.
+ * `MarkdownField`'s, so it runs the same `renderMarkdown` the public page will.
  */
 export const AdminEvents = ({ api }: { api: EventsApi }) => {
   const viewer = useViewer()
@@ -347,11 +345,6 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
                     />
                   </label>
 
-                  {/*
-                    The preview is the field's own tab now, rather than a second
-                    always-rendered copy below it — which was a second call to
-                    `renderMarkdown` on the page that had the most to preview.
-                  */}
                   <MarkdownField
                     label="Welcome text (markdown)"
                     value={welcome}

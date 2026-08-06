@@ -165,13 +165,27 @@ describe('Roles', () => {
       ]),
     )
 
-    // Three columns now, as the spreadsheet had them, rather than one sentence.
-    // Read off the row so a page-wide `getByText('a lot')` cannot pass by finding
-    // the answer in the wrong column.
+    // By position, not `arrayContaining`: the three efforts hold the same vocabulary,
+    // so a containment check passes just as well with before and after swapped.
     const row = (await screen.findByText('Build')).closest('tr')
     const cells = [...(row?.querySelectorAll('td') ?? [])].map((cell) => cell.textContent)
 
-    expect(cells).toEqual(expect.arrayContaining(['a lot', 'a little', 'none']))
+    expect(cells.slice(5, 8)).toEqual(['a lot', 'a little', 'none'])
+  })
+
+  it('labels every cell with the heading of its own column', async () => {
+    // What the narrow layout shows in place of the header row it hides, so a cell
+    // labelled from a literal would announce itself as a column it is not under.
+    renderPage(stub({}, [aRole({ id: 'r-1', title: 'Sauna' })]))
+
+    await screen.findByText('Sauna')
+    const headings = [...document.querySelectorAll('.lead-table thead th')].map((node) => node.textContent)
+    const labels = [...document.querySelectorAll('.lead-table tbody td')].map((node) =>
+      node.getAttribute('data-label'),
+    )
+
+    // The row's `th` holds Title, so the first `td` sits under the second heading.
+    expect(labels.slice(0, -1)).toEqual(headings.slice(1, -1))
   })
 
   it('adds a role from its title alone', async () => {
