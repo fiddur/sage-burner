@@ -18,7 +18,15 @@ import type { Database } from '../db/index.ts'
 import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
-import { account, attendance, place, session, sessionHelper, sessionSupport } from '../db/schema.ts'
+import {
+  account,
+  accountAvatar,
+  attendance,
+  place,
+  session,
+  sessionHelper,
+  sessionSupport,
+} from '../db/schema.ts'
 import { noStore } from '../http.ts'
 import { attendanceFor } from './attendance.ts'
 import { openEvent, todayIso } from './events.ts'
@@ -38,7 +46,7 @@ type DreamRow = typeof session.$inferSelect
 
 interface People {
   helpers: ReadonlyMap<string, Session['helpers']>
-  support: ReadonlyMap<string, { count: number; mine: boolean }>
+  support: ReadonlyMap<string, { people: Session['supporters']; mine: boolean }>
 }
 
 /**
@@ -48,7 +56,7 @@ interface People {
  */
 const peopleFor = async (db: Database, ids: string[], mine: string | undefined): Promise<People> => {
   const helpers = new Map<string, Session['helpers']>()
-  const support = new Map<string, { count: number; mine: boolean }>()
+  const support = new Map<string, { people: Session['supporters']; mine: boolean }>()
 
   // Two queries that can only answer nothing. Drizzle renders the empty `inArray`
   // harmlessly — this skips the round trips, it does not prevent an error.
@@ -63,9 +71,19 @@ const peopleFor = async (db: Database, ids: string[], mine: string | undefined):
     .orderBy(asc(account.name), asc(account.id))
 
   const supportRows = await db
-    .select({ dreamId: sessionSupport.session_id, attendanceId: sessionSupport.attendance_id })
+    .select({
+      dreamId: sessionSupport.session_id,
+      attendanceId: sessionSupport.attendance_id,
+      accountId: account.id,
+      name: account.name,
+      avatar: accountAvatar.updated_at,
+    })
     .from(sessionSupport)
+    .innerJoin(attendance, eq(attendance.id, sessionSupport.attendance_id))
+    .innerJoin(account, eq(account.id, attendance.account_id))
+    .leftJoin(accountAvatar, eq(accountAvatar.account_id, account.id))
     .where(inArray(sessionSupport.session_id, ids))
+    .orderBy(asc(account.name), asc(account.id))
 
   for (const row of helperRows) {
     helpers.set(row.dreamId, [
@@ -75,9 +93,9 @@ const peopleFor = async (db: Database, ids: string[], mine: string | undefined):
   }
 
   for (const row of supportRows) {
-    const sofar = support.get(row.dreamId) ?? { count: 0, mine: false }
+    const sofar = support.get(row.dreamId) ?? { people: [], mine: false }
     support.set(row.dreamId, {
-      count: sofar.count + 1,
+      people: [...sofar.people, { account_id: row.accountId, name: row.name, avatar: row.avatar }],
       mine: sofar.mine || row.attendanceId === mine,
     })
   }
@@ -103,7 +121,10 @@ const asDream = (row: DreamRow, { helpers, support }: People): Session => ({
   time_slot_end: row.time_slot_end,
   place_id: row.place_id,
   helpers: helpers.get(row.id) ?? [],
-  support_count: support.get(row.id)?.count ?? 0,
+  supporters: support.get(row.id)?.people ?? [],
+  // Kept beside the list rather than derived by every reader: the grid's chip shows
+  // the number where there is no room for faces.
+  support_count: support.get(row.id)?.people.length ?? 0,
   supported_by_me: support.get(row.id)?.mine ?? false,
 })
 
@@ -278,7 +299,13 @@ export const registerSessionRoutes = (
 
       // Built from what was written rather than read back: a new dream has nobody
       // helping and no hearts by definition.
-      const dream: Session = { ...row, helpers: [], support_count: 0, supported_by_me: false }
+      const dream: Session = {
+        ...row,
+        helpers: [],
+        supporters: [],
+        support_count: 0,
+        supported_by_me: false,
+      }
 
       return reply.code(201).send({ session: dream } satisfies SessionResponse)
     },

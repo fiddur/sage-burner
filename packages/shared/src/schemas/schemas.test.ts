@@ -407,6 +407,7 @@ describe('sessionSchema', () => {
     // Read-only, and not columns on `session` — which is why the create and update
     // bodies derive from `sessionFields` rather than from `sessionSchema`.
     helpers: [{ account_id: ID, name: 'Ada' }],
+    supporters: [{ account_id: ID, name: 'Ada', avatar: null }],
     support_count: 3,
     supported_by_me: true,
   }

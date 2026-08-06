@@ -43,6 +43,7 @@ const aDream = (over: Partial<Session> & Pick<Session, 'id' | 'title'>): Session
   time_slot_end: null,
   place_id: null,
   helpers: [],
+  supporters: [],
   support_count: 0,
   supported_by_me: false,
   ...over,

@@ -822,6 +822,26 @@ describe('supporting a dream', () => {
     expect(second.json().session.support_count).toBe(2)
   })
 
+  it('names whoever gave one, so the page can show their faces', async () => {
+    // The count used to be all there was, and could be: a heart said nothing about
+    // who. The page says it now (#251), so the answer has to carry it.
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAttending(eventId)
+    const bea = await givenAttending(eventId)
+    const id = (await offer(server, ada.cookie, { title: 'Sunrise yoga' })).json().session.id
+
+    await selfService(server, ada.cookie, id, 'support', 'POST')
+    const both = await selfService(server, bea.cookie, id, 'support', 'POST')
+
+    const ids = both
+      .json()
+      .session.supporters.map((who: { account_id: string }) => who.account_id)
+      .toSorted()
+    expect(ids).toEqual([ada.id, bea.id].toSorted())
+    expect(both.json().session.supporters).toHaveLength(2)
+  })
+
   it('says whose heart it is, and only to them', async () => {
     // Without the per-reader half everybody would see a filled heart the moment
     // anybody gave one.

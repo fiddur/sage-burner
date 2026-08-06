@@ -44,6 +44,7 @@ const aDream = (over: Partial<Session> & Pick<Session, 'id' | 'title'>): Session
   time_slot_end: null,
   place_id: null,
   helpers: [],
+  supporters: [],
   support_count: 0,
   supported_by_me: false,
   ...over,
@@ -721,19 +722,47 @@ describe('Schedule', () => {
     await waitFor(() => expect(updateSession).toHaveBeenCalled())
   })
 
-  it('gives a heart from the details too, and says how many want it', async () => {
+  it('gives a heart from the details too, and shows whose faces they are', async () => {
     const supportSession = vi.fn<ScheduleApi['supportSession']>(() =>
       Promise.resolve({ session: aDream({ id: 's-1', title: 'Cacao ceremony' }) }),
     )
-    renderPage(stub({ supportSession }, [aDream({ id: 's-1', title: 'Cacao ceremony', support_count: 4 })]))
+    renderPage(
+      stub({ supportSession }, [
+        aDream({
+          id: 's-1',
+          title: 'Cacao ceremony',
+          support_count: 2,
+          supporters: [
+            { account_id: 'a-2', name: 'Bea', avatar: null },
+            { account_id: 'a-3', name: null, avatar: null },
+          ],
+        }),
+      ]),
+    )
 
     fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
     const panel = await screen.findByRole('dialog', { name: 'Cacao ceremony' })
-    expect(panel.textContent).toContain('4 people want this')
+
+    // Named, not counted (#251): the number stays on the button, where a chip in the
+    // grid has no room for faces.
+    expect(panel.textContent).toContain('Bea')
+    expect(panel.textContent).toContain('Someone without a name yet')
+    expect(panel.textContent).not.toContain('people want this')
 
     fireEvent.click(within(panel).getByRole('button', { name: 'Show support' }))
 
     await waitFor(() => expect(supportSession).toHaveBeenCalledWith('s-1'))
+  })
+
+  it('says so when nobody has wanted it yet', async () => {
+    // The passing sibling: a stack of faces that is empty renders as nothing at all,
+    // which reads as the feature being broken rather than as nobody having clicked.
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
+    const panel = await screen.findByRole('dialog', { name: 'Cacao ceremony' })
+
+    expect(panel.textContent).toContain('Nobody has said they want this yet.')
   })
 
   it('withdraws a dream from the dialog, but only after asking', async () => {

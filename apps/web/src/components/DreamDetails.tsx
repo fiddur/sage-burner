@@ -4,6 +4,7 @@ import { useState } from 'preact/hooks'
 
 import { toLocalInput } from '../datetime.ts'
 import { renderMarkdown } from '../markdown.ts'
+import { Avatar } from './Avatar.tsx'
 import { DreamFields } from './DreamFields.tsx'
 import { DreamPanel } from './DreamPanel.tsx'
 import { HelperStrip } from './HelperStrip.tsx'
@@ -108,9 +109,33 @@ export const DreamDetails = ({
             >
               <span aria-hidden="true">{dream.supported_by_me ? '❤️‍🔥' : '♡'}</span> {dream.support_count}
             </button>
-            <span class="form-note">
-              {dream.support_count === 1 ? '1 person wants this' : `${dream.support_count} people want this`}
-            </span>
+            {/* Faces rather than a number (#251): "2 people want this" is the same
+                sentence whoever they are, and on a page about who is coming, who is
+                the interesting part. The count stays on the button, where a chip in
+                the grid has no room for faces. */}
+            {dream.supporters.length === 0 ? (
+              <span class="form-note">Nobody has said they want this yet.</span>
+            ) : (
+              <span class="dream-supporters">
+                {dream.supporters.map((person) => {
+                  const who = person.name ?? 'Someone without a name yet'
+
+                  return (
+                    // Wrapped for the name: `Avatar` draws `alt=""` because a name is
+                    // normally beside it, and in a stack of faces there is none.
+                    <span key={person.account_id} class="dream-supporter" title={who}>
+                      <Avatar
+                        accountId={person.account_id}
+                        name={person.name}
+                        avatar={person.avatar}
+                        size="dream-facilitator"
+                      />
+                      <span class="visually-hidden">{who}</span>
+                    </span>
+                  )
+                })}
+              </span>
+            )}
           </p>
 
           <h3>Helping out</h3>
