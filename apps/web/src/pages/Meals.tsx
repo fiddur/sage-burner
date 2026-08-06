@@ -9,6 +9,7 @@ import { useSelectedBurn } from '../burn.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
+import { dayName } from '../datetime.ts'
 import { useAction, useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
 import { useViewer } from '../viewer.tsx'
@@ -30,15 +31,6 @@ type Person = { account_id: string; name: string | null }
 type Plan = (MealsResponse & { eventId: string; attendees: readonly Person[] }) | null
 
 const nameOf = (person: Person) => person.name ?? 'Someone without a name yet'
-
-/** `Sunday 2` — the sheet's "When?" column, which groups the day's sittings. */
-const dayOf = (date: string) => {
-  const at = new Date(`${date}T12:00:00`)
-
-  return Number.isNaN(at.getTime())
-    ? date
-    : at.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric' })
-}
 
 /**
  * The meal plan — who cooks, who helps and who washes up.
@@ -226,7 +218,7 @@ const MealTable = ({
       {meals.map((meal, index) => (
         <tr key={meal.id}>
           {/* Only on the first sitting of a day, like the sheet's merged cells. */}
-          <th scope="row">{meals[index - 1]?.date === meal.date ? '' : dayOf(meal.date)}</th>
+          <th scope="row">{meals[index - 1]?.date === meal.date ? '' : dayName(meal.date)}</th>
           <td>
             {meal.label}
             <span class="form-note"> {meal.at}</span>

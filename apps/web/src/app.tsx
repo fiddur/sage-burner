@@ -69,6 +69,7 @@ export type RoutesApi = Pick<
   | 'joinEvent'
   | 'leaveEvent'
   | 'getActiveRoster'
+  | 'adminAddAttendance'
   | 'getMembers'
   | 'setPayment'
   | 'getPlaces'

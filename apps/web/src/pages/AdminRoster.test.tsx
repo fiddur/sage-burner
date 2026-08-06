@@ -1,6 +1,6 @@
 import type { PaymentUpdate, RosterEntry, RosterResponse } from '@sage-burner/shared'
 
-import { cleanup, render, screen, waitFor, within } from '@testing-library/preact'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Viewer } from '../viewer.tsx'
@@ -44,6 +44,10 @@ const aRoster = (over: Partial<RosterResponse> = {}): RosterResponse => ({
 const stub = (over: Partial<RosterApi> = {}, roster = aRoster()): RosterApi => ({
   getActiveRoster: () => Promise.resolve(roster),
   setPayment: () => Promise.reject(new Error('setPayment is not stubbed here')),
+  // The picker renders nothing until this resolves, so an empty list is what keeps
+  // the tests below about the roster rather than about who could be added to it.
+  getAdminAccounts: () => Promise.resolve({ accounts: [] }),
+  adminAddAttendance: () => Promise.reject(new Error('adminAddAttendance is not stubbed here')),
   ...over,
 })
 
@@ -195,5 +199,84 @@ describe('AdminRoster', () => {
     renderPage(stub({ getActiveRoster: () => Promise.reject(new Error('nope')) }))
 
     expect((await screen.findByRole('alert')).textContent).toContain('reload')
+  })
+})
+
+describe('adding somebody to the burn', () => {
+  const anAccount = (id: string, email: string) => ({
+    id,
+    email,
+    roles: ['member' as const],
+    created_at: '2026-07-01T00:00:00.000Z',
+  })
+
+  it('puts a member on the burn and reloads the list', async () => {
+    const adminAddAttendance = vi.fn(() => Promise.resolve({ attendance: {} as never }))
+    const getActiveRoster = vi.fn(() => Promise.resolve(aRoster()))
+    renderPage(
+      stub({
+        getActiveRoster,
+        getAdminAccounts: () => Promise.resolve({ accounts: [anAccount('a-9', 'late@example.org')] }),
+        adminAddAttendance,
+      }),
+    )
+
+    fireEvent.change(await screen.findByLabelText('Who to add to this burn'), {
+      target: { value: 'a-9' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Add them' }))
+
+    await waitFor(() => expect(adminAddAttendance).toHaveBeenCalledWith('e-1', { account_id: 'a-9' }))
+    // Reloaded rather than patched in: adding somebody can push another past the
+    // cap and onto the waiting list, which only the server's ordering knows.
+    await waitFor(() => expect(getActiveRoster).toHaveBeenCalledTimes(2))
+  })
+
+  it('does not offer somebody who is already coming', async () => {
+    renderPage(
+      stub(
+        {
+          getAdminAccounts: () =>
+            Promise.resolve({
+              accounts: [anAccount('a-1', 'here@example.org'), anAccount('a-9', 'late@example.org')],
+            }),
+        },
+        aRoster({ entries: [anEntry({ account_id: 'a-1', email: 'here@example.org' })] }),
+      ),
+    )
+
+    await screen.findByLabelText('Who to add to this burn')
+
+    // The route is idempotent and would answer their existing stay, so this is not
+    // about correctness — offering a name that visibly does nothing reads as a
+    // broken button.
+    expect(screen.queryByRole('option', { name: 'late@example.org' })).toBeTruthy()
+    expect(screen.queryByRole('option', { name: 'here@example.org' })).toBeNull()
+  })
+
+  it('says so when there is nobody left to add', async () => {
+    renderPage(
+      stub(
+        { getAdminAccounts: () => Promise.resolve({ accounts: [anAccount('a-1', 'here@example.org')] }) },
+        aRoster({ entries: [anEntry({ account_id: 'a-1' })] }),
+      ),
+    )
+
+    expect(await screen.findByText(/already on this burn/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Add them' })).toBeNull()
+  })
+
+  it('keeps the roster when the accounts cannot be loaded', async () => {
+    // The picker is the part that fails, not the page: an organiser who came here
+    // to record a payment should still be able to.
+    renderPage(
+      stub(
+        { getAdminAccounts: () => Promise.reject(new Error('nope')) },
+        aRoster({ entries: [anEntry({ name: 'Ana' })] }),
+      ),
+    )
+
+    expect(await screen.findByText('Ana')).toBeTruthy()
+    expect(screen.queryByLabelText('Who to add to this burn')).toBeNull()
   })
 })

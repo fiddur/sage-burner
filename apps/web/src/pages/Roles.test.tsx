@@ -94,16 +94,23 @@ describe('Roles', () => {
   })
 
   it('shows a vacant role as vacant rather than blank', async () => {
+    // The Lead column is the select itself rather than a sentence beside it: the
+    // register is a table now, and two spellings of who leads in one cell is one
+    // more than the column has room for.
     renderPage(stub({}, [aRole({ id: 'r-1', title: 'Sauna' })]))
 
     expect(await screen.findByText('Sauna')).toBeTruthy()
-    expect(screen.getByText(/Nobody has taken this on yet/)).toBeTruthy()
+    const lead = await screen.findByLabelText('Lead of Sauna')
+    expect(lead instanceof HTMLSelectElement && lead.value).toBe('')
+    expect(screen.getByRole('option', { name: 'Nobody yet', selected: true })).toBeTruthy()
   })
 
   it('names the lead when somebody holds it', async () => {
     renderPage(stub({}, [aRole({ id: 'r-1', title: 'Sauna', lead: { account_id: 'a-2', name: 'Bea' } })]))
 
-    expect(await screen.findByText('Led by Bea')).toBeTruthy()
+    const lead = await screen.findByLabelText('Lead of Sauna')
+    expect(lead instanceof HTMLSelectElement && lead.value).toBe('a-2')
+    expect(screen.getByRole('option', { name: 'Bea', selected: true })).toBeTruthy()
   })
 
   it('shows how many the team wants without ever refusing another', async () => {
@@ -158,7 +165,27 @@ describe('Roles', () => {
       ]),
     )
 
-    expect(await screen.findByText(/a lot before, a little during, none after/)).toBeTruthy()
+    // By position, not `arrayContaining`: the three efforts hold the same vocabulary,
+    // so a containment check passes just as well with before and after swapped.
+    const row = (await screen.findByText('Build')).closest('tr')
+    const cells = [...(row?.querySelectorAll('td') ?? [])].map((cell) => cell.textContent)
+
+    expect(cells.slice(5, 8)).toEqual(['a lot', 'a little', 'none'])
+  })
+
+  it('labels every cell with the heading of its own column', async () => {
+    // What the narrow layout shows in place of the header row it hides, so a cell
+    // labelled from a literal would announce itself as a column it is not under.
+    renderPage(stub({}, [aRole({ id: 'r-1', title: 'Sauna' })]))
+
+    await screen.findByText('Sauna')
+    const headings = [...document.querySelectorAll('.lead-table thead th')].map((node) => node.textContent)
+    const labels = [...document.querySelectorAll('.lead-table tbody td')].map((node) =>
+      node.getAttribute('data-label'),
+    )
+
+    // The row's `th` holds Title, so the first `td` sits under the second heading.
+    expect(labels.slice(0, -1)).toEqual(headings.slice(1, -1))
   })
 
   it('adds a role from its title alone', async () => {

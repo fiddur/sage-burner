@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { fromLocalInput, toLocalInput } from './datetime.ts'
+import { dayName, fromLocalInput, shortDayOf, toLocalInput } from './datetime.ts'
 
 describe('datetime-local conversion', () => {
   it('round-trips an instant through the input and back', () => {
@@ -36,5 +36,42 @@ describe('datetime-local conversion', () => {
   it('does not turn nonsense into an instant', () => {
     expect(fromLocalInput('not a date')).toBeNull()
     expect(toLocalInput('not a date')).toBe('')
+  })
+})
+
+/**
+ * These pin the strings. They do **not** prove the names are independent of the
+ * browser, and nothing in a test can: `LC_ALL` set in-process does not move
+ * Node's resolved locale — measured — so the suite cannot be made to run in
+ * Swedish and catch a reversion to `toLocaleDateString` that way.
+ *
+ * What that costs is worth knowing rather than glossing. Reverting `dayName` to
+ * the locale *is* caught, but incidentally: this runner resolves `en-US`, which
+ * orders it `4 Sunday` against our `Sunday 4`. Reverting `shortDayOf` is **not**
+ * caught at all — `en-US` short days are `Sat`, `Sun`, exactly what we produce.
+ * Both were run to find that out.
+ *
+ * The independence is structural instead: `WEEKDAYS` is a literal array and no
+ * `Intl` call is in reach of either function. Read it, do not trust these.
+ */
+describe('weekday names', () => {
+  it('names the day the burn calls it', () => {
+    expect(dayName('2026-10-03')).toBe('Saturday 3')
+    expect(dayName('2026-10-03', 'short')).toBe('Sat 3')
+    expect(dayName('2026-10-04')).toBe('Sunday 4')
+  })
+
+  it('reads the day in local time, not UTC', () => {
+    // 22:00 UTC on the 3rd is midnight on the 4th in Stockholm. A calendar day
+    // parsed as an instant lands on midnight UTC and slips a day westward, which
+    // is why `dayName` parses at noon — this is the instant-taking sibling, where
+    // the zone is genuinely part of the answer.
+    expect(shortDayOf('2026-10-03T22:00:00.000Z')).toBe('Sun')
+    expect(shortDayOf('2026-10-03T21:00:00.000Z')).toBe('Sat')
+  })
+
+  it('gives back what it was handed when that is not a date', () => {
+    expect(dayName('not a date')).toBe('not a date')
+    expect(shortDayOf('not a date')).toBeUndefined()
   })
 })

@@ -28,3 +28,33 @@ export const fromLocalInput = (local: string): string | null => {
 
   return Number.isNaN(at.getTime()) ? null : at.toISOString()
 }
+
+/**
+ * Written out rather than taken from `toLocaleDateString`, which follows the
+ * browser: a Swedish laptop would read `lör` on a page that is English in every
+ * sentence around it. Indexed by `getDay()`, so Sunday first.
+ */
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const
+
+/**
+ * `Saturday 3` — a day of the burn, as the meal plan's "When?" column names it.
+ *
+ * Parsed at noon: a calendar day has no instant of its own, and taking it as
+ * midnight UTC lands on the previous day for anybody west of Greenwich.
+ */
+export const dayName = (date: string, length: 'long' | 'short' = 'long'): string => {
+  const at = new Date(`${date}T12:00:00`)
+  if (Number.isNaN(at.getTime())) return date
+
+  const full = WEEKDAYS[at.getDay()] ?? date
+
+  return `${length === 'short' ? full.slice(0, 3) : full} ${at.getDate()}`
+}
+
+/** `Sat` — the same names, from an instant rather than a calendar day. */
+export const shortDayOf = (iso: string): string | undefined => {
+  const at = new Date(iso)
+  if (Number.isNaN(at.getTime())) return undefined
+
+  return WEEKDAYS[at.getDay()]?.slice(0, 3)
+}

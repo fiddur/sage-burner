@@ -13,7 +13,7 @@ import { DreamFields } from '../components/DreamFields.tsx'
 import { DreamPanel } from '../components/DreamPanel.tsx'
 import { MealDialog } from '../components/MealDialog.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
-import { fromLocalInput, toLocalInput } from '../datetime.ts'
+import { dayName, fromLocalInput, toLocalInput } from '../datetime.ts'
 import { useAction, useLoad } from '../load.ts'
 import {
   endFor,
@@ -799,9 +799,8 @@ const Timetable = ({
       <table class="schedule-grid" style={{ '--lanes': columns }}>
         {/*
           Fixed layout, so the lanes share what is left equally rather than sizing
-          themselves to whichever happens to hold the longest title. The time column
-          is `17ch`: the widest label it holds is `2026-10-03 00:00` on the daybreak
-          rows, which is sixteen mostly-numeric characters, plus one for slack.
+          themselves to whichever happens to hold the longest title. The time column's
+          own width is in `.schedule-time-col`, which says what decides it.
         */}
         <colgroup>
           <col class="schedule-time-col" />
@@ -827,7 +826,14 @@ const Timetable = ({
         <tbody>
           {rows.map((row, index) => (
             <tr key={row} class={label(row) === '00:00' ? 'schedule-daybreak' : undefined}>
-              <th scope="row">{label(row) === '00:00' ? `${dayOf(row)} 00:00` : label(row)}</th>
+              {/* The first row too, not only midnights: a burn opens at 16:00, so it
+                  starts a day without starting at one. */}
+              <th scope="row">
+                {index === 0 || dayOf(row) !== dayOf(rows[index - 1] ?? row) ? (
+                  <span class="schedule-day">{dayName(dayOf(row), 'short')}</span>
+                ) : null}
+                {label(row)}
+              </th>
               {places.map((place) => {
                 const cell = lanes.get(place.id)?.[index]
                 // A covered row renders no cell at all: the `rowSpan` above is

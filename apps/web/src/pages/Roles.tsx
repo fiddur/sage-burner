@@ -55,6 +55,25 @@ const teamCount = (role: LeadRole) =>
     : `${role.team.length} of ${role.team_size_wanted} wanted`
 
 /**
+ * The header row and, as each cell's `data-label`, what the narrow layout shows in
+ * place of the header it hides. Keyed rather than a list so a cell names the one it
+ * belongs to, and renaming a column reaches both.
+ */
+const COLUMNS = {
+  title: 'Title',
+  purpose: 'Purpose',
+  lead: 'Lead',
+  tasks: 'Tasks include',
+  teamSize: 'Team size',
+  team: 'Team',
+  before: 'Effort before',
+  during: 'Effort during',
+  after: 'Effort after',
+} as const
+
+const HEADINGS = Object.values(COLUMNS)
+
+/**
  * The lead-roles register — who is looking after what at this burn.
  *
  * Two things here would otherwise look like oversights. **The removal button asks
@@ -95,8 +114,8 @@ export const Roles = ({ api }: { api: RolesApi }) => {
   const ready = loaded.status === 'ready' ? (loaded.data ?? undefined) : undefined
 
   return (
-    <GuardedPage title="Roles" require="approved">
-      <h1>Roles</h1>
+    <GuardedPage title="Leads" require="approved">
+      <h1>Leads</h1>
 
       <p class="form-note">
         Who is looking after what. Anyone can add a role, take one on, or put somebody else's name to one —
@@ -123,43 +142,67 @@ export const Roles = ({ api }: { api: RolesApi }) => {
         />
       )}
 
-      <ol class="role-list">
-        {(ready?.roles ?? []).map((role) => (
-          <li key={role.id}>
-            {editing === role.id ? (
-              <RoleFields
-                role={role}
-                busy={busy}
-                onCancel={() => setEditing(undefined)}
-                onSave={(changes) =>
-                  run(async () => {
-                    await api.updateLeadRole(role.id, changes)
-                    setEditing(undefined)
-                  }, 'Could not save that.')
-                }
-              />
-            ) : (
-              <RoleCard
-                role={role}
-                attendees={ready?.attendees ?? []}
-                viewerId={viewer.account?.id}
-                busy={busy}
-                onEdit={() => setEditing(role.id)}
-                onRemove={() => run(() => api.deleteLeadRole(role.id), 'Could not remove that role.')}
-                onLead={(accountId) =>
-                  run(() => api.setLeadRoleLead(role.id, accountId), 'Could not change the lead.')
-                }
-                onJoin={(accountId) =>
-                  run(() => api.joinLeadRoleTeam(role.id, accountId), 'Could not add them to the team.')
-                }
-                onLeave={(accountId) =>
-                  run(() => api.leaveLeadRoleTeam(role.id, accountId), 'Could not take them off the team.')
-                }
-              />
-            )}
-          </li>
-        ))}
-      </ol>
+      {ready !== undefined && ready.roles.length > 0 && (
+        <div class="lead-table-wrap">
+          <table class="lead-table">
+            <thead>
+              <tr>
+                {HEADINGS.map((heading) => (
+                  <th key={heading} scope="col">
+                    {heading}
+                  </th>
+                ))}
+                <th scope="col">
+                  <span class="visually-hidden">Actions</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {ready.roles.map((role) =>
+                editing === role.id ? (
+                  <tr key={role.id}>
+                    <td colSpan={HEADINGS.length + 1}>
+                      <RoleFields
+                        role={role}
+                        busy={busy}
+                        onCancel={() => setEditing(undefined)}
+                        onSave={(changes) =>
+                          run(async () => {
+                            await api.updateLeadRole(role.id, changes)
+                            setEditing(undefined)
+                          }, 'Could not save that.')
+                        }
+                      />
+                    </td>
+                  </tr>
+                ) : (
+                  <RoleRow
+                    key={role.id}
+                    role={role}
+                    attendees={ready.attendees}
+                    viewerId={viewer.account?.id}
+                    busy={busy}
+                    onEdit={() => setEditing(role.id)}
+                    onRemove={() => run(() => api.deleteLeadRole(role.id), 'Could not remove that role.')}
+                    onLead={(accountId) =>
+                      run(() => api.setLeadRoleLead(role.id, accountId), 'Could not change the lead.')
+                    }
+                    onJoin={(accountId) =>
+                      run(() => api.joinLeadRoleTeam(role.id, accountId), 'Could not add them to the team.')
+                    }
+                    onLeave={(accountId) =>
+                      run(
+                        () => api.leaveLeadRoleTeam(role.id, accountId),
+                        'Could not take them off the team.',
+                      )
+                    }
+                  />
+                ),
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {ready !== undefined && (
         <AddRole
@@ -239,7 +282,16 @@ const AddRole = ({
   </form>
 )
 
-const RoleCard = ({
+/** Markdown a member wrote, or an em dash so an empty cell is deliberate. */
+const Prose = ({ markdown }: { markdown: string }) =>
+  markdown.trim() === '' ? (
+    <span class="form-note">—</span>
+  ) : (
+    // Safe by construction: `renderMarkdown` escapes raw HTML rather than filtering it.
+    <div class="markdown-preview" dangerouslySetInnerHTML={{ __html: renderMarkdown(markdown) }} />
+  )
+
+const RoleRow = ({
   role,
   attendees,
   viewerId,
@@ -265,33 +317,14 @@ const RoleCard = ({
   const canJoin = viewerId !== undefined && attendees.some((person) => person.account_id === viewerId)
 
   return (
-    <div class="role-card">
-      <h3>{role.title}</h3>
+    <tr>
+      <th scope="row">{role.title}</th>
 
-      <p class="role-lead">
-        {role.lead === null ? 'Nobody has taken this on yet.' : `Led by ${nameOf(role.lead)}`}
-      </p>
+      <td data-label={COLUMNS.purpose}>
+        <Prose markdown={role.purpose} />
+      </td>
 
-      {role.purpose.trim() !== '' && (
-        // Safe by construction: `renderMarkdown` escapes raw HTML rather than
-        // filtering it, which is why a member may author this. `markdown.ts` says why.
-        <div class="markdown-preview" dangerouslySetInnerHTML={{ __html: renderMarkdown(role.purpose) }} />
-      )}
-
-      {role.tasks.trim() !== '' && (
-        <details>
-          <summary>Tasks include</summary>
-          <div class="markdown-preview" dangerouslySetInnerHTML={{ __html: renderMarkdown(role.tasks) }} />
-        </details>
-      )}
-
-      <p class="role-effort">
-        Effort: {EFFORT_LABEL[role.effort_before]} before, {EFFORT_LABEL[role.effort_during]} during,{' '}
-        {EFFORT_LABEL[role.effort_after]} after
-      </p>
-
-      <label class="field">
-        <span>Lead</span>
+      <td data-label={COLUMNS.lead}>
         <select
           aria-label={`Lead of ${role.title}`}
           disabled={busy}
@@ -305,68 +338,85 @@ const RoleCard = ({
             </option>
           ))}
         </select>
-      </label>
+      </td>
 
-      <p class="role-team-count">{teamCount(role)}</p>
+      <td data-label={COLUMNS.tasks}>
+        <Prose markdown={role.tasks} />
+      </td>
 
-      <ul class="role-team">
-        {role.team.map((person) => (
-          <li key={person.account_id}>
-            {nameOf(person)}
+      <td data-label={COLUMNS.teamSize}>{teamCount(role)}</td>
+
+      <td data-label={COLUMNS.team}>
+        <ul class="role-team">
+          {role.team.map((person) => (
+            <li key={person.account_id}>
+              {nameOf(person)}
+              <button
+                type="button"
+                class="link-button"
+                disabled={busy}
+                aria-label={`Take ${nameOf(person)} off ${role.title}`}
+                onClick={() => onLeave(person.account_id)}
+              >
+                🗑️
+              </button>
+            </li>
+          ))}
+        </ul>
+
+        {canJoin && !onTeam.has(viewerId) && role.lead?.account_id !== viewerId && (
+          <button type="button" disabled={busy} onClick={() => onJoin(viewerId)}>
+            Join the team
+          </button>
+        )}
+
+        <AddToTeam
+          role={role}
+          attendees={attendees.filter(
+            (person) => !onTeam.has(person.account_id) && person.account_id !== viewerId,
+          )}
+          busy={busy}
+          onJoin={onJoin}
+        />
+      </td>
+
+      <td data-label={COLUMNS.before}>{EFFORT_LABEL[role.effort_before]}</td>
+      <td data-label={COLUMNS.during}>{EFFORT_LABEL[role.effort_during]}</td>
+      <td data-label={COLUMNS.after}>{EFFORT_LABEL[role.effort_after]}</td>
+
+      <td data-label="Actions" class="lead-actions">
+        <button type="button" class="link-button" disabled={busy} onClick={onEdit}>
+          Edit
+        </button>
+
+        {confirming ? (
+          <>
+            <span class="form-note">Remove {role.title} and everyone on it?</span>
             <button
               type="button"
-              class="link-button"
               disabled={busy}
-              aria-label={`Take ${nameOf(person)} off ${role.title}`}
-              onClick={() => onLeave(person.account_id)}
+              aria-label={`Really remove ${role.title}`}
+              onClick={onRemove}
             >
-              🗑️
+              Remove it
             </button>
-          </li>
-        ))}
-      </ul>
-
-      {canJoin && !onTeam.has(viewerId) && role.lead?.account_id !== viewerId && (
-        <button type="button" disabled={busy} onClick={() => onJoin(viewerId)}>
-          Join the team
-        </button>
-      )}
-
-      <AddToTeam
-        role={role}
-        attendees={attendees.filter(
-          (person) => !onTeam.has(person.account_id) && person.account_id !== viewerId,
+            <button type="button" class="link-button" disabled={busy} onClick={() => setConfirming(false)}>
+              Keep it
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            class="link-button"
+            disabled={busy}
+            aria-label={`Remove ${role.title}`}
+            onClick={() => setConfirming(true)}
+          >
+            🗑️
+          </button>
         )}
-        busy={busy}
-        onJoin={onJoin}
-      />
-
-      <button type="button" class="link-button" disabled={busy} onClick={onEdit}>
-        Edit
-      </button>
-
-      {confirming ? (
-        <>
-          <span class="form-note">Remove {role.title} and everyone on it?</span>
-          <button type="button" disabled={busy} aria-label={`Really remove ${role.title}`} onClick={onRemove}>
-            Remove it
-          </button>
-          <button type="button" class="link-button" disabled={busy} onClick={() => setConfirming(false)}>
-            Keep it
-          </button>
-        </>
-      ) : (
-        <button
-          type="button"
-          class="link-button"
-          disabled={busy}
-          aria-label={`Remove ${role.title}`}
-          onClick={() => setConfirming(true)}
-        >
-          🗑️
-        </button>
-      )}
-    </div>
+      </td>
+    </tr>
   )
 }
 

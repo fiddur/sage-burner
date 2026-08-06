@@ -176,6 +176,7 @@ describe('AdminEvents', () => {
     await screen.findByLabelText('Welcome text (markdown)')
 
     fill('Welcome text (markdown)', '# Bring water')
+    screen.getByRole('button', { name: 'Preview' }).click()
 
     await waitFor(() => {
       // Level 2, matching what the public page renders — the preview is only
@@ -190,6 +191,7 @@ describe('AdminEvents', () => {
     await screen.findByLabelText('Welcome text (markdown)')
 
     fill('Welcome text (markdown)', '<script>alert(1)</script>')
+    screen.getByRole('button', { name: 'Preview' }).click()
 
     await waitFor(() => {
       expect(screen.getByText(/<script>alert\(1\)<\/script>/)).toBeTruthy()
