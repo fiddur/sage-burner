@@ -129,10 +129,11 @@ describe('Roles', () => {
       ]),
     )
 
-    // The wanted slot is filled, so the ghost 🙋 is the extra one — the offer that
-    // outlives the count, which is the whole of what this is about.
-    const join = await screen.findByRole('button', { name: 'Put me on Kitchen' })
-    expect(screen.getByText('1 of 1 wanted')).toBeTruthy()
+    // The one wanted place is filled, so this row is the extra one — the offer that
+    // outlives the count, which is the whole of what this is about. It carries the
+    // buttons and *not* the word "wanted", since nothing more is asked for.
+    const join = await screen.findByRole('button', { name: 'Take the spot on Kitchen' })
+    expect(screen.queryByText('wanted')).toBeNull()
     expect(join.hasAttribute('disabled')).toBe(false)
 
     fireEvent.click(join)
@@ -343,9 +344,9 @@ describe('Roles', () => {
     const joinLeadRoleTeam = vi.fn(() => Promise.resolve({ role: aRole({ id: 'r-1', title: 'Sauna' }) }))
     renderPage(stub({ joinLeadRoleTeam }, [aRole({ id: 'r-1', title: 'Sauna' })]))
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Put somebody else on Sauna' }))
-    fireEvent.change(screen.getByLabelText('Who to put on Sauna'), { target: { value: 'a-2' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Add them' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Appoint someone to Sauna' }))
+    fireEvent.change(screen.getByLabelText('Who to appoint to Sauna'), { target: { value: 'a-2' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Appoint' }))
 
     await waitFor(() => {
       expect(joinLeadRoleTeam).toHaveBeenCalledWith('r-1', 'a-2')
@@ -358,7 +359,7 @@ describe('Roles', () => {
     renderPage(stub({}, [aRole({ id: 'r-1', title: 'Sauna' })]), ORGANISER)
 
     expect(await screen.findByText('Sauna')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Put me on Sauna' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Take the spot on Sauna' })).toBeNull()
   })
 
   it('offers a previous burn only while the register is empty', async () => {

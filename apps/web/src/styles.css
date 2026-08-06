@@ -1170,54 +1170,63 @@ img.avatar {
   padding: 0.15rem 0;
 }
 
-/* Whoever is on something, and what is still wanted. One control in three places. */
-.helpers {
-  display: grid;
-  gap: 0.35rem;
-}
+/*
+  Whoever is on something, and what is still wanted. One control in three places.
 
-.helper-chips {
+  A list rather than wrapping chips: in a table cell the chips wrapped
+  unpredictably and the vacancies were invisible among them. Down the page, a
+  vacancy is a row like a person is.
+*/
+.helpers {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem;
+  display: grid;
+  gap: 0.25rem;
 }
 
-.helper-chip {
-  display: inline-flex;
+.helpers li {
+  display: flex;
   align-items: center;
-  gap: 0.3rem;
-  padding: 0.15rem 0.5rem;
+  gap: 0.5rem;
+  min-height: 1.9rem;
+}
+
+.helper-taken > span {
+  padding: 0.1rem 0.5rem;
   border: 1px solid var(--line);
   border-radius: 1rem;
   font-size: 0.9rem;
 }
 
-/* A place still wanted. Dashed, so an empty one reads as waiting rather than broken. */
-.helper-slot button,
-.helper-slot > span {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 2rem;
-  padding: 0.15rem 0.4rem;
+.helper-vacancy > span:first-child {
+  font-size: 0.85rem;
+  font-style: italic;
+  /* Holds the row's height when the word is absent, so the buttons do not shift. */
+  min-width: 4rem;
+}
+
+.helper-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/*
+  Thumb-sized, and spaced. These are the two most-pressed controls on the page and
+  the page is read on a phone at a burn — 44px is the floor a thumb reliably hits.
+*/
+.helper-actions button {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0;
   border: 1px dashed var(--line);
-  border-radius: 1rem;
+  border-radius: var(--radius);
   background: none;
-  color: inherit;
-  font: inherit;
+  font-size: 1.1rem;
+  line-height: 1;
   cursor: pointer;
 }
 
-.helper-slot > span {
-  cursor: default;
-  opacity: 0.5;
-}
-
-.helper-count {
-  margin: 0;
-  font-size: 0.85rem;
+.helper-picker {
+  flex-wrap: wrap;
 }
