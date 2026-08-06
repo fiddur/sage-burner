@@ -7,6 +7,8 @@ import type {
   ApplicationDecisionResponse,
   ApplicationResponse,
   ApplicationsResponse,
+  AllergyItem,
+  AllergyItemsResponse,
   Attendance,
   CopyFrom,
   CopySourcesResponse,
@@ -768,6 +770,37 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch) => {
       request<undefined>(apiRoutes.transferMyPlace.path(eventId), {
         method: apiRoutes.transferMyPlace.method,
         body,
+      }),
+
+    /**
+     * The allergy vocabulary. Public, so the invite form can offer it too (#254).
+     */
+    getAllergyItems: (signal?: AbortSignal) =>
+      request<AllergyItemsResponse>(apiRoutes.getAllergyItems.path(), { signal }),
+
+    /** Admin. Renaming rewrites what everybody who ticked it is taken to have said. */
+    addAllergyItem: (body: BodyOf<'addAllergyItem'>) =>
+      request<{ item: AllergyItem }>(apiRoutes.addAllergyItem.path(), {
+        method: apiRoutes.addAllergyItem.method,
+        body,
+      }),
+
+    updateAllergyItem: (id: string, body: BodyOf<'updateAllergyItem'>) =>
+      request<{ item: AllergyItem }>(apiRoutes.updateAllergyItem.path(id), {
+        method: apiRoutes.updateAllergyItem.method,
+        body,
+      }),
+
+    /** 409 when somebody has ticked it — the row holds, so nobody's record is lost. */
+    deleteAllergyItem: (id: string) =>
+      request<undefined>(apiRoutes.deleteAllergyItem.path(id), {
+        method: apiRoutes.deleteAllergyItem.method,
+      }),
+
+    reorderAllergyItems: (ids: readonly string[]) =>
+      request<AllergyItemsResponse>(apiRoutes.reorderAllergyItems.path(), {
+        method: apiRoutes.reorderAllergyItems.method,
+        body: orderBody(ids) satisfies BodyOf<'reorderAllergyItems'>,
       }),
 
     /** Members only. `name` and `contact` may be null on an account never filled in. */

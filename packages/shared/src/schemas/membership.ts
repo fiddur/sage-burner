@@ -33,8 +33,20 @@ export const withStayOrder = <T extends z.ZodType<Stay>>(schema: T) =>
 export const profileFields = z.object({
   name: nonEmptyText(MAX_PERSON_NAME),
   contact: nonEmptyText(MAX_CONTACT),
-  /** Free text — "gluten", "sensitive to red lentils". Never a fixed list. */
+  /**
+   * Free text — "sensitive to red lentils". The **Other** beside the ticks (#254):
+   * a vocabulary is never complete, and the cost of it being wrong here is
+   * somebody's dinner.
+   */
   allergies_notes: optionalText(MAX_NOTES),
+  /**
+   * Which `allergy_item` rows they ticked.
+   *
+   * Ids rather than labels, so renaming an item does not rewrite what anybody said.
+   * Stored as rows in `account_allergy`; a field here only on the way in and out —
+   * the same shape `helping_option_ids` has on a stay.
+   */
+  allergy_item_ids: z.array(idSchema),
 })
 
 /**
@@ -43,7 +55,13 @@ export const profileFields = z.object({
  * `.strict()` for the reason the event and question schemas give: an
  * unrecognised key is a 400 rather than a silent success.
  */
-export const profileCreateSchema = profileFields.strict()
+export const profileCreateSchema = profileFields
+  .extend({
+    // Defaulted so redeeming an invite is not blocked on a list the form may not
+    // show yet. Nothing said is an empty set, not a missing answer.
+    allergy_item_ids: profileFields.shape.allergy_item_ids.default([]),
+  })
+  .strict()
 
 /**
  * A profile as it is read back.
@@ -249,6 +267,13 @@ export const rosterEntrySchema = attendanceFields.extend({
   name: profileFields.shape.name.nullable(),
   contact: profileFields.shape.contact.nullable(),
   allergies_notes: profileFields.shape.allergies_notes,
+  /**
+   * The ticked items, as **labels** rather than ids (#254).
+   *
+   * Whoever cooks reads this, and a column of UUIDs is not something to cook from —
+   * the same reason a stay's `helping` sits beside its `helping_option_ids`.
+   */
+  allergy_items: z.array(z.string()),
   /**
    * The lodging option's label, resolved at read time.
    *

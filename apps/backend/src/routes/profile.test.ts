@@ -740,3 +740,73 @@ describe('a helping option that vanishes mid-save', () => {
     expect(await db().select().from(attendanceHelping)).toEqual([])
   })
 })
+
+describe('the allergy ticks on a profile', () => {
+  const LACTOSE = 'a11e0000-0000-4000-8000-000000000004'
+  const VEGAN = 'a11e0000-0000-4000-8000-000000000001'
+
+  it('comes back empty for somebody who has ticked nothing', async () => {
+    const server = await build()
+    const ada = await givenMember()
+
+    expect((await getProfile(server, ada.cookie)).json().profile.allergy_item_ids).toEqual([])
+  })
+
+  it('saves the ticks and reads them back', async () => {
+    const server = await build()
+    const ada = await givenMember()
+
+    const saved = await patchProfile(server, ada.cookie, { allergy_item_ids: [LACTOSE, VEGAN] })
+
+    expect(saved.statusCode).toBe(200)
+    expect([...saved.json().profile.allergy_item_ids].toSorted()).toEqual([VEGAN, LACTOSE].toSorted())
+  })
+
+  it('replaces the whole set rather than adding to it', async () => {
+    // The form sends every box it is showing, so a delta would need the client to
+    // know what it had before in order to say what changed.
+    const server = await build()
+    const ada = await givenMember()
+    await patchProfile(server, ada.cookie, { allergy_item_ids: [LACTOSE, VEGAN] })
+
+    const saved = await patchProfile(server, ada.cookie, { allergy_item_ids: [VEGAN] })
+
+    expect(saved.json().profile.allergy_item_ids).toEqual([VEGAN])
+  })
+
+  it('leaves the ticks alone when the body does not mention them', async () => {
+    // The passing sibling: treating an absent field as an empty set would wipe
+    // somebody's allergies every time they fixed a typo in their name.
+    const server = await build()
+    const ada = await givenMember()
+    await patchProfile(server, ada.cookie, { allergy_item_ids: [LACTOSE] })
+
+    const saved = await patchProfile(server, ada.cookie, { name: 'Ada Lovelace' })
+
+    expect(saved.json().profile.allergy_item_ids).toEqual([LACTOSE])
+  })
+
+  it('refuses an id that is not an allergy item, and saves nothing at all', async () => {
+    // Asked before the columns are written: the form sends both in one PATCH, so a
+    // late refusal would answer 400 over a name that did change.
+    const server = await build()
+    const ada = await givenMember({ name: 'Ada' })
+
+    const refused = await patchProfile(server, ada.cookie, {
+      name: 'Someone Else',
+      allergy_item_ids: [randomUUID()],
+    })
+
+    expect(refused.statusCode).toBe(400)
+    expect((await getProfile(server, ada.cookie)).json().profile.name).toBe('Ada')
+  })
+
+  it('keeps one person’s ticks off another’s profile', async () => {
+    const server = await build()
+    const ada = await givenMember()
+    const bea = await givenMember()
+    await patchProfile(server, ada.cookie, { allergy_item_ids: [LACTOSE] })
+
+    expect((await getProfile(server, bea.cookie)).json().profile.allergy_item_ids).toEqual([])
+  })
+})

@@ -13,6 +13,7 @@ import { viewerFor } from '../auth/viewer.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
 import { account, attendance, eventOption } from '../db/schema.ts'
 import { noStore } from '../http.ts'
+import { areAllergyItems, allergyTickIdsFor, writeAllergyTicks } from './allergy-ticks.ts'
 import { openEvent, todayIso } from './events.ts'
 import { areHelpingOptions, helpingIdsFor, writeHelping } from './helping.ts'
 
@@ -184,7 +185,11 @@ export const registerProfileRoutes = (
       .where(eq(account.id, accountId))
       .limit(1)
 
-    return row
+    // The ticks travel with the row wherever it is returned, so a caller never has
+    // to know they live in another table — the same as a stay's helping options.
+    return row === undefined
+      ? undefined
+      : { ...row, allergy_item_ids: await allergyTickIdsFor(db, accountId) }
   }
 
   app.get(apiRoutes.getMyProfile.fastify, { preHandler: requireMember }, async (request, reply) => {
@@ -208,10 +213,25 @@ export const registerProfileRoutes = (
     const viewer = await viewerFor(request, { db, sessions })
     if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
 
-    // `set({})` is not valid SQL, so an empty body would be a 500 rather than the
-    // no-op it plainly is.
-    if (Object.keys(parsed.data).length > 0) {
-      await db.update(account).set(parsed.data).where(eq(account.id, viewer.account_id))
+    const { allergy_item_ids: ticks, ...columns } = parsed.data
+
+    // Asked before anything is written: the form sends the ticks and the columns in
+    // one PATCH, so refusing them afterwards would answer 400 with the name saved.
+    if (ticks !== undefined && !(await areAllergyItems(db, ticks))) {
+      return reply.code(400).send(errorResponse('bad_request'))
+    }
+
+    // One transaction, because the columns and the ticks arrive together and a
+    // half-saved profile would answer an error over a record that did change.
+    // `set({})` is not valid SQL, so an empty column set is skipped rather than
+    // written — an empty body is the no-op it plainly is.
+    if (Object.keys(columns).length > 0 || ticks !== undefined) {
+      db.transaction((tx) => {
+        if (Object.keys(columns).length > 0) {
+          tx.update(account).set(columns).where(eq(account.id, viewer.account_id)).run()
+        }
+        if (ticks !== undefined) writeAllergyTicks(tx, viewer.account_id, ticks)
+      })
     }
 
     const profile = await profileFor(viewer.account_id)

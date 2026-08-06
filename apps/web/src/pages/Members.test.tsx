@@ -28,6 +28,7 @@ const anEntry = (over: Partial<MemberRosterEntry> = {}): MemberRosterEntry => ({
   name: 'Ana',
   contact: 'ana on discord',
   allergies_notes: null,
+  allergy_items: [],
   payment_status: 'unpaid',
   waiting: false,
   ...over,
@@ -329,5 +330,25 @@ describe('which text a burn shows when the list is full', () => {
 
     expect(await screen.findByText(/Swish/)).toBeTruthy()
     expect(screen.queryByText('Ask on the waiting list.')).toBeNull()
+  })
+})
+
+describe('what the allergies column shows', () => {
+  it('shows the ticked items beside whatever was written', async () => {
+    renderPage(
+      stub(
+        aRoster({
+          entries: [anEntry({ name: 'Ada', allergy_items: ['Vegan'], allergies_notes: 'red lentils' })],
+        }),
+      ),
+    )
+
+    expect(await screen.findByText('Vegan, red lentils')).toBeTruthy()
+  })
+
+  it('shows the ticks for somebody who wrote nothing', async () => {
+    renderPage(stub(aRoster({ entries: [anEntry({ name: 'Ada', allergy_items: ['Lactose'] })] })))
+
+    expect(await screen.findByText('Lactose')).toBeTruthy()
   })
 })

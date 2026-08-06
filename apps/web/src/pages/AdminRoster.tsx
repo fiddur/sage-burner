@@ -5,6 +5,7 @@ import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
+import { allergiesOf } from '../allergies.ts'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { WaitingListLine, startsTheWaitingList } from '../components/WaitingListLine.tsx'
 import { toCsv } from '../csv.ts'
@@ -20,6 +21,7 @@ const COLUMNS = [
   'name',
   'email',
   'contact',
+  'allergy_items',
   'allergies_notes',
   'arrival_date',
   'departure_date',
@@ -143,7 +145,7 @@ export const AdminRoster = ({ api }: { api: RosterApi }) => {
                         <br />
                         <span class="form-note">{entry.contact ?? entry.email}</span>
                       </td>
-                      <td>{entry.allergies_notes ?? '—'}</td>
+                      <td>{allergiesOf(entry)}</td>
                       <td>
                         {entry.arrival_date ?? '?'} → {entry.departure_date ?? '?'}
                         <br />

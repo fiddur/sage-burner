@@ -242,6 +242,7 @@ describe('handing on a place that has been paid for', () => {
     name: 'Bea',
     contact: null,
     allergies_notes: null,
+    allergy_items: [],
     payment_status: 'unpaid',
     waiting: true,
     ...over,

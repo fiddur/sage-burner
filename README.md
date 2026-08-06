@@ -1073,6 +1073,28 @@ exists to keep people safe. It is also what the central application model implie
 you are approved into the community once, so the details describing _you_ cannot
 hang off a single event.
 
+### Allergies are a list and a free-text box
+
+`allergy_item` is a **global**, admin-editable vocabulary (#254), seeded with five;
+`account_allergy` is what one person ticked. Global rather than per burn for the
+same reason `allergies_notes` is: what somebody cannot eat is a fact about them, and
+a per-burn list would mean re-ticking it every time. Rows rather than an enum, so a
+sixth item is an afternoon rather than a deploy.
+
+`allergies_notes` did not go anywhere. It sits beside the ticks as **Other**,
+because a vocabulary is never complete and the cost of it being wrong here is
+somebody's dinner. Nothing was parsed out of it by the migration — turning free text
+into items would be a guess, on the one kind of data where a wrong guess matters.
+
+**Removing an item somebody has ticked is refused.** `account_allergy.item_id`
+carries no `ON DELETE`, so SQLite objects and `allergies.ts` answers 409; the admin
+page says to rename it instead. This is the one place the roster's usual pattern is
+inverted — `attendance_helping` cascades from its option, because losing a shift
+preference is an inconvenience and losing an allergy is not. Reading the list is
+public like `/api/questions`; writing is **admin's**, not the burn's-furniture
+default, because renaming an item rewrites what everybody who ticked it is taken to
+have said.
+
 An invite's single use is enforced by a **partial unique index on
 `account.invite_token_id`** — partial because NULLs compare distinct in SQLite and
 every CLI-created account has none. Deleting the account would stop the index

@@ -283,6 +283,7 @@ describe('profileSchema', () => {
     name: 'Someone',
     contact: 'someone@example.org',
     allergies_notes: 'gluten. Sensitive to red lentils.',
+    allergy_item_ids: [],
   }
 
   it('accepts a person with their allergies recorded once', () => {
@@ -634,6 +635,7 @@ describe('the named length limits', () => {
     name: 'Someone',
     contact: 'a phone number',
     allergies_notes: null,
+    allergy_item_ids: [],
   }
   const aQuestion = {
     id: ID,

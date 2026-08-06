@@ -267,6 +267,59 @@ export const formQuestion = sqliteTable(
 )
 
 /**
+ * The allergy vocabulary everybody picks from (#254).
+ *
+ * Global rather than per burn, like `form_question` and unlike `event_option`: what
+ * somebody cannot eat is a fact about them, not about one gathering, and a per-burn
+ * list would mean re-ticking it every time.
+ *
+ * Rows rather than an enum so an admin adds one without a deploy — the same argument
+ * the application form makes. The free text on `account` stays beside these as
+ * "Other", because a list is never complete.
+ */
+export const allergyItem = sqliteTable(
+  'allergy_item',
+  {
+    id: text('id').notNull(),
+    // Not unique: reordering swaps positions, and a transient collision mid-swap
+    // must not be rejected.
+    order: integer('order').notNull(),
+    label: text('label').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    index('allergy_item_order_idx').on(table.order),
+    check('allergy_item_order_check', sql`${table.order} >= 0`),
+    check('allergy_item_label_check', sql`length(trim(${table.label})) > 0`),
+  ],
+)
+
+/**
+ * What one person cannot eat, as ticks against that list.
+ *
+ * On the `account`, not an `attendance`: allergies describe a human, and held per
+ * burn a correction would leave every other burn wrong — the same reason
+ * `allergies_notes` lives there.
+ *
+ * **No `onDelete` on the item**, unlike `attendance_helping`'s option. SQLite refuses
+ * to remove an item somebody has ticked, and `allergies.ts` turns that into a 409 an
+ * admin can act on. Cascading would silently drop a row that exists to keep somebody
+ * safe; renaming is what an admin actually wants when a label is wrong.
+ */
+export const accountAllergy = sqliteTable(
+  'account_allergy',
+  {
+    account_id: text('account_id')
+      .notNull()
+      .references(() => account.id, { onDelete: 'cascade' }),
+    item_id: text('item_id')
+      .notNull()
+      .references(() => allergyItem.id),
+  },
+  (table) => [primaryKey({ columns: [table.account_id, table.item_id] })],
+)
+
+/**
  * Somewhere a dream can happen — **per event**, seeded from a previous burn.
  *
  * The venue outlives the burn but the set in use does not: some spots are

@@ -1,4 +1,4 @@
-import type { Profile } from '@sage-burner/shared'
+import type { Profile, AllergyItem } from '@sage-burner/shared'
 
 import { MAX_CONTACT, MAX_NOTES, MAX_PERSON_NAME } from '@sage-burner/shared'
 import { useEffect, useState } from 'preact/hooks'
@@ -20,7 +20,7 @@ import { isMember, useViewer } from '../viewer.tsx'
 
 export type ProfileApi = Pick<
   ApiClient,
-  'getMyProfile' | 'updateMyProfile' | 'logout' | 'setMyAvatar' | 'removeMyAvatar'
+  'getMyProfile' | 'updateMyProfile' | 'logout' | 'setMyAvatar' | 'removeMyAvatar' | 'getAllergyItems'
 > &
   PasskeysApi &
   PushApi &
@@ -35,6 +35,8 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
   const [name, setName] = useState('')
   const [contact, setContact] = useState('')
   const [allergies, setAllergies] = useState('')
+  const [ticked, setTicked] = useState<readonly string[]>([])
+  const [items, setItems] = useState<readonly AllergyItem[]>([])
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useFormError()
@@ -52,10 +54,20 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
         setName(profile.name ?? '')
         setContact(profile.contact ?? '')
         setAllergies(profile.allergies_notes ?? '')
+        setTicked(profile.allergy_item_ids)
       })
       .catch(() => {
         if (!controller.signal.aborted) setLoaded({ status: 'failed' })
       })
+
+    // Its own request, and its own failure: the vocabulary is a nicety beside the
+    // free text, so not having it must not cost somebody the page their name is on.
+    api
+      .getAllergyItems(controller.signal)
+      .then(({ items: found }) => {
+        if (!controller.signal.aborted) setItems(found)
+      })
+      .catch(() => undefined)
 
     return () => controller.abort()
   }, [api, member])
@@ -74,6 +86,7 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
         name: name.trim(),
         contact: contact.trim(),
         allergies_notes: allergies.trim() === '' ? null : allergies.trim(),
+        allergy_item_ids: [...ticked],
       })
       setLoaded({ status: 'ready', profile })
       setSaved(true)
@@ -133,8 +146,34 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
             />
           </label>
 
+          {items.length > 0 && (
+            <fieldset class="field">
+              <legend>Allergies or food you cannot eat</legend>
+              {items.map((item) => (
+                <label key={item.id} class="field-inline">
+                  <input
+                    type="checkbox"
+                    checked={ticked.includes(item.id)}
+                    onChange={(changed) =>
+                      setTicked((current) =>
+                        changed.currentTarget.checked
+                          ? [...current, item.id]
+                          : current.filter((id) => id !== item.id),
+                      )
+                    }
+                  />
+                  <span>{item.label}</span>
+                </label>
+              ))}
+            </fieldset>
+          )}
+
           <label class="field">
-            <span>Allergies or food you cannot eat</span>
+            {/* The Other beside the ticks: a vocabulary is never complete, and the
+                cost of it being wrong here is somebody's dinner. */}
+            <span>
+              {items.length > 0 ? 'Anything else you cannot eat' : 'Allergies or food you cannot eat'}
+            </span>
             <textarea
               name="allergies_notes"
               maxLength={MAX_NOTES}

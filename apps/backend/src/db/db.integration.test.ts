@@ -10,7 +10,9 @@ import { createDb } from './client.ts'
 import { migrationsFolder, runMigrations } from './migrate.ts'
 import {
   account,
+  accountAllergy,
   accountRole,
+  allergyItem,
   application,
   event,
   formQuestion,
@@ -1186,5 +1188,56 @@ describe('the facilitator-is-an-attendance migration', () => {
     } finally {
       fresh.close()
     }
+  })
+})
+
+describe('the allergy list', () => {
+  const LACTOSE = 'a11e0000-0000-4000-8000-000000000004'
+
+  it('seeds the five the migration names, in order', () => {
+    const labels = handle.client
+      .prepare('SELECT label FROM allergy_item ORDER BY "order"')
+      .all()
+      .map((row) => row.label)
+
+    expect(labels).toEqual([
+      'Vegan',
+      'Gluten (non-celiac)',
+      'Strict gluten (celiac)',
+      'Lactose',
+      'Milk protein',
+    ])
+  })
+
+  it('refuses to remove an item somebody has ticked', () => {
+    // These rows exist to keep people safe, so a label going must not take a
+    // person's record with it. `place` refuses the same way when a dream is in it.
+    handle.db.insert(accountAllergy).values({ account_id: ids.account, item_id: LACTOSE }).run()
+
+    expect(() => handle.db.delete(allergyItem).where(eq(allergyItem.id, LACTOSE)).run()).toThrow()
+  })
+
+  it('removes one nobody has ticked', () => {
+    // The passing sibling: refusing every deletion would satisfy the test above, and
+    // an admin must still be able to drop an item that turned out unwanted.
+    expect(() => handle.db.delete(allergyItem).where(eq(allergyItem.id, LACTOSE)).run()).not.toThrow()
+  })
+
+  it('takes the ticks with the person when the account goes', () => {
+    // The other direction cascades: #35 owns account deletion, and a tick is part of
+    // the record being erased rather than something to keep.
+    handle.db.insert(accountAllergy).values({ account_id: ids.account, item_id: LACTOSE }).run()
+
+    handle.db.delete(account).where(eq(account.id, ids.account)).run()
+
+    expect(handle.db.select().from(accountAllergy).all()).toHaveLength(0)
+  })
+
+  it('refuses the same item twice for one person', () => {
+    handle.db.insert(accountAllergy).values({ account_id: ids.account, item_id: LACTOSE }).run()
+
+    expect(() =>
+      handle.db.insert(accountAllergy).values({ account_id: ids.account, item_id: LACTOSE }).run(),
+    ).toThrow()
   })
 })
