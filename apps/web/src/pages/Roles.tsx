@@ -317,19 +317,16 @@ const RoleRow = ({
       </td>
 
       <td data-label={COLUMNS.lead}>
-        <select
-          aria-label={`Lead of ${role.title}`}
-          disabled={busy}
-          value={role.lead?.account_id ?? ''}
-          onChange={(changeEvent) => onLead(changeEvent.currentTarget.value || null)}
-        >
-          <option value="">Nobody yet</option>
-          {attendees.map((person) => (
-            <option key={person.account_id} value={person.account_id}>
-              {nameOf(person)}
-            </option>
-          ))}
-        </select>
+        <HelperStrip
+          label={`${role.title} lead`}
+          people={role.lead === null ? [] : [role.lead]}
+          max={1}
+          candidates={attendees}
+          viewerId={viewerId}
+          busy={busy}
+          onAdd={(accountId) => onLead(accountId)}
+          onRemove={() => onLead(null)}
+        />
       </td>
 
       <td data-label={COLUMNS.tasks}>

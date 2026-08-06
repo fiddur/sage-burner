@@ -8,26 +8,6 @@ export interface Person {
 const nameOf = (person: Person) => person.name ?? 'Someone without a name yet'
 
 /**
- * `Me — Ada` first, then the rest by name.
- *
- * For the selects that name **one** person — a meal's lead, a dream's facilitator —
- * where taking it yourself is the common case and there is no 🙋 beside them.
- * Deliberately not used by the strip below, whose picker excludes you: 🙋 is the
- * route to yourself there, and offering both would be two ways to one thing.
- *
- * Bare `Me` for somebody with no name yet, since `Me — Someone without a name yet`
- * reads as a bug.
- */
-export const meFirst = (people: readonly Person[], viewerId: string | undefined): readonly Person[] => {
-  const rest = [...people]
-    .filter((person) => person.account_id !== viewerId)
-    .sort((a, b) => nameOf(a).localeCompare(nameOf(b)))
-  const me = people.find((person) => person.account_id === viewerId)
-
-  return me === undefined ? rest : [{ ...me, name: me.name === null ? 'Me' : `Me — ${me.name}` }, ...rest]
-}
-
-/**
  * Everywhere several people put their hands up for the same thing (#247).
  *
  * One control for a dream's helpers, a meal's crew and a lead role's team, because
@@ -54,6 +34,7 @@ export const HelperStrip = ({
   label,
   people,
   wanted,
+  max,
   candidates,
   viewerId,
   busy,
@@ -65,6 +46,12 @@ export const HelperStrip = ({
   people: readonly Person[]
   /** How many are asked for. Absent where nobody counts — a dream's helpers. */
   wanted?: number
+  /**
+   * How many may hold it at once. `1` for a lead or a facilitator, where a filled
+   * spot offers only ✕ — handing over is unassign then assign, two steps, and each
+   * tells the person it happened to. Absent where any number of hands is welcome.
+   */
+  max?: number
   candidates: readonly Person[]
   viewerId: string | undefined
   busy: boolean
@@ -80,9 +67,10 @@ export const HelperStrip = ({
   const offerable = candidates.filter((who) => !on.has(who.account_id) && who.account_id !== viewerId)
 
   // At least one, so there is somewhere to put the buttons. The extra one is not
-  // "wanted" — nothing more is asked for there.
+  // "wanted" — nothing more is asked for there. Where `max` says how many may hold
+  // it, a full spot gets none at all: the only way on is through somebody's ✕.
   const short = Math.max(0, (wanted ?? 0) - people.length)
-  const vacancies = Math.max(short, 1)
+  const vacancies = max === undefined ? Math.max(short, 1) : Math.max(0, max - people.length)
 
   return (
     <ul class="helpers">

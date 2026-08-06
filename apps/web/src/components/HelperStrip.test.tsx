@@ -1,9 +1,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { Person } from './HelperStrip.tsx'
-
-import { HelperStrip, meFirst } from './HelperStrip.tsx'
+import { HelperStrip } from './HelperStrip.tsx'
 
 afterEach(cleanup)
 
@@ -138,24 +136,5 @@ describe('HelperStrip', () => {
 
     const hand = screen.getByRole('button', { name: 'Take the spot on the sauna' })
     expect(hand.getAttribute('title')).toBe('Take the spot')
-  })
-})
-
-describe('meFirst', () => {
-  it('puts the viewer at the top, named, and sorts the rest', () => {
-    const ordered = meFirst([CAI, ADA, BEA], 'a-2')
-
-    expect(ordered.map((person) => person.name)).toEqual(['Me — Bea', 'Ada', 'Cai'])
-  })
-
-  it('says just Me for somebody who has not filled a name in', () => {
-    // `Me — Someone without a name yet` reads as a bug rather than as a name.
-    const nameless: Person = { account_id: 'a-4', name: null }
-
-    expect(meFirst([ADA, nameless], 'a-4')[0]?.name).toBe('Me')
-  })
-
-  it('leaves the list alone when the viewer is not in it', () => {
-    expect(meFirst([CAI, ADA], 'a-9').map((person) => person.name)).toEqual(['Ada', 'Cai'])
   })
 })

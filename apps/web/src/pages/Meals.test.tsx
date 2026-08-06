@@ -91,9 +91,7 @@ describe('the meal plan', () => {
     const setMealLead = vi.fn<MealsApi['setMealLead']>(() => Promise.resolve({ meal: aMeal() }))
     renderPage(stub({ setMealLead }))
 
-    fireEvent.change(await screen.findByLabelText('Lead for Dinner on 2026-08-01'), {
-      target: { value: 'a-1' },
-    })
+    fireEvent.click(await screen.findByRole('button', { name: 'Take the spot on Dinner on 2026-08-01' }))
 
     await waitFor(() => expect(setMealLead).toHaveBeenCalledWith('m-1', { account_id: 'a-1' }))
   })
@@ -129,7 +127,9 @@ describe('the meal plan', () => {
 
     await screen.findByText('Morning cleanup')
 
-    expect(screen.queryByLabelText('Lead for Morning cleanup on 2026-08-01')).toBeNull()
+    expect(
+      screen.queryByRole('button', { name: 'Take the spot on Morning cleanup on 2026-08-01' }),
+    ).toBeNull()
     // Nobody may be added to a chore's cooks, so neither button is offered there.
     expect(
       screen.queryByRole('button', { name: 'Take the spot on cooking at Morning cleanup on 2026-08-01' }),
@@ -145,7 +145,7 @@ describe('the meal plan', () => {
     // The passing sibling: hiding them for every sitting would satisfy the test above.
     renderPage(stub())
 
-    expect(await screen.findByLabelText('Lead for Dinner on 2026-08-01')).toBeTruthy()
+    expect(await screen.findByRole('button', { name: 'Take the spot on Dinner on 2026-08-01' })).toBeTruthy()
     expect(
       screen.getByRole('button', { name: 'Take the spot on cooking at Dinner on 2026-08-01' }),
     ).toBeTruthy()
@@ -199,32 +199,31 @@ describe('a chore that still has somebody on it', () => {
     const setMealLead = vi.fn<MealsApi['setMealLead']>(() => Promise.resolve({ meal: chore() }))
     renderPage(stub({ setMealLead }, [chore({ lead: { account_id: 'a-1', name: 'Ada' } })]))
 
-    const select = await screen.findByLabelText('Lead for Morning cleanup on 2026-08-01')
-    fireEvent.change(select, { target: { value: '' } })
+    fireEvent.click(await screen.findByRole('button', { name: 'Take Ada off Morning cleanup on 2026-08-01' }))
 
     await waitFor(() => expect(setMealLead).toHaveBeenCalledWith('m-1', { account_id: null }))
   })
 
   it('names whoever is on it, and offers nobody else, since the API would refuse', async () => {
-    // Two options and no more: "Nobody yet", which vacates, and the person already on
-    // it. Without the second nothing matches the control's value and it draws blank —
-    // vacant-looking while somebody is still on it, which is the thing the whole
-    // stale-lead option exists to prevent.
+    // The holder is drawn from the meal rather than matched against the attendees,
+    // so a chore — which may take no new lead at all — still shows who is on it and
+    // still offers the ✕ that gets them off.
     renderPage(stub({}, [chore({ lead: { account_id: 'a-1', name: 'Ada' } })]))
 
-    const select = await screen.findByLabelText('Lead for Morning cleanup on 2026-08-01')
-    const options = [...select.querySelectorAll('option')].map((option) => option.textContent)
-
-    expect(options).toEqual(['Nobody yet', 'Ada'])
-    expect(select).toHaveProperty('value', 'a-1')
+    expect(await screen.findByText('Ada')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Take Ada off Morning cleanup on 2026-08-01' })).toBeTruthy()
+    expect(
+      screen.queryByRole('button', { name: 'Appoint someone to Morning cleanup on 2026-08-01' }),
+    ).toBeNull()
   })
 
-  it('says so when the one on it has withdrawn as well', async () => {
+  it('shows the one on it even after they have withdrawn from the burn', async () => {
+    // They are not among the attendees any more. Reading the holder off the meal is
+    // what keeps the spot from drawing vacant while somebody is still on it.
     renderPage(stub({}, [chore({ lead: { account_id: 'a-9', name: 'Gone' } })]))
 
-    const select = await screen.findByLabelText('Lead for Morning cleanup on 2026-08-01')
-
-    expect(select.textContent).toContain('Gone — no longer coming')
+    expect(await screen.findByText('Gone')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Take Gone off Morning cleanup on 2026-08-01' })).toBeTruthy()
   })
 
   it('lets a stranded cook stand down, and offers nobody the chance to join', async () => {
@@ -257,7 +256,11 @@ describe('a chore that still has somebody on it', () => {
 
     await screen.findByText('Morning cleanup')
 
-    expect(screen.queryByLabelText('Lead for Morning cleanup on 2026-08-01')).toBeNull()
-    expect(screen.queryByLabelText('Help cook at Morning cleanup on 2026-08-01')).toBeNull()
+    expect(
+      screen.queryByRole('button', { name: 'Take the spot on Morning cleanup on 2026-08-01' }),
+    ).toBeNull()
+    expect(
+      screen.queryByRole('button', { name: 'Take the spot on cooking at Morning cleanup on 2026-08-01' }),
+    ).toBeNull()
   })
 })

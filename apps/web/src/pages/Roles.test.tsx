@@ -93,24 +93,22 @@ describe('Roles', () => {
     expect(await screen.findByText(/No roles yet/)).toBeTruthy()
   })
 
-  it('shows a vacant role as vacant rather than blank', async () => {
-    // The Lead column is the select itself rather than a sentence beside it: the
-    // register is a table now, and two spellings of who leads in one cell is one
-    // more than the column has room for.
+  it('shows a vacant role as a spot anybody can take', async () => {
     renderPage(stub({}, [aRole({ id: 'r-1', title: 'Sauna' })]))
 
     expect(await screen.findByText('Sauna')).toBeTruthy()
-    const lead = await screen.findByLabelText('Lead of Sauna')
-    expect(lead instanceof HTMLSelectElement && lead.value).toBe('')
-    expect(screen.getByRole('option', { name: 'Nobody yet', selected: true })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Take the spot on Sauna lead' })).toBeTruthy()
   })
 
-  it('names the lead when somebody holds it', async () => {
+  it('names the lead when somebody holds it, and offers only to take them off', async () => {
+    // A held spot shows its holder and ✕ and nothing else: handing over is unassign
+    // then assign, which is two gestures and two people told.
     renderPage(stub({}, [aRole({ id: 'r-1', title: 'Sauna', lead: { account_id: 'a-2', name: 'Bea' } })]))
 
-    const lead = await screen.findByLabelText('Lead of Sauna')
-    expect(lead instanceof HTMLSelectElement && lead.value).toBe('a-2')
-    expect(screen.getByRole('option', { name: 'Bea', selected: true })).toBeTruthy()
+    expect(await screen.findByText('Bea')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Take Bea off Sauna lead' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Take the spot on Sauna lead' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Appoint someone to Sauna lead' })).toBeNull()
   })
 
   it('shows how many the team wants without ever refusing another', async () => {
@@ -226,15 +224,19 @@ describe('Roles', () => {
       ]),
     )
 
-    const lead = await screen.findByLabelText('Lead of Sauna')
-    fireEvent.change(lead, { target: { value: 'a-1' } })
+    // The two halves of the handover, each from its own render: the stub answers
+    // with the same list every time, so one render cannot show both states.
+    fireEvent.click(await screen.findByRole('button', { name: 'Take Bea off Sauna lead' }))
     await waitFor(() => {
-      expect(setLeadRoleLead).toHaveBeenCalledWith('r-1', 'a-1')
+      expect(setLeadRoleLead).toHaveBeenCalledWith('r-1', null)
     })
 
-    fireEvent.change(await screen.findByLabelText('Lead of Sauna'), { target: { value: '' } })
+    cleanup()
+    renderPage(stub({ setLeadRoleLead }, [aRole({ id: 'r-1', title: 'Sauna' })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Take the spot on Sauna lead' }))
     await waitFor(() => {
-      expect(setLeadRoleLead).toHaveBeenLastCalledWith('r-1', null)
+      expect(setLeadRoleLead).toHaveBeenLastCalledWith('r-1', 'a-1')
     })
   })
 
