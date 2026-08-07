@@ -176,7 +176,7 @@ describe('security headers', () => {
   it('asks browsers to remember the TLS, which Apache terminates', async () => {
     expect(
       (await (await build()).inject({ method: 'GET', url: '/' })).headers['strict-transport-security'],
-      // The exact value, not merely its presence: the README's apex-domain
+      // The exact value, not merely its presence: docs/http.md's apex-domain
       // warning is entirely about `includeSubDomains` and the one-year
       // max-age, and both come from helmet's defaults rather than from
       // `helmetOptions()`. A helmet upgrade shortening either would leave that

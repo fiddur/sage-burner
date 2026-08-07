@@ -89,7 +89,7 @@ const isLoopbackHost = (host: string): boolean =>
  * repository documents. `NODE_ENV` cannot answer it alone: it defaults to
  * `development` when unset. Nor can `HOST`, because **a reverse proxy in front
  * means the app binds loopback** — `pnpm start` or a systemd unit on
- * `127.0.0.1:3000` behind the README's Apache vhost satisfies "not production"
+ * `127.0.0.1:3000` behind `docs/deploying.md`'s Apache vhost satisfies "not production"
  * and "loopback" both, and would have booted quietly on the development key
  * that is committed to this repository, serving a non-`Secure` cookie over
  * Apache's TLS.
@@ -97,7 +97,7 @@ const isLoopbackHost = (host: string): boolean =>
  * `WEB_ROOT` closes it. Setting it says "serve the built frontend", which is a
  * deployment by definition — Vite serves the frontend in development, so a dev
  * run never sets it. The one case that pays for this is building the frontend
- * and pointing a local backend at it; the README's recipe for that passes a
+ * and pointing a local backend at it; `docs/configuration.md`'s recipe passes a
  * secret, and that run *is* serving the built app, so being treated as a
  * deployment is right.
  */

@@ -1251,8 +1251,14 @@ a:hover {
   border-radius: 50%;
 }
 
-/* The corner's circle, now that it may be a picture rather than letters. */
-.avatar-link {
+/*
+  The corner's icon links — the wheel and the face. Neither is a word, so neither
+  takes the underline the nav's links wear: under an emoji it reads as a mistake, and
+  under a picture there is nothing to underline at all.
+
+  One rule for both, so a third icon in that corner cannot be added without it.
+*/
+.nav-icon {
   display: inline-flex;
   text-decoration: none;
 }

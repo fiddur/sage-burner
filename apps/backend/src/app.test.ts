@@ -383,7 +383,7 @@ describe('the error envelope', () => {
 describe('trustProxy', () => {
   // Nothing else pins this: delete `trustProxy` from the Fastify options and
   // every other test in this file still passes while the spoof-resistance the
-  // README argues for is silently gone. request.ip is what a rate limiter on
+  // docs/deploying.md argues for is silently gone. request.ip is what a rate limiter on
   // invite redemption and an admin audit trail will key on.
   //
   // Verified by deleting the option: the `1` and `true` cases fail. The default

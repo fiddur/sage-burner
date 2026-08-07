@@ -20,7 +20,7 @@ export interface ScheduleDeps {
  *
  * Unauthenticated, because a calendar client cannot hold a session — subscribing
  * is a URL a phone re-fetches on its own schedule. The event id is a UUID, so the
- * URL is unguessable; it is not a secret beyond that, and the README says plainly
+ * URL is unguessable; it is not a secret beyond that, and `docs/burns.md` says plainly
  * that it should not be handed outside the gathering.
  *
  * The columns selected here are the whole of what leaves the building. No host,

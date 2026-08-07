@@ -38,7 +38,7 @@ services:
       # `.env.example`. Set it to 1 in your `.env` for the documented Apache
       # setup — one trusted hop is spoof-resistant there, since a client can
       # only prepend to X-Forwarded-For and Apache appends what it saw. See
-      # `.env.example` and the README for the full reasoning; this comment
+      # `.env.example` and `docs/deploying.md` for the full reasoning; this comment
       # deliberately does not restate their contents, having twice gone stale
       # by describing a version of that file which no longer existed.
       #

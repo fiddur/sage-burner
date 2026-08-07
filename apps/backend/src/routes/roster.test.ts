@@ -284,7 +284,7 @@ describe('recording a payment', () => {
 
     await setPayment(server, admin.cookie, eventId, who.id, { payment_status: 'unpaid' })
 
-    // The invariant the README states: unmarking clears the date, so one never
+    // The invariant `docs/burns.md` states: unmarking clears the date, so one never
     // outlives the payment it recorded. Now a property of the write rather than
     // of the one caller that remembered to send `null`.
     const [row] = await db().select().from(attendance).where(eq(attendance.account_id, who.id))
