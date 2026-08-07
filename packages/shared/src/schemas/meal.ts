@@ -37,7 +37,7 @@ export const mealFields = z.object({
   at: timeSchema,
   label: nonEmptyText(MAX_OPTION_LABEL),
   kind: z.enum(mealSlotKinds),
-  /** The sheet's "Food idea?", whose own header says "Not needed". */
+  /** The sheet's "Food idea?" column. Optional, and nobody is bound by it. */
   food_idea: z.string().max(MAX_OPTION_LABEL),
 })
 

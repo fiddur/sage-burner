@@ -475,7 +475,7 @@ export const registerMealRoutes = (
 
   /**
    * What somebody thought of cooking. Anyone may write it, and the lead is not bound
-   * by it — the sheet's own header calls the column "Not needed".
+   * by it — the sheet's own header called the column "Not needed".
    */
   app.put<{ Params: { id: string } }>(
     apiRoutes.setMealIdea.fastify,

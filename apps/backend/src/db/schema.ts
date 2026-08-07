@@ -1008,7 +1008,7 @@ export const meal = sqliteTable(
     at: text('at').notNull(),
     label: text('label').notNull(),
     kind: text('kind', { enum: mealSlotKinds }).notNull(),
-    /** The sheet's "Food idea?", whose own header says "Not needed". */
+    /** The sheet's "Food idea?" column. Optional, and nobody is bound by it. */
     food_idea: text('food_idea').notNull().default(''),
   },
   (table) => [
