@@ -72,6 +72,16 @@ describe('the nav', () => {
     expectLinks(['Members', 'Schedule', 'Leads', 'Your details'], ['Your burn'])
   })
 
+  it("leaves the corner's icons unlined, since neither of them is a word", () => {
+    // The wheel wore the nav's underline while the face beside it did not. One class
+    // for both, so a third icon in that corner cannot be added without it.
+    renderNav(signedInAs('admin', 'member'))
+
+    for (const label of ['Organise', 'Your details']) {
+      expect(screen.getByRole('link', { name: label }).className).toContain('nav-icon')
+    }
+  })
+
   it('keeps Organise from a member who is not an admin', () => {
     // The ⚙️ split: the page behind it is admin's alone now, so offering it to a
     // member sends them to a refusal. The burn's shared furniture, which a member

@@ -351,7 +351,7 @@ export const memberRosterResponseSchema = z.object({
  * `payment_date` is derived from the status and the clock rather than taken from
  * the caller, the way `joined_at` already is. Accepting both let them disagree:
  * `{ payment_status: 'unpaid' }` alone left yesterday's date standing, and a date
- * alone recorded a payment that the status said had not happened. The README
+ * alone recorded a payment that the status said had not happened. `docs/burns.md`
  * stated the invariant as a property of the system when it was in fact a habit of
  * the single caller.
  *

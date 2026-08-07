@@ -97,7 +97,7 @@ export const registerRedemptionRoutes = (
     // Before the taken-address check, and gated, so a refusal costs what a success
     // costs and neither is free. That throttles member enumeration rather than
     // closing it — the status codes still answer the question, and the 409 does
-    // not spend the token — which the README argues out under "Redeeming".
+    // not spend the token — which `docs/accounts.md` argues out under "Redeeming".
     //
     // Outside the transaction: holding a write transaction open across scrypt
     // would block every other writer for that long.
@@ -174,8 +174,10 @@ export const registerRedemptionRoutes = (
             })
             .run()
 
-          // Redeeming an invite is what makes someone a member. No attendance row:
-          // coming to a particular burn is a separate act, and #76 owns it.
+          // Redeeming an invite is what makes someone a member. No attendance row
+          // here even when the form ticked a burn: joining happens after this
+          // transaction and outside it, so a failure to join cannot roll back the
+          // token spend — see the comment below the commit.
           tx.insert(accountRole).values({ account_id: accountId, role: 'member' }).run()
 
           return true

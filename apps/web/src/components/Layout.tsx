@@ -90,13 +90,13 @@ export const Layout = ({ api, children }: { api: BellApi; children: ComponentChi
           {viewer.account !== undefined && <NotificationBell api={api} />}
 
           {isAdmin(viewer) && (
-            <a href="/admin" aria-label="Organise" title="Organise">
+            <a class="nav-icon" href="/admin" aria-label="Organise" title="Organise">
               ⚙️
             </a>
           )}
 
           {isMember(viewer) && (
-            <a class="avatar-link" href="/profile" aria-label="Your details" title="Your details">
+            <a class="nav-icon" href="/profile" aria-label="Your details" title="Your details">
               <Avatar
                 accountId={viewer.account?.id ?? ''}
                 name={viewer.account?.name ?? null}

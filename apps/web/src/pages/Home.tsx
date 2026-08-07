@@ -140,7 +140,7 @@ export const Home = ({ api }: { api: HomeApi }) => {
         active.event === null && (
           // Before the first event exists, and again once the last has ended.
           // Says so rather than showing a stale welcome text — see the
-          // active-event rule in the README.
+          // active-event rule in `docs/burns.md`.
           <p class="notice">There is no burn scheduled at the moment. Check back later.</p>
         )}
 
