@@ -373,8 +373,6 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
                     />
                   </label>
 
-                  {/* Public: the homepage says it and a shared link puts the burn on a
-                      map, so it holds a place rather than a gate code. */}
                   <p class="form-note">
                     Shown on the homepage and in the card a shared link draws — "Sagegården, outside Rättvik",
                     not the directions.

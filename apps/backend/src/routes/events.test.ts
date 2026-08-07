@@ -327,6 +327,28 @@ describe('admin event routes', () => {
     expect(response.json().event.id).toBeTruthy()
   })
 
+  it('takes where the burn is held, and hands it back', async () => {
+    // Both schemas are `.strict()`, so a field missing from either is a 400 — and
+    // every other test writes `location` straight into the table, which would not
+    // notice (#309).
+    const server = await build()
+    const cookie = await givenAdmin()
+
+    const created = await create(server, cookie, { ...valid, location: 'Sagegården, Rättvik' })
+    expect(created.json().event.location).toBe('Sagegården, Rättvik')
+
+    const moved = await patch(server, cookie, created.json().event.id, { location: 'Ånn, Jämtland' })
+    expect(moved.statusCode).toBe(200)
+    expect(moved.json().event.location).toBe('Ånn, Jämtland')
+  })
+
+  it('leaves the place empty when the create does not name one', async () => {
+    const server = await build()
+    const cookie = await givenAdmin()
+
+    expect((await create(server, cookie, valid)).json().event.location).toBe('')
+  })
+
   it('default the welcome text to empty so an event can exist before it is written', async () => {
     const server = await build()
     const cookie = await givenAdmin()
