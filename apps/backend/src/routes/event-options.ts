@@ -18,6 +18,7 @@ import { createGuards } from '../auth/guards.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
 import { attendance, eventOption } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
+import { refuseIfStale, withVersion } from '../if-match.ts'
 
 const optionsFor = async (db: Database, eventId: string): Promise<EventOptionTaken[]> => {
   const rows = await db
@@ -53,10 +54,15 @@ const optionsFor = async (db: Database, eventId: string): Promise<EventOptionTak
 export const registerEventOptionRoutes = (app: FastifyInstance, { db, sessions }: GuardDeps) => {
   const { requireApproved } = createGuards({ db, sessions })
 
+  /** The lists, as both the `GET` and the `If-Match` guards see them (#274). */
+  const choices = async (eventId: string): Promise<EventOptionsResponse> => ({
+    options: await optionsFor(db, eventId),
+  })
+
   app.get<{ Params: { eventId: string } }>(apiRoutes.getEventOptions.fastify, async (request, reply) => {
     void reply.header('cache-control', 'no-cache')
 
-    return { options: await optionsFor(db, request.params.eventId) } satisfies EventOptionsResponse
+    return withVersion(reply, await choices(request.params.eventId))
   })
 
   app.post<{ Params: { eventId: string } }>(
@@ -114,16 +120,19 @@ export const registerEventOptionRoutes = (app: FastifyInstance, { db, sessions }
       const body = bodyOf(eventOptionUpdateSchema, request)
       if (body === undefined) return sendError(reply, 400)
 
-      // `set({})` is not valid SQL.
-      if (Object.keys(body).length === 0) {
-        const [existing] = await db
-          .select()
-          .from(eventOption)
-          .where(eq(eventOption.id, request.params.id))
-          .limit(1)
+      const [existing] = await db
+        .select()
+        .from(eventOption)
+        .where(eq(eventOption.id, request.params.id))
+        .limit(1)
 
-        return existing === undefined ? sendError(reply, 404) : { option: existing }
-      }
+      if (existing === undefined) return sendError(reply, 404)
+
+      // `set({})` is not valid SQL, and a no-op PATCH is a read — so it answers with
+      // the row rather than writing, and needs no precondition.
+      if (Object.keys(body).length === 0) return { option: existing }
+
+      if (await refuseIfStale(request, reply, () => choices(existing.event_id))) return reply
 
       const [updated] = await db
         .update(eventOption)
@@ -174,6 +183,8 @@ export const registerEventOptionRoutes = (app: FastifyInstance, { db, sessions }
       const body = bodyOf(eventOptionOrderSchema, request)
       if (body === undefined) return sendError(reply, 400)
 
+      if (await refuseIfStale(request, reply, () => choices(eventId))) return reply
+
       const existing = (await optionsFor(db, eventId)).filter((row) => row.kind === kind)
       const wanted = body.ids
 
@@ -188,7 +199,7 @@ export const registerEventOptionRoutes = (app: FastifyInstance, { db, sessions }
         })
       })
 
-      return { options: await optionsFor(db, eventId) } satisfies EventOptionsResponse
+      return withVersion(reply, await choices(eventId))
     },
   )
 }

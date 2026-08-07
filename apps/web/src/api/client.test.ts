@@ -59,7 +59,10 @@ describe('createApiClient', () => {
 
     const init = doFetch.mock.calls[0]?.[1]
     expect(init?.body).toBeUndefined()
-    expect(init?.headers).toBeUndefined()
+    // Named rather than asserting the whole object is absent: since #274 there is
+    // always a headers object, because a write may carry `If-Match`. What must not
+    // be there is a content type for a body that does not exist.
+    expect(init?.headers).not.toHaveProperty('content-type')
   })
 
   it('resolves undefined for 204, which has no body to parse', async () => {
@@ -304,6 +307,112 @@ describe('a body that is not JSON', () => {
     await api.removeMyAvatar()
 
     const [, init] = doFetch.mock.calls[0] ?? []
-    expect(init?.headers).toBeUndefined()
+    expect(init?.headers).not.toHaveProperty('content-type')
+  })
+})
+
+describe('quoting what was read back (#274)', () => {
+  /** Answers each call in turn, so a read and the write after it can differ. */
+  const answering = (...answers: { body: unknown; init?: ResponseInit }[]) => {
+    let call = 0
+
+    return vi.fn<typeof fetch>(() => {
+      const answer = answers[Math.min(call++, answers.length - 1)]
+
+      return Promise.resolve(
+        new Response(JSON.stringify(answer?.body ?? {}), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+          ...answer?.init,
+        }),
+      )
+    })
+  }
+
+  const headersOf = (doFetch: ReturnType<typeof answering>, call: number) =>
+    doFetch.mock.calls[call]?.[1]?.headers
+
+  it('sends the version a guarded read handed over', async () => {
+    const doFetch = answering(
+      { body: { places: [] }, init: { headers: { etag: '"v1"', 'content-type': 'application/json' } } },
+      { body: { place: {} } },
+    )
+    const api = createApiClient(doFetch)
+
+    await api.getPlaces('e-1')
+    await api.updatePlace('p-1', { name: 'Steam Room' })
+
+    expect(headersOf(doFetch, 1)).toMatchObject({ 'if-match': '"v1"' })
+  })
+
+  it('sends none before the read that would have given it one', async () => {
+    // Which the server refuses with a 428 — deliberately, since a write with nothing
+    // to assert is one written against nothing.
+    const doFetch = answering({ body: { place: {} } })
+
+    await createApiClient(doFetch).updatePlace('p-1', { name: 'Steam Room' })
+
+    expect(headersOf(doFetch, 0)).not.toHaveProperty('if-match')
+  })
+
+  it('keeps each guarded thing apart, so a grid is not asserted against a pool', async () => {
+    const doFetch = answering(
+      { body: { places: [] }, init: { headers: { etag: '"grid"', 'content-type': 'application/json' } } },
+      { body: { sessions: [] }, init: { headers: { etag: '"pool"', 'content-type': 'application/json' } } },
+      { body: { place: {} } },
+    )
+    const api = createApiClient(doFetch)
+
+    await api.getPlaces('e-1')
+    await api.getSessions('e-1')
+    await api.updatePlace('p-1', { name: 'Steam Room' })
+
+    expect(headersOf(doFetch, 2)).toMatchObject({ 'if-match': '"grid"' })
+  })
+
+  it('sends nothing on a write that is not guarded, which has nothing to overwrite', async () => {
+    const doFetch = answering(
+      { body: { places: [] }, init: { headers: { etag: '"v1"', 'content-type': 'application/json' } } },
+      { body: { place: {} }, init: { status: 201 } },
+    )
+    const api = createApiClient(doFetch)
+
+    await api.getPlaces('e-1')
+    await api.addPlace('e-1', { name: 'Sauna', emoji: '🥵', color: 'red' })
+
+    expect(headersOf(doFetch, 1)).not.toHaveProperty('if-match')
+  })
+
+  it('takes the version off a refusal, so the retry is not another read first', async () => {
+    const doFetch = answering(
+      { body: { places: [] }, init: { headers: { etag: '"v1"', 'content-type': 'application/json' } } },
+      {
+        body: { error: 'stale', places: [{ id: 'p-1', name: 'Somebody else’s name' }] },
+        init: { status: 412, headers: { etag: '"v2"', 'content-type': 'application/json' } },
+      },
+      { body: { place: {} } },
+    )
+    const api = createApiClient(doFetch)
+
+    await api.getPlaces('e-1')
+    await expect(api.updatePlace('p-1', { name: 'Steam Room' })).rejects.toMatchObject({ status: 412 })
+    await api.updatePlace('p-1', { name: 'Steam Room' })
+
+    expect(headersOf(doFetch, 2)).toMatchObject({ 'if-match': '"v2"' })
+  })
+
+  it('carries what the other person wrote on the failure, not only that they did', async () => {
+    const doFetch = answering({
+      body: { error: 'stale', places: [{ id: 'p-1', name: 'Somebody else’s name' }] },
+      init: { status: 412, headers: { etag: '"v2"', 'content-type': 'application/json' } },
+    })
+
+    const failure = createApiClient(doFetch).updatePlace('p-1', { name: 'Steam Room' })
+
+    await expect(failure).rejects.toMatchObject({
+      status: 412,
+      code: 'stale',
+      payload: { places: [{ name: 'Somebody else’s name' }] },
+    })
   })
 })

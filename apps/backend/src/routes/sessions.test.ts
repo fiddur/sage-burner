@@ -13,6 +13,7 @@ import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, accountRole, attendance, event, place, pushSubscription, session } from '../db/schema.ts'
+import { sendGuarded } from '../if-match.testing.ts'
 
 const SECRET = 's'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
@@ -134,12 +135,14 @@ const editDream = (
   id: string,
   payload: Record<string, unknown>,
 ) =>
-  server.inject({
-    method: 'PATCH',
-    url: `/api/sessions/${id}`,
-    headers: cookie === undefined ? {} : { cookie },
-    payload,
-  })
+  sendGuarded((extra) =>
+    server.inject({
+      method: 'PATCH',
+      url: `/api/sessions/${id}`,
+      headers: { ...(cookie === undefined ? {} : { cookie }), ...extra },
+      payload,
+    }),
+  )
 
 const drop = (server: FastifyInstance, cookie: string | undefined, id: string) =>
   server.inject({
@@ -1007,5 +1010,48 @@ describe('telling somebody a dream role moved', () => {
     await editDream(server, ada.cookie, id, { title: 'Sunset yoga' })
 
     expect(deliver).not.toHaveBeenCalled()
+  })
+})
+
+describe('moving a dream somebody else has just moved', () => {
+  const move = (server: FastifyInstance, cookie: string, id: string, version?: string) =>
+    server.inject({
+      method: 'PATCH',
+      url: `/api/sessions/${id}`,
+      headers: { cookie, ...(version === undefined ? {} : { 'if-match': version }) },
+      payload: { title: 'Sauna ritual' },
+    })
+
+  it('refuses one written against no version of the pool, and against an old one', async () => {
+    const server = await build()
+    await givenEvent()
+    const ada = await givenAttending(OPEN_BURN)
+    const bea = await givenAttending(OPEN_BURN)
+    const mine = (await offer(server, ada.cookie, { title: 'Sauna', description: '' })).json().session.id
+    const theirs = (await offer(server, bea.cookie, { title: 'Fire spinning', description: '' })).json()
+      .session.id
+
+    const asAdaSawIt = String((await list(server, ada.cookie)).headers.etag)
+
+    expect((await move(server, ada.cookie, mine)).statusCode).toBe(428)
+
+    // Bea edits her own dream, which moves the pool Ada is holding a version of.
+    expect((await editDream(server, bea.cookie, theirs, { title: 'Poi' })).statusCode).toBe(200)
+
+    const refused = await move(server, ada.cookie, mine, asAdaSawIt)
+    expect(refused.statusCode).toBe(412)
+    // Carrying the pool as it stands, so the page can say what changed.
+    expect(refused.json().sessions.map((dream: { title: string }) => dream.title)).toContain('Poi')
+  })
+
+  it('takes one written against the version it was handed', async () => {
+    const server = await build()
+    await givenEvent()
+    const ada = await givenAttending(OPEN_BURN)
+    const mine = (await offer(server, ada.cookie, { title: 'Sauna', description: '' })).json().session.id
+
+    const current = String((await list(server, ada.cookie)).headers.etag)
+
+    expect((await move(server, ada.cookie, mine, current)).statusCode).toBe(200)
   })
 })

@@ -11,6 +11,7 @@ import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, accountRole, attendance, event, eventOption } from '../db/schema.ts'
+import { sendGuarded } from '../if-match.testing.ts'
 
 const SECRET = 's'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
@@ -97,12 +98,14 @@ const edit = (
   id: string,
   payload: Record<string, unknown>,
 ) =>
-  server.inject({
-    method: 'PATCH',
-    url: `/api/event-options/${id}`,
-    headers: cookie === undefined ? {} : { cookie },
-    payload,
-  })
+  sendGuarded((extra) =>
+    server.inject({
+      method: 'PATCH',
+      url: `/api/event-options/${id}`,
+      headers: { ...(cookie === undefined ? {} : { cookie }), ...extra },
+      payload,
+    }),
+  )
 
 const remove = (server: FastifyInstance, cookie: string | undefined, id: string) =>
   server.inject({
@@ -118,12 +121,14 @@ const reorder = (
   kind: string,
   payload: Record<string, unknown>,
 ) =>
-  server.inject({
-    method: 'PUT',
-    url: `/api/events/${eventId}/options/${kind}/order`,
-    headers: cookie === undefined ? {} : { cookie },
-    payload,
-  })
+  sendGuarded((extra) =>
+    server.inject({
+      method: 'PUT',
+      url: `/api/events/${eventId}/options/${kind}/order`,
+      headers: { ...(cookie === undefined ? {} : { cookie }), ...extra },
+      payload,
+    }),
+  )
 
 const labels = (server: FastifyInstance, eventId: string, kind: string) =>
   list(server, eventId).then((response) =>
@@ -468,5 +473,47 @@ describe('the lists a member picks from', () => {
     expect(row('lodging', '  ', null)).toThrow()
     expect(row('lodging', 'x', 0)).toThrow()
     expect(row('lodging', 'Temple', 9)).not.toThrow()
+  })
+})
+
+describe('renaming an option somebody else has just renamed', () => {
+  const rename = (server: FastifyInstance, cookie: string, id: string, version?: string) =>
+    server.inject({
+      method: 'PATCH',
+      url: `/api/event-options/${id}`,
+      headers: { cookie, ...(version === undefined ? {} : { 'if-match': version }) },
+      payload: { label: 'Bell tent' },
+    })
+
+  it('refuses one written against no version of the lists, and against an old one', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAccount(['member'])
+    const mine = (await add(server, ada.cookie, eventId, { kind: 'lodging', label: 'Tent' })).json().option.id
+
+    const asAdaSawIt = String((await list(server, eventId)).headers.etag)
+
+    expect((await rename(server, ada.cookie, mine)).statusCode).toBe(428)
+
+    // The other list moves the same tag: one representation covers both kinds, which
+    // is what `GET /options` answers with.
+    expect(
+      (await add(server, ada.cookie, eventId, { kind: 'helping', label: 'Washing up' })).statusCode,
+    ).toBe(201)
+
+    const refused = await rename(server, ada.cookie, mine, asAdaSawIt)
+    expect(refused.statusCode).toBe(412)
+    expect(refused.json().options.map((option: { label: string }) => option.label)).toContain('Washing up')
+  })
+
+  it('takes one written against the version it was handed', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAccount(['member'])
+    const mine = (await add(server, ada.cookie, eventId, { kind: 'lodging', label: 'Tent' })).json().option.id
+
+    const current = String((await list(server, eventId)).headers.etag)
+
+    expect((await rename(server, ada.cookie, mine, current)).statusCode).toBe(200)
   })
 })

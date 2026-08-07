@@ -12,6 +12,7 @@ import { GuardedPage } from '../components/GuardedPage.tsx'
 import { HelperStrip } from '../components/HelperStrip.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
+import { Refreshing } from '../components/Refreshing.tsx'
 import { useAction, useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
 import { isApproved, useViewer } from '../viewer.tsx'
@@ -81,7 +82,7 @@ export const Roles = ({ api }: { api: RolesApi }) => {
   const [editing, setEditing] = useState<string | undefined>(undefined)
 
   const burn = useSelectedBurn()
-  const { loaded, reload } = useLoad<Register>(
+  const { loaded, refreshing, reload } = useLoad<Register>(
     async (signal) => {
       if (burn === undefined) return null
 
@@ -99,7 +100,13 @@ export const Roles = ({ api }: { api: RolesApi }) => {
         sources: sources.sources,
       }
     },
-    { enabled: approved, key: burn?.event.id ?? '', fallback: 'Could not load the roles.', live: true },
+    {
+      enabled: approved,
+      key: burn?.event.id ?? '',
+      fallback: 'Could not load the roles.',
+      live: true,
+      remember: 'roles',
+    },
   )
 
   const { busy, error, setError, run } = useAction(reload)
@@ -108,7 +115,9 @@ export const Roles = ({ api }: { api: RolesApi }) => {
 
   return (
     <GuardedPage title="Leads" require="approved">
-      <h1>Leads</h1>
+      <h1>
+        Leads <Refreshing on={refreshing} />
+      </h1>
 
       <p class="form-note">
         Who is looking after what. Anyone can add a role, take one on, or put somebody else's name to one —

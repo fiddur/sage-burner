@@ -85,6 +85,17 @@ export const IconField = ({ api }: { api: IconApi }) => {
           height={64}
         />
 
+        {/* The same file with the mask over it. An uploaded icon is offered as
+            maskable, so this is the shape a launcher actually cuts — and the only
+            way to see beforehand what it takes off the corners. */}
+        <img
+          class="app-icon app-icon-masked"
+          src={`${apiRoutes.getInstallationIcon.path()}?v=${version}`}
+          alt="The same icon as a home screen will cut it"
+          width={64}
+          height={64}
+        />
+
         <label class="link-button">
           Choose an image
           <input
@@ -115,8 +126,11 @@ export const IconField = ({ api }: { api: IconApi }) => {
       )}
 
       <p class="form-note">
-        An SVG is kept as it is; anything else is cut to a square and sized down in your browser. Somebody who
-        has already installed the app sees the new one when their browser next reads the manifest.
+        An SVG is kept as it is; anything else is cut to a square and sized down in your browser. Fill the
+        square right out to the edges and keep anything that matters within the round preview — a home screen
+        crops to that shape, and a picture with see-through edges will float rather than sit on its own
+        background. Somebody who has already installed the app sees the new one when their browser next reads
+        the manifest.
       </p>
     </div>
   )

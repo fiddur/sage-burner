@@ -1,10 +1,14 @@
+import type { ComponentChildren } from 'preact'
+
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Loaded } from './load.ts'
+import type { Remembered } from './remembered.tsx'
 
-import { apiError } from './api/client.ts'
+import { apiError, isApiError } from './api/client.ts'
 import { errorMessage, useAction, useLoad } from './load.ts'
+import { createRemembered, RememberedProvider } from './remembered.tsx'
 
 afterEach(cleanup)
 
@@ -21,22 +25,26 @@ const Loader = ({
   enabled,
   loadKey,
   live,
+  remember,
 }: {
   fetcher: (signal: AbortSignal) => Promise<string>
   enabled?: boolean
   loadKey?: string
   live?: boolean
+  remember?: string
 }) => {
-  const { loaded, reload } = useLoad(fetcher, {
+  const { loaded, refreshing, reload } = useLoad(fetcher, {
     enabled,
     key: loadKey,
     live,
+    remember,
     fallback: 'Could not load it.',
   })
 
   return (
     <div>
       <span data-testid="state">{describeLoaded(loaded)}</span>
+      <span data-testid="refreshing">{refreshing ? 'refreshing' : 'settled'}</span>
       <button type="button" onClick={reload}>
         Reload
       </button>
@@ -56,12 +64,13 @@ const Actor = ({
   fallback?: string | ((failure: unknown) => string)
   onSuccess?: () => void
 }) => {
-  const { busy, error, run } = useAction(onSuccess)
+  const { busy, error, failure, run } = useAction(onSuccess)
 
   return (
     <div>
       <span data-testid="busy">{busy ? 'busy' : 'idle'}</span>
       <span data-testid="error">{error ?? 'none'}</span>
+      <span data-testid="failure">{isApiError(failure) ? String(failure.status) : 'none'}</span>
       <button type="button" onClick={() => run(work, fallback)}>
         Go
       </button>
@@ -247,6 +256,94 @@ describe('useLoad', () => {
     unmount()
 
     expect(seen[0]?.aborted).toBe(true)
+  })
+})
+
+describe('coming back to a page', () => {
+  const held = (remembered: Remembered, node: ComponentChildren) =>
+    render(<RememberedProvider remembered={remembered}>{node}</RememberedProvider>)
+
+  const refreshingText = () => screen.getByTestId('refreshing').textContent
+
+  it('draws last time’s data instead of Loading, and says it is being checked', async () => {
+    const remembered = createRemembered()
+    let settle: (value: string) => void = () => undefined
+    const answer = (value: string) => () => Promise.resolve(value)
+
+    held(remembered, <Loader fetcher={answer('the roster')} remember="members" />)
+    await waitFor(() => {
+      expect(stateText()).toBe('the roster')
+    })
+    cleanup()
+
+    // Back again, against a fetch that has not answered yet. Without the store this
+    // frame reads "loading" — mutation-checked by dropping `remember` below.
+    held(
+      remembered,
+      <Loader fetcher={() => new Promise<string>((resolve) => (settle = resolve))} remember="members" />,
+    )
+
+    expect(stateText()).toBe('the roster')
+    expect(refreshingText()).toBe('refreshing')
+
+    settle('the newer roster')
+    await waitFor(() => {
+      expect(stateText()).toBe('the newer roster')
+    })
+    expect(refreshingText()).toBe('settled')
+  })
+
+  it('still starts empty for a call site that did not ask to be remembered', async () => {
+    const remembered = createRemembered()
+
+    held(remembered, <Loader fetcher={() => Promise.resolve('the roster')} />)
+    await waitFor(() => {
+      expect(stateText()).toBe('the roster')
+    })
+    cleanup()
+
+    held(remembered, <Loader fetcher={() => new Promise<string>(() => undefined)} />)
+
+    expect(stateText()).toBe('loading')
+  })
+
+  it('keeps one burn’s answer out of another’s', async () => {
+    const remembered = createRemembered()
+    const answers: Record<string, string> = { 'e-1': 'summer', 'e-2': 'winter' }
+
+    const { rerender } = held(
+      remembered,
+      <Loader fetcher={() => Promise.resolve(answers['e-1'] ?? '')} loadKey="e-1" remember="schedule" />,
+    )
+    await waitFor(() => {
+      expect(stateText()).toBe('summer')
+    })
+
+    // The burn selector, with the second burn's fetch still in flight. Summer's grid
+    // must not be what winter is drawn as.
+    rerender(
+      <RememberedProvider remembered={remembered}>
+        <Loader fetcher={() => new Promise<string>(() => undefined)} loadKey="e-2" remember="schedule" />
+      </RememberedProvider>,
+    )
+
+    expect(stateText()).toBe('loading')
+  })
+
+  it('forgets everything on the way out, since it is member data in memory', async () => {
+    const remembered = createRemembered()
+
+    held(remembered, <Loader fetcher={() => Promise.resolve('the roster')} remember="members" />)
+    await waitFor(() => {
+      expect(stateText()).toBe('the roster')
+    })
+    cleanup()
+
+    remembered.forget()
+
+    held(remembered, <Loader fetcher={() => new Promise<string>(() => undefined)} remember="members" />)
+
+    expect(stateText()).toBe('loading')
   })
 })
 
@@ -471,5 +568,92 @@ describe('errorMessage', () => {
     expect(errorMessage(new Error('stack trace'), 'fallback')).toBe('fallback')
     expect(errorMessage('a string', 'fallback')).toBe('fallback')
     expect(errorMessage(undefined, 'fallback')).toBe('fallback')
+  })
+})
+
+describe('a write refused because somebody else got there first', () => {
+  it('re-reads, so "it has been refreshed" is true by the time it is read', async () => {
+    // The reload is `onSuccess` on every page that has one — which is every page
+    // with a guarded write, since they all re-read after a change anyway.
+    const reload = vi.fn()
+    render(
+      <Actor
+        work={() => Promise.reject(apiError(412, 'stale', 'Somebody else changed this.'))}
+        onSuccess={reload}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Go' }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('error').textContent).toBe('Somebody else changed this.')
+    })
+    expect(reload).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not re-read for an ordinary failure, which looking again would not fix', async () => {
+    // The passing sibling. Without it the test above would pass against a `catch`
+    // that reloaded on everything — and a 409 "the burn is full" reloaded over would
+    // read as the app doing something about it.
+    const reload = vi.fn()
+    render(
+      <Actor
+        work={() => Promise.reject(apiError(409, 'conflict', 'The burn is full.'))}
+        onSuccess={reload}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Go' }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('error').textContent).toBe('The burn is full.')
+    })
+    expect(reload).not.toHaveBeenCalled()
+  })
+
+  it('hands the failure itself over, for the fields that show what the other one says', async () => {
+    render(<Actor work={() => Promise.reject(apiError(412, 'stale', 'Changed.'))} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Go' }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('failure').textContent).toBe('412')
+    })
+  })
+
+  it('drops it again when the page writes a message of its own', async () => {
+    // `setError` is how a page reports something it worked out itself — an empty
+    // title, say — and leaving the last failure under it would put somebody else's
+    // paragraph beside an unrelated complaint.
+    const Both = () => {
+      const { error, failure, setError, run } = useAction()
+
+      return (
+        <div>
+          <span data-testid="error">{error ?? 'none'}</span>
+          <span data-testid="failure">{isApiError(failure) ? String(failure.status) : 'none'}</span>
+          <button
+            type="button"
+            onClick={() => run(() => Promise.reject(apiError(412, 'stale', 'Changed.')), 'x')}
+          >
+            Go
+          </button>
+          <button type="button" onClick={() => setError('Give it a name.')}>
+            Complain
+          </button>
+        </div>
+      )
+    }
+
+    render(<Both />)
+    fireEvent.click(screen.getByRole('button', { name: 'Go' }))
+    await waitFor(() => {
+      expect(screen.getByTestId('failure').textContent).toBe('412')
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Complain' }))
+
+    expect(screen.getByTestId('error').textContent).toBe('Give it a name.')
+    expect(screen.getByTestId('failure').textContent).toBe('none')
   })
 })

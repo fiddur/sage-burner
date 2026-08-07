@@ -131,6 +131,23 @@ describe('the web manifest', () => {
     expect(after.icons[0].src).toBe(`/api/installation/icon?v=${NOW}`)
     expect(after.icons[0]).toMatchObject({ type: 'image/png', sizes: '512x512' })
   })
+
+  it('offers an uploaded icon as maskable, so Android does not plate it in white', async () => {
+    const server = await build()
+    const root = await givenAccount()
+
+    // The flame is not offered maskable: it is an emoji in the top left of its box,
+    // and a launcher's circular mask would cut it.
+    expect((await getManifest(server)).json().icons.map((icon: { purpose: string }) => icon.purpose)).toEqual(
+      ['any'],
+    )
+
+    expect((await putIcon(server, root.cookie, PNG)).statusCode).toBe(200)
+
+    expect((await getManifest(server)).json().icons.map((icon: { purpose: string }) => icon.purpose)).toEqual(
+      ['any', 'maskable'],
+    )
+  })
 })
 
 describe('the app icon', () => {

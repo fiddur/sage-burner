@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks'
 
 import { isApiError } from './api/client.ts'
+import { useRemembered } from './remembered.tsx'
+import { isStale } from './stale.ts'
 
 /**
  * The load–mutate–reload skeleton every page was hand-rolling.
@@ -64,6 +66,12 @@ export const errorMessage = (failure: unknown, fallback: string) =>
  * back to the front, so what is on screen keeps up with whoever else is editing it
  * (#256). Off by default: most pages are somebody's own record or an admin workflow,
  * where a background refetch is a request for nothing.
+ *
+ * `remember` names this call site in the store `Remembered` holds, and turns coming
+ * back to a page from "Loading…" into last time's data with `refreshing` set. The
+ * name is spelled out rather than derived because two loads on one page would
+ * otherwise collide silently, and the burn's id joins it so switching burns is not
+ * shown one burn's grid under the other's name.
  */
 export const useLoad = <T>(
   fetcher: (signal: AbortSignal) => Promise<T>,
@@ -72,9 +80,22 @@ export const useLoad = <T>(
     key = '',
     fallback,
     live = false,
-  }: { enabled?: boolean; fallback: string; key?: string; live?: boolean },
-): { loaded: Loaded<T>; reload: () => void } => {
-  const [loaded, setLoaded] = useState<Loaded<T>>({ status: 'loading' })
+    remember,
+  }: { enabled?: boolean; fallback: string; key?: string; live?: boolean; remember?: string },
+): { loaded: Loaded<T>; refreshing: boolean; reload: () => void } => {
+  const remembered = useRemembered()
+  const at = remember === undefined ? undefined : `${remember}:${key}`
+
+  const recall = (): Loaded<T> => {
+    const held = at === undefined ? undefined : remembered.read<T>(at)
+    return held === undefined ? { status: 'loading' } : { status: 'ready', data: held }
+  }
+
+  const [loaded, setLoaded] = useState<Loaded<T>>(recall)
+  const [fetching, setFetching] = useState(false)
+  // What the state above was seeded from, so a `key` change re-seeds and a refetch
+  // does not. Without it every poll would replace `loaded` with an equal object.
+  const seeded = useRef(at)
   // The kind travels with the count, so the effect that reacts to it knows whether a
   // failure is worth replacing the page with. A ref would be read after the state
   // that triggered the run had already changed it.
@@ -91,12 +112,21 @@ export const useLoad = <T>(
   useEffect(() => {
     if (!enabled) return undefined
 
+    if (seeded.current !== at) {
+      seeded.current = at
+      setLoaded(recall())
+    }
+
     const controller = new AbortController()
+    setFetching(true)
 
     latest
       .current(controller.signal)
       .then((data) => {
-        if (!controller.signal.aborted) setLoaded({ status: 'ready', data })
+        if (controller.signal.aborted) return
+
+        if (at !== undefined) remembered.write(at, data)
+        setLoaded({ status: 'ready', data })
       })
       .catch((failure: unknown) => {
         if (controller.signal.aborted) return
@@ -112,11 +142,14 @@ export const useLoad = <T>(
             : { status: 'failed', message: errorMessage(failure, fallback) },
         )
       })
+      .finally(() => {
+        if (!controller.signal.aborted) setFetching(false)
+      })
 
     return () => {
       controller.abort()
     }
-  }, [enabled, attempt, key, fallback])
+  }, [enabled, attempt, at, key, fallback, remembered])
 
   useEffect(() => {
     if (!live || !enabled) return undefined
@@ -143,6 +176,9 @@ export const useLoad = <T>(
 
   return {
     loaded,
+    // Only ever true over data: a first load has "Loading…" to say so, and a spinner
+    // beside it would be two ways of saying one thing.
+    refreshing: fetching && loaded.status === 'ready',
     reload: useCallback(() => setAttempt(({ count }) => ({ count: count + 1, quiet: false })), []),
   }
 }
@@ -157,28 +193,50 @@ export const useLoad = <T>(
  * The fallback may be a function, for the pages that map a particular status to
  * particular words: a 409 on "say you are coming" means the burn is full, which is
  * worth saying rather than "that did not work".
+ *
+ * `failure` is what was thrown, for the pages that want more from it than a sentence
+ * — today the longer fields, which show what the other author wrote (#274). Held
+ * beside the message rather than derived from it, so `setError` writing a message of
+ * the page's own clears it.
  */
 export const useAction = (onSuccess?: () => void) => {
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | undefined>(undefined)
+  const [problem, setProblem] = useState<{ message?: string; failure?: unknown }>({})
 
   const run = (work: () => Promise<unknown>, fallback: string | ((failure: unknown) => string)) => {
     if (busy) return
 
     setBusy(true)
-    setError(undefined)
+    setProblem({})
 
     void work()
       .then(() => {
         onSuccess?.()
       })
       .catch((failure: unknown) => {
-        setError(typeof fallback === 'function' ? fallback(failure) : errorMessage(failure, fallback))
+        setProblem({
+          message: typeof fallback === 'function' ? fallback(failure) : errorMessage(failure, fallback),
+          failure,
+        })
+
+        // A refused write leaves the page holding exactly the version that was
+        // refused, so re-read: the message says it has been refreshed, and that has
+        // to be true by the time somebody reads it. `onSuccess` is the reload on
+        // every page that has one, which is every page with a guarded write.
+        if (isStale(failure)) onSuccess?.()
       })
       .finally(() => {
         setBusy(false)
       })
   }
 
-  return { busy, error, setError, run }
+  return {
+    busy,
+    error: problem.message,
+    failure: problem.failure,
+    setError: (message: string | undefined) => {
+      setProblem({ message })
+    },
+    run,
+  }
 }

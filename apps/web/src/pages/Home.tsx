@@ -8,6 +8,7 @@ import type { ApiClient } from '../api/client.ts'
 import { isApiError } from '../api/client.ts'
 import { FormError, useFormError } from '../components/FormError.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
+import { TheirVersion } from '../components/TheirVersion.tsx'
 import { useInstallationTitle } from '../installation.tsx'
 import { renderMarkdown } from '../markdown.ts'
 import { isApproved, isMember, useViewer } from '../viewer.tsx'
@@ -34,6 +35,7 @@ export const Home = ({ api }: { api: HomeApi }) => {
   const [saving, setSaving] = useState(false)
   const [opening, setOpening] = useState(false)
   const [error, setError] = useFormError()
+  const [refused, setRefused] = useState<unknown>(undefined)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -64,14 +66,20 @@ export const Home = ({ api }: { api: HomeApi }) => {
    * hour and then edited would discard whatever was written in between. Re-reading
    * here shrinks that window from "since the page loaded" to "since Edit was
    * pressed", which for a field forty-odd people share is the difference that
-   * matters. It does not close it, and closing it properly means versioning the
-   * field — see the README.
+   * matters. What closes it is the `If-Match` the save carries (#274): this read is
+   * where the version it quotes comes from, so an edit landing after it is refused
+   * rather than overwritten.
    *
    * A failed re-read falls back to what is on screen: refusing to open the editor
    * because the network hiccuped would be the worse answer.
+   *
+   * The window it leaves — between pressing Edit and pressing Save — is closed by
+   * `If-Match` (#274) rather than by this: the save quotes the version this read
+   * handed over, and a burn edited in between is refused with what it now says.
    */
   const openEditor = async (fallback: string) => {
     setError(undefined)
+    setRefused(undefined)
     // Said out loud, because the re-read is a round trip with nothing else
     // changing on screen. Without it this is a button that appears to do nothing
     // for as long as the network takes — the symptom `FormError` exists for,
@@ -102,12 +110,17 @@ export const Home = ({ api }: { api: HomeApi }) => {
   const save = async (id: string, welcome_markdown: string) => {
     setSaving(true)
     setError(undefined)
+    setRefused(undefined)
     try {
       const { event } = await api.updateWelcome(id, { welcome_markdown })
       setActive({ status: 'ready', event })
       setEditing(undefined)
     } catch (failure) {
       setError(isApiError(failure) ? failure.message : 'Could not save that. Please try again.')
+      // The editor stays open with what was typed still in it. A paragraph somebody
+      // wrote is not something to throw away because somebody else saved first —
+      // `TheirVersion` puts the other one beside it to be reconciled against.
+      setRefused(failure)
     } finally {
       setSaving(false)
     }
@@ -184,6 +197,7 @@ export const Home = ({ api }: { api: HomeApi }) => {
               />
 
               <FormError error={error} />
+              <TheirVersion failure={refused} at={['event', 'welcome_markdown']} />
 
               <button type="submit" disabled={saving}>
                 {saving ? 'Saving…' : 'Save'}

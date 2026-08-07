@@ -81,6 +81,15 @@ import { apiRoutes } from '@sage-burner/shared'
 export interface ApiError extends Error {
   status: number
   code: string
+  /**
+   * The body the failure came with, when there was one (#274).
+   *
+   * A stale write is refused with the resource as it now stands, so the page can
+   * show what the other person wrote rather than only that somebody did. `unknown`
+   * because it is a different shape per route, and the caller is the only one that
+   * knows which.
+   */
+  payload?: unknown
 }
 
 /**
@@ -89,8 +98,8 @@ export interface ApiError extends Error {
  * be unusable here: they are not erasable syntax, and Node runs this
  * TypeScript without a compile step.
  */
-export const apiError = (status: number, code: string, message: string): ApiError =>
-  Object.assign(new Error(message), { name: 'ApiError', status, code })
+export const apiError = (status: number, code: string, message: string, payload?: unknown): ApiError =>
+  Object.assign(new Error(message), { name: 'ApiError', status, code, payload })
 
 /**
  * The body every reorder route takes.
@@ -122,18 +131,28 @@ const messageFor = (status: number) => {
   // client behaviour that makes it worse.
   if (status === 429) return 'Too many attempts just now. Wait a few seconds and try again.'
   if (status === 404) return 'Not found.'
+  // The two `If-Match` refusals (#274). Both mean the same thing to whoever is
+  // reading — what you were looking at has moved on — and both are recoverable by
+  // trying again over what is now on screen, which the page has just reloaded.
+  if (status === 412 || status === 428) {
+    return 'Somebody else changed this while you had it open. It has been refreshed — have a look and try again.'
+  }
   if (status >= 500) return 'Something went wrong at our end. Please try again.'
   return `Request failed (${status}).`
 }
 
 /**
- * Pull the error code out of a response without assuming the body is JSON.
+ * Pull the error code and the body out of a response without assuming it is JSON.
  *
  * A proxy, a crash, or a misrouted request can return HTML or nothing at all,
  * and a client that assumes JSON turns those into an unrelated parse error
  * instead of the status the server actually sent.
+ *
+ * The body travels with the code because a stale write's refusal carries the
+ * resource as it now stands (#274), and reading it twice is not possible — a
+ * response body can only be consumed once.
  */
-const codeFrom = async (response: Response): Promise<string> => {
+const failureFrom = async (response: Response): Promise<{ code: string; payload?: unknown }> => {
   try {
     const body: unknown = await response.json()
     // Narrowed rather than cast to `ErrorResponse`: the whole point of this
@@ -142,11 +161,11 @@ const codeFrom = async (response: Response): Promise<string> => {
     // would put Zod in the browser bundle — the web app imports types only.
     if (typeof body === 'object' && body !== null && 'error' in body) {
       const { error } = body
-      if (typeof error === 'string') return error
+      if (typeof error === 'string') return { code: error, payload: body }
     }
-    return 'unknown'
+    return { code: 'unknown', payload: body }
   } catch {
-    return 'unknown'
+    return { code: 'unknown' }
   }
 }
 
@@ -170,10 +189,22 @@ const failureToReach = (cause: unknown): ApiError =>
     ? apiError(0, 'aborted', 'Request cancelled.')
     : apiError(0, 'network', 'Could not reach the server. Check your connection and try again.')
 
+/**
+ * The shared things a version tag is kept for (#274).
+ *
+ * One name per representation the server guards, used at both ends: on the read it
+ * says where to keep the `ETag` that came back, and on the write it says which kept
+ * one to quote as `If-Match`. Naming it once at each of the two call sites is the
+ * whole of the pairing — the server's half is the function the `GET` and the guard
+ * share, and the route suites pin that they are the same one.
+ */
+export type Guarded = 'active-event' | 'lead-roles' | 'meals' | 'options' | 'places' | 'sessions'
+
 export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
   body?: unknown
   signal?: AbortSignal
+  version?: Guarded
 }
 
 export interface ClientDeps {
@@ -195,8 +226,40 @@ export interface ClientDeps {
  * against crafted responses rather than mocking this module away.
  */
 export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRead }: ClientDeps = {}) => {
+  /**
+   * The newest version tag seen for each guarded representation.
+   *
+   * Per client rather than in a module, for the reason `Freshness` is: two suites in
+   * one process would otherwise share one. It is deliberately keyed by what was read
+   * rather than by URL — a write is given an id, not the collection's path, and the
+   * app shows one burn at a time so the last read of a thing is the one on screen.
+   * Quoting another burn's tag cannot succeed, only be refused, which is the safe
+   * direction.
+   */
+  const versions = new Map<Guarded, string>()
+
+  /** What a write asserts it was looking at. Reads have nothing to assert. */
+  const precondition = (method: string, version?: Guarded): Record<string, string> => {
+    const held = version === undefined ? undefined : versions.get(version)
+
+    return method === 'GET' || held === undefined ? {} : { 'if-match': held }
+  }
+
+  /**
+   * Keep the tag off a guarded answer.
+   *
+   * Both refusals carry one as well as the reads, so a retry after a conflict quotes
+   * what the server has just said rather than needing another read first.
+   */
+  const noteVersion = (response: Response, version?: Guarded) => {
+    if (version === undefined) return
+
+    const tag = response.headers.get('etag')
+    if (tag !== null) versions.set(version, tag)
+  }
+
   const request = async <T>(path: string, options: RequestOptions = {}): Promise<T> => {
-    const { method = 'GET', body, signal } = options
+    const { method = 'GET', body, signal, version } = options
 
     let response: Response
     // Serialised outside the `try`: a body that will not stringify is a bug in
@@ -217,16 +280,21 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
         // Sessions are cookie-based; without this the browser omits them on
         // fetch by default and every authenticated call would 401.
         credentials: 'same-origin',
-        headers: payload === undefined ? undefined : { 'content-type': contentType },
+        headers: {
+          ...(payload === undefined ? {} : { 'content-type': contentType }),
+          ...precondition(method, version),
+        },
         body: payload,
       })
     } catch (cause) {
       throw failureToReach(cause)
     }
 
+    noteVersion(response, version)
+
     if (!response.ok) {
-      const code = await codeFrom(response)
-      throw apiError(response.status, code, messageFor(response.status))
+      const failure = await failureFrom(response)
+      throw apiError(response.status, failure.code, messageFor(response.status), failure.payload)
     }
 
     if (method === 'GET') onRead?.(response)
@@ -366,7 +434,7 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
 
     /** Public. `{ event: null }` before the first event exists — not an error. */
     getActiveEvent: (signal?: AbortSignal) =>
-      request<ActiveEventResponse>(apiRoutes.getActiveEvent.path(), { signal }),
+      request<ActiveEventResponse>(apiRoutes.getActiveEvent.path(), { signal, version: 'active-event' }),
 
     /**
      * Admin only. The whole set the account should end up with, not a delta.
@@ -398,11 +466,15 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
      * spreadsheet everyone could edit.
      */
     getMeals: (eventId: string, signal?: AbortSignal) =>
-      request<MealsResponse>(apiRoutes.getMeals.path(eventId), { signal }),
+      request<MealsResponse>(apiRoutes.getMeals.path(eventId), { signal, version: 'meals' }),
 
     /** Moving a sitting or renaming it. Any approved member: the schedule is theirs. */
     updateMeal: (id: string, body: BodyOf<'updateMeal'>) =>
-      request<MealResponse>(apiRoutes.updateMeal.path(id), { method: apiRoutes.updateMeal.method, body }),
+      request<MealResponse>(apiRoutes.updateMeal.path(id), {
+        method: apiRoutes.updateMeal.method,
+        body,
+        version: 'meals',
+      }),
 
     /** Taking a meal's lead, handing it on, or vacating it with `null`. */
     setMealLead: (id: string, body: BodyOf<'setMealLead'>) =>
@@ -425,13 +497,18 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
 
     /** What somebody thought of cooking. An empty one removes the note. */
     setMealIdea: (id: string, body: BodyOf<'setMealIdea'>) =>
-      request<MealResponse>(apiRoutes.setMealIdea.path(id), { method: apiRoutes.setMealIdea.method, body }),
+      request<MealResponse>(apiRoutes.setMealIdea.path(id), {
+        method: apiRoutes.setMealIdea.method,
+        body,
+        version: 'meals',
+      }),
 
     /** The words above the table, which any approved member may rewrite. */
     updateMealIntro: (eventId: string, body: BodyOf<'updateMealIntro'>) =>
       request<{ meal_intro_markdown: string }>(apiRoutes.updateMealIntro.path(eventId), {
         method: apiRoutes.updateMealIntro.method,
         body,
+        version: 'meals',
       }),
 
     /** The slot templates, and filling the burn's days in from them. Admin only. */
@@ -493,7 +570,7 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
 
     /** Members only. Scheduled dreams first, then the ones only offered. */
     getSessions: (eventId: string, signal?: AbortSignal) =>
-      request<SessionsResponse>(apiRoutes.getSessions.path(eventId), { signal }),
+      request<SessionsResponse>(apiRoutes.getSessions.path(eventId), { signal, version: 'sessions' }),
 
     /** Members only. The burn is the one named; the facilitator is whoever the body says. */
     offerSession: (eventId: string, body: BodyOf<'offerSession'>) =>
@@ -507,6 +584,7 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
       request<SessionResponse>(apiRoutes.updateSession.path(id), {
         method: apiRoutes.updateSession.method,
         body,
+        version: 'sessions',
       }),
 
     /** Members only. */
@@ -551,7 +629,7 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
      * below too, including removing a role somebody else staffed.
      */
     getLeadRoles: (eventId: string, signal?: AbortSignal) =>
-      request<LeadRolesResponse>(apiRoutes.getLeadRoles.path(eventId), { signal }),
+      request<LeadRolesResponse>(apiRoutes.getLeadRoles.path(eventId), { signal, version: 'lead-roles' }),
 
     addLeadRole: (eventId: string, body: BodyOf<'addLeadRole'>) =>
       request<LeadRoleResponse>(apiRoutes.addLeadRole.path(eventId), {
@@ -564,6 +642,7 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
       request<LeadRoleResponse>(apiRoutes.updateLeadRole.path(id), {
         method: apiRoutes.updateLeadRole.method,
         body,
+        version: 'lead-roles',
       }),
 
     deleteLeadRole: (id: string) =>
@@ -605,7 +684,7 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
      * winter grid.
      */
     getPlaces: (eventId: string, signal?: AbortSignal) =>
-      request<PlacesResponse>(apiRoutes.getPlaces.path(eventId), { signal }),
+      request<PlacesResponse>(apiRoutes.getPlaces.path(eventId), { signal, version: 'places' }),
 
     /** Any approved member. `order` and the burn are the server's, so neither is offered. */
     addPlace: (eventId: string, body: BodyOf<'addPlace'>) =>
@@ -619,6 +698,7 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
       request<{ place: Place }>(apiRoutes.updatePlace.path(id), {
         method: apiRoutes.updatePlace.method,
         body,
+        version: 'places',
       }),
 
     /** Any approved member. Throws ApiError(409, 'conflict') when a dream sits in it. */
@@ -630,6 +710,7 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
       request<PlacesResponse>(apiRoutes.reorderPlaces.path(eventId), {
         method: apiRoutes.reorderPlaces.method,
         body: orderBody(ids) satisfies PlaceOrder,
+        version: 'places',
       }),
 
     /** The burns whose grid this one's could be seeded from, newest first. */
@@ -645,7 +726,7 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
 
     /** Public, like the places: nothing in either list is about a person. */
     getEventOptions: (eventId: string, signal?: AbortSignal) =>
-      request<EventOptionsResponse>(apiRoutes.getEventOptions.path(eventId), { signal }),
+      request<EventOptionsResponse>(apiRoutes.getEventOptions.path(eventId), { signal, version: 'options' }),
 
     /** Any approved member. `order` is the server's to assign, per kind. */
     addEventOption: (eventId: string, body: BodyOf<'addEventOption'>) =>
@@ -659,6 +740,7 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
       request<{ option: EventOption }>(apiRoutes.updateEventOption.path(id), {
         method: apiRoutes.updateEventOption.method,
         body,
+        version: 'options',
       }),
 
     /**
@@ -682,6 +764,7 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
       request<EventOptionsResponse>(apiRoutes.reorderEventOptions.path(eventId, kind), {
         method: apiRoutes.reorderEventOptions.method,
         body: orderBody(ids) satisfies EventOptionOrder,
+        version: 'options',
       }),
 
     /** Admin only. */
@@ -711,6 +794,7 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
       request<EventResponse>(apiRoutes.updateWelcome.path(id), {
         method: apiRoutes.updateWelcome.method,
         body,
+        version: 'active-event',
       }),
 
     /** Public. The application form's questions, in display order. One central set. */

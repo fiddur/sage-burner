@@ -33,6 +33,7 @@ import { Places } from './pages/Places.tsx'
 import { ProfilePage } from './pages/Profile.tsx'
 import { Roles } from './pages/Roles.tsx'
 import { Schedule } from './pages/Schedule.tsx'
+import { createRemembered, RememberedProvider } from './remembered.tsx'
 import { FetchedViewerProvider, ViewerProvider } from './viewer.tsx'
 
 /**
@@ -261,6 +262,9 @@ export const App = ({ viewer, title, api }: { viewer?: Viewer; title?: string; a
   // module: two tests in one process would otherwise share one, and the second
   // would start out believing the first one's fetches were its own.
   const freshness = useMemo(() => createFreshness(), [])
+  // Same reasoning, and it has to outlive every route below it: what it is for is the
+  // page somebody left a moment ago still being there when they come back.
+  const remembered = useMemo(() => createRemembered(), [])
   const client = useMemo(
     () =>
       api ??
@@ -295,12 +299,14 @@ export const App = ({ viewer, title, api }: { viewer?: Viewer; title?: string; a
     )
 
   return (
-    <LocationProvider>
-      {viewer === undefined ? (
-        <FetchedViewerProvider api={client}>{content}</FetchedViewerProvider>
-      ) : (
-        <ViewerProvider viewer={viewer}>{content}</ViewerProvider>
-      )}
-    </LocationProvider>
+    <RememberedProvider remembered={remembered}>
+      <LocationProvider>
+        {viewer === undefined ? (
+          <FetchedViewerProvider api={client}>{content}</FetchedViewerProvider>
+        ) : (
+          <ViewerProvider viewer={viewer}>{content}</ViewerProvider>
+        )}
+      </LocationProvider>
+    </RememberedProvider>
   )
 }

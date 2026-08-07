@@ -34,6 +34,13 @@ export type ErrorResponse = z.infer<typeof errorResponseSchema>
  * the distinction a client cannot safely collapse: 401 means signing in would
  * help, 403 means it would not. Both are emitted by the admin guard.
  *
+ * `stale` and `precondition_required` are the two halves of `If-Match` (#274) and
+ * are deliberately distinct from `conflict`: a 409 means the request cannot be
+ * satisfied at all — the burn is full — while these mean it was written against a
+ * version that has moved on, and doing it again over the fresh one would work.
+ * Their responses carry the current representation beside the code, which is what
+ * lets the page show what the other person wrote.
+ *
  * `errorResponseSchema` deliberately accepts codes outside this list, so an
  * older client can still parse a newer API's response rather than failing to
  * read the error explaining what went wrong.
@@ -47,6 +54,8 @@ export const errorCodes = [
   'forbidden',
   'conflict',
   'rate_limited',
+  'stale',
+  'precondition_required',
 ] as const
 export type ErrorCode = (typeof errorCodes)[number]
 

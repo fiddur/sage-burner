@@ -14,6 +14,7 @@ import { DreamFields } from '../components/DreamFields.tsx'
 import { DreamPanel } from '../components/DreamPanel.tsx'
 import { MealDialog } from '../components/MealDialog.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
+import { Refreshing } from '../components/Refreshing.tsx'
 import { dayName, fromLocalInput, toLocalInput } from '../datetime.ts'
 import { useAction, useLoad } from '../load.ts'
 import {
@@ -103,7 +104,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
   // The burn comes first: since #156 the lanes belong to one, so there is no grid to
   // ask for until we know which.
   const burn = useSelectedBurn()
-  const { loaded, reload } = useLoad<Timetable>(
+  const { loaded, refreshing, reload } = useLoad<Timetable>(
     async (signal) => {
       if (burn === undefined) return { event: null, places: [], sessions: [], attendees: [], meals: [] }
 
@@ -122,7 +123,13 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
         meals: plan.meals,
       }
     },
-    { enabled: member, key: burn?.event.id ?? '', fallback: 'Could not load the schedule.', live: true },
+    {
+      enabled: member,
+      key: burn?.event.id ?? '',
+      fallback: 'Could not load the schedule.',
+      live: true,
+      remember: 'schedule',
+    },
   )
 
   const { busy, error, run } = useAction(reload)
@@ -311,7 +318,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
   }
 
   return (
-    <Framed eventId={event.id}>
+    <Framed eventId={event.id} refreshing={refreshing}>
       {error !== undefined &&
         opened === undefined &&
         shownMeal === undefined && (
@@ -504,9 +511,19 @@ const Opened = ({
   )
 }
 
-const Framed = ({ eventId, children }: { eventId?: string; children: ComponentChildren }) => (
+const Framed = ({
+  eventId,
+  refreshing = false,
+  children,
+}: {
+  eventId?: string
+  refreshing?: boolean
+  children: ComponentChildren
+}) => (
   <section class="page">
-    <h1>Schedule</h1>
+    <h1>
+      Schedule <Refreshing on={refreshing} />
+    </h1>
     {eventId !== undefined && <CalendarFeed eventId={eventId} />}
     {children}
   </section>
