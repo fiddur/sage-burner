@@ -245,6 +245,12 @@ height set by the circle rather than by the text. Somebody with no picture gets 
 initials circle, which is what `Avatar` already draws, so a list lines up whether or
 not anybody in it has uploaded anything.
 
+The size modifiers — `.person-badge-face`, and the schedule chip's
+`.dream-facilitator` — must sit **below** `.avatar` in `styles.css`. Each is a single
+class, as `.avatar` is, so specificity ties and source order decides: above the base
+rule they set nothing at all and every circle draws at the bar's 2rem. Both did, and
+a screenshot showed it without anybody noticing — `getComputedStyle` is the check.
+
 `HelperStrip` takes the burn's attendees as `everyone` for this, separately from
 `candidates`: candidates is filtered — a chore offers nobody, a dream's helpers
 exclude its facilitator — so anybody already on the list is by definition absent from
