@@ -4,13 +4,14 @@ import type { FastifyInstance } from 'fastify'
 import { accountRolesUpdateSchema, adminPasswordResetSchema, apiRoutes } from '@sage-burner/shared'
 import { count, eq } from 'drizzle-orm'
 
-import type { GuardDeps } from '../auth/guards.ts'
+import type { Database } from '../db/index.ts'
 
 import { hashPassword } from '../auth/password.ts'
 import { account, accountRole } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 
-export interface AdminDeps extends GuardDeps {
+export interface AdminDeps {
+  db: Database
   /** Injected so the suite never pays for scrypt, the same seam redemption uses. */
   hash?: (password: string) => Promise<string>
 }

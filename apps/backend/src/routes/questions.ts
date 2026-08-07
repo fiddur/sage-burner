@@ -12,7 +12,6 @@ import {
 import { and, asc, desc, eq, notInArray } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
-import type { GuardDeps } from '../auth/guards.ts'
 import type { Database } from '../db/index.ts'
 
 import { formQuestion } from '../db/schema.ts'
@@ -75,7 +74,7 @@ const tickBoxCondition = ({ type, required }: { type?: string; required?: boolea
 export const questionsFor = (db: Database): Promise<FormQuestion[]> =>
   db.select().from(formQuestion).orderBy(asc(formQuestion.order), asc(formQuestion.id))
 
-export const registerQuestionRoutes = (app: FastifyInstance, { db }: GuardDeps) => {
+export const registerQuestionRoutes = (app: FastifyInstance, { db }: { db: Database }) => {
   app.get(apiRoutes.getQuestions.fastify, async (_request, reply) => {
     // Same reasoning as the active event: public, but an edit has to show up
     // without waiting out a heuristic freshness window.

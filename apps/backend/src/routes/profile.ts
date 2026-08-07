@@ -14,11 +14,11 @@ import { isForeignKeyViolation } from '../db/errors.ts'
 import { account, attendance, eventOption } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { allergyTickIdsFor, writeAllergyTicks } from './allergy-ticks.ts'
-import { openEvent, todayIso } from './events.ts'
+import { openEventNow } from './events.ts'
 import { areHelpingOptions, helpingIdsFor, writeHelping } from './helping.ts'
 
 export interface ProfileDeps extends GuardDeps {
-  now?: () => Date
+  now: () => Date
 }
 
 /**
@@ -166,10 +166,7 @@ export const writeStay = (
  * one stay. Both routes derive whose row it is from the session, so there is no
  * id in either body to get wrong or to tamper with.
  */
-export const registerProfileRoutes = (
-  app: FastifyInstance,
-  { db, sessions, now = () => new Date() }: ProfileDeps,
-) => {
+export const registerProfileRoutes = (app: FastifyInstance, { db, sessions, now }: ProfileDeps) => {
   const { requireMember } = createGuards({ db, sessions })
 
   const profileFor = async (accountId: string) => {
@@ -261,7 +258,7 @@ export const registerProfileRoutes = (
       // Named by id rather than scoped to the active burn, so a stay at the second
       // burn on the details page can be filled in — and still refused once that
       // burn has ended, which is what `openEvent` decides.
-      const found = await openEvent(db, todayIso(now), request.params.eventId)
+      const found = await openEventNow(db, now, request.params.eventId)
       if (found === undefined) return sendError(reply, 404)
 
       const mine = and(eq(attendance.event_id, found.id), eq(attendance.account_id, viewer.account_id))

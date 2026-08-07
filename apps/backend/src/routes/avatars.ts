@@ -11,7 +11,7 @@ import { accountAvatar } from '../db/schema.ts'
 import { noStore, sendError } from '../http.ts'
 
 export interface AvatarDeps extends GuardDeps {
-  now?: () => Date
+  now: () => Date
 }
 
 /**
@@ -48,10 +48,7 @@ export const MAX_AVATAR_BYTES = 512 * 1024
  * because only three are storable, and `X-Content-Type-Options: nosniff` stops a
  * browser deciding for itself that a PNG is really HTML.
  */
-export const registerAvatarRoutes = (
-  app: FastifyInstance,
-  { db, sessions, now = () => new Date() }: AvatarDeps,
-) => {
+export const registerAvatarRoutes = (app: FastifyInstance, { db, sessions, now }: AvatarDeps) => {
   const { requireApproved } = createGuards({ db, sessions })
 
   const upload = { bodyLimit: MAX_AVATAR_BYTES, preHandler: requireApproved }

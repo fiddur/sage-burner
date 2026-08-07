@@ -576,6 +576,12 @@ describe('the plan itself', () => {
     expect(isUniqueViolation(orphan)).toBe(false)
     expect(isForeignKeyViolation(orphan)).toBe(true)
     expect(isUniqueViolation(new Error('disk I/O error'))).toBe(false)
+
+    // The targeted form, which three routes now ask in (#142). Without the column
+    // doing anything, every one of them would answer 409 to any duplicate — telling
+    // a caller "there is already one of those" about a row they never touched.
+    expect(isUniqueViolation(duplicate, 'meal.event_id')).toBe(true)
+    expect(isUniqueViolation(duplicate, 'account.email')).toBe(false)
   })
 
   it('allows moving one to another day inside the burn', async () => {

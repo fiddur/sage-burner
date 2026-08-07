@@ -13,7 +13,7 @@ import { noStore, sendError } from '../http.ts'
 import { defaultExpiry, mintToken } from '../invites.ts'
 
 export interface InviteRouteDeps extends GuardDeps {
-  now?: () => Date
+  now: () => Date
 }
 
 /**
@@ -23,10 +23,7 @@ export interface InviteRouteDeps extends GuardDeps {
  * The same token shape approval mints, so both redeem through one path: CSPRNG
  * bytes, digest stored, raw value returned once.
  */
-export const registerInviteRoutes = (
-  app: FastifyInstance,
-  { db, sessions, now = () => new Date() }: InviteRouteDeps,
-) => {
+export const registerInviteRoutes = (app: FastifyInstance, { db, sessions, now }: InviteRouteDeps) => {
   app.get(apiRoutes.getInvites.fastify, async (_request, reply) => {
     void noStore(reply)
 

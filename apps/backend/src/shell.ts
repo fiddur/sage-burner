@@ -9,7 +9,7 @@ import type { ShareImage, ShareSubject } from './share.ts'
 
 import { INSTALLATION_ID, installation } from './db/schema.ts'
 import { bannerVersion } from './routes/banner.ts'
-import { activeEvent, todayIso } from './routes/events.ts'
+import { activeEventNow } from './routes/events.ts'
 import { FALLBACK_NAME, iconVersion } from './routes/pwa.ts'
 import { shareHead } from './share.ts'
 
@@ -123,7 +123,7 @@ const subjectFor = async (
     .where(eq(installation.id, INSTALLATION_ID))
     .limit(1)
 
-  const event = await activeEvent(db, todayIso(now))
+  const event = await activeEventNow(db, now)
 
   return {
     installation: named?.title ?? FALLBACK_NAME,

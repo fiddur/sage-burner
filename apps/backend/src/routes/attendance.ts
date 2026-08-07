@@ -11,11 +11,11 @@ import type { Notifier } from '../push/notify.ts'
 
 import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
-import { isForeignKeyViolation } from '../db/errors.ts'
+import { isForeignKeyViolation, isUniqueViolation } from '../db/errors.ts'
 import { account, accountAvatar, attendance, event } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { displayName, notifyAttendees } from '../push/notify.ts'
-import { openEvent, todayIso } from './events.ts'
+import { openEventNow, todayIso } from './events.ts'
 import { helpingFor, helpingIdsFor } from './helping.ts'
 
 /**
@@ -27,8 +27,7 @@ import { helpingFor, helpingIdsFor } from './helping.ts'
  * `attendance.test.ts` pins this predicate against a real violation instead, so
  * at least the message it matches cannot drift unnoticed.
  */
-export const isAlreadyJoined = (error: unknown) =>
-  error instanceof Error && /UNIQUE constraint failed: attendance\./i.test(error.message)
+export const isAlreadyJoined = (error: unknown) => isUniqueViolation(error, 'attendance.event_id')
 
 /** Somebody's stay at a burn, with the helping ticks that live in another table. */
 export const stayAt = async (db: Database, eventId: string, accountId: string) => {
@@ -70,7 +69,7 @@ export const accountForAttendance = async (db: Database, attendanceId: string) =
  * that an id is real.
  */
 export const joinBurn = async (db: Database, eventId: string, accountId: string, now: () => Date) => {
-  const found = await openEvent(db, todayIso(now), eventId)
+  const found = await openEventNow(db, now, eventId)
   if (found === undefined) return undefined
 
   // A shortcut, not the guarantee — two requests can both pass it before either
@@ -163,7 +162,7 @@ export const handOverPlace = (
 }
 
 export interface AttendanceDeps extends GuardDeps {
-  now?: () => Date
+  now: () => Date
   /** Told when a place is handed to them — the one person here who did not click. */
   notify?: Notifier
 }
@@ -185,7 +184,7 @@ export interface AttendanceDeps extends GuardDeps {
  */
 export const registerAttendanceRoutes = (
   app: FastifyInstance,
-  { db, sessions, now = () => new Date(), notify = async () => undefined }: AttendanceDeps,
+  { db, sessions, now, notify = async () => undefined }: AttendanceDeps,
 ) => {
   const { requireApproved, requireMember } = createGuards({ db, sessions })
 
@@ -302,7 +301,7 @@ export const registerAttendanceRoutes = (
       const viewer = await viewerFor(request, { db, sessions })
       if (viewer === undefined) return sendError(reply, 401)
 
-      const found = await openEvent(db, todayIso(now), request.params.eventId)
+      const found = await openEventNow(db, now, request.params.eventId)
       if (found === undefined) return sendError(reply, 404)
 
       // Refused once anything has been paid, rather than guessed at: what a refund
@@ -366,7 +365,7 @@ export const registerAttendanceRoutes = (
       const body = bodyOf(placeTransferSchema, request)
       if (body === undefined) return sendError(reply, 400)
 
-      const open = await openEvent(db, todayIso(now), request.params.eventId)
+      const open = await openEventNow(db, now, request.params.eventId)
       if (open === undefined) return sendError(reply, 404)
 
       const mine = await stayAt(db, open.id, viewer.account_id)

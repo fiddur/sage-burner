@@ -17,12 +17,12 @@ import { viewerFor } from '../auth/viewer.ts'
 import { account, attendance, event, eventOption } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { allergyLabelsFor } from './allergy-ticks.ts'
-import { activeEvent, todayIso } from './events.ts'
+import { activeEventNow, todayIso } from './events.ts'
 import { helpingIdsFor, helpingLabelsFor } from './helping.ts'
 import { tellAboutTheWaitingList } from './waiting-list.ts'
 
 export interface RosterDeps extends GuardDeps {
-  now?: () => Date
+  now: () => Date
   /** Told when their payment is recorded, and when somebody else's fills the burn. */
   notify?: Notifier
 }
@@ -73,7 +73,7 @@ const asMemberEntry = (entry: RosterEntry): MemberRosterEntry => ({
  */
 export const registerRosterRoutes = (
   app: FastifyInstance,
-  { db, sessions, now = () => new Date(), notify = async () => undefined }: RosterDeps,
+  { db, sessions, now, notify = async () => undefined }: RosterDeps,
 ) => {
   const { requireApproved } = createGuards({ db, sessions })
 
@@ -93,7 +93,7 @@ export const registerRosterRoutes = (
   app.get(apiRoutes.getActiveRoster.fastify, async (_request, reply) => {
     void noStore(reply)
 
-    const open = await activeEvent(db, todayIso(now))
+    const open = await activeEventNow(db, now)
     if (open === undefined) return { event: null, entries: [] } satisfies RosterResponse
 
     const summary = { id: open.id, name: open.name, member_cap: open.member_cap }

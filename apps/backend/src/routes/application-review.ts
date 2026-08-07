@@ -20,7 +20,7 @@ import { originOf } from '../shell.ts'
 export interface ApplicationReviewDeps extends GuardDeps {
   config: Config
   mail: MailDeps
-  now?: () => Date
+  now: () => Date
 }
 
 /**
@@ -35,7 +35,7 @@ export interface ApplicationReviewDeps extends GuardDeps {
  */
 export const registerApplicationReviewRoutes = (
   app: FastifyInstance,
-  { db, sessions, mail, config, now = () => new Date() }: ApplicationReviewDeps,
+  { db, sessions, mail, config, now }: ApplicationReviewDeps,
 ) => {
   /**
    * The invite, in the applicant's inbox, if that is what they gave us (#30).

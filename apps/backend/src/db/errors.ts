@@ -24,16 +24,25 @@ export const isForeignKeyViolation = (failure: unknown): boolean =>
 /**
  * SQLite refusing a duplicate, on a UNIQUE column or a unique index.
  *
- * Untargeted, unlike `isCheckViolation`: the message names columns rather than the
- * index, so a table with two unique indexes cannot be told apart here. Every caller
- * so far has one, and a second would want the distinction made by the write rather
- * than by a wider regex.
- *
  * The narrowing is the point. A `catch` that answers 409 to everything tells a caller
  * "there is already one of those" when the disk filled up.
+ *
+ * `column` narrows it further, to `table.column` as the message spells it — which is
+ * what a route wants when the table it wrote to has more than one unique constraint
+ * and only one of them means what its 409 says. Left out, any duplicate matches; the
+ * message names columns rather than the index, so that is as far as this can go
+ * without being told which.
+ *
+ * Three routes had a regex of their own for exactly this, one of them with a doc
+ * comment saying it mirrored another — which is what the file's own opening
+ * paragraph exists to prevent.
  */
-export const isUniqueViolation = (failure: unknown): boolean =>
-  failure instanceof Error && /UNIQUE constraint failed/i.test(failure.message)
+export const isUniqueViolation = (failure: unknown, column?: string): boolean => {
+  if (!(failure instanceof Error)) return false
+  if (!/UNIQUE constraint failed/i.test(failure.message)) return false
+
+  return column === undefined || failure.message.includes(column)
+}
 
 /**
  * SQLite refusing a named CHECK.

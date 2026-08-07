@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify'
 
 import { apiRoutes, inviteStatusOf, redeemRequestSchema } from '@sage-burner/shared'
 import { and, eq, isNull } from 'drizzle-orm'
-import { createHash, randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 
 import type { Gate } from '../auth/gate.ts'
 import type { Sessions } from '../auth/session.ts'
@@ -11,8 +11,10 @@ import type { Config } from '../config.ts'
 import type { Database } from '../db/index.ts'
 
 import { hashPassword } from '../auth/password.ts'
+import { isUniqueViolation } from '../db/errors.ts'
 import { account, accountRole, application, inviteToken } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
+import { digestOf } from '../invites.ts'
 import { joinBurn } from './attendance.ts'
 import { cookieHeader } from './auth.ts'
 
@@ -20,17 +22,14 @@ export interface RedemptionDeps {
   db: Database
   config: Config
   sessions: Sessions
-  now?: () => Date
+  now: () => Date
   hash?: (password: string) => Promise<string>
   /** The scrypt gate, shared with login. See `SCRYPT_GATE`. */
   gate: Gate
 }
 
-const digestOf = (token: string) => createHash('sha256').update(token).digest('hex')
-
-/** Mirrors `isSlugConflict` in `events.ts`: a lost UNIQUE race is a 409, not a 500. */
-const isEmailConflict = (error: unknown) =>
-  error instanceof Error && /UNIQUE constraint failed: account\.email/i.test(error.message)
+/** A lost UNIQUE race is a 409, not a 500. */
+const isEmailConflict = (error: unknown) => isUniqueViolation(error, 'account.email')
 
 /**
  * Turning an invite link into an account.
@@ -41,7 +40,7 @@ const isEmailConflict = (error: unknown) =>
  */
 export const registerRedemptionRoutes = (
   app: FastifyInstance,
-  { db, config, sessions, now = () => new Date(), hash = hashPassword, gate }: RedemptionDeps,
+  { db, config, sessions, now, hash = hashPassword, gate }: RedemptionDeps,
 ) => {
   app.get<{ Params: { token: string } }>(apiRoutes.getInviteState.fastify, async (request, reply) => {
     void noStore(reply)
