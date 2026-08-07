@@ -34,6 +34,7 @@ import { registerAvatarRoutes } from './routes/avatars.ts'
 import { registerBannerRoutes } from './routes/banner.ts'
 import { registerEventOptionRoutes } from './routes/event-options.ts'
 import { registerEventRoutes } from './routes/events.ts'
+import { registerFaqRoutes } from './routes/faq.ts'
 import { registerImageBodyParser } from './routes/image-body.ts'
 import { registerInstallationRoutes } from './routes/installation.ts'
 import { registerInviteRoutes } from './routes/invites.ts'
@@ -494,6 +495,7 @@ export const createApp = async ({
   registerProfileRoutes(app, { db, sessions, now })
   registerRosterRoutes(app, { db, sessions, now, notify: tellAccount })
   registerLeadRoleRoutes(app, { db, sessions, now, notify: tellAccount })
+  registerFaqRoutes(app, { db, sessions, now })
   registerSessionRoutes(app, { db, sessions, now, notify: tellAccount })
   registerScheduleRoutes(app, { db, now })
 

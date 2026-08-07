@@ -19,6 +19,8 @@ import type {
   EventOptionsResponse,
   EventResponse,
   EventsResponse,
+  FaqListResponse,
+  FaqResponse,
   FormQuestionOrder,
   FormQuestionResponse,
   FormQuestionsResponse,
@@ -200,7 +202,7 @@ const failureToReach = (cause: unknown): ApiError =>
  * whole of the pairing — the server's half is the function the `GET` and the guard
  * share, and the route suites pin that they are the same one.
  */
-export type Guarded = 'active-event' | 'lead-roles' | 'meals' | 'options' | 'places' | 'sessions'
+export type Guarded = 'active-event' | 'faq' | 'lead-roles' | 'meals' | 'options' | 'places' | 'sessions'
 
 export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
@@ -602,6 +604,45 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
     sendTestEmail: () =>
       request<MailTestResponse>(apiRoutes.sendTestEmail.path(), {
         method: apiRoutes.sendTestEmail.method,
+      }),
+
+    /** Members only, per burn: the Q&A the spreadsheet had a tab for (#28). */
+    getFaq: (eventId: string, signal?: AbortSignal) =>
+      request<FaqListResponse>(apiRoutes.getFaq.path(eventId), { signal, version: 'faq' }),
+
+    addFaqEntry: (eventId: string, body: BodyOf<'addFaqEntry'>) =>
+      request<FaqResponse>(apiRoutes.addFaqEntry.path(eventId), {
+        method: apiRoutes.addFaqEntry.method,
+        body,
+      }),
+
+    updateFaqEntry: (id: string, body: BodyOf<'updateFaqEntry'>) =>
+      request<FaqResponse>(apiRoutes.updateFaqEntry.path(id), {
+        method: apiRoutes.updateFaqEntry.method,
+        body,
+        version: 'faq',
+      }),
+
+    deleteFaqEntry: (id: string) =>
+      request<undefined>(apiRoutes.deleteFaqEntry.path(id), {
+        method: apiRoutes.deleteFaqEntry.method,
+        version: 'faq',
+      }),
+
+    reorderFaq: (eventId: string, ids: string[]) =>
+      request<FaqListResponse>(apiRoutes.reorderFaq.path(eventId), {
+        method: apiRoutes.reorderFaq.method,
+        body: { ids },
+        version: 'faq',
+      }),
+
+    getFaqSources: (eventId: string, signal?: AbortSignal) =>
+      request<CopySourcesResponse>(apiRoutes.getFaqSources.path(eventId), { signal }),
+
+    copyFaq: (eventId: string, from_event_id: string) =>
+      request<FaqListResponse>(apiRoutes.copyFaq.path(eventId), {
+        method: apiRoutes.copyFaq.method,
+        body: { from_event_id },
       }),
 
     /** Members only. Scheduled dreams first, then the ones only offered. */
