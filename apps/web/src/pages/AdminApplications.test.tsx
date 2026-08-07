@@ -100,7 +100,7 @@ describe('AdminApplications', () => {
     ;(await screen.findByRole('button', { name: 'Approve' })).click()
 
     const note = await screen.findByRole('status')
-    expect(note.textContent).toContain('Not sent: wrong version number')
+    expect(note.textContent).toContain('Not sent — wrong version number.')
     expect(note.textContent).toContain('Send this link')
   })
 

@@ -57,8 +57,13 @@ const EFFORT_LABEL: Record<EffortLevel, string> = {
   high: 'a lot',
 }
 
-/** How many of the three segments a level fills. `none` fills none, and says so. */
-const EFFORT_SEGMENTS: Record<EffortLevel, number> = { none: 0, low: 1, medium: 2, high: 3 }
+/**
+ * How many of the three segments a level fills. `none` fills none, and says so.
+ *
+ * `effortLevels` is already in that order, so its index *is* the count — a record
+ * writing the numbers out again is one more thing to keep in step with the vocabulary.
+ */
+const segmentsFor = (level: EffortLevel): number => effortLevels.indexOf(level)
 
 /**
  * The three phases of a burn, as one cell (#307).
@@ -79,23 +84,16 @@ const PHASES = [
 ] as const
 
 /**
- * The header row.
- *
- * Keyed rather than a list because the cells beneath refer to these by name — the
- * merged **Who** column labels its two halves from the same place a heading would.
+ * The header row, and nothing refers to a heading by name: `RoleRow` writes its cells
+ * out in this order and `Roles.test.tsx` is what holds the two to the same count.
  */
-const COLUMNS = {
-  title: 'Title',
-  purpose: 'Purpose',
-  who: 'Who',
-  tasks: 'Tasks include',
-  effort: 'Effort',
-} as const
-
-const HEADINGS = Object.values(COLUMNS)
+const HEADINGS = ['Title', 'Purpose', 'Who', 'Tasks include', 'Effort'] as const
 
 /** The two halves of `Who`, which the column header can no longer tell apart. */
 const WHO = { lead: 'Lead', team: 'Team' } as const
+
+/** What the icons in the `Effort` column mean, since a phone has no hover (#317). */
+const EFFORT_LEGEND = PHASES.map((phase) => `${phase.icon} ${phase.label}`).join(' · ')
 
 const Effort = ({ role }: { role: LeadRole }) => (
   <span class="effort-strip">
@@ -108,7 +106,7 @@ const Effort = ({ role }: { role: LeadRole }) => (
           <span aria-hidden="true">{phase.icon}</span>
           <span class="effort-bar" aria-hidden="true">
             {[0, 1, 2].map((segment) => (
-              <span key={segment} class={segment < EFFORT_SEGMENTS[level] ? 'is-on' : undefined} />
+              <span key={segment} class={segment < segmentsFor(level) ? 'is-on' : undefined} />
             ))}
           </span>
           <span class="visually-hidden">{said}</span>
@@ -193,6 +191,11 @@ export const Roles = ({ api }: { api: RolesApi }) => {
 
       {ready !== undefined && ready.roles.length > 0 && (
         <div class="lead-table-wrap">
+          {/* The icons say nothing on a phone without it: `title` needs a hover and
+              `.visually-hidden` needs a screen reader, so a sighted touch user — the
+              case #307 exists for — had 🌱🔥🧹 under a heading reading only "Effort"
+              (#317). */}
+          <p class="form-note lead-effort-legend">Effort: {EFFORT_LEGEND}</p>
           <table class="lead-table">
             <thead>
               <tr>
@@ -366,9 +369,6 @@ const RoleRow = ({
         <Prose markdown={role.purpose} />
       </td>
 
-      {/* One column, two strips (#307). They were a column each, and side by side
-          they cost the width of two while saying one thing: who is on this. Each
-          names itself, since a shared header no longer can. */}
       <td>
         <div class="lead-who">
           <div class="lead-who-part">

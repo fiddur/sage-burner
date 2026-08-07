@@ -115,6 +115,16 @@ would not convey.
 `invalid_credentials` covers a wrong password and an unknown address alike:
 telling those apart is an account-enumeration oracle.
 
+**A `PATCH` that wrote nothing has to choose between them**, and asks rather than
+guesses. The rule the write is only allowed under lives in the statement's own
+`WHERE` — so the decision and the guard against a concurrent change are one thing —
+which leaves "no rows" meaning either "no such row" or "the condition said no".
+`patchRow` in [`db/patch.ts`](../apps/backend/src/db/patch.ts) re-reads to tell those
+apart and answers `not_found` or `refused`; the route words `refused`, since a
+tick-box rule is a `bad_request` and a burn that is already full is a `conflict`. It
+also answers the one body that never reaches an `UPDATE`: `set({})` is not valid SQL,
+and a `PATCH` naming no column is a read.
+
 Clients should tolerate a slug they do not recognise: the schema accepts any
 string so an older frontend can still read a newer API's error instead of
 failing to parse the explanation of what went wrong.
