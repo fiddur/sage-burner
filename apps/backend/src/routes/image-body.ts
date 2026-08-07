@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 
-import { ICON_TYPES } from '@sage-burner/shared'
+import { BANNER_TYPE, ICON_TYPES } from '@sage-burner/shared'
 
 import { AVATAR_TYPES } from './avatars.ts'
 
@@ -10,8 +10,12 @@ import { AVATAR_TYPES } from './avatars.ts'
  * One registration rather than one per route, because Fastify throws on a second
  * parser for a type already claimed — and an avatar and the app icon are both
  * `image/png`. Deduplicated for that reason, not for tidiness.
+ *
+ * The banner's `image/jpeg` is already among the avatar's three, and is named anyway:
+ * that overlap is a coincidence, and a day when avatars stop taking JPEG should not be
+ * the day banner uploads start answering 415.
  */
-export const IMAGE_BODY_TYPES = [...new Set<string>([...AVATAR_TYPES, ...ICON_TYPES])]
+export const IMAGE_BODY_TYPES = [...new Set<string>([...AVATAR_TYPES, ...ICON_TYPES, BANNER_TYPE])]
 
 /**
  * Raw bytes, for the routes that take an image.

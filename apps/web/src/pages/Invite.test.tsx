@@ -20,6 +20,7 @@ const aBurn = (over: Partial<Event> = {}): Event => ({
   end_date: '2026-08-03',
   start_time: '16:00',
   end_time: '12:00',
+  location: '',
   welcome_markdown: '',
   payment_info_markdown: '',
   transfer_info_markdown: '',

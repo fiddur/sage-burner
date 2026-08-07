@@ -247,6 +247,15 @@ export const apiRoutes = {
     path: () => '/api/installation',
   },
   /**
+   * Public for the same reason as the icon, and more so: this is the picture a link
+   * to the homepage shows, and the crawler fetching it carries nobody's session.
+   */
+  getInstallationBanner: {
+    method: 'GET',
+    fastify: '/api/installation/banner',
+    path: () => '/api/installation/banner',
+  },
+  /**
    * Public, unlike `accountAvatar`: the browser fetches it for the home screen
    * without the app's cookies, and it is a logo rather than anybody's face.
    */
@@ -433,6 +442,11 @@ export const apiRoutes = {
     fastify: '/api/admin/applications/:id/reject',
     path: (id: string) => `/api/admin/applications/${encodeURIComponent(id)}/reject`,
   },
+  removeInstallationBanner: {
+    method: 'DELETE',
+    fastify: '/api/admin/installation/banner',
+    path: () => '/api/admin/installation/banner',
+  },
   removeInstallationIcon: {
     method: 'DELETE',
     fastify: '/api/admin/installation/icon',
@@ -488,6 +502,11 @@ export const apiRoutes = {
     method: 'PUT',
     fastify: '/api/admin/accounts/:accountId/roles',
     path: (accountId: string) => `/api/admin/accounts/${encodeURIComponent(accountId)}/roles`,
+  },
+  setInstallationBanner: {
+    method: 'PUT',
+    fastify: '/api/admin/installation/banner',
+    path: () => '/api/admin/installation/banner',
   },
   setInstallationIcon: {
     method: 'PUT',

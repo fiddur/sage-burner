@@ -253,7 +253,7 @@ These are member records, so treat them as such:
   a place — cannot come out differently on the two pages.
 - **What the offline cache holds is a sign-out question** (#256). The service
   worker keeps two caches, and the split is the whole of what stays on a device: the
-  shell, bundles, manifest and icon survive a sign-out because none of it is
+  shell, bundles, manifest, icon and banner survive a sign-out because none of it is
   anybody's data, and the cache holding every API read — the roster, the schedule,
   who you are — is deleted whole on the way out. Whole rather than by URL: entries
   picked out by path would be a list to keep in step with the routes, which is the
@@ -267,6 +267,16 @@ These are member records, so treat them as such:
   admin-only; reading is public, because a browser fetching an icon for a home
   screen carries no cookies. Nothing in this process decodes an image, exactly as
   with avatars.
+- **A crawler reads the shell, so the shell has to say who this is** (#306). The
+  card a shared link draws is `<meta>` tags injected by the backend, because nothing
+  the SPA applies after load ever reaches one. Injected from **one** handler that
+  both the registered `/` and the not-found handler call — into one of the two makes
+  sharing the bare domain work while a deep link does not. The origin comes from
+  `Host`, with `PUBLIC_ORIGIN` winning, since this app has no notion of its own
+  address and `og:url` and `og:image` must be absolute; a `Host` that is not
+  hostname-shaped gets neither tag rather than a URL nobody can fetch. The banner is
+  the icon's pipeline with a narrower type — JPEG, because no crawler draws an SVG,
+  and a banner that leaves the card blank is the bug this fixed.
 - Markdown is sanitized before rendering, and members author it too — any longer
   field shown to other people is markdown. `markdown.ts` escapes raw HTML rather
   than filtering it and allowlists link schemes, so untrusted authors are inside

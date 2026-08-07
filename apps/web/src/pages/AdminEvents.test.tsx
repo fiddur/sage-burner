@@ -24,6 +24,7 @@ const summer: Event = {
   end_date: '2026-08-05',
   start_time: '00:00',
   end_time: '23:59',
+  location: '',
   welcome_markdown: '# Hello',
   payment_info_markdown: '',
   transfer_info_markdown: '',
@@ -122,6 +123,7 @@ describe('AdminEvents', () => {
         end_date: '2026-12-05',
         start_time: '00:00',
         end_time: '23:59',
+        location: '',
         welcome_markdown: '',
         payment_info_markdown: '',
         // No `transfer_info_markdown`: its schema default is a real sentence, and

@@ -78,6 +78,10 @@ export const planFor = (
   if (pathname.startsWith('/assets/')) return 'asset'
   if (pathname === apiRoutes.webManifest.path()) return 'app'
   if (pathname === apiRoutes.getInstallationIcon.path()) return 'app'
+  // With the icon rather than with the reads beside it in `/api/`: a banner is the
+  // installation's own picture, on a page anybody can see, and the cache that goes at
+  // sign-out is the one holding somebody's data.
+  if (pathname === apiRoutes.getInstallationBanner.path()) return 'app'
   if (NEVER_CACHED.includes(pathname)) return 'skip'
   if (pathname.startsWith('/api/')) return 'api'
 

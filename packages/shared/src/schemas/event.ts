@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { MAX_TITLE, MAX_WELCOME_LENGTH } from '../limits.ts'
+import { MAX_LOCATION, MAX_TITLE, MAX_WELCOME_LENGTH } from '../limits.ts'
 import { dateSchema, dateTimeSchema, idSchema, slugSchema, nonEmptyText, timeSchema } from './common.ts'
 
 /** Tolerates missing keys so `.partial()` and `.omit()` derivations still typecheck. */
@@ -68,6 +68,19 @@ export const eventFields = z.object({
   start_time: timeSchema,
   end_time: timeSchema,
   /**
+   * Where the burn is held, in the words somebody would say it in — "Sagegården,
+   * outside Rättvik" (#306).
+   *
+   * Per burn rather than per installation: the same people meet at a different farm
+   * next time, and one installation-wide address would be wrong for precisely the
+   * burn somebody is reading about. Public — it is on the homepage and in the share
+   * card's structured data, which is what puts the burn on a map for whoever is
+   * deciding whether to apply — so it holds a place, not a gate code.
+   *
+   * Empty until somebody fills it in. Nothing requires it.
+   */
+  location: z.string().max(MAX_LOCATION),
+  /**
    * Rendered on the public homepage, written by any approved member, sanitized
    * before display. `MAX_WELCOME_LENGTH` is the limit the form shares.
    */
@@ -127,6 +140,9 @@ export const eventCreateSchema = withEventDateOrder(
   eventFields
     .omit({ id: true, created_at: true })
     .extend({
+      // Defaulted for the same reason as the welcome text: naming a date and a cap is
+      // what creating a burn is, and where it is held is often decided later.
+      location: eventFields.shape.location.default(''),
       welcome_markdown: eventFields.shape.welcome_markdown.default(''),
       payment_info_markdown: eventFields.shape.payment_info_markdown.default(''),
       transfer_info_markdown: eventFields.shape.transfer_info_markdown.default(DEFAULT_TRANSFER_INFO),

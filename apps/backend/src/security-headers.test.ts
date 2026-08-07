@@ -28,7 +28,10 @@ let webRoot: string | undefined
 const build = async (): Promise<FastifyInstance> => {
   webRoot = mkdtempSync(join(tmpdir(), 'sage-headers-'))
   mkdirSync(join(webRoot, 'assets'), { recursive: true })
-  writeFileSync(join(webRoot, 'index.html'), '<!doctype html><title>x</title><div id="app"></div>')
+  writeFileSync(
+    join(webRoot, 'index.html'),
+    '<!doctype html><html><head><title>x</title></head><body><div id="app"></div></body></html>',
+  )
   writeFileSync(join(webRoot, 'assets', 'index.js'), 'console.log(1)')
 
   handle = createDb({ url: ':memory:' })

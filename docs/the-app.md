@@ -93,13 +93,12 @@ The singleton is a constraint rather than a convention, so no read has to decide
 which row is authoritative, and the migration seeds it — with `Sage Burner`, so
 a fresh deployment looks exactly as it did before anyone renamed anything.
 
-`index.html` still ships `<title>Sage Burner</title>`, which is what the browser
-tab says for the moment before the app boots. That is the software's name and it
-is accurate until the app knows better; serving a per-installation shell would
-mean injecting into the HTML at three separate entry points, which is not worth
-it for one frame. Until the fetch lands the header renders no name at all,
-rather than the software's — showing it and then replacing it is what would look
-like a bug.
+`index.html` ships `<title>Sage Burner</title>`, and the backend takes it out on
+the way past: the shell it serves carries this installation's own title instead
+(#306, below). Vite serves the file unchanged in development, so that is where
+the software's name is still what the tab says for a moment. Until the fetch
+lands the header renders no name at all, rather than the software's — showing it
+and then replacing it is what would look like a bug.
 
 ### The app icon
 
@@ -149,6 +148,89 @@ that is the only thing that draws them: they lived in `@sage-burner/shared` whil
 went — nothing called it once the dot moved onto the canvas, and a shared constant
 with one consumer is a description to keep in step for nothing.
 
+### The card a shared link shows
+
+Paste the homepage into Facebook, Slack, Signal or WhatsApp and it draws a card.
+Until #306 that card said **Sage Burner** and showed no picture, because none of
+those crawlers runs JavaScript: they fetch the HTML and read the `<head>` of it,
+and everything this app knows about itself arrives afterwards over the API.
+
+**So the backend injects it.** `shell.ts` reads `index.html` once at boot,
+takes out the static `<title>` and description, and puts the installation's own
+in — the name of the open burn, its dates and place, the welcome text stripped to
+plain sentences, and a picture. `share.ts` builds the tags and is tested as a
+string in, a string out.
+
+**Both entry points, from one handler.** `@fastify/static` serves a route per
+file, so `/` and `/index.html` come from there, while `/apply`, `/login` and every
+other client-side route come from the not-found handler. Injecting into one of the
+two makes sharing the bare domain work while sharing a deep link does not, or the
+reverse — so `index.html` is kept out of the static glob and both paths call
+`createShellHandler`. `app.test.ts` asserts the two answer identically.
+
+What goes in:
+
+| Tag                     | What it says                                                       |
+| ----------------------- | ------------------------------------------------------------------ |
+| `<title>`, `og:title`   | `Autumn Burn · The Burning Sage`, or the installation alone        |
+| `og:site_name`          | the installation                                                   |
+| `og:description`        | the dates, the place, then the welcome text, ~200 characters       |
+| `og:type`               | `event` with a burn open, `website` without                        |
+| `og:url`, `og:image`    | absolute, and omitted entirely when the origin is unknown          |
+| `og:image:width/height` | 1200 × 630 for a banner, 512 × 512 for a raster icon, none for SVG |
+| `twitter:card`          | `summary_large_image` for the banner, `summary` for the icon       |
+| `application/ld+json`   | schema.org `Event` — `startDate`, `endDate`, `location`            |
+
+`og:type: event` is in the Open Graph spec, and **Facebook treats every type it
+has not graduated as `other`**, so nothing there renders a typed date. That is
+why the dates are also in the description, which is the line a human reads. The
+JSON-LD is for Google, which reads it for rich results and which Facebook
+ignores; it is a `<script type="application/ld+json">`, which CSP does not
+restrict because it never executes, and every `<` inside it is escaped to
+`<` so nothing somebody typed can close the element early.
+
+**The origin comes from the request.** This app deliberately has no notion of its
+own public address — `docker compose up` has to stay sufficient — so `Host` is
+what it uses, and `PUBLIC_ORIGIN` wins where an operator set one. The scheme is
+`request.protocol`, which follows `X-Forwarded-Proto` only as far as
+`TRUST_PROXY` allows: behind Apache with that unset, the card names `http://` on
+an https site. A `Host` that is not hostname-shaped gets no `og:url` and no
+`og:image` at all, since both must be absolute and a card naming an origin nobody
+can fetch is worth nothing.
+
+### The banner
+
+Organise → **Settings** takes the wide picture the card shows, which the public
+homepage also wears above the burn. `PUT /api/admin/installation/banner` takes
+raw bytes, **`image/jpeg` only**, up to a megabyte; `DELETE` removes it;
+`GET /api/installation/banner` is public and 404s when there is none — unlike the
+icon, nothing asks for it until `GET /api/installation` has said
+`banner_updated_at`, which is also the `?v=` that makes a new banner a new URL.
+
+JPEG and nothing else, which is a narrower list than the icon's two. The whole
+job of this image is to be drawn by crawlers, none of them draws an SVG, and a
+1200 × 630 PNG of a photograph is a megabyte the homepage would then load on
+every visit. Whatever is chosen is cropped from the middle to 1200 × 630 and
+encoded in the browser, so nothing here decodes an image — the same trade as
+avatars and the icon, and what lets `og:image:width` be declared by a process
+with no image library.
+
+**1200 × 630 is the size to give it.** Facebook draws the large card above about
+600 × 315 and a small thumbnail below it, so the format is what decides which of
+the two a share looks like. With no banner the card falls back to the app icon,
+which is square, and says `summary` rather than claiming a wide picture it does
+not have.
+
+**Where the burn is** is a field on the burn, edited under Organise → Events —
+per burn rather than per installation, because the same people meet at a different
+farm next time. It shows beside the dates on the homepage, in the card's
+description, and as the `Place` in the structured data. Empty until somebody fills
+it in.
+
+**Cards are cached hard.** After a deploy, Facebook keeps showing the old one
+until it re-scrapes; its Sharing Debugger has a button for that, and Signal and
+WhatsApp cache too. A change that "did not work" is usually this.
+
 ## Offline and installing
 
 The app is a PWA: installable, and readable with no connection.
@@ -162,7 +244,7 @@ than one an installed copy holds on to.
 Two caches, and the split is the whole of what stays on a device:
 
 - **`sage-burner-shell-v1`** — the HTML shell, the hashed bundles, the manifest,
-  the icon. None of it is anybody's data. Kept across a sign-out, because
+  the icon, the banner. None of it is anybody's data. Kept across a sign-out, because
   dropping it would mean the next person to open the app offline gets nothing at
   all. Trimmed to the 40 most recently stored entries, oldest first, so old
   builds' chunks do not accumulate forever.

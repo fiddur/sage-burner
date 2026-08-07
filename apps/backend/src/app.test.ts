@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 
 import { errorResponseSchema } from '@sage-burner/shared'
+import { randomUUID } from 'node:crypto'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -12,6 +13,7 @@ import type { DbHandle } from './db/index.ts'
 import { createApp } from './app.ts'
 import { createConfig } from './config.ts'
 import { createDb, runMigrations } from './db/index.ts'
+import { INSTALLATION_ID, event, installationBanner } from './db/schema.ts'
 
 /**
  * Builds the real app in-process against an in-memory database and drives it
@@ -443,12 +445,24 @@ describe('without a web root', () => {
   })
 })
 
+/**
+ * A shell shaped like the one Vite emits.
+ *
+ * The `<head>` is load-bearing rather than decoration: the share card is injected
+ * before `</head>` and the static `<title>` is taken out on the way (#306), so a
+ * fixture without one would exercise neither.
+ */
+const SHELL =
+  '<!doctype html><html><head><title>Sage Burner</title>' +
+  '<meta name="description" content="Membership and scheduling for a small co-created gathering." />' +
+  '</head><body><div id="app"></div></body></html>'
+
 describe('with a web root', () => {
   let webRoot: string
 
   beforeEach(() => {
     webRoot = mkdtempSync(join(tmpdir(), 'sage-burner-web-'))
-    writeFileSync(join(webRoot, 'index.html'), '<!doctype html><title>Sage Burner</title>')
+    writeFileSync(join(webRoot, 'index.html'), SHELL)
     writeFileSync(join(webRoot, 'app.js'), 'console.info("hi")')
     mkdirSync(join(webRoot, 'assets'))
     writeFileSync(join(webRoot, 'assets', 'index-a1b2c3.js'), 'export const hashed = true')
@@ -500,7 +514,7 @@ describe('with a web root', () => {
     const outer = mkdtempSync(join(tmpdir(), 'sage-burner-outer-'))
     const nested = join(outer, 'assets', 'app', 'dist')
     mkdirSync(nested, { recursive: true })
-    writeFileSync(join(nested, 'index.html'), '<!doctype html><title>Sage Burner</title>')
+    writeFileSync(join(nested, 'index.html'), SHELL)
 
     try {
       await build({ WEB_ROOT: nested })
@@ -516,11 +530,10 @@ describe('with a web root', () => {
   })
 
   it('keeps the shell uncached on the SPA fallback path too', async () => {
-    // The path real navigations take. It reaches the shell through
-    // `reply.sendFile` rather than a registered route, so the header applying
-    // there is a non-obvious property of @fastify/static rather than something
-    // this code arranges — worth pinning, since caching the shell is what pins
-    // clients to a build that no longer exists.
+    // The path real navigations take, and one of the two places the shell goes out
+    // from — the not-found handler rather than a registered route. Both call the same
+    // handler, and this is what says the header is on that side of it too: caching
+    // the shell is what pins clients to a build that no longer exists.
     await build({ WEB_ROOT: webRoot })
 
     const response = await app.inject({ method: 'GET', url: '/schedule' })
@@ -639,6 +652,169 @@ describe('with a web root', () => {
   })
 })
 
+describe('the share card in the shell (#306)', () => {
+  // Social crawlers do not run JavaScript, so the burn's name has to be in the HTML
+  // before it is sent. The two-places trap is the point of most of this: the shell
+  // goes out from a registered route *and* from the not-found handler, and injecting
+  // into one of them makes sharing the bare domain work while a deep link does not.
+  let webRoot: string
+
+  beforeEach(() => {
+    webRoot = mkdtempSync(join(tmpdir(), 'sage-burner-card-'))
+    writeFileSync(join(webRoot, 'index.html'), SHELL)
+  })
+
+  afterEach(() => {
+    rmSync(webRoot, { recursive: true, force: true })
+  })
+
+  const givenBurn = async (overrides: Partial<typeof event.$inferInsert> = {}) => {
+    await handle.db.insert(event).values({
+      id: randomUUID(),
+      name: 'Autumn Burn',
+      slug: 'autumn-2030',
+      start_date: '2030-10-02',
+      end_date: '2030-10-04',
+      location: 'Sagegården',
+      welcome_markdown: '# Welcome\n\nFiery weekend burn.',
+      member_cap: 42,
+      created_at: new Date().toISOString(),
+      ...overrides,
+    })
+  }
+
+  const givenBanner = async () => {
+    await handle.db.insert(installationBanner).values({
+      id: INSTALLATION_ID,
+      image: Buffer.from('not really a jpeg'),
+      updated_at: '2026-08-07T10:00:00.000Z',
+    })
+  }
+
+  const shellAt = async (url: string, headers: Record<string, string> = {}) =>
+    (await app.inject({ method: 'GET', url, headers })).body
+
+  it('names the open burn in the title, where a crawler reads it', async () => {
+    await build({ WEB_ROOT: webRoot })
+    await givenBurn()
+
+    expect(await shellAt('/')).toContain('<title>Autumn Burn · Sage Burner</title>')
+  })
+
+  it('says the same on a client-side route as at the root', async () => {
+    // The trap: `/` comes from a registered route and `/apply` from the not-found
+    // handler. One `sendShell` is what makes these two assertions the same assertion.
+    await build({ WEB_ROOT: webRoot })
+    await givenBurn()
+
+    const [root, deep] = [await shellAt('/'), await shellAt('/apply')]
+
+    expect(deep).toContain('property="og:title" content="Autumn Burn · Sage Burner"')
+    expect(deep).toBe(root)
+  })
+
+  it('leaves exactly one title and no description of the software', async () => {
+    // A second `<title>` leaves it to the browser which wins, and the shell's own
+    // description describes Sage Burner rather than this gathering.
+    await build({ WEB_ROOT: webRoot })
+    await givenBurn()
+
+    const body = await shellAt('/')
+
+    expect(body.match(/<title>/g)).toHaveLength(1)
+    expect(body).not.toContain('Membership and scheduling for a small co-created gathering.')
+    expect(body).toContain('property="og:description" content="2030-10-02 – 2030-10-04 · Sagegården ·')
+  })
+
+  it('falls back to the installation when no burn is open', async () => {
+    await build({ WEB_ROOT: webRoot })
+
+    const body = await shellAt('/')
+
+    expect(body).toContain('<title>Sage Burner</title>')
+    expect(body).toContain('property="og:type" content="website"')
+    expect(body).not.toContain('og:description')
+  })
+
+  it('points the card at the banner when one has been uploaded', async () => {
+    await build({ WEB_ROOT: webRoot })
+    await givenBurn()
+    await givenBanner()
+
+    const body = await shellAt('/', { host: 'burn.example.org' })
+
+    expect(body).toContain(
+      'property="og:image" content="http://burn.example.org/api/installation/banner' +
+        '?v=2026-08-07T10%3A00%3A00.000Z"',
+    )
+    expect(body).toContain('name="twitter:card" content="summary_large_image"')
+  })
+
+  it('falls back to the app icon, and asks for the small card because it is square', async () => {
+    await build({ WEB_ROOT: webRoot })
+    await givenBurn()
+
+    const body = await shellAt('/', { host: 'burn.example.org' })
+
+    expect(body).toContain('property="og:image" content="http://burn.example.org/api/installation/icon')
+    expect(body).toContain('name="twitter:card" content="summary"')
+  })
+
+  it('takes the origin from the request, since the app has no notion of its own', async () => {
+    await build({ WEB_ROOT: webRoot })
+    await givenBurn()
+
+    expect(await shellAt('/', { host: 'burn.example.org' })).toContain(
+      'property="og:url" content="http://burn.example.org"',
+    )
+  })
+
+  it('lets PUBLIC_ORIGIN win, which is also the https a proxy terminates', async () => {
+    await build({ WEB_ROOT: webRoot, PUBLIC_ORIGIN: 'https://burn.example.org' })
+    await givenBurn()
+
+    expect(await shellAt('/', { host: 'whatever.invalid' })).toContain(
+      'property="og:url" content="https://burn.example.org"',
+    )
+  })
+
+  it('leaves the absolute tags out rather than believing a bent Host', async () => {
+    // The header is the client's. Escaped as well as shape-checked — but a card
+    // naming an origin nobody can fetch is worth nothing, so it is left off.
+    await build({ WEB_ROOT: webRoot })
+    await givenBurn()
+
+    const body = await shellAt('/', { host: 'burn.example.org/"><script>x</script>' })
+
+    expect(body).not.toContain('og:url')
+    expect(body).not.toContain('og:image')
+    expect(body).toContain('<title>Autumn Burn · Sage Burner</title>')
+  })
+
+  it('carries the structured data Google reads, dates and all', async () => {
+    await build({ WEB_ROOT: webRoot })
+    await givenBurn({ start_time: '15:00', end_time: '14:00' })
+
+    const body = await shellAt('/')
+
+    expect(body).toContain('"@type":"Event"')
+    expect(body).toContain('"startDate":"2030-10-02T15:00"')
+    expect(body).toContain('"endDate":"2030-10-04T14:00"')
+    expect(body).toContain('"location":{"@type":"Place","name":"Sagegården"}')
+  })
+
+  it('serves the shell as HTML, not as a download', async () => {
+    await build({ WEB_ROOT: webRoot })
+
+    for (const url of ['/', '/index.html', '/apply']) {
+      const response = await app.inject({ method: 'GET', url })
+
+      expect(response.statusCode, url).toBe(200)
+      expect(response.headers['content-type'], url).toContain('text/html')
+    }
+  })
+})
+
 describe('a web root that cannot serve the app', () => {
   // Setting WEB_ROOT states an intent to serve the frontend. Failing to do so
   // must stop the boot: /api/version would keep answering, so the container
@@ -679,5 +855,14 @@ describe('a web root that cannot serve the app', () => {
 
   it('refuses to start when there is no index.html to serve', async () => {
     await expect(buildWith(dir)).rejects.toThrow(/index\.html/i)
+  })
+
+  it('refuses to start on a shell it cannot put the share card into', async () => {
+    // Same argument as the three above: a container that will not start is easier to
+    // diagnose than one quietly serving the software's name to every crawler. Every
+    // other test in this file boots on a shell that does have a `</head>`.
+    writeFileSync(join(dir, 'index.html'), '<!doctype html><div id="app"></div>')
+
+    await expect(buildWith(dir)).rejects.toThrow(/<\/head>/i)
   })
 })

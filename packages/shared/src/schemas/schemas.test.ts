@@ -6,6 +6,7 @@ import {
   MAX_NOTES,
   MAX_PERSON_NAME,
   MAX_QUESTION_LABEL,
+  MAX_LOCATION,
   MAX_SLUG,
   MAX_TITLE,
   MAX_WELCOME_LENGTH,
@@ -48,6 +49,7 @@ const anEvent = {
   end_date: '2026-10-04',
   start_time: '15:00',
   end_time: '12:00',
+  location: 'Hökås',
   welcome_markdown: '# Welcome!',
   payment_info_markdown: '',
   transfer_info_markdown: '',
@@ -657,6 +659,7 @@ describe('the named length limits', () => {
       (v) => eventSchema.safeParse({ ...anEvent, welcome_markdown: v }).success,
       MAX_WELCOME_LENGTH,
     ],
+    ["a burn's place", (v) => eventSchema.safeParse({ ...anEvent, location: v }).success, MAX_LOCATION],
     [
       'a question label',
       (v) => formQuestionSchema.safeParse({ ...aQuestion, label: v }).success,

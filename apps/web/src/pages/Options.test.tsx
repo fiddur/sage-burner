@@ -26,6 +26,7 @@ const BURN: Event = {
   end_date: '2026-08-05',
   start_time: '00:00',
   end_time: '23:59',
+  location: '',
   welcome_markdown: '',
   payment_info_markdown: '',
   transfer_info_markdown: '',

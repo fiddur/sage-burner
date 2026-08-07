@@ -31,6 +31,7 @@ const BURN: Event = {
   member_cap: 42,
   start_time: '16:00',
   end_time: '12:00',
+  location: '',
   welcome_markdown: '',
   payment_info_markdown: '',
   transfer_info_markdown: '',
