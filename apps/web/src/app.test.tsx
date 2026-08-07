@@ -43,6 +43,10 @@ const clientWith = (
   setInstallationBanner: () => Promise.reject(new Error('setInstallationBanner is not stubbed in this file')),
   removeInstallationBanner: () =>
     Promise.reject(new Error('removeInstallationBanner is not stubbed in this file')),
+  getMailSettings: () => Promise.reject(new Error('getMailSettings is not stubbed in this file')),
+  updateMailSettings: () => Promise.reject(new Error('updateMailSettings is not stubbed in this file')),
+  removeMailSettings: () => Promise.reject(new Error('removeMailSettings is not stubbed in this file')),
+  sendTestEmail: () => Promise.reject(new Error('sendTestEmail is not stubbed in this file')),
   getQuestions: () => Promise.reject(new Error('getQuestions is not stubbed in this file')),
   submitApplication: () => Promise.reject(new Error('submitApplication is not stubbed in this file')),
   getApplications: () => Promise.reject(new Error('getApplications is not stubbed in this file')),
@@ -78,7 +82,7 @@ const clientWith = (
   // file, and a rejection is swallowed anyway — being offline is not a new version.
   getVersion: () => Promise.resolve({ build_sha: 'the-one-this-page-loaded' }),
   getMyNotifications: () => Promise.resolve({ notifications: [], unseen: 0 }),
-  getMyNotificationSettings: () => Promise.resolve({ on: [] }),
+  getMyNotificationSettings: () => Promise.resolve({ on: [], email: [] }),
   updateMyNotificationSettings: () =>
     Promise.reject(new Error('updateMyNotificationSettings is not stubbed here')),
   markNotificationsSeen: () => Promise.reject(new Error('markNotificationsSeen is not stubbed in this file')),

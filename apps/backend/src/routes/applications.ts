@@ -103,7 +103,7 @@ export const registerApplicationRoutes = (
       answers,
       status: 'pending',
       applicant_name: body.applicant_name,
-      applicant_contact: body.applicant_contact,
+      applicant_email: body.applicant_email,
       submitted_at: now().toISOString(),
       decided_at: null,
     } satisfies Application

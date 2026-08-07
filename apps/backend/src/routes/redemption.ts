@@ -51,6 +51,7 @@ export const registerRedemptionRoutes = (
         expires_at: inviteToken.expires_at,
         used_at: inviteToken.used_at,
         applicant_name: application.applicant_name,
+        applicant_email: application.applicant_email,
       })
       .from(inviteToken)
       // Left: an admin's direct invite has no application behind it, and is still a
@@ -73,6 +74,10 @@ export const registerRedemptionRoutes = (
       // Only while it is outstanding. A spent or expired link has no form to fill,
       // so naming its applicant would be disclosure bought for nothing.
       name: status === 'outstanding' ? (invite?.applicant_name ?? null) : null,
+      // The address the invite was posted to, so the form does not ask for the one
+      // the message it arrived in was addressed to (#30). Same condition as the name,
+      // and `inviteStateSchema` argues the trade out.
+      email: status === 'outstanding' ? (invite?.applicant_email ?? null) : null,
     } satisfies InviteState
   })
 

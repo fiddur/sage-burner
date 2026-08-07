@@ -21,6 +21,15 @@ export interface Told {
 export type Notifier = (accountId: string, told: Told) => Promise<unknown>
 
 /**
+ * Posting one notification to somebody who asked for it by email (#30).
+ *
+ * Injected rather than built here, so `notify.ts` stays free of both the mail
+ * settings and the installation's name — and so an installation with no SMTP server
+ * passes nothing and this whole branch costs a comparison.
+ */
+export type EmailChannel = (accountId: string, told: Told) => Promise<unknown>
+
+/**
  * What a push carries, and the one place it is built (#279).
  *
  * There are two senders and they had drifted. `recordAndPush` below covers everything
@@ -43,22 +52,38 @@ export interface Pushed {
 export const pushPayload = ({ body, link, category }: Pushed): string =>
   JSON.stringify({ body, link, category })
 
+/** Which ways this person wants to hear about one category. */
+export interface Channels {
+  /** The bell, and the push that copies it. */
+  bell: boolean
+  email: boolean
+}
+
 /**
- * Whether this person wants to hear about this.
+ * Whether this person wants to hear about this, and how.
  *
  * A stored row is what they said; absence is that they have not said, and the
  * default answers instead. That indirection is the whole reason the table carries
  * `enabled` rather than only listing mutes — six categories are on unless refused
  * and five are off unless asked for, and "is there a row" cannot mean both (#259).
+ *
+ * Email needs no such indirection: it is off for every category until somebody asks,
+ * so absence and `false` say the same thing (#30). The two channels are independent
+ * — somebody may want the burn-wide ones in their inbox and not on their phone —
+ * which is why this answers with both rather than with one switch and a channel.
  */
-export const wants = async (db: Database, accountId: string, category: NotificationCategory) => {
+export const wants = async (
+  db: Database,
+  accountId: string,
+  category: NotificationCategory,
+): Promise<Channels> => {
   const [row] = await db
-    .select({ enabled: notificationSetting.enabled })
+    .select({ enabled: notificationSetting.enabled, email: notificationSetting.email })
     .from(notificationSetting)
     .where(and(eq(notificationSetting.account_id, accountId), eq(notificationSetting.category, category)))
     .limit(1)
 
-  return row?.enabled ?? notifiesByDefault(category)
+  return { bell: row?.enabled ?? notifiesByDefault(category), email: row?.email ?? false }
 }
 
 /**
@@ -69,16 +94,33 @@ export const wants = async (db: Database, accountId: string, category: Notificat
  * the bell is the surface that is always there. A member with no subscription gets
  * the bell and nothing else, which is the ordinary case.
  *
- * A category somebody does not want is not written at all. The setting says "notify
- * me", so switching it off means neither channel — a bell that fills up with things
- * somebody asked not to hear about is the same noise in a quieter place. That holds
- * for the ones that are off until asked for too: nothing is recorded for somebody
- * who never turned them on (#259).
+ * A category somebody has switched off is not written at all — a bell that fills up
+ * with things somebody asked not to hear about is the same noise in a quieter place.
+ * That holds for the ones that are off until asked for too: nothing is recorded for
+ * somebody who never turned them on (#259).
+ *
+ * **Email is a channel of its own, not a copy of the bell** (#30). The two switches
+ * are independent, so somebody may take the burn-wide ones in their inbox and off
+ * their phone — and switching the bell off is then not also an instruction to stop
+ * posting. It is started before the row is written and awaited after, so a mail
+ * server that is slow costs nobody their record.
  */
 export const recordAndPush =
-  (deps: PushDeps, now: () => Date, log: (counts: DeliveryCounts) => void): Notifier =>
+  (
+    deps: PushDeps,
+    now: () => Date,
+    log: (counts: DeliveryCounts) => void,
+    byEmail?: EmailChannel,
+  ): Notifier =>
   async (accountId, told) => {
-    if (!(await wants(deps.db, accountId, told.category))) return
+    const channels = await wants(deps.db, accountId, told.category)
+
+    // Independent of the bell, and after it: somebody may want the burn-wide ones in
+    // their inbox and nowhere else, and the write must not fail because a mail server
+    // did — the rule push already follows here (#30).
+    const posting = channels.email && byEmail !== undefined ? byEmail(accountId, told) : undefined
+
+    if (!channels.bell) return await posting
 
     await deps.db.insert(notification).values({
       id: randomUUID(),
@@ -95,25 +137,40 @@ export const recordAndPush =
     const counts = await notifyAccount(deps, accountId, pushPayload(told))
     if (counts.failed > 0 || counts.gone > 0) log(counts)
 
+    await posting
+
     return counts
   }
 
 /**
- * Every category this account currently has on, defaults filled in.
+ * Every category this account currently has on, per channel, defaults filled in.
  *
  * Computed here rather than left to the client, which would otherwise need its own
  * copy of the defaults to know what an absent row means — and a second copy of a
  * default is a default that drifts.
  */
-export const switchedOn = async (db: Database, accountId: string): Promise<NotificationCategory[]> => {
+export const switchedOn = async (
+  db: Database,
+  accountId: string,
+): Promise<{ on: NotificationCategory[]; email: NotificationCategory[] }> => {
   const rows = await db
-    .select({ category: notificationSetting.category, enabled: notificationSetting.enabled })
+    .select({
+      category: notificationSetting.category,
+      enabled: notificationSetting.enabled,
+      email: notificationSetting.email,
+    })
     .from(notificationSetting)
     .where(eq(notificationSetting.account_id, accountId))
 
-  const said = new Map(rows.map((row) => [row.category, row.enabled]))
+  const said = new Map(rows.map((row) => [row.category, row]))
 
-  return notificationCategories.filter((category) => said.get(category) ?? notifiesByDefault(category))
+  return {
+    on: notificationCategories.filter(
+      (category) => said.get(category)?.enabled ?? notifiesByDefault(category),
+    ),
+    // No default to fill in: email is off until asked for, so absence is `false`.
+    email: notificationCategories.filter((category) => said.get(category)?.email ?? false),
+  }
 }
 
 /**

@@ -17,11 +17,18 @@ const ADMIN: Viewer = {
 }
 
 const stub = (over: Partial<AdminSettingsApi> = {}): AdminSettingsApi => ({
-  getInstallation: () => Promise.resolve({ installation: { title: 'Sage Burner', banner_updated_at: null } }),
+  getInstallation: () =>
+    Promise.resolve({ installation: { title: 'Sage Burner', banner_updated_at: null, sends_email: false } }),
+  // The mail form mounted here has its own tests; this keeps it from reaching the API
+  // when the page under test is about the title.
+  getMailSettings: () => Promise.resolve({ mail: null }),
+  updateMailSettings: () => Promise.reject(new Error('updateMailSettings is not stubbed here')),
+  removeMailSettings: () => Promise.reject(new Error('removeMailSettings is not stubbed here')),
+  sendTestEmail: () => Promise.reject(new Error('sendTestEmail is not stubbed here')),
   updateInstallation: () => Promise.reject(new Error('updateInstallation is not stubbed here')),
   // The toggle mounted here has its own tests; these keep it from reaching the API
   // when the page under test is about the title.
-  getMyNotificationSettings: () => Promise.resolve({ on: [] }),
+  getMyNotificationSettings: () => Promise.resolve({ on: [], email: [] }),
   updateMyNotificationSettings: () =>
     Promise.reject(new Error('updateMyNotificationSettings is not stubbed here')),
   getPushKey: () => Promise.resolve({ public_key: null }),
@@ -63,7 +70,9 @@ describe('AdminSettings', () => {
 
   it('renames it', async () => {
     const updateInstallation = vi.fn<AdminSettingsApi['updateInstallation']>(() =>
-      Promise.resolve({ installation: { title: 'The Burning Sage', banner_updated_at: null } }),
+      Promise.resolve({
+        installation: { title: 'The Burning Sage', banner_updated_at: null, sends_email: false },
+      }),
     )
     renderPage(stub({ updateInstallation }))
 
@@ -76,7 +85,9 @@ describe('AdminSettings', () => {
 
   it('trims what it sends, so a stray space is not a rename', async () => {
     const updateInstallation = vi.fn<AdminSettingsApi['updateInstallation']>(() =>
-      Promise.resolve({ installation: { title: 'The Burning Sage', banner_updated_at: null } }),
+      Promise.resolve({
+        installation: { title: 'The Burning Sage', banner_updated_at: null, sends_email: false },
+      }),
     )
     renderPage(stub({ updateInstallation }))
 
@@ -90,7 +101,7 @@ describe('AdminSettings', () => {
     // `aria-required` rather than `required`, so the browser does not block the
     // submit before this message can be shown. The page is the only authority.
     const updateInstallation = vi.fn<AdminSettingsApi['updateInstallation']>(() =>
-      Promise.resolve({ installation: { title: '', banner_updated_at: null } }),
+      Promise.resolve({ installation: { title: '', banner_updated_at: null, sends_email: false } }),
     )
     renderPage(stub({ updateInstallation }))
 
@@ -113,7 +124,9 @@ describe('AdminSettings', () => {
           <AdminSettings
             api={stub({
               updateInstallation: () =>
-                Promise.resolve({ installation: { title: 'The Burning Sage', banner_updated_at: null } }),
+                Promise.resolve({
+                  installation: { title: 'The Burning Sage', banner_updated_at: null, sends_email: false },
+                }),
             })}
           />
         </InstallationProvider>
@@ -151,7 +164,9 @@ describe('AdminSettings', () => {
     // who already has admin" — advice for somebody already signed in. #145 fixed it
     // once, in `GuardedPage`, rather than five times.
     const getInstallation = vi.fn<AdminSettingsApi['getInstallation']>(() =>
-      Promise.resolve({ installation: { title: 'Sage Burner', banner_updated_at: null } }),
+      Promise.resolve({
+        installation: { title: 'Sage Burner', banner_updated_at: null, sends_email: false },
+      }),
     )
     renderPage(stub({ getInstallation }), { status: 'signed-out' })
 
@@ -162,7 +177,9 @@ describe('AdminSettings', () => {
 
   it('tells somebody signed in without the role to ask, not to log in again', async () => {
     const getInstallation = vi.fn<AdminSettingsApi['getInstallation']>(() =>
-      Promise.resolve({ installation: { title: 'Sage Burner', banner_updated_at: null } }),
+      Promise.resolve({
+        installation: { title: 'Sage Burner', banner_updated_at: null, sends_email: false },
+      }),
     )
     renderPage(stub({ getInstallation }), {
       status: 'signed-in',

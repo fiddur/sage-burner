@@ -59,3 +59,24 @@ export const MAX_WELCOME_LENGTH = 100_000
 
 /** What a member calls one of their passkeys: "Phone", "Work laptop". */
 export const MAX_PASSKEY_LABEL = 100
+
+/** An SMTP server's hostname. A DNS name's own ceiling, which nothing here beats. */
+export const MAX_SMTP_HOST = 253
+
+/** What the SMTP server is told this account is called. */
+export const MAX_SMTP_USERNAME = 320
+
+/** An SMTP password, or an app password, which providers make long. */
+export const MAX_SMTP_PASSWORD = 500
+
+/**
+ * An email address.
+ *
+ * 254 rather than RFC 5321's 320: that is the length of a path in an SMTP envelope,
+ * angle brackets included, and 254 is what the address inside one can be. Same bound
+ * as `emailSchema`, which is what actually refuses one.
+ */
+export const MAX_EMAIL = 254
+
+/** The name beside the from address — "The Burning Sage", not a sentence. */
+export const MAX_FROM_NAME = 200

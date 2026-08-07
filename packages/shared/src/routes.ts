@@ -32,6 +32,7 @@ import type {
   Helper,
   MealSlotUpdate,
   MealUpdate,
+  MailSettingsUpdate,
   NotificationSettings,
   PasskeyLogin,
   PasskeyRegistration,
@@ -284,6 +285,17 @@ export const apiRoutes = {
     fastify: '/api/events/:eventId/roles',
     path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/roles`,
   },
+  /**
+   * How this installation posts, for the admin who set it up (#30).
+   *
+   * Behind the admin prefix, and never carrying the password — `mailSettingsSchema`
+   * says why `has_password` is what comes back instead.
+   */
+  getMailSettings: {
+    method: 'GET',
+    fastify: '/api/admin/installation/mail',
+    path: () => '/api/admin/installation/mail',
+  },
   getMe: {
     method: 'GET',
     fastify: '/api/auth/me',
@@ -452,6 +464,11 @@ export const apiRoutes = {
     fastify: '/api/admin/installation/icon',
     path: () => '/api/admin/installation/icon',
   },
+  removeMailSettings: {
+    method: 'DELETE',
+    fastify: '/api/admin/installation/mail',
+    path: () => '/api/admin/installation/mail',
+  },
   removeMyAvatar: {
     method: 'DELETE',
     fastify: '/api/me/avatar',
@@ -492,6 +509,15 @@ export const apiRoutes = {
     method: 'GET',
     fastify: '/events/:eventId/schedule.ics',
     path: (eventId: string) => `/events/${encodeURIComponent(eventId)}/schedule.ics`,
+  },
+  /**
+   * A message to the admin's own address, so a wrong password is found here rather
+   * than by an applicant who never got an invite.
+   */
+  sendTestEmail: {
+    method: 'POST',
+    fastify: '/api/admin/installation/mail/test',
+    path: () => '/api/admin/installation/mail/test',
   },
   setAccountPassword: {
     method: 'PUT',
@@ -599,6 +625,11 @@ export const apiRoutes = {
     method: 'PATCH',
     fastify: '/api/roles/:id',
     path: (id: string) => `/api/roles/${encodeURIComponent(id)}`,
+  },
+  updateMailSettings: {
+    method: 'PUT',
+    fastify: '/api/admin/installation/mail',
+    path: () => '/api/admin/installation/mail',
   },
   updateMeal: {
     method: 'PATCH',
@@ -734,6 +765,7 @@ export interface RouteBodies {
   updateEvent: EventUpdate
   updateEventOption: EventOptionUpdate
   updateInstallation: InstallationUpdate
+  updateMailSettings: MailSettingsUpdate
   updateLeadRole: LeadRoleUpdate
   updateMeal: MealUpdate
   updateMealIntro: MealIntroUpdate

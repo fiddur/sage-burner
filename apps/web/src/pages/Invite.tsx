@@ -176,8 +176,12 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
 
         setLoaded({ status: 'ready', state, upcoming })
         // What they typed on the application. Asked for it twice, a form reads as
-        // one that was not listening the first time.
+        // one that was not listening the first time — and the address doubly so once
+        // the invite arrives at it (#30). Still editable: this becomes the login, and
+        // somebody may want a different address for that than the one they applied
+        // with.
         if (state.name !== null) setName(state.name)
+        if (state.email !== null) setEmail(state.email)
         if (upcoming !== undefined) {
           setStay(stayForBurn(upcoming.event.start_date, upcoming.event.end_date))
         }

@@ -22,22 +22,31 @@ interface InstallationContextValue {
    * banner is a new URL rather than whatever the browser already had.
    */
   banner?: string | null
+  /**
+   * Whether an admin has set an SMTP server up (#30). `undefined` until the answer
+   * arrives, which the application form reads as "do not promise either way".
+   */
+  sendsEmail?: boolean
   setTitle: (title: string) => void
   setBanner: (banner: string | null) => void
+  setSendsEmail: (sends: boolean) => void
 }
 
 const InstallationContext = createContext<InstallationContextValue>({
   setTitle: () => undefined,
   setBanner: () => undefined,
+  setSendsEmail: () => undefined,
 })
 
 const Provide = ({
   title,
   banner,
+  sendsEmail,
   children,
 }: {
   title?: string
   banner?: string | null
+  sendsEmail?: boolean
   children: ComponentChildren
 }) => {
   // A rename on the settings page has to reach the header, which is a sibling
@@ -48,6 +57,7 @@ const Provide = ({
   // nothing.
   const [override, setOverride] = useState<string | undefined>(undefined)
   const [bannerOverride, setBannerOverride] = useState<string | null | undefined>(undefined)
+  const [mailOverride, setMailOverride] = useState<boolean | undefined>(undefined)
   const current = override ?? title
 
   useEffect(() => {
@@ -59,8 +69,10 @@ const Provide = ({
       value={{
         title: current,
         banner: bannerOverride === undefined ? banner : bannerOverride,
+        sendsEmail: mailOverride ?? sendsEmail,
         setTitle: setOverride,
         setBanner: setBannerOverride,
+        setSendsEmail: setMailOverride,
       }}
     >
       {children}
@@ -73,12 +85,14 @@ export const InstallationProvider = ({
   children,
   title,
   banner,
+  sendsEmail,
 }: {
   children: ComponentChildren
   title?: string
   banner?: string | null
+  sendsEmail?: boolean
 }) => (
-  <Provide title={title} banner={banner}>
+  <Provide title={title} banner={banner} sendsEmail={sendsEmail}>
     {children}
   </Provide>
 )
@@ -99,6 +113,7 @@ export const FetchedInstallationProvider = ({
 }) => {
   const [title, setTitle] = useState<string | undefined>(undefined)
   const [banner, setBanner] = useState<string | null | undefined>(undefined)
+  const [sendsEmail, setSendsEmail] = useState<boolean | undefined>(undefined)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -109,6 +124,7 @@ export const FetchedInstallationProvider = ({
         if (controller.signal.aborted) return
         setTitle(response.installation.title)
         setBanner(response.installation.banner_updated_at)
+        setSendsEmail(response.installation.sends_email)
       })
       .catch(() => {
         // Nothing to report and nowhere to report it: this renders in the
@@ -122,7 +138,7 @@ export const FetchedInstallationProvider = ({
   }, [api])
 
   return (
-    <Provide title={title} banner={banner}>
+    <Provide title={title} banner={banner} sendsEmail={sendsEmail}>
       {children}
     </Provide>
   )
@@ -138,3 +154,14 @@ export const useSetInstallationTitle = () => useContext(InstallationContext).set
 
 /** For the settings page, so the homepage draws the new banner without a reload. */
 export const useSetInstallationBanner = () => useContext(InstallationContext).setBanner
+
+/**
+ * Whether an invite will arrive by email, for the one public page that promises (#30).
+ *
+ * `undefined` while the answer is still coming, so the application form says the part
+ * that is true either way rather than a promise it may have to take back.
+ */
+export const useInstallationSendsEmail = () => useContext(InstallationContext).sendsEmail
+
+/** For the settings page, which has just turned mail on or off. */
+export const useSetInstallationSendsEmail = () => useContext(InstallationContext).setSendsEmail

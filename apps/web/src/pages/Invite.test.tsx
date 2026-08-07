@@ -50,7 +50,7 @@ const anAttendance = (over: Partial<Attendance> = {}): Attendance => ({
  * written against. `withBurn` is what turns the checkbox and the stay questions on.
  */
 const stub = (over: Partial<InviteApi> = {}): InviteApi => ({
-  getInviteState: () => Promise.resolve({ status: 'outstanding', name: null }),
+  getInviteState: () => Promise.resolve({ status: 'outstanding', name: null, email: null }),
   redeemInvite: () => Promise.reject(new Error('redeemInvite is not stubbed here')),
   getActiveEvent: () => Promise.resolve({ event: null }),
   getEventOptions: () => Promise.resolve({ options: [] }),
@@ -90,7 +90,7 @@ const complete = () => {
 const join = () => screen.getByRole('button', { name: 'Join' }).click()
 
 const withState = (status: InviteState['status']) =>
-  stub({ getInviteState: () => Promise.resolve({ status, name: null }) })
+  stub({ getInviteState: () => Promise.resolve({ status, name: null, email: null }) })
 
 describe('Invite', () => {
   it('offers the form for a live invite', async () => {
@@ -377,7 +377,9 @@ describe('Invite', () => {
   it('does not offer redemption to someone already signed in', async () => {
     // It would create a second account for the same human, and the page cannot
     // tell whether that is what they meant.
-    const getInviteState = vi.fn(() => Promise.resolve({ status: 'outstanding' as const, name: null }))
+    const getInviteState = vi.fn(() =>
+      Promise.resolve({ status: 'outstanding' as const, name: null, email: null }),
+    )
     renderPage(stub({ getInviteState }), {
       status: 'signed-in',
       account: { id: 'a-1', name: null, avatar: null, roles: ['member'] },
@@ -397,9 +399,31 @@ describe('Invite', () => {
 
 describe('the name the applicant already gave', () => {
   it('starts the form from it, rather than asking twice', async () => {
-    renderPage(stub({ getInviteState: () => Promise.resolve({ status: 'outstanding', name: 'Ada' }) }))
+    renderPage(
+      stub({ getInviteState: () => Promise.resolve({ status: 'outstanding', name: 'Ada', email: null }) }),
+    )
 
     expect(await screen.findByLabelText('Your name', { exact: false })).toHaveProperty('value', 'Ada')
+  })
+
+  it('starts the address from it too, since the invite arrived there', async () => {
+    // #30. Asking for the address the message it came in was addressed to is worse
+    // than not listening.
+    renderPage(
+      stub({
+        getInviteState: () =>
+          Promise.resolve({ status: 'outstanding', name: 'Ada', email: 'ada@example.org' }),
+      }),
+    )
+
+    expect(await screen.findByLabelText('Email', { exact: false })).toHaveProperty('value', 'ada@example.org')
+  })
+
+  it('leaves the address blank for an invite nobody applied for', async () => {
+    // An admin's direct invite has no application behind it.
+    renderPage(stub())
+
+    expect(await screen.findByLabelText('Email', { exact: false })).toHaveProperty('value', '')
   })
 
   it('leaves it blank for an invite nobody applied for', async () => {
@@ -411,7 +435,9 @@ describe('the name the applicant already gave', () => {
   })
 
   it('is still the reader’s to change', async () => {
-    renderPage(stub({ getInviteState: () => Promise.resolve({ status: 'outstanding', name: 'Ada' }) }))
+    renderPage(
+      stub({ getInviteState: () => Promise.resolve({ status: 'outstanding', name: 'Ada', email: null }) }),
+    )
 
     fireEvent.input(await screen.findByLabelText('Your name', { exact: false }), {
       target: { value: 'Ada Lovelace' },

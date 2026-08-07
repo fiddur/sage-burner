@@ -1187,6 +1187,24 @@ a:hover {
 }
 
 /*
+  The notification switches, drawn as two tables that have to read as one list.
+
+  They are one list split by heading, so a check column landing in a different place
+  in each reads as two unrelated sets of controls. `fixed` plus a stated width for the
+  switch columns is what makes the split invisible; without it each table sizes its
+  first column to its own longest label, and those differ by several words.
+*/
+.notification-settings {
+  table-layout: fixed;
+}
+
+.notification-settings thead th:not(:first-child),
+.notification-settings tbody td {
+  width: 5.5rem;
+  text-align: center;
+}
+
+/*
   Scrolls itself rather than taking the page with it, like `.schedule-grid-wrap`. The
   height is not decoration: an element with one axis set to something other than
   `visible` computes the other to `auto`, so without it the sticky header would pin to

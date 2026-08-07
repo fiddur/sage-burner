@@ -112,7 +112,7 @@ const apply = (server: FastifyInstance) =>
     url: '/api/applications',
     payload: {
       applicant_name: 'Fredrik',
-      applicant_contact: 'fredrik@example.org',
+      applicant_email: 'fredrik@example.org',
       answers: {},
       asked: [],
     },

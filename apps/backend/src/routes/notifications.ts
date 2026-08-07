@@ -59,7 +59,7 @@ export const registerNotificationRoutes = (
     const accountId = await mine(request)
     if (accountId === undefined) return sendError(reply, 401)
 
-    return { on: await switchedOn(db, accountId) } satisfies NotificationSettings
+    return (await switchedOn(db, accountId)) satisfies NotificationSettings
   })
 
   app.put(apiRoutes.updateMyNotificationSettings.fastify, async (request, reply) => {
@@ -84,17 +84,24 @@ export const registerNotificationRoutes = (
     // would leave the rest reading as "never said" — which is the default, not the
     // choice they just made.
     const on = new Set(body.on)
+    const email = new Set(body.email)
     db.transaction((tx) => {
       tx.delete(notificationSetting).where(eq(notificationSetting.account_id, accountId)).run()
       for (const category of notificationCategories) {
         tx.insert(notificationSetting)
-          .values({ account_id: accountId, category, enabled: on.has(category) })
+          .values({
+            account_id: accountId,
+            category,
+            enabled: on.has(category),
+            email: email.has(category),
+          })
           .run()
       }
     })
 
     return {
       on: notificationCategories.filter((category) => on.has(category)),
+      email: notificationCategories.filter((category) => email.has(category)),
     } satisfies NotificationSettings
   })
 }

@@ -67,7 +67,12 @@ const db = () => {
 }
 
 const givenInvite = async (
-  over: { expires_at?: string; used_at?: string | null; applicantName?: string } = {},
+  over: {
+    expires_at?: string
+    used_at?: string | null
+    applicantName?: string
+    applicantEmail?: string
+  } = {},
 ) => {
   const token = `token-${randomUUID()}`
   const admin = randomUUID()
@@ -78,14 +83,16 @@ const givenInvite = async (
   let applicationId: string | null = null
   if (over.applicantName !== undefined) {
     applicationId = randomUUID()
-    await db().insert(application).values({
-      id: applicationId,
-      answers: [],
-      status: 'approved',
-      applicant_name: over.applicantName,
-      applicant_contact: 'somewhere',
-      submitted_at: NOW,
-    })
+    await db()
+      .insert(application)
+      .values({
+        id: applicationId,
+        answers: [],
+        status: 'approved',
+        applicant_name: over.applicantName,
+        applicant_email: over.applicantEmail ?? 'ada@example.org',
+        submitted_at: NOW,
+      })
   }
 
   await db()
@@ -176,18 +183,17 @@ describe('looking at an invite before redeeming it', () => {
     expect(response.json().status).toBe('unknown')
   })
 
-  it('never echoes the token, nor the email it was minted for', async () => {
+  it('never echoes the token, and says nothing the applicant did not write', async () => {
     // An invite link is unguessable but forwardable, so whoever holds it is a
-    // stranger until they redeem. The email is the login identity, and confirming an
-    // address has an application is an enumeration oracle. The applicant's *name* is
-    // the one deliberate exception — see "the name an invite carries" below.
+    // stranger until they redeem. What comes back is what that applicant typed on
+    // their own application — see "what an invite carries" below for the trade.
     const server = await build()
     const token = await givenInvite({ applicantName: 'Ada' })
 
     const body = (await look(server, token)).body
 
     expect(body).not.toContain(token)
-    expect(Object.keys(JSON.parse(body))).toEqual(['status', 'name'])
+    expect(Object.keys(JSON.parse(body))).toEqual(['status', 'name', 'email'])
   })
 })
 
@@ -646,7 +652,7 @@ describe('joining the ticked burn while redeeming', () => {
   })
 })
 
-describe('the name an invite carries', () => {
+describe('what an invite carries', () => {
   it('gives back what the applicant called themselves, so the form need not ask twice', async () => {
     const server = await build()
     const token = await givenInvite({ applicantName: 'Ada Lovelace' })
@@ -654,6 +660,7 @@ describe('the name an invite carries', () => {
     expect(await look(server, token).then((response) => response.json())).toEqual({
       status: 'outstanding',
       name: 'Ada Lovelace',
+      email: 'ada@example.org',
     })
   })
 
@@ -672,15 +679,26 @@ describe('the name an invite carries', () => {
     const used = await givenInvite({ applicantName: 'Ada', used_at: '2026-07-01T00:00:00.000Z' })
     const expired = await givenInvite({ applicantName: 'Ada', expires_at: '2026-06-01T00:00:00.000Z' })
 
-    expect((await look(server, used)).json()).toEqual({ status: 'used', name: null })
-    expect((await look(server, expired)).json()).toEqual({ status: 'expired', name: null })
+    expect((await look(server, used)).json()).toEqual({ status: 'used', name: null, email: null })
+    expect((await look(server, expired)).json()).toEqual({ status: 'expired', name: null, email: null })
   })
 
-  it('never gives back the email, which is the login identity', async () => {
+  it('gives back the address the invite was posted to, so the form need not ask either', async () => {
+    // Reversed by #30: the invite now *arrives* at this address, and asking somebody
+    // for the address the message they are reading came to is worse than not
+    // listening. Not an enumeration oracle — nothing here takes an address and says
+    // whether it has an application; it takes a token nobody can guess.
     const server = await build()
-    const token = await givenInvite({ applicantName: 'Ada' })
+    const token = await givenInvite({ applicantName: 'Ada', applicantEmail: 'ada@example.org' })
 
-    expect(Object.keys((await look(server, token)).json())).toEqual(['status', 'name'])
+    expect((await look(server, token)).json().email).toBe('ada@example.org')
+  })
+
+  it('has no address either for an invite an admin minted directly', async () => {
+    const server = await build()
+    const token = await givenInvite()
+
+    expect((await look(server, token)).json().email).toBeNull()
   })
 })
 

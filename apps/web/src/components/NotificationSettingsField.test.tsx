@@ -20,13 +20,15 @@ const DEFAULTS = [
 ] as const
 
 const stub = (over: Partial<NotificationSettingsApi> = {}): NotificationSettingsApi => ({
-  getMyNotificationSettings: () => Promise.resolve({ on: [...DEFAULTS] }),
-  updateMyNotificationSettings: () => Promise.resolve({ on: [...DEFAULTS] }),
+  getMyNotificationSettings: () => Promise.resolve({ on: [...DEFAULTS], email: [] }),
+  updateMyNotificationSettings: () => Promise.resolve({ on: [...DEFAULTS], email: [] }),
   ...over,
 })
 
-const MEAL = 'Put on or taken off a meal'
-const DREAM_OFFERED = 'Somebody offers a dream'
+/** A row has a box per channel now, so a label names both (#30). */
+const MEAL = 'Put on or taken off a meal — Here'
+const MEAL_EMAIL = 'Put on or taken off a meal — Email'
+const DREAM_OFFERED = 'Somebody offers a dream — Here'
 
 const checked = (label: string) => {
   const box = screen.getByLabelText(label)
@@ -81,7 +83,7 @@ describe('what to be told about', () => {
           getMyNotificationSettings: () => Promise.reject(apiError(500, 'internal_error', 'Nope.')),
           updateMyNotificationSettings: () => {
             saves += 1
-            return Promise.resolve({ on: [] })
+            return Promise.resolve({ on: [], email: [] })
           },
         })}
       />,
@@ -93,7 +95,7 @@ describe('what to be told about', () => {
   })
 
   it('switches one off by unticking it', async () => {
-    const update = vi.fn(() => Promise.resolve({ on: [] }))
+    const update = vi.fn(() => Promise.resolve({ on: [], email: [] }))
     render(<NotificationSettingsField api={stub({ updateMyNotificationSettings: update })} />)
 
     fireEvent.click(await screen.findByLabelText(MEAL))
@@ -101,6 +103,7 @@ describe('what to be told about', () => {
     await waitFor(() => {
       expect(update).toHaveBeenCalledWith({
         on: DEFAULTS.filter((category) => category !== 'meal_role'),
+        email: [],
       })
     })
   })
@@ -108,13 +111,43 @@ describe('what to be told about', () => {
   it('switches one on by ticking it', async () => {
     // The passing sibling, and the case the old model could not express: this
     // category is off until somebody asks for it.
-    const update = vi.fn(() => Promise.resolve({ on: [] }))
+    const update = vi.fn(() => Promise.resolve({ on: [], email: [] }))
     render(<NotificationSettingsField api={stub({ updateMyNotificationSettings: update })} />)
 
     fireEvent.click(await screen.findByLabelText(DREAM_OFFERED))
 
     await waitFor(() => {
-      expect(update).toHaveBeenCalledWith({ on: [...DEFAULTS, 'dream_offered'] })
+      expect(update).toHaveBeenCalledWith({ on: [...DEFAULTS, 'dream_offered'], email: [] })
+    })
+  })
+
+  it('offers no email column where the installation has no mail server', async () => {
+    // A switch that cannot do anything reads as a promise (#30).
+    render(<NotificationSettingsField api={stub()} />)
+
+    await screen.findByLabelText(MEAL)
+    expect(screen.queryByLabelText(MEAL_EMAIL)).toBeNull()
+    expect(screen.queryByText('Email')).toBeNull()
+  })
+
+  it('offers one where it has, off for every category', async () => {
+    render(<NotificationSettingsField api={stub()} sendsEmail />)
+
+    await screen.findByLabelText(MEAL_EMAIL)
+    // Off even for the ones the bell has on: email is a channel of its own and is
+    // never switched on by anything but asking.
+    expect(checked(MEAL)).toBe(true)
+    expect(checked(MEAL_EMAIL)).toBe(false)
+  })
+
+  it('sends both lists when one channel is ticked, leaving the other alone', async () => {
+    const update = vi.fn(() => Promise.resolve({ on: [...DEFAULTS], email: ['meal_role' as const] }))
+    render(<NotificationSettingsField api={stub({ updateMyNotificationSettings: update })} sendsEmail />)
+
+    fireEvent.click(await screen.findByLabelText(MEAL_EMAIL))
+
+    await waitFor(() => {
+      expect(update).toHaveBeenCalledWith({ on: [...DEFAULTS], email: ['meal_role'] })
     })
   })
 

@@ -117,7 +117,7 @@ const submit = (server: FastifyInstance, payload: Record<string, unknown>): Prom
     payload: { asked: answerKeys(payload.answers), ...payload },
   })
 
-const applicant = { applicant_name: 'Fredrik', applicant_contact: 'fredrik@example.org' }
+const applicant = { applicant_name: 'Fredrik', applicant_email: 'fredrik@example.org' }
 
 const stored = async () => db().select().from(application)
 
@@ -257,10 +257,10 @@ describe('submitting an application', () => {
   it('requires a name and a contact', async () => {
     const server = await build()
 
-    expect((await submit(server, { applicant_contact: 'a@b.c', answers: {} })).statusCode).toBe(400)
+    expect((await submit(server, { applicant_email: 'a@b.c', answers: {} })).statusCode).toBe(400)
     expect((await submit(server, { applicant_name: 'Fredrik', answers: {} })).statusCode).toBe(400)
     expect(
-      (await submit(server, { applicant_name: '  ', applicant_contact: 'a@b.c', answers: {} })).statusCode,
+      (await submit(server, { applicant_name: '  ', applicant_email: 'a@b.c', answers: {} })).statusCode,
     ).toBe(400)
   })
 

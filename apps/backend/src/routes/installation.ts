@@ -8,6 +8,7 @@ import type { GuardDeps } from '../auth/guards.ts'
 
 import { INSTALLATION_ID, installation } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
+import { mailSettingsFor } from '../mail/mail.ts'
 import { bannerVersion } from './banner.ts'
 
 /**
@@ -30,7 +31,11 @@ export const registerInstallationRoutes = (app: FastifyInstance, { db }: GuardDe
 
     // Read here rather than by the homepage asking the image route, which would 404
     // in the ordinary case of nobody having uploaded one.
-    return { ...row, banner_updated_at: (await bannerVersion(db)) ?? null }
+    return {
+      ...row,
+      banner_updated_at: (await bannerVersion(db)) ?? null,
+      sends_email: (await mailSettingsFor(db)) !== undefined,
+    }
   }
 
   app.get(apiRoutes.getInstallation.fastify, async (_request, reply) => {
