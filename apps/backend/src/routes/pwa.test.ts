@@ -145,8 +145,22 @@ describe('the web manifest', () => {
     expect((await putIcon(server, root.cookie, PNG)).statusCode).toBe(200)
 
     expect((await getManifest(server)).json().icons.map((icon: { purpose: string }) => icon.purpose)).toEqual(
-      ['any', 'maskable'],
+      ['any maskable'],
     )
+  })
+
+  it('names the icon once however many purposes it serves', async () => {
+    // The same `src` listed once per purpose is what killed Pixel Launcher on "add
+    // to home screen": Firefox built two icon records from one URL, and a 512-square
+    // bitmap is already the whole of what a binder transaction may carry.
+    const server = await build()
+    const root = await givenAccount()
+
+    expect((await putIcon(server, root.cookie, PNG)).statusCode).toBe(200)
+
+    const { icons } = (await getManifest(server)).json()
+    expect(icons).toHaveLength(1)
+    expect(new Set(icons.map((icon: { src: string }) => icon.src)).size).toBe(1)
   })
 })
 

@@ -88,17 +88,26 @@ export const registerPwaRoutes = (app: FastifyInstance, { db, now = () => new Da
         theme_color: THEME_COLOR,
         background_color: BACKGROUND_COLOR,
         icons: [
-          { ...entry, purpose: 'any' },
-          // An uploaded icon is offered as maskable as well, and that is what stops
-          // Android drawing a white plate behind it: without a maskable entry the
-          // launcher makes its own adaptive icon by shrinking `any` onto a white
-          // circle, so a logo with its own background comes out ringed in white.
-          // Declaring maskable hands the launcher an edge-to-edge image instead.
-          //
-          // Not offered for the app's own flame, which is an emoji sitting in the top
-          // left of its box: a circular mask would cut it. An admin's file is the
-          // admin's to pad, on the same reasoning as serving their SVG as authored.
-          ...(icon === undefined ? [] : [{ ...entry, purpose: 'maskable' }]),
+          {
+            ...entry,
+            // An uploaded icon is maskable as well as plain, and that is what stops
+            // Android drawing a white plate behind it: with no maskable icon the
+            // launcher makes its own adaptive one by shrinking the plain icon onto a
+            // white circle, so a logo with its own background comes out ringed in
+            // white. Saying maskable hands the launcher an edge-to-edge image.
+            //
+            // **One entry with both purposes, not one entry per purpose.** The same
+            // `src` listed twice is legal and is what this was first, and Firefox on
+            // Android answered it by killing Pixel Launcher on "add to home screen" —
+            // a 512-square bitmap decodes to exactly the 1 MB a binder transaction
+            // may carry, so passing it twice is over. A file serving both roles says
+            // so with a token list, which is also the spelling the spec intends.
+            //
+            // The app's own flame stays plain: it is an emoji in the top left of its
+            // box, and a circular mask would cut it. An admin's file is the admin's
+            // to pad, on the same reasoning as serving their SVG as authored.
+            purpose: icon === undefined ? 'any' : 'any maskable',
+          },
         ],
       }),
     )
