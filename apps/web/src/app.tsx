@@ -24,6 +24,7 @@ import { AdminQuestions } from './pages/AdminQuestions.tsx'
 import { AdminRoster } from './pages/AdminRoster.tsx'
 import { AdminSettings } from './pages/AdminSettings.tsx'
 import { Apply } from './pages/Apply.tsx'
+import { Changelog } from './pages/Changelog.tsx'
 import { Dreams } from './pages/Dreams.tsx'
 import { Faq } from './pages/Faq.tsx'
 import { Home } from './pages/Home.tsx'
@@ -57,6 +58,7 @@ export type RoutesApi = Pick<
   | 'deleteQuestion'
   | 'getActiveEvent'
   | 'getAllergyItems'
+  | 'getChangelog'
   | 'addAllergyItem'
   | 'updateAllergyItem'
   | 'deleteAllergyItem'
@@ -218,6 +220,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
   const MealsRoute = useMemo(() => () => <Meals api={api} />, [api])
   const ProfileRoute = useMemo(() => () => <ProfilePage api={api} />, [api])
   const ApplyRoute = useMemo(() => () => <Apply api={api} />, [api])
+  const ChangelogRoute = useMemo(() => () => <Changelog api={api} />, [api])
   // The token arrives as a prop from the route pattern, so this one takes props
   // rather than closing over nothing like the others.
   const InviteRoute = useMemo(
@@ -230,6 +233,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
     <Router>
       <Route path="/" component={HomeRoute} />
       <Route path="/apply" component={ApplyRoute} />
+      <Route path="/changelog" component={ChangelogRoute} />
       <Route path="/members" component={MembersRoute} />
       <Route path="/meals" component={MealsRoute} />
       <Route path="/dreams" component={DreamsRoute} />

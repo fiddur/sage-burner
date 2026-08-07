@@ -32,6 +32,7 @@ import { registerAttendanceRoutes } from './routes/attendance.ts'
 import { registerAuthRoutes } from './routes/auth.ts'
 import { registerAvatarRoutes } from './routes/avatars.ts'
 import { registerBannerRoutes } from './routes/banner.ts'
+import { readChangelog, registerChangelogRoutes } from './routes/changelog.ts'
 import { registerEventOptionRoutes } from './routes/event-options.ts'
 import { registerEventRoutes } from './routes/events.ts'
 import { registerFaqRoutes } from './routes/faq.ts'
@@ -91,6 +92,14 @@ export interface AppDeps {
    * shedding without spending the real thing's five-second window.
    */
   gate?: Gate
+  /**
+   * What `GET /api/changelog` answers with (#325).
+   *
+   * Read from `CHANGELOG.md` at boot by default. Injected so a test can hand one over
+   * without writing a file, and so nothing in the suite depends on what the repository
+   * root happens to hold today.
+   */
+  changelog?: string
 }
 
 /** The API lives here; everything else is the single-page app. */
@@ -347,6 +356,7 @@ export const createApp = async ({
   send = sendWithSmtp,
   hash,
   now = () => new Date(),
+  changelog = readChangelog(),
 }: AppDeps): Promise<FastifyInstance> => {
   const app = Fastify({
     logger: loggerOptions(config.log_level),
@@ -411,6 +421,9 @@ export const createApp = async ({
   refuseEnvelopeStrippers(app)
 
   registerVersionRoutes(app, { config })
+  // Read once, at boot: the file is part of the image, and a page nobody is signed in
+  // to read is not worth a stat per request.
+  registerChangelogRoutes(app, { markdown: changelog })
 
   // One `Sessions` for both, so the guards verify what the login route signed.
   const sessions = createSessions(sessionDeps(config))

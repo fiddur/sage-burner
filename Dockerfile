@@ -75,6 +75,12 @@ COPY --from=builder /app/apps/web/dist ./apps/web/dist
 # load-bearing rather than decorative — do not tidy it away in a redesign.
 COPY LICENSE ./
 
+# What `GET /api/changelog` answers with, and the page the redeploy notification leads
+# to (#325). Served rather than bundled: a tab that has just been told there is a new
+# version is still running the old web build, and the entry it wants is the one that
+# arrived with the build it has not loaded yet.
+COPY CHANGELOG.md ./
+
 # The volume mount point, and the only thing the app needs to write. /app stays
 # root-owned and world-readable: `node` can read its own code and dependencies
 # but cannot modify them, and a recursive chown here would rewrite every copied

@@ -23,7 +23,7 @@ import { INSTALLATION_ID, event, installationBanner } from './db/schema.ts'
 let handle: DbHandle
 let app: FastifyInstance
 
-const build = async (env: NodeJS.ProcessEnv = {}) => {
+const build = async (env: NodeJS.ProcessEnv = {}, changelog?: string) => {
   handle = createDb({ url: ':memory:' })
   runMigrations(handle)
   app = await createApp({
@@ -32,6 +32,7 @@ const build = async (env: NodeJS.ProcessEnv = {}) => {
     // counts as reachable — so the published development key is refused. Passed
     // unconditionally rather than per-test so the reason lives in one place.
     config: createConfig({ LOG_LEVEL: 'silent', SESSION_SECRET: 't'.repeat(40), ...env }),
+    ...(changelog === undefined ? {} : { changelog }),
   })
   return app
 }
@@ -39,6 +40,49 @@ const build = async (env: NodeJS.ProcessEnv = {}) => {
 afterEach(async () => {
   await app?.close()
   handle?.close()
+})
+
+describe('GET /api/changelog', () => {
+  it('answers with the file as markdown, to anyone', async () => {
+    // Public, like the homepage: release notes for an app whose homepage is public, and
+    // the page the redeploy notice sends people to before they have reloaded (#325).
+    await build({}, '# What is new\n\n## 2026-08-07\n\n- A Q&A per burn.\n')
+
+    const response = await app.inject({ method: 'GET', url: '/api/changelog' })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().markdown).toContain('A Q&A per burn.')
+  })
+
+  it('revalidates rather than being cached as fresh', async () => {
+    // The notification that sends somebody here fires on a redeploy, so serving the
+    // previous build's changelog from a browser cache is the one thing this must not do.
+    await build({}, '# What is new\n')
+
+    const response = await app.inject({ method: 'GET', url: '/api/changelog' })
+
+    expect(response.headers['cache-control']).toBe('no-cache')
+  })
+
+  it('answers empty rather than 404 where the image has no changelog', async () => {
+    // The page says so. A 404 would be a notification landing on nothing.
+    await build({}, '')
+
+    const response = await app.inject({ method: 'GET', url: '/api/changelog' })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toEqual({ markdown: '' })
+  })
+
+  it("reads the repository's own file when nothing is injected", async () => {
+    // The default is `readChangelog()`, resolved relative to the backend's source, so
+    // the checkout and the container find it in the same place.
+    await build()
+
+    expect((await app.inject({ method: 'GET', url: '/api/changelog' })).json().markdown).toContain(
+      '## 2026-08-07',
+    )
+  })
 })
 
 describe('GET /api/version', () => {

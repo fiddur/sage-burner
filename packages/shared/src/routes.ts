@@ -404,6 +404,11 @@ export const apiRoutes = {
     fastify: '/api/events/:eventId/sessions',
     path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/sessions`,
   },
+  getChangelog: {
+    method: 'GET',
+    fastify: '/api/changelog',
+    path: () => '/api/changelog',
+  },
   getVersion: {
     method: 'GET',
     fastify: '/api/version',

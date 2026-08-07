@@ -47,12 +47,12 @@ const givenAccount = async (wantsIt?: boolean) => {
 
 /** Collects who was told what, in place of writing rows and reaching a push service. */
 const collector = () => {
-  const told: { accountId: string; body: string }[] = []
+  const told: { accountId: string; body: string; link: string | null }[] = []
 
   return {
     told,
     notify: (accountId: string, what: Told) => {
-      told.push({ accountId, body: what.body })
+      told.push({ accountId, body: what.body, link: what.link })
       return Promise.resolve()
     },
   }
@@ -92,6 +92,8 @@ describe('announcing a redeploy', () => {
 
     expect(heard.told.map((one) => one.accountId)).toEqual([ada])
     expect(heard.told[0]?.body).toContain('new version')
+    // Where "what's new" is written down (#325). It named no page until there was one.
+    expect(heard.told[0]?.link).toBe('/changelog')
   })
 
   it('says nothing at all on a restart of the same build', async () => {

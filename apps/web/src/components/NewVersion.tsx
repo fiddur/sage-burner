@@ -29,6 +29,10 @@ export const NewVersion = ({ api }: { api: VersionApi }) => {
       <button type="button" onClick={() => globalThis.location.reload()}>
         Reload
       </button>
+      {/* Beside the reload rather than instead of it: what changed is worth knowing,
+          and a link cannot throw away what is half-typed (#325). Reading it on the old
+          bundle still shows the new entry — the page asks the server. */}
+      <a href="/changelog">What's new</a>
     </p>
   )
 }

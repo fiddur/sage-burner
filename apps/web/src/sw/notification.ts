@@ -72,8 +72,10 @@ export const landOn = async (
   const windows = await clients.matchAll({ type: 'window', includeUncontrolled: true })
   const [anywhere] = windows
 
-  // No page of its own — a new version is everywhere. Any window of ours is already
-  // the right one, and routing it would take somebody off what they were reading.
+  // No page of its own. Any window of ours is already the right one, and routing it
+  // would take somebody off what they were reading. Since #325 the redeploy notice does
+  // name a page — the changelog — so what reaches this is a payload with no link at all:
+  // a row written before that, or a category added later with nowhere to send anybody.
   if (path === undefined) {
     return anywhere === undefined ? clients.openWindow(HOME) : anywhere.focus()
   }
@@ -103,10 +105,11 @@ export interface Alert {
   /**
    * The page it is about, or nothing.
    *
-   * **Absent is not the homepage.** Several categories have no page of their own — a
-   * new version is everywhere — and the difference decides what a tap does: a named
-   * page is opened, an absent one means any window of this app is already the right
-   * one and must not be navigated away from what somebody was reading.
+   * **Absent is not the homepage.** The difference decides what a tap does: a named
+   * page is opened, an absent one means any window of this app is already the right one
+   * and must not be navigated away from what somebody was reading. Every category names
+   * a page today — the redeploy notice took one in #325 — so this is what a row written
+   * before that, or a link that resolves off-origin, comes out as.
    */
   path?: string
   /**

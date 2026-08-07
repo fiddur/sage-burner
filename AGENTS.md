@@ -433,3 +433,11 @@ them.)
 
 Keep `README.md` and `docs/` current when behavior changes. If a change makes
 the README's setup instructions wrong, it is not finished.
+
+**`CHANGELOG.md` is part of that** (#325). Anything a member would notice gets a line
+under today's date, newest first, written for the people using the app rather than the
+people building it — a refactor gets none. The app serves it at `/changelog`, and it is
+where the "a new version is out" notification and the redeploy bar both lead, so an
+entry that is missing is a release that says nothing about itself. There are no version
+numbers to keep in step: every merge to `develop` deploys, so a date holds however many
+deploys it holds.

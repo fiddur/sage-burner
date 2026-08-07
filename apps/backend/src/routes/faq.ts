@@ -297,10 +297,8 @@ export const registerFaqRoutes = (app: FastifyInstance, { db, sessions, now }: F
       if (seeded === 'not_found') return sendError(reply, 404)
       if (seeded === 'conflict') return sendError(reply, 409)
 
-      // 201 like `copyPlaces` and `copyLeadRoles` — rows were created — *and* tagged
-      // like every other read of this list, which those two are not: the client holds
-      // one tag per collection and a write that answers the new list may as well hand
-      // it over rather than making the reload fetch it (#323).
+      // 201 like `copyPlaces` and `copyLeadRoles`: rows were created. Tagged as well,
+      // which those two are not — this is a read of the list either way.
       void reply.code(201)
 
       return withVersion(reply, await questions(request.params.eventId))
