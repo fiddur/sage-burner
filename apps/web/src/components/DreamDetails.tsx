@@ -1,7 +1,5 @@
 import type { EventAttendeesResponse, Place, Session, SessionUpdate } from '@sage-burner/shared'
 
-import { useState } from 'preact/hooks'
-
 import type { Person } from './HelperStrip.tsx'
 
 import { toLocalInput } from '../datetime.ts'
@@ -10,6 +8,7 @@ import { Avatar } from './Avatar.tsx'
 import { DreamFields } from './DreamFields.tsx'
 import { DreamPanel } from './DreamPanel.tsx'
 import { HelperStrip } from './HelperStrip.tsx'
+import { WithdrawDream } from './WithdrawDream.tsx'
 
 /**
  * One dream, opened from the grid — read, edited or withdrawn without leaving it.
@@ -60,17 +59,6 @@ export const DreamDetails = ({
   onSave: (changes: SessionUpdate) => void
   onRemove: () => void
 }) => {
-  const [confirming, setConfirming] = useState(false)
-
-  // Dropped whenever the panel switches between reading and editing (#208). Without
-  // it, 🗑️ then ✏️ then Cancel comes back to a "Withdraw it?" nobody is still asking:
-  // `confirming` is local state, and nothing else resets it.
-  const [confirmingFor, setConfirmingFor] = useState(editing)
-  if (confirmingFor !== editing) {
-    setConfirmingFor(editing)
-    setConfirming(false)
-  }
-
   const place = places.find((lane) => lane.id === dream.place_id)
 
   return (
@@ -186,37 +174,7 @@ export const DreamDetails = ({
             >
               ✏️
             </button>
-            {confirming ? (
-              <>
-                <span class="form-note">Withdraw it? Its helpers and hearts go too.</span>
-                <button
-                  type="button"
-                  disabled={busy}
-                  aria-label={`Really withdraw ${dream.title}`}
-                  onClick={onRemove}
-                >
-                  Withdraw it
-                </button>
-                <button
-                  type="button"
-                  class="link-button"
-                  disabled={busy}
-                  onClick={() => setConfirming(false)}
-                >
-                  Keep it
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                class="link-button"
-                disabled={busy}
-                aria-label={`Withdraw ${dream.title}`}
-                onClick={() => setConfirming(true)}
-              >
-                🗑️
-              </button>
-            )}
+            <WithdrawDream title={dream.title} busy={busy} onWithdraw={onRemove} />
             <button type="button" class="link-button" onClick={onClose}>
               Close
             </button>
