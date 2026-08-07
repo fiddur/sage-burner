@@ -59,6 +59,11 @@ to configure and no CORS anywhere.
 `GET /api/version` answers with the build SHA and doubles as the container
 healthcheck.
 
+**Installability and offline are production-build-only.** Vite proxies `/api` and
+nothing else, so under `pnpm dev:web` the manifest 404s and there is no `sw.js` to
+register — the registration failure is swallowed on purpose. Build and run the
+backend against `dist` to try either.
+
 **Client-side routes must not contain a dot.** The backend distinguishes a
 missing asset from a client-side route by whether the last path segment has a
 file extension, so anything with one gets a 404 and never reaches the router.

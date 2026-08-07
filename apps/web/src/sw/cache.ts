@@ -143,9 +143,17 @@ export const stamped = async (response: Response, at: string): Promise<Response>
 export const cachedAt = (response: Pick<Response, 'headers'>): string | undefined =>
   response.headers.get(CACHED_AT) ?? undefined
 
-/** Drop the oldest entries past the limit. See `ASSET_LIMIT` for why the front. */
+/**
+ * Drop the oldest hashed assets past the limit. See `ASSET_LIMIT` for why the front.
+ *
+ * Only `/assets/`. The shell cache also holds the shell itself, the manifest, the
+ * icon and the banner, and a count-based trim over the lot could evict the one entry
+ * that makes the app open offline at all. Re-puts move an entry to the back, so it
+ * took forty asset stores with no navigation in between — unlikely rather than
+ * impossible, which is not a distinction worth relying on for that entry (#268).
+ */
 export const trim = async (cache: Pick<Cache, 'delete' | 'keys'>, limit: number): Promise<number> => {
-  const keys = await cache.keys()
+  const keys = (await cache.keys()).filter((request) => new URL(request.url).pathname.startsWith('/assets/'))
   const doomed = keys.slice(0, Math.max(0, keys.length - limit))
 
   for (const request of doomed) await cache.delete(request)

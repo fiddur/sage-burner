@@ -166,6 +166,28 @@ describe('keeping the asset cache from growing forever', () => {
     expect(cache.kept()).toEqual(['/assets/mid.js', '/assets/new.js'])
   })
 
+  it('never counts or evicts the shell, the manifest, the icon or the banner', async () => {
+    // They share the cache with the assets, and the shell is what makes the app open
+    // offline at all — a count-based trim over the lot could take it (#268).
+    const cache = fakeCache([
+      '/index.html',
+      '/manifest.webmanifest',
+      '/api/installation/icon',
+      '/api/installation/banner',
+      '/assets/old.js',
+      '/assets/new.js',
+    ])
+
+    expect(await trim(cache, 1)).toBe(1)
+    expect(cache.kept()).toEqual([
+      '/index.html',
+      '/manifest.webmanifest',
+      '/api/installation/icon',
+      '/api/installation/banner',
+      '/assets/new.js',
+    ])
+  })
+
   it('leaves a cache under the limit alone', async () => {
     const cache = fakeCache(['/assets/one.js', '/assets/two.js'])
 
