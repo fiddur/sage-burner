@@ -12,6 +12,7 @@ import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, accountRole, activity, attendance, event } from '../db/schema.ts'
+import { FEED_LIMIT } from './feed.ts'
 
 /**
  * What everyone has been doing (#303).
@@ -95,15 +96,10 @@ const lines = async (server: FastifyInstance, cookie: string): Promise<string[]>
   (await feed(server, cookie)).json().activity.map((one: { body: string }) => one.body)
 
 /** A line written straight into the table, for the cases a frozen clock cannot stage. */
-const givenLine = async (body: string, created_at: string, eventId = BURN) => {
-  await db().insert(activity).values({
-    id: randomUUID(),
-    event_id: eventId,
-    category: 'dream_offered',
-    body,
-    link: null,
-    created_at,
-  })
+const givenLine = async (body: string, created_at: string, eventId = BURN, id = randomUUID()) => {
+  await db()
+    .insert(activity)
+    .values({ id, event_id: eventId, category: 'dream_offered', body, link: null, created_at })
 }
 
 const offerDream = (server: FastifyInstance, cookie: string, title: string, eventId = BURN) =>
@@ -215,19 +211,41 @@ describe('the feed', () => {
     expect(await lines(server, ada.cookie)).toEqual(['Later', 'Earlier'])
   })
 
-  it('reads the same way twice when two things share a stamp', async () => {
+  it('breaks a shared stamp by id, so two reads cannot disagree', async () => {
     // A copied register writes several rows a millisecond apart, and nothing promises
     // that — an order that changed between two reads of the same rows would read as
-    // though something had happened again.
+    // though something had happened again. Asserted as the expected order rather than as
+    // two equal reads: SQLite answers one query the same way twice with or without the
+    // tie-break, so comparing two runs proves nothing.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
     await givenComing(ada.id)
-    await givenLine('One', NOW)
-    await givenLine('Two', NOW)
-    await givenLine('Three', NOW)
+    // Written in the opposite order to their ids, which is what makes this reject the
+    // tie-break's removal: without it SQLite answers in rowid order, which here is the
+    // order they were written rather than the order the ids ask for.
+    await givenLine('One', NOW, BURN, 'a0000000-0000-4000-8000-000000000003')
+    await givenLine('Two', NOW, BURN, 'a0000000-0000-4000-8000-000000000002')
+    await givenLine('Three', NOW, BURN, 'a0000000-0000-4000-8000-000000000001')
 
-    expect(await lines(server, ada.cookie)).toEqual(await lines(server, ada.cookie))
+    expect(await lines(server, ada.cookie)).toEqual(['One', 'Two', 'Three'])
+  })
+
+  it('stops at the limit rather than answering the whole table', async () => {
+    // A page, not an audit log. The other half of the retention rule, and the reason
+    // `FEED_LIMIT` is a named export rather than a literal in the query.
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    for (let index = 0; index <= FEED_LIMIT; index += 1) {
+      await givenLine(`Line ${index}`, `2026-07-01T10:${String(index).padStart(2, '0')}:00.000Z`)
+    }
+
+    const rows = (await feed(server, ada.cookie)).json().activity
+    expect(rows).toHaveLength(FEED_LIMIT)
+    // And it is the newest that survive the cut, not the first written.
+    expect(rows[0].body).toBe(`Line ${FEED_LIMIT}`)
   })
 
   it('refuses anybody without a role, and anybody not signed in', async () => {
@@ -249,14 +267,18 @@ describe('the feed', () => {
   })
 
   it('goes with the burn, which is the whole retention rule', async () => {
+    // Asserted against the table, not the route: the route's `innerJoin event` hides an
+    // orphan either way, so reading through it would pass with the cascade removed.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
     await givenComing(ada.id)
     await offerDream(server, ada.cookie, 'Sauna at dawn')
+    expect(await db().select().from(activity)).toHaveLength(1)
 
     await db().delete(event).where(eq(event.id, BURN))
 
+    expect(await db().select().from(activity)).toEqual([])
     expect(await lines(server, ada.cookie)).toEqual([])
   })
 

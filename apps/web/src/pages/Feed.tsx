@@ -22,18 +22,11 @@ interface Happening {
 }
 
 /**
- * What everyone has been doing (#303).
+ * What everyone has been doing (#303). `docs/the-app.md` has the why.
  *
- * Between burns the app is quiet, and quiet reads as nothing-to-do. These are the same
- * events the burn-wide notifications carry — a dream offered, somebody coming, a lead
- * role taken — and most of those are **off** by default, so until this page the ordinary
- * way to learn about one was to go looking at the schedule.
- *
- * **Across burns**, unlike every other page about a burn: the quiet the page fills is
- * exactly the gap between them, and each line says which burn it belongs to.
- *
- * Reading it writes nothing. The bell and its unseen count stay `notification`'s — a
- * second thing to mark read would be a second thing to keep in step.
+ * The lines are the burn-wide notifications, shown to everybody rather than only to
+ * whoever switched that category on — and across burns, so each says which it belongs
+ * to. Reading it writes nothing: the bell and its unseen count stay `notification`'s.
  */
 export const Feed = ({ api }: { api: FeedApi }) => {
   const approved = isApproved(useViewer())

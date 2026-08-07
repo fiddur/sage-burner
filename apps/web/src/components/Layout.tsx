@@ -77,9 +77,8 @@ export const Layout = ({ api, children }: { api: BellApi; children: ComponentChi
               themselves allow. */}
           {isApproved(viewer) && (
             <>
-              {/* First of the approved entries: it is the page that says whether
-                  anything is happening at all, which is the question somebody opening
-                  the app between burns has (#303). */}
+              {/* First, because it answers the question somebody opening the app
+                  between burns has: is anything happening? (#303) */}
               <a href="/going-on">Going on</a>
               <a href="/members">Members</a>
               <a href="/schedule">Schedule</a>

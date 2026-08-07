@@ -1,14 +1,13 @@
-# What's new
-
 What changed, newest first, written for the people using the app rather than the
-people building it. The app is served at `/changelog`, which is where the "a new
-version is out" notification leads.
+people building it. The app serves this file at `/changelog`, which is where the "a new
+version is out" notification leads — so the page supplies the title and the sections
+below start at `#`, which `renderMarkdown` shifts down one level under it.
 
 There are no version numbers: every merge to `develop` builds an image and the server
 picks it up within a few minutes, so a date can hold several deploys. Add your line
 under today's heading, and make a new heading when there is none.
 
-## 2026-08-07
+# 2026-08-07
 
 - **A page saying what's new.** This one — reached from the "a new version is out"
   notification, which until now led nowhere at all, and from the bar that offers a
@@ -35,7 +34,7 @@ under today's heading, and make a new heading when there is none.
 - **Two people editing the same list no longer overwrite each other silently** — the
   second one is told the list moved under them and shown what it says now.
 
-## 2026-08-06
+# 2026-08-06
 
 - **Notifications.** A bell in the corner with what happened while you were away, and
   browser push if you turn it on, per browser. What happens _to you_ is on unless you
@@ -54,7 +53,7 @@ under today's heading, and make a new heading when there is none.
 - **A bar when the page has been redeployed under you**, offering a reload rather than
   taking one.
 
-## 2026-08-05
+# 2026-08-05
 
 - **Passkeys**, alongside the password rather than instead of it.
 - **The meal plan.** Sittings per burn, who cooks and who cleans, and what is cooking
@@ -65,7 +64,7 @@ under today's heading, and make a new heading when there is none.
   several mornings.
 - **Say you are coming to the next burn while signing up.**
 
-## 2026-08-04
+# 2026-08-04
 
 - **A selector in the bar**, because there is more than one burn at a time, and every
   page is about the one it names.
@@ -75,19 +74,19 @@ under today's heading, and make a new heading when there is none.
 - **Members read the roster**, without the payment dates or anybody's login address.
 - **A lost invite link can be re-issued**, which kills the old one in the same breath.
 
-## 2026-08-03
+# 2026-08-03
 
 - **An application tells the admins**, on whichever browsers they asked on.
 - **The burn's shared furniture is every member's** — the lodging and helping lists,
   the places, the welcome text. This replaces a spreadsheet everyone could edit.
 
-## 2026-08-02
+# 2026-08-02
 
 - **Lodging and helping lists per burn.** Pick where to sleep from what is actually
   there, with the full options refused, and tick what you will help with — or write in
   what the list is missing.
 
-## 2026-08-01
+# 2026-08-01
 
 - **The programme.** Offer a dream, edit it, and drag it into a timetable of lanes and
   hours.
@@ -96,7 +95,7 @@ under today's heading, and make a new heading when there is none.
 - **A burn starts and ends at a time**, not just on a day.
 - **The installation has a name of its own.**
 
-## 2026-07-31
+# 2026-07-31
 
 - **The public application form**, rendered from questions an admin edits, with the
   answers stored beside the wording each applicant was actually shown.
@@ -105,14 +104,14 @@ under today's heading, and make a new heading when there is none.
 - **Redeeming a link makes the account**, with the details filled in as you go.
 - **Members maintain their own record**, and say which burns they are coming to.
 
-## 2026-07-30
+# 2026-07-30
 
 - **Accounts and roles**, with the first admin bootstrapped from the command line.
 - **Burns as records** rather than one hardcoded event, with an admin editor.
 - **The application form's questions are rows**, so changing them needs no redeploy.
 - **The welcome text on the public homepage**, written in markdown per burn.
 
-## 2026-07-28
+# 2026-07-28
 
 - **The first container.** One Node process serving the API, the web app and a single
   SQLite file, with password login and a Docker image Watchtower can pick up.

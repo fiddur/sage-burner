@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { dayName, fromLocalInput, shortDayOf, toLocalInput } from './datetime.ts'
+import { dayName, fromLocalInput, localDay, shortDayOf, toLocalInput } from './datetime.ts'
 
 describe('datetime-local conversion', () => {
   it('round-trips an instant through the input and back', () => {
@@ -73,5 +73,24 @@ describe('weekday names', () => {
   it('gives back what it was handed when that is not a date', () => {
     expect(dayName('not a date')).toBe('not a date')
     expect(shortDayOf('not a date')).toBeUndefined()
+  })
+})
+
+describe('the day a feed line happened', () => {
+  it('reads it in local time, which is the whole reason it is not an ISO slice', () => {
+    // 22:00 UTC on the 3rd is midnight on the 4th in Stockholm, so `iso.slice(0, 10)`
+    // would say the 3rd — the shortcut `localDay` exists to avoid. Only a test in a zone
+    // ahead of UTC can say so, which is what `vite.config.ts` pins the suite to.
+    expect(localDay('2026-10-03T22:00:00.000Z')).toBe('4 Oct')
+    expect(localDay('2026-10-03T21:00:00.000Z')).toBe('3 Oct')
+  })
+
+  it('crosses a month, and a year, the same way', () => {
+    expect(localDay('2026-10-31T23:00:00.000Z')).toBe('1 Nov')
+    expect(localDay('2026-12-31T23:30:00.000Z')).toBe('1 Jan')
+  })
+
+  it('gives back what it was handed when that is not a date', () => {
+    expect(localDay('not a date')).toBe('not a date')
   })
 })

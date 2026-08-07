@@ -14,21 +14,16 @@ import { noStore } from '../http.ts'
 export const FEED_LIMIT = 50
 
 /**
- * `GET /api/feed` — what everyone has been doing (#303).
+ * `GET /api/feed` — what everyone has been doing (#303). `docs/the-app.md` has the why.
  *
- * **Across burns, not per burn**, which is the one place this diverges from #184's rule
- * that a burn-scoped route takes an event id: the quiet between burns is what the page
- * exists to fill, and "somebody joined the Autumn Burn" is news to people still
- * thinking about the summer one. Each line names its burn for the same reason.
+ * **Across burns**, the one place this diverges from #184's rule that a burn-scoped route
+ * takes an event id, so each line names its own burn instead.
  *
- * `requireApproved`, like the roster. Everything here is already readable by an approved
- * member — who is coming, who leads what, which dreams exist — and the feed gathers into
- * one place what is spread across pages. Nothing about payment, contact details or
- * allergies is in it, because nothing that reaches `activity` is: the rows are written
- * from the burn-wide notifications, which are the ones that go to everybody attending.
+ * `requireApproved`, like the roster: everything here is already readable by an approved
+ * member, gathered into one place. Nothing about payment, contact details or allergies
+ * can be in it, because only the burn-wide notifications write to `activity`.
  *
- * **Reading it writes nothing.** The bell's unseen count is `notification`'s, and a feed
- * that marked itself read would be a second thing to keep in step with it.
+ * **Reading it writes nothing.** The bell's unseen count is `notification`'s.
  */
 export const registerFeedRoutes = (app: FastifyInstance, { db, sessions }: GuardDeps) => {
   const { requireApproved } = createGuards({ db, sessions })

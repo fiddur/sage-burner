@@ -1,8 +1,6 @@
--- What has been going on, for the feed to show (#303).
---
--- The same events the burn-wide notifications carry, written once for everybody rather
--- than once per person — `schema.ts` says why, and why the CHECK lists the notification
--- vocabulary. Cascades with the burn, which is the whole of the retention rule.
+-- What has been going on, for the feed to show (#303). `docs/the-app.md` has the why;
+-- the CHECK lists the notification vocabulary because the feed's chip switches one on.
+-- Cascades with the burn, which is the whole of the retention rule.
 CREATE TABLE `activity` (
 	`id` text NOT NULL,
 	`event_id` text NOT NULL,

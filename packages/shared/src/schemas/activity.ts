@@ -7,16 +7,10 @@ import { dateTimeSchema, idSchema } from './common.ts'
 /**
  * One thing that happened at a burn, as the feed shows it (#303).
  *
- * The wording is the server's — the same third-person sentence the burn-wide
- * notification carries, so the feed and the bell cannot describe one event two ways.
- *
- * `burn` is the name rather than only the id, because the feed spans burns: between
- * them the app is quiet, and "somebody joined the Autumn Burn" is news to people still
- * thinking about the summer one.
- *
- * `category` is a notification category, so the chip beside the line can offer to
- * switch that category on — which is the point of the chip, and why nothing can reach
- * the feed that a member could not have been notified about.
+ * The wording is the server's — the same third-person sentence the notification carries,
+ * so the two cannot describe one event differently. `burn` is the name and not only the
+ * id because the page spans burns, and `category` is a notification category because the
+ * chip beside the line switches one on.
  */
 export const activitySchema = z.object({
   id: idSchema,

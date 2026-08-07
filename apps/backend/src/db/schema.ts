@@ -1259,24 +1259,17 @@ export const notificationSetting = sqliteTable(
 )
 
 /**
- * What has been going on, for the feed to show (#303).
+ * What has been going on, for the feed to show (#303). `docs/the-app.md` has the why.
  *
- * The same events the burn-wide notifications carry, written once for everybody rather
- * than once per person: a notification is per account and switched off by most people,
- * so between burns the app looked empty even while things were happening in it. This is
- * the other half of #248's rule — a notification is a row, a push is a copy of it, and
- * this is the copy that belongs to nobody.
+ * A notification belongs to one account and this belongs to nobody, which is the whole
+ * difference: one row per event rather than one per person told.
  *
- * Written where `notifyAttendees` fans out, which is what stops the two drifting: a
- * line here exists exactly when a burn-wide notification was sent, whether or not
- * anybody had that category switched on.
- *
- * `category` is a notification category because the feed's chip offers to switch it on,
- * so it has to name something a member can actually turn on and be told about.
+ * `category` is a notification category because the page's chip switches one on, so it
+ * has to name something a member can be told about.
  *
  * **Cascades with the burn, which is the whole retention rule.** An audit log grows
- * without bound; this is bounded by the burns it belongs to, and the page reads the
- * newest few. Nothing else deletes from it, and nothing edits it.
+ * without bound; this is bounded by the burns it belongs to. Nothing else deletes from
+ * it, and nothing edits it.
  */
 export const activity = sqliteTable(
   'activity',
