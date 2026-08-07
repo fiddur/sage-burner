@@ -1,6 +1,6 @@
 import type { Notification } from '@sage-burner/shared'
 
-import { cleanup, render, screen, waitFor } from '@testing-library/preact'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { BellApi } from './NotificationBell.tsx'
@@ -99,6 +99,66 @@ describe('the bell', () => {
     ;(await screen.findByRole('button', { name: 'Notifications' })).click()
 
     expect(await screen.findByText('You are on helper for Dinner')).toBeTruthy()
+  })
+
+  /**
+   * Opens the panel on a bell with nothing new, and answers with the line inside it.
+   *
+   * Nothing new on purpose: opening an unseen bell calls `markNotificationsSeen`,
+   * whose reply replaces the list — which for a test about dismissing the panel would
+   * empty it for a reason that has nothing to do with dismissal.
+   */
+  const opened = async () => {
+    render(
+      <NotificationBell
+        api={stub({
+          getMyNotifications: () =>
+            Promise.resolve({
+              notifications: [one({ seen_at: '2026-08-06T11:00:00.000Z' })],
+              unseen: 0,
+            }),
+        })}
+      />,
+    )
+    // `fireEvent` rather than `.click()`, because it runs inside `act` — which is what
+    // flushes the effect that attaches the dismissal listeners. A bare `.click()`
+    // renders the panel but leaves them queued until some later frame.
+    fireEvent.click(await screen.findByRole('button', { name: 'Notifications' }))
+
+    return await screen.findByText('You are on helper for Dinner')
+  }
+
+  it('puts itself away when something else on the page is pressed', async () => {
+    await opened()
+
+    fireEvent.pointerDown(document.body)
+
+    await waitFor(() => expect(screen.queryByText('You are on helper for Dinner')).toBeNull())
+  })
+
+  it('stays open when the press lands inside it', async () => {
+    // The success path the outside-press test cannot show: the bell's own toggle is a
+    // press inside, so a listener that did not check would fight it.
+    fireEvent.pointerDown(await opened())
+
+    expect(screen.queryByText('You are on helper for Dinner')).toBeTruthy()
+  })
+
+  it('closes on Escape and hands focus back to the bell', async () => {
+    await opened()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    await waitFor(() => expect(screen.queryByText('You are on helper for Dinner')).toBeNull())
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Notifications' }))
+  })
+
+  it('ignores a key that is not Escape', async () => {
+    await opened()
+
+    fireEvent.keyDown(document, { key: 'Enter' })
+
+    expect(screen.queryByText('You are on helper for Dinner')).toBeTruthy()
   })
 
   it('says nothing at all when the server cannot be reached', async () => {

@@ -1,6 +1,6 @@
 import type { Notification } from '@sage-burner/shared'
 
-import { useEffect, useState } from 'preact/hooks'
+import { useEffect, useRef, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
@@ -28,6 +28,8 @@ export const NotificationBell = ({ api }: { api: BellApi }) => {
   const [items, setItems] = useState<readonly Notification[]>([])
   const [unseen, setUnseen] = useState(0)
   const [open, setOpen] = useState(false)
+  const wrap = useRef<HTMLSpanElement>(null)
+  const button = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -54,7 +56,47 @@ export const NotificationBell = ({ api }: { api: BellApi }) => {
     }
   }, [api])
 
-  useEffect(() => markFavicon(unseen > 0), [unseen])
+  // On the boolean, not the count. Keyed by `unseen`, going from one to two re-ran
+  // the effect: the cleanup put the plain icon back and the new call redrew the dot
+  // after a fetch and a compose, so the tab flickered undotted for no change a reader
+  // would notice (#295).
+  const badged = unseen > 0
+  useEffect(() => markFavicon(badged), [badged])
+
+  /**
+   * Anywhere else, or Escape, puts it away.
+   *
+   * `pointerdown` rather than `click`, so a press that begins outside closes the panel
+   * even when it ends somewhere else — and so the panel is gone before whatever was
+   * pressed reacts. A press inside is left alone: the bell's own toggle is one of
+   * them, and closing here would fight it.
+   *
+   * Escape hands focus back to the bell, which is where it came from — a keyboard
+   * user who dismisses the panel otherwise lands at the top of the document.
+   */
+  useEffect(() => {
+    if (!open) return undefined
+
+    const outside = (pointer: Event) => {
+      const target = pointer.target
+      if (target instanceof Node && wrap.current?.contains(target) === true) return
+      setOpen(false)
+    }
+
+    const escape = (key: KeyboardEvent) => {
+      if (key.key !== 'Escape') return
+      setOpen(false)
+      button.current?.focus()
+    }
+
+    document.addEventListener('pointerdown', outside)
+    document.addEventListener('keydown', escape)
+
+    return () => {
+      document.removeEventListener('pointerdown', outside)
+      document.removeEventListener('keydown', escape)
+    }
+  }, [open])
 
   const toggle = () => {
     const opening = !open
@@ -71,8 +113,9 @@ export const NotificationBell = ({ api }: { api: BellApi }) => {
   }
 
   return (
-    <span class="bell-wrap">
+    <span class="bell-wrap" ref={wrap}>
       <button
+        ref={button}
         type="button"
         class={unseen > 0 ? 'bell has-unseen' : 'bell'}
         aria-expanded={open}
