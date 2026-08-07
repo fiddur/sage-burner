@@ -1,4 +1,5 @@
 import type { CachePlan } from './cache.ts'
+import type { WindowClients } from './notification.ts'
 
 import {
   API_CACHE,
@@ -12,7 +13,7 @@ import {
   trim,
   worthStoring,
 } from './cache.ts'
-import { alertFrom, HOME, ROUTE_TO } from './notification.ts'
+import { alertFrom, landOn } from './notification.ts'
 
 /**
  * The service worker: push notifications (#248) and offline (#256).
@@ -51,12 +52,6 @@ interface SwNotificationEvent extends ExtendableEvent {
   notification: { close: () => void; data?: { path?: string } }
 }
 
-interface SwClient {
-  focus: () => Promise<SwClient>
-  postMessage: (message: unknown) => void
-  url: string
-}
-
 interface WorkerScope {
   addEventListener: {
     (type: 'activate' | 'install', handler: (event: ExtendableEvent) => void): void
@@ -65,11 +60,7 @@ interface WorkerScope {
     (type: 'push', handler: (event: SwPushEvent) => void): void
   }
   caches: CacheStorage
-  clients: {
-    claim: () => Promise<void>
-    matchAll: (options: { includeUncontrolled: boolean; type: 'window' }) => Promise<SwClient[]>
-    openWindow: (url: string) => Promise<SwClient | null>
-  }
+  clients: WindowClients & { claim: () => Promise<void> }
   location: { origin: string }
   registration: {
     showNotification: (title: string, options: Record<string, unknown>) => Promise<void>
@@ -78,15 +69,6 @@ interface WorkerScope {
 }
 
 declare const self: WorkerScope
-
-/** Whether a window is already showing the page, ignoring any query or fragment. */
-const showing = (client: SwClient, path: string, origin: string): boolean => {
-  try {
-    return new URL(client.url).pathname === new URL(path, origin).pathname
-  } catch {
-    return false
-  }
-}
 
 // Take over straight away rather than waiting for every tab to close. A worker that
 // only starts controlling pages on the next cold start would leave somebody who just
@@ -192,48 +174,8 @@ self.addEventListener('push', (event) => {
   )
 })
 
-/**
- * Where a tap lands, in the order that costs somebody least (#279).
- *
- * A new window is the worst answer available and used to be the common one: the match
- * was a suffix of the whole URL, so an app open on `/meals` did not count as open for
- * anything else — including a notification naming no page at all, whose `/` a URL not
- * ending in a slash cannot end with. On a phone, where the worker belongs to the
- * browser rather than to the installed copy, that meant a browser tab instead of the
- * app that was already on screen.
- *
- * So: the window already showing it, else any window of ours asked to route in place,
- * else a new one. `postMessage` rather than `client.navigate()` — see `ROUTE_TO`. A
- * window loaded before this shipped has no listener for it and simply stays where it
- * is, which is still inside the app rather than beside it.
- *
- * Any window will do, and the first is taken rather than the focused one: `Client`
- * carries `focused` and `visibilityState`, but at one window per phone the difference
- * is not worth declaring more of the API than is touched.
- */
-const landOn = async (path: string | undefined): Promise<unknown> => {
-  const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-  const [anywhere] = windows
-
-  // No page of its own — a new version is everywhere. Any window of ours is already
-  // the right one, and routing it would take somebody off what they were reading.
-  if (path === undefined) {
-    return anywhere === undefined ? self.clients.openWindow(HOME) : anywhere.focus()
-  }
-
-  const already = windows.find((client) => showing(client, path, self.location.origin))
-  if (already !== undefined) return already.focus()
-
-  if (anywhere === undefined) return self.clients.openWindow(path)
-
-  await anywhere.focus()
-  anywhere.postMessage({ type: ROUTE_TO, path })
-
-  return anywhere
-}
-
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
 
-  event.waitUntil(landOn(event.notification.data?.path))
+  event.waitUntil(landOn(self.clients, self.location.origin, event.notification.data?.path))
 })

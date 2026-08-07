@@ -31,6 +31,83 @@ export const routeAsked = (data: unknown): string | undefined => {
 }
 
 /**
+ * Enough of a window this worker can reach, so a test can supply one.
+ *
+ * Narrower than the real `WindowClient` on purpose, in the same spirit as `push.ts`'s
+ * `PushBrowser`: this is every capability a tap uses. `Client` also carries `focused`
+ * and `visibilityState`, and `landOn` deliberately does not ask — see there.
+ */
+export interface OpenWindow {
+  focus: () => Promise<unknown>
+  postMessage: (message: unknown) => void
+  url: string
+}
+
+/** Enough of the worker's `clients` to land a tap on one of them. */
+export interface WindowClients {
+  matchAll: (options: { includeUncontrolled: boolean; type: 'window' }) => Promise<OpenWindow[]>
+  openWindow: (url: string) => Promise<unknown>
+}
+
+/**
+ * Whether a window is already showing the page, ignoring any query or fragment.
+ *
+ * A window that will not parse is not showing anything we can match, and a tap must
+ * not die on one: the answer is no, and the next window is asked.
+ */
+const showing = (client: OpenWindow, path: string, origin: string): boolean => {
+  try {
+    return new URL(client.url).pathname === new URL(path, origin).pathname
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Where a tap lands, in the order that costs somebody least (#279).
+ *
+ * A new window is the worst answer available and used to be the common one: the match
+ * was a suffix of the whole URL, so an app open on `/meals` did not count as open for
+ * anything else — including a notification naming no page at all, whose `/` a URL not
+ * ending in a slash cannot end with. On a phone, where the worker belongs to the
+ * browser rather than to the installed copy, that meant a browser tab instead of the
+ * app that was already on screen.
+ *
+ * So: the window already showing it, else any window of ours asked to route in place,
+ * else a new one. `postMessage` rather than `client.navigate()` — see `ROUTE_TO`. A
+ * window loaded before this shipped has no listener for it and simply stays where it
+ * is, which is still inside the app rather than beside it.
+ *
+ * Any window will do, and the first is taken rather than the focused one: at one
+ * window per phone the difference is not worth declaring more of the API than is
+ * touched.
+ */
+export const landOn = async (
+  clients: WindowClients,
+  origin: string,
+  path: string | undefined,
+): Promise<unknown> => {
+  const windows = await clients.matchAll({ type: 'window', includeUncontrolled: true })
+  const [anywhere] = windows
+
+  // No page of its own — a new version is everywhere. Any window of ours is already
+  // the right one, and routing it would take somebody off what they were reading.
+  if (path === undefined) {
+    return anywhere === undefined ? clients.openWindow(HOME) : anywhere.focus()
+  }
+
+  const already = windows.find((client) => showing(client, path, origin))
+  if (already !== undefined) return already.focus()
+
+  if (anywhere === undefined) return clients.openWindow(path)
+
+  await anywhere.focus()
+  anywhere.postMessage({ type: ROUTE_TO, path })
+
+  return anywhere
+}
+
+/**
  * What is shown when the payload cannot be read at all.
  *
  * Something happened, and silence is the worse failure. The push service cannot read

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { alertFrom, ROUTE_TO, routeAsked, UNREADABLE } from './notification.ts'
+import { alertFrom, HOME, landOn, ROUTE_TO, routeAsked, UNREADABLE } from './notification.ts'
 
 describe('reading a push payload', () => {
   it('takes the wording, the page and the category the server sent', () => {
@@ -77,6 +77,100 @@ describe('reading a push payload', () => {
 
   it('keeps a query and a fragment, which still name something in this app', () => {
     expect(alertFrom({ body: 'a', link: '/schedule?dream=d-1#top' }).path).toBe('/schedule?dream=d-1#top')
+  })
+})
+
+const ORIGIN = 'https://burn.example'
+
+/**
+ * Windows this worker can reach, and one list of everything it did to them — so a
+ * test pins that a tap focused rather than opened, and that nothing else happened.
+ */
+const browserWith = (...urls: string[]) => {
+  const did: unknown[] = []
+  const windows = urls.map((url) => ({
+    url,
+    focus: () => {
+      did.push({ focused: url })
+      return Promise.resolve(url)
+    },
+    postMessage: (message: unknown) => {
+      did.push({ told: url, message })
+    },
+  }))
+
+  return {
+    did,
+    clients: {
+      matchAll: () => Promise.resolve(windows),
+      openWindow: (url: string) => {
+        did.push({ opened: url })
+        return Promise.resolve(null)
+      },
+    },
+  }
+}
+
+describe('where a tap lands', () => {
+  it('focuses a window that is open, without moving it, when no page is named', async () => {
+    const browser = browserWith(`${ORIGIN}/meals`)
+
+    await landOn(browser.clients, ORIGIN, undefined)
+
+    expect(browser.did).toEqual([{ focused: `${ORIGIN}/meals` }])
+  })
+
+  it('opens home when no page is named and nothing is open', async () => {
+    const browser = browserWith()
+
+    await landOn(browser.clients, ORIGIN, undefined)
+
+    expect(browser.did).toEqual([{ opened: HOME }])
+  })
+
+  it('focuses the window already showing the page rather than routing it', async () => {
+    const browser = browserWith(`${ORIGIN}/meals`, `${ORIGIN}/schedule`)
+
+    await landOn(browser.clients, ORIGIN, '/schedule')
+
+    expect(browser.did).toEqual([{ focused: `${ORIGIN}/schedule` }])
+  })
+
+  it('counts one showing the page with a different query as showing it', async () => {
+    // The window somebody left on a particular dream is still on the schedule, and
+    // routing it would move them off what the notification is about.
+    const browser = browserWith(`${ORIGIN}/schedule?dream=d-1#top`)
+
+    await landOn(browser.clients, ORIGIN, '/schedule')
+
+    expect(browser.did).toEqual([{ focused: `${ORIGIN}/schedule?dream=d-1#top` }])
+  })
+
+  it('asks a window showing something else to route in place, after focusing it', async () => {
+    const browser = browserWith(`${ORIGIN}/meals`)
+
+    await landOn(browser.clients, ORIGIN, '/schedule')
+
+    expect(browser.did).toEqual([
+      { focused: `${ORIGIN}/meals` },
+      { told: `${ORIGIN}/meals`, message: { type: ROUTE_TO, path: '/schedule' } },
+    ])
+  })
+
+  it('opens a window only when this app has none', async () => {
+    const browser = browserWith()
+
+    await landOn(browser.clients, ORIGIN, '/schedule')
+
+    expect(browser.did).toEqual([{ opened: '/schedule' }])
+  })
+
+  it('passes over a window whose url will not parse instead of failing the tap', async () => {
+    const browser = browserWith('not a url', `${ORIGIN}/schedule`)
+
+    await landOn(browser.clients, ORIGIN, '/schedule')
+
+    expect(browser.did).toEqual([{ focused: `${ORIGIN}/schedule` }])
   })
 })
 
