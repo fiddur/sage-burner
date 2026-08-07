@@ -88,7 +88,7 @@ describe('the meal plan', () => {
   })
 
   it('gives the sitting one column and what is cooked another', async () => {
-    // Six columns were five too wide on a phone. When and Meal say one thing between
+    // Six columns were one too many for a phone. When and Meal say one thing between
     // them, and so do the sitting's name and the idea for it.
     renderPage(stub())
 

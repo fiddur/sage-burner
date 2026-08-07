@@ -28,13 +28,25 @@ export interface MessageSource {
  * shipped has no listener, so it stays where it is — inside the app, on the wrong
  * page, which is the better half of the trade the worker already made.
  */
-export const RouteOnMessage = ({ from = globalThis.navigator?.serviceWorker }: { from?: MessageSource }) => {
+export const RouteOnMessage = ({
+  from = globalThis.navigator?.serviceWorker ?? null,
+}: {
+  /**
+   * The worker's side of the channel, or `null` for none.
+   *
+   * `null` rather than `undefined` for the empty case, because a destructuring
+   * default replaces an explicit `undefined` — so `from={undefined}` reached the real
+   * container, and a test meaning "no worker" got one only because happy-dom happens
+   * not to provide `navigator.serviceWorker` (#288).
+   */
+  from?: MessageSource | null
+}) => {
   const { route } = useLocation()
 
   useEffect(() => {
-    // Absent in a browser with workers turned off, and in a test that has not asked
-    // for this. Neither is a failure: nothing is listening because nothing sends.
-    if (from === undefined) return undefined
+    // Nothing listening because nothing sends: workers turned off, or a test that
+    // did not ask for one.
+    if (from === null) return undefined
 
     const onMessage = (event: MessageEvent) => {
       const path = routeAsked(event.data)

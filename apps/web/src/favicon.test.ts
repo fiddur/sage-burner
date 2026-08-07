@@ -1,4 +1,4 @@
-import { notificationBadge, apiRoutes } from '@sage-burner/shared'
+import { apiRoutes } from '@sage-burner/shared'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { BadgeCanvas } from './favicon.ts'
@@ -54,8 +54,8 @@ const anImage = {} as CanvasImageSource
 
 describe('where the dot goes on a canvas', () => {
   it('lands where the SVG puts it, at the mark’s own size', () => {
-    // 64 is `notificationBadge.box`, so at that size the numbers pass through
-    // untouched and must equal the ones `flameIcon` writes into its `<circle>`.
+    // 64 is the badge's own square, so at that size the numbers pass through
+    // untouched — this is where they are pinned, now that nothing else states them.
     expect(badgeSpot(64)).toEqual({ x: 50, y: 16, radius: 13, stroke: 3 })
   })
 
@@ -74,8 +74,8 @@ describe('composing the tab icon', () => {
 
     expect(composeBadged(anImage, canvas)).toBe('data:image/png;base64,drawn')
     expect(calls).toEqual(['image 0,0 64x64', 'begin', 'arc 50,16 r13', 'fill', 'stroke'])
-    expect(recorder.fillStyle).toBe(notificationBadge.fill)
-    expect(recorder.strokeStyle).toBe(notificationBadge.stroke)
+    expect(recorder.fillStyle).toBe('#dc2626')
+    expect(recorder.strokeStyle).toBe('#fff')
   })
 
   it('sizes the canvas before it draws, or the drawing is wiped', () => {
@@ -135,7 +135,10 @@ describe('the tab’s icon link', () => {
     await Promise.resolve()
     await Promise.resolve()
 
-    expect(link()?.getAttribute('href')).not.toBe(ICON)
+    // The fake canvas's own output, not merely "something other than the route":
+    // `link()?.…` yields `undefined` when there is no link at all, so a `not.toBe`
+    // passes on a page with no favicon.
+    expect(link()?.getAttribute('href')).toBe('data:image/png;base64,drawn')
   })
 
   it('keeps the plain icon when the icon will not load', async () => {
@@ -171,7 +174,7 @@ describe('the tab’s icon link', () => {
     })
     await Promise.resolve()
     await Promise.resolve()
-    expect(link()?.getAttribute('href')).not.toBe(ICON)
+    expect(link()?.getAttribute('href')).toBe('data:image/png;base64,drawn')
 
     restore()
 

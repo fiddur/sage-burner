@@ -1,16 +1,26 @@
-import { apiRoutes, notificationBadge } from '@sage-burner/shared'
+import { apiRoutes } from '@sage-burner/shared'
 
 /** The one icon link, declared in `index.html` so a signed-out visitor has it too. */
 const ICON_ID = 'app-favicon'
 
 /**
- * The square the dot's numbers are stated in, and what the icon is drawn into.
+ * The unseen-notification dot, stated in the square it is drawn into.
+ *
+ * Here rather than in `@sage-burner/shared` because only this file draws it. It lived
+ * there while `flameIcon` drew a `<circle>` version too, and moved back when that
+ * went (#285) — a shared constant with one consumer is a description to keep in step
+ * for nothing.
+ */
+const BADGE = { box: 64, cx: 50, cy: 16, r: 13, fill: '#dc2626', stroke: '#fff', width: 3 } as const
+
+/**
+ * How big the composed icon is drawn.
  *
  * An uploaded 512-pixel icon is scaled down to it — a favicon is shown at a fraction
  * of that anyway, and drawing into the badge's own square means its coordinates need
  * no second conversion.
  */
-const SIZE = notificationBadge.box
+const SIZE = BADGE.box
 
 /** Enough of a canvas to draw on, so a test can supply one. */
 export interface BadgeCanvas {
@@ -23,14 +33,13 @@ export interface BadgeCanvas {
 /**
  * The dot's place on a canvas of this size, from the numbers the SVG draws with.
  *
- * Scaled rather than hardcoded: `notificationBadge` is stated once, in the square the
- * flame's viewBox uses, and both drawings derive from it.
+ * Scaled rather than hardcoded, so the numbers stay true if `SIZE` ever changes.
  */
 export const badgeSpot = (size: number) => ({
-  x: (notificationBadge.cx / notificationBadge.box) * size,
-  y: (notificationBadge.cy / notificationBadge.box) * size,
-  radius: (notificationBadge.r / notificationBadge.box) * size,
-  stroke: (notificationBadge.strokeWidth / notificationBadge.box) * size,
+  x: (BADGE.cx / BADGE.box) * size,
+  y: (BADGE.cy / BADGE.box) * size,
+  radius: (BADGE.r / BADGE.box) * size,
+  stroke: (BADGE.width / BADGE.box) * size,
 })
 
 /**
@@ -57,17 +66,17 @@ export const composeBadged = (image: CanvasImageSource, canvas: BadgeCanvas): st
 
   context.beginPath()
   context.arc(spot.x, spot.y, spot.radius, 0, Math.PI * 2)
-  context.fillStyle = notificationBadge.fill
+  context.fillStyle = BADGE.fill
   context.fill()
   context.lineWidth = spot.stroke
-  context.strokeStyle = notificationBadge.stroke
+  context.strokeStyle = BADGE.stroke
   context.stroke()
 
   return canvas.toDataURL('image/png')
 }
 
 /** The installation's icon as an image, or nothing if it will not load. */
-export const loadIcon = (source: string): Promise<HTMLImageElement | undefined> =>
+const loadIcon = (source: string): Promise<HTMLImageElement | undefined> =>
   new Promise((resolve) => {
     const image = new globalThis.Image()
 
@@ -100,7 +109,8 @@ export interface FaviconBrowser {
  * inside an SVG data URL, which is why the tab wore the flame while the home screen
  * wore the upload: a data URL cannot reference an external image to draw over. This
  * is the same trick the upload path uses, since a chosen file is cut square and
- * resized in the browser. Same-origin, so the canvas is not tainted.
+ * resized in the browser. Same-origin, so the canvas is not tainted — and it is the
+ * only place the dot is drawn now, which is why `BADGE` is stated here.
  *
  * **The plain icon is the floor.** It is set synchronously first and only replaced if
  * the drawing succeeds, so a failed fetch, a browser that will not draw an SVG with

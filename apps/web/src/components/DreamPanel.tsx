@@ -25,10 +25,11 @@ export const DreamPanel = ({
    * instead (#207).
    *
    * The form inside is what this is for: #205 stopped a *refused write* discarding
-   * what somebody had typed, and Escape went on doing it silently. With a step to go
-   * back to, the first press leaves the form and the second closes the panel. Without
-   * one, the first press closes — reading a dream and pressing Escape is the common
-   * case, and a press that does nothing would be worse than the thing being guarded.
+   * what somebody had typed. Escape still discards a draft — the first press runs
+   * `onCancelEdit`, which unmounts the form — but it no longer closes the panel with
+   * it, so the dream is still open to edit again. Without a step to go back to the
+   * first press closes: reading a dream and pressing Escape is the common case, and a
+   * press that did nothing would be worse than the thing being guarded.
    */
   onBack?: () => void
   onClose: () => void

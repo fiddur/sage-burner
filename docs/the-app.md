@@ -124,13 +124,15 @@ document an opaque origin and no scripting. Uploading is admin-only.
 
 **The tab wears it too** (#285), and `index.html` is where that starts: the link
 points at the same route, so a signed-out visitor on the public homepage gets the
-installation's mark rather than the browser's default. Adding the dot took a detour. The unseen-notification dot
-(#248) was drawn as a `<circle>` inside an SVG data URL, and a data URL cannot
-reference an external image to draw over — so for a while the tab kept the flame
-while the home screen wore the upload. The tab now loads the icon into an image and
-composes it with the dot on a canvas instead: the same trick the upload path already
-uses, since a chosen file is cut square and resized in the browser. Same-origin, so
-the canvas is not tainted, and still nothing decodes an image server-side.
+installation's mark rather than the browser's default. Adding the dot took a detour.
+
+The unseen-notification dot (#248) was drawn as a `<circle>` inside an SVG data URL,
+and a data URL cannot reference an external image to draw over — so for a while the
+tab kept the flame while the home screen wore the upload. The tab now loads the icon
+into an image and composes it with the dot on a canvas instead: the same trick the
+upload path already uses, since a chosen file is cut square and resized in the
+browser. Same-origin, so the canvas is not tainted, and still nothing decodes an
+image server-side.
 
 **The plain icon is the floor under it.** `favicon.ts` finds the link the shell
 declared — by `id`, so there is only ever one `rel="icon"` — sets it back to the route
@@ -140,10 +142,12 @@ the tab wearing the right mark without a dot. Two links rather than one would le
 to the browser which wins, which is how the first attempt at this came out doing
 nothing at all.
 
-The dot's numbers are `notificationBadge` in `@sage-burner/shared`, and the mark
-itself is `flameIcon` beside it — the backend reads one to serve the default icon,
-`favicon.ts` reads both. The badge is stated once because it is now drawn twice, and
-two copies would drift with only one of them ever looked at.
+The mark itself is `flameIcon` in `@sage-burner/shared`, which the backend serves
+when nothing has been uploaded. The dot's numbers are `favicon.ts`'s own, because
+that is the only thing that draws them: they lived in `@sage-burner/shared` while
+`flameIcon` had a badged variant drawing a `<circle>`, and came back when that variant
+went — nothing called it once the dot moved onto the canvas, and a shared constant
+with one consumer is a description to keep in step for nothing.
 
 ## Offline and installing
 

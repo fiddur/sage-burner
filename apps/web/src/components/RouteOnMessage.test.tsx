@@ -100,11 +100,13 @@ describe('being asked to move by the worker', () => {
   })
 
   it('does nothing at all where there is no worker to listen to', () => {
-    // A browser with workers turned off, and every test that has not asked for this.
+    // `null`, not `undefined`: a destructuring default replaces an explicit
+    // `undefined`, so `from={undefined}` would hand this the real container and pass
+    // only because happy-dom has no `navigator.serviceWorker` to hand over (#288).
     expect(() =>
       render(
         <LocationProvider>
-          <RouteOnMessage from={undefined} />
+          <RouteOnMessage from={null} />
         </LocationProvider>,
       ),
     ).not.toThrow()
