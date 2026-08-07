@@ -131,36 +131,19 @@ a:hover {
   white-space: nowrap;
 }
 
-/* Smaller than the corner's, since a chip is an hour tall at best. */
-.dream-facilitator {
-  width: 1.35rem;
-  height: 1.35rem;
-  font-size: 0.6rem;
-  margin-inline-start: 0.35rem;
-  vertical-align: middle;
-}
-
 /*
   A face and a name as one thing (#301). The name used to sit on its own wherever a
   list showed people, so the same person read as a circle in one place and a string
   in another.
 
-  `inline-flex` with the face's own line-height, so a row of these is the height of
-  the circle rather than of the text — which is what makes a list of them line up
-  whether or not anybody in it has a picture.
+  `inline-flex`, so the row is as tall as its tallest item — the circle — rather than
+  as tall as the text. That is what makes a list of them line up whether or not
+  anybody in it has a picture.
 */
 .person-badge {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-}
-
-/* Smaller than the corner's, since it sits inside a list row rather than a bar. */
-.person-badge-face {
-  width: 1.5rem;
-  height: 1.5rem;
-  font-size: 0.65rem;
-  flex: none;
 }
 
 /* A placeholder for the avatar image that will replace it, so it is sized like one. */
@@ -175,6 +158,33 @@ a:hover {
   font-size: 0.8rem;
   line-height: 1;
   text-decoration: none;
+}
+
+/*
+  The size modifiers, and they must stay **below** `.avatar`.
+
+  Both are one class, as `.avatar` is, so specificity is equal and source order is
+  the whole of it — above the base rule these set nothing at all, and every circle
+  drew at the bar's 2rem while the comments here claimed otherwise. Found by
+  measuring `getComputedStyle` rather than by looking at a screenshot, which showed
+  the wrong size perfectly clearly.
+*/
+
+/* Smaller than the corner's, since a chip is an hour tall at best. */
+.dream-facilitator {
+  width: 1.35rem;
+  height: 1.35rem;
+  font-size: 0.6rem;
+  margin-inline-start: 0.35rem;
+  vertical-align: middle;
+}
+
+/* Smaller than the corner's, since it sits inside a list row rather than a bar. */
+.person-badge-face {
+  width: 1.5rem;
+  height: 1.5rem;
+  font-size: 0.65rem;
+  flex: none;
 }
 
 /*
