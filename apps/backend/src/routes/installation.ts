@@ -6,6 +6,7 @@ import { eq } from 'drizzle-orm'
 
 import type { Database } from '../db/index.ts'
 
+import { isEmptyPatch } from '../db/patch.ts'
 import { INSTALLATION_ID, installation } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { mailSettingsFor } from '../mail/mail.ts'
@@ -57,9 +58,9 @@ export const registerInstallationRoutes = (app: FastifyInstance, { db }: { db: D
     const body = bodyOf(installationUpdateSchema, request)
     if (body === undefined) return sendError(reply, 400)
 
-    // `set({})` is not valid SQL, so an empty body would be a 500 rather than
-    // the no-op it plainly is.
-    if (Object.keys(body).length > 0) {
+    // The write is skipped rather than answered by a read, because the row is a
+    // singleton and is read below either way — see `isEmptyPatch`.
+    if (!isEmptyPatch(body)) {
       await db.update(installation).set(body).where(eq(installation.id, INSTALLATION_ID))
     }
 

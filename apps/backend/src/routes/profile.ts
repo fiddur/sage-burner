@@ -13,6 +13,7 @@ import { viewerFor } from '../auth/viewer.ts'
 import { allOf } from '../db/conditions.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
 import { whyNothingWritten } from '../db/refusals.ts'
+import { isEmptyPatch } from '../db/patch.ts'
 import { account, attendance, eventOption } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { allergyTickIdsFor, writeAllergyTicks } from './allergy-ticks.ts'
@@ -142,10 +143,11 @@ export const writeStay = (
 ): (typeof attendance.$inferSelect)[] =>
   db.transaction((tx) => {
     // No columns to set is not an error: the body may be empty, or may carry only
-    // the helping ticks, which live in their own table. `set({})` is not valid
-    // SQL, so both read instead of writing.
+    // the helping ticks, which live in their own table. Both read instead of writing —
+    // see `isEmptyPatch`. Not `patchRow`, which is one statement per call and would
+    // commit the columns outside this transaction.
     const rows =
-      Object.keys(columns).length === 0
+      isEmptyPatch(columns)
         ? tx.select().from(attendance).where(mine).limit(1).all()
         : tx
             .update(attendance)
@@ -215,13 +217,12 @@ export const registerProfileRoutes = (app: FastifyInstance, { db, sessions, now 
     const { allergy_item_ids: ticks, ...columns } = body
 
     // One transaction, because the columns and the ticks arrive together and a
-    // half-saved profile would answer an error over a record that did change.
-    // `set({})` is not valid SQL, so an empty column set is skipped rather than
-    // written — an empty body is the no-op it plainly is.
-    if (Object.keys(columns).length > 0 || ticks !== undefined) {
+    // half-saved profile would answer an error over a record that did change. An empty
+    // column set is skipped rather than written — see `isEmptyPatch`.
+    if (!isEmptyPatch(columns) || ticks !== undefined) {
       try {
         db.transaction((tx) => {
-          if (Object.keys(columns).length > 0) {
+          if (!isEmptyPatch(columns)) {
             tx.update(account).set(columns).where(eq(account.id, viewer.account_id)).run()
           }
           if (ticks !== undefined) writeAllergyTicks(tx, viewer.account_id, ticks)

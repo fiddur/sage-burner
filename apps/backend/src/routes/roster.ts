@@ -7,13 +7,15 @@ import type {
 import type { FastifyInstance } from 'fastify'
 
 import { apiRoutes, paymentUpdateSchema, withPlaces } from '@sage-burner/shared'
-import { and, eq } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 
 import type { GuardDeps } from '../auth/guards.ts'
 import type { Notifier } from '../push/notify.ts'
 
 import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
+import { allOf } from '../db/conditions.ts'
+import { isEmptyPatch, patchRow } from '../db/patch.ts'
 import { account, attendance, event, eventOption } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { allergyLabelsFor } from './allergy-ticks.ts'
@@ -127,34 +129,32 @@ export const registerRosterRoutes = (
       const body = bodyOf(paymentUpdateSchema, request)
       if (body === undefined) return sendError(reply, 400)
 
-      if (Object.keys(body).length === 0) {
-        const [row] = await db
-          .select()
-          .from(attendance)
-          .where(and(eq(attendance.event_id, eventId), eq(attendance.account_id, accountId)))
-          .limit(1)
-
-        return row === undefined ? sendError(reply, 404) : { attendance: await withHelping(row) }
-      }
+      // The pair, not an id: an attendance is found by the burn and the person.
+      const theirs = allOf(eq(attendance.event_id, eventId), eq(attendance.account_id, accountId))
 
       const [before] = await db
         .select({ payment_status: attendance.payment_status })
         .from(attendance)
-        .where(and(eq(attendance.event_id, eventId), eq(attendance.account_id, accountId)))
+        .where(theirs)
         .limit(1)
 
-      const [updated] = await db
-        .update(attendance)
-        .set({
-          payment_status: body.payment_status,
-          // Cleared on unmarking, in the same statement that unmarks — so a date
-          // cannot outlive the payment it recorded.
-          payment_date: body.payment_status === 'paid' ? todayIso(now) : null,
-        })
-        .where(and(eq(attendance.event_id, eventId), eq(attendance.account_id, accountId)))
-        .returning()
+      const patched = await patchRow(
+        db,
+        attendance,
+        theirs,
+        isEmptyPatch(body)
+          ? {}
+          : {
+              payment_status: body.payment_status,
+              // Cleared on unmarking, in the same statement that unmarks — so a date
+              // cannot outlive the payment it recorded.
+              payment_date: body.payment_status === 'paid' ? todayIso(now) : null,
+            },
+      )
 
-      if (updated === undefined) return sendError(reply, 404)
+      // No condition, so nothing but `ok` is "not coming to this burn".
+      if (patched.kind !== 'ok') return sendError(reply, 404)
+      const updated = patched.row
 
       // Both only on the transition. Re-saving 'paid' over 'paid' — which the
       // roster's checkbox does on a double click — changes no count and must not

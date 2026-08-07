@@ -16,6 +16,7 @@ import type { Database } from '../db/index.ts'
 
 import { createGuards } from '../auth/guards.ts'
 import { isCheckViolation, isUniqueViolation } from '../db/errors.ts'
+import { patchRow } from '../db/patch.ts'
 import { event } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { refuseIfStale, withVersion } from '../if-match.ts'
@@ -193,24 +194,6 @@ export const registerEventRoutes = (app: FastifyInstance, { db, sessions, now }:
     const body = bodyOf(eventUpdateSchema, request)
     if (body === undefined) return sendError(reply, 400)
 
-    // The only body that never reaches the `UPDATE`. A body of only unrecognised
-    // keys is a 400 from the schema now, so `{}` is the one case left that
-    // changes nothing — and `set({})` is not valid SQL, so it has to be answered
-    // before the statement. A no-op PATCH is idempotent; returning the row
-    // unchanged is the honest answer.
-    //
-    // The read lives inside this branch rather than above it. It used to be
-    // unconditional, and once `.returning()` landed that bought nothing for any
-    // other body: the row comes back from the write, and a vanished row is
-    // answered by the re-read below. All the pre-read did was spend a third
-    // query to produce a 404 the write path produces anyway — and it left the
-    // handler holding a pre-write snapshot to build the response from.
-    if (Object.keys(body).length === 0) {
-      const [existing] = await db.select().from(event).where(eq(event.id, id)).limit(1)
-
-      return existing === undefined ? sendError(reply, 404) : ({ event: existing } satisfies EventResponse)
-    }
-
     // The rule applied to the row as it would be, because a body carrying one
     // date — or only a time — cannot be judged on its own. A multi-day burn may
     // run 22:00 to 10:00; narrowing it to a single day makes that pair invalid,
@@ -220,6 +203,9 @@ export const registerEventRoutes = (app: FastifyInstance, { db, sessions, now }:
     // against the stored other, but had no way to see the times, so those two
     // patches reached the database and came back as a 500 from
     // `event_date_order_check`.
+    //
+    // Unconditional, and it costs nothing: the no-op body `patchRow` answers with a
+    // read of its own is the only one that did not already need this.
     const [before] = await db.select().from(event).where(eq(event.id, id)).limit(1)
     if (before === undefined) return sendError(reply, 404)
 
@@ -227,39 +213,25 @@ export const registerEventRoutes = (app: FastifyInstance, { db, sessions, now }:
       return sendError(reply, 400)
     }
 
-    // `.returning()` rather than reading `changes`, for two reasons that turn out
-    // to be the same one: the row it hands back is the row as written, so the
-    // response cannot report a field from the pre-read snapshot that another
-    // write has since changed — and an empty array means "no row matched" without
-    // depending on SQLite counting a row whose SET values are identical, which
-    // MySQL does not.
-    const updated = await db
-      .update(event)
-      .set(body)
-      .where(eq(event.id, id))
-      .returning()
-      .catch((error: unknown) => {
-        if (isSlugConflict(error)) return 'conflict' as const
-        // Only reachable when two patches merged against the same pre-write
-        // row into a combination neither sent. Answered rather than thrown:
-        // the caller can retry, and a 500 tells them nothing.
-        if (isCheckViolation(error, 'event_date_order_check')) return 'unordered' as const
-        throw error
-      })
+    // Caught around `patchRow` rather than inside it: a unique index and a CHECK are
+    // this route's own, and each has a status of its own to answer with.
+    const patched = await patchRow(db, event, eq(event.id, id), body).catch((error: unknown) => {
+      if (isSlugConflict(error)) return 'conflict' as const
+      // Only reachable when two patches merged against the same pre-write
+      // row into a combination neither sent. Answered rather than thrown:
+      // the caller can retry, and a 500 tells them nothing.
+      if (isCheckViolation(error, 'event_date_order_check')) return 'unordered' as const
+      throw error
+    })
 
-    if (updated === 'conflict') return sendError(reply, 409)
-    if (updated === 'unordered') return sendError(reply, 400)
+    if (patched === 'conflict') return sendError(reply, 409)
+    if (patched === 'unordered') return sendError(reply, 400)
 
-    const [row] = updated
+    // No condition was passed, so nothing but `ok` can mean anything other than
+    // "the row went between the read above and the write" — which `inject`
+    // serialises requests too tightly to reach, and 404 is what happened.
+    if (patched.kind !== 'ok') return sendError(reply, 404)
 
-    // One cause left. The `WHERE` is the id alone and the ordering was settled
-    // before the write, so no row matching means the row was deleted between
-    // the read above and this statement — the re-read that used to tell that
-    // apart from a refused condition has nothing left to distinguish.
-    //
-    // Not reachable under test: `inject` serialises requests, so nothing can
-    // delete the row in that gap. Kept because the alternative is answering 200
-    // with `{ event: undefined }`, and a 404 is simply what happened.
-    return row === undefined ? sendError(reply, 404) : ({ event: row } satisfies EventResponse)
+    return { event: patched.row } satisfies EventResponse
   })
 }
