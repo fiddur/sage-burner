@@ -10,6 +10,9 @@ under today's heading, and make a new heading when there is none.
 
 ## 2026-08-07
 
+- **A page saying what's new.** This one — reached from the "a new version is out"
+  notification, which until now led nowhere at all, and from the bar that offers a
+  reload when the app has been redeployed under you.
 - **A Q&A per burn.** How to get there, what to bring, what taking part actually asks
   of you. Anyone can ask a question and anyone can answer one — including somebody
   else's — and a new burn can copy last time's answers. Readable before you have said

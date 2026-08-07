@@ -33,10 +33,7 @@ export const readChangelog = (file: string = changelogFile): string => {
 /**
  * `GET /api/changelog` — what the new-version notification leads to (#325).
  *
- * Public, like `/api/version`: release notes for an app with a public homepage, holding
- * nobody's data. Served rather than bundled, because a tab that has just been told
- * there is a new version is still running the old bundle and the entry it wants is the
- * one that came with the build it has not loaded yet.
+ * `changelogResponseSchema` carries the why: public, and served rather than bundled.
  *
  * The text is passed in rather than read here, so a test can hand it a changelog
  * without writing a file.

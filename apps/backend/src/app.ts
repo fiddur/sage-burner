@@ -96,8 +96,8 @@ export interface AppDeps {
    * What `GET /api/changelog` answers with (#325).
    *
    * Read from `CHANGELOG.md` at boot by default. Injected so a test can hand one over
-   * without writing a file, and so nothing in the suite depends on what the repository
-   * root happens to hold today.
+   * without writing a file — bar the one case that covers the default, which reads the
+   * repository's own.
    */
   changelog?: string
 }

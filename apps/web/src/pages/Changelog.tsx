@@ -13,13 +13,8 @@ export type ChangelogApi = Pick<ApiClient, 'getChangelog'>
  * release contained. A hand-written `CHANGELOG.md` can, so the bell row and the
  * redeploy bar both point here.
  *
- * **Public**, like the homepage: release notes for an app whose homepage is public,
- * holding nobody's data. It is also what the bar links to, and the bar is on every
- * page a signed-out visitor can see.
- *
- * Fetched from the server rather than bundled with the page. A tab that has just been
- * told there is a new version is still running the old bundle, so a bundled changelog
- * would be missing exactly the entry somebody came here to read.
+ * Public, because the bar that links here is on every page a signed-out visitor can
+ * see. Fetched rather than bundled — `changelogResponseSchema` says why both.
  */
 export const Changelog = ({ api }: { api: ChangelogApi }) => {
   const { loaded } = useLoad((signal) => api.getChangelog(signal), {
