@@ -37,6 +37,7 @@ export const Members = ({ api }: { api: MembersApi }) => {
       enabled: isApproved(viewer),
       key: burn?.event.id ?? '',
       fallback: 'Could not load the list. Please reload the page.',
+      live: true,
     },
   )
 

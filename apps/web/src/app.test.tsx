@@ -37,6 +37,9 @@ const clientWith = (
   setAccountPassword: () => Promise.reject(new Error('setAccountPassword is not stubbed in this file')),
   setMyAvatar: () => Promise.reject(new Error('setMyAvatar is not stubbed in this file')),
   removeMyAvatar: () => Promise.reject(new Error('removeMyAvatar is not stubbed in this file')),
+  setInstallationIcon: () => Promise.reject(new Error('setInstallationIcon is not stubbed in this file')),
+  removeInstallationIcon: () =>
+    Promise.reject(new Error('removeInstallationIcon is not stubbed in this file')),
   getQuestions: () => Promise.reject(new Error('getQuestions is not stubbed in this file')),
   submitApplication: () => Promise.reject(new Error('submitApplication is not stubbed in this file')),
   getApplications: () => Promise.reject(new Error('getApplications is not stubbed in this file')),

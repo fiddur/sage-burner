@@ -9,6 +9,8 @@ import { createApiClient } from './api/client.ts'
 import { FetchedBurnProvider } from './burn.tsx'
 import { Layout } from './components/Layout.tsx'
 import { NewVersion } from './components/NewVersion.tsx'
+import { StaleData } from './components/StaleData.tsx'
+import { createFreshness, freshnessAt } from './freshness.ts'
 import { FetchedInstallationProvider, InstallationProvider } from './installation.tsx'
 import { Admin } from './pages/Admin.tsx'
 import { AdminAllergies } from './pages/AdminAllergies.tsx'
@@ -61,6 +63,8 @@ export type RoutesApi = Pick<
   | 'setAccountPassword'
   | 'setMyAvatar'
   | 'removeMyAvatar'
+  | 'setInstallationIcon'
+  | 'removeInstallationIcon'
   | 'getEvents'
   | 'getInviteState'
   | 'redeemInvite'
@@ -252,7 +256,21 @@ export const App = ({ viewer, title, api }: { viewer?: Viewer; title?: string; a
   //
   // Inert while `App` is the root and holds no state. The memo below it is
   // written to survive that changing; this would have stopped it.
-  const client = useMemo(() => api ?? createApiClient(), [api])
+  //
+  // Built here and handed to both the client and the bar rather than kept in a
+  // module: two tests in one process would otherwise share one, and the second
+  // would start out believing the first one's fetches were its own.
+  const freshness = useMemo(() => createFreshness(), [])
+  const client = useMemo(
+    () =>
+      api ??
+      createApiClient(globalThis.fetch, {
+        onRead: (response) => {
+          freshness.note(freshnessAt(response, Date.now()))
+        },
+      }),
+    [api, freshness],
+  )
 
   // Inside the viewer provider, since which burns can be chosen between depends on
   // who is looking, and outside `Layout`, since the selector is in the bar and every
@@ -260,9 +278,10 @@ export const App = ({ viewer, title, api }: { viewer?: Viewer; title?: string; a
   const framed = (
     <FetchedBurnProvider api={client}>
       <Layout api={client}>
-        {/* Above the page rather than in the layout's chrome: it is about the tab,
-            not about the burn, and it has to survive whatever route is open. */}
+        {/* Above the page rather than in the layout's chrome: both are about the tab,
+            not about the burn, and have to survive whatever route is open. */}
         <NewVersion api={client} />
+        <StaleData freshness={freshness} />
         <Routes api={client} />
       </Layout>
     </FetchedBurnProvider>

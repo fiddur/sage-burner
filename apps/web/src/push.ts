@@ -1,5 +1,7 @@
 import type { PushSubscriptionCreate } from '@sage-burner/shared'
 
+import { SERVICE_WORKER_URL } from './offline.ts'
+
 /**
  * Turning browser notifications on and off, apart from the component that offers
  * it.
@@ -109,7 +111,10 @@ export const browserPush = (): PushBrowser | undefined => {
     requestPermission: () => Notification.requestPermission(),
     permission: () => Notification.permission,
     register: async () => {
-      await navigator.serviceWorker.register('/sw.js')
+      // A no-op once `registerServiceWorker` has run on load, which it has since
+      // #256 — a registration is keyed on its URL. Kept because this is the path
+      // that *needs* one, and it must not depend on the other having happened.
+      await navigator.serviceWorker.register(SERVICE_WORKER_URL)
 
       // `register()` resolves before the worker activates, and `subscribe()`
       // requires an active one — the spec rejects with `InvalidStateError`, Chrome

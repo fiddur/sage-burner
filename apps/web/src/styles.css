@@ -1171,6 +1171,17 @@ a:hover {
   padding: 0.15rem 0;
 }
 
+/* The installation's own icon, shown on the settings page at the size a home screen
+   draws it. Square rather than round: an installer applies its own mask. */
+.app-icon {
+  width: 4rem;
+  height: 4rem;
+  object-fit: contain;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+
 /* The corner's circle, now that it may be a picture rather than letters. */
 .avatar-link {
   display: inline-flex;
@@ -1273,6 +1284,17 @@ img.avatar {
   padding: 0.6rem 0.8rem;
   border-left: 3px solid var(--ember);
   background: color-mix(in srgb, var(--ember) 10%, transparent);
+}
+
+/* What is on screen has not refreshed in five minutes. Muted rather than alarming:
+   the app still works, and this is a caveat on it rather than a failure. */
+.stale-data {
+  margin: 0 0 1rem;
+  padding: 0.6rem 0.8rem;
+  border-left: 3px solid var(--muted);
+  background: color-mix(in srgb, var(--muted) 10%, transparent);
+  color: var(--muted);
+  font-size: 0.9rem;
 }
 
 /* The faces of whoever gave a dream a ❤️‍🔥. Overlapped, like every stack of avatars. */

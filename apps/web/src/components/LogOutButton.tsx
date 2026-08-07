@@ -1,5 +1,6 @@
 import type { ApiClient } from '../api/client.ts'
 
+import { forgetCachedMemberData } from '../offline.ts'
 import { useSetViewer } from '../viewer.tsx'
 
 /**
@@ -14,10 +15,22 @@ import { useSetViewer } from '../viewer.tsx'
  * `member` is refused from it. Leaving them no way to sign out is worse than a
  * second button most people never see.
  */
-export const LogOutButton = ({ api }: { api: Pick<ApiClient, 'logout'> }) => {
+export const LogOutButton = ({
+  api,
+  forget = forgetCachedMemberData,
+}: {
+  api: Pick<ApiClient, 'logout'>
+  forget?: () => Promise<boolean>
+}) => {
   const setViewer = useSetViewer()
 
   const logOut = async () => {
+    // Before the request, not after: this is the half that has to happen. The cookie
+    // expires on its own and a stale one reaches nothing, but a roster left in the
+    // browser's cache is member data still on the device — and if the request throws
+    // it is the branch that would have been skipped (#256).
+    await forget()
+
     // The cookie is cleared server-side; the local viewer is cleared either way. A
     // failed logout that left the nav saying "Log out" would be worse than one that
     // says signed-out while a stale cookie expires on its own.

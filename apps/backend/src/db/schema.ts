@@ -9,6 +9,7 @@ import {
   effortLevels,
   eventOptionKinds,
   formQuestionTypes,
+  ICON_TYPES,
   mealRoles,
   mealSlotKinds,
   paymentStatuses,
@@ -148,6 +149,32 @@ export const installation = sqliteTable(
 
 /** The id of the one `installation` row. */
 export const INSTALLATION_ID = 'installation'
+
+/**
+ * The icon an installed copy of this app wears on a home screen (#256).
+ *
+ * Its own table rather than a column on `installation`, so the row every page
+ * load reads for a title does not carry half a megabyte of image with it.
+ *
+ * Nothing here decodes it, exactly as with `account_avatar`: the browser resizes
+ * a raster to `ICON_PIXELS` before sending and an SVG is stored as authored, so
+ * the content type is what the uploader claimed and the bytes are served back
+ * with it. The route that serves them is what makes that safe to do.
+ */
+export const installationIcon = sqliteTable(
+  'installation_icon',
+  {
+    id: text('id').notNull(),
+    image: blob('image', { mode: 'buffer' }).notNull(),
+    content_type: text('content_type').notNull(),
+    updated_at: text('updated_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    check('installation_icon_singleton_check', sql`${table.id} = 'installation'`),
+    check('installation_icon_type_check', oneOf(table.content_type, ICON_TYPES)),
+  ],
+)
 
 /** A single burn. Never assume there is only one — the whole point is recurrence. */
 export const event = sqliteTable(

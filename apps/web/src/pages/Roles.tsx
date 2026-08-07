@@ -99,7 +99,7 @@ export const Roles = ({ api }: { api: RolesApi }) => {
         sources: sources.sources,
       }
     },
-    { enabled: approved, key: burn?.event.id ?? '', fallback: 'Could not load the roles.' },
+    { enabled: approved, key: burn?.event.id ?? '', fallback: 'Could not load the roles.', live: true },
   )
 
   const { busy, error, setError, run } = useAction(reload)
