@@ -49,8 +49,6 @@ const TWO: FaqEntry[] = [
 const stub = (over: Partial<FaqApi> = {}, entries: FaqEntry[] = TWO): FaqApi => ({
   getFaq: () => Promise.resolve({ entries }),
   getFaqSources: () => Promise.resolve({ sources: [] }),
-  // The fallback when the bar has nothing (#321). `null` is "no burn planned at all",
-  // which is the only state with nothing to show.
   getActiveEvent: () => Promise.resolve({ event: null }),
   addFaqEntry: () => Promise.reject(new Error('addFaqEntry is not stubbed here')),
   updateFaqEntry: () => Promise.reject(new Error('updateFaqEntry is not stubbed here')),
@@ -176,8 +174,6 @@ describe('asking and answering', () => {
   })
 
   it('removes one, on the second click', async () => {
-    // Two clicks like a lead role and unlike a lane: one row holds a paragraph somebody
-    // else wrote and nobody has a copy of (#323).
     const deleteFaqEntry = vi.fn<FaqApi['deleteFaqEntry']>(() => Promise.resolve(undefined))
     renderPage(stub({ deleteFaqEntry }))
 

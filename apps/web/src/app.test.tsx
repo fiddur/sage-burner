@@ -89,6 +89,7 @@ const clientWith = (
   // Resolves rather than rejecting: the version watcher runs on every route in this
   // file, and a rejection is swallowed anyway — being offline is not a new version.
   getVersion: () => Promise.resolve({ build_sha: 'the-one-this-page-loaded' }),
+  getChangelog: () => Promise.resolve({ markdown: '## 2026-08-07\n\n- Something changed.\n' }),
   getMyNotifications: () => Promise.resolve({ notifications: [], unseen: 0 }),
   getMyNotificationSettings: () => Promise.resolve({ on: [], email: [] }),
   updateMyNotificationSettings: () =>

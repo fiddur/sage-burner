@@ -110,6 +110,9 @@ does it that way rather than the obvious other way — live in `docs/`:
 | [schedule.md](./docs/schedule.md)           | Meals, dreams, the lead roles register, places and the grid                          |
 | [http.md](./docs/http.md)                   | Security headers, and the shape every API error takes                                |
 
+What changed, release by release, is [`CHANGELOG.md`](./CHANGELOG.md) — which the app
+serves at `/changelog`, and which the "a new version is out" notification leads to.
+
 ## Repository layout
 
 ```

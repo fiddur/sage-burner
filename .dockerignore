@@ -37,8 +37,11 @@ node_modules
 **/*.sqlite-wal
 **/*.sqlite-shm
 
-# Documentation
+# Documentation. `CHANGELOG.md` is the exception: the app serves it at `/changelog`,
+# which is where the "a new version is out" notification leads, so it is part of the
+# image rather than something a reader of the repository sees (#325).
 **/*.md
+!CHANGELOG.md
 docs
 
 # Environment files (passed in as env vars instead)

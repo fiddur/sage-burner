@@ -712,7 +712,9 @@ What notifies today:
 - **A dream offered, somebody saying they are coming, a lead role added, a lead
   taken** — to everyone attending that burn who asked for them, never to whoever did
   it (#259).
-- **A new version being deployed**, to everyone who asked, once per build.
+- **A new version being deployed**, to everyone who asked, once per build. It links to
+  `/changelog` since #325 — until there was a changelog, nothing in the app could say
+  what a release contained, so it named no page at all.
 
 The lead-role routes take `notify` as a dependency rather than importing the push
 module. Handing somebody a role is the point and the notification is a courtesy, so
@@ -786,9 +788,11 @@ rather than to the installed copy, that meant a browser tab beside the app that 
 already on screen.
 
 **A notification naming no page focuses a window without moving it.** `link` is null
-for the categories that are about everywhere — a new version — and that is a different
-instruction from "go to `/`": any window of this app is already the right one, and
-routing it would take somebody off what they were reading.
+for a category with nowhere to send anybody, and that is a different instruction from
+"go to `/`": any window of this app is already the right one, and routing it would take
+somebody off what they were reading. Every category names a page today — the redeploy
+notice took `/changelog` in #325 — so what reaches that branch is a row written before
+that, and the branch stays because those rows are still in the bell.
 
 The move is a `postMessage` the app routes on, never `client.navigate()`, which is a
 full page load and would discard whatever had been typed into a markdown editor — the

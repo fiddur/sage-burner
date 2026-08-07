@@ -59,9 +59,10 @@ export const announceDeploy = async (
   await notifyEveryone(db, notify, {
     category: 'new_version',
     body: 'A new version of the app is out. Reload to pick it up.',
-    // No page of its own: the change is everywhere, and sending somebody to one
-    // screen would say something about the release that is not known here.
-    link: null,
+    // The changelog, since #325 — until there was one, nothing in the app could say
+    // what a release contained, and naming any other screen would have claimed
+    // something about it that is not known here.
+    link: '/changelog',
   })
 
   return 'announced'
