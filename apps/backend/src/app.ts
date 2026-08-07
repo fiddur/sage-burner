@@ -17,6 +17,7 @@ import type { Delivery, VapidKeys } from './push/push.ts'
 import { createGate, SCRYPT_GATE } from './auth/gate.ts'
 import { createGuards } from './auth/guards.ts'
 import { createSessions } from './auth/session.ts'
+import { refuseEnvelopeStrippers } from './envelope.ts'
 import { clientErrorHandler, frameworkErrorHandler, registerErrorHandler } from './errors.ts'
 import { sendError } from './http.ts'
 import { emailChannel } from './mail/channel.ts'
@@ -413,6 +414,9 @@ export const createApp = async ({
   // One gate for every route that spends scrypt, and per-app rather than
   // module-level so two apps in one test process do not share one.
   const gate = suppliedGate ?? createGate(SCRYPT_GATE)
+
+  // Before any route registers, since `onRoute` only sees what comes after it.
+  refuseEnvelopeStrippers(app)
 
   registerAdminPrefixGuard(app, { db, sessions })
 
