@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import type { MessageSource } from './RouteOnMessage.tsx'
 
-import { ROUTE_TO } from '../sw/notification.ts'
+import { ROUTE_TO } from '../worker-message.ts'
 import { RouteOnMessage } from './RouteOnMessage.tsx'
 
 afterEach(cleanup)
@@ -100,9 +100,7 @@ describe('being asked to move by the worker', () => {
   })
 
   it('does nothing at all where there is no worker to listen to', () => {
-    // `null`, not `undefined`: a destructuring default replaces an explicit
-    // `undefined`, so `from={undefined}` would hand this the real container and pass
-    // only because happy-dom has no `navigator.serviceWorker` to hand over (#288).
+    // `null`, not `undefined` — the prop's own doc says why.
     expect(() =>
       render(
         <LocationProvider>

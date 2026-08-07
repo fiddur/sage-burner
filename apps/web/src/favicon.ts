@@ -109,8 +109,7 @@ export interface FaviconBrowser {
  * inside an SVG data URL, which is why the tab wore the flame while the home screen
  * wore the upload: a data URL cannot reference an external image to draw over. This
  * is the same trick the upload path uses, since a chosen file is cut square and
- * resized in the browser. Same-origin, so the canvas is not tainted — and it is the
- * only place the dot is drawn now, which is why `BADGE` is stated here.
+ * resized in the browser. Same-origin, so the canvas is not tainted.
  *
  * **The plain icon is the floor.** It is set synchronously first and only replaced if
  * the drawing succeeds, so a failed fetch, a browser that will not draw an SVG with
