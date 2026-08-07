@@ -16,6 +16,7 @@ import type { Database } from '../db/index.ts'
 
 import { nextOrder, reorder } from '../db/ordered.ts'
 import { formQuestion } from '../db/schema.ts'
+import { whyNothingWritten } from '../db/write.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 
 /**
@@ -160,22 +161,13 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db }: { db: Datab
 
     const [row] = updated
     if (row === undefined) {
-      // Nothing is read before the write on this path — the only `select` above
-      // is inside the empty-body branch, which returns — so zero rows has three
-      // causes, not two: the id never existed, the row was deleted a moment ago,
-      // or the tick-box condition refused the change. The first two are the same
-      // answer and the same question to ask.
-      //
-      // Told apart by asking rather than guessed at from whether a condition was
-      // present: guessing answered "Request failed (400)" for a question that is
-      // not there.
-      const [stillThere] = await db
-        .select({ id: formQuestion.id })
-        .from(formQuestion)
-        .where(eq(formQuestion.id, request.params.id))
-        .limit(1)
+      // Zero rows has three causes here, not two: the id never existed, the row
+      // was deleted a moment ago, or the tick-box condition refused the change. The
+      // first two are the same answer — see `whyNothingWritten` for why this is
+      // asked rather than inferred.
+      const why = await whyNothingWritten(db, formQuestion, eq(formQuestion.id, request.params.id))
 
-      return stillThere === undefined ? sendError(reply, 404) : sendError(reply, 400)
+      return sendError(reply, why === 'not_found' ? 404 : 400)
     }
 
     return { question: row } satisfies FormQuestionResponse

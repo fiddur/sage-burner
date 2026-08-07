@@ -12,6 +12,7 @@ import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
 import { account, attendance, eventOption } from '../db/schema.ts'
+import { whyNothingWritten } from '../db/write.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { allergyTickIdsFor, writeAllergyTicks } from './allergy-ticks.ts'
 import { openEventNow } from './events.ts'
@@ -134,7 +135,7 @@ const problemBody = (code: 400 | 409) => (code === 409 ? 'conflict' : 'bad_reque
  */
 export const writeStay = (
   db: Database,
-  mine: SQL | undefined,
+  mine: SQL,
   columns: Omit<AttendanceUpdate, 'helping_option_ids'>,
   helping: readonly string[] | undefined,
 ): (typeof attendance.$inferSelect)[] =>
@@ -262,6 +263,11 @@ export const registerProfileRoutes = (app: FastifyInstance, { db, sessions, now 
       if (found === undefined) return sendError(reply, 404)
 
       const mine = and(eq(attendance.event_id, found.id), eq(attendance.account_id, viewer.account_id))
+      // `and` is typed `SQL | undefined` however many conditions it is given, and
+      // this one reaches an `UPDATE` as well as two reads — the same guard
+      // `questions.ts` puts on its own composed `WHERE`, and unreachable for the
+      // same reason.
+      if (mine === undefined) throw new Error('refusing an unfiltered write on attendance')
 
       // `helping_option_ids` lives in its own table, so it never reaches `set()`.
       const { helping_option_ids: helping, ...columns } = body
@@ -288,10 +294,10 @@ export const registerProfileRoutes = (app: FastifyInstance, { db, sessions, now 
       }
 
       // Nothing was written, which is either "not coming to this burn" or "that
-      // would put the departure before the arrival". Asked rather than inferred.
-      const [existing] = await db.select().from(attendance).where(mine).limit(1)
+      // would put the departure before the arrival" — see `whyNothingWritten`.
+      const why = await whyNothingWritten(db, attendance, mine)
 
-      return existing === undefined ? sendError(reply, 404) : sendError(reply, 400)
+      return sendError(reply, why === 'not_found' ? 404 : 400)
     },
   )
 }

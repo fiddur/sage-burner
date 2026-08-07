@@ -9,6 +9,7 @@ import type { GuardDeps } from '../auth/guards.ts'
 
 import { viewerFor } from '../auth/viewer.ts'
 import { application, inviteToken } from '../db/schema.ts'
+import { whyNothingWritten } from '../db/write.ts'
 import { noStore, sendError } from '../http.ts'
 import { defaultExpiry, mintToken } from '../invites.ts'
 
@@ -95,12 +96,8 @@ export const registerInviteRoutes = (app: FastifyInstance, { db, sessions, now }
 
     if (deleted.length > 0) return reply.code(204).send()
 
-    const [existing] = await db
-      .select()
-      .from(inviteToken)
-      .where(eq(inviteToken.id, request.params.id))
-      .limit(1)
+    const why = await whyNothingWritten(db, inviteToken, eq(inviteToken.id, request.params.id))
 
-    return existing === undefined ? sendError(reply, 404) : sendError(reply, 409)
+    return sendError(reply, why === 'not_found' ? 404 : 409)
   })
 }
