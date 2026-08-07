@@ -29,6 +29,8 @@ import type {
   LeadRoleResponse,
   LeadRoleTeam,
   LeadRolesResponse,
+  MailSettingsResponse,
+  MailTestResponse,
   MealResponse,
   MealSlotsResponse,
   MealsResponse,
@@ -578,6 +580,28 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
     removeInstallationIcon: () =>
       request<undefined>(apiRoutes.removeInstallationIcon.path(), {
         method: apiRoutes.removeInstallationIcon.method,
+      }),
+
+    /** Admin only. Null when nobody has set a mail server up (#30). */
+    getMailSettings: (signal?: AbortSignal) =>
+      request<MailSettingsResponse>(apiRoutes.getMailSettings.path(), { signal }),
+
+    /** Admin only. An absent `password` leaves the stored one alone. */
+    updateMailSettings: (body: BodyOf<'updateMailSettings'>) =>
+      request<MailSettingsResponse>(apiRoutes.updateMailSettings.path(), {
+        method: apiRoutes.updateMailSettings.method,
+        body,
+      }),
+
+    removeMailSettings: () =>
+      request<MailSettingsResponse>(apiRoutes.removeMailSettings.path(), {
+        method: apiRoutes.removeMailSettings.method,
+      }),
+
+    /** Admin only. 200 whether or not it got out — the answer says which. */
+    sendTestEmail: () =>
+      request<MailTestResponse>(apiRoutes.sendTestEmail.path(), {
+        method: apiRoutes.sendTestEmail.method,
       }),
 
     /** Members only. Scheduled dreams first, then the ones only offered. */

@@ -21,6 +21,15 @@ export const installationSchema = z.object({
    * a banner at all — without a request that 404s in the ordinary case.
    */
   banner_updated_at: dateTimeSchema.nullable(),
+  /**
+   * Whether an SMTP server has been set up, and nothing else about it (#30).
+   *
+   * Public, because the page it changes is the public one: the application form
+   * promises "nothing will arrive in your inbox" where there is no mail server, and
+   * that promise is broken the moment an admin configures one. A boolean rather than
+   * a reason — the host, the port and the address are the admin's business.
+   */
+  sends_email: z.boolean(),
 })
 
 export const installationResponseSchema = z.object({
@@ -30,12 +39,13 @@ export const installationResponseSchema = z.object({
 /**
  * What an admin may change here: the name, and nothing else.
  *
- * `banner_updated_at` is omitted rather than left to `.strict()` to reject, because
+ * The read-only fields are omitted rather than left to `.strict()` to reject, because
  * the two are not the same statement — omitting says the field is not this route's to
- * write, and keeps that true if a second read-only field is added beside it.
+ * write. Both are set elsewhere: the banner by its own image route, and `sends_email`
+ * by whether `/api/admin/installation/mail` has been filled in.
  */
 export const installationUpdateSchema = installationSchema
-  .omit({ banner_updated_at: true })
+  .omit({ banner_updated_at: true, sends_email: true })
   .partial()
   .strict()
 

@@ -5,6 +5,7 @@ import type { PushBrowser, PushState } from '../push.ts'
 import type { NotificationSettingsApi } from './NotificationSettingsField.tsx'
 
 import { isApiError } from '../api/client.ts'
+import { useInstallationSendsEmail } from '../installation.tsx'
 import { browserPush, decodeVapidKey, subscriptionBody } from '../push.ts'
 import { FormError, useFormError } from './FormError.tsx'
 import { NotificationSettingsField } from './NotificationSettingsField.tsx'
@@ -60,6 +61,9 @@ export const PushToggle = ({
   // below would re-register the worker and re-derive state after each one rather
   // than on mount.
   const browser = useMemo(() => supplied ?? browserPush(), [supplied])
+  // The email column exists only where an admin has set a mail server up (#30). A
+  // switch that cannot do anything reads as a promise.
+  const sendsEmail = useInstallationSendsEmail()
   // 'checking' rather than 'off' until the effect below has read the browser: an
   // admin who presses a live button first can have `turnOn` finish and then be
   // overwritten by the effect's own answer, leaving the toggle saying the opposite
@@ -244,7 +248,7 @@ export const PushToggle = ({
           off for is the bell as much as the push, so this applies with no browser
           subscribed at all. */}
       <h3>What to tell me about</h3>
-      <NotificationSettingsField api={api} />
+      <NotificationSettingsField api={api} sendsEmail={sendsEmail === true} />
     </section>
   )
 }

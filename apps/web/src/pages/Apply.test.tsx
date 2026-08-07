@@ -1,10 +1,6 @@
 import type { FormQuestion } from '@sage-burner/shared'
 
-import {
-  MAX_ANSWER_LENGTH,
-  MAX_APPLICANT_CONTACT_LENGTH,
-  MAX_APPLICANT_NAME_LENGTH,
-} from '@sage-burner/shared'
+import { MAX_ANSWER_LENGTH, MAX_APPLICANT_EMAIL_LENGTH, MAX_APPLICANT_NAME_LENGTH } from '@sage-burner/shared'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -12,6 +8,7 @@ import type { renderMarkdown as realRenderMarkdown } from '../markdown.ts'
 import type { ApplyApi } from './Apply.tsx'
 
 import { apiError } from '../api/client.ts'
+import { InstallationProvider } from '../installation.tsx'
 
 // Counts calls while still rendering for real, so the markdown assertions below
 // stay assertions about markdown.
@@ -85,7 +82,7 @@ const tick = (label: string) => {
 
 const identify = () => {
   fill('Your name', 'Fredrik')
-  fill('How can we reach you?', 'fredrik@example.org')
+  fill('Your email address', 'fredrik@example.org')
 }
 
 const send = () => screen.getByRole('button', { name: 'Send application' }).click()
@@ -133,7 +130,7 @@ describe('Apply', () => {
     await screen.findByLabelText('Second')
     expect(screen.getAllByRole('textbox').map((field) => field.getAttribute('name'))).toEqual([
       'applicant_name',
-      'applicant_contact',
+      'applicant_email',
       'q-2',
       'q-1',
     ])
@@ -236,7 +233,7 @@ describe('Apply', () => {
     await waitFor(() =>
       expect(submitApplication).toHaveBeenCalledWith({
         applicant_name: 'Fredrik',
-        applicant_contact: 'fredrik@example.org',
+        applicant_email: 'fredrik@example.org',
         answers: { 'q-1': 'Sage', 'q-2': true },
         asked: ['q-1', 'q-2'],
       }),
@@ -331,6 +328,38 @@ describe('Apply', () => {
     expect(screen.queryByRole('button', { name: 'Send application' })).toBeNull()
   })
 
+  it('promises the invite by email only where the installation posts', async () => {
+    // The copy has to be true either way: with no mail server nothing arrives, and
+    // saying otherwise is a promise the installation cannot keep (#30).
+    render(
+      <InstallationProvider sendsEmail>
+        <Apply api={stub({ submitApplication: () => Promise.resolve({ application: {} as never }) })} />
+      </InstallationProvider>,
+    )
+
+    await ready()
+    identify()
+    send()
+
+    expect((await screen.findByRole('status')).textContent).toContain('your invite arrives')
+  })
+
+  it('says somebody will get back to you where it does not', async () => {
+    render(
+      <InstallationProvider sendsEmail={false}>
+        <Apply api={stub({ submitApplication: () => Promise.resolve({ application: {} as never }) })} />
+      </InstallationProvider>,
+    )
+
+    await ready()
+    identify()
+    send()
+
+    const confirmation = await screen.findByRole('status')
+    expect(confirmation.textContent).toContain('Someone will get back to you')
+    expect(confirmation.textContent).not.toContain('your invite arrives')
+  })
+
   it('keeps the answers on screen when the request fails', async () => {
     render(
       <Apply
@@ -365,7 +394,7 @@ describe('Apply', () => {
 
     await ready()
     fill('Your name', '   ')
-    fill('How can we reach you?', 'fredrik@example.org')
+    fill('Your email address', 'fredrik@example.org')
     send()
 
     expect(await screen.findByRole('alert')).toBeTruthy()
@@ -401,24 +430,22 @@ describe('Apply', () => {
     expect(labelled('Why?').getAttribute('maxlength')).toBe(String(MAX_ANSWER_LENGTH))
     expect(labelled('Dust name').getAttribute('maxlength')).toBe(String(MAX_ANSWER_LENGTH))
     expect(labelled('Your name').getAttribute('maxlength')).toBe(String(MAX_APPLICANT_NAME_LENGTH))
-    expect(labelled('How can we reach you?').getAttribute('maxlength')).toBe(
-      String(MAX_APPLICANT_CONTACT_LENGTH),
-    )
+    expect(labelled('Your email address').getAttribute('maxlength')).toBe(String(MAX_APPLICANT_EMAIL_LENGTH))
   })
 
-  it('sends the name and contact trimmed, which is what the server stores', async () => {
+  it('sends the name and address trimmed, which is what the server stores', async () => {
     const submitApplication = vi.fn(() => Promise.resolve({ application: {} as never }))
     render(<Apply api={stub({ submitApplication })} />)
 
     await ready()
     fill('Your name', '  Fredrik  ')
-    fill('How can we reach you?', '  fredrik@example.org ')
+    fill('Your email address', '  fredrik@example.org ')
     send()
 
     await waitFor(() =>
       expect(submitApplication).toHaveBeenCalledWith({
         applicant_name: 'Fredrik',
-        applicant_contact: 'fredrik@example.org',
+        applicant_email: 'fredrik@example.org',
         answers: {},
         asked: [],
       }),

@@ -9,18 +9,20 @@ import { attendanceSchema } from './membership.ts'
 /**
  * What a visitor may do with an invite before it is spent.
  *
- * The token is never echoed back, and the **email** never is either: it is the login
- * identity, and confirming that an address has an application is an enumeration
- * oracle. An invite link is unguessable but forwardable, so whoever holds it is
- * treated as a stranger until they redeem.
+ * The token is never echoed back. What the applicant themselves typed is: their
+ * **name** and, since #30, the **email** the invite was posted to — both only while
+ * the invite is outstanding, so a spent or expired link discloses nothing.
  *
- * The applicant's **name** is the one exception, and a deliberate trade: they typed
- * it on the application and are then asked for it again on the form the invite leads
- * to, which reads as a system that was not listening. Pre-filling it means a
- * forwarded link tells its holder whose invite it was — weighed against a token that
- * is 256 bits of CSPRNG, single-use and expiring, and a name that is not a
- * credential. Returned **only while the invite is outstanding**, so a spent or
- * expired link discloses nothing.
+ * Both are the same trade. They filled these in on the application and are then asked
+ * for them again on the form the invite leads to, which reads as a system that was
+ * not listening — and once the invite arrives *by email*, asking the address it just
+ * came to is worse than not listening. The cost is that a forwarded link tells its
+ * holder whose invite it was, weighed against a token that is 256 bits of CSPRNG,
+ * single-use and expiring, and only ever sent to the person it names.
+ *
+ * This is **not** an enumeration oracle, which is what the email was held back from
+ * being: nothing here takes an address and says whether it has an application. It
+ * takes a token nobody can guess and says what the person who applied wrote.
  */
 export const inviteStateSchema = z.object({
   // Derived from `inviteStatuses` rather than a second list of the same words,
@@ -30,6 +32,13 @@ export const inviteStateSchema = z.object({
   status: z.enum([...inviteStatuses, 'unknown']),
   /** What they called themselves when they applied, for the form to start from. */
   name: z.string().nullable(),
+  /**
+   * The address they applied with, for the form to start from.
+   *
+   * Null for an admin's direct invite, which has no application behind it, and null
+   * for a link that is no longer outstanding.
+   */
+  email: z.string().nullable(),
 })
 
 /**

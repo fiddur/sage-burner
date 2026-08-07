@@ -11,6 +11,7 @@ import type { Gate } from './auth/gate.ts'
 import type { GuardDeps } from './auth/guards.ts'
 import type { Config } from './config.ts'
 import type { Database } from './db/index.ts'
+import type { Send } from './mail/mail.ts'
 import type { Delivery, VapidKeys } from './push/push.ts'
 
 import { createGate, SCRYPT_GATE } from './auth/gate.ts'
@@ -18,6 +19,8 @@ import { createGuards } from './auth/guards.ts'
 import { createSessions } from './auth/session.ts'
 import { clientErrorHandler, frameworkErrorHandler, registerErrorHandler } from './errors.ts'
 import { sendError } from './http.ts'
+import { emailChannel } from './mail/channel.ts'
+import { sendWithSmtp } from './mail/smtp.ts'
 import { pushPayload, recordAndPush } from './push/notify.ts'
 import { notifyAdmins } from './push/push.ts'
 import { deliverWithWebPush, DEFAULT_PUSH_CONTACT, generateVAPIDKeys } from './push/web-push.ts'
@@ -35,6 +38,7 @@ import { registerImageBodyParser } from './routes/image-body.ts'
 import { registerInstallationRoutes } from './routes/installation.ts'
 import { registerInviteRoutes } from './routes/invites.ts'
 import { registerLeadRoleRoutes } from './routes/lead-roles.ts'
+import { registerMailRoutes } from './routes/mail.ts'
 import { registerMealAdminRoutes, registerMealRoutes } from './routes/meals.ts'
 import { registerNotificationRoutes } from './routes/notifications.ts'
 import { registerPasskeyRoutes } from './routes/passkeys.ts'
@@ -72,6 +76,15 @@ export interface AppDeps {
    */
   deliver?: Delivery
   mintKeys?: () => VapidKeys
+  /**
+   * How a message reaches a mail server (#30).
+   *
+   * Injected for the same reason as `deliver`: the suite must never open a socket to
+   * somebody's SMTP server, and production passes `sendWithSmtp`. Whether anything is
+   * posted at all is a row in `mail_setting`, not this — an installation that never
+   * configures one has this and sends nothing.
+   */
+  send?: Send
   /**
    * The scrypt gate. Injected so a test can shrink it to one slot and assert
    * shedding without spending the real thing's five-second window.
@@ -330,6 +343,7 @@ export const createApp = async ({
   gate: suppliedGate,
   deliver = deliverWithWebPush(DEFAULT_PUSH_CONTACT),
   mintKeys = generateVAPIDKeys,
+  send = sendWithSmtp,
   hash,
   now = () => new Date(),
 }: AppDeps): Promise<FastifyInstance> => {
@@ -414,9 +428,25 @@ export const createApp = async ({
    * it, which has no logger and is the more testable for it, and only when something
    * went wrong.
    */
-  const tellAccount = recordAndPush(push, now, (counts) => {
-    app.log.warn({ ...counts }, 'notifying a member')
+  // The second channel, off for everybody until they ask (#30). Built whether or not
+  // an SMTP server has been set up: the settings are a row, read per message, so an
+  // admin filling them in does not have to restart the container.
+  const mail = { db, send }
+  const byEmail = emailChannel({
+    ...mail,
+    ...(config.public_origin === undefined ? {} : { origin: config.public_origin }),
+    log: (posted, account_id) =>
+      app.log.warn({ reason: posted.reason, account_id }, 'posting a notification'),
   })
+
+  const tellAccount = recordAndPush(
+    push,
+    now,
+    (counts) => {
+      app.log.warn({ ...counts }, 'notifying a member')
+    },
+    byEmail,
+  )
 
   registerAuthRoutes(app, { db, config, sessions, gate })
   registerPasskeyRoutes(app, { db, config, sessions, now })
@@ -429,6 +459,7 @@ export const createApp = async ({
   registerAvatarRoutes(app, { db, sessions, now })
   registerPwaRoutes(app, { db, sessions, now })
   registerBannerRoutes(app, { db, sessions, now })
+  registerMailRoutes(app, { db, sessions, mail, now })
   registerMealRoutes(app, { db, sessions, now, notify: tellAccount })
   // Separate registration, not a separate guard: the plan lives under `/api/admin/`,
   // where the prefix hook is the only thing that lets it through. The member-facing
@@ -455,7 +486,7 @@ export const createApp = async ({
       return counts
     },
   })
-  registerApplicationReviewRoutes(app, { db, sessions, now })
+  registerApplicationReviewRoutes(app, { db, config, sessions, mail, now })
   registerInviteRoutes(app, { db, sessions, now })
   registerRedemptionRoutes(app, { db, config, sessions, now, hash, gate })
   registerAllergyRoutes(app, { db })

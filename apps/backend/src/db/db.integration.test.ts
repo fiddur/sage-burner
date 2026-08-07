@@ -324,7 +324,7 @@ describe('foreign keys', () => {
         answers: [{ question_id: 'q1', label: 'Why do you want to join?', type: 'text', value: 'because' }],
         status: 'pending',
         applicant_name: 'Someone',
-        applicant_contact: 'someone@example.org',
+        applicant_email: 'someone@example.org',
         submitted_at: NOW,
       })
       .run()
@@ -415,7 +415,7 @@ describe('uniqueness', () => {
         answers: [],
         status: 'approved',
         applicant_name: 'Someone',
-        applicant_contact: 'someone@example.org',
+        applicant_email: 'someone@example.org',
         submitted_at: NOW,
         decided_at: NOW,
       })
@@ -532,7 +532,7 @@ describe('check constraints', () => {
     expect(() =>
       handle.client
         .prepare(
-          `INSERT INTO application (id, event_id, answers, status, applicant_name, applicant_contact, submitted_at)
+          `INSERT INTO application (id, event_id, answers, status, applicant_name, applicant_email, submitted_at)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
         )
         .run('app2', ids.event, '{}', 'maybe', 'Someone', 'a@b.c', NOW),
@@ -831,7 +831,7 @@ describe('json columns', () => {
         answers: [...answers],
         status: 'pending',
         applicant_name: 'Someone',
-        applicant_contact: 'someone@example.org',
+        applicant_email: 'someone@example.org',
         submitted_at: NOW,
       })
       .run()

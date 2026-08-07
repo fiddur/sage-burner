@@ -2,10 +2,11 @@ import type { AnswerProblem, FormQuestion, SubmittedAnswers } from '@sage-burner
 
 import {
   MAX_ANSWER_LENGTH,
-  MAX_APPLICANT_CONTACT_LENGTH,
+  MAX_APPLICANT_EMAIL_LENGTH,
   MAX_APPLICANT_NAME_LENGTH,
   answerProblems,
   isTickBox,
+  looksLikeEmail,
 } from '@sage-burner/shared'
 import { useCallback, useEffect, useMemo, useState } from 'preact/hooks'
 
@@ -13,6 +14,7 @@ import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
 import { FormError, useFormError } from '../components/FormError.tsx'
+import { useInstallationSendsEmail } from '../installation.tsx'
 import { renderMarkdown } from '../markdown.ts'
 
 /**
@@ -52,6 +54,17 @@ const identityProblem = (value: string, max: number) => {
 }
 
 /**
+ * The same answers for the address, plus the one only it can have.
+ *
+ * Checked here rather than left to the 400: this is where the invite will be posted,
+ * and a typo caught on submit costs a correction where a typo caught by nobody costs
+ * an application that silently goes nowhere. `looksLikeEmail` is the shared shape
+ * rule, deliberately looser than `emailSchema`, which is what actually refuses one.
+ */
+const emailProblem = (value: string) =>
+  identityProblem(value, MAX_APPLICANT_EMAIL_LENGTH) ?? (looksLikeEmail(value) ? undefined : 'malformed')
+
+/**
  * The controls below are `aria-required`, not natively `required`, because
  * native validation blocks submission before this page's handler runs — leaving
  * the browser to decide the empty cases and `answerProblems` the rest. The
@@ -59,15 +72,37 @@ const identityProblem = (value: string, max: number) => {
  * `agreement` must be ticked rather than merely present.
  */
 
+/**
+ * What the page says once it has been sent.
+ *
+ * The copy has to be true either way: with a mail server the invite arrives at the
+ * address they typed, and without one it does not, so promising it would be a promise
+ * the installation cannot keep (#30). `undefined` is the answer still arriving, and
+ * takes the cautious half.
+ */
+const Sent = ({ sendsEmail }: { sendsEmail?: boolean }) => (
+  <article>
+    <h1>Application sent</h1>
+    <p role="status">
+      Thank you — we have your application. We read them together before each burn.{' '}
+      {sendsEmail === true
+        ? 'If you are accepted, your invite arrives at the address you gave us.'
+        : 'Someone will get back to you at the address you gave us.'}{' '}
+      Nothing else will arrive in your inbox in the meantime.
+    </p>
+  </article>
+)
+
 /** The problems are `field:reason`, so a field is flagged whatever its reason. */
 const hasProblem = (problems: string[], field: string) =>
   problems.some((problem) => problem.startsWith(`${field}:`))
 
 export const Apply = ({ api }: ApplyProps) => {
+  const sendsEmail = useInstallationSendsEmail()
   const [questions, setQuestions] = useState<FormQuestion[] | undefined>(undefined)
   const [loadFailed, setLoadFailed] = useState(false)
   const [name, setName] = useState('')
-  const [contact, setContact] = useState('')
+  const [email, setEmail] = useState('')
   const [answers, setAnswers] = useState<SubmittedAnswers>({})
   const [problems, setProblems] = useState<AnswerProblem[]>([])
   const [identityProblems, setIdentityProblems] = useState<string[]>([])
@@ -118,10 +153,10 @@ export const Apply = ({ api }: ApplyProps) => {
 
     const found = answerProblems(questions, answers)
     const nameProblem = identityProblem(name, MAX_APPLICANT_NAME_LENGTH)
-    const contactProblem = identityProblem(contact, MAX_APPLICANT_CONTACT_LENGTH)
+    const addressProblem = emailProblem(email)
     const identity = [
       ...(nameProblem === undefined ? [] : [`applicant_name:${nameProblem}`]),
-      ...(contactProblem === undefined ? [] : [`applicant_contact:${contactProblem}`]),
+      ...(addressProblem === undefined ? [] : [`applicant_email:${addressProblem}`]),
     ]
     setProblems(found)
     setIdentityProblems(identity)
@@ -132,7 +167,7 @@ export const Apply = ({ api }: ApplyProps) => {
     try {
       await api.submitApplication({
         applicant_name: name.trim(),
-        applicant_contact: contact.trim(),
+        applicant_email: email.trim(),
         answers,
         // What this page put on screen, which is not necessarily what the server
         // holds now: a question added while it was open is not one the applicant
@@ -154,18 +189,7 @@ export const Apply = ({ api }: ApplyProps) => {
     }
   }
 
-  if (sent) {
-    return (
-      <article>
-        <h1>Application sent</h1>
-        <p role="status">
-          Thank you — we have your application. We read them together before each burn, and someone will get
-          back to you at the contact you gave us. There is no automatic email, so nothing will arrive in your
-          inbox in the meantime.
-        </p>
-      </article>
-    )
-  }
+  if (sent) return <Sent sendsEmail={sendsEmail} />
 
   return (
     <article>
@@ -208,25 +232,30 @@ export const Apply = ({ api }: ApplyProps) => {
         )}
 
         <label class="field">
-          <span>How can we reach you?</span>
+          <span>Your email address</span>
           <input
-            name="applicant_contact"
-            type="text"
-            maxLength={MAX_APPLICANT_CONTACT_LENGTH}
+            name="applicant_email"
+            // `type="email"` for the keyboard a phone offers, not for the validation:
+            // `aria-required` above says why the browser's own is not what decides.
+            type="email"
+            maxLength={MAX_APPLICANT_EMAIL_LENGTH}
+            autocomplete="email"
             aria-required
-            aria-invalid={hasProblem(identityProblems, 'applicant_contact')}
+            aria-invalid={hasProblem(identityProblems, 'applicant_email')}
             aria-describedby={
-              hasProblem(identityProblems, 'applicant_contact') ? 'applicant_contact-error' : undefined
+              hasProblem(identityProblems, 'applicant_email') ? 'applicant_email-error' : undefined
             }
-            value={contact}
-            onInput={(event) => setContact(event.currentTarget.value)}
+            value={email}
+            onInput={(event) => setEmail(event.currentTarget.value)}
           />
         </label>
-        {hasProblem(identityProblems, 'applicant_contact') && (
-          <p class="form-error" role="alert" id="applicant_contact-error">
-            {identityProblems.includes('applicant_contact:too_long')
-              ? `Please keep this under ${MAX_APPLICANT_CONTACT_LENGTH} characters.`
-              : 'Please give us an email address or a phone number.'}
+        {hasProblem(identityProblems, 'applicant_email') && (
+          <p class="form-error" role="alert" id="applicant_email-error">
+            {identityProblems.includes('applicant_email:too_long')
+              ? `Please keep this under ${MAX_APPLICANT_EMAIL_LENGTH} characters.`
+              : identityProblems.includes('applicant_email:malformed')
+                ? 'That does not look like an email address.'
+                : 'Please give us an email address — it is where your invite would go.'}
           </p>
         )}
 

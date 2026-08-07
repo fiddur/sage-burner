@@ -237,6 +237,59 @@ it in.
 until it re-scrapes; its Sharing Debugger has a button for that, and Signal and
 WhatsApp cache too. A change that "did not work" is usually this.
 
+### Where this installation posts from
+
+Organise → **Settings** takes an SMTP server (#30), and there is nothing else to
+set up: no hosted service, no account to sign up for, and no environment variable.
+It is whatever mail the people running the gathering already have.
+
+**All of it is optional.** With no server set up, approving an application posts
+nothing, no notification is emailed, and the email column on the notification
+settings is not drawn. `docker compose up` stays sufficient, exactly as it does for
+push.
+
+In the database rather than the environment, for the reason the VAPID pair gives —
+and in a singleton table of its own rather than columns on `installation`, because
+that row is read for a title on nearly every page load and an SMTP password should
+not ride along on each of them. The password is stored **as given**: SMTP AUTH sends
+the password itself, so a digest would be one this app could not use. It is the same
+class of secret as `vapid_private_key`, kept safe by the volume rather than by the
+column, and it never leaves the process — the read answers with `has_password`, and
+a save that omits the field leaves the stored one alone.
+
+| Field    | What it is                                                           |
+| -------- | -------------------------------------------------------------------- |
+| Server   | the SMTP host                                                        |
+| Port     | 587 or 25 (STARTTLS), or 465                                         |
+| TLS      | the socket is TLS from the first byte — 465 only, not "use TLS"      |
+| Username | empty for a relay that authenticates by network                      |
+| Password | stored as given; blank on a save keeps what is there, `""` clears it |
+| From     | the address and the name every message appears to come from          |
+
+**Test it before trusting it.** A wrong password fails silently otherwise: the next
+approval posts nothing, the admin sees the invite link as usual, and the applicant
+waits. The button posts to the **admin's own** address rather than one they type —
+a send-to box on an admin page is an open relay with extra steps — and the answer
+carries the server's own refusal, because "535 authentication failed" and "connect
+ECONNREFUSED" want completely different fixes.
+
+`nodemailer` does the talking, in `mail/smtp.ts` and nowhere else, so everything
+else about email is testable with an injected spy — the same split `web-push.ts`
+has. The protocol is a handful of lines; STARTTLS negotiation, AUTH mechanisms,
+dot-stuffing and MIME encoding of anything that is not ASCII are not, and a
+gathering called "Sagegården" would find that last one on the first message.
+
+Every message is plain text. Nothing sent from here is worth a second rendering to
+keep in step with the first, and it means no address or member-written line is ever
+interpolated into markup on the way out. The `From:` display name is quoted per RFC
+5322 and stripped of anything that could end a header, since an installation calls
+itself whatever it likes.
+
+**Links in email need `PUBLIC_ORIGIN`.** An invite is posted from a request and
+takes the origin that request arrived on, so it always has one. A notification is
+posted from wherever a role was handed out, with no request to read `Host` from — so
+without `PUBLIC_ORIGIN` it says what happened and stops there.
+
 ## Offline and installing
 
 The app is a PWA: installable, and readable with no connection.

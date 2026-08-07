@@ -5,13 +5,14 @@ import { createHash, randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import type { DbHandle } from '../db/index.ts'
+import type { Message } from '../mail/mail.ts'
 
 import { createApp } from '../app.ts'
 import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, application, inviteToken } from '../db/schema.ts'
+import { account, accountRole, application, INSTALLATION_ID, inviteToken, mailSetting } from '../db/schema.ts'
 
 const SECRET = 's'.repeat(40)
 
@@ -27,15 +28,38 @@ afterEach(async () => {
 
 const NOW = '2026-07-02T00:00:00.000Z'
 
+/** Every send in this file lands here. Nothing in the suite opens a socket. */
+const posted: Message[] = []
+
 const build = async (now: () => Date = () => new Date(NOW)) => {
+  posted.length = 0
   handle = createDb({ url: ':memory:' })
   runMigrations(handle)
   app = await createApp({
     db: handle.db,
     config: createConfig({ LOG_LEVEL: 'silent', SESSION_SECRET: SECRET }),
     now,
+    send: (_transport, message) => {
+      posted.push(message)
+      return Promise.resolve()
+    },
   })
   return app
+}
+
+/** An SMTP server, so approving somebody has somewhere to post the invite. */
+const givenMailServer = async () => {
+  await db().insert(mailSetting).values({
+    id: INSTALLATION_ID,
+    host: 'smtp.example.org',
+    port: 587,
+    secure: false,
+    username: '',
+    password: '',
+    from_email: 'burn@example.org',
+    from_name: '',
+    updated_at: NOW,
+  })
 }
 
 const db = () => {
@@ -75,7 +99,7 @@ const givenApplication = async (name = 'Someone') => {
       answers: [{ question_id: randomUUID(), label: 'Why?', type: 'text', value: 'because' }],
       status: 'pending',
       applicant_name: name,
-      applicant_contact: 'someone@example.org',
+      applicant_email: 'someone@example.org',
       submitted_at: '2026-07-02T00:00:00Z',
       decided_at: null,
     })
@@ -433,5 +457,107 @@ describe('a fresh link when the first one was lost', () => {
 
     expect((await reissue(server, undefined, id)).statusCode).toBe(401)
     expect((await reissue(server, member.cookie, id)).statusCode).toBe(403)
+  })
+})
+
+describe('the invite in the applicant’s inbox', () => {
+  const approveAt = (server: FastifyInstance, cookie: string, id: string) =>
+    server.inject({
+      method: 'POST',
+      url: `/api/admin/applications/${encodeURIComponent(id)}/approve`,
+      headers: { cookie, host: 'burn.example.org' },
+    })
+
+  it('carries the link, at the origin the request arrived on', async () => {
+    const server = await build()
+    await givenMailServer()
+    const { cookie } = await givenAdmin()
+    const id = await givenApplication('Ada')
+
+    const decided = await approveAt(server, cookie, id)
+
+    expect(posted).toHaveLength(1)
+    expect(posted[0]?.to).toBe('someone@example.org')
+    expect(posted[0]?.text).toContain(`http://burn.example.org/invite/${decided.json().invite.token}`)
+  })
+
+  it('is not sent when nobody has set a mail server up', async () => {
+    // The ordinary state, and the whole feature is optional: the admin still has the
+    // link in the response, which is how this worked before there was one.
+    const server = await build()
+    const { cookie } = await givenAdmin()
+    const id = await givenApplication()
+
+    const decided = await approveAt(server, cookie, id)
+
+    expect(decided.statusCode).toBe(200)
+    expect(decided.json().invite.token).toBeTruthy()
+    expect(posted).toHaveLength(0)
+  })
+
+  it('is not sent for a rejection', async () => {
+    const server = await build()
+    await givenMailServer()
+    const { cookie } = await givenAdmin()
+    const id = await givenApplication()
+
+    await decide(server, cookie, id, 'reject')
+
+    expect(posted).toHaveLength(0)
+  })
+
+  it('is skipped for a contact that is not an address', async () => {
+    // Rows written while this column was "how can we reach you" hold phone numbers
+    // and Discord handles, and posting to one of those is a bounce nobody reads.
+    const server = await build()
+    await givenMailServer()
+    const { cookie } = await givenAdmin()
+    const id = await givenApplication()
+    await db()
+      .update(application)
+      .set({ applicant_email: '@someone on discord' })
+      .where(eq(application.id, id))
+
+    await approveAt(server, cookie, id)
+
+    expect(posted).toHaveLength(0)
+  })
+
+  it('still approves when the mail server refuses', async () => {
+    // The invite is committed before this runs, so a mail server that is down costs
+    // a message rather than an approval — and the admin has the link either way.
+    handle = createDb({ url: ':memory:' })
+    runMigrations(handle)
+    app = await createApp({
+      db: handle.db,
+      config: createConfig({ LOG_LEVEL: 'silent', SESSION_SECRET: SECRET }),
+      now: () => new Date(NOW),
+      send: () => Promise.reject(new Error('connect ECONNREFUSED')),
+    })
+    await givenMailServer()
+    const { cookie } = await givenAdmin()
+    const id = await givenApplication()
+
+    const decided = await approveAt(app, cookie, id)
+
+    expect(decided.statusCode).toBe(200)
+    expect(decided.json().invite.token).toBeTruthy()
+  })
+
+  it('posts the replacement too, which is the case a reissue exists for', async () => {
+    const server = await build()
+    await givenMailServer()
+    const { cookie } = await givenAdmin()
+    const id = await givenApplication()
+    await approveAt(server, cookie, id)
+
+    const fresh = await server.inject({
+      method: 'POST',
+      url: `/api/admin/applications/${encodeURIComponent(id)}/invite`,
+      headers: { cookie, host: 'burn.example.org' },
+    })
+
+    expect(posted).toHaveLength(2)
+    expect(posted[1]?.text).toContain(`http://burn.example.org/invite/${fresh.json().invite.token}`)
   })
 })

@@ -16,7 +16,7 @@ const anApplication = (over: Partial<Application> = {}): Application => ({
   answers: [{ question_id: 'q-1', label: 'Why do you want to come?', type: 'text', value: 'the fire' }],
   status: 'pending',
   applicant_name: 'Fredrik',
-  applicant_contact: 'fredrik@example.org',
+  applicant_email: 'fredrik@example.org',
   submitted_at: '2026-07-02T10:00:00Z',
   decided_at: null,
   ...over,

@@ -1,9 +1,11 @@
 import type { FastifyInstance } from 'fastify'
 
+import { eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { DbHandle } from '../db/index.ts'
+import type { Message } from '../mail/mail.ts'
 import type { Delivery } from '../push/push.ts'
 
 import { createApp } from '../app.ts'
@@ -11,7 +13,16 @@ import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, attendance, event, notification, pushSubscription } from '../db/schema.ts'
+import {
+  account,
+  accountRole,
+  attendance,
+  event,
+  INSTALLATION_ID,
+  mailSetting,
+  notification,
+  pushSubscription,
+} from '../db/schema.ts'
 
 const SECRET = 's'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
@@ -33,17 +44,40 @@ const db = () => {
   return found
 }
 
-const build = async (deliver: Delivery = () => Promise.resolve('sent')) => {
+/** Every send in this file lands here. Nothing in the suite opens a socket. */
+const posted: Message[] = []
+
+const build = async (deliver: Delivery = () => Promise.resolve('sent'), env: Record<string, string> = {}) => {
+  posted.length = 0
   handle = createDb({ url: ':memory:' })
   runMigrations(handle)
   app = await createApp({
     db: handle.db,
-    config: createConfig({ LOG_LEVEL: 'silent', SESSION_SECRET: SECRET }),
+    config: createConfig({ LOG_LEVEL: 'silent', SESSION_SECRET: SECRET, ...env }),
     now: () => new Date(NOW),
     deliver,
     mintKeys: () => ({ publicKey: 'a-public-key', privateKey: 'a-private-key' }),
+    send: (_transport, message) => {
+      posted.push(message)
+      return Promise.resolve()
+    },
   })
   return app
+}
+
+/** An SMTP server, so a member who asks for email has somewhere to be posted from. */
+const givenMailServer = async () => {
+  await db().insert(mailSetting).values({
+    id: INSTALLATION_ID,
+    host: 'smtp.example.org',
+    port: 587,
+    secure: false,
+    username: '',
+    password: '',
+    from_email: 'burn@example.org',
+    from_name: '',
+    updated_at: NOW,
+  })
 }
 
 const cookieFor = (id: string) => {
@@ -183,12 +217,12 @@ describe('what somebody has switched on', () => {
     'waiting_list_pushed',
   ]
 
-  const setOn = (server: FastifyInstance, cookie: string, on: string[]) =>
+  const setOn = (server: FastifyInstance, cookie: string, on: string[], email: string[] = []) =>
     server.inject({
       method: 'PUT',
       url: '/api/me/notification-settings',
       headers: { cookie },
-      payload: { on },
+      payload: { on, email },
     })
 
   /** Everything on except the named ones — what unticking a box used to mean. */
@@ -200,8 +234,8 @@ describe('what somebody has switched on', () => {
     )
 
   it('records nothing at all for a category switched off', async () => {
-    // The setting says "notify me", so off means neither channel — a bell filling
-    // with things somebody asked not to hear about is the same noise, quieter.
+    // A bell filling with things somebody asked not to hear about is the same noise,
+    // quieter. Email is a switch of its own and is off here, as it is by default.
     const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
     const server = await build(deliver)
     await givenBurn()
@@ -456,5 +490,167 @@ describe('the unseen count', () => {
 
     expect(body.notifications).toHaveLength(50)
     expect(body.unseen).toBe(55)
+  })
+})
+
+describe('the email channel', () => {
+  const setOn = (server: FastifyInstance, cookie: string, on: string[], email: string[]) =>
+    server.inject({
+      method: 'PUT',
+      url: '/api/me/notification-settings',
+      headers: { cookie },
+      payload: { on, email },
+    })
+
+  const ADDRESS = 'ada@example.org'
+
+  const givenAda = async () => {
+    const ada = await givenAccount()
+    await db().update(account).set({ email: ADDRESS }).where(eq(account.id, ada.id))
+    await givenComing(ada.id)
+    return ada
+  }
+
+  it('is off until somebody asks, so a member with a mail server hears nothing new', async () => {
+    // Absence is `false` for this one, unlike the bell — an upgrade must never be
+    // what starts posting to somebody's inbox (#30).
+    const server = await build()
+    await givenMailServer()
+    await givenBurn()
+    const admin = await givenAccount(['admin'])
+    const ada = await givenAda()
+
+    await setPaid(server, admin.cookie, ada.id)
+
+    expect((await list(server, ada.cookie)).json().notifications).toHaveLength(1)
+    expect(posted).toHaveLength(0)
+  })
+
+  it('posts to somebody who asked, with the same sentence the bell shows', async () => {
+    const server = await build()
+    await givenMailServer()
+    await givenBurn()
+    const admin = await givenAccount(['admin'])
+    const ada = await givenAda()
+    await setOn(server, ada.cookie, ['payment'], ['payment'])
+
+    await setPaid(server, admin.cookie, ada.id)
+
+    expect(posted).toHaveLength(1)
+    expect(posted[0]?.to).toBe(ADDRESS)
+    const [row] = (await list(server, ada.cookie)).json().notifications
+    expect(posted[0]?.subject).toContain(row.body)
+  })
+
+  it('posts even with the bell switched off, the two being separate switches', async () => {
+    const server = await build()
+    await givenMailServer()
+    await givenBurn()
+    const admin = await givenAccount(['admin'])
+    const ada = await givenAda()
+    await setOn(server, ada.cookie, [], ['payment'])
+
+    await setPaid(server, admin.cookie, ada.id)
+
+    expect((await list(server, ada.cookie)).json().notifications).toHaveLength(0)
+    expect(posted).toHaveLength(1)
+  })
+
+  it('posts nothing where no mail server has been set up', async () => {
+    const server = await build()
+    await givenBurn()
+    const admin = await givenAccount(['admin'])
+    const ada = await givenAda()
+    await setOn(server, ada.cookie, ['payment'], ['payment'])
+
+    await setPaid(server, admin.cookie, ada.id)
+
+    expect(posted).toHaveLength(0)
+  })
+
+  it('writes no link at all unless the installation has named its own address', async () => {
+    // An email is read outside the app, and this runs from wherever a role was handed
+    // out — there is no request to read `Host` from.
+    const server = await build()
+    await givenMailServer()
+    await givenBurn()
+    const admin = await givenAccount(['admin'])
+    const ada = await givenAda()
+    await setOn(server, ada.cookie, ['payment'], ['payment'])
+
+    await setPaid(server, admin.cookie, ada.id)
+
+    expect(posted[0]?.text).not.toContain('http')
+  })
+
+  it('writes an absolute one when PUBLIC_ORIGIN says where this is', async () => {
+    const server = await build(() => Promise.resolve('sent'), {
+      PUBLIC_ORIGIN: 'https://burn.example.org',
+    })
+    await givenMailServer()
+    await givenBurn()
+    const admin = await givenAccount(['admin'])
+    const ada = await givenAda()
+    await setOn(server, ada.cookie, ['payment'], ['payment'])
+
+    await setPaid(server, admin.cookie, ada.id)
+
+    expect(posted[0]?.text).toContain('https://burn.example.org/')
+  })
+
+  it('is finished before the route answers, rather than left in flight', async () => {
+    // The send is started beside the bell and awaited after it, so a request that has
+    // returned has already tried. Left unawaited it would still usually arrive — which
+    // is exactly why this uses a `send` that does not resolve immediately.
+    handle = createDb({ url: ':memory:' })
+    runMigrations(handle)
+    const slow: Message[] = []
+    app = await createApp({
+      db: handle.db,
+      config: createConfig({ LOG_LEVEL: 'silent', SESSION_SECRET: SECRET }),
+      now: () => new Date(NOW),
+      deliver: () => Promise.resolve('sent'),
+      mintKeys: () => ({ publicKey: 'a-public-key', privateKey: 'a-private-key' }),
+      send: (_transport, message) =>
+        new Promise((resolve) => {
+          setTimeout(() => {
+            slow.push(message)
+            resolve()
+          }, 0)
+        }),
+    })
+    await givenMailServer()
+    await givenBurn()
+    const admin = await givenAccount(['admin'])
+    const ada = await givenAda()
+    await setOn(app, ada.cookie, ['payment'], ['payment'])
+
+    await setPaid(app, admin.cookie, ada.id)
+
+    expect(slow).toHaveLength(1)
+  })
+
+  it('still records the row when the mail server refuses', async () => {
+    // The write must not fail because a mail server did — the rule push follows.
+    handle = createDb({ url: ':memory:' })
+    runMigrations(handle)
+    app = await createApp({
+      db: handle.db,
+      config: createConfig({ LOG_LEVEL: 'silent', SESSION_SECRET: SECRET }),
+      now: () => new Date(NOW),
+      deliver: () => Promise.resolve('sent'),
+      mintKeys: () => ({ publicKey: 'a-public-key', privateKey: 'a-private-key' }),
+      send: () => Promise.reject(new Error('connect ECONNREFUSED')),
+    })
+    await givenMailServer()
+    await givenBurn()
+    const admin = await givenAccount(['admin'])
+    const ada = await givenAda()
+    await setOn(app, ada.cookie, ['payment'], ['payment'])
+
+    const paid = await setPaid(app, admin.cookie, ada.id)
+
+    expect(paid.statusCode).toBe(200)
+    expect((await list(app, ada.cookie)).json().notifications).toHaveLength(1)
   })
 })

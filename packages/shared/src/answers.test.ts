@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { FormQuestion } from './schemas/form-question.ts'
 
-import { MAX_ANSWER_LENGTH, answerProblems } from './answers.ts'
+import { MAX_ANSWER_LENGTH, answerProblems, looksLikeEmail } from './answers.ts'
 
 const question = (over: Partial<FormQuestion> & Pick<FormQuestion, 'id' | 'type'>): FormQuestion => ({
   order: 0,
@@ -99,5 +99,35 @@ describe('answerProblems', () => {
 
   it('accepts an empty form', () => {
     expect(answerProblems([], {})).toEqual([])
+  })
+})
+
+describe('whether something is shaped like an address', () => {
+  it('accepts an ordinary one', () => {
+    expect(looksLikeEmail('ada@example.org')).toBe(true)
+  })
+
+  it('accepts one with a plus tag and a subdomain, which people really use', () => {
+    expect(looksLikeEmail('ada+burn@mail.example.co.uk')).toBe(true)
+  })
+
+  it('ignores space around it, as the form does before sending', () => {
+    expect(looksLikeEmail('  ada@example.org ')).toBe(true)
+  })
+
+  it('rejects the things the old free-text box held', () => {
+    // Phone numbers and Discord handles, which is what "how can we reach you" got
+    // before this was an address field (#30).
+    expect(looksLikeEmail('+46 70 123 45 67')).toBe(false)
+    expect(looksLikeEmail('@ada on discord')).toBe(false)
+    expect(looksLikeEmail('ada')).toBe(false)
+  })
+
+  it('rejects one with no dot after the @, which is not a deliverable domain', () => {
+    expect(looksLikeEmail('ada@localhost')).toBe(false)
+  })
+
+  it('rejects a blank', () => {
+    expect(looksLikeEmail('   ')).toBe(false)
   })
 })

@@ -113,7 +113,7 @@ export const AdminApplications = ({ api }: { api: ApplicationsApi }) => {
           <article key={entry.id} class="application">
             <h2>{entry.applicant_name}</h2>
             <p class="form-note">
-              {entry.applicant_contact} · applied {entry.submitted_at.slice(0, 10)} · {entry.status}
+              {entry.applicant_email} · applied {entry.submitted_at.slice(0, 10)} · {entry.status}
             </p>
 
             <dl>

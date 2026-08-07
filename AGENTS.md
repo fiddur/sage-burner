@@ -277,6 +277,30 @@ These are member records, so treat them as such:
   hostname-shaped gets neither tag rather than a URL nobody can fetch. The banner is
   the icon's pipeline with a narrower type — JPEG, because no crawler draws an SVG,
   and a banner that leaves the card blank is the bug this fixed.
+- **Email is optional, admin-configured, and never fails a write** (#30). The SMTP
+  settings are a singleton row an admin fills in, not an environment variable — so
+  `docker compose up` stays sufficient and an installation that never wants email
+  never has one. The password is stored as given, because SMTP AUTH sends the
+  password itself, and it never leaves the process: the read answers `has_password`,
+  and a save that omits the field keeps what is stored. The test button posts to the
+  **admin's own** address rather than one they type, since a send-to box on an admin
+  page is an open relay with extra steps. Posting is started beside the write and
+  awaited after it, so a mail server that is down costs a message rather than a
+  record — the rule push already follows. `mail/smtp.ts` is the only module that
+  opens a socket, exactly as `web-push.ts` is.
+- **The email column on the notification settings is a channel of its own** (#30),
+  independent of the bell, and **off for every category until somebody asks** — so
+  it needs no defaults, and an upgrade is never what starts posting to somebody's
+  inbox. Absent where the installation has no mail server, rather than present and
+  inert: a switch that cannot do anything reads as a promise.
+- **An invite is posted to the address the applicant gave** (#30), and the raw token
+  is still in the approval's response either way. `applicant_contact` became
+  `applicant_email` because once the app writes to it, an address is the one thing
+  it must have; rows written before that hold phone numbers and Discord handles, so
+  `looksLikeEmail` decides whether one is worth posting to. The invite form starts
+  from that address as well as the name — the reversal of an earlier decision, and
+  not an enumeration oracle: nothing takes an address and says whether it has an
+  application, it takes a token nobody can guess.
 - Markdown is sanitized before rendering, and members author it too — any longer
   field shown to other people is markdown. `markdown.ts` escapes raw HTML rather
   than filtering it and allowlists link schemes, so untrusted authors are inside
@@ -389,13 +413,15 @@ them.)
 - Merge to `main` promotes the image to `:latest`.
 - The app is served at a **domain root** — there is no sub-path/`BASE_PATH`
   handling, deliberately.
-- No external services are required to run it: no SMTP, no payment gateway, no
-  external database — and nothing to sign up for or configure. Browser push
-  (#96) is the one feature that reaches outward at runtime: a notification goes
-  to the push service the _browser_ chose, so the container needs outbound
-  HTTPS. There is still no account and no key to set — the VAPID pair is minted
-  into the database the first time an admin turns notifications on, and an
-  installation that never does never acquires one.
+- No external services are required to run it: no payment gateway, no external
+  database — and nothing to sign up for. Two features reach outward at runtime and
+  both are optional and configured from inside the app, never from the environment.
+  Browser push (#96) goes to the push service the _browser_ chose, so the container
+  needs outbound HTTPS; the VAPID pair is minted into the database the first time an
+  admin turns notifications on, and an installation that never does never acquires
+  one. Email (#30) goes to whatever SMTP the people running the gathering already
+  have, set under ⚙️ → Settings and stored in `mail_setting`; with no row there, no
+  invite is posted, no notification is, and nothing else changes.
 - `docker compose up` must be sufficient — with one current exception: the app
   refuses to start without `SESSION_SECRET`, so a bare clone needs it generated
   first (the README's Deploying section is one `sed` line). Failing loudly beats

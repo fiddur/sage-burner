@@ -149,6 +149,15 @@ One entry is stored per question **asked**, answered or not, so a reviewer can
 tell "said no" from "was never asked". An absent tick box stores `false`; an
 absent optional text answer stores `""`.
 
+**The form asks for an email address, not "how can we reach you".** It was the
+latter — one free-text box holding phone numbers and Discord handles as often as
+addresses — until approving somebody started posting them their invite (#30). Once
+the app has to write to it, the address is the one thing it must have. The form
+marks a typo before submitting, because a bad address is an application that
+silently goes nowhere; the column keeps whatever the old box held for everybody who
+applied before, with no CHECK on the shape, and `looksLikeEmail` is what decides
+whether one of those is worth posting to.
+
 **"Asked" means the form said so, not that the question exists now.** The
 submission carries `asked` — the ids the page actually rendered — and only those
 get an entry. Without it, a question an admin added while someone was filling
@@ -216,9 +225,11 @@ The form itself hardcodes nothing about the questions: it renders whatever
 it appear on the public form with no deploy, which is the acceptance criterion
 `form_question` exists for.
 
-There is **no email**. Nothing is sent on submission and nothing is sent on
-approval, so the confirmation screen says so outright rather than leaving an
-applicant waiting for a message that will never arrive.
+**Nothing is sent on submission**, ever. Whether anything is sent on approval
+depends on the installation, so the confirmation screen reads
+`installation.sends_email` and says which — a promise the installation may not be
+able to keep is worse than no promise, and an applicant left waiting for a message
+that will never arrive is what the copy exists to prevent.
 
 ## Reviewing applications
 
@@ -242,8 +253,16 @@ rather than to try again, since retrying cannot help.
 **Approval mints the invite.** 32 CSPRNG bytes, base64url, valid 30 days. Only
 the SHA-256 digest is stored, so the raw token exists in that one response and
 nowhere else — a leaked backup or a stray copy of the volume hands out no
-invites. The admin copies it into Discord or Messenger themselves; there is
-no email.
+invites.
+
+**It is posted to the applicant where the installation has a mail server** (#30),
+and the admin still gets the link in the response either way — pasting it into
+Discord is how this worked before there was one to configure, and is still the
+answer for an installation with no SMTP. The message goes out _after_ the
+transaction: the invite is committed by the time it runs, so a mail server that is
+down costs a message rather than an approval, and a refusal is logged rather than
+turned into a failed decision. A re-issue posts the replacement the same way, which
+is the case that route exists for.
 
 **A lost link is re-issued, not worked around.**
 `POST /api/admin/applications/:id/invite` mints a replacement and shows it once,
@@ -326,12 +345,24 @@ token is the only credential — an invite is unguessable but **forwardable**, s
 whoever holds it is a stranger until they redeem.
 
 `GET /api/invites/:token` answers `200` with one of four statuses —
-`outstanding`, `expired`, `used`, `unknown` — and **nothing else**. Not a 404 for
-an unknown token, and not who the invite was minted for: either would turn a
-leaked link into a way of probing for live ones, or into a disclosure. The page
-needs the distinction because the three dead ends want three different things
-done about them: an expired link can be re-sent, a used one usually means you
-already have an account, an unknown one is usually a truncated paste.
+`outstanding`, `expired`, `used`, `unknown` — never a 404 for an unknown token,
+which would turn a leaked link into a way of probing for live ones. The page needs
+the distinction because the three dead ends want three different things done about
+them: an expired link can be re-sent, a used one usually means you already have an
+account, an unknown one is usually a truncated paste.
+
+**While the invite is outstanding it also carries what that applicant typed** —
+their name, and since #30 the address the invite was posted to. Both are theirs;
+both are dropped once the link is spent or expired, where there is no form to fill
+and naming them would be disclosure bought for nothing. The trade is that a
+forwarded live link tells its holder whose it was, weighed against a token that is
+256 bits of CSPRNG, single-use, expiring, and sent only to the person it names.
+Being asked for the address the message you are reading arrived at is worse than a
+system that was not listening.
+
+This is **not** the enumeration channel the redemption section describes: nothing
+here takes an address and says whether it has an application. It takes a token
+nobody can guess and repeats what the person who applied wrote.
 
 `POST /api/invites/:token/redeem` creates the account, fills in the person-level
 fields, grants the `member` role and signs them in. **One transaction**, because
@@ -575,10 +606,43 @@ seeded, so an account made tomorrow still picks up today's defaults. The wire ca
 `{ on: [...] }` — the complete list of what is on — rather than a list of exceptions
 whose meaning would depend on which category it named.
 
-Switching one off silences both channels — the setting says "notify me", and a bell
-filling with things somebody asked not to hear about is the same noise in a quieter
-place. The same holds in the other direction: nothing is recorded at all for a
+Switching one off silences the bell and the push together — those are one switch, and
+a bell filling with things somebody asked not to hear about is the same noise in a
+quieter place. The same holds in the other direction: nothing is recorded at all for a
 category somebody never turned on.
+
+### The email column
+
+Where an admin has set an SMTP server up, each row grows a second switch (#30). The
+two tables are `table-layout: fixed` with a stated width for the switch columns, so
+the split by heading does not put the same control in two different places.
+
+**Email is a channel of its own, not a copy of the bell.** They are independent: take
+the burn-wide ones in your inbox and off your phone if that is what suits. It is **off
+for every category until somebody asks**, so it needs no defaults at all — absence and
+`false` say the same thing, which is why `notification_setting.email` has a SQL
+`DEFAULT 0` and the migration adding it decided nothing for the rows already there. An
+upgrade must never be what starts posting to somebody's inbox.
+
+The wire carries both lists in full — `{ on: [...], email: [...] }` — for the same
+reason it carries `on` in full: two lists meaning two different things is exactly what
+the `muted` rewrite got rid of.
+
+With no mail server there is **no column**, rather than one that cannot do anything: a
+switch that does nothing reads as a promise. Setting one up puts it there without a
+reload, because `GET /api/installation` carries `sends_email` and the settings page
+sets it locally when it saves.
+
+A message is the same sentence the bell shows, which is the whole of it — a second
+wording per category would be eleven more things to keep in step. It links to the page
+the notification belongs to **only when `PUBLIC_ORIGIN` is set**: an email is read
+outside the app, so a relative path is no use, and unlike the share card this runs from
+wherever a role was handed out, with no request to read `Host` from. Without one the
+message says what happened and stops there.
+
+Posting never fails a write. The send starts beside the bell's row and is awaited after
+it, so a mail server that is down costs a message rather than somebody's record — the
+rule push already follows here.
 
 Anything somebody else can put you on or take you off notifies you — a dream's
 helpers, a meal's crew, a meal's lead, a lead role and its team, a dream's

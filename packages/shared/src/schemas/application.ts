@@ -2,12 +2,13 @@ import { z } from 'zod'
 
 import {
   MAX_ANSWER_LENGTH,
-  MAX_APPLICANT_CONTACT_LENGTH,
+  MAX_APPLICANT_EMAIL_LENGTH,
   MAX_APPLICANT_NAME_LENGTH,
   MAX_ASKED_QUESTIONS,
 } from '../answers.ts'
 import { applicationStatuses, formQuestionTypes } from '../enums.ts'
 import { MAX_QUESTION_LABEL } from '../limits.ts'
+import { emailSchema } from './auth.ts'
 import { dateTimeSchema, idSchema, nonEmptyText } from './common.ts'
 
 /**
@@ -67,7 +68,20 @@ export const applicationSchema = z.object({
   answers: storedAnswersSchema,
   status: z.enum(applicationStatuses),
   applicant_name: nonEmptyText(MAX_APPLICANT_NAME_LENGTH),
-  applicant_contact: nonEmptyText(MAX_APPLICANT_CONTACT_LENGTH),
+  /**
+   * Where the invite is sent, and the address the account will be made under (#30).
+   *
+   * Was `applicant_contact`, one free-text box asking how to reach somebody, which
+   * held phone numbers and Discord handles as often as addresses. Once approving
+   * somebody posts them a link, "how can we reach you" is no longer the question —
+   * the app needs the one thing it can actually write to.
+   *
+   * Not normalised the way `emailSchema` normalises a login: this is stored as typed
+   * and only becomes an identity when the invite is redeemed, which is where the
+   * lowercasing that the UNIQUE depends on belongs. Rows written before this was an
+   * address keep whatever they held.
+   */
+  applicant_email: z.string().max(MAX_APPLICANT_EMAIL_LENGTH),
   submitted_at: dateTimeSchema,
   /** Set when an admin approves or rejects; null while pending. */
   decided_at: dateTimeSchema.nullable(),
@@ -90,7 +104,10 @@ export const applicationSchema = z.object({
 export const applicationCreateSchema = z
   .object({
     applicant_name: nonEmptyText(MAX_APPLICANT_NAME_LENGTH),
-    applicant_contact: nonEmptyText(MAX_APPLICANT_CONTACT_LENGTH),
+    // `emailSchema` rather than the loose field above: a submission is where an
+    // address can still be corrected by the person typing it, and an invite posted
+    // to a typo is an application that silently goes nowhere.
+    applicant_email: emailSchema,
     answers: submittedAnswersSchema,
     /**
      * The questions the form actually put on screen.

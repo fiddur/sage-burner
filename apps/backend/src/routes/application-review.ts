@@ -1,18 +1,25 @@
 import type { ApplicationDecisionResponse, ApplicationsResponse, InviteResponse } from '@sage-burner/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
-import { apiRoutes } from '@sage-burner/shared'
+import { apiRoutes, looksLikeEmail } from '@sage-burner/shared'
 import { and, desc, eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
+import type { Config } from '../config.ts'
+import type { MailDeps } from '../mail/mail.ts'
 
 import { viewerFor } from '../auth/viewer.ts'
-import { application, inviteToken } from '../db/schema.ts'
+import { application, INSTALLATION_ID, installation, inviteToken } from '../db/schema.ts'
 import { noStore, sendError } from '../http.ts'
 import { defaultExpiry, mintToken } from '../invites.ts'
+import { post } from '../mail/mail.ts'
+import { inviteMessage } from '../mail/messages.ts'
+import { originOf } from '../shell.ts'
 
 export interface ApplicationReviewDeps extends GuardDeps {
+  config: Config
+  mail: MailDeps
   now?: () => Date
 }
 
@@ -28,8 +35,52 @@ export interface ApplicationReviewDeps extends GuardDeps {
  */
 export const registerApplicationReviewRoutes = (
   app: FastifyInstance,
-  { db, sessions, now = () => new Date() }: ApplicationReviewDeps,
+  { db, sessions, mail, config, now = () => new Date() }: ApplicationReviewDeps,
 ) => {
+  /**
+   * The invite, in the applicant's inbox, if that is what they gave us (#30).
+   *
+   * `applicant_email` is an address for everybody who has applied since #30, and
+   * whatever the old free-text box held for everybody before — see `looksLikeEmail`,
+   * which is what decides. Nothing changes for the others: the raw token is in the
+   * response either way, and pasting it into Discord is how this worked before there
+   * was a mail server to configure.
+   *
+   * Awaited, and never throws: `post` answers with the reason instead, and a
+   * refusal is logged rather than turned into a failed approval. Bounded by the
+   * client's own timeouts, so an unreachable server cannot hang the request.
+   */
+  const postInvite = async (
+    request: FastifyRequest,
+    settled: { applicant_email: string; applicant_name: string },
+    token: string,
+    expires_at: string,
+  ) => {
+    if (!looksLikeEmail(settled.applicant_email)) return
+
+    const origin = originOf(request, config)
+    if (origin === undefined) return
+
+    const [named] = await db
+      .select({ title: installation.title })
+      .from(installation)
+      .where(eq(installation.id, INSTALLATION_ID))
+      .limit(1)
+
+    const posted = await post(
+      mail,
+      inviteMessage({
+        installation: named?.title ?? '',
+        to: settled.applicant_email,
+        name: settled.applicant_name,
+        link: `${origin}/invite/${token}`,
+        expires: expires_at.slice(0, 10),
+      }),
+    )
+
+    if (!posted.sent) app.log.warn({ reason: posted.reason }, 'posting an invite')
+  }
+
   app.get(apiRoutes.getApplications.fastify, async (_request, reply) => {
     void noStore(reply)
 
@@ -93,6 +144,14 @@ export const registerApplicationReviewRoutes = (
         return existing === undefined ? sendError(reply, 404) : sendError(reply, 409)
       }
 
+      // After the transaction, and never inside it: the invite is committed by the
+      // time this runs, so a mail server that is down costs a message rather than an
+      // approval. The link the admin sees is still the one that matters — this is a
+      // convenience, which is why nothing about the answer changes when it fails.
+      if (minted !== undefined) {
+        await postInvite(request, settled, minted.token, expires_at)
+      }
+
       return {
         application: settled,
         invite: minted === undefined ? null : { token: minted.token, expires_at },
@@ -135,9 +194,11 @@ export const registerApplicationReviewRoutes = (
     const minted = mintToken()
     const expires_at = defaultExpiry(now())
 
+    let applicant: { applicant_email: string; applicant_name: string } | undefined
     const outcome = db.transaction((tx) => {
       const [found] = tx.select().from(application).where(eq(application.id, id)).limit(1).all()
       if (found === undefined) return 'not_found' as const
+      applicant = found
 
       // Only an approved application has anybody to invite. A pending one is
       // approved instead, and a rejected one is not reopened by a side door.
@@ -182,6 +243,11 @@ export const registerApplicationReviewRoutes = (
 
     if (outcome === 'not_found') return sendError(reply, 404)
     if (outcome !== 'issued') return sendError(reply, 409)
+
+    // Posted here as well as on approval, which is the case this route exists for: a
+    // link that was lost. An address that has not changed gets the new one where the
+    // first went, and the admin still has it in the response either way.
+    if (applicant !== undefined) await postInvite(request, applicant, minted.token, expires_at)
 
     return { invite: { token: minted.token, expires_at } } satisfies InviteResponse
   })
