@@ -9,6 +9,7 @@ import { useSelectedBurn } from '../burn.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { HelperStrip } from '../components/HelperStrip.tsx'
+import { IconButton } from '../components/IconButton.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
@@ -105,9 +106,14 @@ export const Meals = ({ api }: { api: MealsApi }) => {
                   dangerouslySetInnerHTML={{ __html: renderMarkdown(plan.intro_markdown) }}
                 />
               )}
-              <button type="button" class="link-button" disabled={busy} onClick={() => setEditingIntro(true)}>
-                Edit these words
-              </button>
+              {/* A pen, not a sentence. "Edit these words" sat under a paragraph in the
+                  same face as the paragraph, so it read as the last line of it. */}
+              <IconButton
+                icon="✏️"
+                label="Edit these words"
+                disabled={busy}
+                onClick={() => setEditingIntro(true)}
+              />
             </div>
           )}
 

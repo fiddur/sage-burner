@@ -211,13 +211,19 @@ export const Home = ({ api }: { api: HomeApi }) => {
                 one likely to fix it. The burn's dates and cap stay admin-only and
                 are edited under Organise, which is why this is not a link to there.
               */}
+              {/* A pen, for the reason the meal intro's is one: a text button under a
+                  paragraph, in the paragraph's own face, read as part of it. Still a
+                  `PendingButton` rather than an `IconButton` — the editor opens after a
+                  read, and the hourglass is what says so — so the label the emoji
+                  replaces moves to `aria-label` by hand. */}
               {isApproved(viewer) && (
                 <PendingButton
                   busy={opening}
-                  label="Edit this text"
-                  busyLabel="Opening…"
+                  label="✏️"
+                  busyLabel="⌛"
                   type="button"
                   class="link-button"
+                  aria-label="Edit this text"
                   onClick={() => void openEditor(openEvent.welcome_markdown)}
                 />
               )}
