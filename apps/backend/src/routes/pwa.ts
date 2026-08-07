@@ -4,6 +4,7 @@ import { apiRoutes, flameIcon, isIconType, MAX_ICON_BYTES } from '@sage-burner/s
 import { eq } from 'drizzle-orm'
 
 import type { GuardDeps } from '../auth/guards.ts'
+import type { Database } from '../db/index.ts'
 
 import { INSTALLATION_ID, installation, installationIcon } from '../db/schema.ts'
 import { noStore, sendError } from '../http.ts'
@@ -33,9 +34,10 @@ const BACKGROUND_COLOR = '#1c1917'
  * The one place a fallback title is spelled out. `installation.tsx` deliberately
  * has none — showing `Sage Burner` and then replacing it reads as a bug — but a
  * manifest has to answer with something the moment it is asked, and a nameless
- * app cannot be installed at all.
+ * app cannot be installed at all. The share card takes it from here for the same
+ * reason: a crawler asks once and gets whatever was in the head.
  */
-const FALLBACK_NAME = 'Sage Burner'
+export const FALLBACK_NAME = 'Sage Burner'
 
 /**
  * A raster icon is 512 square because the browser made it so before uploading;
@@ -46,6 +48,25 @@ const FALLBACK_NAME = 'Sage Burner'
  * cost of a lie is an admin's own icon looking wrong on their own home screen.
  */
 const sizesFor = (contentType: string) => (contentType === 'image/svg+xml' ? 'any' : '512x512')
+
+/**
+ * What the icon is and when it changed, without reading the bytes.
+ *
+ * The manifest needs both and the image neither; the share card, which asks on every
+ * page load that is not an API call, needs the same two. Half a megabyte of blob
+ * fetched to build a URL is what this exists to avoid.
+ */
+export const iconVersion = async (
+  db: Database,
+): Promise<{ content_type: string; updated_at: string } | undefined> => {
+  const [row] = await db
+    .select({ content_type: installationIcon.content_type, updated_at: installationIcon.updated_at })
+    .from(installationIcon)
+    .where(eq(installationIcon.id, INSTALLATION_ID))
+    .limit(1)
+
+  return row
+}
 
 /**
  * Installability, and the icon it installs (#256).
@@ -73,7 +94,7 @@ export const registerPwaRoutes = (app: FastifyInstance, { db, now = () => new Da
       .where(eq(installation.id, INSTALLATION_ID))
       .limit(1)
 
-    const icon = await currentIcon()
+    const icon = await iconVersion(db)
     const contentType = icon?.content_type ?? 'image/svg+xml'
     const entry = {
       // The version is what makes a new icon a new URL, so an installed copy

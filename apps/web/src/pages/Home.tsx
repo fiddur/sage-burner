@@ -1,6 +1,6 @@
 import type { Event } from '@sage-burner/shared'
 
-import { MAX_WELCOME_LENGTH } from '@sage-burner/shared'
+import { apiRoutes, BANNER_HEIGHT, BANNER_WIDTH, MAX_WELCOME_LENGTH } from '@sage-burner/shared'
 import { useEffect, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -9,7 +9,7 @@ import { isApiError } from '../api/client.ts'
 import { FormError, useFormError } from '../components/FormError.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
 import { TheirVersion } from '../components/TheirVersion.tsx'
-import { useInstallationTitle } from '../installation.tsx'
+import { useInstallationBanner } from '../installation.tsx'
 import { renderMarkdown } from '../markdown.ts'
 import { isApproved, isMember, useViewer } from '../viewer.tsx'
 
@@ -18,18 +18,44 @@ type Active = { status: 'loading' } | { status: 'ready'; event: Event | null } |
 export type HomeApi = Pick<ApiClient, 'getActiveEvent' | 'updateWelcome'>
 
 /**
+ * The picture an admin uploaded, above the burn it is a picture of (#306).
+ *
+ * `undefined` while the installation is still arriving and `null` when nobody has
+ * uploaded one — both draw nothing, so the page does not flash a broken image at a
+ * URL that would 404.
+ *
+ * The alt is empty deliberately: what it shows is the burn whose name follows it, and
+ * nobody has been asked to describe the photograph. The dimensions are the ones the
+ * browser drew it at, so the space is reserved before the bytes arrive.
+ */
+const Banner = ({ version }: { version?: string | null }) =>
+  version === undefined || version === null ? null : (
+    <img
+      class="burn-banner"
+      src={`${apiRoutes.getInstallationBanner.path()}?v=${encodeURIComponent(version)}`}
+      alt=""
+      width={BANNER_WIDTH}
+      height={BANNER_HEIGHT}
+    />
+  )
+
+/**
  * The public landing page.
  *
- * Almost nothing here is written by us. Everything below the title comes from
- * `welcome_markdown` on the active event, because copy that lives in this file
- * is copy an admin cannot change without a deploy — which is the whole
- * point of #11 and this page.
+ * Almost nothing here is written by us: the banner is uploaded, and everything below
+ * the burn's name comes from `welcome_markdown` on the active event, because copy that
+ * lives in this file is copy an admin cannot change without a deploy — which is the
+ * whole point of #11 and this page.
+ *
+ * The burn's name is the heading. What the installation calls itself is in the bar
+ * above, on every page and beside its icon, so a second copy of it here was the same
+ * words twice on the one page where the burn should lead (#306).
  *
  * Reachable signed out; `getActiveEvent` needs no session.
  */
 export const Home = ({ api }: { api: HomeApi }) => {
   const viewer = useViewer()
-  const title = useInstallationTitle()
+  const banner = useInstallationBanner()
   const [active, setActive] = useState<Active>({ status: 'loading' })
   const [editing, setEditing] = useState<string | undefined>(undefined)
   const [saving, setSaving] = useState(false)
@@ -128,7 +154,7 @@ export const Home = ({ api }: { api: HomeApi }) => {
 
   return (
     <article class="prose">
-      <h1>{title}</h1>
+      <Banner version={banner} />
 
       {active.status === 'loading' && <p class="form-note">One moment…</p>}
 
@@ -146,10 +172,11 @@ export const Home = ({ api }: { api: HomeApi }) => {
 
       {openEvent !== null && (
         <>
-          <h2>{openEvent.name}</h2>
+          <h1>{openEvent.name}</h1>
           <p class="event-dates">
             <time dateTime={openEvent.start_date}>{openEvent.start_date}</time> –{' '}
             <time dateTime={openEvent.end_date}>{openEvent.end_date}</time>
+            {openEvent.location !== '' && <> · {openEvent.location}</>}
           </p>
 
           {/*

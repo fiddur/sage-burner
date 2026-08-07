@@ -563,6 +563,18 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
         body: image,
       }),
 
+    /** Admin only. JPEG bytes the browser has already drawn to 1200 × 630. */
+    setInstallationBanner: (image: Blob) =>
+      request<{ banner: string }>(apiRoutes.setInstallationBanner.path(), {
+        method: apiRoutes.setInstallationBanner.method,
+        body: image,
+      }),
+
+    removeInstallationBanner: () =>
+      request<undefined>(apiRoutes.removeInstallationBanner.path(), {
+        method: apiRoutes.removeInstallationBanner.method,
+      }),
+
     removeInstallationIcon: () =>
       request<undefined>(apiRoutes.removeInstallationIcon.path(), {
         method: apiRoutes.removeInstallationIcon.method,

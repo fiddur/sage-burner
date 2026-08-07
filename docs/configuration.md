@@ -37,7 +37,7 @@ expands to an empty string rather than to nothing.
 | `TRUST_PROXY`         | `false`                     | `false`, `true`, a hop count like `1`, or an address/CIDR list                                                                                          |
 | `SESSION_SECRET`      | _(none)_                    | **Required if `NODE_ENV=production`, `HOST` is not loopback, or `WEB_ROOT` is set.** HMAC key for session cookies, 32+ chars. `openssl rand -base64 48` |
 | `SESSION_TTL_SECONDS` | `1209600`                   | How long a session lasts. Two weeks                                                                                                                     |
-| `PUBLIC_ORIGIN`       | _(unset)_                   | Where a browser reaches this installation, e.g. `https://burn.example.org`. Only passkeys read it — see below                                           |
+| `PUBLIC_ORIGIN`       | _(unset)_                   | Where a browser reaches this installation, e.g. `https://burn.example.org`. Passkeys and the share card read it — see below                             |
 
 Invalid configuration fails at boot with every problem listed, rather than
 starting and behaving subtly wrong.
@@ -54,8 +54,15 @@ passkey — the authenticator will not sign for a domain the credential was not
 registered under — but this closes the other half. It is one line, and it is not
 required only because `docker compose up` has to stay sufficient.
 
+The share card reads it too (#306), and is happier without it: `og:url` and
+`og:image` are absolute and are otherwise built from the request's own `Host`,
+which is what a crawler sends anyway. Setting it pins them to one address, which
+is the right answer for an installation reachable at more than one.
+
 `TRUST_PROXY` defaults to trusting nothing. See
-[deploying.md](./deploying.md) for what to set it to.
+[deploying.md](./deploying.md) for what to set it to — with it unset behind a TLS
+proxy, `request.protocol` is `http`, so the share card names `http://` on an https
+site.
 
 Setting `WEB_ROOT` is a statement of intent to serve the frontend, so the app
 refuses to start if that directory is missing, is not a directory, or has no

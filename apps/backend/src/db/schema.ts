@@ -183,6 +183,27 @@ export const installationIcon = sqliteTable(
   ],
 )
 
+/**
+ * The wide picture a link to this installation shows, and the homepage's own banner
+ * (#306).
+ *
+ * Beside `installation_icon` rather than in it: a square logo a home screen installs
+ * and a 1200 × 630 photograph a crawler draws are two images with nothing but an owner
+ * in common. No `content_type` — a banner is a JPEG and can be nothing else.
+ */
+export const installationBanner = sqliteTable(
+  'installation_banner',
+  {
+    id: text('id').notNull(),
+    image: blob('image', { mode: 'buffer' }).notNull(),
+    updated_at: text('updated_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    check('installation_banner_singleton_check', sql`${table.id} = 'installation'`),
+  ],
+)
+
 /** A single burn. Never assume there is only one — the whole point is recurrence. */
 export const event = sqliteTable(
   'event',
@@ -194,6 +215,8 @@ export const event = sqliteTable(
     end_date: text('end_date').notNull(),
     start_time: text('start_time').notNull().default('00:00'),
     end_time: text('end_time').notNull().default('23:59'),
+    /** Where this one is held. Public: the homepage says it and the share card maps it. */
+    location: text('location').notNull().default(''),
     welcome_markdown: text('welcome_markdown').notNull().default(''),
     /** How to pay for this burn. Shown to whoever has not, on the Members page. */
     payment_info_markdown: text('payment_info_markdown').notNull().default(''),

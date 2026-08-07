@@ -17,7 +17,7 @@ const ADMIN: Viewer = {
 }
 
 const stub = (over: Partial<AdminSettingsApi> = {}): AdminSettingsApi => ({
-  getInstallation: () => Promise.resolve({ installation: { title: 'Sage Burner' } }),
+  getInstallation: () => Promise.resolve({ installation: { title: 'Sage Burner', banner_updated_at: null } }),
   updateInstallation: () => Promise.reject(new Error('updateInstallation is not stubbed here')),
   // The toggle mounted here has its own tests; these keep it from reaching the API
   // when the page under test is about the title.
@@ -29,6 +29,8 @@ const stub = (over: Partial<AdminSettingsApi> = {}): AdminSettingsApi => ({
   unsubscribeFromPush: () => Promise.reject(new Error('unsubscribeFromPush is not stubbed here')),
   setInstallationIcon: () => Promise.reject(new Error('setInstallationIcon is not stubbed here')),
   removeInstallationIcon: () => Promise.reject(new Error('removeInstallationIcon is not stubbed here')),
+  setInstallationBanner: () => Promise.reject(new Error('setInstallationBanner is not stubbed here')),
+  removeInstallationBanner: () => Promise.reject(new Error('removeInstallationBanner is not stubbed here')),
   logout: () => Promise.reject(new Error('logout is not stubbed here')),
   ...over,
 })
@@ -49,9 +51,19 @@ describe('AdminSettings', () => {
     expect(await titleField()).toHaveProperty('value', 'Sage Burner')
   })
 
+  it('is where both pictures are chosen — the home screen’s and a shared link’s', async () => {
+    // Two uploads on one page, and neither is inside the form that saves the title:
+    // they save on choosing a file, and a file input in that form would be two ways
+    // to save one page.
+    renderPage(stub())
+
+    expect(await screen.findByLabelText('The icon on a home screen')).toBeTruthy()
+    expect(screen.getByLabelText('The picture a shared link shows')).toBeTruthy()
+  })
+
   it('renames it', async () => {
     const updateInstallation = vi.fn<AdminSettingsApi['updateInstallation']>(() =>
-      Promise.resolve({ installation: { title: 'The Burning Sage' } }),
+      Promise.resolve({ installation: { title: 'The Burning Sage', banner_updated_at: null } }),
     )
     renderPage(stub({ updateInstallation }))
 
@@ -64,7 +76,7 @@ describe('AdminSettings', () => {
 
   it('trims what it sends, so a stray space is not a rename', async () => {
     const updateInstallation = vi.fn<AdminSettingsApi['updateInstallation']>(() =>
-      Promise.resolve({ installation: { title: 'The Burning Sage' } }),
+      Promise.resolve({ installation: { title: 'The Burning Sage', banner_updated_at: null } }),
     )
     renderPage(stub({ updateInstallation }))
 
@@ -78,7 +90,7 @@ describe('AdminSettings', () => {
     // `aria-required` rather than `required`, so the browser does not block the
     // submit before this message can be shown. The page is the only authority.
     const updateInstallation = vi.fn<AdminSettingsApi['updateInstallation']>(() =>
-      Promise.resolve({ installation: { title: '' } }),
+      Promise.resolve({ installation: { title: '', banner_updated_at: null } }),
     )
     renderPage(stub({ updateInstallation }))
 
@@ -100,7 +112,8 @@ describe('AdminSettings', () => {
           <Header />
           <AdminSettings
             api={stub({
-              updateInstallation: () => Promise.resolve({ installation: { title: 'The Burning Sage' } }),
+              updateInstallation: () =>
+                Promise.resolve({ installation: { title: 'The Burning Sage', banner_updated_at: null } }),
             })}
           />
         </InstallationProvider>
@@ -138,7 +151,7 @@ describe('AdminSettings', () => {
     // who already has admin" — advice for somebody already signed in. #145 fixed it
     // once, in `GuardedPage`, rather than five times.
     const getInstallation = vi.fn<AdminSettingsApi['getInstallation']>(() =>
-      Promise.resolve({ installation: { title: 'Sage Burner' } }),
+      Promise.resolve({ installation: { title: 'Sage Burner', banner_updated_at: null } }),
     )
     renderPage(stub({ getInstallation }), { status: 'signed-out' })
 
@@ -149,7 +162,7 @@ describe('AdminSettings', () => {
 
   it('tells somebody signed in without the role to ask, not to log in again', async () => {
     const getInstallation = vi.fn<AdminSettingsApi['getInstallation']>(() =>
-      Promise.resolve({ installation: { title: 'Sage Burner' } }),
+      Promise.resolve({ installation: { title: 'Sage Burner', banner_updated_at: null } }),
     )
     renderPage(stub({ getInstallation }), {
       status: 'signed-in',

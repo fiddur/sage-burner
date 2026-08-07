@@ -39,6 +39,9 @@ export const MAX_OPTION_LABEL = 200
 /** The name of a burn, a dream, or the installation itself. */
 export const MAX_TITLE = 200
 
+/** Where a burn is held, as a person would say it: a farm, a village, an address. */
+export const MAX_LOCATION = 200
+
 /** A schedule lane's name. Shorter than a label: it has to fit a grid column. */
 export const MAX_PLACE_NAME = 100
 

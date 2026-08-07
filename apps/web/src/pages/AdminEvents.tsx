@@ -1,6 +1,6 @@
 import type { Event } from '@sage-burner/shared'
 
-import { MAX_SLUG, MAX_TITLE, MAX_WELCOME_LENGTH } from '@sage-burner/shared'
+import { MAX_LOCATION, MAX_SLUG, MAX_TITLE, MAX_WELCOME_LENGTH } from '@sage-burner/shared'
 import { useEffect, useRef, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -26,6 +26,7 @@ type Editable = Pick<
   | 'end_date'
   | 'start_time'
   | 'end_time'
+  | 'location'
   | 'member_cap'
   | 'welcome_markdown'
   | 'payment_info_markdown'
@@ -57,6 +58,7 @@ const BLANK = {
   // existed. An admin who knows the gate times narrows it.
   start_time: '00:00',
   end_time: '23:59',
+  location: '',
   member_cap: '42',
 }
 
@@ -103,6 +105,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
     end_date: '',
     start_time: '',
     end_time: '',
+    location: '',
     member_cap: '',
   })
   const [saving, setSaving] = useState(false)
@@ -142,6 +145,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
         end_date: draft.end_date,
         start_time: draft.start_time,
         end_time: draft.end_time,
+        location: draft.location,
         welcome_markdown: '',
         // Sent rather than left to the schema's default, like the welcome text and
         // for the same reason: both are written after the burn exists.
@@ -186,6 +190,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
       end_date: row.end_date,
       start_time: row.start_time,
       end_time: row.end_time,
+      location: row.location,
       member_cap: String(row.member_cap),
     })
     setSaveError(undefined)
@@ -211,6 +216,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
         end_date: details.end_date,
         start_time: details.start_time,
         end_time: details.end_time,
+        location: details.location,
         member_cap: cap,
         welcome_markdown: welcome,
         payment_info_markdown: payment,
@@ -234,6 +240,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
           end_date: updated.end_date,
           start_time: updated.start_time,
           end_time: updated.end_time,
+          location: updated.location,
           member_cap: String(updated.member_cap),
         })
         setWelcome(updated.welcome_markdown)
@@ -352,6 +359,26 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
                       }
                     />
                   </label>
+
+                  <label class="field">
+                    <span>Where</span>
+                    <input
+                      type="text"
+                      maxLength={MAX_LOCATION}
+                      aria-label={`Location of ${row.slug}`}
+                      value={details.location}
+                      onInput={(inputEvent) =>
+                        setDetails({ ...details, location: inputEvent.currentTarget.value })
+                      }
+                    />
+                  </label>
+
+                  {/* Public: the homepage says it and a shared link puts the burn on a
+                      map, so it holds a place rather than a gate code. */}
+                  <p class="form-note">
+                    Shown on the homepage and in the card a shared link draws — "Sagegården, outside Rättvik",
+                    not the directions.
+                  </p>
 
                   <label class="field">
                     <span>Member cap</span>
@@ -511,6 +538,18 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
           The schedule runs between these, so a burn that opens at midday and closes at midday is two half
           days of grid rather than three whole ones.
         </p>
+
+        {/* Not required: naming a date and a cap is what creating a burn is, and
+            where it is held is often decided after. */}
+        <label class="field">
+          <span>Where</span>
+          <input
+            type="text"
+            maxLength={MAX_LOCATION}
+            value={draft.location}
+            onInput={(inputEvent) => setDraft({ ...draft, location: inputEvent.currentTarget.value })}
+          />
+        </label>
 
         <label class="field">
           <span>Member cap</span>

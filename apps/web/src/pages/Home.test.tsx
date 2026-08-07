@@ -7,6 +7,7 @@ import type { Viewer } from '../viewer.tsx'
 import type { HomeApi } from './Home.tsx'
 
 import { apiError } from '../api/client.ts'
+import { InstallationProvider } from '../installation.tsx'
 import { ViewerProvider } from '../viewer.tsx'
 import { Home } from './Home.tsx'
 
@@ -20,6 +21,7 @@ const summer: Event = {
   end_date: '2026-08-05',
   start_time: '00:00',
   end_time: '23:59',
+  location: '',
   welcome_markdown: '# Bring water\n\nAnd a [map](/map).',
   payment_info_markdown: '',
   transfer_info_markdown: '',
@@ -36,11 +38,14 @@ const renderHome = (
   event: Event | null,
   viewer: Viewer = SIGNED_OUT,
   updateWelcome: HomeApi['updateWelcome'] = notStubbed,
+  banner: string | null = null,
 ) =>
   render(
-    <ViewerProvider viewer={viewer}>
-      <Home api={{ getActiveEvent: () => Promise.resolve({ event }), updateWelcome }} />
-    </ViewerProvider>,
+    <InstallationProvider title="The Burning Sage" banner={banner}>
+      <ViewerProvider viewer={viewer}>
+        <Home api={{ getActiveEvent: () => Promise.resolve({ event }), updateWelcome }} />
+      </ViewerProvider>
+    </InstallationProvider>,
   )
 
 const asRoles = (roles: ('admin' | 'member')[]): Viewer => ({
@@ -52,9 +57,49 @@ describe('Home', () => {
   it('renders the active event name and dates', async () => {
     renderHome(summer)
 
-    expect(await screen.findByRole('heading', { name: 'Summer Burn 2026', level: 2 })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Summer Burn 2026', level: 1 })).toBeTruthy()
     expect(screen.getByText('2026-08-01')).toBeTruthy()
     expect(screen.getByText('2026-08-05')).toBeTruthy()
+  })
+
+  it('says where the burn is, beside its dates', async () => {
+    renderHome({ ...summer, location: 'Sagegården, Rättvik' })
+
+    expect(await screen.findByText(/Sagegården, Rättvik/)).toBeTruthy()
+  })
+
+  it('says nothing about the place when nobody has named one', async () => {
+    // A burn with no location yet is the ordinary state of one just created, and a
+    // stray separator with nothing after it reads as something failing to load.
+    const { container } = renderHome(summer)
+
+    await screen.findByRole('heading', { name: 'Summer Burn 2026', level: 1 })
+    expect(container.querySelector('.event-dates')?.textContent).toBe('2026-08-01 – 2026-08-05')
+  })
+
+  it('leads with the burn rather than repeating what the bar already says', async () => {
+    // The installation's name is in the header of every page, beside its icon (#306).
+    const { container } = renderHome(summer)
+
+    await screen.findByRole('heading', { name: 'Summer Burn 2026', level: 1 })
+    expect(container.textContent).not.toContain('The Burning Sage')
+  })
+
+  it('draws the banner an admin uploaded, at the version they uploaded', async () => {
+    renderHome(summer, SIGNED_OUT, notStubbed, '2026-08-07T10:00:00.000Z')
+
+    const banner = document.querySelector('.burn-banner')
+
+    expect(banner?.getAttribute('src')).toBe('/api/installation/banner?v=2026-08-07T10%3A00%3A00.000Z')
+    // Decorative: what it shows is the burn whose name follows it, and nobody has
+    // been asked to describe the picture.
+    expect(banner?.getAttribute('alt')).toBe('')
+  })
+
+  it('draws no banner when nobody has uploaded one', () => {
+    renderHome(summer)
+
+    expect(document.querySelector('.burn-banner')).toBeNull()
   })
 
   it('renders the welcome markdown', async () => {
@@ -62,8 +107,8 @@ describe('Home', () => {
     // page, with no deploy in between.
     renderHome(summer)
 
-    // Level 2: the page's own `h1` is the site name, so content headings shift
-    // down one rather than producing a second `h1` under an `h2`.
+    // Level 2: the page's `h1` is the burn's name, so a heading written into the
+    // welcome text shifts down one rather than becoming a second `h1`.
     expect(await screen.findByRole('heading', { name: 'Bring water', level: 2 })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'map' }).getAttribute('href')).toBe('/map')
   })
@@ -73,7 +118,7 @@ describe('Home', () => {
     // makes that safe, so this test is the one holding the control up.
     renderHome({ ...summer, welcome_markdown: 'Hi <script>alert(1)</script>' })
 
-    await screen.findByRole('heading', { name: 'Summer Burn 2026', level: 2 })
+    await screen.findByRole('heading', { name: 'Summer Burn 2026', level: 1 })
     expect(document.querySelector('.welcome script')).toBeNull()
     expect(screen.getByText(/<script>alert\(1\)<\/script>/)).toBeTruthy()
   })
@@ -138,7 +183,7 @@ describe('Home', () => {
       account: { id: 'a-1', name: null, avatar: null, roles: ['member'] },
     })
 
-    await screen.findByRole('heading', { name: 'Summer Burn 2026', level: 2 })
+    await screen.findByRole('heading', { name: 'Summer Burn 2026', level: 1 })
     expect(screen.queryByRole('link', { name: 'Apply to join' })).toBeNull()
     expect(screen.queryByRole('link', { name: 'Log in' })).toBeNull()
   })
@@ -156,7 +201,7 @@ describe('Home', () => {
         <Home api={api} />
       </ViewerProvider>,
     )
-    await screen.findByRole('heading', { name: 'Summer Burn 2026', level: 2 })
+    await screen.findByRole('heading', { name: 'Summer Burn 2026', level: 1 })
 
     rerender(
       <ViewerProvider viewer={SIGNED_OUT}>
@@ -170,14 +215,14 @@ describe('Home', () => {
   describe('editing the welcome text', () => {
     it('offers no editor to someone signed out', async () => {
       renderHome(summer)
-      await screen.findByRole('heading', { name: 'Summer Burn 2026', level: 2 })
+      await screen.findByRole('heading', { name: 'Summer Burn 2026', level: 1 })
 
       expect(screen.queryByRole('button', { name: 'Edit this text' })).toBeNull()
     })
 
     it('offers no editor to a signed-in account with no roles', async () => {
       renderHome(summer, asRoles([]))
-      await screen.findByRole('heading', { name: 'Summer Burn 2026', level: 2 })
+      await screen.findByRole('heading', { name: 'Summer Burn 2026', level: 1 })
 
       expect(screen.queryByRole('button', { name: 'Edit this text' })).toBeNull()
     })

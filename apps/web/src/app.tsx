@@ -69,6 +69,8 @@ export type RoutesApi = Pick<
   | 'removeMyAvatar'
   | 'setInstallationIcon'
   | 'removeInstallationIcon'
+  | 'setInstallationBanner'
+  | 'removeInstallationBanner'
   | 'getEvents'
   | 'getInviteState'
   | 'redeemInvite'

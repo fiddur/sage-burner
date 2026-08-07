@@ -334,6 +334,32 @@ a:hover {
   height: auto;
 }
 
+/* The uploaded banner, above the burn it is a picture of (#306). The ratio is
+   reserved before the bytes arrive, so the welcome text does not jump down the page
+   when they do — and `cover` is what keeps a picture the browser cropped to another
+   shape from stretching. */
+.burn-banner {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-bottom: 1.5rem;
+  border-radius: var(--radius);
+  aspect-ratio: 1200 / 630;
+  object-fit: cover;
+}
+
+/* The same picture on the settings page, at a size that sits under a label rather
+   than filling the page. Shown at the shape the card will use it in: the format is
+   what decides whether a share is a big picture or a thumbnail. */
+.banner-preview {
+  display: block;
+  width: min(100%, 24rem);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  aspect-ratio: 1200 / 630;
+  object-fit: cover;
+}
+
 /* Marks a required question on the public form. Not colour alone — the word is
    the marker, so it survives a screen reader and a monochrome screen. */
 .required-marker {

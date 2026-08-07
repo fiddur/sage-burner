@@ -114,13 +114,23 @@ deployment, not an error.
 ### Editing an event
 
 Organise → **Events**. Create burns there, and edit any of it afterwards — name,
-dates, hours, member cap and the welcome text are all on the same form. The hours
-in particular need to be editable: a burn created before anyone thought about them
-takes the whole-day default, and the schedule grid is drawn from them.
+dates, hours, where it is held, member cap and the welcome text are all on the
+same form. The hours in particular need to be editable: a burn created before
+anyone thought about them takes the whole-day default, and the schedule grid is
+drawn from them.
 
-The public homepage renders it: name, dates and the welcome markdown, with
-"Apply to join" and "Log in" for a signed-out visitor. The editor's preview uses
-the same renderer, so what it shows is what a visitor gets.
+`location` is free text in whatever words somebody would say it in — "Sagegården,
+outside Rättvik" — and it is **per burn** rather than per installation, because the
+same people meet at a different farm next time (#306). It is public: the homepage
+says it beside the dates, and the card a shared link draws carries it as the
+schema.org `Place` that puts the burn on a map. So it holds a place, not a gate
+code. Empty until somebody fills it in.
+
+The public homepage renders it: the banner above, then name, dates, place and the
+welcome markdown, with "Apply to join" and "Log in" for a signed-out visitor. The
+burn's name is the page's heading — what the installation calls itself is in the
+bar above, on every page. The editor's preview uses the same renderer, so what it
+shows is what a visitor gets.
 
 A slug collision answers **409** rather than a generic failure — the slug appears
 in URLs, so it is something the admin fixes by choosing another.

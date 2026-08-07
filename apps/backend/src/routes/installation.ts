@@ -8,6 +8,7 @@ import type { GuardDeps } from '../auth/guards.ts'
 
 import { INSTALLATION_ID, installation } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
+import { bannerVersion } from './banner.ts'
 
 /**
  * What this deployment calls itself.
@@ -18,14 +19,18 @@ import { bodyOf, noStore, sendError } from '../http.ts'
  * operator, a redeploy, or a fork.
  */
 export const registerInstallationRoutes = (app: FastifyInstance, { db }: GuardDeps) => {
-  const current = async () => {
+  const current = async (): Promise<InstallationResponse['installation'] | undefined> => {
     const [row] = await db
       .select({ title: installation.title })
       .from(installation)
       .where(eq(installation.id, INSTALLATION_ID))
       .limit(1)
 
-    return row
+    if (row === undefined) return undefined
+
+    // Read here rather than by the homepage asking the image route, which would 404
+    // in the ordinary case of nobody having uploaded one.
+    return { ...row, banner_updated_at: (await bannerVersion(db)) ?? null }
   }
 
   app.get(apiRoutes.getInstallation.fastify, async (_request, reply) => {

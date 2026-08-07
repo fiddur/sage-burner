@@ -16,17 +16,38 @@ import type { ApiClient } from './api/client.ts'
  */
 interface InstallationContextValue {
   title?: string
+  /**
+   * When the banner was last uploaded — `null` for none, `undefined` until the
+   * answer arrives (#306). It is the `?v=` the homepage's `<img>` quotes, so a new
+   * banner is a new URL rather than whatever the browser already had.
+   */
+  banner?: string | null
   setTitle: (title: string) => void
+  setBanner: (banner: string | null) => void
 }
 
-const InstallationContext = createContext<InstallationContextValue>({ setTitle: () => undefined })
+const InstallationContext = createContext<InstallationContextValue>({
+  setTitle: () => undefined,
+  setBanner: () => undefined,
+})
 
-const Provide = ({ title, children }: { title?: string; children: ComponentChildren }) => {
+const Provide = ({
+  title,
+  banner,
+  children,
+}: {
+  title?: string
+  banner?: string | null
+  children: ComponentChildren
+}) => {
   // A rename on the settings page has to reach the header, which is a sibling
   // several levels up. The override wins over the fetched value for the same
   // reason it does for the viewer: at that point the local answer is the newer
-  // one.
+  // one. The banner is the same story one page over — it is uploaded under ⚙️ and
+  // drawn on the homepage, and a client-side navigation between the two fetches
+  // nothing.
   const [override, setOverride] = useState<string | undefined>(undefined)
+  const [bannerOverride, setBannerOverride] = useState<string | null | undefined>(undefined)
   const current = override ?? title
 
   useEffect(() => {
@@ -34,20 +55,33 @@ const Provide = ({ title, children }: { title?: string; children: ComponentChild
   }, [current])
 
   return (
-    <InstallationContext.Provider value={{ title: current, setTitle: setOverride }}>
+    <InstallationContext.Provider
+      value={{
+        title: current,
+        banner: bannerOverride === undefined ? banner : bannerOverride,
+        setTitle: setOverride,
+        setBanner: setBannerOverride,
+      }}
+    >
       {children}
     </InstallationContext.Provider>
   )
 }
 
-/** A known title, for tests and for anywhere the answer is already in hand. */
+/** A known installation, for tests and for anywhere the answer is already in hand. */
 export const InstallationProvider = ({
   children,
   title,
+  banner,
 }: {
   children: ComponentChildren
   title?: string
-}) => <Provide title={title}>{children}</Provide>
+  banner?: string | null
+}) => (
+  <Provide title={title} banner={banner}>
+    {children}
+  </Provide>
+)
 
 /**
  * The provider the real app uses: asks the API.
@@ -64,6 +98,7 @@ export const FetchedInstallationProvider = ({
   api: Pick<ApiClient, 'getInstallation'>
 }) => {
   const [title, setTitle] = useState<string | undefined>(undefined)
+  const [banner, setBanner] = useState<string | null | undefined>(undefined)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -71,7 +106,9 @@ export const FetchedInstallationProvider = ({
     api
       .getInstallation(controller.signal)
       .then((response) => {
-        if (!controller.signal.aborted) setTitle(response.installation.title)
+        if (controller.signal.aborted) return
+        setTitle(response.installation.title)
+        setBanner(response.installation.banner_updated_at)
       })
       .catch(() => {
         // Nothing to report and nowhere to report it: this renders in the
@@ -84,10 +121,20 @@ export const FetchedInstallationProvider = ({
     }
   }, [api])
 
-  return <Provide title={title}>{children}</Provide>
+  return (
+    <Provide title={title} banner={banner}>
+      {children}
+    </Provide>
+  )
 }
 
 export const useInstallationTitle = () => useContext(InstallationContext).title
 
+/** The homepage's banner, or `null` when nobody has uploaded one (#306). */
+export const useInstallationBanner = () => useContext(InstallationContext).banner
+
 /** For the settings page, which already knows the new title. */
 export const useSetInstallationTitle = () => useContext(InstallationContext).setTitle
+
+/** For the settings page, so the homepage draws the new banner without a reload. */
+export const useSetInstallationBanner = () => useContext(InstallationContext).setBanner

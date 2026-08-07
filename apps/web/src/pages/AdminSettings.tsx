@@ -2,10 +2,12 @@ import { MAX_TITLE } from '@sage-burner/shared'
 import { useEffect, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
+import type { BannerApi } from '../components/BannerField.tsx'
 import type { IconApi } from '../components/IconField.tsx'
 import type { PushApi } from '../components/PushToggle.tsx'
 
 import { isApiError } from '../api/client.ts'
+import { BannerField } from '../components/BannerField.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { IconField } from '../components/IconField.tsx'
 import { LogOutButton } from '../components/LogOutButton.tsx'
@@ -13,7 +15,8 @@ import { PushToggle } from '../components/PushToggle.tsx'
 import { useSetInstallationTitle } from '../installation.tsx'
 import { isAdmin, useViewer } from '../viewer.tsx'
 
-export type AdminSettingsApi = IconApi &
+export type AdminSettingsApi = BannerApi &
+  IconApi &
   PushApi &
   Pick<ApiClient, 'getInstallation' | 'logout' | 'updateInstallation'>
 
@@ -127,10 +130,11 @@ export const AdminSettings = ({ api }: { api: AdminSettingsApi }) => {
         </form>
       )}
 
-      {/* Outside the form: it saves on choosing a file rather than on submit, and a
+      {/* Outside the form: they save on choosing a file rather than on submit, and a
           file input inside a form that posts a title would be two ways to save one
           page. */}
       {loaded.status === 'ready' && <IconField api={api} />}
+      {loaded.status === 'ready' && <BannerField api={api} />}
 
       {/* Also on the details page, which is where a member finds it. Kept here for
           the same reason ⚙️ keeps the Places and lodging links: an admin holding

@@ -40,6 +40,9 @@ const clientWith = (
   setInstallationIcon: () => Promise.reject(new Error('setInstallationIcon is not stubbed in this file')),
   removeInstallationIcon: () =>
     Promise.reject(new Error('removeInstallationIcon is not stubbed in this file')),
+  setInstallationBanner: () => Promise.reject(new Error('setInstallationBanner is not stubbed in this file')),
+  removeInstallationBanner: () =>
+    Promise.reject(new Error('removeInstallationBanner is not stubbed in this file')),
   getQuestions: () => Promise.reject(new Error('getQuestions is not stubbed in this file')),
   submitApplication: () => Promise.reject(new Error('submitApplication is not stubbed in this file')),
   getApplications: () => Promise.reject(new Error('getApplications is not stubbed in this file')),
@@ -218,7 +221,10 @@ describe('routing', () => {
   it('renders the home page at the root', () => {
     renderAt('/')
 
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('The Burning Sage')
+    // The homepage's own invitation to apply, which the nav's shorter "Apply" is not.
+    // Its `h1` is the burn's name now (#306), and this file's client never answers
+    // with a burn — the installation's name is in the bar, asserted below.
+    expect(screen.getByRole('link', { name: 'Apply to join' })).toBeTruthy()
   })
 
   it('routes every page the app links to, from the nav and the admin landing page', () => {

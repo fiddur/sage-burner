@@ -44,7 +44,7 @@ describe('FetchedInstallationProvider', () => {
   it('hands the title to whoever asks for it', async () => {
     renderWith(
       vi.fn<AppApi['getInstallation']>(() =>
-        Promise.resolve({ installation: { title: 'The Burning Sage' } }),
+        Promise.resolve({ installation: { title: 'The Burning Sage', banner_updated_at: null } }),
       ),
     )
 
@@ -54,7 +54,7 @@ describe('FetchedInstallationProvider', () => {
   it('puts it in the browser tab as well as the page', async () => {
     renderWith(
       vi.fn<AppApi['getInstallation']>(() =>
-        Promise.resolve({ installation: { title: 'The Burning Sage' } }),
+        Promise.resolve({ installation: { title: 'The Burning Sage', banner_updated_at: null } }),
       ),
     )
 

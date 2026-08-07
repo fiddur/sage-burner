@@ -1,10 +1,10 @@
 import type { FastifyHelmetOptions } from '@fastify/helmet'
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
 import helmet from '@fastify/helmet'
 import fastifyStatic from '@fastify/static'
 import Fastify from 'fastify'
-import { existsSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 
 import type { Gate } from './auth/gate.ts'
@@ -28,6 +28,7 @@ import { registerApplicationRoutes } from './routes/applications.ts'
 import { registerAttendanceRoutes } from './routes/attendance.ts'
 import { registerAuthRoutes } from './routes/auth.ts'
 import { registerAvatarRoutes } from './routes/avatars.ts'
+import { registerBannerRoutes } from './routes/banner.ts'
 import { registerEventOptionRoutes } from './routes/event-options.ts'
 import { registerEventRoutes } from './routes/events.ts'
 import { registerImageBodyParser } from './routes/image-body.ts'
@@ -47,6 +48,7 @@ import { registerRosterRoutes } from './routes/roster.ts'
 import { registerScheduleRoutes } from './routes/schedule.ts'
 import { registerSessionRoutes } from './routes/sessions.ts'
 import { registerVersionRoutes } from './routes/version.ts'
+import { createShellHandler, prepareShell } from './shell.ts'
 
 export interface AppDeps {
   db: Database
@@ -426,6 +428,7 @@ export const createApp = async ({
   registerPlaceRoutes(app, { db, sessions, now })
   registerAvatarRoutes(app, { db, sessions, now })
   registerPwaRoutes(app, { db, sessions, now })
+  registerBannerRoutes(app, { db, sessions, now })
   registerMealRoutes(app, { db, sessions, now, notify: tellAccount })
   // Separate registration, not a separate guard: the plan lives under `/api/admin/`,
   // where the prefix hook is the only thing that lets it through. The member-facing
@@ -465,13 +468,34 @@ export const createApp = async ({
 
   const webRoot = config.web_root
   const servesWebApp = webRoot !== undefined
+  let sendShell: ((request: FastifyRequest, reply: FastifyReply) => Promise<unknown>) | undefined
 
   if (webRoot !== undefined) {
     const root = path.resolve(webRoot)
     assertServableWebRoot(root)
 
+    // Read once, at boot: the file is part of the image and cannot change under a
+    // running process — the same assumption `wildcard: false` already makes below.
+    sendShell = createShellHandler({
+      db,
+      config,
+      now,
+      template: prepareShell(readFileSync(path.join(root, 'index.html'), 'utf8')),
+    })
+
+    // Both spellings of the shell, and both by hand: `index.html` is kept out of the
+    // static glob so the card is injected wherever the shell goes out. Serving it from
+    // two places is how sharing the bare domain works while sharing a deep link does
+    // not, or the reverse.
+    app.get('/', sendShell)
+    app.get('/index.html', sendShell)
+
     await app.register(fastifyStatic, {
       root,
+      // The shell is this instance's own route, above. `@fastify/static` would
+      // otherwise register `/index.html` — and `/`, which it derives from the same
+      // file — and Fastify throws on a route declared twice.
+      globIgnore: ['index.html'],
       // A `/*` route would swallow every unmatched request before the
       // not-found handler below ever ran, taking the API's 404s with it.
       //
@@ -511,7 +535,7 @@ export const createApp = async ({
     // parse failure at the caller.
     if (isApiRequest(pathname)) return notFound()
 
-    if (!servesWebApp) return notFound()
+    if (!servesWebApp || sendShell === undefined) return notFound()
 
     // A POST to a nonexistent path is a mistake, not a page.
     if (request.method !== 'GET' && request.method !== 'HEAD') return notFound()
@@ -519,7 +543,7 @@ export const createApp = async ({
     // A missing asset is a missing asset, not a client-side route.
     if (looksLikeAsset(pathname)) return notFound()
 
-    return reply.sendFile('index.html')
+    return sendShell(request, reply)
   })
 
   return app
