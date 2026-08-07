@@ -44,8 +44,22 @@ describe('reading a push payload', () => {
     expect(alertFrom({ body: 'a', link: 'javascript:alert(1)' }).path).toBe(HOME)
   })
 
+  it('refuses the ones that walk past a leading-slash check', () => {
+    // Both of these satisfy `startsWith('/') && !startsWith('//')`, which is what
+    // this was, and both resolve to `https://elsewhere.example/`: WHATWG parsing
+    // reads `\` as `/` for special schemes, and strips tab and newline before it
+    // parses at all. Run against the old implementation, not reasoned about.
+    expect(alertFrom({ body: 'a', link: '/\\elsewhere.example' }).path).toBe(HOME)
+    expect(alertFrom({ body: 'a', link: '/\t/elsewhere.example' }).path).toBe(HOME)
+    expect(alertFrom({ body: 'a', link: '/\n/elsewhere.example' }).path).toBe(HOME)
+  })
+
   it('keeps an ordinary path, which is the case the one above must not break', () => {
     expect(alertFrom({ body: 'a', link: '/roles' }).path).toBe('/roles')
     expect(alertFrom({ body: 'a', link: '/admin/applications' }).path).toBe('/admin/applications')
+  })
+
+  it('keeps a query and a fragment, which still name something in this app', () => {
+    expect(alertFrom({ body: 'a', link: '/schedule?dream=d-1#top' }).path).toBe('/schedule?dream=d-1#top')
   })
 })

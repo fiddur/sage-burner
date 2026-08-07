@@ -192,12 +192,16 @@ self.addEventListener('notificationclick', (event) => {
       // Focus a window that is already showing the page rather than piling up new
       // ones, which is what happens on a phone otherwise.
       //
-      // **Only an exact match, and it is never navigated.** `client.navigate()` is a
-      // full page load, so pointing an open window at the notification's page would
-      // discard whatever somebody had typed into a markdown editor — the same thing
-      // the dream panel was rewritten to stop doing. A second window is the cheaper
-      // mistake. Routing it in-page by `postMessage` would have both, and is #279's
-      // remaining half.
+      // **A suffix match on the whole URL**, which is looser than it looks: a client
+      // carrying a query or a fragment falls outside it, and so would a future route
+      // that ends in another one's path. Today's links make it behave. Comparing
+      // parsed pathnames is the honest version and is #279's remaining half.
+      //
+      // **Never navigated**, whatever it matches. `client.navigate()` is a full page
+      // load, so pointing an open window at the notification's page would discard
+      // whatever somebody had typed into a markdown editor — the thing the dream
+      // panel was rewritten to stop doing. A second window is the cheaper mistake;
+      // routing in-page by `postMessage` would avoid both.
       for (const client of windows) {
         if (client.url.endsWith(path)) return client.focus()
       }

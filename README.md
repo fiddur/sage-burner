@@ -814,8 +814,9 @@ three applications on a locked phone should be one line to act on, and that was 
 whole point of a tag, but one tag for everything made a meal role replace a dream
 offer instead.
 
-Tapping one focuses a window already showing that page, and otherwise opens a new
-one. Deliberately **not** navigating an open window to it: `client.navigate()` is a
+Tapping one focuses a window already showing that page — a suffix match on the URL,
+which today's links make behave — and otherwise opens a new one. Deliberately **not**
+navigating an open window to it: `client.navigate()` is a
 full page load, so it would discard whatever somebody had typed into a markdown
 editor — the thing the dream panel was rewritten to stop doing. A second window is
 the cheaper mistake.

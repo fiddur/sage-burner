@@ -42,14 +42,41 @@ const stringAt = (raw: unknown, key: string): string | undefined => {
 }
 
 /**
+ * Anywhere but here, to resolve against. Any fixed origin does — the only question
+ * asked of it is whether resolving the link left it.
+ */
+const NOWHERE = 'https://app.invalid'
+
+/**
  * A path this app can open, or home.
  *
- * The link is the server's own, so this is a floor rather than a defence — but it is
- * a cheap one, and `openWindow` takes a URL: `//elsewhere.example` is a
- * protocol-relative address rather than a path, and would leave the app entirely.
+ * The link is the server's own, so this is a floor rather than a defence — but
+ * `openWindow` takes a URL, and a link that resolves elsewhere would leave the app
+ * entirely.
+ *
+ * **Asked of the parser, not matched against.** This was `startsWith('/') &&
+ * !startsWith('//')`, which the very inputs its test named walk straight past:
+ * WHATWG parsing treats `\` as `/` for special schemes and strips tab and newline
+ * before parsing, so `/\evil.example` and `/<tab>/evil.example` both satisfy that
+ * pair and resolve to `https://evil.example/`. Measured, not reasoned about. An
+ * escapable syntax loses to the thing that parses it; asking that thing instead
+ * cannot be one escape behind.
+ *
+ * The answer is rebuilt from the parse rather than handed back as written, so what
+ * `openWindow` gets is the normalised path — with the query and fragment kept, since
+ * a link to a particular thing on a page is still a link to this app.
  */
-const pathIn = (link: string | undefined): string =>
-  link !== undefined && link.startsWith('/') && !link.startsWith('//') ? link : HOME
+const pathIn = (link: string | undefined): string => {
+  if (link === undefined) return HOME
+
+  try {
+    const asked = new URL(link, NOWHERE)
+
+    return asked.origin === NOWHERE ? `${asked.pathname}${asked.search}${asked.hash}` : HOME
+  } catch {
+    return HOME
+  }
+}
 
 export const alertFrom = (raw: unknown): Alert => {
   const category = stringAt(raw, 'category')
