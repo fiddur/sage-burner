@@ -1,15 +1,20 @@
 import type { NotificationsResponse, NotificationSettings } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { apiRoutes, errorResponse, notificationSettingsSchema } from '@sage-burner/shared'
+import {
+  apiRoutes,
+  errorResponse,
+  notificationCategories,
+  notificationSettingsSchema,
+} from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 
 import type { GuardDeps } from '../auth/guards.ts'
 
 import { viewerFor } from '../auth/viewer.ts'
-import { notificationMute } from '../db/schema.ts'
+import { notificationSetting } from '../db/schema.ts'
 import { noStore } from '../http.ts'
-import { markSeen, notificationsFor } from '../push/notify.ts'
+import { markSeen, notificationsFor, switchedOn } from '../push/notify.ts'
 
 export interface NotificationDeps extends GuardDeps {
   now?: () => Date
@@ -59,12 +64,7 @@ export const registerNotificationRoutes = (
     const accountId = await mine(request)
     if (accountId === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
 
-    const rows = await db
-      .select({ category: notificationMute.category })
-      .from(notificationMute)
-      .where(eq(notificationMute.account_id, accountId))
-
-    return { muted: rows.map((row) => row.category) } satisfies NotificationSettings
+    return { on: await switchedOn(db, accountId) } satisfies NotificationSettings
   })
 
   app.put(apiRoutes.updateMyNotificationSettings.fastify, async (request, reply) => {
@@ -81,16 +81,25 @@ export const registerNotificationRoutes = (
 
     // The whole set, not a delta — the form sends every tick it is showing, and a
     // delta would need the client to know what it had before to say what changed.
-    // Replaced in one transaction so a failure halfway does not leave somebody muted
-    // on categories they just switched back on.
-    const wanted = [...new Set(parsed.data.muted)]
+    // Replaced in one transaction so a failure halfway does not leave somebody
+    // switched off on categories they just switched back on.
+    //
+    // A row is written for **every** category, not only the on ones: the body is a
+    // complete statement of what this person wants, and storing only half of it
+    // would leave the rest reading as "never said" — which is the default, not the
+    // choice they just made.
+    const on = new Set(parsed.data.on)
     db.transaction((tx) => {
-      tx.delete(notificationMute).where(eq(notificationMute.account_id, accountId)).run()
-      for (const category of wanted) {
-        tx.insert(notificationMute).values({ account_id: accountId, category }).run()
+      tx.delete(notificationSetting).where(eq(notificationSetting.account_id, accountId)).run()
+      for (const category of notificationCategories) {
+        tx.insert(notificationSetting)
+          .values({ account_id: accountId, category, enabled: on.has(category) })
+          .run()
       }
     })
 
-    return { muted: wanted } satisfies NotificationSettings
+    return {
+      on: notificationCategories.filter((category) => on.has(category)),
+    } satisfies NotificationSettings
   })
 }

@@ -75,7 +75,7 @@ const clientWith = (
   // file, and a rejection is swallowed anyway — being offline is not a new version.
   getVersion: () => Promise.resolve({ build_sha: 'the-one-this-page-loaded' }),
   getMyNotifications: () => Promise.resolve({ notifications: [], unseen: 0 }),
-  getMyNotificationSettings: () => Promise.resolve({ muted: [] }),
+  getMyNotificationSettings: () => Promise.resolve({ on: [] }),
   updateMyNotificationSettings: () =>
     Promise.reject(new Error('updateMyNotificationSettings is not stubbed here')),
   markNotificationsSeen: () => Promise.reject(new Error('markNotificationsSeen is not stubbed in this file')),

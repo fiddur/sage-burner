@@ -67,7 +67,7 @@ const aBrowser = (over: Partial<PushBrowser> = {}): PushBrowser => ({
 type Subscribe = Awaited<ReturnType<PushBrowser['register']>>['subscribe']
 
 const stub = (over: Partial<PushApi> = {}): PushApi => ({
-  getMyNotificationSettings: () => Promise.resolve({ muted: [] }),
+  getMyNotificationSettings: () => Promise.resolve({ on: [] }),
   updateMyNotificationSettings: () =>
     Promise.reject(new Error('updateMyNotificationSettings is not stubbed here')),
   getPushKey: () => Promise.resolve({ public_key: 'BFakeKey_with-url-safe' }),

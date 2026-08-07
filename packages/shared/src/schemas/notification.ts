@@ -28,10 +28,16 @@ export const notificationsResponseSchema = z.object({
 export type NotificationsResponse = z.infer<typeof notificationsResponseSchema>
 
 /**
- * Which categories are switched off. Absence is on, so an empty list is the default
- * and nothing has to be seeded for a new account.
+ * Which categories are switched **on**, in full.
+ *
+ * Was `muted` — the ones switched off — which worked while every category was on by
+ * default. #259 added five that are off by default, and one list of exceptions
+ * cannot mean "off" for some categories and "on" for others without the reader
+ * having to know which is which. So the wire carries the answer rather than the
+ * delta: what is on, whatever the defaults are.
+ *
+ * The server fills the defaults in for an account that has never saved, so a client
+ * never has to know them either.
  */
-export const notificationSettingsSchema = z
-  .object({ muted: z.array(z.enum(notificationCategories)) })
-  .strict()
+export const notificationSettingsSchema = z.object({ on: z.array(z.enum(notificationCategories)) }).strict()
 export type NotificationSettings = z.infer<typeof notificationSettingsSchema>

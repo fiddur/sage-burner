@@ -689,31 +689,70 @@ message is gone the moment it is dismissed, which is why the row is the notifica
 rather than the other way round. A member with no browser subscribed still gets the
 bell, which is the ordinary case.
 
-Six categories, each switchable off under **Your details → Notifications**. Only the
-switched-**off** ones are stored, so every box starts ticked and a new account needs
-nothing seeded. Switching one off silences both channels — the setting says "notify
-me", and a bell filling with things somebody asked not to hear about is the same
-noise in a quieter place.
+Eleven categories under **Your details → Notifications**, in two sections, and the
+sections default differently:
+
+- **What happens to you** — the original six. On unless you refuse them: being put on
+  a meal is not noise, and somebody who never opens the settings should still hear it.
+- **What else is going on** — the five #259 added. **Off unless you ask.** A burn
+  where every dream and every arrival pings forty-two people is a channel people learn
+  to ignore, which costs the notifications that are actually about them.
+
+That split is what decides the storage. `notification_mute` held only the categories
+somebody had switched _off_, and absence meant on — sound while every category was on
+by default, and unable to say anything once five are off by default. So a row in
+`notification_setting` now carries `enabled` and means "this person said"; absence
+means they have not, and the default lives in `notificationCategoryInfo`. Nothing is
+seeded, so an account made tomorrow still picks up today's defaults. The wire carries
+`{ on: [...] }` — the complete list of what is on — rather than a list of exceptions
+whose meaning would depend on which category it named.
+
+Switching one off silences both channels — the setting says "notify me", and a bell
+filling with things somebody asked not to hear about is the same noise in a quieter
+place. The same holds in the other direction: nothing is recorded at all for a
+category somebody never turned on.
 
 Anything somebody else can put you on or take you off notifies you — a dream's
 helpers, a meal's crew, a meal's lead, a lead role and its team, a dream's
 facilitator. Never for your own click.
 
-Two of the six are different in kind: **the waiting-list ones are not caused by an
-action taken against the person told.** Somebody else pays, the burn gets fuller, and
-an unpaid member's standing changes without anybody touching their row — which is
+Two of the first six are different in kind: **the waiting-list ones are not caused by
+an action taken against the person told.** Somebody else pays, the burn gets fuller,
+and an unpaid member's standing changes without anybody touching their row — which is
 exactly why they are worth sending, and why they run outside the payment's
 transaction. Recording that somebody paid must not fail because a bell could not be
 rung.
 
-Three things notify today:
+The five burn-wide ones fan out with `notifyAttendees`, and **attendance is the whole
+audience**: somebody who has not said they are coming hears nothing about that burn,
+however their switches are set, and a member who leaves stops hearing about it the
+moment their row goes. They name people — "Ada offered a dream: Sauna at dawn" —
+unlike the applications notification, which hides an applicant. The difference is who
+is reading: these go only to people attending the same burn, who already read each
+other's names on the Members page, and "somebody is coming" is not worth switching on.
+
+**A redeploy is the one notification nobody caused.** Watchtower replaces the
+container on every merge, so a boot is the event: `announceDeploy` compares the build
+sha this process was given against the one the last boot recorded in `installation`.
+The first boot on a fresh database records and says nothing — there is no previous
+version for it to be new against. It is called from `server.ts` rather than
+`createApp`, deliberately: the suite builds an app per test, and an announcement wired
+into that would fire in every one of them.
+
+What notifies today:
 
 - **Being handed a lead role, or taken off one** — the lead column and the team
   both, and only the person it happened _to_. Not when they did it themselves:
   taking a role you want is the common case, and a notification for your own click
   is noise that teaches people to ignore the channel.
+- **Being put on or taken off a meal or a dream**, on the same rule.
+- **Your payment being recorded**, and the two waiting-list movements above.
 - **Someone applying**, which goes to every admin, since only an admin can act on
-  one.
+  one — and which names nobody, because an applicant is not a member yet.
+- **A dream offered, somebody saying they are coming, a lead role added, a lead
+  taken** — to everyone attending that burn who asked for them, never to whoever did
+  it (#259).
+- **A new version being deployed**, to everyone who asked, once per build.
 
 The lead-role routes take `notify` as a dependency rather than importing the push
 module. Handing somebody a role is the point and the notification is a courtesy, so

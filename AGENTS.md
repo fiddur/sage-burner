@@ -207,7 +207,15 @@ These are member records, so treat them as such:
   Removing the last passkey off an account with no password is refused.
 - **A notification is a row; a push is a copy of it** (#248). The bell needs history
   and a push does not have any. Written before the push, so an unreachable push
-  service cannot cost somebody the record. A muted category is not written at all.
+  service cannot cost somebody the record. A category somebody does not want is not
+  written at all.
+- **A stored setting is an explicit choice, not a mute** (#259). What happens _to you_
+  is on unless refused; what happens _around you_ is off unless asked for. One list of
+  exceptions cannot mean both, so `notification_setting` carries `enabled` and absence
+  means "has not said" — the default lives in `notificationCategoryInfo`, and the wire
+  carries the complete `{ on: [...] }` rather than a delta. **Attendance is the whole
+  audience** for the burn-wide ones: somebody who has not said they are coming hears
+  nothing about that burn, whatever their switches say.
 - **Any role somebody else can change tells the person it happened to** (#247). One
   control everywhere several people sign up — 🙋 takes the spot, 👉 appoints somebody
   else, ✕ takes them off — and every route behind it notifies, on being _given_ a job
