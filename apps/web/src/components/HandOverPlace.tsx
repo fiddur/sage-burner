@@ -40,6 +40,9 @@ export const HandOverPlace = ({
   const openPicker = async () => {
     setOpen(true)
     setError(undefined)
+    // Dropped, or *Never mind* then reopening renders the list fetched last time
+    // until this one lands, with whoever has paid since still on it (#263).
+    setCandidates(undefined)
     try {
       const { entries } = await api.getMembers(eventId)
       setCandidates(entries.filter((entry) => entry.payment_status !== 'paid'))
@@ -85,7 +88,10 @@ export const HandOverPlace = ({
 
       {candidates === undefined && error === undefined && <p class="form-note">One moment…</p>}
 
-      {candidates?.length === 0 && <p>Nobody is waiting for a place at this burn.</p>}
+      {/* Not "nobody is waiting": the offer is to everybody here who has not paid,
+          which includes members above the line — an unpaid member is exactly who you
+          might hand a place to, since paying is what secures one (#263). */}
+      {candidates?.length === 0 && <p>Everybody at this burn has paid, so there is nobody to hand it to.</p>}
 
       {candidates !== undefined && candidates.length > 0 && (
         <p class="row">

@@ -376,13 +376,47 @@ describe('Dreams', () => {
     )
   })
 
-  it('withdraws one', async () => {
+  it('withdraws one, but only after asking — as the grid’s panel does', async () => {
+    // The list withdrew on a single unconfirmed click while the grid asked first, so
+    // the same act had two levels of protection and the weaker one was the list (#209)
+    // — the page where hitting the neighbouring row is easiest.
     const withdrawSession = vi.fn<DreamsApi['withdrawSession']>(() => Promise.resolve(undefined))
     renderPage(stub({ withdrawSession }, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))
 
     fireEvent.click(await screen.findByRole('button', { name: 'Withdraw Sunrise yoga' }))
+    expect(withdrawSession).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Really withdraw Sunrise yoga' }))
 
     await waitFor(() => expect(withdrawSession).toHaveBeenCalledWith('s-1'))
+  })
+
+  it('keeps it when the question is answered the other way', async () => {
+    const withdrawSession = vi.fn<DreamsApi['withdrawSession']>(() => Promise.resolve(undefined))
+    renderPage(stub({ withdrawSession }, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Withdraw Sunrise yoga' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Keep it' }))
+
+    expect(withdrawSession).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Withdraw Sunrise yoga' })).toBeTruthy()
+  })
+
+  it('asks about the row that was clicked, not about every row', async () => {
+    // The question is one component's own state, so two rows cannot share it. Written
+    // out per page it was a single flag, which would have asked about both.
+    renderPage(
+      stub({}, [
+        aDream({ id: 's-1', title: 'Sunrise yoga' }),
+        aDream({ id: 's-2', title: 'Cacao ceremony' }),
+      ]),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Withdraw Sunrise yoga' }))
+
+    expect(screen.getByRole('button', { name: 'Really withdraw Sunrise yoga' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Really withdraw Cacao ceremony' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Withdraw Cacao ceremony' })).toBeTruthy()
   })
 
   it('lets a member edit a dream someone else offered', async () => {
@@ -405,6 +439,7 @@ describe('Dreams', () => {
     )
 
     fireEvent.click(await screen.findByRole('button', { name: 'Withdraw Sunrise yoga' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Really withdraw Sunrise yoga' }))
 
     expect((await screen.findByRole('alert')).textContent).toContain('That will not do.')
   })

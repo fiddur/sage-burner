@@ -9,6 +9,7 @@ import { useSelectedBurn } from '../burn.tsx'
 import { DreamFields } from '../components/DreamFields.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
+import { WithdrawDream } from '../components/WithdrawDream.tsx'
 import { shortDayOf } from '../datetime.ts'
 import { useAction, useLoad } from '../load.ts'
 import { isMember, useViewer } from '../viewer.tsx'
@@ -165,15 +166,11 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
                 >
                   ✏️
                 </button>
-                <button
-                  type="button"
-                  class="link-button"
-                  disabled={busy}
-                  aria-label={`Withdraw ${dream.title}`}
-                  onClick={() => run(() => api.withdrawSession(dream.id), 'Could not withdraw that.')}
-                >
-                  🗑️
-                </button>
+                <WithdrawDream
+                  title={dream.title}
+                  busy={busy}
+                  onWithdraw={() => run(() => api.withdrawSession(dream.id), 'Could not withdraw that.')}
+                />
               </>
             )}
           </li>
