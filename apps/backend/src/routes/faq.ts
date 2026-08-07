@@ -8,7 +8,7 @@ import {
   faqUpdateSchema,
   idOrderSchema,
 } from '@sage-burner/shared'
-import { asc, eq } from 'drizzle-orm'
+import { and, asc, eq, gte } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -18,9 +18,9 @@ import { createGuards } from '../auth/guards.ts'
 import { nextOrder, reorder } from '../db/ordered.ts'
 import { event, faqEntry } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
-import { refuseIfStale, withVersion } from '../if-match.ts'
+import { refuseIfStale, withCollectionVersion, withVersion } from '../if-match.ts'
 import { copySourcesFor } from './copy-sources.ts'
-import { openEventNow } from './events.ts'
+import { openEventNow, todayIso } from './events.ts'
 
 export interface FaqDeps extends GuardDeps {
   now: () => Date
@@ -138,7 +138,9 @@ export const registerFaqRoutes = (app: FastifyInstance, { db, sessions, now }: F
         .returning()
       if (updated === undefined) return sendError(reply, 404)
 
-      return { entry: updated } satisfies FaqResponse
+      return await withCollectionVersion(reply, { entry: updated } satisfies FaqResponse, () =>
+        questions(existing.event_id),
+      )
     },
   )
 
@@ -230,14 +232,18 @@ export const registerFaqRoutes = (app: FastifyInstance, { db, sessions, now }: F
       if (body.from_event_id === request.params.eventId) return sendError(reply, 400)
 
       const created_at = now().toISOString()
+      const today = todayIso(now)
       const seeded = db.transaction((tx) => {
-        // Checked rather than left to the foreign key, which only fires when there is
-        // a row to insert: copying from an empty source into a burn that does not
-        // exist would otherwise answer 201 with nothing.
+        // **Open**, not merely existing — every other write here is scoped that way,
+        // and seeding a burn that has ended would leave rows nothing can afterwards
+        // edit, reorder or remove. Checked rather than left to the foreign key,
+        // which only fires when there is a row to insert: copying from an empty
+        // source into a burn that is not there would otherwise answer 200 with
+        // nothing.
         const [burn] = tx
           .select({ id: event.id })
           .from(event)
-          .where(eq(event.id, request.params.eventId))
+          .where(and(eq(event.id, request.params.eventId), gte(event.end_date, today)))
           .limit(1)
           .all()
 

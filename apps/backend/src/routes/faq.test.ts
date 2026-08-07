@@ -313,10 +313,15 @@ describe('who may write it', () => {
       .insert(faqEntry)
       .values({ id, event_id: past, question: 'Old one', answer: '', order: 0, created_at: NOW })
 
+    const open = await givenEvent('Autumn burn')
+
     expect((await ask(server, ada.cookie, past)).statusCode).toBe(404)
     expect((await edit(server, ada.cookie, id, { answer: 'no' })).statusCode).toBe(404)
     expect((await remove(server, ada.cookie, id)).statusCode).toBe(404)
     expect((await sort(server, ada.cookie, past, [id])).statusCode).toBe(404)
+    // The copy too. It checked existence alone at first, which would have seeded a
+    // finished burn with rows nothing could afterwards touch.
+    expect((await copy(server, ada.cookie, past, open)).statusCode).toBe(404)
   })
 
   it('still reads a finished burn’s, which is how it gets copied forward', async () => {
@@ -433,6 +438,28 @@ describe('the precondition', () => {
 
     expect(bare.statusCode).toBe(428)
     expect(bare.headers.etag).toBeTruthy()
+  })
+
+  it('answers a successful edit with the tag the next one must quote', async () => {
+    // #277: without it the client keeps the tag it has just invalidated, and its
+    // second edit refuses itself with "somebody else changed this".
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAccount()
+    const first = await ask(server, ada.cookie, eventId)
+
+    const saved = await edit(server, ada.cookie, first.json().entry.id, { answer: 'One.' })
+
+    expect(saved.headers.etag).toBe((await list(server, ada.cookie, eventId)).headers.etag)
+
+    const again = await server.inject({
+      method: 'PATCH',
+      url: `/api/faq/${first.json().entry.id}`,
+      headers: { cookie: ada.cookie, 'if-match': String(saved.headers.etag) },
+      payload: { answer: 'Two.' },
+    })
+
+    expect(again.statusCode).toBe(200)
   })
 
   it('refuses one quoting a version somebody has since moved past', async () => {
