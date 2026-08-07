@@ -686,6 +686,12 @@ a:hover {
 .schedule-grid-wrap {
   overflow: auto;
   max-height: 70vh;
+  /*
+    One finger still scrolls; two are ours (#284). Without this the browser answers a
+    pinch with its own page zoom and the handler never sees it. `none` would take the
+    scrolling as well, which is the thing this box exists to do.
+  */
+  touch-action: pan-x pan-y;
 }
 
 .schedule-grid {
@@ -710,7 +716,7 @@ a:hover {
     which is what `min-width: 7rem` on the cells did before fixed layout stopped
     cells having any say in their column's width.
   */
-  min-width: calc(7ch + var(--lanes, 1) * 7rem);
+  min-width: calc(7ch + var(--lanes, 1) * 7rem * var(--zoom, 1));
 }
 
 /*
@@ -766,8 +772,16 @@ a:hover {
   opacity: 0.9;
 }
 
+/*
+  An hour's height, and half of what a pinch scales (#284) — the lane floor in
+  `.schedule-grid`'s `min-width` is the other half, so one factor moves both.
+
+  Zooming *out* stops narrowing the lanes once they all fit: the table is
+  `width: 100%`, so a `min-width` below that changes nothing. That is the right floor
+  — every place on screen — and the hours go on shrinking past it.
+*/
 .schedule-cell {
-  height: 3.2rem;
+  height: calc(3.2rem * var(--zoom, 1));
 }
 
 /*

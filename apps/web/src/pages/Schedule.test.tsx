@@ -1716,6 +1716,92 @@ describe('facilitating a dream, in the panel', () => {
   })
 })
 
+describe('pinching the grid', () => {
+  const gridWrap = () => {
+    const wrap = document.querySelector<HTMLElement>('.schedule-grid-wrap')
+    if (wrap === null) throw new Error('the grid is drawn, so there is a wrapper')
+    return wrap
+  }
+
+  const zoomOf = (wrap: HTMLElement) => wrap.style.getPropertyValue('--zoom')
+
+  const fingers = (...gaps: number[]) => gaps.map((gap) => ({ clientX: gap, clientY: 0 }) as unknown as Touch)
+
+  it('starts at its natural size, with no zoom of its own', async () => {
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
+    await screen.findByText('Cacao ceremony')
+
+    expect(zoomOf(gridWrap())).toBe('1')
+  })
+
+  it('stretches the grid as the fingers go apart', async () => {
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
+    await screen.findByText('Cacao ceremony')
+    const wrap = gridWrap()
+
+    fireEvent.touchStart(wrap, { touches: fingers(0, 100) })
+    fireEvent.touchMove(wrap, { touches: fingers(0, 200) })
+
+    expect(Number(zoomOf(wrap))).toBeCloseTo(2)
+  })
+
+  it('squeezes it as they come together, which is how more places fit', async () => {
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
+    await screen.findByText('Cacao ceremony')
+    const wrap = gridWrap()
+
+    fireEvent.touchStart(wrap, { touches: fingers(0, 200) })
+    fireEvent.touchMove(wrap, { touches: fingers(0, 100) })
+
+    expect(Number(zoomOf(wrap))).toBeCloseTo(0.5)
+  })
+
+  it('ignores one finger, which is how the grid is scrolled', async () => {
+    // The passing sibling for the two above, and the reason `touch-action` keeps
+    // `pan-x pan-y`: a one-finger drag is a scroll and must not resize anything.
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
+    await screen.findByText('Cacao ceremony')
+    const wrap = gridWrap()
+
+    // Away from the origin on purpose: a lone finger at 0 has a gap of nought from
+    // it, and the zero-gap guard would hold the zoom still whatever the finger count
+    // check did — so the test would pass without the thing it names.
+    fireEvent.touchStart(wrap, { touches: fingers(50) })
+    fireEvent.touchMove(wrap, { touches: fingers(400) })
+
+    expect(zoomOf(wrap)).toBe('1')
+  })
+
+  it('carries on from where the last pinch left it, rather than snapping back', async () => {
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
+    await screen.findByText('Cacao ceremony')
+    const wrap = gridWrap()
+
+    fireEvent.touchStart(wrap, { touches: fingers(0, 100) })
+    fireEvent.touchMove(wrap, { touches: fingers(0, 150) })
+    fireEvent.touchEnd(wrap, { touches: [] })
+
+    fireEvent.touchStart(wrap, { touches: fingers(0, 100) })
+    fireEvent.touchMove(wrap, { touches: fingers(0, 120) })
+
+    expect(Number(zoomOf(wrap))).toBeCloseTo(1.8)
+  })
+
+  it('forgets a pinch that ended, so the next one does not jump', async () => {
+    // Without clearing on touchend the second pinch would be measured against the
+    // first one's gap, and the grid would leap the moment a finger touched down.
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
+    await screen.findByText('Cacao ceremony')
+    const wrap = gridWrap()
+
+    fireEvent.touchStart(wrap, { touches: fingers(0, 100) })
+    fireEvent.touchEnd(wrap, { touches: [] })
+    fireEvent.touchMove(wrap, { touches: fingers(0, 400) })
+
+    expect(zoomOf(wrap)).toBe('1')
+  })
+})
+
 describe('the calendar feed', () => {
   it('links the selected burn’s feed, which no page pointed at before', async () => {
     renderPage(stub())

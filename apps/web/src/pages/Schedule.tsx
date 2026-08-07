@@ -4,6 +4,7 @@ import type { ComponentChildren } from 'preact'
 import { useRef, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
+import type { Pinch } from '../pinch.ts'
 import type { LaneCell, MealBlock } from '../schedule.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
@@ -17,6 +18,7 @@ import { NoBurn } from '../components/NoBurn.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { dayName, fromLocalInput, toLocalInput } from '../datetime.ts'
 import { useAction, useLoad } from '../load.ts'
+import { pinchedZoom, touchGap } from '../pinch.ts'
 import {
   endFor,
   hourOf,
@@ -853,8 +855,52 @@ const Timetable = ({
   // the wrapper scrolls instead.
   const columns = places.length + (kitchen === undefined ? 0 : 1)
 
+  /**
+   * Pinching to see more of the grid (#284).
+   *
+   * One factor for both axes, handed to the CSS as `--zoom`: the hours' height and
+   * the lanes' floor are both written in terms of it, so fingers apart stretch the
+   * timetable and fingers together squeeze a burn with more places than the phone is
+   * wide until they all fit.
+   *
+   * Not persisted. This is a gesture for reading the grid the way you want it *now*,
+   * and a zoom restored from a previous visit would greet somebody with a timetable
+   * they do not remember setting.
+   *
+   * Touch only, so a desktop pointer is untouched — there is no wheel handler here,
+   * and ctrl+wheel stays the browser's own page zoom.
+   */
+  const [zoom, setZoom] = useState(1)
+  const pinch = useRef<Pinch | undefined>(undefined)
+
+  const twoFingerGap = (touches: TouchList): number | undefined =>
+    touches.length === 2 && touches[0] !== undefined && touches[1] !== undefined
+      ? touchGap(touches[0], touches[1])
+      : undefined
+
   return (
-    <div class="schedule-grid-wrap">
+    <div
+      class="schedule-grid-wrap"
+      style={{ '--zoom': zoom }}
+      onTouchStart={(touchEvent) => {
+        const gap = twoFingerGap(touchEvent.touches)
+        if (gap !== undefined) pinch.current = { gap, zoom }
+      }}
+      onTouchMove={(touchEvent) => {
+        const start = pinch.current
+        const gap = twoFingerGap(touchEvent.touches)
+        if (start !== undefined && gap !== undefined) setZoom(pinchedZoom(start, gap))
+      }}
+      // Cleared on both, and on a lift rather than only on a cancel: a pinch that
+      // ends with one finger up leaves the other on the glass, and a stale start
+      // would make the next pinch jump from a gap nobody is holding any more.
+      onTouchEnd={() => {
+        pinch.current = undefined
+      }}
+      onTouchCancel={() => {
+        pinch.current = undefined
+      }}
+    >
       <table class="schedule-grid" style={{ '--lanes': columns }}>
         {/*
           Fixed layout, so the lanes share what is left equally rather than sizing
