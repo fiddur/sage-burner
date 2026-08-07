@@ -806,8 +806,11 @@ events, and every decision worth asserting is in `cache.ts` and `notification.ts
 beside their tests.
 
 **What a push says and where it lands are the server's** (#279). The payload carries
-the wording, the link and the category, so the worker routes by what it was told
-rather than by a page written into it — which is what it did while a new application
+the wording, the link and the category — built by one function, `pushPayload`,
+because there are two senders and they had already drifted: an application is neither
+a bell row nor a per-account setting, so it does not go through `recordAndPush` and
+went on sending a body alone. The worker routes by what it was told rather than by a
+page written into it — which is what it did while a new application
 was the only thing that pushed, sending a member told they were on a meal to the
 admin applications page. The category is also what a notification collapses on:
 three applications on a locked phone should be one line to act on, and that was the

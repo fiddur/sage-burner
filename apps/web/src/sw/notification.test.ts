@@ -15,11 +15,23 @@ describe('reading a push payload', () => {
     // The reason a tag exists at all is that three applications on a locked phone
     // should be one thing to act on. One tag for everything made a meal role replace
     // a dream offer, which is the opposite of what that buys.
-    const application = alertFrom({ body: 'a', link: '/admin/applications', category: 'application' })
+    const lead = alertFrom({ body: 'a', link: '/roles', category: 'lead_role' })
     const meal = alertFrom({ body: 'b', link: '/meals', category: 'meal_role' })
 
-    expect(application.tag).not.toBe(meal.tag)
+    expect(lead.tag).not.toBe(meal.tag)
     expect(alertFrom({ body: 'c', link: '/meals', category: 'meal_role' }).tag).toBe(meal.tag)
+  })
+
+  it('collapses the ones with no category together, which is what applications are', () => {
+    // A new application is neither a bell row nor a setting — it predates both — so
+    // it carries a link and no category. Those share one tag, which is the behaviour
+    // it always had back when the worker had a page written into it.
+    const first = alertFrom({ body: 'Someone has applied.', link: '/admin/applications' })
+    const second = alertFrom({ body: 'Someone else has applied.', link: '/admin/applications' })
+
+    expect(first.tag).toBe(second.tag)
+    expect(first.path).toBe('/admin/applications')
+    expect(first.tag).not.toBe(alertFrom({ body: 'x', link: '/meals', category: 'meal_role' }).tag)
   })
 
   it('sends somebody home rather than nowhere when there is no page for it', () => {
@@ -56,7 +68,7 @@ describe('reading a push payload', () => {
 
   it('keeps an ordinary path, which is the case the one above must not break', () => {
     expect(alertFrom({ body: 'a', link: '/roles' }).path).toBe('/roles')
-    expect(alertFrom({ body: 'a', link: '/admin/applications' }).path).toBe('/admin/applications')
+    expect(alertFrom({ body: 'a', link: '/schedule' }).path).toBe('/schedule')
   })
 
   it('keeps a query and a fragment, which still name something in this app', () => {
