@@ -1,13 +1,13 @@
 /**
- * Rearranging a list of ids, for the three pages that let somebody reorder one.
+ * Rearranging a list of ids. `ReorderableList` is the only caller.
  *
  * `undefined` means "no move" rather than an error — moving the first row up is an
  * ordinary thing to try, and the caller's job is then to do nothing rather than to
  * send an unchanged order. Every reorder endpoint takes the whole list and rejects a
  * partial one, so an unchanged send is a wasted round trip at best.
  *
- * Pure and id-only: the pages hold rows of three different shapes and only their
- * order is shared.
+ * Separate from the component because these are the half that is worth testing
+ * without a DOM.
  */
 
 /** The row at `index` swapped with its neighbour, or nothing at either end. */

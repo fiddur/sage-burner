@@ -164,7 +164,7 @@ const OptionList = ({
               />
             ) : (
               <>
-                <span class="place-name">{row.label}</span>
+                <span class="reorder-name">{row.label}</span>
                 <span class="place-color-name">
                   {row.capacity === null ? 'no limit' : `${row.capacity} spaces`}
                 </span>

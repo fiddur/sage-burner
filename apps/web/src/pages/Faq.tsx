@@ -210,13 +210,7 @@ export const Faq = ({ api }: { api: FaqApi }) => {
 
 const Notice = ({ loaded }: { loaded: Loaded<Questions> }) => {
   if (loaded.status === 'loading') return <p class="form-note">Loading…</p>
-  if (loaded.status === 'failed') {
-    return (
-      <p class="form-error" role="alert">
-        {loaded.message}
-      </p>
-    )
-  }
+  if (loaded.status === 'failed') return <ErrorText message={loaded.message} />
   if (loaded.data === null) return <NoBurn absent="there are no questions to answer" />
   if (loaded.data.entries.length === 0) return <p class="form-note">Nobody has asked anything yet.</p>
 

@@ -74,7 +74,7 @@ const renderPage = (api: PlacesApi, viewer: Viewer = ADMIN, burn: MyBurn | null 
     </ViewerProvider>,
   )
 
-const rowNames = () => [...document.querySelectorAll('.place-name')].map((node) => node.textContent)
+const rowNames = () => [...document.querySelectorAll('.reorder-name')].map((node) => node.textContent)
 
 describe('Places', () => {
   it('lists the places in order, with their emoji and colour', async () => {
