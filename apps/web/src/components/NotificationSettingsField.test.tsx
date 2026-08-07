@@ -1,15 +1,23 @@
-import { notificationCategories } from '@sage-burner/shared'
+import { categoriesAbout, notificationCategories } from '@sage-burner/shared'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { NotificationSettingsApi } from './NotificationSettingsField.tsx'
 
 import { apiError } from '../api/client.ts'
+import { ViewerProvider } from '../viewer.tsx'
 import { NotificationSettingsField } from './NotificationSettingsField.tsx'
 
 afterEach(cleanup)
 
-/** What the server sends an account that has never saved: the six on by default. */
+/**
+ * What the server sends an account that has never saved: the ones on by default.
+ *
+ * `application` is among them for everybody, admin or not — the settings are per
+ * account and know nothing about roles, and only an admin is ever told (#326). So it
+ * rides along in every save below, which is what stops a member unticking one row from
+ * switching off a category they were never shown.
+ */
 const DEFAULTS = [
   'meal_role',
   'dream_role',
@@ -17,7 +25,17 @@ const DEFAULTS = [
   'payment',
   'waiting_list_near',
   'waiting_list_pushed',
+  'application',
 ] as const
+
+/** Signed in and holding `admin`, which is the only viewer offered the third table. */
+const asAdmin = (api: NotificationSettingsApi) => (
+  <ViewerProvider
+    viewer={{ status: 'signed-in', account: { id: 'a1', name: 'Ada', avatar: null, roles: ['admin'] } }}
+  >
+    <NotificationSettingsField api={api} />
+  </ViewerProvider>
+)
 
 const stub = (over: Partial<NotificationSettingsApi> = {}): NotificationSettingsApi => ({
   getMyNotificationSettings: () => Promise.resolve({ on: [...DEFAULTS], email: [] }),
@@ -36,13 +54,25 @@ const checked = (label: string) => {
 }
 
 describe('what to be told about', () => {
-  it('shows a row for every category, in two sections', async () => {
+  it('shows a row for every category a member is ever told about, in two sections', async () => {
     render(<NotificationSettingsField api={stub()} />)
 
     const boxes = await screen.findAllByRole('checkbox')
-    expect(boxes).toHaveLength(notificationCategories.length)
+    expect(boxes).toHaveLength(notificationCategories.length - categoriesAbout('admin').length)
     expect(screen.getByText('What happens to you')).toBeTruthy()
     expect(screen.getByText('What else is going on')).toBeTruthy()
+    // Nobody but an admin is ever told an application arrived, and a switch that
+    // cannot do anything reads as a promise (#326).
+    expect(screen.queryByText('What you look after')).toBeNull()
+    expect(screen.queryByLabelText('Somebody applies to join — Here')).toBeNull()
+  })
+
+  it('adds the admin section for an admin', async () => {
+    render(asAdmin(stub()))
+
+    expect(await screen.findByText('What you look after')).toBeTruthy()
+    expect(screen.getAllByRole('checkbox')).toHaveLength(notificationCategories.length)
+    expect(checked('Somebody applies to join — Here')).toBe(true)
   })
 
   it('ticks what happens to you and leaves the rest alone', async () => {
@@ -110,7 +140,9 @@ describe('what to be told about', () => {
 
   it('switches one on by ticking it', async () => {
     // The passing sibling, and the case the old model could not express: this
-    // category is off until somebody asks for it.
+    // category is off until somebody asks for it. The payload carries `application`
+    // too, which a member is shown no row for — every save replaces the whole set, so
+    // a hidden category has to ride along or the first tick switches it off (#326).
     const update = vi.fn(() => Promise.resolve({ on: [], email: [] }))
     render(<NotificationSettingsField api={stub({ updateMyNotificationSettings: update })} />)
 

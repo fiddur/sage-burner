@@ -877,8 +877,8 @@ export const session = sqliteTable(
  * Google's or Mozilla's infrastructure at all.
  *
  * Cascades with the account, so a deleted one leaves no live subscription behind.
- * Losing the `admin` role stops the notifications too, but by a different
- * mechanism — `notifyAdmins` joins through `account_role` — and the row itself
+ * Losing the `admin` role stops the admin-only notifications too, but by a different
+ * mechanism — `notifyAdmins` selects the accounts holding it — and the row itself
  * survives a demotion, ready if the role comes back.
  */
 export const pushSubscription = sqliteTable(

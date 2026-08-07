@@ -7,7 +7,7 @@ import type { Delivery, PushDeps, Subscription } from './push.ts'
 
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, accountRole, installation, INSTALLATION_ID, pushSubscription } from '../db/schema.ts'
-import { forgetSubscription, notifyAdmins, rememberSubscription, vapidKeysFor } from './push.ts'
+import { forgetSubscription, notifyAccount, rememberSubscription, vapidKeysFor } from './push.ts'
 
 /**
  * Browser push, with the push service replaced by a spy.
@@ -149,20 +149,18 @@ describe('remembering a browser', () => {
   })
 })
 
-describe('notifying the admins', () => {
-  it('sends to every admin browser, and to no one else', async () => {
+describe('notifying one person', () => {
+  it('sends to every browser of theirs, and to no one else', async () => {
     const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
     const deps = await build(deliver)
     const admin = await givenAccount(['admin'])
     const member = await givenAccount(['member'])
-    const roleless = await givenAccount([])
 
     await rememberSubscription(deps, admin, aSubscription('https://push.example/laptop'))
     await rememberSubscription(deps, admin, aSubscription('https://push.example/phone'))
     await rememberSubscription(deps, member, aSubscription('https://push.example/member'))
-    await rememberSubscription(deps, roleless, aSubscription('https://push.example/roleless'))
 
-    const counts = await notifyAdmins(deps, 'someone applied')
+    const counts = await notifyAccount(deps, admin, 'someone applied')
 
     expect(counts.sent).toBe(2)
     expect(deliver.mock.calls.map((call) => call[0].endpoint).sort()).toEqual([
@@ -172,16 +170,15 @@ describe('notifying the admins', () => {
     expect(deliver.mock.calls.every((call) => call[1] === 'someone applied')).toBe(true)
   })
 
-  it('counts an admin once who also holds member', async () => {
-    // The join goes through `account_role`, so without care two rows for one
-    // account would send twice to the same browser.
+  it('asks no role of them, so a demoted account still hears what happened to it', async () => {
+    // A subscription only exists because that person asked for it, and what is pushed
+    // is something that happened to them.
     const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
     const deps = await build(deliver)
-    const both = await givenAccount(['admin', 'member'])
-    await rememberSubscription(deps, both, aSubscription('https://push.example/one'))
+    const roleless = await givenAccount([])
+    await rememberSubscription(deps, roleless, aSubscription('https://push.example/one'))
 
-    expect((await notifyAdmins(deps, 'x')).sent).toBe(1)
-    expect(deliver).toHaveBeenCalledTimes(1)
+    expect((await notifyAccount(deps, roleless, 'x')).sent).toBe(1)
   })
 
   it('cleans up the gone ones even when another delivery rejects outright', async () => {
@@ -196,7 +193,7 @@ describe('notifying the admins', () => {
     await rememberSubscription(deps, admin, aSubscription('https://push.example/dead'))
     await rememberSubscription(deps, admin, aSubscription('https://push.example/alive'))
 
-    const counts = await notifyAdmins(deps, 'x')
+    const counts = await notifyAccount(deps, admin, 'x')
 
     expect(counts).toEqual({ sent: 1, gone: 1, failed: 1 })
     expect((await stored()).map((row) => row.endpoint).sort()).toEqual([
@@ -215,7 +212,7 @@ describe('notifying the admins', () => {
     await rememberSubscription(deps, admin, aSubscription('https://push.example/dead'))
     await rememberSubscription(deps, admin, aSubscription('https://push.example/alive'))
 
-    expect((await notifyAdmins(deps, 'x')).sent).toBe(1)
+    expect((await notifyAccount(deps, admin, 'x')).sent).toBe(1)
 
     expect((await stored()).map((row) => row.endpoint)).toEqual(['https://push.example/alive'])
   })
@@ -227,17 +224,17 @@ describe('notifying the admins', () => {
     const admin = await givenAccount(['admin'])
     await rememberSubscription(deps, admin, aSubscription('https://push.example/flaky'))
 
-    expect((await notifyAdmins(deps, 'x')).sent).toBe(0)
+    expect((await notifyAccount(deps, admin, 'x')).sent).toBe(0)
 
     expect(await stored()).toHaveLength(1)
   })
 
-  it('does nothing, and mints nothing, when no admin has opted in', async () => {
+  it('does nothing, and mints nothing, when nobody has opted in', async () => {
     const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
     const deps = await build(deliver)
-    await givenAccount(['admin'])
+    const admin = await givenAccount(['admin'])
 
-    expect((await notifyAdmins(deps, 'x')).sent).toBe(0)
+    expect((await notifyAccount(deps, admin, 'x')).sent).toBe(0)
     expect(deliver).not.toHaveBeenCalled()
     // And no key: an installation nobody has opted into should not acquire one
     // because a stranger applied.
