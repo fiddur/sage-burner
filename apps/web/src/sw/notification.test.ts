@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { alertFrom, HOME, landOn, ROUTE_TO, routeAsked, UNREADABLE } from './notification.ts'
+import { ROUTE_TO, routeAsked } from '../worker-message.ts'
+import { alertFrom, HOME, landOn, UNREADABLE } from './notification.ts'
 
 describe('reading a push payload', () => {
   it('takes the wording, the page and the category the server sent', () => {

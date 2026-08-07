@@ -1806,12 +1806,10 @@ describe('pinching the grid', () => {
 describe('the calendar feed', () => {
   const feedLink = () => screen.findByRole('link', { name: /Add to calendar/ })
 
-  it('subscribes rather than downloading, and so escapes the SPA router (#298)', async () => {
-    // Two things at once. `webcal` is what asks an OS to *subscribe* to a live feed,
-    // where following the `https` URL downloads a snapshot that never updates — and
-    // a `webcal:` URL has origin `"null"`, so `preact-iso`'s
-    // `link.origin != location.origin` check leaves the click alone. The `https` one
-    // was taken by the router, matched no route, and rendered "Nothing here".
+  it('offers the webcal scheme, which subscribes and which the router ignores', async () => {
+    // The `href`, not a click: nothing here renders it under a router and follows it.
+    // `CalendarFeed` says what the scheme buys — a subscription rather than a
+    // snapshot, and an origin `preact-iso` will not take over (#298).
     renderPage(stub())
 
     expect((await feedLink()).getAttribute('href')).toBe('webcal://localhost:3000/events/e-1/schedule.ics')
@@ -1835,7 +1833,6 @@ describe('the calendar feed', () => {
     await waitFor(() =>
       expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/events/e-1/schedule.ics`),
     )
-    vi.unstubAllGlobals()
   })
 
   it('says nothing about a feed when there is no burn to have one', async () => {

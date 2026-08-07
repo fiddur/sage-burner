@@ -1,7 +1,7 @@
 import { useLocation } from 'preact-iso'
 import { useEffect } from 'preact/hooks'
 
-import { routeAsked } from '../sw/notification.ts'
+import { routeAsked } from '../worker-message.ts'
 
 /**
  * Enough of the worker's side of the channel to be handed a fake.
