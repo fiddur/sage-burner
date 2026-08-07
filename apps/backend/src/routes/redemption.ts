@@ -174,8 +174,10 @@ export const registerRedemptionRoutes = (
             })
             .run()
 
-          // Redeeming an invite is what makes someone a member. No attendance row:
-          // coming to a particular burn is a separate act, and #76 owns it.
+          // Redeeming an invite is what makes someone a member. No attendance row
+          // here even when the form ticked a burn: joining happens after this
+          // transaction and outside it, so a failure to join cannot roll back the
+          // token spend — see the comment below the commit.
           tx.insert(accountRole).values({ account_id: accountId, role: 'member' }).run()
 
           return true

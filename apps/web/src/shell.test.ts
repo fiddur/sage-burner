@@ -35,6 +35,20 @@ describe('the HTML shell', () => {
     expect(shell).toContain('rel="apple-touch-icon"')
   })
 
+  it('uses the same icon in the tab as on the home screen (#285)', () => {
+    // The admin's icon was the installed app's and the tab kept the browser's default
+    // globe, which is the one place the installation did not look like itself.
+    expect(shell).toContain(`<link rel="icon" href="${apiRoutes.getInstallationIcon.path()}" />`)
+  })
+
+  it('claims no type for the icon, since the upload decides it', () => {
+    // A `type="image/svg+xml"` here would be a lie the moment somebody uploads a PNG
+    // — and nothing in this process decodes an image to find out which it is. The
+    // response's own `content-type` is the answer, so the link must not second-guess
+    // it. A browser that cannot read what arrives falls back on its own.
+    expect(/<link rel="icon"[^>]*\stype=/.test(shell)).toBe(false)
+  })
+
   it('names a theme colour from the palette', () => {
     // `--ember`, the same one the manifest sends. Two places, because a browser reads
     // this one before it has fetched anything.
