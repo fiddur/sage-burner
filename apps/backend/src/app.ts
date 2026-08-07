@@ -36,6 +36,7 @@ import { readChangelog, registerChangelogRoutes } from './routes/changelog.ts'
 import { registerEventOptionRoutes } from './routes/event-options.ts'
 import { registerEventRoutes } from './routes/events.ts'
 import { registerFaqRoutes } from './routes/faq.ts'
+import { registerFeedRoutes } from './routes/feed.ts'
 import { registerImageBodyParser } from './routes/image-body.ts'
 import { registerInstallationRoutes } from './routes/installation.ts'
 import { registerInviteRoutes } from './routes/invites.ts'
@@ -510,6 +511,7 @@ export const createApp = async ({
   registerRosterRoutes(app, { db, sessions, now, notify: tellAccount })
   registerLeadRoleRoutes(app, { db, sessions, now, notify: tellAccount })
   registerFaqRoutes(app, { db, sessions, now })
+  registerFeedRoutes(app, { db, sessions })
   registerSessionRoutes(app, { db, sessions, now, notify: tellAccount })
   registerScheduleRoutes(app, { db, now })
 

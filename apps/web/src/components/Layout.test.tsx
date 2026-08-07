@@ -60,7 +60,10 @@ describe('the nav', () => {
   it('offers a signed-out visitor the way in, and none of the pages behind it', () => {
     renderNav({ status: 'signed-out' })
 
-    expectLinks(['Apply', 'Log in'], ['Members', 'Schedule', 'Leads', 'FAQ', 'Your details', 'Organise'])
+    expectLinks(
+      ['Apply', 'Log in'],
+      ['Going on', 'Members', 'Schedule', 'Leads', 'FAQ', 'Your details', 'Organise'],
+    )
   })
 
   it('gives a member their own pages and the shared ones', () => {
@@ -69,7 +72,7 @@ describe('the nav', () => {
     // "Your burn" is not among them: the burns are sections of the details page
     // now, since more than one is planned at a time and the singular was from when
     // there was only ever the next one (#184).
-    expectLinks(['Members', 'Schedule', 'Leads', 'FAQ', 'Your details'], ['Your burn'])
+    expectLinks(['Going on', 'Members', 'Schedule', 'Leads', 'FAQ', 'Your details'], ['Your burn'])
   })
 
   it("gives the corner's icons one class, since neither of them is a word", () => {
@@ -101,7 +104,10 @@ describe('the nav', () => {
     // `member`, since somebody not attending has no stay to fill in.
     renderNav(signedInAs('admin'))
 
-    expectLinks(['Members', 'Schedule', 'Leads', 'FAQ', 'Organise'], ['Your burn', 'Your details'])
+    expectLinks(
+      ['Going on', 'Members', 'Schedule', 'Leads', 'FAQ', 'Organise'],
+      ['Your burn', 'Your details'],
+    )
   })
 
   it('offers Dreams from the Schedule rather than from the bar', () => {
@@ -131,7 +137,7 @@ describe('the nav', () => {
 
     expectLinks(
       [],
-      ['Your burn', 'Members', 'Dreams', 'Schedule', 'Leads', 'FAQ', 'Your details', 'Organise'],
+      ['Your burn', 'Going on', 'Members', 'Dreams', 'Schedule', 'Leads', 'FAQ', 'Your details', 'Organise'],
     )
   })
 })
