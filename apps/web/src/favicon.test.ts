@@ -1,4 +1,4 @@
-import { notificationBadge } from '@sage-burner/shared'
+import { notificationBadge, apiRoutes } from '@sage-burner/shared'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { BadgeCanvas } from './favicon.ts'
@@ -68,18 +68,11 @@ describe('where the dot goes on a canvas', () => {
 })
 
 describe('composing the tab icon', () => {
-  it('draws the icon at the full size, and no dot when nothing is waiting', () => {
-    const { canvas, calls } = fakeCanvas()
-
-    expect(composeBadged(anImage, false, canvas)).toBe('data:image/png;base64,drawn')
-    expect(calls).toEqual(['image 0,0 64x64'])
-  })
-
-  it('draws the dot over it when something is', () => {
+  it('draws the icon first and the dot on top of it', () => {
+    // The order is the point: a dot under the icon is a dot nobody sees.
     const { canvas, calls, recorder } = fakeCanvas()
 
-    composeBadged(anImage, true, canvas)
-
+    expect(composeBadged(anImage, canvas)).toBe('data:image/png;base64,drawn')
     expect(calls).toEqual(['image 0,0 64x64', 'begin', 'arc 50,16 r13', 'fill', 'stroke'])
     expect(recorder.fillStyle).toBe(notificationBadge.fill)
     expect(recorder.strokeStyle).toBe(notificationBadge.stroke)
@@ -91,7 +84,7 @@ describe('composing the tab icon', () => {
     // square, so what pins the ordering is that the icon is still in `calls`.
     const { canvas, calls } = fakeCanvas()
 
-    composeBadged(anImage, true, canvas)
+    composeBadged(anImage, canvas)
 
     expect(canvas.width).toBe(64)
     expect(canvas.height).toBe(64)
@@ -99,51 +92,98 @@ describe('composing the tab icon', () => {
   })
 
   it('answers with nothing when the browser gives no 2D context', () => {
-    // Nothing rather than a broken data URL: the caller keeps the flame it set first,
-    // which is the whole failure story.
+    // Nothing rather than a broken data URL: the caller keeps the plain icon it set
+    // first, which is the whole failure story.
     const { canvas } = fakeCanvas(null)
 
-    expect(composeBadged(anImage, true, canvas)).toBeUndefined()
+    expect(composeBadged(anImage, canvas)).toBeUndefined()
   })
 })
 
 describe('the tab’s icon link', () => {
-  it('wears the flame straight away, before anything is fetched', () => {
-    // Synchronous and first, so the tab never flickers through a blank icon while
-    // the composed one loads — and so a failed load leaves the mark it had.
-    markFavicon(false)
+  const ICON = apiRoutes.getInstallationIcon.path()
 
-    const link = document.head.querySelector<HTMLLinkElement>('link#app-favicon')
+  /** An image that never loads, which is what happy-dom does with a real one. */
+  const neverLoads = () => new Promise<HTMLImageElement | undefined>(() => undefined)
 
-    expect(link).not.toBeNull()
-    expect(decodeURIComponent(link?.href ?? '')).toContain('🔥')
-    expect(decodeURIComponent(link?.href ?? '')).not.toContain('<circle')
+  const link = () => document.head.querySelector<HTMLLinkElement>('link#app-favicon')
+
+  it('points at the installation’s own icon, not at a mark of its own', () => {
+    // Whatever the admin uploaded, or the app's flame when nothing is — the route
+    // answers either way, so there is no unset case here to branch on.
+    markFavicon(false, { load: neverLoads })
+
+    expect(link()?.getAttribute('href')).toBe(ICON)
   })
 
-  it('puts the dot in it while something is waiting', () => {
-    markFavicon(true)
+  it('shows that icon straight away even while something is waiting', () => {
+    // Synchronous and first: composing needs a fetch, and the tab must not sit blank
+    // — nor wear the wrong mark — while that happens.
+    markFavicon(true, { load: neverLoads })
 
-    const link = document.head.querySelector<HTMLLinkElement>('link#app-favicon')
-
-    expect(decodeURIComponent(link?.href ?? '')).toContain('<circle')
+    expect(link()?.getAttribute('href')).toBe(ICON)
   })
 
-  it('takes the dot back off in the cleanup', () => {
-    const restore = markFavicon(true)
+  it('draws the dot onto it once the icon has loaded', async () => {
+    // The half that had no test at all: happy-dom fires neither `load` nor `error`
+    // on a real image, so injecting the loader is what makes this reachable.
+    markFavicon(true, {
+      load: () => Promise.resolve({} as HTMLImageElement),
+      canvas: () => fakeCanvas().canvas,
+    })
+
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(link()?.getAttribute('href')).not.toBe(ICON)
+  })
+
+  it('keeps the plain icon when the icon will not load', async () => {
+    markFavicon(true, { load: () => Promise.resolve(undefined) })
+
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(link()?.getAttribute('href')).toBe(ICON)
+  })
+
+  it('does not let a slow drawing land after the cleanup that cancelled it', async () => {
+    // The one piece with a described failure mode: without the guard, a dot arrives
+    // on a tab that has nothing waiting any more.
+    let settle: (image: HTMLImageElement | undefined) => void = () => undefined
+    const restore = markFavicon(true, {
+      load: () => new Promise((resolve) => (settle = resolve)),
+      canvas: () => fakeCanvas().canvas,
+    })
+
+    restore()
+    settle({} as HTMLImageElement)
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(link()?.getAttribute('href')).toBe(ICON)
+  })
+
+  it('takes the dot back off in the cleanup', async () => {
+    const restore = markFavicon(true, {
+      load: () => Promise.resolve({} as HTMLImageElement),
+      canvas: () => fakeCanvas().canvas,
+    })
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(link()?.getAttribute('href')).not.toBe(ICON)
 
     restore()
 
-    const link = document.head.querySelector<HTMLLinkElement>('link#app-favicon')
-
-    expect(decodeURIComponent(link?.href ?? '')).not.toContain('<circle')
+    expect(link()?.getAttribute('href')).toBe(ICON)
   })
 
   it('reuses the one link rather than stacking a new one per change', () => {
     // Two `rel="icon"` links leave it to the browser which wins, which is how the
     // first attempt at #285 came out inert.
-    markFavicon(false)
-    markFavicon(true)
-    markFavicon(false)
+    markFavicon(false, { load: neverLoads })
+    markFavicon(true, { load: neverLoads })
+    markFavicon(false, { load: neverLoads })
 
     expect(document.head.querySelectorAll('link[rel="icon"]')).toHaveLength(1)
   })

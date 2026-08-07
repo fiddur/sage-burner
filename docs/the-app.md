@@ -122,7 +122,9 @@ document — and that one remaining route is closed by serving the response
 `Content-Security-Policy: default-src 'none'; sandbox`, which gives such a
 document an opaque origin and no scripting. Uploading is admin-only.
 
-**The tab wears it too** (#285), which took a detour. The unseen-notification dot
+**The tab wears it too** (#285), and `index.html` is where that starts: the link
+points at the same route, so a signed-out visitor on the public homepage gets the
+installation's mark rather than the browser's default. Adding the dot took a detour. The unseen-notification dot
 (#248) was drawn as a `<circle>` inside an SVG data URL, and a data URL cannot
 reference an external image to draw over — so for a while the tab kept the flame
 while the home screen wore the upload. The tab now loads the icon into an image and
@@ -130,11 +132,13 @@ composes it with the dot on a canvas instead: the same trick the upload path alr
 uses, since a chosen file is cut square and resized in the browser. Same-origin, so
 the canvas is not tainted, and still nothing decodes an image server-side.
 
-**The flame is the floor under it.** `favicon.ts` sets `flameIcon({ badged })`
-synchronously first and only replaces it if the composition succeeds, so a failed
-fetch, a browser that will not draw an SVG with no intrinsic size, or a missing 2D
-context all leave the tab exactly as it was before any of this. It is also what stops
-the tab flickering through a blank icon while the composed one loads.
+**The plain icon is the floor under it.** `favicon.ts` finds the link the shell
+declared — by `id`, so there is only ever one `rel="icon"` — sets it back to the route
+synchronously, and only replaces it if the drawing succeeds. A failed fetch, a browser
+that will not draw an SVG with no intrinsic size, or a missing 2D context all leave
+the tab wearing the right mark without a dot. Two links rather than one would leave it
+to the browser which wins, which is how the first attempt at this came out doing
+nothing at all.
 
 The dot's numbers are `notificationBadge` in `@sage-burner/shared`, and the mark
 itself is `flameIcon` beside it — the backend reads one to serve the default icon,

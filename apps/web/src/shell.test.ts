@@ -35,6 +35,32 @@ describe('the HTML shell', () => {
     expect(shell).toContain('rel="apple-touch-icon"')
   })
 
+  it('gives the tab the installation’s icon, for a signed-out visitor too (#285)', () => {
+    // `favicon.ts` runs from the notification bell, which only a signed-in member
+    // renders — so without this the public homepage's tab wore nothing at all.
+    // One tag carrying both, not two `toContain`s: the `apple-touch-icon` beside it
+    // already has that href, so a bare href check passes with no `rel="icon"` at all.
+    expect(shell).toMatch(
+      new RegExp(`<link[^>]*rel="icon"[^>]*href="${apiRoutes.getInstallationIcon.path()}"`),
+    )
+  })
+
+  it('gives that link the id favicon.ts rewrites, and declares only one', () => {
+    // Two `rel="icon"` links leave it to the browser which wins, which is how the
+    // first attempt at #285 came out doing nothing at all. `favicon.ts` finds this
+    // one by id and rewrites its href rather than appending a second.
+    expect(shell).toContain('id="app-favicon"')
+    // Counted as tags, not as text: the comment above the links says the words
+    // "a second `rel=\"icon\"`", and a bare match counts that too.
+    expect(shell.match(/<link[^>]*rel="icon"/g)).toHaveLength(1)
+  })
+
+  it('claims no type for the icon, since the upload decides it', () => {
+    // A `type="image/svg+xml"` here would be a lie the moment somebody uploads a PNG,
+    // and nothing in this process decodes an image to find out which it is.
+    expect(/<link[^>]*rel="icon"[^>]*\stype=/.test(shell)).toBe(false)
+  })
+
   it('names a theme colour from the palette', () => {
     // `--ember`, the same one the manifest sends. Two places, because a browser reads
     // this one before it has fetched anything.
