@@ -156,7 +156,9 @@ describe('Roles', () => {
     expect(document.body.textContent).toContain('<script>alert(1)</script>')
   })
 
-  it('names all three effort answers separately', async () => {
+  it('names all three effort answers separately, in one cell', async () => {
+    // One cell since #307, three icons wide — but each phase still says which it is
+    // and how much, because 🌱 is a guess until somebody tells you.
     renderPage(
       stub({}, [
         aRole({
@@ -169,27 +171,45 @@ describe('Roles', () => {
       ]),
     )
 
-    // By position, not `arrayContaining`: the three efforts hold the same vocabulary,
-    // so a containment check passes just as well with before and after swapped.
+    // In order, not `arrayContaining`: the three phases hold the same vocabulary, so
+    // a containment check passes just as well with before and after swapped.
     const row = (await screen.findByText('Build')).closest('tr')
-    const cells = [...(row?.querySelectorAll('td') ?? [])].map((cell) => cell.textContent)
+    const efforts = [...(row?.querySelectorAll('.effort') ?? [])].map((one) => one.textContent)
 
-    expect(cells.slice(4, 7)).toEqual(['a lot', 'a little', 'none'])
+    expect(efforts).toEqual(['🌱Effort before: a lot', '🔥Effort during: a little', '🧹Effort after: none'])
   })
 
-  it('labels every cell with the heading of its own column', async () => {
-    // What the narrow layout shows in place of the header row it hides, so a cell
-    // labelled from a literal would announce itself as a column it is not under.
+  it('draws the level as a bar, and none as an empty one', async () => {
+    // "None" has to look like an answer somebody gave rather than a cell nobody
+    // filled in, which is why the unfilled segments stay drawn.
+    renderPage(
+      stub({}, [aRole({ id: 'r-1', title: 'Build', effort_before: 'medium', effort_after: 'none' })]),
+    )
+
+    const row = (await screen.findByText('Build')).closest('tr')
+    const bars = [...(row?.querySelectorAll('.effort-bar') ?? [])]
+
+    expect(bars).toHaveLength(3)
+    expect(bars[0]?.querySelectorAll('span')).toHaveLength(3)
+    expect(bars[0]?.querySelectorAll('span.is-on')).toHaveLength(2)
+    expect(bars[2]?.querySelectorAll('span.is-on')).toHaveLength(0)
+  })
+
+  it('keeps the lead and the team apart inside the one column they share', async () => {
+    // They were a column each until #307. Merged, the header can no longer say which
+    // is which, so each half does — and the two are still two controls with two sets
+    // of buttons behind them.
     renderPage(stub({}, [aRole({ id: 'r-1', title: 'Sauna' })]))
 
     await screen.findByText('Sauna')
-    const headings = [...document.querySelectorAll('.lead-table thead th')].map((node) => node.textContent)
-    const labels = [...document.querySelectorAll('.lead-table tbody td')].map((node) =>
-      node.getAttribute('data-label'),
-    )
+    const who = document.querySelector('.lead-who')
 
-    // The row's `th` holds Title, so the first `td` sits under the second heading.
-    expect(labels.slice(0, -1)).toEqual(headings.slice(1, -1))
+    expect([...(who?.querySelectorAll('.lead-who-label') ?? [])].map((one) => one.textContent)).toEqual([
+      'Lead',
+      'Team',
+    ])
+    expect(screen.getByRole('button', { name: 'Take the spot on Sauna lead' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Take the spot on Sauna' })).toBeTruthy()
   })
 
   it('adds a role from its title alone', async () => {

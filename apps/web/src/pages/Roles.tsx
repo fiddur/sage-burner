@@ -55,23 +55,66 @@ const EFFORT_LABEL: Record<EffortLevel, string> = {
   high: 'a lot',
 }
 
+/** How many of the three segments a level fills. `none` fills none, and says so. */
+const EFFORT_SEGMENTS: Record<EffortLevel, number> = { none: 0, low: 1, medium: 2, high: 3 }
+
 /**
- * The header row and, as each cell's `data-label`, what the narrow layout shows in
- * place of the header it hides. Keyed rather than a list so a cell names the one it
- * belongs to, and renaming a column reaches both.
+ * The three phases of a burn, as one cell (#307).
+ *
+ * They had a column each, three headings of two words for one word of content — more
+ * width between them than every prose column together, on the page most likely to be
+ * read standing up in a field. An icon and a three-segment bar says the same thing in
+ * a fraction of the room.
+ *
+ * The words are still there, in the `title` and for a screen reader: 🌱 is a guess
+ * until somebody tells you, and a register nobody can read is not compact, it is
+ * broken.
+ */
+const PHASES = [
+  { key: 'before', icon: '🌱', label: 'before' },
+  { key: 'during', icon: '🔥', label: 'during' },
+  { key: 'after', icon: '🧹', label: 'after' },
+] as const
+
+/**
+ * The header row.
+ *
+ * Keyed rather than a list because the cells beneath refer to these by name — the
+ * merged **Who** column labels its two halves from the same place a heading would.
  */
 const COLUMNS = {
   title: 'Title',
   purpose: 'Purpose',
-  lead: 'Lead',
+  who: 'Who',
   tasks: 'Tasks include',
-  team: 'Team',
-  before: 'Effort before',
-  during: 'Effort during',
-  after: 'Effort after',
+  effort: 'Effort',
 } as const
 
 const HEADINGS = Object.values(COLUMNS)
+
+/** The two halves of `Who`, which the column header can no longer tell apart. */
+const WHO = { lead: 'Lead', team: 'Team' } as const
+
+const Effort = ({ role }: { role: LeadRole }) => (
+  <span class="effort-strip">
+    {PHASES.map((phase) => {
+      const level = role[`effort_${phase.key}`]
+      const said = `Effort ${phase.label}: ${EFFORT_LABEL[level]}`
+
+      return (
+        <span class="effort" key={phase.key} title={said}>
+          <span aria-hidden="true">{phase.icon}</span>
+          <span class="effort-bar" aria-hidden="true">
+            {[0, 1, 2].map((segment) => (
+              <span key={segment} class={segment < EFFORT_SEGMENTS[level] ? 'is-on' : undefined} />
+            ))}
+          </span>
+          <span class="visually-hidden">{said}</span>
+        </span>
+      )
+    })}
+  </span>
+)
 
 /**
  * The lead-roles register — who is looking after what at this burn.
@@ -325,47 +368,56 @@ const RoleRow = ({
     <tr>
       <th scope="row">{role.title}</th>
 
-      <td data-label={COLUMNS.purpose}>
+      <td>
         <Prose markdown={role.purpose} />
       </td>
 
-      <td data-label={COLUMNS.lead}>
-        <HelperStrip
-          label={`${role.title} lead`}
-          people={role.lead === null ? [] : [role.lead]}
-          max={1}
-          candidates={attendees}
-          everyone={attendees}
-          viewerId={viewerId}
-          busy={busy}
-          onAdd={(accountId) => onLead(accountId)}
-          onRemove={() => onLead(null)}
-        />
+      {/* One column, two strips (#307). They were a column each, and side by side
+          they cost the width of two while saying one thing: who is on this. Each
+          names itself, since a shared header no longer can. */}
+      <td>
+        <div class="lead-who">
+          <div class="lead-who-part">
+            <p class="lead-who-label">{WHO.lead}</p>
+            <HelperStrip
+              label={`${role.title} lead`}
+              people={role.lead === null ? [] : [role.lead]}
+              max={1}
+              candidates={attendees}
+              everyone={attendees}
+              viewerId={viewerId}
+              busy={busy}
+              onAdd={(accountId) => onLead(accountId)}
+              onRemove={() => onLead(null)}
+            />
+          </div>
+
+          <div class="lead-who-part">
+            <p class="lead-who-label">{WHO.team}</p>
+            <HelperStrip
+              label={role.title}
+              people={role.team}
+              wanted={role.team_size_wanted}
+              candidates={attendees}
+              everyone={attendees}
+              viewerId={viewerId}
+              busy={busy}
+              onAdd={onJoin}
+              onRemove={onLeave}
+            />
+          </div>
+        </div>
       </td>
 
-      <td data-label={COLUMNS.tasks}>
+      <td>
         <Prose markdown={role.tasks} />
       </td>
 
-      <td data-label={COLUMNS.team}>
-        <HelperStrip
-          label={role.title}
-          people={role.team}
-          wanted={role.team_size_wanted}
-          candidates={attendees}
-          everyone={attendees}
-          viewerId={viewerId}
-          busy={busy}
-          onAdd={onJoin}
-          onRemove={onLeave}
-        />
+      <td>
+        <Effort role={role} />
       </td>
 
-      <td data-label={COLUMNS.before}>{EFFORT_LABEL[role.effort_before]}</td>
-      <td data-label={COLUMNS.during}>{EFFORT_LABEL[role.effort_during]}</td>
-      <td data-label={COLUMNS.after}>{EFFORT_LABEL[role.effort_after]}</td>
-
-      <td data-label="Actions" class="lead-actions">
+      <td class="lead-actions">
         <button
           type="button"
           class="link-button"
