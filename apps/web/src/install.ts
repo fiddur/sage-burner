@@ -103,7 +103,7 @@ export const watchInstalls = ({
 }
 
 /** Where a dismissal is remembered, so declining is not asked again next visit. */
-export const DISMISSED_AT = 'sage-burner:install-dismissed'
+export const DISMISSED_KEY = 'sage-burner:install-dismissed'
 
 /**
  * Whether somebody has already said no.
@@ -123,7 +123,7 @@ export const dismissedInstall = (store?: Storage): boolean => {
   try {
     const held = store ?? globalThis.localStorage
 
-    return typeof held?.getItem(DISMISSED_AT) === 'string'
+    return typeof held?.getItem(DISMISSED_KEY) === 'string'
   } catch {
     return false
   }
@@ -133,7 +133,7 @@ export const dismissInstall = (store?: Storage): void => {
   try {
     const held = store ?? globalThis.localStorage
 
-    held?.setItem(DISMISSED_AT, 'yes')
+    held?.setItem(DISMISSED_KEY, 'yes')
   } catch {
     // Nothing to do about it, and nothing worth saying: the offer comes back next
     // visit, which is the same as never having stored it.

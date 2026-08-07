@@ -143,7 +143,6 @@ describe('AdminInvites', () => {
 
     expect(await screen.findByText(/second/)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Copy link' })).toBeTruthy()
-    vi.unstubAllGlobals()
   })
 
   it('revokes and reloads', async () => {

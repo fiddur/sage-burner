@@ -151,12 +151,25 @@ export const envSchema = z.object({
   /**
    * Where a browser reaches this installation, e.g. `https://burn.example.org`.
    *
-   * Only passkeys read it, and what they need from it is a *stable* domain: a
-   * WebAuthn credential belongs to one, and is invisible under any other. Left
-   * unset, each ceremony takes the browser's own `Origin` — which works, and
-   * which `auth/webauthn.ts` says exactly what it costs.
+   * Passkeys need a *stable* domain from it: a WebAuthn credential belongs to one,
+   * and is invisible under any other. Left unset, each ceremony takes the browser's
+   * own `Origin` — which works, and which `auth/webauthn.ts` says exactly what it
+   * costs. The share card reads it too, as the origin it makes `og:url` and
+   * `og:image` absolute against (#306).
+   *
+   * Reduced to an actual origin here, so that is what the name means everywhere it
+   * is read. The share card concatenates onto it, and a configured
+   * `https://burn.example.org/` builds `https://burn.example.org//api/…` — a path
+   * find-my-way will not route, from a value `z.url()` is happy with. `relyingParty`
+   * has always done its own reduction for the same reason; this one is upstream of
+   * both, and the app is served at a domain root, so a path here means nothing.
    */
-  PUBLIC_ORIGIN: optional(z.url().optional()),
+  PUBLIC_ORIGIN: optional(
+    z
+      .url()
+      .transform((configured) => new URL(configured).origin)
+      .optional(),
+  ),
   /** How long a session lasts. Two weeks by default. */
   SESSION_TTL_SECONDS: optional(
     z.coerce
@@ -188,7 +201,10 @@ export interface Config {
   build_sha: string
   web_root?: string
   trust_proxy: boolean | number | string
-  /** The origin passkeys are bound to, when the operator has named one. */
+  /**
+   * The origin passkeys are bound to and the share card is absolute against, when the
+   * operator has named one. Never with a trailing slash — see the env schema.
+   */
   public_origin?: string
 }
 

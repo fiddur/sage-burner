@@ -190,7 +190,9 @@ const wordTags = ({ installation, event }: ShareSubject, title: string): string[
     meta('property', 'og:site_name', installation),
     meta('property', 'og:title', title),
     meta('property', 'og:type', event === undefined ? 'website' : 'event'),
-    meta('property', 'og:locale', 'en'),
+    // `language_TERRITORY` is the shape the spec asks for. Crawlers tolerate a bare
+    // `en`, but nothing is gained by being the one that needs tolerating.
+    meta('property', 'og:locale', 'en_US'),
   ]
 }
 

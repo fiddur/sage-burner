@@ -750,7 +750,10 @@ describe('the share card in the shell (#306)', () => {
     expect(body).toContain('name="twitter:card" content="summary_large_image"')
   })
 
-  it('falls back to the app icon, and asks for the small card because it is square', async () => {
+  it('falls back to the app icon, and to the small card with it', async () => {
+    // No icon has been uploaded here either, so the fallback is the default SVG and
+    // `summary` is chosen because that declares no size at all. The square-raster
+    // branch — where the size is known and still not wide — is in `share.test.ts`.
     await build({ WEB_ROOT: webRoot })
     await givenBurn()
 

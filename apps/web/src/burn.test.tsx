@@ -1,6 +1,6 @@
-import type { Attendance, MyBurn } from '@sage-burner/shared'
+import type { Attendance, MyBurn, MyBurnsResponse } from '@sage-burner/shared'
 
-import { cleanup, render, screen, waitFor } from '@testing-library/preact'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Viewer } from './viewer.tsx'
@@ -49,12 +49,17 @@ const ADMIN: Viewer = {
 
 /** Renders the choice as text, so a test can read it without a page. */
 const Shown = () => {
-  const { status, burns, selected } = useBurns()
+  const { status, burns, selected, reload } = useBurns()
 
   return (
-    <p>
-      {status}:{burns.map((burn) => burn.event.name).join(',')}:{selected?.event.name ?? 'none'}
-    </p>
+    <>
+      <p>
+        {status}:{burns.map((burn) => burn.event.name).join(',')}:{selected?.event.name ?? 'none'}
+      </p>
+      <button type="button" onClick={reload}>
+        Try again
+      </button>
+    </>
   )
 }
 
@@ -130,6 +135,38 @@ describe('the burn choice', () => {
     )
 
     await waitFor(() => expect(screen.getByText(/^failed:/).textContent).toBe('failed::none'))
+  })
+
+  it('goes back to loading while a retry is in flight', async () => {
+    // #236. `reload` refetched without saying so, leaving "could not load your burns"
+    // on screen for the whole of the second attempt — so the button read as broken.
+    let settle: (response: MyBurnsResponse) => void = () => undefined
+    const getMyBurns = vi
+      .fn<() => Promise<MyBurnsResponse>>()
+      .mockRejectedValueOnce(new Error('nope'))
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            settle = resolve
+          }),
+      )
+
+    render(
+      <ViewerProvider viewer={MEMBER}>
+        <FetchedBurnProvider api={{ getMyBurns }}>
+          <Shown />
+        </FetchedBurnProvider>
+      </ViewerProvider>,
+    )
+    await waitFor(() => expect(screen.getByText(/^failed:/)).toBeTruthy())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+
+    expect(screen.getByText(/^loading:/)).toBeTruthy()
+
+    // The passing sibling: it must go back to `loading` and still arrive.
+    settle({ coming: [aBurn('e-1', 'Summer', true)], past: [] })
+    expect((await screen.findByText(/^ready:/)).textContent).toBe('ready:Summer:Summer')
   })
 
   it('offers an admin a burn nobody has joined', async () => {

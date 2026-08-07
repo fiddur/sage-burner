@@ -487,7 +487,17 @@ const Opened = ({
 
   if (opened.kind === 'new') {
     return (
-      <DreamPanel label="Offer a dream" error={error} onClose={onClose}>
+      <DreamPanel
+        label="Offer a dream"
+        error={error}
+        onClose={onClose}
+        // Escape and the backdrop take this step instead of closing — and here the
+        // step is nothing. There is no dream behind an offer panel to fall back to,
+        // so a stray press threw away everything typed into the form, which is the
+        // most typing anywhere in the grid. Cancel is the way out, and it is in the
+        // form (#295).
+        onBack={() => undefined}
+      >
         <h2>Offer a dream</h2>
         <DreamFields
           dream={{
@@ -891,9 +901,13 @@ const Timetable = ({
         const gap = twoFingerGap(touchEvent.touches)
         if (start !== undefined && gap !== undefined) setZoom(pinchedZoom(start, gap))
       }}
-      // Cleared on both, and on a lift rather than only on a cancel: a pinch that
+      // Cleared on both, and on any lift rather than only on a cancel: a pinch that
       // ends with one finger up leaves the other on the glass, and a stale start
       // would make the next pinch jump from a gap nobody is holding any more.
+      //
+      // Any lift, including a third finger's — which ends the pinch until two are
+      // re-placed. It fails towards doing nothing, and counting the remaining touches
+      // to tell the cases apart is more code than the case is worth (#295).
       onTouchEnd={() => {
         pinch.current = undefined
       }}

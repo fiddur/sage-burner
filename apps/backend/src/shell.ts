@@ -17,11 +17,11 @@ import { shareHead } from './share.ts'
  * The single-page app's shell, with this installation's own card in its head (#306).
  *
  * **One handler for every path that serves the shell.** `@fastify/static` registers a
- * route per file, so `/` and `/index.html` come from there, while `/apply`, `/login`
- * and every other client-side route come from the not-found handler. Injecting into
- * one of the two is how sharing the bare domain works and sharing a deep link does
- * not, or the reverse — so `app.ts` keeps `index.html` out of the static glob and
- * points both paths here instead.
+ * route per file, so `/` and `/index.html` *would* come from there, while `/apply`,
+ * `/login` and every other client-side route come from the not-found handler.
+ * Injecting into one of the two is how sharing the bare domain works and sharing a
+ * deep link does not, or the reverse — so `app.ts` keeps `index.html` out of the
+ * static glob and points both paths here instead.
  */
 
 export interface ShellDeps {

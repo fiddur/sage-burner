@@ -202,6 +202,38 @@ describe('createConfig', () => {
     })
   })
 
+  describe('PUBLIC_ORIGIN', () => {
+    it('keeps an origin as it was given', () => {
+      expect(createConfig({ PUBLIC_ORIGIN: 'https://burn.example.org' }).public_origin).toBe(
+        'https://burn.example.org',
+      )
+    })
+
+    it('takes a trailing slash off, which would otherwise build an unroutable path', () => {
+      // The share card concatenates onto this, so `https://burn.example.org//api/…`
+      // is what a slash produces — and `z.url()` accepts the value that made it.
+      expect(createConfig({ PUBLIC_ORIGIN: 'https://burn.example.org/' }).public_origin).toBe(
+        'https://burn.example.org',
+      )
+    })
+
+    it('takes a path off too — the app is served at a domain root', () => {
+      expect(createConfig({ PUBLIC_ORIGIN: 'https://burn.example.org/app/' }).public_origin).toBe(
+        'https://burn.example.org',
+      )
+    })
+
+    it('keeps the port, which is part of an origin', () => {
+      expect(createConfig({ PUBLIC_ORIGIN: 'http://localhost:3000/' }).public_origin).toBe(
+        'http://localhost:3000',
+      )
+    })
+
+    it('is absent when nobody set one', () => {
+      expect(createConfig({}).public_origin).toBeUndefined()
+    })
+  })
+
   describe('trust_proxy', () => {
     it('trusts nothing by default', () => {
       // `true` would believe the whole X-Forwarded-For chain from whoever

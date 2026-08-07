@@ -119,6 +119,11 @@ export const FetchedBurnProvider = ({
 
     const controller = new AbortController()
 
+    // A retry is an attempt in progress, and says so. Without this the "could not
+    // load your burns" copy stays on screen for the whole of the second try, so the
+    // button appears to do nothing until it either succeeds or fails again (#236).
+    setStatus('loading')
+
     api
       .getMyBurns(controller.signal)
       .then(({ coming }) => {

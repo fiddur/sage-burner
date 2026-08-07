@@ -83,7 +83,6 @@ describe('AdminApplications', () => {
 
     await waitFor(() => expect(writeText).toHaveBeenCalled())
     expect(screen.getByRole('button', { name: 'Copy link' })).toBeTruthy()
-    vi.unstubAllGlobals()
   })
 
   it('survives a browser with no clipboard at all', async () => {
@@ -103,7 +102,6 @@ describe('AdminApplications', () => {
     ;(await screen.findByRole('button', { name: 'Copy link' })).click()
 
     expect(screen.getByRole('button', { name: 'Copy link' })).toBeTruthy()
-    vi.unstubAllGlobals()
   })
 
   it('stops offering a decision once one is made', async () => {

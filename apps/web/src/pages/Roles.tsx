@@ -37,13 +37,6 @@ export type RolesApi = Pick<
   | 'copyLeadRoles'
 >
 
-/**
- * Somebody at this burn, as `getEventAttendees` sends them.
- *
- * The shared shape rather than a narrower local one: this was
- * `{ account_id, name }`, which threw away the picture the route had already sent —
- * so the badges had nothing to draw (#301).
- */
 type Person = EventAttendeesResponse['attendees'][number]
 type Source = CopySourcesResponse['sources'][number]
 

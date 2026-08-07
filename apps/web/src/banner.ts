@@ -57,9 +57,8 @@ export const preparedBanner = async (file: Blob): Promise<Blob> => {
     context.drawImage(bitmap, x, y, width, height, 0, 0, BANNER_WIDTH, BANNER_HEIGHT)
 
     const blob = await new Promise<Blob | null>((resolve) => {
-      // JPEG at a quality a photograph survives, because that is what a banner is —
-      // and because every crawler draws one. A PNG of the same picture is a megabyte
-      // the public homepage would then load.
+      // A quality a photograph survives, which is what a banner is. `BANNER_TYPE`
+      // says why it is the only format.
       canvas.toBlob(resolve, BANNER_TYPE, 0.9)
     })
 

@@ -139,6 +139,28 @@ describe('Home', () => {
     expect(await screen.findByText(/no burn scheduled/i)).toBeTruthy()
   })
 
+  it('falls back to the installation for its heading between burns', async () => {
+    // #309. The heading is the burn's name, so with no burn the public page had no
+    // heading at all — and this is the one state where the name in the bar is not
+    // then repeated on the page.
+    renderHome(null)
+
+    expect(await screen.findByRole('heading', { name: 'The Burning Sage', level: 1 })).toBeTruthy()
+  })
+
+  it('waits for the installation rather than heading the page with nothing', async () => {
+    render(
+      <InstallationProvider>
+        <ViewerProvider viewer={SIGNED_OUT}>
+          <Home api={{ getActiveEvent: () => Promise.resolve({ event: null }), updateWelcome: notStubbed }} />
+        </ViewerProvider>
+      </InstallationProvider>,
+    )
+
+    await screen.findByText(/no burn scheduled/i)
+    expect(screen.queryByRole('heading')).toBeNull()
+  })
+
   it('says come back later when the API cannot be reached', async () => {
     // Also what an offline first paint looks like, which is why it does not
     // render a code or a stack.

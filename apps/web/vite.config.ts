@@ -31,5 +31,10 @@ export default defineConfig({
     // implementation — slicing the ISO string, for one — is indistinguishable
     // from a right one. A fixed offset makes the difference fail.
     env: { TZ: 'Europe/Stockholm' },
+    // A `vi.unstubAllGlobals()` written at the end of a test body never runs when
+    // that body fails, so one stubbed `navigator` used to leak into the rest of the
+    // file and report a single failure as several (#300). Undone between tests here,
+    // where no test can forget it.
+    unstubGlobals: true,
   },
 })

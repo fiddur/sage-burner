@@ -165,9 +165,7 @@ a:hover {
 
   Both are one class, as `.avatar` is, so specificity is equal and source order is
   the whole of it — above the base rule these set nothing at all, and every circle
-  drew at the bar's 2rem while the comments here claimed otherwise. Found by
-  measuring `getComputedStyle` rather than by looking at a screenshot, which showed
-  the wrong size perfectly clearly.
+  drew at the bar's 2rem while the comments here claimed otherwise.
 */
 
 /* Smaller than the corner's, since a chip is an hour tall at best. */
@@ -203,9 +201,14 @@ a:hover {
   padding: clamp(1.5rem, 5vw, 3rem) clamp(1rem, 5vw, 3rem);
 }
 
-/* The homepage's welcome text and the 404 — the only long-form prose here. */
+/* The homepage's welcome text and the 404 — the only long-form prose here.
+
+   Centred, unlike every other page: the wide ones are grids and rosters that use the
+   room, while this one is paragraphs bounded to a reading measure, and left-aligning
+   that puts a column of text beside an empty half-screen. */
 .prose {
   max-width: var(--measure);
+  margin-inline: auto;
 }
 
 .site-footer {
@@ -1376,7 +1379,8 @@ img.avatar {
   same size.
 */
 .helper-taken > span {
-  padding: 0.15rem 0.6rem 0.15rem 0.15rem;
+  padding-block: 0.15rem;
+  padding-inline: 0.15rem 0.6rem;
   border: 1px solid var(--line);
   border-radius: 1rem;
   font-size: 0.9rem;
@@ -1513,6 +1517,13 @@ img.avatar {
 }
 
 .dream-supporter:first-child {
+  margin-inline-start: 0;
+}
+
+/* `.dream-facilitator`'s own gap separates a face from the chip text beside it in the
+   grid. In a stack there is no text, and it cancelled the overlap above exactly — so
+   the faces sat in a row while the rule said they were overlapped. */
+.dream-supporter .dream-facilitator {
   margin-inline-start: 0;
 }
 

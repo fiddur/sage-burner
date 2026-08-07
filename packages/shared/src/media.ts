@@ -87,11 +87,6 @@ export const MAX_BANNER_BYTES = 1024 * 1024
  * with when nothing has been uploaded, which is also what the tab then wears. Two
  * copies of one emoji would be two things to keep in step for no gain.
  *
- * It had a `badged` variant, drawing the unseen-notification dot as a `<circle>`.
- * That went when the tab started wearing the installation's own icon (#285): the dot
- * is drawn on a canvas now, over whatever the route served, so there was one caller
- * left and four descriptions of a thing nothing did.
- *
  * An emoji rather than an asset, so there is no file to ship, none to cache, and
  * no second image to redraw when the first changes.
  */
