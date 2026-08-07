@@ -210,12 +210,10 @@ export const Home = ({ api }: { api: HomeApi }) => {
                 Edited where it is read: whoever spots a typo on the homepage is the
                 one likely to fix it. The burn's dates and cap stay admin-only and
                 are edited under Organise, which is why this is not a link to there.
+
+                A `PendingButton` rather than the `IconButton` the pen would suggest:
+                the editor opens after a read, and the hourglass is what says so.
               */}
-              {/* A pen, for the reason the meal intro's is one: a text button under a
-                  paragraph, in the paragraph's own face, read as part of it. Still a
-                  `PendingButton` rather than an `IconButton` — the editor opens after a
-                  read, and the hourglass is what says so — so the label the emoji
-                  replaces moves to `aria-label` by hand. */}
               {isApproved(viewer) && (
                 <PendingButton
                   busy={opening}

@@ -106,8 +106,6 @@ export const Meals = ({ api }: { api: MealsApi }) => {
                   dangerouslySetInnerHTML={{ __html: renderMarkdown(plan.intro_markdown) }}
                 />
               )}
-              {/* A pen, not a sentence. "Edit these words" sat under a paragraph in the
-                  same face as the paragraph, so it read as the last line of it. */}
               <IconButton
                 icon="✏️"
                 label="Edit these words"

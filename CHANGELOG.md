@@ -7,6 +7,12 @@ There are no version numbers: every merge to `develop` builds an image and the s
 picks it up within a few minutes, so a date can hold several deploys. Add your line
 under today's heading, and make a new heading when there is none.
 
+# 2026-08-08
+
+- **The way into a text block is a pen.** "Edit these words" under the meal plan's
+  intro, and the same under the homepage's welcome text, read as the last line of the
+  paragraph they sat under. Both are ✏️ now.
+
 # 2026-08-07
 
 - **Going on — a page of what everyone has been doing.** A dream offered, somebody

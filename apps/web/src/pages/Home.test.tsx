@@ -373,6 +373,9 @@ describe('Home', () => {
       const opening = await screen.findByRole('button', { name: 'Edit this text' })
       await waitFor(() => expect(opening.textContent).toBe('⌛'))
       expect(opening.hasAttribute('disabled')).toBe(true)
+      // The glyph is the whole cue for anybody who can see it, so the wait is said out
+      // loud as well — `disabled` alone does not say why it cannot be pressed.
+      expect(opening.getAttribute('aria-busy')).toBe('true')
 
       release({ event: summer })
       expect(await screen.findByLabelText('Welcome text')).toBeTruthy()
