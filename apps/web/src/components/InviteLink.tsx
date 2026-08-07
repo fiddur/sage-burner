@@ -1,4 +1,4 @@
-import type { Invite } from '@sage-burner/shared'
+import type { Invite, InviteDelivery } from '@sage-burner/shared'
 
 import { CopyButton } from './CopyButton.tsx'
 
@@ -10,15 +10,37 @@ import { CopyButton } from './CopyButton.tsx'
  */
 const urlFor = (invite: Invite) => `${window.location.origin}/invite/${invite.token}`
 
-export const InviteLink = ({ invite }: { invite: Invite | undefined }) => {
+/**
+ * What to say about the copy that was emailed, if there was one (#327).
+ *
+ * Three cases and all three are legitimate. The page said "Send this link" for all of
+ * them, which was wrong in both directions: an applicant got the link twice from two
+ * people, or the send failed on a TLS misconfiguration and the admin never learned.
+ *
+ * The link is shown whichever way it went — a bounce is invisible to this app, and the
+ * admin may still need it.
+ */
+const deliveryNote = (delivery: InviteDelivery) => {
+  if (delivery === null) return 'Send this link — it is shown once and cannot be recovered afterwards.'
+  if (delivery.sent) return `Emailed to ${delivery.to}. The link is here too, shown once.`
+
+  return `Not sent: ${delivery.reason ?? 'the mail server refused it.'} Send this link — it is shown once and cannot be recovered afterwards.`
+}
+
+export const InviteLink = ({
+  invite,
+  delivery = null,
+}: {
+  invite: Invite | undefined
+  delivery?: InviteDelivery
+}) => {
   if (invite === undefined) return null
 
   const url = urlFor(invite)
 
   return (
     <p class="form-note" role="status">
-      Send this link — it is shown once and cannot be recovered afterwards. Expires{' '}
-      {invite.expires_at.slice(0, 10)}.
+      {deliveryNote(delivery)} Expires {invite.expires_at.slice(0, 10)}.
       <br />
       <code>{url}</code>
       <br />

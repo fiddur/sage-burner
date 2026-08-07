@@ -10,6 +10,7 @@ import { applicationStatuses, formQuestionTypes } from '../enums.ts'
 import { MAX_QUESTION_LABEL } from '../limits.ts'
 import { emailSchema } from './auth.ts'
 import { dateTimeSchema, idSchema, nonEmptyText } from './common.ts'
+import { mailTestResponseSchema } from './mail.ts'
 
 /**
  * One answer's value. Text questions yield a string; `checkbox` and `agreement`
@@ -149,18 +150,32 @@ export const inviteSchema = z.object({
 })
 
 /**
+ * Whether the invite was emailed, and what the mail server said if not (#327).
+ *
+ * The same shape a test message answers with, reused rather than invented twice —
+ * `{ sent, to, reason }` is exactly the question here too. **Null means nothing was
+ * attempted**, which is the case a direct invite is always in and an application from
+ * before #30 may be: `applicant_email` held Discord handles and phone numbers, and
+ * `looksLikeEmail` is what decides. That is a different thing from a send that failed,
+ * and the two need different words — the admin was told to send the link either way,
+ * so a real invite went missing behind a TLS misconfiguration that never surfaced.
+ */
+export const inviteDeliverySchema = mailTestResponseSchema.nullable()
+
+/**
  * What `POST /api/admin/invites` answers with.
  *
  * Named rather than declared inline at both ends: the route and `client.ts` each
  * used to write `{ invite: … }` out for themselves, so renaming a key on one side
  * compiled cleanly against the other.
  */
-export const inviteResponseSchema = z.object({ invite: inviteSchema })
+export const inviteResponseSchema = z.object({ invite: inviteSchema, delivery: inviteDeliverySchema })
 
 export const applicationDecisionResponseSchema = z.object({
   application: applicationSchema,
   /** Null on rejection. An approval either mints one or fails. */
   invite: inviteSchema.nullable(),
+  delivery: inviteDeliverySchema,
 })
 
 export type AnswerValue = z.infer<typeof answerValueSchema>
@@ -172,5 +187,6 @@ export type ApplicationCreate = z.infer<typeof applicationCreateSchema>
 export type ApplicationResponse = z.infer<typeof applicationResponseSchema>
 export type ApplicationsResponse = z.infer<typeof applicationsResponseSchema>
 export type Invite = z.infer<typeof inviteSchema>
+export type InviteDelivery = z.infer<typeof inviteDeliverySchema>
 export type InviteResponse = z.infer<typeof inviteResponseSchema>
 export type ApplicationDecisionResponse = z.infer<typeof applicationDecisionResponseSchema>

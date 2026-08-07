@@ -71,7 +71,9 @@ export const registerInviteRoutes = (app: FastifyInstance, { db, sessions, now }
       created_by: viewer.account_id,
     })
 
-    return reply.code(201).send({ invite: { token, expires_at } } satisfies InviteResponse)
+    // Nothing to post to: a direct invite names nobody, which is what separates it
+    // from an application's (#327). Null rather than a failure — there was no attempt.
+    return reply.code(201).send({ invite: { token, expires_at }, delivery: null } satisfies InviteResponse)
   })
 
   app.delete<{ Params: { id: string } }>(apiRoutes.revokeInvite.fastify, async (request, reply) => {

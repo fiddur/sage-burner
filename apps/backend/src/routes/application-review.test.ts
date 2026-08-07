@@ -13,6 +13,7 @@ import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, accountRole, application, INSTALLATION_ID, inviteToken, mailSetting } from '../db/schema.ts'
+import { NO_ORIGIN, NOT_CONFIGURED } from '../mail/mail.ts'
 
 const SECRET = 's'.repeat(40)
 
@@ -479,6 +480,9 @@ describe('the invite in the applicant’s inbox', () => {
     expect(posted).toHaveLength(1)
     expect(posted[0]?.to).toBe('someone@example.org')
     expect(posted[0]?.text).toContain(`http://burn.example.org/invite/${decided.json().invite.token}`)
+    // And the admin is told, which is what stops them sending the same link a second
+    // time (#327).
+    expect(decided.json().delivery).toEqual({ sent: true, to: 'someone@example.org', reason: null })
   })
 
   it('is not sent when nobody has set a mail server up', async () => {
@@ -493,6 +497,9 @@ describe('the invite in the applicant’s inbox', () => {
     expect(decided.statusCode).toBe(200)
     expect(decided.json().invite.token).toBeTruthy()
     expect(posted).toHaveLength(0)
+    // A reason rather than silence: "nowhere to send it" and "the server refused" are
+    // different problems and the page words them differently (#327).
+    expect(decided.json().delivery).toMatchObject({ sent: false, reason: NOT_CONFIGURED })
   })
 
   it('is not sent for a rejection', async () => {
@@ -518,9 +525,12 @@ describe('the invite in the applicant’s inbox', () => {
       .set({ applicant_email: '@someone on discord' })
       .where(eq(application.id, id))
 
-    await approveAt(server, cookie, id)
+    const decided = await approveAt(server, cookie, id)
 
     expect(posted).toHaveLength(0)
+    // Null, not a failure: nothing was attempted, and the present copy — "send this
+    // link" — is exactly right for an applicant who left a Discord handle.
+    expect(decided.json().delivery).toBeNull()
   })
 
   it('still approves when the mail server refuses', async () => {
@@ -542,6 +552,46 @@ describe('the invite in the applicant’s inbox', () => {
 
     expect(decided.statusCode).toBe(200)
     expect(decided.json().invite.token).toBeTruthy()
+    // What was missing: the send failed and the answer said nothing, so an invite went
+    // missing behind a TLS misconfiguration nobody could see (#327).
+    expect(decided.json().delivery.sent).toBe(false)
+    expect(decided.json().delivery.reason).toBeTruthy()
+  })
+
+  it('carries the outcome on a reissue as well', async () => {
+    const server = await build()
+    await givenMailServer()
+    const { cookie } = await givenAdmin()
+    const id = await givenApplication()
+    await approveAt(server, cookie, id)
+
+    const fresh = await server.inject({
+      method: 'POST',
+      url: `/api/admin/applications/${encodeURIComponent(id)}/invite`,
+      headers: { cookie, host: 'burn.example.org' },
+    })
+
+    expect(fresh.json().delivery).toEqual({ sent: true, to: 'someone@example.org', reason: null })
+  })
+
+  it('says so when this installation cannot say where it lives', async () => {
+    // Reachable only with a `Host` that is not hostname-shaped, since a link in an
+    // inbox has to be absolute. It was a bare `return` — the one path that skipped the
+    // send and did not even log (#327).
+    const server = await build()
+    await givenMailServer()
+    const { cookie } = await givenAdmin()
+    const id = await givenApplication()
+
+    const decided = await server.inject({
+      method: 'POST',
+      url: `/api/admin/applications/${encodeURIComponent(id)}/approve`,
+      headers: { cookie, host: 'not a host' },
+    })
+
+    expect(decided.statusCode).toBe(200)
+    expect(posted).toHaveLength(0)
+    expect(decided.json().delivery).toMatchObject({ sent: false, reason: NO_ORIGIN })
   })
 
   it('posts the replacement too, which is the case a reissue exists for', async () => {

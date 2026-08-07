@@ -264,6 +264,20 @@ down costs a message rather than an approval, and a refusal is logged rather tha
 turned into a failed decision. A re-issue posts the replacement the same way, which
 is the case that route exists for.
 
+**The admin is told which of those happened** (#327). The response carries
+`delivery` — the same `{ sent, to, reason }` a test message answers with — and the
+paragraph beside the link words itself from it. It said "Send this link" whichever way
+it had gone, and that was wrong in both directions: an applicant got the link twice
+from two people, or every send failed with a TLS record error and nobody learned. The
+link stays visible in all three cases, because a bounce is invisible to this app.
+
+`null` there means nothing was attempted, which needs different words from a refusal:
+a direct invite has nobody to post to, and an application from before #30 may hold a
+Discord handle rather than an address — `looksLikeEmail` is what decides. The third
+silent path was a `Host` that is not hostname-shaped, since a link in an inbox has to
+be absolute; it now answers with a reason naming `PUBLIC_ORIGIN` instead of returning
+quietly.
+
 **A lost link is re-issued, not worked around.**
 `POST /api/admin/applications/:id/invite` mints a replacement and shows it once,
 the same way approving does. The link is shown in a paragraph that vanishes on
