@@ -4,7 +4,7 @@ import type { FastifyInstance } from 'fastify'
 import { apiRoutes, installationUpdateSchema } from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 
-import type { GuardDeps } from '../auth/guards.ts'
+import type { Database } from '../db/index.ts'
 
 import { INSTALLATION_ID, installation } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
@@ -19,7 +19,7 @@ import { bannerVersion } from './banner.ts'
  * configured, because renaming the thing you are part of should not need an
  * operator, a redeploy, or a fork.
  */
-export const registerInstallationRoutes = (app: FastifyInstance, { db }: GuardDeps) => {
+export const registerInstallationRoutes = (app: FastifyInstance, { db }: { db: Database }) => {
   const current = async (): Promise<InstallationResponse['installation'] | undefined> => {
     const [row] = await db
       .select({ title: installation.title })

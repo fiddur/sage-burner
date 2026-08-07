@@ -1,8 +1,10 @@
 import { z } from 'zod'
 
+import type { IdOrder } from './common.ts'
+
 import { placeColors } from '../enums.ts'
 import { MAX_EMOJI, MAX_PLACE_NAME } from '../limits.ts'
-import { idSchema, nonEmptyText } from './common.ts'
+import { idOrderSchema, idSchema, nonEmptyText } from './common.ts'
 import { copyFromSchema } from './copy.ts'
 
 /**
@@ -49,12 +51,9 @@ export type PlaceCreate = z.infer<typeof placeCreateSchema>
 export const placeUpdateSchema = placeCreateSchema.partial().strict()
 export type PlaceUpdate = z.infer<typeof placeUpdateSchema>
 
-/**
- * The whole ordering, as ids. Every place exactly once — a partial list would
- * renumber some rows and leave others on stale positions.
- */
-export const placeOrderSchema = z.object({ ids: z.array(idSchema) }).strict()
-export type PlaceOrder = z.infer<typeof placeOrderSchema>
+/** The whole ordering, as ids. Every place exactly once — see `idOrderSchema`. */
+export const placeOrderSchema = idOrderSchema
+export type PlaceOrder = IdOrder
 
 /**
  * Seeding a burn's lanes from a previous burn's.

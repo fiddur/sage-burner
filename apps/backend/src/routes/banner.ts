@@ -10,7 +10,7 @@ import { INSTALLATION_ID, installationBanner } from '../db/schema.ts'
 import { noStore, sendError } from '../http.ts'
 
 export interface BannerDeps extends GuardDeps {
-  now?: () => Date
+  now: () => Date
 }
 
 /**
@@ -47,7 +47,7 @@ export const bannerVersion = async (db: Database): Promise<string | undefined> =
  * — the same trade the manifest's `sizes` makes, and worth the same caveat: those
  * numbers are only as true as the client that sent the bytes.
  */
-export const registerBannerRoutes = (app: FastifyInstance, { db, now = () => new Date() }: BannerDeps) => {
+export const registerBannerRoutes = (app: FastifyInstance, { db, now }: BannerDeps) => {
   app.get(apiRoutes.getInstallationBanner.fastify, async (_request, reply) => {
     const [row] = await db
       .select({ image: installationBanner.image })

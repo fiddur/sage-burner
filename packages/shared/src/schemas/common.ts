@@ -55,3 +55,19 @@ export const optionalText = (max: number) =>
     .max(max)
     .nullable()
     .transform((value) => (value === '' ? null : value))
+
+/**
+ * A whole ordering, as ids.
+ *
+ * The complete list rather than a move-this-one instruction, because the order is
+ * what somebody sees and dragging one entry renumbers several. Sending all of them
+ * makes the request describe the end state, so a lost or reordered request cannot
+ * leave the list half-renumbered — and the server refuses anything that is not
+ * exactly the rows it has, which is `reorder` in `db/ordered.ts`.
+ *
+ * One schema for all three reorderable lists. They were three identical
+ * declarations, which is three chances for one of them to grow a rule the others
+ * do not have.
+ */
+export const idOrderSchema = z.object({ ids: z.array(idSchema) }).strict()
+export type IdOrder = z.infer<typeof idOrderSchema>

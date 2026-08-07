@@ -15,13 +15,13 @@ import type { GuardDeps } from '../auth/guards.ts'
 import type { Database } from '../db/index.ts'
 
 import { createGuards } from '../auth/guards.ts'
-import { isCheckViolation } from '../db/errors.ts'
+import { isCheckViolation, isUniqueViolation } from '../db/errors.ts'
 import { event } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { refuseIfStale, withVersion } from '../if-match.ts'
 
 export interface EventRouteDeps extends GuardDeps {
-  now?: () => Date
+  now: () => Date
 }
 
 /**
@@ -78,14 +78,25 @@ export const openEvent = async (db: Database, today: string, eventId: string): P
   return row
 }
 
-/** Whether `error` is SQLite refusing a duplicate `slug`. */
-const isSlugConflict = (error: unknown) =>
-  error instanceof Error && /UNIQUE constraint failed: event\.slug/i.test(error.message)
+/**
+ * The two above with the clock composed in, which is how every caller wants them.
+ *
+ * `openEvent(db, todayIso(now), id)` was written out thirteen times and
+ * `activeEvent(db, todayIso(now))` three more. The middle argument is the one nobody
+ * varies — a route asking about a different day would be doing something nothing
+ * here does — so it is the composition that belongs in one place rather than the
+ * decision, which already was.
+ */
+export const openEventNow = (db: Database, now: () => Date, eventId: string): Promise<Event | undefined> =>
+  openEvent(db, todayIso(now), eventId)
 
-export const registerEventRoutes = (
-  app: FastifyInstance,
-  { db, sessions, now = () => new Date() }: EventRouteDeps,
-) => {
+export const activeEventNow = (db: Database, now: () => Date): Promise<Event | undefined> =>
+  activeEvent(db, todayIso(now))
+
+/** Whether `error` is SQLite refusing a duplicate `slug`. */
+const isSlugConflict = (error: unknown) => isUniqueViolation(error, 'event.slug')
+
+export const registerEventRoutes = (app: FastifyInstance, { db, sessions, now }: EventRouteDeps) => {
   const { requireApproved } = createGuards({ db, sessions })
 
   /**
@@ -105,7 +116,7 @@ export const registerEventRoutes = (
 
     // Null rather than 404: having no event yet is the ordinary state of a
     // fresh deployment, not an error, and the homepage renders an explanation.
-    return withVersion(reply, asRead((await activeEvent(db, todayIso(now))) ?? null))
+    return withVersion(reply, asRead((await activeEventNow(db, now)) ?? null))
   })
 
   app.get(apiRoutes.getEvents.fastify, async (_request, reply) => {
@@ -160,7 +171,7 @@ export const registerEventRoutes = (
       // it any approved member could rewrite a finished burn's welcome text
       // indefinitely — the one route in this family that took an id and never looked
       // at `end_date`.
-      const open = await openEvent(db, todayIso(now), request.params.id)
+      const open = await openEventNow(db, now, request.params.id)
       if (open === undefined) return sendError(reply, 404)
 
       // Against `{ event }`, the shape `getActiveEvent` answers with — the page that

@@ -8,7 +8,7 @@ import {
   placeOrderSchema,
   placeUpdateSchema,
 } from '@sage-burner/shared'
-import { and, asc, desc, eq, gte } from 'drizzle-orm'
+import { and, asc, eq, gte } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -16,14 +16,15 @@ import type { Database } from '../db/index.ts'
 
 import { createGuards } from '../auth/guards.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
+import { nextOrder, reorder } from '../db/ordered.ts'
 import { event, place } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { refuseIfStale, withVersion } from '../if-match.ts'
 import { copySourcesFor } from './copy-sources.ts'
-import { todayIso } from './events.ts'
+import { openEventNow, todayIso } from './events.ts'
 
 export interface PlaceDeps extends GuardDeps {
-  now?: () => Date
+  now: () => Date
 }
 
 export const placesFor = (db: Database, eventId: string): Promise<Place[]> =>
@@ -43,23 +44,13 @@ export const placesFor = (db: Database, eventId: string): Promise<Place[]> =>
  * Reading stays open, including reading a finished grid to copy it into the next
  * burn.
  */
-const burnIsOpen = async (db: Database, today: string, eventId: string): Promise<boolean> => {
-  const [row] = await db
-    .select({ id: event.id })
-    .from(event)
-    .where(and(eq(event.id, eventId), gte(event.end_date, today)))
-    .limit(1)
-
-  return row !== undefined
-}
-
 /** The lane, when the burn it belongs to is open — the id alone does not say which burn. */
-const openLane = async (db: Database, today: string, placeId: string): Promise<Place | undefined> => {
+const openLane = async (db: Database, now: () => Date, placeId: string): Promise<Place | undefined> => {
   const [row] = await db
     .select()
     .from(place)
     .innerJoin(event, eq(place.event_id, event.id))
-    .where(and(eq(place.id, placeId), gte(event.end_date, today)))
+    .where(and(eq(place.id, placeId), gte(event.end_date, todayIso(now))))
     .limit(1)
 
   return row?.place
@@ -79,12 +70,9 @@ const openLane = async (db: Database, today: string, placeId: string): Promise<P
  * in `docs/burns.md`'s calendar-feed section. Every write is open to any approved
  * member: this
  * is the burn's furniture, not admin's. Every write also needs the burn to be open;
- * see `burnIsOpen`.
+ * see `openEventNow`.
  */
-export const registerPlaceRoutes = (
-  app: FastifyInstance,
-  { db, sessions, now = () => new Date() }: PlaceDeps,
-) => {
+export const registerPlaceRoutes = (app: FastifyInstance, { db, sessions, now }: PlaceDeps) => {
   const { requireApproved } = createGuards({ db, sessions })
 
   /**
@@ -117,7 +105,7 @@ export const registerPlaceRoutes = (
       const id = randomUUID()
       const event_id = request.params.eventId
 
-      if (!(await burnIsOpen(db, todayIso(now), event_id))) {
+      if (!(await openEventNow(db, now, event_id))) {
         return sendError(reply, 404)
       }
 
@@ -133,15 +121,7 @@ export const registerPlaceRoutes = (
       let order: number
       try {
         order = db.transaction((tx) => {
-          const [last] = tx
-            .select({ order: place.order })
-            .from(place)
-            .where(eq(place.event_id, event_id))
-            .orderBy(desc(place.order))
-            .limit(1)
-            .all()
-
-          const next = last === undefined ? 0 : last.order + 1
+          const next = nextOrder(tx, place, eq(place.event_id, event_id))
           tx.insert(place)
             .values({ ...body, id, event_id, order: next })
             .run()
@@ -172,7 +152,7 @@ export const registerPlaceRoutes = (
       // One read answering both "is it there" and "is its burn still open", so the
       // two cases cannot answer differently. `set({})` is not valid SQL, so the one
       // body that never reaches the UPDATE returns this row instead.
-      const existing = await openLane(db, todayIso(now), request.params.id)
+      const existing = await openLane(db, now, request.params.id)
       if (existing === undefined) return sendError(reply, 404)
       if (Object.keys(body).length === 0) return { place: existing }
 
@@ -192,7 +172,7 @@ export const registerPlaceRoutes = (
     async (request, reply) => {
       void noStore(reply)
 
-      if ((await openLane(db, todayIso(now), request.params.id)) === undefined) {
+      if ((await openLane(db, now, request.params.id)) === undefined) {
         return sendError(reply, 404)
       }
 
@@ -234,36 +214,23 @@ export const registerPlaceRoutes = (
       const body = bodyOf(placeOrderSchema, request)
       if (body === undefined) return sendError(reply, 400)
 
-      if (!(await burnIsOpen(db, todayIso(now), request.params.eventId))) {
+      if (!(await openEventNow(db, now, request.params.eventId))) {
         return sendError(reply, 404)
       }
 
       if (await refuseIfStale(request, reply, () => grid(request.params.eventId))) return reply
 
-      const existing = await placesFor(db, request.params.eventId)
-      const wanted = body.ids
-
-      // Exactly the places this burn has, no more and no fewer. A partial list
-      // would renumber some rows and leave the rest on stale positions, producing an
-      // order nobody chose; another burn's id would reach into a grid this request
-      // is not about. Distinctness is implied rather than checked: `wanted` has
-      // exactly `existing.length` slots and must contain every existing id, and
-      // those are distinct because `id` is the primary key.
-      const sameSet = wanted.length === existing.length && existing.every((row) => wanted.includes(row.id))
-      if (!sameSet) return sendError(reply, 400)
-
-      // One statement per place, but in a transaction: a half-applied reorder is
-      // an order the admin never chose. Scoped by event as well as id, so an id
-      // from another burn could not renumber it even if the set check above were
-      // wrong.
-      db.transaction((tx) => {
-        wanted.forEach((id, index) => {
-          tx.update(place)
-            .set({ order: index })
-            .where(and(eq(place.id, id), eq(place.event_id, request.params.eventId)))
-            .run()
-        })
-      })
+      // Exactly the places this burn has — `reorder` argues that rule out, and
+      // scoping by event as well as id is what keeps another burn's grid out of
+      // reach even if the set check were wrong.
+      const renumbered = reorder(
+        db,
+        place,
+        await placesFor(db, request.params.eventId),
+        body.ids,
+        eq(place.event_id, request.params.eventId),
+      )
+      if (renumbered === 'mismatch') return sendError(reply, 400)
 
       return withVersion(reply, await grid(request.params.eventId))
     },

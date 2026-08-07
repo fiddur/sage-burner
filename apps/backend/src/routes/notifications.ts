@@ -12,7 +12,7 @@ import { bodyOf, noStore, sendError } from '../http.ts'
 import { markSeen, notificationsFor, switchedOn } from '../push/notify.ts'
 
 export interface NotificationDeps extends GuardDeps {
-  now?: () => Date
+  now: () => Date
 }
 
 /**
@@ -24,10 +24,7 @@ export interface NotificationDeps extends GuardDeps {
  * Every route derives whose they are from the session, so there is no id in any
  * path to get wrong or to tamper with.
  */
-export const registerNotificationRoutes = (
-  app: FastifyInstance,
-  { db, sessions, now = () => new Date() }: NotificationDeps,
-) => {
+export const registerNotificationRoutes = (app: FastifyInstance, { db, sessions, now }: NotificationDeps) => {
   const mine = async (request: Parameters<typeof viewerFor>[0]) =>
     (await viewerFor(request, { db, sessions }))?.account_id
 

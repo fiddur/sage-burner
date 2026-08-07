@@ -15,7 +15,7 @@ import { testMessage } from '../mail/messages.ts'
 
 export interface MailRouteDeps extends GuardDeps {
   mail: MailDeps
-  now?: () => Date
+  now: () => Date
 }
 
 /**
@@ -29,10 +29,7 @@ export interface MailRouteDeps extends GuardDeps {
  * that had to re-type it to change the port would end up putting it in a text input
  * on every visit, and a masked value invites a save that stores the mask.
  */
-export const registerMailRoutes = (
-  app: FastifyInstance,
-  { db, sessions, mail, now = () => new Date() }: MailRouteDeps,
-) => {
+export const registerMailRoutes = (app: FastifyInstance, { db, sessions, mail, now }: MailRouteDeps) => {
   const current = async (): Promise<MailSettingsResponse['mail']> => {
     const [row] = await db.select().from(mailSetting).where(eq(mailSetting.id, INSTALLATION_ID)).limit(1)
 

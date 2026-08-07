@@ -33,10 +33,10 @@ import { bodyOf, noStore, sendError } from '../http.ts'
 import { refuseIfStale, withVersion } from '../if-match.ts'
 import { displayName, notifyAttendees } from '../push/notify.ts'
 import { attendanceFor } from './attendance.ts'
-import { openEvent, todayIso } from './events.ts'
+import { openEventNow } from './events.ts'
 
 export interface SessionDeps extends GuardDeps {
-  now?: () => Date
+  now: () => Date
   /**
    * Told when somebody is put on a dream, or taken off one, by anybody but
    * themselves. Optional and swallowing its own failures, like the lead-roles
@@ -250,7 +250,7 @@ const facilitatorSpot = async (
  */
 export const registerSessionRoutes = (
   app: FastifyInstance,
-  { db, sessions, now = () => new Date(), notify = async () => undefined }: SessionDeps,
+  { db, sessions, now, notify = async () => undefined }: SessionDeps,
 ) => {
   const { requireMember } = createGuards({ db, sessions })
 
@@ -324,7 +324,7 @@ export const registerSessionRoutes = (
       const viewer = await viewerFor(request, { db, sessions })
       if (viewer === undefined) return sendError(reply, 401)
 
-      const open = await openEvent(db, todayIso(now), request.params.eventId)
+      const open = await openEventNow(db, now, request.params.eventId)
       if (open === undefined) return sendError(reply, 404)
 
       if (!(await placeIsOnThisBurn(db, open.id, body.place_id))) {
@@ -402,7 +402,7 @@ export const registerSessionRoutes = (
       // current should not still be a way to rewrite it. Not the *active* burn —
       // the selector offers every burn still to come, and a dream can be offered
       // for the one after next.
-      const open = existing === undefined ? undefined : await openEvent(db, todayIso(now), existing.event_id)
+      const open = existing === undefined ? undefined : await openEventNow(db, now, existing.event_id)
       if (existing === undefined || open === undefined) {
         return sendError(reply, 404)
       }
@@ -470,7 +470,7 @@ export const registerSessionRoutes = (
         .where(eq(session.id, request.params.id))
         .limit(1)
 
-      const open = existing === undefined ? undefined : await openEvent(db, todayIso(now), existing.event_id)
+      const open = existing === undefined ? undefined : await openEventNow(db, now, existing.event_id)
       if (open === undefined) return sendError(reply, 404)
 
       const deleted = await db
@@ -496,7 +496,7 @@ export const registerSessionRoutes = (
     const [dream] = await dreamRows(db, eq(session.id, request.params.id)).limit(1)
     if (dream === undefined) return { code: 404, error: 'not_found' }
 
-    const open = await openEvent(db, todayIso(now), dream.event_id)
+    const open = await openEventNow(db, now, dream.event_id)
     if (open === undefined) return { code: 404, error: 'not_found' }
 
     const attendanceId = await mineAt(request, dream.event_id)

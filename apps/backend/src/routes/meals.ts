@@ -26,10 +26,10 @@ import { account, attendance, event, meal, mealRole, mealSlot } from '../db/sche
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { refuseIfStale, withVersion } from '../if-match.ts'
 import { accountForAttendance, attendanceFor } from './attendance.ts'
-import { openEvent, todayIso } from './events.ts'
+import { openEventNow } from './events.ts'
 
 export interface MealDeps extends GuardDeps {
-  now?: () => Date
+  now: () => Date
   /** Told when somebody is put on a crew, or taken off one, by anybody but themselves. */
   notify?: Notifier
 }
@@ -157,7 +157,7 @@ const burnFor = async (db: Database, eventId: string) => {
  */
 export const registerMealRoutes = (
   app: FastifyInstance,
-  { db, sessions, now = () => new Date(), notify = async () => undefined }: MealDeps,
+  { db, sessions, now, notify = async () => undefined }: MealDeps,
 ) => {
   const { requireApproved } = createGuards({ db, sessions })
 
@@ -184,7 +184,7 @@ export const registerMealRoutes = (
     const [row] = await db.select().from(meal).where(eq(meal.id, id)).limit(1)
     if (row === undefined) return undefined
 
-    return (await openEvent(db, todayIso(now), row.event_id)) === undefined ? undefined : row
+    return (await openEventNow(db, now, row.event_id)) === undefined ? undefined : row
   }
 
   /**
@@ -237,7 +237,7 @@ export const registerMealRoutes = (
 
       // Scoped like the writes below, and unlike `/events/:id/welcome`, which has the
       // same gap — see #218. New code follows the rule rather than the neighbour.
-      if ((await openEvent(db, todayIso(now), request.params.eventId)) === undefined) {
+      if ((await openEventNow(db, now, request.params.eventId)) === undefined) {
         return sendError(reply, 404)
       }
 

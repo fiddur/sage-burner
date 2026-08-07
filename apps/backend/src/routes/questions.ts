@@ -9,13 +9,14 @@ import {
   formQuestionUpdateSchema,
   tickBoxRequired,
 } from '@sage-burner/shared'
-import { and, asc, desc, eq, notInArray } from 'drizzle-orm'
+import { and, asc, eq, notInArray } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
-import type { GuardDeps } from '../auth/guards.ts'
 import type { Database } from '../db/index.ts'
 
+import { nextOrder, reorder } from '../db/ordered.ts'
 import { formQuestion } from '../db/schema.ts'
+import { whyNothingWritten } from '../db/write.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 
 /**
@@ -75,7 +76,7 @@ const tickBoxCondition = ({ type, required }: { type?: string; required?: boolea
 export const questionsFor = (db: Database): Promise<FormQuestion[]> =>
   db.select().from(formQuestion).orderBy(asc(formQuestion.order), asc(formQuestion.id))
 
-export const registerQuestionRoutes = (app: FastifyInstance, { db }: GuardDeps) => {
+export const registerQuestionRoutes = (app: FastifyInstance, { db }: { db: Database }) => {
   app.get(apiRoutes.getQuestions.fastify, async (_request, reply) => {
     // Same reasoning as the active event: public, but an edit has to show up
     // without waiting out a heuristic freshness window.
@@ -92,21 +93,15 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db }: GuardDeps) 
 
     const id = randomUUID()
 
-    // Read and insert in one transaction, because otherwise "the server assigns
-    // `order`" is not true: two requests can observe the same last row between
-    // separate awaits and insert the same position. The order is returned rather
-    // than assigned into a row from inside the callback — that worked only because
-    // `drizzle-orm/node-sqlite` is synchronous, and on an async driver the insert
-    // would still be right while the 201 body reported `order: 0`.
+    // One transaction, because otherwise "the server assigns `order`" is not true —
+    // `nextOrder` says why. The order is returned rather than read back off a row
+    // from inside the callback: that worked only because `drizzle-orm/node-sqlite` is
+    // synchronous, and on an async driver the insert would still be right while the
+    // 201 body reported `order: 0`.
+    //
+    // No scope: there is one application form, so its questions number as one list.
     const order = db.transaction((tx) => {
-      const [last] = tx
-        .select({ order: formQuestion.order })
-        .from(formQuestion)
-        .orderBy(desc(formQuestion.order))
-        .limit(1)
-        .all()
-
-      const next = last === undefined ? 0 : last.order + 1
+      const next = nextOrder(tx, formQuestion)
       tx.insert(formQuestion)
         .values({ ...body, id, order: next })
         .run()
@@ -166,22 +161,13 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db }: GuardDeps) 
 
     const [row] = updated
     if (row === undefined) {
-      // Nothing is read before the write on this path — the only `select` above
-      // is inside the empty-body branch, which returns — so zero rows has three
-      // causes, not two: the id never existed, the row was deleted a moment ago,
-      // or the tick-box condition refused the change. The first two are the same
-      // answer and the same question to ask.
-      //
-      // Told apart by asking rather than guessed at from whether a condition was
-      // present: guessing answered "Request failed (400)" for a question that is
-      // not there.
-      const [stillThere] = await db
-        .select({ id: formQuestion.id })
-        .from(formQuestion)
-        .where(eq(formQuestion.id, request.params.id))
-        .limit(1)
+      // Zero rows has three causes here, not two: the id never existed, the row
+      // was deleted a moment ago, or the tick-box condition refused the change. The
+      // first two are the same answer — see `whyNothingWritten` for why this is
+      // asked rather than inferred.
+      const why = await whyNothingWritten(db, formQuestion, eq(formQuestion.id, request.params.id))
 
-      return stillThere === undefined ? sendError(reply, 404) : sendError(reply, 400)
+      return sendError(reply, why === 'not_found' ? 404 : 400)
     }
 
     return { question: row } satisfies FormQuestionResponse
@@ -217,28 +203,11 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db }: GuardDeps) 
     const body = bodyOf(formQuestionOrderSchema, request)
     if (body === undefined) return sendError(reply, 400)
 
-    const existing = await questionsFor(db)
-    const wanted = body.ids
-
-    // The request must name exactly the questions that exist, no more and no
-    // fewer. A partial list would renumber some rows and leave others on stale
-    // positions, producing an order nobody asked for.
-    // No distinctness check: it is implied. `wanted` has exactly `existing.length`
-    // slots and must contain every existing id, and those are distinct because `id`
-    // is the primary key — so `existing.length` distinct values in that many slots
-    // leaves no room for a duplicate. Testing it separately would have been a
-    // conjunct that can never be the one that decides.
-    const sameSet = wanted.length === existing.length && existing.every((row) => wanted.includes(row.id))
-    if (!sameSet) return sendError(reply, 400)
-
-    // One statement per question, but inside a transaction: a half-applied
-    // reorder is an order the admin never chose, and this is the one write
-    // here that touches several rows at once.
-    db.transaction((tx) => {
-      wanted.forEach((id, index) => {
-        tx.update(formQuestion).set({ order: index }).where(eq(formQuestion.id, id)).run()
-      })
-    })
+    // The request must name exactly the questions that exist — `reorder` argues that
+    // rule out, and refuses on its own rather than in three places.
+    if (reorder(db, formQuestion, await questionsFor(db), body.ids) === 'mismatch') {
+      return sendError(reply, 400)
+    }
 
     return { questions: await questionsFor(db) } satisfies FormQuestionsResponse
   })
