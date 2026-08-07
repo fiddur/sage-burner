@@ -121,7 +121,7 @@ export const registerAllergyRoutes = (app: FastifyInstance, { db }: { db: Databa
     if (body === undefined) return sendError(reply, 400)
 
     // Exactly the items there are — `reorder` argues that rule out, and owns it for
-    // the four lists that have one.
+    // every list that has one.
     if (reorder(db, allergyItem, await allergyItemsFor(db), body.ids) === 'mismatch') {
       return sendError(reply, 400)
     }

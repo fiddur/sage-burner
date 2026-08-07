@@ -633,12 +633,16 @@ a:hover {
   min-width: 0;
 }
 
-/* The question is the control that opens the answer, so it has to look like one. */
+/*
+  The question is the control that opens the answer, so it has to look like one — the
+  browser's own triangle is that signal, and `inside` is load-bearing: the row is a
+  flex container and an outside marker renders past the summary's content box, where
+  it is clipped and the question reads as plain text.
+*/
 .faq-entry > summary {
   cursor: pointer;
   font-weight: 600;
-  /* The list marker is the browser's triangle; a bullet beside it would be two. */
-  list-style-position: outside;
+  list-style-position: inside;
 }
 
 .faq-entry > summary:focus-visible {

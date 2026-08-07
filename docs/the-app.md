@@ -40,14 +40,17 @@ The choice is **not persisted**. A reload landing on the soonest burn is the rig
 default every time, and a remembered choice would leave somebody looking at last
 month's grid with nothing on screen to say why.
 
-| Viewer                   | Bar                                               |
-| ------------------------ | ------------------------------------------------- |
-| Signed out               | Apply, Log in                                     |
-| An account, neither role | nothing — an applicant waiting on a decision      |
-| `member`                 | Members, Schedule, Roles, and the initials circle |
-| `admin` without `member` | Members, Schedule, Roles, ⚙️                      |
+| Viewer                   | Bar                                                           |
+| ------------------------ | ------------------------------------------------------------- |
+| Signed out               | Apply, Log in                                                 |
+| An account, neither role | nothing — an applicant waiting on a decision                  |
+| `member`                 | Members, Schedule, Leads, Meals, FAQ, and the initials circle |
+| `admin` without `member` | Members, Schedule, Leads, Meals, FAQ, ⚙️                      |
 
 - **Members** is the roster a member may now read — see "What a member may change".
+- **FAQ** is the burn's Q&A (#28) — a thing of its own rather than something reached
+  from another page, because it is what somebody opens when they have a question and
+  no idea which page would answer it. `docs/burns.md` has the shape.
 - **Dreams** is reached from Schedule. Offering a dream and placing one are the
   same activity, and two entries for it is what the restructure undid.
 - **Places** is reached from Schedule too: the lanes are what the grid draws.

@@ -94,7 +94,7 @@ export const Faq = ({ api }: { api: FaqApi }) => {
   return (
     <GuardedPage title="FAQ" require="approved">
       <h1>
-        Questions <Refreshing on={refreshing} />
+        FAQ <Refreshing on={refreshing} />
       </h1>
 
       <p class="form-note">

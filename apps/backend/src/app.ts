@@ -407,6 +407,10 @@ export const createApp = async ({
   app.decorate('config', config)
 
   registerErrorHandler(app)
+  // Before any route registers, `registerVersionRoutes` included: `onRoute` only
+  // sees what comes after it, and a hook with one exception is a hook to forget.
+  refuseEnvelopeStrippers(app)
+
   registerVersionRoutes(app, { config })
 
   // One `Sessions` for both, so the guards verify what the login route signed.
@@ -415,9 +419,6 @@ export const createApp = async ({
   // One gate for every route that spends scrypt, and per-app rather than
   // module-level so two apps in one test process do not share one.
   const gate = suppliedGate ?? createGate(SCRYPT_GATE)
-
-  // Before any route registers, since `onRoute` only sees what comes after it.
-  refuseEnvelopeStrippers(app)
 
   registerAdminPrefixGuard(app, { db, sessions })
 
