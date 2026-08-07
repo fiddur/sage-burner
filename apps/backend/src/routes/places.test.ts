@@ -805,6 +805,37 @@ describe('writing over what somebody else changed', () => {
     expect(retried.statusCode).toBe(200)
   })
 
+  it('answers a successful write with the tag the next one must quote', async () => {
+    // #277. These answered 200 with no `ETag`, so a client kept the tag it had just
+    // invalidated and its *second* edit refused itself with "somebody else changed
+    // this" — when the somebody was them. The tag is the collection's, not the row's,
+    // because that is what the precondition is over.
+    const server = await build()
+    const eventId = await givenEvent()
+    const admin = await givenAccount(['admin'])
+    const [, sauna] = await givenPlaces(server, admin.cookie, eventId)
+
+    const first = await writeLane(
+      server,
+      admin.cookie,
+      sauna ?? '',
+      { name: 'Steam Room' },
+      String((await list(server, eventId)).headers.etag),
+    )
+    expect(first.headers.etag).toBe((await list(server, eventId)).headers.etag)
+
+    // And the second edit goes through on it, which is the whole complaint.
+    const second = await writeLane(
+      server,
+      admin.cookie,
+      sauna ?? '',
+      { name: 'Sweat Lodge' },
+      String(first.headers.etag),
+    )
+
+    expect(second.statusCode).toBe(200)
+  })
+
   it('guards the ordering too, which is one write over the whole list', async () => {
     const server = await build()
     const eventId = await givenEvent()

@@ -555,8 +555,13 @@ passkeys and no password at all.
   is what keeps a device that cannot do it from failing at the last step, after
   the browser has already said yes.
 - **Removing the last passkey is refused when there is no password** — 409, and
-  the page says why. There is no mail service to send a reset through ([#30]), so
-  that combination is a lockout with nothing to undo it.
+  the page says why. There is no reset flow at all: #30 gave the app a mail server
+  and nothing that sends a reset through it, so the only way back is an admin, from
+  the accounts page. That combination is a lockout with nothing in the app to undo
+  it, which is why the refusal is folded into the `DELETE`'s own `WHERE` (#239)
+  rather than checked before it — two removals from two tabs could otherwise each
+  see two passkeys, both pass, and together strip the account bare. It is the one
+  place here that engineers for a race, and the consequence is why.
 - The **challenge is a row**, not a signed cookie, and it is deleted by the
   statement that reads it. Single-use is the whole point of a challenge, and a
   signed one is replayable for as long as it is valid. Expired rows are swept
@@ -885,7 +890,14 @@ last-write-wins there.
 
 Both refusals carry the resource **as it now stands**, and its new tag. So a page can
 say what the other person wrote rather than only that somebody did, and a retry costs
-no extra read. The longer fields — the welcome text, the words above the meal table —
+no extra read.
+
+**A successful write carries the next tag too** (#277). A single-row write answers
+with the row while the precondition is over the whole collection, so the tag it hands
+back is the collection's — `withCollectionVersion`, which re-reads what the guard
+already read once. Without it these routes answered 200 with no `ETag` at all, and a
+second edit before the page reloaded refused _itself_ with "Somebody else changed
+this". The longer fields — the welcome text, the words above the meal table —
 keep what was being typed and show the other version beside it; a refused click just
 warns and catches up, because there is nothing there worth reconciling.
 

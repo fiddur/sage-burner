@@ -16,6 +16,9 @@ import type {
   EventOptionUpdate,
   EventUpdate,
   EventWelcomeUpdate,
+  FaqCreateInput,
+  FaqUpdate,
+  IdOrder,
   FormQuestionCreateInput,
   FormQuestionOrder,
   FormQuestionUpdate,
@@ -86,6 +89,11 @@ export const apiRoutes = {
     fastify: '/api/events/:eventId/options',
     path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/options`,
   },
+  addFaqEntry: {
+    method: 'POST',
+    fastify: '/api/events/:eventId/faq',
+    path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/faq`,
+  },
   addLeadRole: {
     method: 'POST',
     fastify: '/api/events/:eventId/roles',
@@ -142,6 +150,11 @@ export const apiRoutes = {
     fastify: '/api/admin/applications/:id/approve',
     path: (id: string) => `/api/admin/applications/${encodeURIComponent(id)}/approve`,
   },
+  copyFaq: {
+    method: 'POST',
+    fastify: '/api/events/:eventId/faq/copy',
+    path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/faq/copy`,
+  },
   copyLeadRoles: {
     method: 'POST',
     fastify: '/api/events/:eventId/roles/copy',
@@ -166,6 +179,11 @@ export const apiRoutes = {
     method: 'DELETE',
     fastify: '/api/event-options/:id',
     path: (id: string) => `/api/event-options/${encodeURIComponent(id)}`,
+  },
+  deleteFaqEntry: {
+    method: 'DELETE',
+    fastify: '/api/faq/:id',
+    path: (id: string) => `/api/faq/${encodeURIComponent(id)}`,
   },
   deleteLeadRole: {
     method: 'DELETE',
@@ -274,6 +292,16 @@ export const apiRoutes = {
     method: 'GET',
     fastify: '/api/admin/invites',
     path: () => '/api/admin/invites',
+  },
+  getFaq: {
+    method: 'GET',
+    fastify: '/api/events/:eventId/faq',
+    path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/faq`,
+  },
+  getFaqSources: {
+    method: 'GET',
+    fastify: '/api/events/:eventId/faq/sources',
+    path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/faq/sources`,
   },
   getLeadRoleSources: {
     method: 'GET',
@@ -479,6 +507,11 @@ export const apiRoutes = {
     fastify: '/api/me/passkeys/:id',
     path: (id: string) => `/api/me/passkeys/${encodeURIComponent(id)}`,
   },
+  reorderFaq: {
+    method: 'PUT',
+    fastify: '/api/events/:eventId/faq/order',
+    path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/faq/order`,
+  },
   reorderEventOptions: {
     method: 'PUT',
     fastify: '/api/events/:eventId/options/:kind/order',
@@ -621,6 +654,11 @@ export const apiRoutes = {
     fastify: '/api/admin/installation',
     path: () => '/api/admin/installation',
   },
+  updateFaqEntry: {
+    method: 'PATCH',
+    fastify: '/api/faq/:id',
+    path: (id: string) => `/api/faq/${encodeURIComponent(id)}`,
+  },
   updateLeadRole: {
     method: 'PATCH',
     fastify: '/api/roles/:id',
@@ -729,6 +767,7 @@ export type RouteKey = keyof typeof apiRoutes
  */
 export interface RouteBodies {
   addEventOption: EventOptionCreateInput
+  addFaqEntry: FaqCreateInput
   addLeadRole: LeadRoleCreateInput
   addMeal: MealCreateInput
   addMealSlot: MealSlotCreateInput
@@ -737,6 +776,7 @@ export interface RouteBodies {
   addPlace: PlaceCreate
   addQuestion: FormQuestionCreateInput
   adminAddAttendance: AttendanceCreate
+  copyFaq: CopyFrom
   copyLeadRoles: CopyFrom
   copyPlaces: CopyFrom
   createEvent: EventCreateInput
@@ -750,6 +790,7 @@ export interface RouteBodies {
   redeemInvite: RedeemRequestInput
   reorderEventOptions: EventOptionOrder
   reorderAllergyItems: AllergyItemOrder
+  reorderFaq: IdOrder
   reorderPlaces: PlaceOrder
   reorderQuestions: FormQuestionOrder
   setAccountPassword: AdminPasswordReset
@@ -766,6 +807,7 @@ export interface RouteBodies {
   updateEventOption: EventOptionUpdate
   updateInstallation: InstallationUpdate
   updateMailSettings: MailSettingsUpdate
+  updateFaqEntry: FaqUpdate
   updateLeadRole: LeadRoleUpdate
   updateMeal: MealUpdate
   updateMealIntro: MealIntroUpdate

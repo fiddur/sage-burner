@@ -83,6 +83,7 @@ export const Layout = ({ api, children }: { api: BellApi; children: ComponentChi
                   and it is not what anybody reads. */}
               <a href="/roles">Leads</a>
               <a href="/meals">Meals</a>
+              <a href="/faq">FAQ</a>
             </>
           )}
 

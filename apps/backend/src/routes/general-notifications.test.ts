@@ -93,8 +93,9 @@ const givenComing = async (accountId: string, eventId = BURN) => {
     .values({ id: randomUUID(), event_id: eventId, account_id: accountId, joined_at: NOW })
 }
 
-/** Switch a category on for somebody, which is what makes any of these arrive. */
 /**
+ * Switch categories on for somebody, which is what makes any of these arrive.
+ *
  * Replaces the whole set, which is what the route takes — so anything a test still
  * wants on has to be named here too.
  */
