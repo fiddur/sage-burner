@@ -18,7 +18,7 @@ import { createGuards } from './auth/guards.ts'
 import { createSessions } from './auth/session.ts'
 import { clientErrorHandler, frameworkErrorHandler, registerErrorHandler } from './errors.ts'
 import { sendError } from './http.ts'
-import { recordAndPush } from './push/notify.ts'
+import { pushPayload, recordAndPush } from './push/notify.ts'
 import { notifyAdmins } from './push/push.ts'
 import { deliverWithWebPush, DEFAULT_PUSH_CONTACT, generateVAPIDKeys } from './push/web-push.ts'
 import { registerAdminRoutes } from './routes/admin.ts'
@@ -439,7 +439,10 @@ export const createApp = async ({
     db,
     now,
     notify: async (message) => {
-      const counts = await notifyAdmins(push, JSON.stringify({ body: message }))
+      // Through the same builder as every other push, which is what stops this one
+      // going somewhere else again. No category: an application is not a bell row and
+      // has no switch, so there is nothing to name — see `Pushed`.
+      const counts = await notifyAdmins(push, pushPayload({ body: message, link: '/admin/applications' }))
 
       // Logged here rather than inside `notifyAdmins`, which has no logger and is
       // the more testable for it. Only when something went wrong: a quiet success

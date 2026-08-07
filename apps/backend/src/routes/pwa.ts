@@ -12,9 +12,20 @@ export interface PwaDeps extends GuardDeps {
   now?: () => Date
 }
 
-/** The toolbar and the splash screen, from `styles.css`'s light palette. */
+/** The toolbar, from `styles.css`. The same `--ember` in both palettes' neighbourhood. */
 const THEME_COLOR = '#c2410c'
-const BACKGROUND_COLOR = '#faf7f2'
+
+/**
+ * The splash screen, and on Android the strip behind the gesture bar.
+ *
+ * The **dark** palette's paper rather than the light one's. A manifest colour is a
+ * single fixed value with no way to follow `prefers-color-scheme`, so one of the two
+ * is going to be wrong — and this one is wrong for the length of a launch in light
+ * mode against being wrong for as long as the app is open in dark mode, which is
+ * where most phones are. It also sits flush against an icon with a dark ground,
+ * which the uploaded ones tend to have.
+ */
+const BACKGROUND_COLOR = '#1c1917'
 
 /**
  * What the software calls itself when the installation has not been named yet.

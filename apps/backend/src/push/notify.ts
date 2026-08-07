@@ -21,6 +21,29 @@ export interface Told {
 export type Notifier = (accountId: string, told: Told) => Promise<unknown>
 
 /**
+ * What a push carries, and the one place it is built (#279).
+ *
+ * There are two senders and they had drifted. `recordAndPush` below covers everything
+ * that is also a bell row; the applications callback in `app.ts` is neither a row nor
+ * a setting — it predates both — and went on sending a body alone. That was invisible
+ * while the worker had a page written into it, and became the one notification going
+ * nowhere the moment it stopped.
+ *
+ * `category` is optional for exactly that sender. It is what a notification collapses
+ * with, and one that has no category collapses with the others that have none — which
+ * today is only itself, and is the behaviour the applications push always had.
+ */
+export interface Pushed {
+  body: string
+  /** A path in this app. Null for anything with no page of its own. */
+  link: string | null
+  category?: NotificationCategory
+}
+
+export const pushPayload = ({ body, link, category }: Pushed): string =>
+  JSON.stringify({ body, link, category })
+
+/**
  * Whether this person wants to hear about this.
  *
  * A stored row is what they said; absence is that they have not said, and the
@@ -66,7 +89,10 @@ export const recordAndPush =
       created_at: now().toISOString(),
     })
 
-    const counts = await notifyAccount(deps, accountId, JSON.stringify({ body: told.body }))
+    // The whole of what was told, not just the wording (#279). The row already had
+    // the link and the category; the push carried neither, so the worker had nowhere
+    // to send anybody and hardcoded the one page that existed when it was written.
+    const counts = await notifyAccount(deps, accountId, pushPayload(told))
     if (counts.failed > 0 || counts.gone > 0) log(counts)
 
     return counts

@@ -3,14 +3,15 @@ import type { FastifyInstance, LightMyRequestResponse } from 'fastify'
 
 import { eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { DbHandle } from '../db/index.ts'
+import type { Delivery } from '../push/push.ts'
 
 import { createApp } from '../app.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { application, formQuestion } from '../db/schema.ts'
+import { account, accountRole, application, formQuestion, pushSubscription } from '../db/schema.ts'
 
 /**
  * Submitting the public application form.
@@ -23,6 +24,7 @@ import { application, formQuestion } from '../db/schema.ts'
  */
 
 const SECRET = 's'.repeat(40)
+const NOW = '2026-07-02T00:00:00.000Z'
 
 let handle: DbHandle | undefined
 let app: FastifyInstance | undefined
@@ -34,14 +36,37 @@ afterEach(async () => {
   handle = undefined
 })
 
-const build = async () => {
+const build = async (deliver: Delivery = () => Promise.resolve('sent')) => {
   handle = createDb({ url: ':memory:' })
   runMigrations(handle)
   app = await createApp({
     db: handle.db,
     config: createConfig({ LOG_LEVEL: 'silent', SESSION_SECRET: SECRET }),
+    deliver,
+    mintKeys: () => ({ publicKey: 'a-public-key', privateKey: 'a-private-key' }),
   })
   return app
+}
+
+/** An admin with a browser signed up for push, which is who an application reaches. */
+const givenSubscribedAdmin = async () => {
+  const id = randomUUID()
+  await db()
+    .insert(account)
+    .values({ id, email: `${id}@example.org`, password_hash: null, created_at: NOW })
+  await db().insert(accountRole).values({ account_id: id, role: 'admin' })
+  await db()
+    .insert(pushSubscription)
+    .values({
+      id: randomUUID(),
+      endpoint: `https://push.example.org/${randomUUID()}`,
+      account_id: id,
+      p256dh: 'a-key',
+      auth: 'a-secret',
+      created_at: NOW,
+    })
+
+  return id
 }
 
 const db = () => {
@@ -407,5 +432,26 @@ describe('submitting an application', () => {
     const response = await submit(server, { ...applicant, answers: {} })
 
     expect(response.statusCode).toBe(201)
+  })
+})
+
+describe('telling the admins', () => {
+  it('sends the page to open with the wording, like every other push', async () => {
+    // This one does not go through `recordAndPush` — an application is neither a bell
+    // row nor a setting, it predates both — so it builds its payload separately, and
+    // that is exactly how it came to send a body alone. Invisible while the worker
+    // had `/admin/applications` written into it, and the one notification going
+    // nowhere the moment it stopped (#279).
+    const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
+    const server = await build(deliver)
+    await givenSubscribedAdmin()
+
+    expect((await submit(server, { ...applicant, answers: {} })).statusCode).toBe(201)
+
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1))
+    expect(JSON.parse(String(deliver.mock.calls[0]?.[1]))).toEqual({
+      body: 'Someone has applied to join.',
+      link: '/admin/applications',
+    })
   })
 })
