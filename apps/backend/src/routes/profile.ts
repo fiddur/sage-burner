@@ -12,13 +12,14 @@ import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
 import { account, attendance, eventOption } from '../db/schema.ts'
+import { whyNothingWritten } from '../db/write.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { allergyTickIdsFor, writeAllergyTicks } from './allergy-ticks.ts'
-import { openEvent, todayIso } from './events.ts'
+import { openEventNow } from './events.ts'
 import { areHelpingOptions, helpingIdsFor, writeHelping } from './helping.ts'
 
 export interface ProfileDeps extends GuardDeps {
-  now?: () => Date
+  now: () => Date
 }
 
 /**
@@ -134,7 +135,7 @@ const problemBody = (code: 400 | 409) => (code === 409 ? 'conflict' : 'bad_reque
  */
 export const writeStay = (
   db: Database,
-  mine: SQL | undefined,
+  mine: SQL,
   columns: Omit<AttendanceUpdate, 'helping_option_ids'>,
   helping: readonly string[] | undefined,
 ): (typeof attendance.$inferSelect)[] =>
@@ -166,10 +167,7 @@ export const writeStay = (
  * one stay. Both routes derive whose row it is from the session, so there is no
  * id in either body to get wrong or to tamper with.
  */
-export const registerProfileRoutes = (
-  app: FastifyInstance,
-  { db, sessions, now = () => new Date() }: ProfileDeps,
-) => {
+export const registerProfileRoutes = (app: FastifyInstance, { db, sessions, now }: ProfileDeps) => {
   const { requireMember } = createGuards({ db, sessions })
 
   const profileFor = async (accountId: string) => {
@@ -261,10 +259,15 @@ export const registerProfileRoutes = (
       // Named by id rather than scoped to the active burn, so a stay at the second
       // burn on the details page can be filled in — and still refused once that
       // burn has ended, which is what `openEvent` decides.
-      const found = await openEvent(db, todayIso(now), request.params.eventId)
+      const found = await openEventNow(db, now, request.params.eventId)
       if (found === undefined) return sendError(reply, 404)
 
       const mine = and(eq(attendance.event_id, found.id), eq(attendance.account_id, viewer.account_id))
+      // `and` is typed `SQL | undefined` however many conditions it is given, and
+      // this one reaches an `UPDATE` as well as two reads — the same guard
+      // `questions.ts` puts on its own composed `WHERE`, and unreachable for the
+      // same reason.
+      if (mine === undefined) throw new Error('refusing an unfiltered write on attendance')
 
       // `helping_option_ids` lives in its own table, so it never reaches `set()`.
       const { helping_option_ids: helping, ...columns } = body
@@ -291,10 +294,10 @@ export const registerProfileRoutes = (
       }
 
       // Nothing was written, which is either "not coming to this burn" or "that
-      // would put the departure before the arrival". Asked rather than inferred.
-      const [existing] = await db.select().from(attendance).where(mine).limit(1)
+      // would put the departure before the arrival" — see `whyNothingWritten`.
+      const why = await whyNothingWritten(db, attendance, mine)
 
-      return existing === undefined ? sendError(reply, 404) : sendError(reply, 400)
+      return sendError(reply, why === 'not_found' ? 404 : 400)
     },
   )
 }

@@ -12,7 +12,7 @@ import { renderCalendar } from '../ics.ts'
 
 export interface ScheduleDeps {
   db: Database
-  now?: () => Date
+  now: () => Date
 }
 
 /**
@@ -28,10 +28,7 @@ export interface ScheduleDeps {
  * the rendered feed contains none of them, which is a test about the output
  * rather than about this query, so a future join cannot quietly widen it.
  */
-export const registerScheduleRoutes = (
-  app: FastifyInstance,
-  { db, now = () => new Date() }: ScheduleDeps,
-) => {
+export const registerScheduleRoutes = (app: FastifyInstance, { db, now }: ScheduleDeps) => {
   app.get<{ Params: { eventId: string } }>(apiRoutes.scheduleFeed.fastify, async (request, reply) => {
     // Public and re-fetched on a client's own schedule, so it may be cached —
     // but an edit has to show up, and there is no ETag here to revalidate

@@ -25,10 +25,10 @@ import { refuseIfStale, withCollectionVersion, withVersion } from '../if-match.t
 import { displayName, notifyAttendees } from '../push/notify.ts'
 import { accountForAttendance, attendanceFor } from './attendance.ts'
 import { copySourcesFor } from './copy-sources.ts'
-import { openEvent, todayIso } from './events.ts'
+import { openEventNow } from './events.ts'
 
 export interface LeadRoleDeps extends GuardDeps {
-  now?: () => Date
+  now: () => Date
   /**
    * Tell somebody something happened to them here.
    *
@@ -124,7 +124,7 @@ const roleRow = async (db: Database, id: string) => {
  * register names members, so unlike the schedule it is not public.
  */
 export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps) => {
-  const { db, sessions, now = () => new Date(), notify = async () => undefined } = deps
+  const { db, sessions, now, notify = async () => undefined } = deps
   const { requireApproved } = createGuards({ db, sessions })
 
   /** The register, as both the `GET` and the `If-Match` guard see it (#274). */
@@ -148,7 +148,7 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
     const row = await roleRow(db, id)
     if (row === undefined) return undefined
 
-    return (await openEvent(db, todayIso(now), row.event_id)) === undefined ? undefined : row
+    return (await openEventNow(db, now, row.event_id)) === undefined ? undefined : row
   }
 
   /**

@@ -11,6 +11,7 @@ import type { MailDeps } from '../mail/mail.ts'
 
 import { viewerFor } from '../auth/viewer.ts'
 import { application, INSTALLATION_ID, installation, inviteToken } from '../db/schema.ts'
+import { whyNothingWritten } from '../db/write.ts'
 import { noStore, sendError } from '../http.ts'
 import { defaultExpiry, mintToken } from '../invites.ts'
 import { post } from '../mail/mail.ts'
@@ -20,7 +21,7 @@ import { originOf } from '../shell.ts'
 export interface ApplicationReviewDeps extends GuardDeps {
   config: Config
   mail: MailDeps
-  now?: () => Date
+  now: () => Date
 }
 
 /**
@@ -35,7 +36,7 @@ export interface ApplicationReviewDeps extends GuardDeps {
  */
 export const registerApplicationReviewRoutes = (
   app: FastifyInstance,
-  { db, sessions, mail, config, now = () => new Date() }: ApplicationReviewDeps,
+  { db, sessions, mail, config, now }: ApplicationReviewDeps,
 ) => {
   /**
    * The invite, in the applicant's inbox, if that is what they gave us (#30).
@@ -137,11 +138,10 @@ export const registerApplicationReviewRoutes = (
 
       if (settled === undefined) {
         // Nothing was written, which is either "no such application" or "already
-        // decided". Asked rather than inferred, the same way the question and
-        // event PATCHes do it.
-        const [existing] = await db.select().from(application).where(eq(application.id, id)).limit(1)
+        // decided" — see `whyNothingWritten`.
+        const why = await whyNothingWritten(db, application, eq(application.id, id))
 
-        return existing === undefined ? sendError(reply, 404) : sendError(reply, 409)
+        return sendError(reply, why === 'not_found' ? 404 : 409)
       }
 
       // After the transaction, and never inside it: the invite is committed by the

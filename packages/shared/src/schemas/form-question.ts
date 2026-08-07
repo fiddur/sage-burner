@@ -1,8 +1,10 @@
 import { z } from 'zod'
 
+import type { IdOrder } from './common.ts'
+
 import { formQuestionTypes, tickBoxRequired } from '../enums.ts'
 import { MAX_NOTES, MAX_OPTION_LABEL, MAX_QUESTION_LABEL } from '../limits.ts'
-import { idSchema, optionalText, nonEmptyText } from './common.ts'
+import { idOrderSchema, idSchema, optionalText, nonEmptyText } from './common.ts'
 
 /**
  * One question on the application form.
@@ -143,16 +145,9 @@ export const formQuestionUpdateSchema = withTickBoxRules(
 )
 export type FormQuestionUpdate = z.infer<typeof formQuestionUpdateSchema>
 
-/**
- * Reordering: the complete list of question ids, in the order wanted.
- *
- * The whole list rather than a move-this-one instruction, because the order is
- * what the admin sees and dragging one question renumbers several. Sending
- * all of them makes the request describe the end state, so a lost or reordered
- * request cannot leave the form half-renumbered.
- */
-export const formQuestionOrderSchema = z.object({ ids: z.array(idSchema) }).strict()
-export type FormQuestionOrder = z.infer<typeof formQuestionOrderSchema>
+/** Reordering: the complete list of question ids. See `idOrderSchema`. */
+export const formQuestionOrderSchema = idOrderSchema
+export type FormQuestionOrder = IdOrder
 
 export const formQuestionsResponseSchema = z.object({ questions: z.array(formQuestionSchema) })
 export type FormQuestionsResponse = z.infer<typeof formQuestionsResponseSchema>

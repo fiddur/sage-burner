@@ -27,7 +27,7 @@ export interface PasskeyDeps {
   db: Database
   config: Config
   sessions: Sessions
-  now?: () => Date
+  now: () => Date
 }
 
 /**
@@ -56,10 +56,7 @@ const CHALLENGE_TTL_SECONDS = 300
  * which is also why no email is asked for, and why nothing here can be used to
  * find out whether an address has an account.
  */
-export const registerPasskeyRoutes = (
-  app: FastifyInstance,
-  { db, config, sessions, now = () => new Date() }: PasskeyDeps,
-) => {
+export const registerPasskeyRoutes = (app: FastifyInstance, { db, config, sessions, now }: PasskeyDeps) => {
   const partyFor = (request: FastifyRequest) => relyingParty(config.public_origin, request.headers.origin)
 
   const mintChallenge = async (challenge: string, accountId: string | null) => {

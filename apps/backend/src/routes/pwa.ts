@@ -10,7 +10,7 @@ import { INSTALLATION_ID, installation, installationIcon } from '../db/schema.ts
 import { noStore, sendError } from '../http.ts'
 
 export interface PwaDeps extends GuardDeps {
-  now?: () => Date
+  now: () => Date
 }
 
 /** The toolbar, from `styles.css`. The same `--ember` in both palettes' neighbourhood. */
@@ -76,7 +76,7 @@ export const iconVersion = async (
  * `manifest.webmanifest` would say `Sage Burner` on a deployment called something
  * else, and would need a redeploy to stop.
  */
-export const registerPwaRoutes = (app: FastifyInstance, { db, now = () => new Date() }: PwaDeps) => {
+export const registerPwaRoutes = (app: FastifyInstance, { db, now }: PwaDeps) => {
   const currentIcon = async () => {
     const [row] = await db
       .select()

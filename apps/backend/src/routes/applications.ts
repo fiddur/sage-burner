@@ -12,7 +12,7 @@ import { questionsFor } from './questions.ts'
 
 export interface ApplicationRouteDeps {
   db: Database
-  now?: () => Date
+  now: () => Date
   /**
    * Tell the admins, if anything is listening.
    *
@@ -51,7 +51,7 @@ export interface ApplicationRouteDeps {
  */
 export const registerApplicationRoutes = (
   app: FastifyInstance,
-  { db, now = () => new Date(), notify }: ApplicationRouteDeps,
+  { db, now, notify }: ApplicationRouteDeps,
 ) => {
   app.post(apiRoutes.submitApplication.fastify, async (request, reply) => {
     void noStore(reply)

@@ -679,8 +679,15 @@ describe('a helping option that vanishes mid-save', () => {
     return id
   }
 
-  const stayOf = (eventId: string, accountId: string) =>
-    and(eq(attendance.event_id, eventId), eq(attendance.account_id, accountId))
+  const stayOf = (eventId: string, accountId: string) => {
+    // `and` is typed `SQL | undefined` however many conditions it is given, and
+    // `writeStay` takes a definite one — an unfiltered `UPDATE` on `attendance` is
+    // exactly what its own guard refuses.
+    const where = and(eq(attendance.event_id, eventId), eq(attendance.account_id, accountId))
+    if (where === undefined) throw new Error('unreachable: two conditions')
+
+    return where
+  }
 
   it('takes the column write down with it, rather than half-saving the stay', async () => {
     await build()

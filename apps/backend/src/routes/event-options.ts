@@ -8,7 +8,7 @@ import {
   eventOptionUpdateSchema,
   isEventOptionKind,
 } from '@sage-burner/shared'
-import { and, asc, desc, eq } from 'drizzle-orm'
+import { and, asc, eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -16,6 +16,7 @@ import type { Database } from '../db/index.ts'
 
 import { createGuards } from '../auth/guards.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
+import { nextOrder, reorder } from '../db/ordered.ts'
 import { attendance, eventOption } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { refuseIfStale, withCollectionVersion, withVersion } from '../if-match.ts'
@@ -83,15 +84,11 @@ export const registerEventOptionRoutes = (app: FastifyInstance, { db, sessions }
       let order: number
       try {
         order = db.transaction((tx) => {
-          const [last] = tx
-            .select({ order: eventOption.order })
-            .from(eventOption)
-            .where(and(eq(eventOption.event_id, eventId), eq(eventOption.kind, body.kind)))
-            .orderBy(desc(eventOption.order))
-            .limit(1)
-            .all()
-
-          const next = last === undefined ? 0 : last.order + 1
+          const next = nextOrder(
+            tx,
+            eventOption,
+            and(eq(eventOption.event_id, eventId), eq(eventOption.kind, body.kind)),
+          )
           tx.insert(eventOption)
             .values({ ...body, id, event_id: eventId, order: next })
             .run()
@@ -186,19 +183,10 @@ export const registerEventOptionRoutes = (app: FastifyInstance, { db, sessions }
 
       if (await refuseIfStale(request, reply, () => choices(eventId))) return reply
 
+      // Exactly this kind's options — the two lists number independently, so the
+      // set is filtered to one kind before `reorder` is asked about it.
       const existing = (await optionsFor(db, eventId)).filter((row) => row.kind === kind)
-      const wanted = body.ids
-
-      // Exactly this kind's options, no more and no fewer. A partial list would
-      // renumber some and leave the rest on stale positions.
-      const sameSet = wanted.length === existing.length && existing.every((row) => wanted.includes(row.id))
-      if (!sameSet) return sendError(reply, 400)
-
-      db.transaction((tx) => {
-        wanted.forEach((id, index) => {
-          tx.update(eventOption).set({ order: index }).where(eq(eventOption.id, id)).run()
-        })
-      })
+      if (reorder(db, eventOption, existing, body.ids) === 'mismatch') return sendError(reply, 400)
 
       return withVersion(reply, await choices(eventId))
     },
