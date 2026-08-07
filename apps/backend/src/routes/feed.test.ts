@@ -96,16 +96,14 @@ const lines = async (server: FastifyInstance, cookie: string): Promise<string[]>
 
 /** A line written straight into the table, for the cases a frozen clock cannot stage. */
 const givenLine = async (body: string, created_at: string, eventId = BURN) => {
-  await db()
-    .insert(activity)
-    .values({
-      id: randomUUID(),
-      event_id: eventId,
-      category: 'dream_offered',
-      body,
-      link: null,
-      created_at,
-    })
+  await db().insert(activity).values({
+    id: randomUUID(),
+    event_id: eventId,
+    category: 'dream_offered',
+    body,
+    link: null,
+    created_at,
+  })
 }
 
 const offerDream = (server: FastifyInstance, cookie: string, title: string, eventId = BURN) =>
@@ -270,9 +268,7 @@ describe('the feed', () => {
 
     expect(() =>
       client()
-        .prepare(
-          'insert into activity (id, event_id, category, body, created_at) values (?, ?, ?, ?, ?)',
-        )
+        .prepare('insert into activity (id, event_id, category, body, created_at) values (?, ?, ?, ?, ?)')
         .run(randomUUID(), BURN, 'gossip', 'something happened', NOW),
     ).toThrow()
   })

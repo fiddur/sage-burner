@@ -112,8 +112,7 @@ describe('what everyone has been doing', () => {
     renderPage(
       stub(
         {
-          getMyNotificationSettings: () =>
-            Promise.resolve({ on: ['dream_offered'], email: ['meal_role'] }),
+          getMyNotificationSettings: () => Promise.resolve({ on: ['dream_offered'], email: ['meal_role'] }),
           updateMyNotificationSettings: update,
         },
         [aLine({ id: 'x-1', body: 'A dream.' })],

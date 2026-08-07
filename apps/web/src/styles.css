@@ -1260,9 +1260,8 @@ a:hover {
   }
 }
 
-/* The legend under the register, because the icons in the Effort column have no
-   words anywhere on a touch screen: `title` needs a hover and `.visually-hidden`
-   needs a screen reader (#317). */
+/* Above the register and outside its scrolling wrapper, or it slides away with the
+   table on the phone it exists for (#317). */
 .lead-effort-legend {
   margin: 0 0 0.5rem;
   font-size: 0.85rem;

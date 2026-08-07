@@ -40,13 +40,16 @@ The choice is **not persisted**. A reload landing on the soonest burn is the rig
 default every time, and a remembered choice would leave somebody looking at last
 month's grid with nothing on screen to say why.
 
-| Viewer                   | Bar                                                           |
-| ------------------------ | ------------------------------------------------------------- |
-| Signed out               | Apply, Log in                                                 |
-| An account, neither role | nothing — an applicant waiting on a decision                  |
-| `member`                 | Members, Schedule, Leads, Meals, FAQ, and the initials circle |
-| `admin` without `member` | Members, Schedule, Leads, Meals, FAQ, ⚙️                      |
+| Viewer                   | Bar                                                            |
+| ------------------------ | -------------------------------------------------------------- |
+| Signed out               | Apply, Log in                                                  |
+| An account, neither role | nothing — an applicant waiting on a decision                   |
+| `member`                 | Going on, Members, Schedule, Leads, Meals, FAQ, and the circle |
+| `admin` without `member` | Going on, Members, Schedule, Leads, Meals, FAQ, ⚙️             |
 
+- **Going on** is the feed (#303) — see below. First of the entries, because it is the
+  page that answers the question somebody has on opening the app between burns: is
+  anything happening?
 - **Members** is the roster a member may now read — see "What a member may change".
 - **FAQ** is the burn's Q&A (#28) — a thing of its own rather than something reached
   from another page, because it is what somebody opens when they have a question and
@@ -83,6 +86,54 @@ which is not a problem the wide pages have — they use the room.
 Hiding a link is presentation. Every page behind these is guarded again server-side,
 and `Layout.test.tsx` asserts each absence by name — a negated `arrayContaining`
 passes when any _one_ of the named links is missing, which is not the question.
+
+## Going on
+
+A page of what everyone has been doing (#303), because between burns the app was quiet
+and quiet reads as nothing-to-do.
+
+**The lines are the burn-wide notifications, shown to everybody.** A dream offered,
+somebody saying they are coming, a lead role added, a lead taken. Those categories are
+**off by default** — a burn where every arrival pings forty-two people is a channel
+people learn to ignore (#259) — so until this page the ordinary way to learn somebody
+had offered a dream was to go looking at the schedule.
+
+**An `activity` row, written where `notifyAttendees` fans out.** The alternative was
+deriving the feed from the rows that already exist, and it does not work: those carry
+_current_ state, so a helper who signed up and stood down again leaves nothing to show,
+and several of the join tables have no `created_at` at all. Writing it in the same
+function that sends the notification is what stops the two describing one event two
+ways, and it is written whether or not anybody has that category switched on — which is
+the whole point.
+
+The wording is the notification's own, third person, and so is the link. Nothing about
+payment, contact details or allergies can reach the feed, because nothing but a
+burn-wide notification writes to it.
+
+**Across burns**, which is the one place a burn-scoped page does not take an event id
+(#184): the gap between burns is exactly what the page fills, and "somebody joined the
+Autumn Burn" is news to people still thinking about the summer one. Each line names its
+own burn instead.
+
+**The chip is half of it.** Every line carries the category's own settings-table label
+as a toggle button, so somebody meets the switch in the moment they have just found the
+thing interesting rather than in a table of twelve rows they went looking for. It sends
+the same complete `{ on, email }` the settings table does, so the two cannot mean
+different things by a shorter list.
+
+**Reading it writes nothing.** The bell and its unseen count stay `notification`'s; a
+feed that marked itself read would be a second thing to keep in step with them. And
+`requireApproved`, like the roster: everything on it is already readable by an approved
+member, gathered into one place.
+
+**Retention is the burn.** `activity` cascades with `event`, so a burn's lines go when
+it does, and the route reads the newest fifty. An audit log grows without bound; this is
+bounded by something that already ends.
+
+What is _not_ on it yet: taking a meal role, joining a lead role's team, putting a hand
+up on a dream. Those notify the person rather than the burn, so a line for them would
+need a category of its own — and the chip has to name something a reader can actually
+switch on, or it is a promise the page cannot keep.
 
 ## What this installation is called
 

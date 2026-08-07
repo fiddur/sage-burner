@@ -63,20 +63,7 @@ export const shortDayOf = (iso: string): string | undefined => {
  * The month names, written out for the reason `WEEKDAYS` is: a Swedish laptop would
  * read `aug.` on a page that is English in every sentence around it.
  */
-const MONTHS = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-] as const
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const
 
 /**
  * `7 Aug` — an instant as the day it happened, in the reader's own zone.

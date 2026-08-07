@@ -92,7 +92,13 @@ describe('AdminApplications', () => {
           Promise.resolve({
             application: anApplication({ status: 'approved', decided_at: '2026-07-03T00:00:00Z' }),
             invite: { token: 'a-very-secret-token', expires_at: '2026-08-02T00:00:00Z' },
-            delivery: { sent: false, to: 'fredrik@example.org', reason: 'wrong version number' },
+            delivery: {
+              sent: false,
+              to: 'fredrik@example.org',
+              // A raw driver message, which is the one kind of reason that arrives
+              // without a full stop of its own.
+              reason: 'wrong version number',
+            },
           }),
       }),
     )
@@ -100,8 +106,30 @@ describe('AdminApplications', () => {
     ;(await screen.findByRole('button', { name: 'Approve' })).click()
 
     const note = await screen.findByRole('status')
-    expect(note.textContent).toContain('Not sent — wrong version number.')
+    expect(note.textContent).toContain('Not emailed.')
+    expect(note.textContent).toContain('Why: wrong version number')
     expect(note.textContent).toContain('Send this link')
+  })
+
+  it('does not double the full stop on a reason that is already a sentence', async () => {
+    // Every reason the server produces ends in one — `NOT_CONFIGURED` is "No mail server
+    // has been set up." — and appending another read as "up.. Send this link".
+    renderPage(
+      stub({
+        approveApplication: () =>
+          Promise.resolve({
+            application: anApplication({ status: 'approved', decided_at: '2026-07-03T00:00:00Z' }),
+            invite: { token: 'a-very-secret-token', expires_at: '2026-08-02T00:00:00Z' },
+            delivery: { sent: false, to: 'fredrik@example.org', reason: 'No mail server has been set up.' },
+          }),
+      }),
+    )
+
+    ;(await screen.findByRole('button', { name: 'Approve' })).click()
+
+    const note = await screen.findByRole('status')
+    expect(note.textContent).toContain('Why: No mail server has been set up.')
+    expect(note.textContent).not.toContain('up..')
   })
 
   it('does not say "Copied" when the copy failed', async () => {

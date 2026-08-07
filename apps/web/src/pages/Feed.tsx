@@ -1,18 +1,20 @@
 import type { Activity, NotificationCategory, NotificationSettings } from '@sage-burner/shared'
 
 import { notificationCategoryInfo } from '@sage-burner/shared'
-import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
-import { localDay } from '../datetime.ts'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
+import { localDay } from '../datetime.ts'
 import { useAction, useLoad } from '../load.ts'
 import { isApproved, useViewer } from '../viewer.tsx'
 
-export type FeedApi = Pick<ApiClient, 'getFeed' | 'getMyNotificationSettings' | 'updateMyNotificationSettings'>
+export type FeedApi = Pick<
+  ApiClient,
+  'getFeed' | 'getMyNotificationSettings' | 'updateMyNotificationSettings'
+>
 
 interface Happening {
   activity: readonly Activity[]
@@ -37,10 +39,7 @@ export const Feed = ({ api }: { api: FeedApi }) => {
   const approved = isApproved(useViewer())
   const { loaded, refreshing, reload } = useLoad<Happening>(
     async (signal) => {
-      const [feed, settings] = await Promise.all([
-        api.getFeed(signal),
-        api.getMyNotificationSettings(signal),
-      ])
+      const [feed, settings] = await Promise.all([api.getFeed(signal), api.getMyNotificationSettings(signal)])
 
       return { activity: feed.activity, settings }
     },
@@ -76,8 +75,8 @@ export const Feed = ({ api }: { api: FeedApi }) => {
       </h1>
 
       <p class="form-note">
-        What people have been doing, newest first. Tap what a line is about to be told
-        about the next one — that is the same switch as the one on <a href="/profile">your details</a>.
+        What people have been doing, newest first. Tap what a line is about to be told about the next one —
+        that is the same switch as the one on <a href="/profile">your details</a>.
       </p>
 
       <ErrorText message={error} />
@@ -93,9 +92,7 @@ export const Feed = ({ api }: { api: FeedApi }) => {
         <ul class="feed">
           {loaded.data.activity.map((line) => (
             <li key={line.id} class="feed-line">
-              <p class="feed-what">
-                {line.link === null ? line.body : <a href={line.link}>{line.body}</a>}
-              </p>
+              <p class="feed-what">{line.link === null ? line.body : <a href={line.link}>{line.body}</a>}</p>
               <p class="feed-when">
                 {line.burn} · {localDay(line.created_at)}
               </p>
