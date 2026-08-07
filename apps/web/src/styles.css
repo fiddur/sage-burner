@@ -1026,51 +1026,103 @@ a:hover {
   border-radius: 0.5rem;
 }
 
-/* The leads register, laid out as the spreadsheet tab it replaces. */
+/*
+  The register, one table at every width (#307).
+
+  It used to become a card per role below 60rem, which turned six short cells into a
+  column of labelled paragraphs — a page you scrolled for a minute to read what a
+  screen and a half of table says. It scrolls sideways instead, like the meal plan
+  and the grid, with the role's name held still on the left so you always know whose
+  row you are in.
+*/
 .lead-table-wrap {
   overflow-x: auto;
   margin: 1rem 0;
 }
 
 .lead-table {
-  border-collapse: collapse;
+  /*
+    `separate`, as on the meal table and for the same reason: a collapsed border
+    belongs to the table and scrolls out from under a stuck cell, leaving it with no
+    edge. Each cell draws its own right and bottom, the table the two outer ones.
+  */
+  border-collapse: separate;
+  border-spacing: 0;
+  border-top: 1px solid var(--line);
+  border-left: 1px solid var(--line);
   width: 100%;
 }
 
 .lead-table th,
 .lead-table td {
-  border: 1px solid var(--line);
-  padding: 0.5rem 0.65rem;
-  text-align: left;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 0.4rem 0.55rem;
+  text-align: start;
   vertical-align: top;
 }
 
 .lead-table thead th {
   white-space: nowrap;
   font-size: 0.85rem;
-}
-
-.lead-table th[scope='row'] {
-  min-width: 10ch;
-}
-
-/* Prose gets room; the effort verdicts and the count are a word each. */
-.lead-table td:nth-child(2),
-.lead-table td:nth-child(4) {
-  min-width: 18ch;
+  background: var(--paper);
 }
 
 /*
-  The three effort verdicts, which are a word each. Positional, so check them against
-  the cell order after adding or moving a column — the team count used to be among
-  them and held a sentence `nowrap` would not break.
+  The role's name, held still while the rest scrolls under it — **and its heading with
+  it**. Sticking the body cell alone desyncs the two on the one gesture this layout is
+  built around: "Title" slides away and whatever heading has arrived in its place ends
+  up sitting over the frozen column, naming it as something it is not.
+
+  Load-bearing background, as on the grid: without one the cells show straight
+  through. The corner outranks the row header, which outranks nothing else.
 */
-.lead-table td:nth-child(6),
-.lead-table td:nth-child(7),
-.lead-table td:nth-child(8) {
-  white-space: nowrap;
-  font-size: 0.9rem;
-  opacity: 0.85;
+.lead-table th[scope='row'],
+.lead-table thead th:first-child {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+  min-width: 8ch;
+  background: var(--paper);
+}
+
+.lead-table thead th:first-child {
+  z-index: 2;
+}
+
+/* Prose gets room; nothing else needs any. Positional, so check these against the
+   cell order after adding or moving a column. */
+.lead-table td:nth-child(2),
+.lead-table td:nth-child(4) {
+  min-width: 16ch;
+}
+
+/*
+  Lead and team in one cell (#307). Side by side they cost the width of two columns
+  to say one thing — who is on this — and each half names itself now that the column
+  header cannot.
+*/
+.lead-who {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.25rem;
+}
+
+/*
+  Side by side where there is room, stacked where there is not — which is the whole
+  point of merging them. One column of width on a phone, and no more height on a
+  desktop than the two columns cost before.
+*/
+.lead-who-part {
+  flex: 0 0 auto;
+}
+
+.lead-who-label {
+  margin: 0 0 0.1rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.55;
 }
 
 .lead-table .markdown-preview > :first-child {
@@ -1090,48 +1142,72 @@ a:hover {
   margin-inline-start: 0.6rem;
 }
 
-/* Narrow: one card per role, each cell labelled with the heading the table hides. */
-@media (max-width: 60rem) {
-  .lead-table,
-  .lead-table tbody,
-  .lead-table tr,
+/*
+  Before, during and after in one cell: an icon each and a bar for how much (#307).
+  Three columns of one word were wider than the two prose columns put together.
+*/
+.effort-strip {
+  display: inline-flex;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+}
+
+.effort {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  /* Cursor and all: the words are in the `title`, and this says there is one. */
+  cursor: help;
+}
+
+.effort-bar {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 1px;
+  height: 0.75rem;
+}
+
+/*
+  A segment per level, unfilled ones left as an outline rather than hidden — "none"
+  has to look like an answer somebody gave, not like a cell nobody filled in.
+*/
+.effort-bar > span {
+  width: 3px;
+  height: 100%;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--line) 70%, transparent);
+}
+
+.effort-bar > span.is-on {
+  background: var(--ember);
+}
+
+/*
+  Narrower still: the same table, with less air in it. Nothing makes six columns fit a
+  phone, so this buys back what it can and leaves the rest to the sideways scroll the
+  sticky first column is there for.
+*/
+@media (max-width: 45rem) {
   .lead-table th,
   .lead-table td {
-    display: block;
+    padding: 0.3rem 0.4rem;
+    font-size: 0.92rem;
   }
 
-  .lead-table thead {
-    display: none;
+  /*
+    A floor rather than a ceiling. Clamping the prose narrower was tried and is worse:
+    a 14ch column breaks "Feeding forty-two people" one word to a line, which is a
+    taller row and a harder read for a swipe it barely saves.
+  */
+  .lead-table td:nth-child(2),
+  .lead-table td:nth-child(4) {
+    min-width: 12ch;
   }
 
-  .lead-table tr {
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    padding: 0.75rem 1rem;
-    margin-bottom: 0.75rem;
-  }
-
-  .lead-table th,
-  .lead-table td {
-    border: 0;
-    padding: 0.25rem 0;
-    white-space: normal;
+  /* The vacancy word holds a width so buttons do not shift; here there is none to
+     spare, and the strip is one row of its own anyway. */
+  .lead-table .helper-vacancy > span:first-child {
     min-width: 0;
-  }
-
-  .lead-table th[scope='row'] {
-    font-size: 1.1rem;
-  }
-
-  .lead-table td::before {
-    content: attr(data-label);
-    display: block;
-    font-size: 0.8rem;
-    opacity: 0.6;
-  }
-
-  .lead-table td.lead-actions::before {
-    content: none;
   }
 }
 

@@ -480,6 +480,28 @@ account exists, it is the pairing that is wrong.
 Names are resolved at read time from `account`, never copied into the register: a
 name corrected on the profile page is corrected here too.
 
+### One table, at every width
+
+The register used to become a card per role below 60rem, which turned six short
+cells into a column of labelled paragraphs — a page you scrolled for a minute to
+read what a screen and a half of table says. It is one table now (#307), scrolling
+sideways on a phone like the meal plan and the grid, with the role's name held
+still on the left so you always know whose row you are in.
+
+Two compactions paid for that:
+
+- **The three effort answers are one cell.** They had a column each — three
+  headings of two words for one word of content, wider between them than both prose
+  columns together. Now an icon per phase (🌱 before, 🔥 during, 🧹 after) and a
+  three-segment bar for how much. The words are still in the `title` and for a
+  screen reader: 🌱 is a guess until somebody tells you, and a register nobody can
+  read is not compact, it is broken. An unfilled bar stays drawn, because "none" has
+  to look like an answer somebody gave rather than a cell nobody filled in.
+- **The lead and the team share a column.** They are one question — who is on this —
+  and side by side they cost the width of two. They sit side by side _inside_ the
+  cell where there is room and stack where there is not, so a desktop row is no
+  taller than it was. Each half names itself now that the shared header cannot.
+
 ### Seeding a new burn from a previous one
 
 Fifteen roles retyped four times a year is the friction worth removing.
