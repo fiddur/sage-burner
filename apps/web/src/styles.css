@@ -525,7 +525,6 @@ a:hover {
    beside the three `ReorderableList` gives it, which is more than a phone's width. */
 .question-row {
   flex-wrap: wrap;
-  align-items: baseline;
 }
 
 .question-label {

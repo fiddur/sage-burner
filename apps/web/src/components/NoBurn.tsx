@@ -32,7 +32,7 @@ export const NoBurn = ({ absent }: { absent: string }) => {
   // fact about the request (#193). Telling somebody they are not coming to a burn when
   // the fetch simply failed is wrong, and points them at a page that will not help.
   if (status === 'failed') {
-    return <ErrorText message="Could not load your burns, so {absent}. Please reload the page." />
+    return <ErrorText message={`Could not load your burns, so ${absent}. Please reload the page.`} />
   }
 
   return admin ? (
