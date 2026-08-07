@@ -430,7 +430,8 @@ describe('somebody applies to join', () => {
   })
 
   it('tells an admin who also holds member exactly once', async () => {
-    // The fan-out selects `account_role`, where one account can hold two rows.
+    // A cheap guard on the fan-out's shape: `(account_id, role)` is the primary key
+    // and the query filters on the role, so a duplicate is not expressible today.
     const server = await build()
     const ada = await givenAccount('Ada', ['admin', 'member'])
 

@@ -24,7 +24,9 @@ const deliveryNote = (delivery: InviteDelivery) => {
   if (delivery === null) return 'Send this link — it is shown once and cannot be recovered afterwards.'
   if (delivery.sent) return `Emailed to ${delivery.to}. The link is here too, shown once.`
 
-  return `Not sent: ${delivery.reason ?? 'the mail server refused it.'} Send this link — it is shown once and cannot be recovered afterwards.`
+  const why = delivery.reason ?? 'the mail server refused it'
+
+  return `Not sent — ${why}. Send this link: it is shown once and cannot be recovered afterwards.`
 }
 
 export const InviteLink = ({

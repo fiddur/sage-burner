@@ -43,8 +43,7 @@ export type EmailChannel = (accountId: string, told: Told) => Promise<unknown>
  * one sender now that the applications push writes a row like everything else (#326),
  * so a push cannot carry less than the row it copies.
  */
-export const pushPayload = ({ body, link, category }: Told): string =>
-  JSON.stringify({ body, link, category })
+const pushPayload = ({ body, link, category }: Told): string => JSON.stringify({ body, link, category })
 
 /** Which ways this person wants to hear about one category. */
 export interface Channels {
@@ -58,7 +57,7 @@ export interface Channels {
  *
  * A stored row is what they said; absence is that they have not said, and the
  * default answers instead. That indirection is the whole reason the table carries
- * `enabled` rather than only listing mutes — six categories are on unless refused
+ * `enabled` rather than only listing mutes — seven categories are on unless refused
  * and five are off unless asked for, and "is there a row" cannot mean both (#259).
  *
  * Email needs no such indirection: it is off for every category until somebody asks,
