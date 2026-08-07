@@ -15,6 +15,7 @@ import { isApiError } from '../api/client.ts'
 import { useSetInstallationSendsEmail } from '../installation.tsx'
 import { ErrorText } from './ErrorText.tsx'
 import { FormError, useFormError } from './FormError.tsx'
+import { PendingButton } from './PendingButton.tsx'
 
 export type MailApi = Pick<
   ApiClient,
@@ -290,13 +291,16 @@ export const MailField = ({ api }: { api: MailApi }) => {
         )}
 
         <p class="row">
-          <button type="submit" disabled={busy || testing}>
-            {busy ? 'Saving…' : 'Save'}
-          </button>
+          <PendingButton busy={busy} label="Save" busyLabel="Saving…" type="submit" disabled={testing} />
           {stored !== null && (
-            <button type="button" disabled={busy || testing} onClick={() => void test()}>
-              {testing ? 'Sending…' : 'Send a test to me'}
-            </button>
+            <PendingButton
+              busy={testing}
+              label="Send a test to me"
+              busyLabel="Sending…"
+              type="button"
+              disabled={busy}
+              onClick={() => void test()}
+            />
           )}
           {stored !== null && (
             <button

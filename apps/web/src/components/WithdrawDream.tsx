@@ -1,5 +1,7 @@
 import { useState } from 'preact/hooks'
 
+import { IconButton } from './IconButton.tsx'
+
 /**
  * 🗑️ that asks first, on both pages a dream can be withdrawn from (#209).
  *
@@ -21,15 +23,7 @@ export const WithdrawDream = ({
 
   if (!asking) {
     return (
-      <button
-        type="button"
-        class="link-button"
-        disabled={busy}
-        aria-label={`Withdraw ${title}`}
-        onClick={() => setAsking(true)}
-      >
-        🗑️
-      </button>
+      <IconButton icon="🗑️" label={`Withdraw ${title}`} disabled={busy} onClick={() => setAsking(true)} />
     )
   }
 

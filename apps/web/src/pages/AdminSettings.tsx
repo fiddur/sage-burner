@@ -14,6 +14,7 @@ import { GuardedPage } from '../components/GuardedPage.tsx'
 import { IconField } from '../components/IconField.tsx'
 import { LogOutButton } from '../components/LogOutButton.tsx'
 import { MailField } from '../components/MailField.tsx'
+import { PendingButton } from '../components/PendingButton.tsx'
 import { PushToggle } from '../components/PushToggle.tsx'
 import { useSetInstallationTitle } from '../installation.tsx'
 import { isAdmin, useViewer } from '../viewer.tsx'
@@ -122,9 +123,7 @@ export const AdminSettings = ({ api }: { api: AdminSettingsApi }) => {
             </p>
           )}
 
-          <button type="submit" disabled={saving}>
-            {saving ? 'Saving…' : 'Save'}
-          </button>
+          <PendingButton busy={saving} label="Save" busyLabel="Saving…" type="submit" />
         </form>
       )}
 

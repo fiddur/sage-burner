@@ -11,6 +11,7 @@ import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
 import { MealSlots } from '../components/MealSlots.tsx'
+import { PendingButton } from '../components/PendingButton.tsx'
 import { isAdmin, useViewer } from '../viewer.tsx'
 
 type Events =
@@ -433,9 +434,13 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
                     </p>
                   )}
 
-                  <button type="button" disabled={saving} onClick={() => void saveEvent(row.id)}>
-                    {saving ? 'Saving…' : 'Save event'}
-                  </button>
+                  <PendingButton
+                    busy={saving}
+                    label="Save event"
+                    busyLabel="Saving…"
+                    type="button"
+                    onClick={() => void saveEvent(row.id)}
+                  />
                   <button type="button" class="link-button" onClick={() => setEditing(undefined)}>
                     Done
                   </button>
@@ -549,9 +554,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
           />
         </label>
 
-        <button type="submit" disabled={creating}>
-          {creating ? 'Creating…' : 'Create event'}
-        </button>
+        <PendingButton busy={creating} label="Create event" busyLabel="Creating…" type="submit" />
       </form>
     </GuardedPage>
   )

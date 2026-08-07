@@ -17,6 +17,7 @@ import { CopyFrom } from '../components/CopyFrom.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { HelperStrip } from '../components/HelperStrip.tsx'
+import { IconButton } from '../components/IconButton.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
@@ -411,15 +412,7 @@ const RoleRow = ({
       </td>
 
       <td class="lead-actions">
-        <button
-          type="button"
-          class="link-button"
-          disabled={busy}
-          aria-label={`Edit ${role.title}`}
-          onClick={onEdit}
-        >
-          ✏️
-        </button>
+        <IconButton icon="✏️" label={`Edit ${role.title}`} disabled={busy} onClick={onEdit} />
 
         {confirming ? (
           <>
@@ -437,15 +430,12 @@ const RoleRow = ({
             </button>
           </>
         ) : (
-          <button
-            type="button"
-            class="link-button"
+          <IconButton
+            icon="🗑️"
+            label={`Remove ${role.title}`}
             disabled={busy}
-            aria-label={`Remove ${role.title}`}
             onClick={() => setConfirming(true)}
-          >
-            🗑️
-          </button>
+          />
         )}
       </td>
     </tr>

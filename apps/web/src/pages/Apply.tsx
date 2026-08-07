@@ -15,6 +15,7 @@ import type { ApiClient } from '../api/client.ts'
 import { isApiError } from '../api/client.ts'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { FormError, useFormError } from '../components/FormError.tsx'
+import { PendingButton } from '../components/PendingButton.tsx'
 import { useInstallationSendsEmail } from '../installation.tsx'
 import { renderMarkdown } from '../markdown.ts'
 
@@ -344,9 +345,13 @@ export const Apply = ({ api }: ApplyProps) => {
 
         <FormError error={sendError} />
 
-        <button type="submit" disabled={sending || questions === undefined}>
-          {sending ? 'Sending…' : 'Send application'}
-        </button>
+        <PendingButton
+          busy={sending}
+          label="Send application"
+          busyLabel="Sending…"
+          type="submit"
+          disabled={questions === undefined}
+        />
       </form>
     </article>
   )

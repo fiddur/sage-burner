@@ -521,21 +521,11 @@ a:hover {
   border-top: 1px solid color-mix(in srgb, var(--sage) 25%, transparent);
 }
 
-.question-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding-left: 1.25rem;
-}
-
-/* The label, the type note and the four controls, which otherwise render as one
-   run-on word: "required↑↓EditRemove". Not on the `li`, which also holds the
-   edit form. */
+/* A question's row wraps: it carries the label, the type note and two controls
+   beside the three `ReorderableList` gives it, which is more than a phone's width. */
 .question-row {
-  display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 0.5rem;
 }
 
 .question-label {
@@ -616,29 +606,12 @@ a:hover {
 /*
   The Q&A (#28): questions always visible, answers folded away behind them.
 
-  A row is the handle and one `<details>`, and the handle sits at the top rather than
-  centred — an open answer can be several paragraphs tall, and a grip drifting down
-  beside it reads as belonging to the text rather than to the row.
+  The controls sit at the top rather than centred — an open answer can be several
+  paragraphs tall, and a grip drifting down beside it reads as belonging to the text
+  rather than to the row. Everything else about the row is `.reorder-row`.
 */
-.faq-list {
-  list-style: none;
-  margin: 1rem 0;
-  padding: 0;
-  display: grid;
-  gap: 0.5rem;
-}
-
 .faq-row {
-  display: flex;
   align-items: flex-start;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--line);
-  border-radius: 0.5rem;
-}
-
-.faq-dragging {
-  opacity: 0.5;
 }
 
 .faq-entry {

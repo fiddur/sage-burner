@@ -8,6 +8,7 @@ import type { ApiClient } from '../api/client.ts'
 import { isApiError } from '../api/client.ts'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
+import { IconButton } from '../components/IconButton.tsx'
 import { ReorderableList } from '../components/ReorderableList.tsx'
 import { useAction, useLoad } from '../load.ts'
 
@@ -111,27 +112,21 @@ export const AdminAllergies = ({ api }: { api: AllergiesApi }) => {
                 ) : (
                   <>
                     <span>{item.label}</span>
-                    <button
-                      type="button"
-                      class="link-button"
-                      aria-label={`Edit ${item.label}`}
+                    <IconButton
+                      icon="✏️"
+                      label={`Edit ${item.label}`}
                       disabled={busy}
                       onClick={() => {
                         setEditing(item.id)
                         setDraft(item.label)
                       }}
-                    >
-                      ✏️
-                    </button>
-                    <button
-                      type="button"
-                      class="link-button"
-                      aria-label={`Remove ${item.label}`}
+                    />
+                    <IconButton
+                      icon="🗑️"
+                      label={`Remove ${item.label}`}
                       disabled={busy}
                       onClick={() => remove(item)}
-                    >
-                      🗑️
-                    </button>
+                    />
                   </>
                 )}
               </>

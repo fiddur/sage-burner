@@ -8,6 +8,7 @@ import type { ApiClient } from '../api/client.ts'
 import { useSelectedBurn } from '../burn.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
+import { IconButton } from '../components/IconButton.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
 import { ReorderableList } from '../components/ReorderableList.tsx'
 import { useAction, useLoad } from '../load.ts'
@@ -168,24 +169,18 @@ const OptionList = ({
                   {row.capacity === null ? 'no limit' : `${row.capacity} spaces`}
                 </span>
 
-                <button
-                  type="button"
-                  class="link-button"
+                <IconButton
+                  icon="✏️"
+                  label={`Edit ${row.label}`}
                   disabled={busy}
-                  aria-label={`Edit ${row.label}`}
                   onClick={() => setEditing(row.id)}
-                >
-                  ✏️
-                </button>
-                <button
-                  type="button"
-                  class="link-button"
+                />
+                <IconButton
+                  icon="🗑️"
+                  label={`Remove ${row.label}`}
                   disabled={busy}
-                  aria-label={`Remove ${row.label}`}
                   onClick={() => run(() => api.deleteEventOption(row.id), 'Could not remove that.')}
-                >
-                  🗑️
-                </button>
+                />
               </>
             )}
           </>

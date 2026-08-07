@@ -7,6 +7,7 @@ import type { ApiClient } from '../api/client.ts'
 import { isApiError } from '../api/client.ts'
 import { stayFromAttendance, stayProblem, stayUpdate } from '../stay.ts'
 import { FormError, useFormError } from './FormError.tsx'
+import { PendingButton } from './PendingButton.tsx'
 import { StayFields } from './StayFields.tsx'
 
 /**
@@ -94,9 +95,7 @@ export const StayForm = ({
 
       <FormError error={error} />
 
-      <button type="submit" disabled={saving}>
-        {saving ? 'Saving…' : 'Save these details'}
-      </button>
+      <PendingButton busy={saving} label="Save these details" busyLabel="Saving…" type="submit" />
     </form>
   )
 }

@@ -7,6 +7,7 @@ import type { ApiClient } from '../api/client.ts'
 
 import { useAction, useLoad } from '../load.ts'
 import { ErrorText } from './ErrorText.tsx'
+import { IconButton } from './IconButton.tsx'
 
 export type MealSlotsApi = Pick<
   ApiClient,
@@ -64,15 +65,12 @@ export const MealSlots = ({ api, eventId }: { api: MealSlotsApi; eventId: string
                 )
               }
             />
-            <button
-              type="button"
-              class="link-button"
+            <IconButton
+              icon="🗑️"
+              label={`Remove ${slot.label}`}
               disabled={busy}
-              aria-label={`Remove ${slot.label}`}
               onClick={() => run(() => api.deleteMealSlot(slot.id), 'Could not remove that.')}
-            >
-              🗑️
-            </button>
+            />
           </li>
         ))}
       </ul>

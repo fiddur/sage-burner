@@ -7,6 +7,7 @@ import type { Ceremony, PasskeyApi } from '../passkey.ts'
 
 import { isApiError } from '../api/client.ts'
 import { FormError, useFormError } from '../components/FormError.tsx'
+import { PendingButton } from '../components/PendingButton.tsx'
 import { messageForCeremony, passkeysWork, signInWithPasskey } from '../passkey.ts'
 import { useSetViewer, useViewer } from '../viewer.tsx'
 
@@ -189,9 +190,7 @@ export const Login = ({
 
         <FormError error={error} />
 
-        <button type="submit" disabled={submitting}>
-          {submitting ? 'Signing in…' : 'Log in'}
-        </button>
+        <PendingButton busy={submitting} label="Log in" busyLabel="Signing in…" type="submit" />
       </form>
 
       {passkeys && (

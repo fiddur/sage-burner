@@ -15,6 +15,7 @@ import { FormError, useFormError } from '../components/FormError.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { LogOutButton } from '../components/LogOutButton.tsx'
 import { PasskeysField } from '../components/PasskeysField.tsx'
+import { PendingButton } from '../components/PendingButton.tsx'
 import { PushToggle } from '../components/PushToggle.tsx'
 import { YourBurns } from '../components/YourBurns.tsx'
 import { isMember, useViewer } from '../viewer.tsx'
@@ -192,9 +193,7 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
 
           <FormError error={error} />
 
-          <button type="submit" disabled={saving}>
-            {saving ? 'Saving…' : 'Save'}
-          </button>
+          <PendingButton busy={saving} label="Save" busyLabel="Saving…" type="submit" />
         </form>
       )}
 

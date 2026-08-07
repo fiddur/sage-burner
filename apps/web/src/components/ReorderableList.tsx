@@ -3,6 +3,7 @@ import type { ComponentChildren } from 'preact'
 import { useState } from 'preact/hooks'
 
 import { moveTo, swap } from '../reorder.ts'
+import { IconButton } from './IconButton.tsx'
 
 /**
  * A list somebody can put in order (#146).
@@ -96,24 +97,18 @@ export const ReorderableList = <Row extends { id: string }>({
 
             {/* Disabled at the ends as well as guarded by `swap`, so the control says
                 what it will do rather than doing nothing when pressed. */}
-            <button
-              type="button"
-              class="link-button"
-              aria-label={`Move ${labelFor(row)} up`}
+            <IconButton
+              icon="↑"
+              label={`Move ${labelFor(row)} up`}
               disabled={busy || index === 0}
               onClick={() => move(swap(ids, index, -1))}
-            >
-              ↑
-            </button>
-            <button
-              type="button"
-              class="link-button"
-              aria-label={`Move ${labelFor(row)} down`}
+            />
+            <IconButton
+              icon="↓"
+              label={`Move ${labelFor(row)} down`}
               disabled={busy || index === rows.length - 1}
               onClick={() => move(swap(ids, index, 1))}
-            >
-              ↓
-            </button>
+            />
           </span>
 
           {children(row, index)}

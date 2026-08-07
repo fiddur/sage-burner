@@ -9,6 +9,7 @@ import type { StayDraft } from '../stay.ts'
 import { isApiError } from '../api/client.ts'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { FormError, useFormError } from '../components/FormError.tsx'
+import { PendingButton } from '../components/PendingButton.tsx'
 import { StayFields } from '../components/StayFields.tsx'
 import { stayForBurn, stayProblem, stayUpdate } from '../stay.ts'
 import { useSetViewer, useViewer } from '../viewer.tsx'
@@ -425,9 +426,7 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
 
         <FormError error={error} />
 
-        <button type="submit" disabled={sending}>
-          {sending ? 'Setting you up…' : 'Join'}
-        </button>
+        <PendingButton busy={sending} label="Join" busyLabel="Setting you up…" type="submit" />
       </form>
     </section>
   )

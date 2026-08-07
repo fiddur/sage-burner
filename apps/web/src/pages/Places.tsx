@@ -10,6 +10,7 @@ import { useSelectedBurn } from '../burn.tsx'
 import { CopyFrom } from '../components/CopyFrom.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
+import { IconButton } from '../components/IconButton.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
 import { ReorderableList } from '../components/ReorderableList.tsx'
 import { useAction, useLoad } from '../load.ts'
@@ -161,24 +162,18 @@ export const Places = ({ api }: { api: PlacesApi }) => {
                 <span class="place-name">{row.name}</span>
                 <span class="place-color-name">{row.color}</span>
 
-                <button
-                  type="button"
-                  class="link-button"
+                <IconButton
+                  icon="✏️"
+                  label={`Edit ${row.name}`}
                   disabled={busy}
-                  aria-label={`Edit ${row.name}`}
                   onClick={() => setEditing(row.id)}
-                >
-                  ✏️
-                </button>
-                <button
-                  type="button"
-                  class="link-button"
+                />
+                <IconButton
+                  icon="🗑️"
+                  label={`Remove ${row.name}`}
                   disabled={busy}
-                  aria-label={`Remove ${row.name}`}
                   onClick={() => run(() => api.deletePlace(row.id), 'Could not remove the place.')}
-                >
-                  🗑️
-                </button>
+                />
               </>
             )}
           </>

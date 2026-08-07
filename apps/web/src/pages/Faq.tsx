@@ -8,13 +8,15 @@ import type { Loaded } from '../load.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
 import { CopyFrom } from '../components/CopyFrom.tsx'
+import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
+import { IconButton } from '../components/IconButton.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
+import { ReorderableList } from '../components/ReorderableList.tsx'
 import { useAction, useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
-import { moveTo, swap } from '../reorder.ts'
 import { isApproved, useViewer } from '../viewer.tsx'
 
 export type FaqApi = Pick<
@@ -41,15 +43,14 @@ const UNANSWERED = 'Nobody has answered this yet.'
  * **Anyone may ask, and anyone may answer.** The person with the question is rarely
  * the person with the answer, so an entry can exist with no answer at all and says
  * where one is still wanted. The order is somebody's arrangement — a FAQ is read top
- * to bottom, and the question people have first belongs first — so it is draggable,
- * with the arrow keys doing the same thing for anybody not using a mouse.
+ * to bottom, and the question people have first belongs first — so it is a
+ * `ReorderableList`.
  */
 export const Faq = ({ api }: { api: FaqApi }) => {
   const viewer = useViewer()
   const approved = isApproved(viewer)
   const [asking, setAsking] = useState('')
   const [editing, setEditing] = useState<string | undefined>(undefined)
-  const [dragging, setDragging] = useState<number | undefined>(undefined)
 
   const burn = useSelectedBurn()
   const { loaded, refreshing, reload } = useLoad<Questions>(
@@ -71,10 +72,9 @@ export const Faq = ({ api }: { api: FaqApi }) => {
 
   const ready = loaded.status === 'ready' ? (loaded.data ?? undefined) : undefined
   const entries = ready?.entries ?? []
-  const ids = entries.map((row) => row.id)
 
-  const reorderTo = (wanted: string[] | undefined) => {
-    if (wanted === undefined || ready === undefined) return
+  const reorderTo = (wanted: string[]) => {
+    if (ready === undefined) return
     run(() => api.reorderFaq(ready.eventId, wanted), 'Could not reorder the questions.')
   }
 
@@ -102,11 +102,7 @@ export const Faq = ({ api }: { api: FaqApi }) => {
         anyone can answer one — including a question somebody else asked.
       </p>
 
-      {error !== undefined && (
-        <p class="form-error" role="alert">
-          {error}
-        </p>
-      )}
+      <ErrorText message={error} />
 
       <Notice loaded={loaded} />
 
@@ -122,97 +118,57 @@ export const Faq = ({ api }: { api: FaqApi }) => {
         />
       )}
 
-      <ol class="faq-list">
-        {entries.map((row, index) => (
-          <li
-            key={row.id}
-            class={dragging === index ? 'faq-row faq-dragging' : 'faq-row'}
-            onDragOver={(dragEvent) => {
-              // Without this the drop never fires — the default is "not a drop target".
-              dragEvent.preventDefault()
-            }}
-            onDrop={(dropEvent) => {
-              dropEvent.preventDefault()
-              if (dragging !== undefined) reorderTo(moveTo(ids, dragging, index))
-              setDragging(undefined)
-            }}
-          >
-            <button
-              type="button"
-              class="drag-handle"
-              draggable
-              disabled={busy}
-              aria-label={`Move ${row.question}`}
-              onDragStart={(dragEvent) => {
-                // Firefox will not start a drag whose data store is empty.
-                dragEvent.dataTransfer?.setData('text/plain', row.id)
-                setDragging(index)
+      <ReorderableList
+        rows={entries}
+        busy={busy}
+        rowClass="faq-row"
+        labelFor={(row) => row.question}
+        onReorder={reorderTo}
+      >
+        {(row) =>
+          editing === row.id ? (
+            <FaqFields
+              entry={row}
+              busy={busy}
+              onCancel={() => setEditing(undefined)}
+              onSave={(changes) => {
+                run(async () => {
+                  await api.updateFaqEntry(row.id, changes)
+                  setEditing(undefined)
+                }, 'Could not save that.')
               }}
-              onDragEnd={() => setDragging(undefined)}
-              onKeyDown={(keyEvent) => {
-                // The handle is the keyboard route too: a reorder nobody can do
-                // without a mouse is a reorder half the people here cannot do.
-                const by = keyEvent.key === 'ArrowUp' ? -1 : keyEvent.key === 'ArrowDown' ? 1 : undefined
-                if (by === undefined) return
-                keyEvent.preventDefault()
-                reorderTo(swap(ids, index, by))
-              }}
-            >
-              ⠿
-            </button>
+            />
+          ) : (
+            <details class="faq-entry">
+              <summary>{row.question}</summary>
 
-            {editing === row.id ? (
-              <FaqFields
-                entry={row}
-                busy={busy}
-                onCancel={() => setEditing(undefined)}
-                onSave={(changes) => {
-                  run(async () => {
-                    await api.updateFaqEntry(row.id, changes)
-                    setEditing(undefined)
-                  }, 'Could not save that.')
-                }}
-              />
-            ) : (
-              <details class="faq-entry">
-                <summary>{row.question}</summary>
+              {row.answer.trim() === '' ? (
+                <p class="form-note">{UNANSWERED}</p>
+              ) : (
+                // Written by any approved member and read by all of them.
+                // `renderMarkdown` escapes raw HTML rather than filtering it, which
+                // is what makes a member author safe to have.
+                <div
+                  class="markdown-preview"
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(row.answer) }}
+                />
+              )}
 
-                {row.answer.trim() === '' ? (
-                  <p class="form-note">{UNANSWERED}</p>
-                ) : (
-                  // Written by any approved member and read by all of them.
-                  // `renderMarkdown` escapes raw HTML rather than filtering it, which
-                  // is what makes a member author safe to have.
-                  <div
-                    class="markdown-preview"
-                    dangerouslySetInnerHTML={{ __html: renderMarkdown(row.answer) }}
-                  />
-                )}
-
-                <p class="row">
-                  <button
-                    type="button"
-                    class="link-button"
-                    disabled={busy}
-                    onClick={() => setEditing(row.id)}
-                  >
-                    {row.answer.trim() === '' ? 'Answer it' : 'Edit'}
-                  </button>
-                  <button
-                    type="button"
-                    class="link-button"
-                    disabled={busy}
-                    aria-label={`Remove ${row.question}`}
-                    onClick={() => run(() => api.deleteFaqEntry(row.id), 'Could not remove that question.')}
-                  >
-                    🗑️
-                  </button>
-                </p>
-              </details>
-            )}
-          </li>
-        ))}
-      </ol>
+              <p class="row">
+                <button type="button" class="link-button" disabled={busy} onClick={() => setEditing(row.id)}>
+                  {row.answer.trim() === '' ? 'Answer it' : 'Edit'}
+                </button>
+                <IconButton
+                  icon="🗑️"
+                  label={`Remove ${row.question}`}
+                  disabled={busy}
+                  onClick={() => run(() => api.deleteFaqEntry(row.id), 'Could not remove that question.')}
+                />
+              </p>
+            </details>
+          )
+        }
+      </ReorderableList>
 
       {/* Only once the burn is known: a question belongs to one, so a form rendered
           before then would take one and have nowhere to put it. */}

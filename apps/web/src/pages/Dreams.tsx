@@ -9,6 +9,7 @@ import { useSelectedBurn } from '../burn.tsx'
 import { DreamFields } from '../components/DreamFields.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
+import { IconButton } from '../components/IconButton.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { WithdrawDream } from '../components/WithdrawDream.tsx'
 import { shortDayOf } from '../datetime.ts'
@@ -150,15 +151,12 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
                 <span class="dream-when">{when(dream) ?? 'not scheduled yet'}</span>
                 <span class="dream-place">{placeLabel(places, dream.place_id) ?? '—'}</span>
 
-                <button
-                  type="button"
-                  class="link-button"
+                <IconButton
+                  icon="✏️"
+                  label={`Edit ${dream.title}`}
                   disabled={busy}
-                  aria-label={`Edit ${dream.title}`}
                   onClick={() => setEditing(dream.id)}
-                >
-                  ✏️
-                </button>
+                />
                 <WithdrawDream
                   title={dream.title}
                   busy={busy}

@@ -8,6 +8,7 @@ import { Avatar } from './Avatar.tsx'
 import { DreamFields } from './DreamFields.tsx'
 import { DreamPanel } from './DreamPanel.tsx'
 import { HelperStrip } from './HelperStrip.tsx'
+import { IconButton } from './IconButton.tsx'
 import { NAMELESS } from './PersonBadge.tsx'
 import { WithdrawDream } from './WithdrawDream.tsx'
 
@@ -171,15 +172,7 @@ export const DreamDetails = ({
           />
 
           <p class="row">
-            <button
-              type="button"
-              class="link-button"
-              disabled={busy}
-              aria-label={`Edit ${dream.title}`}
-              onClick={onEdit}
-            >
-              ✏️
-            </button>
+            <IconButton icon="✏️" label={`Edit ${dream.title}`} disabled={busy} onClick={onEdit} />
             <WithdrawDream title={dream.title} busy={busy} onWithdraw={onRemove} />
             <button type="button" class="link-button" onClick={onClose}>
               Close

@@ -8,6 +8,7 @@ import type { ApiClient } from '../api/client.ts'
 import { isApiError } from '../api/client.ts'
 import { FormError, useFormError } from '../components/FormError.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
+import { PendingButton } from '../components/PendingButton.tsx'
 import { TheirVersion } from '../components/TheirVersion.tsx'
 import { useInstallationBanner, useInstallationTitle } from '../installation.tsx'
 import { renderMarkdown } from '../markdown.ts'
@@ -211,14 +212,14 @@ export const Home = ({ api }: { api: HomeApi }) => {
                 are edited under Organise, which is why this is not a link to there.
               */}
               {isApproved(viewer) && (
-                <button
+                <PendingButton
+                  busy={opening}
+                  label="Edit this text"
+                  busyLabel="Opening…"
                   type="button"
                   class="link-button"
-                  disabled={opening}
                   onClick={() => void openEditor(openEvent.welcome_markdown)}
-                >
-                  {opening ? 'Opening…' : 'Edit this text'}
-                </button>
+                />
               )}
             </>
           ) : (
@@ -239,9 +240,7 @@ export const Home = ({ api }: { api: HomeApi }) => {
               <FormError error={error} />
               <TheirVersion failure={refused} at={['event', 'welcome_markdown']} />
 
-              <button type="submit" disabled={saving}>
-                {saving ? 'Saving…' : 'Save'}
-              </button>
+              <PendingButton busy={saving} label="Save" busyLabel="Saving…" type="submit" />
               <button
                 type="button"
                 class="link-button"
