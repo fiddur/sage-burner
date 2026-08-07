@@ -201,7 +201,8 @@ describe('Login', () => {
 
   it('says why there is no sign-up or password reset', async () => {
     // Both are absent by design — accounts come from invites (#17) and there is
-    // no mail service (#30). A dead link would be worse than saying so.
+    // no reset flow at all — #30 gave the app a mail server and nothing that sends
+    // a reset through it. A dead link would be worse than saying so.
     renderLogin(vi.fn(() => Promise.resolve({ viewer: null })))
 
     const note = await screen.findByText(/Accounts are created by invitation/)

@@ -32,8 +32,9 @@ const messageForFailure = (failure: unknown): string => {
  * Sign in.
  *
  * There is no "forgot password" and no sign-up link, deliberately: accounts are
- * created only by redeeming an invite (#17), and there is no mail service to
- * send a reset through (#30). An admin resets a password out of band until
+ * created only by redeeming an invite (#17), and there is no reset flow at all —
+ * #30 gave the app a mail server, and nothing that sends a reset through it. An
+ * admin resets a password out of band until
  * either exists — saying so here is better than a dead link.
  */
 export const Login = ({
@@ -209,7 +210,7 @@ export const Login = ({
 
       <p class="form-note">
         Accounts are created by invitation, so there is nothing to sign up for here. If you have lost your
-        password, ask someone with admin — there is no mail service to send a reset through yet.
+        password, ask someone with admin — this app cannot send you a reset link.
       </p>
     </section>
   )

@@ -248,6 +248,45 @@ which is [#14]'s half of the work.
 
 [#14]: https://github.com/fiddur/sage-burner/issues/14
 
+## The Q&A
+
+The spreadsheet's other tab: how to get there by public transport, what to bring,
+what taking part actually asks of you. `/faq`, open to any approved member.
+
+**Per burn**, like the places and the lead-roles register — the practical answers
+change with the site and the year, and last summer's directions are wrong for the
+next one. A burn with none offers to seed itself from a previous one, which is where
+most of them come from; it refuses to copy into a list that already has some, for the
+reason the register gives.
+
+**Questions are always visible; answers are folded away behind them.** The list is
+read by somebody looking for one thing, so it is a column of headings they scan and
+open. It is a native `<details>`, not state of the page's own, which keeps the
+browser's find-in-page working — half of finding an answer is Ctrl-F.
+
+**Anyone may ask, and anyone may answer**, including a question somebody else asked.
+The person with the question is rarely the person with the answer, so asking is one
+field, an entry may have no answer at all, and the page says where one is still
+wanted. That default — the burn's shared furniture is every member's — is the same
+call #27 made for the register.
+
+The **question is plain text** and the **answer is markdown**, which is the split
+every pair like this has here: the short one is a heading and the long one is written
+for other people to read. The CHECK is on the question alone, since an unanswered one
+is worth having on the page.
+
+**The order is somebody's arrangement**, not the order things were typed: a FAQ is
+read top to bottom and the question people have first belongs first. It is draggable,
+with the arrow keys on the handle doing the same for anybody not using a mouse, and
+the copy carries the arrangement rather than re-deriving one. Every write needs the
+burn to be open — a finished burn's Q&A is the record of what was asked — and goes
+through the same `If-Match` guard as the rest of the shared furniture.
+
+**Members, not the public.** The homepage's welcome text is this app's public
+surface; these are the answers written for people who are already coming, and some of
+them say exactly where the gate is. Opening it later is moving one route out from
+behind the guard, which is a smaller decision than taking it back.
+
 ## The calendar feed
 
 `GET /events/:eventId/schedule.ics` is the programme as a calendar subscription,

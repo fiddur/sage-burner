@@ -35,6 +35,7 @@ import { registerAvatarRoutes } from './routes/avatars.ts'
 import { registerBannerRoutes } from './routes/banner.ts'
 import { registerEventOptionRoutes } from './routes/event-options.ts'
 import { registerEventRoutes } from './routes/events.ts'
+import { registerFaqRoutes } from './routes/faq.ts'
 import { registerImageBodyParser } from './routes/image-body.ts'
 import { registerInstallationRoutes } from './routes/installation.ts'
 import { registerInviteRoutes } from './routes/invites.ts'
@@ -406,6 +407,10 @@ export const createApp = async ({
   app.decorate('config', config)
 
   registerErrorHandler(app)
+  // Before any route registers, `registerVersionRoutes` included: `onRoute` only
+  // sees what comes after it, and a hook with one exception is a hook to forget.
+  refuseEnvelopeStrippers(app)
+
   registerVersionRoutes(app, { config })
 
   // One `Sessions` for both, so the guards verify what the login route signed.
@@ -414,9 +419,6 @@ export const createApp = async ({
   // One gate for every route that spends scrypt, and per-app rather than
   // module-level so two apps in one test process do not share one.
   const gate = suppliedGate ?? createGate(SCRYPT_GATE)
-
-  // Before any route registers, since `onRoute` only sees what comes after it.
-  refuseEnvelopeStrippers(app)
 
   registerAdminPrefixGuard(app, { db, sessions })
 
@@ -498,6 +500,7 @@ export const createApp = async ({
   registerProfileRoutes(app, { db, sessions, now })
   registerRosterRoutes(app, { db, sessions, now, notify: tellAccount })
   registerLeadRoleRoutes(app, { db, sessions, now, notify: tellAccount })
+  registerFaqRoutes(app, { db, sessions, now })
   registerSessionRoutes(app, { db, sessions, now, notify: tellAccount })
   registerScheduleRoutes(app, { db, now })
 
