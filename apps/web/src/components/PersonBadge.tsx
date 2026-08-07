@@ -6,11 +6,6 @@ export const NAMELESS = 'Someone without a name yet'
 /**
  * Somebody's face and their name, as one thing (#301).
  *
- * The app showed a picture in some places and a bare name in others, so the same
- * person read as two different kinds of thing depending on the page. This is the
- * name half, with the circle put back on its left — the picture-only circles are
- * unchanged.
- *
  * Someone with no picture gets the initials circle, which is what `Avatar` already
  * draws for them, so a list of people is the same height whether or not anybody in
  * it has uploaded anything.

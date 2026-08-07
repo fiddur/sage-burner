@@ -8,6 +8,7 @@ import { Avatar } from './Avatar.tsx'
 import { DreamFields } from './DreamFields.tsx'
 import { DreamPanel } from './DreamPanel.tsx'
 import { HelperStrip } from './HelperStrip.tsx'
+import { NAMELESS } from './PersonBadge.tsx'
 import { WithdrawDream } from './WithdrawDream.tsx'
 
 /**
@@ -112,7 +113,7 @@ export const DreamDetails = ({
             ) : (
               <span class="dream-supporters">
                 {dream.supporters.map((person) => {
-                  const who = person.name ?? 'Someone without a name yet'
+                  const who = person.name ?? NAMELESS
 
                   return (
                     // Wrapped for the name: `Avatar` draws `alt=""` because a name is
@@ -135,12 +136,18 @@ export const DreamDetails = ({
           <h3>Facilitating</h3>
 
           {/* The same control as everywhere else somebody takes a job (#247), rather
-              than a line of prose only the edit form could change. */}
+              than a line of prose only the edit form could change.
+
+              The exclusion runs both ways: somebody already helping is not offered as
+              facilitator either, since appointing them would leave them holding both
+              of a pair the strip below treats as exclusive (#295). */}
           <HelperStrip
             label={`${dream.title} as facilitator`}
             people={facilitator === undefined ? [] : [facilitator]}
             max={1}
-            candidates={attendees}
+            candidates={attendees.filter(
+              (person) => !dream.helpers.some((helper) => helper.account_id === person.account_id),
+            )}
             everyone={attendees}
             viewerId={viewerId}
             busy={busy}
@@ -151,7 +158,7 @@ export const DreamDetails = ({
           <h3>Helping out</h3>
 
           {/* The facilitator is running it, so they are not offered as a pair of
-              hands for it — the one exclusion a dream has. */}
+              hands for it. The other half of the same rule is above. */}
           <HelperStrip
             label={dream.title}
             people={dream.helpers}

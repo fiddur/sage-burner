@@ -28,13 +28,6 @@ export type MealsApi = Pick<
   | 'updateMealIntro'
 >
 
-/**
- * Somebody at this burn, as `getEventAttendees` sends them.
- *
- * The shared shape rather than a narrower local one: this was
- * `{ account_id, name }`, which threw away the picture the route had already sent —
- * so the badges had nothing to draw (#301).
- */
 type Person = EventAttendeesResponse['attendees'][number]
 
 /** Null rather than a fourth status: "no burn is selected" is data, not a load outcome. */
@@ -308,14 +301,6 @@ const MealTable = ({
   </div>
 )
 
-/**
- * Whoever may hold this sitting's lead, as options.
- *
- * Nobody may be handed a **chore's**, so nobody is offered for one — but whoever is
- * already on it still needs an option, or nothing matches the control's value and it
- * reads as vacant while somebody is still on it. Same for a lead who has withdrawn,
- * which is where that rule started.
- */
 /** The sheet's "Food idea?" column: what somebody thought of cooking, if anything. */
 const FoodIdea = ({
   meal,
