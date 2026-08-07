@@ -1,4 +1,10 @@
-import type { CopySourcesResponse, EffortLevel, LeadRole, LeadRoleUpdate } from '@sage-burner/shared'
+import type {
+  CopySourcesResponse,
+  EffortLevel,
+  EventAttendeesResponse,
+  LeadRole,
+  LeadRoleUpdate,
+} from '@sage-burner/shared'
 
 import { effortLevels, MAX_NOTES, MAX_TITLE } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
@@ -31,7 +37,14 @@ export type RolesApi = Pick<
   | 'copyLeadRoles'
 >
 
-type Person = { account_id: string; name: string | null }
+/**
+ * Somebody at this burn, as `getEventAttendees` sends them.
+ *
+ * The shared shape rather than a narrower local one: this was
+ * `{ account_id, name }`, which threw away the picture the route had already sent —
+ * so the badges had nothing to draw (#301).
+ */
+type Person = EventAttendeesResponse['attendees'][number]
 type Source = CopySourcesResponse['sources'][number]
 
 /** Null rather than a fourth status: "no burn is open" is data, not a load outcome. */
@@ -329,6 +342,7 @@ const RoleRow = ({
           people={role.lead === null ? [] : [role.lead]}
           max={1}
           candidates={attendees}
+          everyone={attendees}
           viewerId={viewerId}
           busy={busy}
           onAdd={(accountId) => onLead(accountId)}
@@ -346,6 +360,7 @@ const RoleRow = ({
           people={role.team}
           wanted={role.team_size_wanted}
           candidates={attendees}
+          everyone={attendees}
           viewerId={viewerId}
           busy={busy}
           onAdd={onJoin}

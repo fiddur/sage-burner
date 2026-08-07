@@ -238,6 +238,28 @@ nothing is its own bug.
 The circle in the corner, and on a schedule chip, may be a picture instead of initials
 (#222).
 
+**Wherever a name is listed, the face goes with it** (#301). The rounded chips that
+say who has taken a spot — a dream's helpers, a meal's lead and crew, a lead role's
+team — draw `PersonBadge`: the circle on the left, the name beside it, the chip's
+height set by the circle rather than by the text. Somebody with no picture gets the
+initials circle, which is what `Avatar` already draws, so a list lines up whether or
+not anybody in it has uploaded anything.
+
+The size modifiers — `.person-badge-face`, and the schedule chip's
+`.dream-facilitator` — must sit **below** `.avatar` in `styles.css`. Each is a single
+class, as `.avatar` is, so specificity ties and source order decides: above the base
+rule they set nothing at all and every circle draws at the bar's 2rem. Both did, and
+a screenshot showed it without anybody noticing — `getComputedStyle` is the check.
+
+`HelperStrip` takes the burn's attendees as `everyone` for this, separately from
+`candidates`: candidates is filtered — a chore offers nobody, a dream's helpers
+exclude its facilitator — so anybody already on the list is by definition absent from
+it, and looking there would draw initials for exactly the people who have a picture.
+It is required rather than optional so a call site cannot quietly forget it.
+
+**A `<select>` keeps a bare name.** An `<option>` cannot hold an image, so the badge
+stops at the list and the picker stays text.
+
 **In the database**, in its own table. The container has no writable path but the data
 volume and `docker compose up` has to stay sufficient, which is the same argument that
 keeps the VAPID keys here — a bind mount for uploads would be a second thing to back

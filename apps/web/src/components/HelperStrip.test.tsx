@@ -5,9 +5,10 @@ import { HelperStrip } from './HelperStrip.tsx'
 
 afterEach(cleanup)
 
-const ADA = { account_id: 'a-1', name: 'Ada' }
-const BEA = { account_id: 'a-2', name: 'Bea' }
-const CAI = { account_id: 'a-3', name: 'Cai' }
+// `avatar` is when the picture last changed; null draws the initials circle.
+const ADA = { account_id: 'a-1', name: 'Ada', avatar: null }
+const BEA = { account_id: 'a-2', name: 'Bea', avatar: '2026-08-01T00:00:00.000Z' }
+const CAI = { account_id: 'a-3', name: 'Cai', avatar: null }
 
 const strip = (over: Partial<Parameters<typeof HelperStrip>[0]> = {}) =>
   render(
@@ -15,6 +16,7 @@ const strip = (over: Partial<Parameters<typeof HelperStrip>[0]> = {}) =>
       label="the sauna"
       people={[]}
       candidates={[ADA, BEA, CAI]}
+      everyone={[ADA, BEA, CAI]}
       viewerId="a-1"
       busy={false}
       onAdd={() => undefined}
@@ -26,6 +28,39 @@ const strip = (over: Partial<Parameters<typeof HelperStrip>[0]> = {}) =>
 const vacancies = () => [...document.querySelectorAll('.helper-vacancy')]
 
 describe('HelperStrip', () => {
+  it('draws each person as a face beside their name (#301)', () => {
+    // Bea has a picture, so hers is an `<img>` at the avatar route; Ada has none and
+    // gets the initials circle, so a list is the same height either way.
+    strip({ people: [ADA, BEA] })
+
+    const badges = [...document.querySelectorAll('.person-badge')]
+
+    expect(badges).toHaveLength(2)
+    expect(badges[0]?.textContent).toContain('Ada')
+    expect(badges[0]?.querySelector('img')).toBeNull()
+    expect(badges[1]?.textContent).toContain('Bea')
+    expect(badges[1]?.querySelector('img')?.getAttribute('src')).toContain('/api/accounts/a-2/avatar')
+  })
+
+  it('finds the face in `everyone`, not in `candidates`', () => {
+    // Somebody already on the list is filtered out of `candidates` by definition, so
+    // looking there would draw initials for everyone who had taken a spot.
+    strip({ people: [BEA], candidates: [] })
+
+    expect(document.querySelector('.person-badge img')).not.toBeNull()
+  })
+
+  it('falls back to the initials circle for somebody it has no face for', () => {
+    // A person on the list who is no longer among the burn's attendees. The badge is
+    // still a badge — the alternative was a bare name, half a row shorter.
+    strip({ people: [BEA], everyone: [] })
+
+    const badge = document.querySelector('.person-badge')
+
+    expect(badge?.textContent).toContain('Bea')
+    expect(badge?.querySelector('img')).toBeNull()
+  })
+
   it('shows a row per place still wanted', () => {
     strip({ people: [ADA], wanted: 3, viewerId: 'a-3' })
 

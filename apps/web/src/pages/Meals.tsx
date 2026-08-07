@@ -1,4 +1,4 @@
-import type { Meal, MealsResponse } from '@sage-burner/shared'
+import type { EventAttendeesResponse, Meal, MealsResponse } from '@sage-burner/shared'
 
 import { MAX_OPTION_LABEL, MAX_WELCOME_LENGTH } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
@@ -28,7 +28,14 @@ export type MealsApi = Pick<
   | 'updateMealIntro'
 >
 
-type Person = { account_id: string; name: string | null }
+/**
+ * Somebody at this burn, as `getEventAttendees` sends them.
+ *
+ * The shared shape rather than a narrower local one: this was
+ * `{ account_id, name }`, which threw away the picture the route had already sent —
+ * so the badges had nothing to draw (#301).
+ */
+type Person = EventAttendeesResponse['attendees'][number]
 
 /** Null rather than a fourth status: "no burn is selected" is data, not a load outcome. */
 type Plan = (MealsResponse & { eventId: string; attendees: readonly Person[] }) | null
@@ -260,6 +267,7 @@ const MealTable = ({
                   // A chore takes no new lead, so it offers nobody — whoever is still
                   // on one has their ✕ regardless, which is what the API allows.
                   candidates={meal.kind === 'chore' ? [] : attendees}
+                  everyone={attendees}
                   viewerId={viewerId}
                   busy={busy}
                   onAdd={(accountId) => onLead(meal.id, accountId)}
@@ -377,6 +385,7 @@ const Crew = ({
         label={`${role === 'helper' ? 'cooking' : 'cleanup'} at ${meal.label} on ${meal.date}`}
         people={crew}
         candidates={offerable}
+        everyone={attendees}
         viewerId={viewerId}
         busy={busy}
         onAdd={(accountId) => onStand(meal.id, role, true, accountId)}

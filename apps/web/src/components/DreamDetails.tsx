@@ -141,6 +141,7 @@ export const DreamDetails = ({
             people={facilitator === undefined ? [] : [facilitator]}
             max={1}
             candidates={attendees}
+            everyone={attendees}
             viewerId={viewerId}
             busy={busy}
             onAdd={(accountId) => onFacilitate(accountId)}
@@ -155,6 +156,7 @@ export const DreamDetails = ({
             label={dream.title}
             people={dream.helpers}
             candidates={attendees.filter((person) => person.account_id !== dream.facilitator_account_id)}
+            everyone={attendees}
             viewerId={viewerId}
             busy={busy}
             onAdd={(accountId) => onHelp(true, accountId)}

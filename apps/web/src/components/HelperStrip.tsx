@@ -1,11 +1,24 @@
 import { useState } from 'preact/hooks'
 
+import { NAMELESS, PersonBadge } from './PersonBadge.tsx'
+
 export interface Person {
   account_id: string
   name: string | null
 }
 
-const nameOf = (person: Person) => person.name ?? 'Someone without a name yet'
+/**
+ * Somebody's picture, for the badge beside their name (#301).
+ *
+ * Structural, so an attendee satisfies it without being converted — every caller
+ * already has the burn's attendee list in hand, which is where the pictures are.
+ */
+export interface Face {
+  account_id: string
+  avatar: string | null
+}
+
+const nameOf = (person: Person) => person.name ?? NAMELESS
 
 /**
  * Everywhere several people put their hands up for the same thing (#247).
@@ -36,6 +49,7 @@ export const HelperStrip = ({
   wanted,
   max,
   candidates,
+  everyone,
   viewerId,
   busy,
   onAdd,
@@ -53,6 +67,16 @@ export const HelperStrip = ({
    */
   max?: number
   candidates: readonly Person[]
+  /**
+   * Where the faces come from: the burn's attendees, with their pictures.
+   *
+   * Separate from `candidates`, which is filtered — a chore offers nobody, a dream's
+   * helpers exclude its facilitator — so somebody already on the list is by
+   * definition absent from it. Required rather than optional: a caller that forgot
+   * would draw initials for people who have a picture, which reads as the picture
+   * failing to load rather than as a lookup nobody wired up.
+   */
+  everyone: readonly Face[]
   viewerId: string | undefined
   busy: boolean
   onAdd: (accountId: string) => void
@@ -76,7 +100,11 @@ export const HelperStrip = ({
     <ul class="helpers">
       {people.map((person) => (
         <li key={person.account_id} class="helper-taken">
-          <span>{nameOf(person)}</span>
+          <PersonBadge
+            accountId={person.account_id}
+            name={person.name}
+            avatar={everyone.find((who) => who.account_id === person.account_id)?.avatar ?? null}
+          />
           <button
             type="button"
             class="link-button"
@@ -135,6 +163,8 @@ export const HelperStrip = ({
             {[...offerable]
               .sort((a, b) => nameOf(a).localeCompare(nameOf(b)))
               .map((person) => (
+                // A name alone: an `<option>` cannot hold an image, so the badge
+                // stops at the list and the picker stays text.
                 <option key={person.account_id} value={person.account_id}>
                   {nameOf(person)}
                 </option>
