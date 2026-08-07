@@ -31,6 +31,7 @@ const anEntry = (over: Partial<RosterEntry> = {}): RosterEntry => ({
   name: 'Ana',
   contact: 'ana on discord',
   allergies_notes: null,
+  allergy_items: [],
   waiting: false,
   ...over,
 })

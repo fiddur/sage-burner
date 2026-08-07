@@ -43,3 +43,17 @@ describe('toCsv', () => {
     expect(toCsv(['name'], [])).toBe('"name"')
   })
 })
+
+describe('a column holding a list', () => {
+  it('writes the items into one quoted field, commas and all', () => {
+    // The allergy ticks are an array (#254). Quoting is unconditional here, so the
+    // commas between items stay inside the cell rather than splitting it.
+    expect(toCsv(['who', 'allergy_items'], [{ who: 'Ana', allergy_items: ['Vegan', 'Lactose'] }])).toBe(
+      '"who","allergy_items"\r\n"Ana","Vegan,Lactose"',
+    )
+  })
+
+  it('writes an empty field for somebody who ticked nothing', () => {
+    expect(toCsv(['allergy_items'], [{ allergy_items: [] }])).toBe('"allergy_items"\r\n""')
+  })
+})

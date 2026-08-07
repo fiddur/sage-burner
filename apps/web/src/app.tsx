@@ -11,6 +11,7 @@ import { Layout } from './components/Layout.tsx'
 import { NewVersion } from './components/NewVersion.tsx'
 import { FetchedInstallationProvider, InstallationProvider } from './installation.tsx'
 import { Admin } from './pages/Admin.tsx'
+import { AdminAllergies } from './pages/AdminAllergies.tsx'
 import { AdminApplications } from './pages/AdminApplications.tsx'
 import { AdminEvents } from './pages/AdminEvents.tsx'
 import { AdminInvites } from './pages/AdminInvites.tsx'
@@ -48,6 +49,11 @@ export type RoutesApi = Pick<
   | 'createEvent'
   | 'deleteQuestion'
   | 'getActiveEvent'
+  | 'getAllergyItems'
+  | 'addAllergyItem'
+  | 'updateAllergyItem'
+  | 'deleteAllergyItem'
+  | 'reorderAllergyItems'
   | 'logout'
   | 'updateWelcome'
   | 'getAdminAccounts'
@@ -173,6 +179,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
   const LoginRoute = useMemo(() => () => <Login api={api} />, [api])
   const AdminRoute = useMemo(() => () => <Admin api={api} />, [api])
   const AdminEventsRoute = useMemo(() => () => <AdminEvents api={api} />, [api])
+  const AdminAllergiesRoute = useMemo(() => () => <AdminAllergies api={api} />, [api])
   const AdminQuestionsRoute = useMemo(() => () => <AdminQuestions api={api} />, [api])
   const AdminApplicationsRoute = useMemo(() => () => <AdminApplications api={api} />, [api])
   const AdminInvitesRoute = useMemo(() => () => <AdminInvites api={api} />, [api])
@@ -210,6 +217,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
       <Route path="/login" component={LoginRoute} />
       <Route path="/admin" component={AdminRoute} />
       <Route path="/admin/events" component={AdminEventsRoute} />
+      <Route path="/admin/allergies" component={AdminAllergiesRoute} />
       <Route path="/admin/questions" component={AdminQuestionsRoute} />
       <Route path="/admin/applications" component={AdminApplicationsRoute} />
       <Route path="/admin/invites" component={AdminInvitesRoute} />

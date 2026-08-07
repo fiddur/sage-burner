@@ -1,4 +1,7 @@
 import type {
+  AllergyItemCreate,
+  AllergyItemOrder,
+  AllergyItemUpdate,
   LoginRequest,
   InviteCreate,
   AccountRolesUpdate,
@@ -102,6 +105,11 @@ export const apiRoutes = {
     fastify: '/api/me/passkeys',
     path: () => '/api/me/passkeys',
   },
+  addAllergyItem: {
+    method: 'POST',
+    fastify: '/api/admin/allergy-items',
+    path: () => '/api/admin/allergy-items',
+  },
   addPlace: {
     method: 'POST',
     fastify: '/api/events/:eventId/places',
@@ -172,6 +180,11 @@ export const apiRoutes = {
     method: 'DELETE',
     fastify: '/api/admin/meal-slots/:id',
     path: (id: string) => `/api/admin/meal-slots/${encodeURIComponent(id)}`,
+  },
+  deleteAllergyItem: {
+    method: 'DELETE',
+    fastify: '/api/admin/allergy-items/:id',
+    path: (id: string) => `/api/admin/allergy-items/${encodeURIComponent(id)}`,
   },
   deletePlace: {
     method: 'DELETE',
@@ -303,6 +316,16 @@ export const apiRoutes = {
     fastify: '/api/events/:eventId/places/sources',
     path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/places/sources`,
   },
+  /**
+   * Public, like `/api/questions`: a vocabulary of foods, carrying nothing about
+   * anybody. That also lets the invite form offer the ticks without this route
+   * learning to hand out anything new.
+   */
+  getAllergyItems: {
+    method: 'GET',
+    fastify: '/api/allergy-items',
+    path: () => '/api/allergy-items',
+  },
   getPlaces: {
     method: 'GET',
     fastify: '/api/events/:eventId/places',
@@ -416,6 +439,11 @@ export const apiRoutes = {
     fastify: '/api/events/:eventId/options/:kind/order',
     path: (eventId: string, kind: string) =>
       `/api/events/${encodeURIComponent(eventId)}/options/${encodeURIComponent(kind)}/order`,
+  },
+  reorderAllergyItems: {
+    method: 'PUT',
+    fastify: '/api/admin/allergy-items/order',
+    path: () => '/api/admin/allergy-items/order',
   },
   reorderPlaces: {
     method: 'PUT',
@@ -564,6 +592,11 @@ export const apiRoutes = {
     fastify: '/api/events/:eventId/attendance/me',
     path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/attendance/me`,
   },
+  updateAllergyItem: {
+    method: 'PATCH',
+    fastify: '/api/admin/allergy-items/:id',
+    path: (id: string) => `/api/admin/allergy-items/${encodeURIComponent(id)}`,
+  },
   updatePlace: {
     method: 'PATCH',
     fastify: '/api/places/:id',
@@ -619,6 +652,7 @@ export interface RouteBodies {
   addMeal: MealCreateInput
   addMealSlot: MealSlotCreateInput
   addPasskey: PasskeyRegistration
+  addAllergyItem: AllergyItemCreate
   addPlace: PlaceCreate
   addQuestion: FormQuestionCreateInput
   adminAddAttendance: AttendanceCreate
@@ -634,6 +668,7 @@ export interface RouteBodies {
   offerSession: SessionCreateInput
   redeemInvite: RedeemRequestInput
   reorderEventOptions: EventOptionOrder
+  reorderAllergyItems: AllergyItemOrder
   reorderPlaces: PlaceOrder
   reorderQuestions: FormQuestionOrder
   setAccountPassword: AdminPasswordReset
@@ -656,6 +691,7 @@ export interface RouteBodies {
   updateMyNotificationSettings: NotificationSettings
   updateMyProfile: ProfileUpdate
   updateMyStay: AttendanceUpdate
+  updateAllergyItem: AllergyItemUpdate
   updatePlace: PlaceUpdate
   updateQuestion: FormQuestionUpdate
   updateSession: SessionUpdate

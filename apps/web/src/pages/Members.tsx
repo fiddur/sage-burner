@@ -4,6 +4,7 @@ import { Fragment } from 'preact'
 
 import type { ApiClient } from '../api/client.ts'
 
+import { allergiesOf } from '../allergies.ts'
 import { useSelectedBurn } from '../burn.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
@@ -143,7 +144,7 @@ const RosterTable = ({ entries }: { entries: readonly MemberRosterEntry[] }) => 
               <br />
               <span class="form-note">{entry.contact ?? 'no contact given'}</span>
             </td>
-            <td>{entry.allergies_notes ?? '—'}</td>
+            <td>{allergiesOf(entry)}</td>
             <td>
               {entry.arrival_date ?? '?'} → {entry.departure_date ?? '?'}
               <br />

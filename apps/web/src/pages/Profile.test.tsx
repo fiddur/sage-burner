@@ -18,6 +18,7 @@ const aProfile = (over: Partial<Profile> = {}): Profile => ({
   name: 'Fredrik',
   contact: 'fredrik on discord',
   allergies_notes: 'peanuts',
+  allergy_item_ids: [],
   ...over,
 })
 
@@ -25,6 +26,7 @@ const aProfile = (over: Partial<Profile> = {}): Profile => ({
 // details form is what these tests are looking at.
 const stub = (over: Partial<ProfileApi> = {}, profile = aProfile()): ProfileApi => ({
   getMyProfile: () => Promise.resolve({ profile }),
+  getAllergyItems: () => Promise.resolve({ items: [] }),
   setMyAvatar: () => Promise.reject(new Error('setMyAvatar is not stubbed here')),
   removeMyAvatar: () => Promise.reject(new Error('removeMyAvatar is not stubbed here')),
   updateMyProfile: () => Promise.reject(new Error('updateMyProfile is not stubbed here')),
@@ -101,6 +103,9 @@ describe('ProfilePage', () => {
         name: 'Fredrik L',
         contact: 'fredrik on discord',
         allergies_notes: 'peanuts',
+        // Sent every time, because the form shows every box: a delta would need the
+        // page to know what it had before in order to say what changed.
+        allergy_item_ids: [],
       }),
     )
     expect((await screen.findByRole('status')).textContent).toContain('Saved')
@@ -160,5 +165,80 @@ describe('ProfilePage', () => {
     renderPage(stub({ getMyProfile: () => Promise.reject(new Error('nope')) }))
 
     expect((await screen.findByRole('alert')).textContent).toContain('reload')
+  })
+})
+
+describe('the allergy tick boxes', () => {
+  const ITEMS = [
+    { id: 'i-1', order: 0, label: 'Vegan' },
+    { id: 'i-2', order: 1, label: 'Lactose' },
+  ]
+
+  const withItems = (over: Partial<ProfileApi> = {}) =>
+    stub({ getAllergyItems: () => Promise.resolve({ items: ITEMS }), ...over })
+
+  it('offers the list, ticked from what is stored', async () => {
+    renderPage(
+      withItems({
+        getMyProfile: () => Promise.resolve({ profile: aProfile({ allergy_item_ids: ['i-2'] }) }),
+      }),
+    )
+
+    expect(await screen.findByLabelText('Lactose')).toHaveProperty('checked', true)
+    expect(screen.getByLabelText('Vegan')).toHaveProperty('checked', false)
+  })
+
+  it('sends what was ticked', async () => {
+    const updateMyProfile = vi.fn(() => Promise.resolve({ profile: aProfile() }))
+    renderPage(withItems({ updateMyProfile }))
+
+    fireEvent.click(await screen.findByLabelText('Vegan'))
+    screen.getByRole('button', { name: 'Save' }).click()
+
+    await waitFor(() =>
+      expect(updateMyProfile).toHaveBeenCalledWith(expect.objectContaining({ allergy_item_ids: ['i-1'] })),
+    )
+  })
+
+  it('sends the set without one that was unticked', async () => {
+    const updateMyProfile = vi.fn(() => Promise.resolve({ profile: aProfile() }))
+    renderPage(
+      withItems({
+        updateMyProfile,
+        getMyProfile: () => Promise.resolve({ profile: aProfile({ allergy_item_ids: ['i-1', 'i-2'] }) }),
+      }),
+    )
+
+    fireEvent.click(await screen.findByLabelText('Vegan'))
+    screen.getByRole('button', { name: 'Save' }).click()
+
+    await waitFor(() =>
+      expect(updateMyProfile).toHaveBeenCalledWith(expect.objectContaining({ allergy_item_ids: ['i-2'] })),
+    )
+  })
+
+  it('keeps the free text as the Other beside them', async () => {
+    // A vocabulary is never complete, and the cost of it being wrong here is
+    // somebody's dinner.
+    renderPage(withItems())
+
+    expect(await screen.findByLabelText('Anything else you cannot eat')).toBeTruthy()
+  })
+
+  it('asks the old way when the list could not be fetched', async () => {
+    // The passing sibling, and the reason the fetch has its own catch: the
+    // vocabulary is a nicety beside the free text, and not having it must not cost
+    // somebody the page their name is on.
+    renderPage(stub({ getAllergyItems: () => Promise.reject(new Error('nope')) }))
+    await screen.findByRole('button', { name: 'Save' })
+
+    // Settled, not merely first-seen: `findBy` returns on the first match, so a
+    // failure landing a microtask later would slip past it — which a mutation
+    // turning this catch into `setLoaded({ status: 'failed' })` proved it did.
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.getByLabelText('Allergies or food you cannot eat')).toBeTruthy()
+    expect(screen.queryByLabelText('Vegan')).toBeNull()
   })
 })

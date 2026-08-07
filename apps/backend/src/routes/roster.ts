@@ -16,6 +16,7 @@ import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
 import { account, attendance, event, eventOption } from '../db/schema.ts'
 import { noStore } from '../http.ts'
+import { allergyLabelsFor } from './allergy-ticks.ts'
 import { activeEvent, todayIso } from './events.ts'
 import { helpingIdsFor, helpingLabelsFor } from './helping.ts'
 import { tellAboutTheWaitingList } from './waiting-list.ts'
@@ -51,6 +52,7 @@ const asMemberEntry = (entry: RosterEntry): MemberRosterEntry => ({
   name: entry.name,
   contact: entry.contact,
   allergies_notes: entry.allergies_notes,
+  allergy_items: entry.allergy_items,
   payment_status: entry.payment_status,
   waiting: entry.waiting,
 })
@@ -243,6 +245,13 @@ export const registerRosterRoutes = (
       rows.map((row) => row.id),
     )
 
+    // Keyed by account, not by stay: allergies describe a human, so the same person
+    // at two burns has one set.
+    const allergies = await allergyLabelsFor(
+      db,
+      rows.map((row) => row.account_id),
+    )
+
     // Ordered and cut by the shared rule rather than here, so #79's member-facing
     // list gives the same answer when it arrives.
     return withPlaces(
@@ -251,6 +260,7 @@ export const registerRosterRoutes = (
 
         return {
           ...row,
+          allergy_items: allergies.get(row.account_id) ?? [],
           helping_option_ids: ticked.map((entry) => entry.id),
           helping: ticked.length === 0 ? null : ticked.map((entry) => entry.label).join(', '),
         }
