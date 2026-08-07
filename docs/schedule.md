@@ -250,6 +250,33 @@ empty is half a slot, which the schema refuses with a 400. The failure is shown
 error renders under it; the page suppresses its copy while a panel is open, so the
 message is never announced twice.
 
+### Pinching it
+
+Two fingers on the grid scale it, on a touch screen only (#284). **One factor for
+both axes**, not a guess at which direction the pinch meant: fingers apart make the
+hours taller and the lanes wider, fingers together squeeze a burn with more places
+than a phone is wide until they all fit — accepting that very little text will.
+
+The CSS is where that lands. `--zoom` multiplies `.schedule-cell`'s height and the
+`min-width` the lanes are floored at, so one number moves both and nothing measures
+anything. Zooming out stops narrowing the lanes once they all fit, because the table
+is `width: 100%` and a `min-width` below that changes nothing — the right floor, and
+the hours go on shrinking past it.
+
+`touch-action: pan-x pan-y` on the wrapper is what makes the gesture reachable: it
+leaves one finger scrolling and takes the browser's own pinch-zoom off this box only.
+**A desktop pointer is untouched** — there is no wheel handler, so ctrl+wheel stays
+the browser's page zoom, which is what the issue asked for.
+
+The zoom is not remembered between visits. It is a gesture for reading the grid the
+way you want it now, and one restored from last time would greet somebody with a
+timetable they do not remember setting.
+
+The arithmetic is `pinch.ts`, apart from the event wiring, so what a pinch _means_ is
+tested without a `TouchEvent`: measured from the gap at `touchstart` rather than
+accumulated per move, so letting go and pinching again from the same place lands
+where it was.
+
 ### Pulling the bottom edge
 
 A placed chip carries a handle on its bottom edge. Dragging it changes the length in

@@ -1,32 +1,16 @@
-import { apiRoutes, flameIcon, notificationBadge } from '@sage-burner/shared'
+import { apiRoutes, notificationBadge } from '@sage-burner/shared'
 
-/**
- * The tab icon: this installation's own mark, with a dot when something is waiting
- * (#248, #285).
- *
- * The dot used to be drawn as a `<circle>` inside an SVG data URL, which is why the
- * tab wore the flame while the home screen wore the admin's upload — a data URL
- * cannot reference an external image to draw over. So the uploaded one is loaded into
- * an image and composed with the dot on a canvas instead: the same trick the upload
- * path already uses, since icons are cut square and resized in the browser. Nothing
- * new is fetched that the page was not already entitled to, and the icon is
- * same-origin, so the canvas is not tainted.
- *
- * The flame stays the floor under it. It is set first and synchronously, because
- * composing needs a fetch and a tab must not flicker through a blank icon meanwhile —
- * and it is what remains if the fetch fails, if the browser will not draw an SVG with
- * no intrinsic size, or if there is no 2D context at all. That is the whole failure
- * story: the icon is never worse than it was before #285.
- *
- * Returns a function restoring the plain one, so a caller in an effect can hand it
- * straight back as the cleanup.
- */
+/** The one icon link, declared in `index.html` so a signed-out visitor has it too. */
 const ICON_ID = 'app-favicon'
 
-/** How big the composed icon is drawn. The mark's own square, so nothing scales. */
+/**
+ * The square the dot's numbers are stated in, and what the icon is drawn into.
+ *
+ * An uploaded 512-pixel icon is scaled down to it — a favicon is shown at a fraction
+ * of that anyway, and drawing into the badge's own square means its coordinates need
+ * no second conversion.
+ */
 const SIZE = notificationBadge.box
-
-const flameUrl = (badged: boolean) => `data:image/svg+xml,${encodeURIComponent(flameIcon({ badged }))}`
 
 /** Enough of a canvas to draw on, so a test can supply one. */
 export interface BadgeCanvas {
@@ -52,14 +36,10 @@ export const badgeSpot = (size: number) => ({
 /**
  * The icon with the dot over it, or nothing if this browser will not draw it.
  *
- * Nothing rather than a half-drawn icon: the caller keeps the flame it already set,
- * which is the answer to every way this can fail.
+ * Nothing rather than a half-drawn icon: the caller keeps the plain icon it already
+ * set, which is the answer to every way this can fail.
  */
-export const composeBadged = (
-  image: CanvasImageSource,
-  badged: boolean,
-  canvas: BadgeCanvas,
-): string | undefined => {
+export const composeBadged = (image: CanvasImageSource, canvas: BadgeCanvas): string | undefined => {
   // Before the context is asked for: assigning a canvas's width resets everything
   // drawn on it, so doing it afterwards would throw the first drawing away.
   canvas.width = SIZE
@@ -68,46 +48,79 @@ export const composeBadged = (
   const context = canvas.getContext('2d')
   if (context === null) return undefined
 
-  // Sized explicitly rather than drawn at its natural size: `flameIcon` declares a
-  // viewBox and no width, and an SVG with no intrinsic size draws as nothing in some
-  // browsers unless the destination rectangle says how big it is.
+  // Sized explicitly rather than drawn at its natural size: an SVG with a viewBox and
+  // no width has no intrinsic size, and draws as nothing in some browsers unless the
+  // destination rectangle says how big it is.
   context.drawImage(image, 0, 0, SIZE, SIZE)
 
-  if (badged) {
-    const spot = badgeSpot(SIZE)
+  const spot = badgeSpot(SIZE)
 
-    context.beginPath()
-    context.arc(spot.x, spot.y, spot.radius, 0, Math.PI * 2)
-    context.fillStyle = notificationBadge.fill
-    context.fill()
-    context.lineWidth = spot.stroke
-    context.strokeStyle = notificationBadge.stroke
-    context.stroke()
-  }
+  context.beginPath()
+  context.arc(spot.x, spot.y, spot.radius, 0, Math.PI * 2)
+  context.fillStyle = notificationBadge.fill
+  context.fill()
+  context.lineWidth = spot.stroke
+  context.strokeStyle = notificationBadge.stroke
+  context.stroke()
 
   return canvas.toDataURL('image/png')
 }
 
-const loadInstallationIcon = (): Promise<HTMLImageElement | undefined> =>
+/** The installation's icon as an image, or nothing if it will not load. */
+export const loadIcon = (source: string): Promise<HTMLImageElement | undefined> =>
   new Promise((resolve) => {
     const image = new globalThis.Image()
 
     image.addEventListener('load', () => resolve(image))
     image.addEventListener('error', () => resolve(undefined))
-    image.src = apiRoutes.getInstallationIcon.path()
+    image.src = source
   })
 
-const draw = async (badged: boolean): Promise<string | undefined> => {
-  const image = await loadInstallationIcon()
-  if (image === undefined) return undefined
-
-  return composeBadged(image, badged, globalThis.document.createElement('canvas'))
+/**
+ * The browser bits the drawing needs, so a test can supply them.
+ *
+ * Both are here because neither works in happy-dom: an `Image` never fires `load` or
+ * `error`, and a canvas has no 2D context — so without them the composed half of this
+ * module could only be asserted by reading it.
+ */
+export interface FaviconBrowser {
+  load?: (source: string) => Promise<HTMLImageElement | undefined>
+  canvas?: () => BadgeCanvas
 }
 
-export const markFavicon = (badged: boolean): (() => void) => {
+/**
+ * A dot on the tab icon when something is waiting (#248, #285).
+ *
+ * The icon itself is the installation's own and `index.html` already points the link
+ * at the route that serves it — the admin's upload, or the app's flame when there is
+ * none. So the tab wears the right mark before any of this runs, signed in or not,
+ * and what this adds is the dot.
+ *
+ * **Drawn on a canvas rather than into the image.** The dot used to be a `<circle>`
+ * inside an SVG data URL, which is why the tab wore the flame while the home screen
+ * wore the upload: a data URL cannot reference an external image to draw over. This
+ * is the same trick the upload path uses, since a chosen file is cut square and
+ * resized in the browser. Same-origin, so the canvas is not tainted.
+ *
+ * **The plain icon is the floor.** It is set synchronously first and only replaced if
+ * the drawing succeeds, so a failed fetch, a browser that will not draw an SVG with
+ * no intrinsic size, or a missing 2D context all leave the tab wearing the right mark
+ * without a dot — never a blank icon, and never somebody else's.
+ *
+ * Returns a function restoring the plain one, so a caller in an effect can hand it
+ * straight back as the cleanup.
+ */
+export const markFavicon = (badged: boolean, browser: FaviconBrowser = {}): (() => void) => {
+  const load = browser.load ?? loadIcon
+  const canvas = browser.canvas ?? (() => globalThis.document.createElement('canvas'))
+
   const head = globalThis.document?.head
   if (head === undefined) return () => undefined
 
+  // Created only if the shell's is missing, which is every test that renders a
+  // component rather than the page. Never a second one: two `rel="icon"` links leave
+  // it to the browser which wins, and that is how the first attempt at #285 came out
+  // doing nothing at all.
   const link =
     head.querySelector<HTMLLinkElement>(`link#${ICON_ID}`) ??
     (() => {
@@ -118,17 +131,30 @@ export const markFavicon = (badged: boolean): (() => void) => {
       return made
     })()
 
-  link.href = flameUrl(badged)
+  const plain = apiRoutes.getInstallationIcon.path()
 
-  // Guarded, or a slow draw for the badged state lands after the cleanup that was
-  // meant to clear it and leaves a dot on a tab with nothing waiting.
+  link.href = plain
+  if (!badged) return () => undefined
+
+  // Guarded, or a slow draw lands after the cleanup that was meant to clear it and
+  // leaves a dot on a tab with nothing waiting.
   let live = true
-  void draw(badged).then((composed) => {
-    if (live && composed !== undefined) link.href = composed
-  })
+
+  void load(plain)
+    .then((image) => {
+      if (!live || image === undefined) return
+
+      const drawn = composeBadged(image, canvas())
+      if (drawn !== undefined) link.href = drawn
+    })
+    // `composeBadged` throws where it cannot return — `toDataURL` on a tainted
+    // canvas, `drawImage` refusing an image an engine will not decode. The tab keeps
+    // the plain icon either way; this is so it does that without an unhandled
+    // rejection, which nothing in this app is watching for.
+    .catch(() => undefined)
 
   return () => {
     live = false
-    link.href = flameUrl(false)
+    link.href = plain
   }
 }

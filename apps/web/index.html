@@ -14,8 +14,18 @@
       These three paths are also in `apiRoutes`, which is where the backend registers
       them from. A `<link>` cannot import it, so `shell.test.ts` reads this file and
       asserts the two spellings still agree.
+
+      The tab icon is declared here rather than only created by `favicon.ts`, so a
+      signed-out visitor gets it too — that code runs from the notification bell,
+      which only a signed-in member renders (#285). It carries no `type`, because the
+      upload decides that and nothing here decodes an image to find out which it was.
+
+      `id` is load-bearing: `favicon.ts` finds *this* element and rewrites its `href`.
+      A second `rel="icon"` would leave it to the browser which one wins, which is
+      how the first attempt at this came out doing nothing at all.
     -->
     <link rel="manifest" href="/manifest.webmanifest" />
+    <link id="app-favicon" rel="icon" href="/api/installation/icon" />
     <link rel="apple-touch-icon" href="/api/installation/icon" />
     <meta name="theme-color" content="#c2410c" />
   </head>

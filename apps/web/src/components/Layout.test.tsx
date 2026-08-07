@@ -72,9 +72,12 @@ describe('the nav', () => {
     expectLinks(['Members', 'Schedule', 'Leads', 'Your details'], ['Your burn'])
   })
 
-  it("leaves the corner's icons unlined, since neither of them is a word", () => {
+  it("gives the corner's icons one class, since neither of them is a word", () => {
     // The wheel wore the nav's underline while the face beside it did not. One class
     // for both, so a third icon in that corner cannot be added without it.
+    //
+    // The class, not the underline: happy-dom applies no CSS, so nothing here can
+    // pin `text-decoration: none` — the shared class is the half that is testable.
     renderNav(signedInAs('admin', 'member'))
 
     for (const label of ['Organise', 'Your details']) {
