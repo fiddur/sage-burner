@@ -49,8 +49,33 @@ export const MAX_ICON_BYTES = 512 * 1024
  * An emoji rather than an asset, so there is no file to ship, none to cache, and
  * no second image to redraw when the first changes.
  */
+/**
+ * The unseen-notification dot, in the icon's own square.
+ *
+ * Here rather than written into the SVG below, because it is drawn twice: as a
+ * `<circle>` on the flame, and onto a canvas when the tab wears an admin's uploaded
+ * icon instead (#285) — an SVG data URL cannot reference an external image to draw
+ * over, so that path composes the same dot itself. One set of numbers, or the two
+ * marks drift and only one of them is ever looked at.
+ *
+ * `box` is what the rest are relative to, so a canvas of any size scales them.
+ */
+export const notificationBadge = {
+  box: 64,
+  cx: 50,
+  cy: 16,
+  r: 13,
+  fill: '#dc2626',
+  stroke: '#fff',
+  strokeWidth: 3,
+} as const
+
 export const flameIcon = ({ badged = false }: { badged?: boolean } = {}): string =>
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">` +
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${notificationBadge.box} ${notificationBadge.box}">` +
   `<text y="52" font-size="52">🔥</text>` +
-  (badged ? `<circle cx="50" cy="16" r="13" fill="#dc2626" stroke="#fff" stroke-width="3"/>` : '') +
+  (badged
+    ? `<circle cx="${notificationBadge.cx}" cy="${notificationBadge.cy}" r="${notificationBadge.r}" ` +
+      `fill="${notificationBadge.fill}" stroke="${notificationBadge.stroke}" ` +
+      `stroke-width="${notificationBadge.strokeWidth}"/>`
+    : '') +
   `</svg>`

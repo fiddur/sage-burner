@@ -11,18 +11,12 @@
       here as a file, because it carries the installation's own name and its icon —
       both database rows an admin can change without a redeploy.
 
-      These four paths are also in `apiRoutes`, which is where the backend registers
+      These three paths are also in `apiRoutes`, which is where the backend registers
       them from. A `<link>` cannot import it, so `shell.test.ts` reads this file and
       asserts the two spellings still agree.
 
-      The tab icon is the same route as the home screen's (#285), and carries no
-      `type`: the upload decides that, and nothing in this process decodes an image to
-      find out which it was. The route answers with the app's own flame when nothing
-      has been uploaded, so this needs no fallback and no version — it is `no-cache`,
-      like the manifest, so a new icon shows up without a redeploy.
     -->
     <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="icon" href="/api/installation/icon" />
     <link rel="apple-touch-icon" href="/api/installation/icon" />
     <meta name="theme-color" content="#c2410c" />
   </head>
