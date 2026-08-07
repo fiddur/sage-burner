@@ -11,6 +11,10 @@ import type { JSX } from 'preact'
  * The wording stays the caller's. "Saving…", "Signing in…" and "Setting you up…" say
  * different things about how long to expect, and a shared "One moment…" would lose
  * that for nothing.
+ *
+ * `aria-busy` says the same thing the wording does, for the callers whose face is an
+ * emoji: the homepage's pen becomes an hourglass, which changes nothing a screen reader
+ * can read, and `disabled` alone does not say *why* it cannot be pressed.
  */
 export const PendingButton = ({
   busy,
@@ -23,7 +27,7 @@ export const PendingButton = ({
   label: string
   busyLabel: string
 } & Omit<JSX.IntrinsicElements['button'], 'children'>) => (
-  <button {...rest} disabled={busy || disabled === true}>
+  <button {...rest} disabled={busy || disabled === true} aria-busy={busy}>
     {busy ? busyLabel : label}
   </button>
 )

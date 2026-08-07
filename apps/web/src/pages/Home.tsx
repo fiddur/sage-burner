@@ -210,14 +210,18 @@ export const Home = ({ api }: { api: HomeApi }) => {
                 Edited where it is read: whoever spots a typo on the homepage is the
                 one likely to fix it. The burn's dates and cap stay admin-only and
                 are edited under Organise, which is why this is not a link to there.
+
+                A `PendingButton` rather than the `IconButton` the pen would suggest:
+                the editor opens after a read, and the hourglass is what says so.
               */}
               {isApproved(viewer) && (
                 <PendingButton
                   busy={opening}
-                  label="Edit this text"
-                  busyLabel="Opening…"
+                  label="✏️"
+                  busyLabel="⌛"
                   type="button"
                   class="link-button"
+                  aria-label="Edit this text"
                   onClick={() => void openEditor(openEvent.welcome_markdown)}
                 />
               )}

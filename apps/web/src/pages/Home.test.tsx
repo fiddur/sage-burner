@@ -348,11 +348,12 @@ describe('Home', () => {
       expect(updateWelcome).not.toHaveBeenCalled()
     })
 
-    it('says it is opening while the re-read is in flight', async () => {
+    it('shows the wait while the re-read is in flight', async () => {
       // The re-read is a round trip with nothing else changing on screen, so
       // without this the button appears to do nothing for as long as it takes —
       // the symptom `FormError` exists for, reintroduced by the fix for the stale
-      // draft.
+      // draft. The pen becomes an hourglass and the name stays, so the button is
+      // still findable by what it does rather than by what it is wearing.
       let release = (_value: { event: Event | null }) => {}
       const held = new Promise<{ event: Event | null }>((resolve) => {
         release = resolve
@@ -369,8 +370,12 @@ describe('Home', () => {
 
       fireEvent.click(await screen.findByRole('button', { name: 'Edit this text' }))
 
-      const opening = await screen.findByRole('button', { name: 'Opening…' })
+      const opening = await screen.findByRole('button', { name: 'Edit this text' })
+      await waitFor(() => expect(opening.textContent).toBe('⌛'))
       expect(opening.hasAttribute('disabled')).toBe(true)
+      // The glyph is the whole cue for anybody who can see it, so the wait is said out
+      // loud as well — `disabled` alone does not say why it cannot be pressed.
+      expect(opening.getAttribute('aria-busy')).toBe('true')
 
       release({ event: summer })
       expect(await screen.findByLabelText('Welcome text')).toBeTruthy()

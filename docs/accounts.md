@@ -942,7 +942,10 @@ spreadsheet default rather than being an oversight, and it is the same trust the
 lead-roles register assumes in #27.
 
 The welcome text is edited **on the homepage**, where it is read — whoever spots a
-typo is the one likely to fix it — through `PATCH /api/events/:id/welcome`. An admin
+typo is the one likely to fix it — through `PATCH /api/events/:id/welcome`. The way in
+is a ✏️ rather than a sentence: a text button under a paragraph, in the paragraph's own
+face, read as the last line of it. The meal plan's intro carries the same pen for the
+same reason. An admin
 can also edit it under Organise → Events, alongside the dates and the cap, which
 goes through the admin `PATCH` with everything else. That is
 a route of its own rather than a carve-out in the admin `PATCH`, and the reason is
