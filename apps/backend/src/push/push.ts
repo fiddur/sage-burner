@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 
 import type { Database } from '../db/index.ts'
 
-import { account, accountRole, installation, INSTALLATION_ID, pushSubscription } from '../db/schema.ts'
+import { installation, INSTALLATION_ID, pushSubscription } from '../db/schema.ts'
 
 /** What a browser hands over when it subscribes. */
 export interface Subscription {
@@ -182,19 +182,6 @@ const subscriptionColumns = {
   p256dh: pushSubscription.p256dh,
   auth: pushSubscription.auth,
 }
-
-/** Notify every admin who has opted in, on every browser they opted in from. */
-export const notifyAdmins = async (deps: PushDeps, payload: string): Promise<DeliveryCounts> =>
-  notifyRows(
-    deps,
-    await deps.db
-      .select(subscriptionColumns)
-      .from(pushSubscription)
-      .innerJoin(account, eq(account.id, pushSubscription.account_id))
-      .innerJoin(accountRole, eq(accountRole.account_id, account.id))
-      .where(eq(accountRole.role, 'admin')),
-    payload,
-  )
 
 /**
  * Notify one person, on every browser they opted in from.

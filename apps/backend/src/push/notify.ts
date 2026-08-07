@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto'
 import type { Database } from '../db/index.ts'
 import type { DeliveryCounts, PushDeps } from './push.ts'
 
-import { account, attendance, notification, notificationSetting } from '../db/schema.ts'
+import { account, accountRole, attendance, notification, notificationSetting } from '../db/schema.ts'
 import { notifyAccount } from './push.ts'
 
 /** What a route says happened. The wording and the page it belongs to. */
@@ -32,24 +32,11 @@ export type EmailChannel = (accountId: string, told: Told) => Promise<unknown>
 /**
  * What a push carries, and the one place it is built (#279).
  *
- * There are two senders and they had drifted. `recordAndPush` below covers everything
- * that is also a bell row; the applications callback in `app.ts` is neither a row nor
- * a setting — it predates both — and went on sending a body alone. That was invisible
- * while the worker had a page written into it, and became the one notification going
- * nowhere the moment it stopped.
- *
- * `category` is optional for exactly that sender. It is what a notification collapses
- * with, and one that has no category collapses with the others that have none — which
- * today is only itself, and is the behaviour the applications push always had.
+ * The whole of what was told, which is the same thing the bell row holds — there is
+ * one sender now that the applications push writes a row like everything else (#326),
+ * so a push cannot carry less than the row it copies.
  */
-export interface Pushed {
-  body: string
-  /** A path in this app. Null for anything with no page of its own. */
-  link: string | null
-  category?: NotificationCategory
-}
-
-export const pushPayload = ({ body, link, category }: Pushed): string =>
+export const pushPayload = ({ body, link, category }: Told): string =>
   JSON.stringify({ body, link, category })
 
 /** Which ways this person wants to hear about one category. */
@@ -233,6 +220,28 @@ export const notifyAttendees = async (
   }
 
   return told_count
+}
+
+/**
+ * Tell every admin about something they look after (#326).
+ *
+ * An application is the one thing notified about that is nobody's personally and not a
+ * burn's either: it is a job waiting for whoever reviews applications. The category is
+ * `about: 'admin'`, so only an admin is offered the switch — and it is on by default,
+ * because an application nobody sees leaves the applicant waiting.
+ *
+ * Every admin account, not every subscribed admin: the row is the point, and a push is
+ * a copy of it. An installation with nobody subscribed still fills the bell.
+ */
+export const notifyAdmins = async (db: Database, notify: Notifier, told: Told): Promise<number> => {
+  const rows = await db
+    .select({ account_id: accountRole.account_id })
+    .from(accountRole)
+    .where(eq(accountRole.role, 'admin'))
+
+  for (const row of rows) await notify(row.account_id, told)
+
+  return rows.length
 }
 
 /**

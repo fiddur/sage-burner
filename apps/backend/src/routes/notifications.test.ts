@@ -207,7 +207,14 @@ describe('the bell', () => {
 })
 
 describe('what somebody has switched on', () => {
-  /** The six that are on unless somebody says otherwise. */
+  /**
+   * The ones that are on unless somebody says otherwise.
+   *
+   * `application` is among them for every account, admin or not — the settings are
+   * per account and know nothing about roles, and only an admin is ever *told*. The
+   * web hides the switch from anybody else rather than the wire pretending it is off
+   * (#326).
+   */
   const DEFAULTS = [
     'meal_role',
     'dream_role',
@@ -215,6 +222,7 @@ describe('what somebody has switched on', () => {
     'payment',
     'waiting_list_near',
     'waiting_list_pushed',
+    'application',
   ]
 
   const setOn = (server: FastifyInstance, cookie: string, on: string[], email: string[] = []) =>

@@ -1,4 +1,9 @@
-import type { ApplicationDecisionResponse, ApplicationsResponse, InviteResponse } from '@sage-burner/shared'
+import type {
+  ApplicationDecisionResponse,
+  ApplicationsResponse,
+  InviteDelivery,
+  InviteResponse,
+} from '@sage-burner/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
 import { apiRoutes, looksLikeEmail } from '@sage-burner/shared'
@@ -14,7 +19,7 @@ import { whyNothingWritten } from '../db/refusals.ts'
 import { application, INSTALLATION_ID, installation, inviteToken } from '../db/schema.ts'
 import { noStore, sendError } from '../http.ts'
 import { defaultExpiry, mintToken } from '../invites.ts'
-import { post } from '../mail/mail.ts'
+import { NO_ORIGIN, post } from '../mail/mail.ts'
 import { inviteMessage } from '../mail/messages.ts'
 import { originOf } from '../shell.ts'
 
@@ -47,6 +52,12 @@ export const registerApplicationReviewRoutes = (
    * response either way, and pasting it into Discord is how this worked before there
    * was a mail server to configure.
    *
+   * **The answer goes back to the admin** (#327), which is the whole of what was wrong
+   * here: the outcome went to the log and the page said "Send this link" whichever way
+   * it had gone. Both directions were wrong — a link sent twice by two people, or a
+   * send that failed on a TLS misconfiguration and nobody the wiser. `null` is nothing
+   * attempted, which needs different words from a refusal.
+   *
    * Awaited, and never throws: `post` answers with the reason instead, and a
    * refusal is logged rather than turned into a failed approval. Bounded by the
    * client's own timeouts, so an unreachable server cannot hang the request.
@@ -56,11 +67,16 @@ export const registerApplicationReviewRoutes = (
     settled: { applicant_email: string; applicant_name: string },
     token: string,
     expires_at: string,
-  ) => {
-    if (!looksLikeEmail(settled.applicant_email)) return
+  ): Promise<InviteDelivery> => {
+    if (!looksLikeEmail(settled.applicant_email)) return null
 
     const origin = originOf(request, config)
-    if (origin === undefined) return
+    // Nothing to put in the message: the link has to be absolute to be clickable in an
+    // inbox, and this installation cannot say where it lives. A reason rather than
+    // silence — it is the admin's to fix, in `PUBLIC_ORIGIN`.
+    if (origin === undefined) {
+      return { sent: false, to: settled.applicant_email, reason: NO_ORIGIN }
+    }
 
     const [named] = await db
       .select({ title: installation.title })
@@ -80,6 +96,8 @@ export const registerApplicationReviewRoutes = (
     )
 
     if (!posted.sent) app.log.warn({ reason: posted.reason }, 'posting an invite')
+
+    return { ...posted, to: settled.applicant_email }
   }
 
   app.get(apiRoutes.getApplications.fastify, async (_request, reply) => {
@@ -146,15 +164,16 @@ export const registerApplicationReviewRoutes = (
 
       // After the transaction, and never inside it: the invite is committed by the
       // time this runs, so a mail server that is down costs a message rather than an
-      // approval. The link the admin sees is still the one that matters — this is a
-      // convenience, which is why nothing about the answer changes when it fails.
-      if (minted !== undefined) {
-        await postInvite(request, settled, minted.token, expires_at)
-      }
+      // approval. The link the admin sees is still the one that matters, and it is
+      // shown whether or not the message got out — a bounce is invisible to this app.
+      // What the outcome changes is only the words beside it (#327).
+      const delivery =
+        minted === undefined ? null : await postInvite(request, settled, minted.token, expires_at)
 
       return {
         application: settled,
         invite: minted === undefined ? null : { token: minted.token, expires_at },
+        delivery,
       } satisfies ApplicationDecisionResponse
     }
 
@@ -247,8 +266,9 @@ export const registerApplicationReviewRoutes = (
     // Posted here as well as on approval, which is the case this route exists for: a
     // link that was lost. An address that has not changed gets the new one where the
     // first went, and the admin still has it in the response either way.
-    if (applicant !== undefined) await postInvite(request, applicant, minted.token, expires_at)
+    const delivery =
+      applicant === undefined ? null : await postInvite(request, applicant, minted.token, expires_at)
 
-    return { invite: { token: minted.token, expires_at } } satisfies InviteResponse
+    return { invite: { token: minted.token, expires_at }, delivery } satisfies InviteResponse
   })
 }

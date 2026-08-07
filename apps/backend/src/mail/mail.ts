@@ -60,6 +60,15 @@ export interface Posted {
 /** Nobody has set an SMTP server up, which is the ordinary state. */
 export const NOT_CONFIGURED = 'No mail server has been set up.'
 
+/**
+ * The installation cannot say where it lives, so a link in a message would be relative.
+ *
+ * Only reachable for a request whose `Host` is not hostname-shaped — `PUBLIC_ORIGIN`
+ * wins when it is set, and `originOf` falls back to `Host`. Said out loud rather than
+ * skipped in silence, which is how an invite went missing (#327).
+ */
+export const NO_ORIGIN = 'This installation does not know its own address. Set PUBLIC_ORIGIN.'
+
 export const mailSettingsFor = async (db: Database) => {
   const [row] = await db.select().from(mailSetting).where(eq(mailSetting.id, INSTALLATION_ID)).limit(1)
 
