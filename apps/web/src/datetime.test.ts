@@ -81,13 +81,28 @@ describe('the day a feed line happened', () => {
     // 22:00 UTC on the 3rd is midnight on the 4th in Stockholm, so `iso.slice(0, 10)`
     // would say the 3rd — the shortcut `localDay` exists to avoid. Only a test in a zone
     // ahead of UTC can say so, which is what `vite.config.ts` pins the suite to.
-    expect(localDay('2026-10-03T22:00:00.000Z')).toBe('4 Oct')
-    expect(localDay('2026-10-03T21:00:00.000Z')).toBe('3 Oct')
+    const thatYear = new Date('2026-06-01T12:00:00.000Z')
+
+    expect(localDay('2026-10-03T22:00:00.000Z', thatYear)).toBe('4 Oct')
+    expect(localDay('2026-10-03T21:00:00.000Z', thatYear)).toBe('3 Oct')
   })
 
   it('crosses a month, and a year, the same way', () => {
-    expect(localDay('2026-10-31T23:00:00.000Z')).toBe('1 Nov')
-    expect(localDay('2026-12-31T23:30:00.000Z')).toBe('1 Jan')
+    const inThatYear = new Date('2026-11-01T12:00:00.000Z')
+
+    expect(localDay('2026-10-31T23:00:00.000Z', inThatYear)).toBe('1 Nov')
+    // Local midnight on New Year's Eve is already 1 January, and 2027 — which the
+    // reader is not standing in, so it says so.
+    expect(localDay('2026-12-31T23:30:00.000Z', inThatYear)).toBe('1 Jan 2027')
+  })
+
+  it('names the year only when it is not the one the reader is in', () => {
+    // The page reading this spans burns, so a line from last autumn needs placing —
+    // and a year on every line of this week's would be noise.
+    const now = new Date('2026-08-07T12:00:00.000Z')
+
+    expect(localDay('2026-08-07T18:00:00.000Z', now)).toBe('7 Aug')
+    expect(localDay('2025-10-03T18:00:00.000Z', now)).toBe('3 Oct 2025')
   })
 
   it('gives back what it was handed when that is not a date', () => {

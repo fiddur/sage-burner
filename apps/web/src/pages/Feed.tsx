@@ -68,8 +68,8 @@ export const Feed = ({ api }: { api: FeedApi }) => {
       </h1>
 
       <p class="form-note">
-        What people have been doing, newest first. Tap what a line is about to be told about the next one —
-        that is the same switch as the one on <a href="/profile">your details</a>.
+        What people have been doing, newest first. Tap what a line is about to be told about the next one at a
+        burn you are coming to — the same switch as the one on <a href="/profile">your details</a>.
       </p>
 
       <ErrorText message={error} />

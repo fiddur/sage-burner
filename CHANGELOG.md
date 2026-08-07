@@ -9,6 +9,10 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-07
 
+- **Going on — a page of what everyone has been doing.** A dream offered, somebody
+  saying they are coming, a lead role taken. Across burns, so it has something to say
+  in the quiet between them, and each line carries what kind of thing it is: tap that
+  to be told about the next one without going looking for the setting.
 - **A page saying what's new.** This one — reached from the "a new version is out"
   notification, which until now led nowhere at all, and from the bar that offers a
   reload when the app has been redeployed under you.
@@ -26,7 +30,7 @@ under today's heading, and make a new heading when there is none.
   not. It used to say "send this link" either way, so a link went out twice or not at
   all.
 - **The lead-roles register is one table on a phone**, scrolling sideways with the
-  role's name held still, and the effort icons have a legend under it.
+  role's name held still, and the effort icons have a legend above it.
 - **A shared link draws a card** with the burn's name, its dates and a picture.
 - **The app offers to install itself** where the browser allows it.
 - **Names carry faces** wherever people are listed.

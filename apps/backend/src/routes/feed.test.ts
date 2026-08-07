@@ -222,8 +222,10 @@ describe('the feed', () => {
     const ada = await givenAccount('Ada')
     await givenComing(ada.id)
     // Written in the opposite order to their ids, which is what makes this reject the
-    // tie-break's removal: without it SQLite answers in rowid order, which here is the
-    // order they were written rather than the order the ids ask for.
+    // tie-break's removal. What answers without it is a reverse scan of
+    // `activity_recent_idx`, where equal `created_at` keys come back rowid-descending —
+    // so the two orders differ only when the ids run against the writing order. Measured
+    // by removing `desc(activity.id)` and watching this fail, not reasoned out.
     await givenLine('One', NOW, BURN, 'a0000000-0000-4000-8000-000000000003')
     await givenLine('Two', NOW, BURN, 'a0000000-0000-4000-8000-000000000002')
     await givenLine('Three', NOW, BURN, 'a0000000-0000-4000-8000-000000000001')

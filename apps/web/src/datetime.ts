@@ -66,14 +66,22 @@ export const shortDayOf = (iso: string): string | undefined => {
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const
 
 /**
- * `7 Aug` — an instant as the day it happened, in the reader's own zone.
+ * `7 Aug` — an instant as the day it happened, in the reader's own zone. `7 Aug 2025`
+ * when that was another year.
  *
  * Local rather than the ISO string's first ten characters, which is the shortcut that
  * shows the previous day to anybody whose evening is the next day in UTC.
+ *
+ * The year only where it is needed, because the one page reading this spans burns: a
+ * line from last autumn reading "7 Aug" has nothing to place it, and a year on every
+ * line of this week's would be noise. `today` is a parameter so a test can say which
+ * year it is standing in.
  */
-export const localDay = (iso: string): string => {
+export const localDay = (iso: string, today: Date = new Date()): string => {
   const at = new Date(iso)
   if (Number.isNaN(at.getTime())) return iso
 
-  return `${at.getDate()} ${MONTHS[at.getMonth()] ?? ''}`.trim()
+  const year = at.getFullYear() === today.getFullYear() ? '' : ` ${at.getFullYear()}`
+
+  return `${at.getDate()} ${MONTHS[at.getMonth()] ?? ''}${year}`.trim()
 }
