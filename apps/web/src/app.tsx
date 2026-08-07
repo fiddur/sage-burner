@@ -3,10 +3,12 @@ import { useMemo } from 'preact/hooks'
 
 import type { ApiClient } from './api/client.ts'
 import type { BellApi } from './components/NotificationBell.tsx'
+import type { InstallWatch } from './install.ts'
 import type { Viewer } from './viewer.tsx'
 
 import { createApiClient } from './api/client.ts'
 import { FetchedBurnProvider } from './burn.tsx'
+import { InstallApp } from './components/InstallApp.tsx'
 import { Layout } from './components/Layout.tsx'
 import { NewVersion } from './components/NewVersion.tsx'
 import { RouteOnMessage } from './components/RouteOnMessage.tsx'
@@ -247,7 +249,25 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
  * flag, because "fetch unless told otherwise" is the kind of conditional that
  * ends up fetching in a test suite.
  */
-export const App = ({ viewer, title, api }: { viewer?: Viewer; title?: string; api?: AppApi }) => {
+export const App = ({
+  viewer,
+  title,
+  api,
+  installs = null,
+}: {
+  viewer?: Viewer
+  title?: string
+  api?: AppApi
+  /**
+   * The install offer, watched from before the first render (#281).
+   *
+   * Built in `main.tsx` rather than here, because `beforeinstallprompt` fires once
+   * and can do so before any effect has run — a listener attached on mount would
+   * miss it and the button would never appear. `null` in every test that does not
+   * ask for one.
+   */
+  installs?: InstallWatch | null
+}) => {
   // Not a default parameter. `api = createApiClient()` builds a fresh client on
   // every render of `App`, and that identity is load-bearing twice over: it is
   // the `useEffect` dependency in `FetchedViewerProvider`, so a new one aborts
@@ -286,6 +306,7 @@ export const App = ({ viewer, title, api }: { viewer?: Viewer; title?: string; a
         {/* Above the page rather than in the layout's chrome: both are about the tab,
             not about the burn, and have to survive whatever route is open. */}
         <NewVersion api={client} />
+        <InstallApp watch={installs} />
         <StaleData freshness={freshness} />
         <Routes api={client} />
       </Layout>
