@@ -58,12 +58,15 @@ const EFFORT_LABEL: Record<EffortLevel, string> = {
 }
 
 /**
- * How many of the three segments a level fills. `none` fills none, and says so.
+ * How many segments a level fills, and how many there are to fill.
  *
- * `effortLevels` is already in that order, so its index *is* the count — a record
- * writing the numbers out again is one more thing to keep in step with the vocabulary.
+ * Both from `effortLevels`, which is in order: the index *is* the count, and `none`
+ * fills none. A record of numbers and a hardcoded `[0, 1, 2]` were each one more thing
+ * to keep in step with the vocabulary — a fifth level would have filled four of three.
  */
 const segmentsFor = (level: EffortLevel): number => effortLevels.indexOf(level)
+
+const SEGMENTS = effortLevels.slice(1).map((_level, index) => index)
 
 /**
  * The three phases of a burn, as one cell (#307).
@@ -92,7 +95,14 @@ const HEADINGS = ['Title', 'Purpose', 'Who', 'Tasks include', 'Effort'] as const
 /** The two halves of `Who`, which the column header can no longer tell apart. */
 const WHO = { lead: 'Lead', team: 'Team' } as const
 
-/** What the icons in the `Effort` column mean, since a phone has no hover (#317). */
+/**
+ * What the icons in the `Effort` column mean, above the table (#317).
+ *
+ * The only one of the three ways they are labelled that a sighted touch user gets:
+ * `title` needs a pointer and `.visually-hidden` needs a screen reader, so on the device
+ * the compaction was for, 🌱🔥🧹 sat under a heading reading only "Effort". Above the
+ * scrolling wrapper rather than inside it, or it slides out of view with the table.
+ */
 const EFFORT_LEGEND = PHASES.map((phase) => `${phase.icon} ${phase.label}`).join(' · ')
 
 const Effort = ({ role }: { role: LeadRole }) => (
@@ -105,7 +115,7 @@ const Effort = ({ role }: { role: LeadRole }) => (
         <span class="effort" key={phase.key} title={said}>
           <span aria-hidden="true">{phase.icon}</span>
           <span class="effort-bar" aria-hidden="true">
-            {[0, 1, 2].map((segment) => (
+            {SEGMENTS.map((segment) => (
               <span key={segment} class={segment < segmentsFor(level) ? 'is-on' : undefined} />
             ))}
           </span>
@@ -190,70 +200,68 @@ export const Roles = ({ api }: { api: RolesApi }) => {
       )}
 
       {ready !== undefined && ready.roles.length > 0 && (
-        <div class="lead-table-wrap">
-          {/* The icons say nothing on a phone without it: `title` needs a hover and
-              `.visually-hidden` needs a screen reader, so a sighted touch user — the
-              case #307 exists for — had 🌱🔥🧹 under a heading reading only "Effort"
-              (#317). */}
+        <>
           <p class="form-note lead-effort-legend">Effort: {EFFORT_LEGEND}</p>
-          <table class="lead-table">
-            <thead>
-              <tr>
-                {HEADINGS.map((heading) => (
-                  <th key={heading} scope="col">
-                    {heading}
+          <div class="lead-table-wrap">
+            <table class="lead-table">
+              <thead>
+                <tr>
+                  {HEADINGS.map((heading) => (
+                    <th key={heading} scope="col">
+                      {heading}
+                    </th>
+                  ))}
+                  <th scope="col">
+                    <span class="visually-hidden">Actions</span>
                   </th>
-                ))}
-                <th scope="col">
-                  <span class="visually-hidden">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {ready.roles.map((role) =>
-                editing === role.id ? (
-                  <tr key={role.id}>
-                    <td colSpan={HEADINGS.length + 1}>
-                      <RoleFields
-                        role={role}
-                        busy={busy}
-                        onCancel={() => setEditing(undefined)}
-                        onSave={(changes) =>
-                          run(async () => {
-                            await api.updateLeadRole(role.id, changes)
-                            setEditing(undefined)
-                          }, 'Could not save that.')
-                        }
-                      />
-                    </td>
-                  </tr>
-                ) : (
-                  <RoleRow
-                    key={role.id}
-                    role={role}
-                    attendees={ready.attendees}
-                    viewerId={viewer.account?.id}
-                    busy={busy}
-                    onEdit={() => setEditing(role.id)}
-                    onRemove={() => run(() => api.deleteLeadRole(role.id), 'Could not remove that role.')}
-                    onLead={(accountId) =>
-                      run(() => api.setLeadRoleLead(role.id, accountId), 'Could not change the lead.')
-                    }
-                    onJoin={(accountId) =>
-                      run(() => api.joinLeadRoleTeam(role.id, accountId), 'Could not add them to the team.')
-                    }
-                    onLeave={(accountId) =>
-                      run(
-                        () => api.leaveLeadRoleTeam(role.id, accountId),
-                        'Could not take them off the team.',
-                      )
-                    }
-                  />
-                ),
-              )}
-            </tbody>
-          </table>
-        </div>
+                </tr>
+              </thead>
+              <tbody>
+                {ready.roles.map((role) =>
+                  editing === role.id ? (
+                    <tr key={role.id}>
+                      <td colSpan={HEADINGS.length + 1}>
+                        <RoleFields
+                          role={role}
+                          busy={busy}
+                          onCancel={() => setEditing(undefined)}
+                          onSave={(changes) =>
+                            run(async () => {
+                              await api.updateLeadRole(role.id, changes)
+                              setEditing(undefined)
+                            }, 'Could not save that.')
+                          }
+                        />
+                      </td>
+                    </tr>
+                  ) : (
+                    <RoleRow
+                      key={role.id}
+                      role={role}
+                      attendees={ready.attendees}
+                      viewerId={viewer.account?.id}
+                      busy={busy}
+                      onEdit={() => setEditing(role.id)}
+                      onRemove={() => run(() => api.deleteLeadRole(role.id), 'Could not remove that role.')}
+                      onLead={(accountId) =>
+                        run(() => api.setLeadRoleLead(role.id, accountId), 'Could not change the lead.')
+                      }
+                      onJoin={(accountId) =>
+                        run(() => api.joinLeadRoleTeam(role.id, accountId), 'Could not add them to the team.')
+                      }
+                      onLeave={(accountId) =>
+                        run(
+                          () => api.leaveLeadRoleTeam(role.id, accountId),
+                          'Could not take them off the team.',
+                        )
+                      }
+                    />
+                  ),
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       {ready !== undefined && (

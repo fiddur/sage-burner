@@ -16,16 +16,19 @@ afterEach(cleanup)
  * has been signed into.
  */
 const stub = (over: Partial<ChangelogApi> = {}): ChangelogApi => ({
-  getChangelog: () => Promise.resolve({ markdown: '## 2026-08-07\n\n- A Q&A per burn.\n' }),
+  getChangelog: () => Promise.resolve({ markdown: '# 2026-08-07\n\n- A Q&A per burn.\n' }),
   ...over,
 })
 
 describe('the changelog', () => {
-  it('renders what the server sent as markdown', async () => {
+  it('renders what the server sent as markdown, under a heading of its own', async () => {
+    // The page owns the `<h1>`: `renderMarkdown` shifts the file's headings down one, so
+    // a page taking its only heading from the file would start at `<h2>`.
     render(<Changelog api={stub()} />)
 
-    expect(await screen.findByText('2026-08-07')).toBeTruthy()
-    expect(screen.getByText('A Q&A per burn.')).toBeTruthy()
+    expect(await screen.findByText('A Q&A per burn.')).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe("What's new")
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('2026-08-07')
   })
 
   it('escapes html rather than rendering it', async () => {

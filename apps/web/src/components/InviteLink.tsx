@@ -24,9 +24,12 @@ const deliveryNote = (delivery: InviteDelivery) => {
   if (delivery === null) return 'Send this link — it is shown once and cannot be recovered afterwards.'
   if (delivery.sent) return `Emailed to ${delivery.to}. The link is here too, shown once.`
 
-  const why = delivery.reason ?? 'the mail server refused it'
-
-  return `Not sent — ${why}. Send this link: it is shown once and cannot be recovered afterwards.`
+  // The reason goes last and nothing is appended to it. Most are already a sentence —
+  // "No mail server has been set up.", "Set PUBLIC_ORIGIN." — so a full stop of our own
+  // read as "up.. Send this link", while a raw driver message arrives without one and
+  // needs no stop at the end of a line. Putting it after the instruction is what makes
+  // both read: the admin's job first, the server's words quoted after it.
+  return `Not emailed. Send this link — it is shown once and cannot be recovered afterwards. Why: ${delivery.reason ?? 'the mail server refused it.'}`
 }
 
 export const InviteLink = ({

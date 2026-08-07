@@ -369,7 +369,7 @@ export const registerSessionRoutes = (
           body: `${await displayName(db, viewer.account_id)} offered a dream: ${row.title}`,
           link: '/dreams',
         },
-        { except: [viewer.account_id] },
+        { except: [viewer.account_id], at: now() },
       )
 
       // Built from what was written rather than read back: a new dream has nobody

@@ -80,7 +80,7 @@ describe('GET /api/changelog', () => {
     await build()
 
     expect((await app.inject({ method: 'GET', url: '/api/changelog' })).json().markdown).toContain(
-      '## 2026-08-07',
+      '# 2026-08-07',
     )
   })
 })

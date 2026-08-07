@@ -23,27 +23,22 @@ export const Changelog = ({ api }: { api: ChangelogApi }) => {
 
   return (
     <section class="page prose">
+      {/* The page's own, in every state, which is why the file has no title of its own:
+          `renderMarkdown` shifts a `#` down a level so member-authored content cannot
+          compete with a page heading, and a page whose only heading came from the file
+          would have started at `<h2>`. The file's date sections are `#`, landing here. */}
+      <h1>What's new</h1>
+
       {loaded.status === 'loading' && <p class="form-note">One moment…</p>}
 
-      {loaded.status === 'failed' && (
-        <>
-          <h1>What's new</h1>
-          <ErrorText message={loaded.message} />
-        </>
-      )}
+      {loaded.status === 'failed' && <ErrorText message={loaded.message} />}
 
       {loaded.status === 'ready' &&
         (loaded.data.markdown.trim() === '' ? (
-          <>
-            <h1>What's new</h1>
-            {/* An installation built without the file, rather than an error: the
-                notification that sends people here must land on something. */}
-            <p class="form-note">Nothing is written down for this version.</p>
-          </>
+          // An installation built without the file, rather than an error: the
+          // notification that sends people here must land on something.
+          <p class="form-note">Nothing is written down for this version.</p>
         ) : (
-          // The heading comes from the file, which is why this page has none of its
-          // own. Written by whoever deploys the app, and rendered through the same
-          // escaping every other markdown field uses.
           <div
             class="markdown-preview"
             dangerouslySetInnerHTML={{ __html: renderMarkdown(loaded.data.markdown) }}

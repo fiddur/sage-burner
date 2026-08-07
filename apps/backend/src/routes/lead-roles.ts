@@ -217,7 +217,7 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
         notify,
         fields.event_id,
         { category: 'lead_role_added', body: `A new lead role: ${fields.title}`, link: '/roles' },
-        { except: [await callerId(request)] },
+        { except: [await callerId(request)], at: now() },
       )
 
       // Built from what was written rather than read back: a new role is vacant and
@@ -348,7 +348,7 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
           },
           // The appointee too: they already have the personal "You are now …", and
           // hearing about themselves twice is how a channel stops being read (#270).
-          { except: [by, body.account_id] },
+          { except: [by, body.account_id], at: now() },
         )
       }
 

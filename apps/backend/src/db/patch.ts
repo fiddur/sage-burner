@@ -1,13 +1,9 @@
 /**
- * The PATCH ritual, once.
+ * The PATCH ritual, once (#140).
  *
- * Seven routes wrote out the same three steps, near-identical paragraphs of comment
- * included (#140): an empty patch never reaches the `UPDATE`, a non-empty one writes
- * with `.returning()`, and no row back means either the row is gone or a condition in
- * the `WHERE` said no — which are different answers.
- *
- * Beside `refusals.ts`, which is the third step on its own, and `ordered.ts`, which is
- * the same idea for the two writes that keep a list in an order.
+ * An empty patch never reaches the `UPDATE`, a non-empty one writes and asks what it
+ * matched, and no row back means either the row is gone or a condition in the `WHERE`
+ * said no — which are different answers.
  */
 
 import type { InferInsertModel, SQL } from 'drizzle-orm'
@@ -26,9 +22,10 @@ import { whyNothingWritten } from './refusals.ts'
  * honest answer. An unrecognised key is already a 400 from `.strict()`, which is why
  * `{}` is the only body left that changes nothing.
  *
- * `patchRow` applies this itself. It is exported for the two writes that cannot use
- * `patchRow` — one skips the statement inside a transaction, the other re-reads a
- * singleton row afterwards — so that the rule is still stated in one place.
+ * `patchRow` applies this itself, and it is exported because six call sites need the
+ * rule on its own: three writes cannot use `patchRow` at all — two inside a transaction
+ * they own, one re-reading a singleton — and three that do use it answer the empty body
+ * before a precondition check.
  */
 export const isEmptyPatch = (patch: object): boolean => Object.keys(patch).length === 0
 
