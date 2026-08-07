@@ -13,6 +13,7 @@ import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
 import { useSetInstallationSendsEmail } from '../installation.tsx'
+import { ErrorText } from './ErrorText.tsx'
 import { FormError, useFormError } from './FormError.tsx'
 
 export type MailApi = Pick<
@@ -113,9 +114,7 @@ export const MailField = ({ api }: { api: MailApi }) => {
       <section>
         <h2>Email</h2>
         {loadFailed ? (
-          <p class="form-error" role="alert">
-            Could not load the mail settings. Please reload the page.
-          </p>
+          <ErrorText message="Could not load the mail settings. Please reload the page." />
         ) : (
           <p class="form-note">Loading…</p>
         )}

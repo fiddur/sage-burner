@@ -172,11 +172,7 @@ export const QuestionEditor = ({ api }: { api: QuestionsApi }) => {
   if (loaded.status === 'loading') return <p class="form-note">Loading questions…</p>
 
   if (loaded.status === 'failed') {
-    return (
-      <p class="form-error" role="alert">
-        {loaded.message}
-      </p>
-    )
+    return <ErrorText message={loaded.message} />
   }
 
   return (

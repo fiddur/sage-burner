@@ -7,6 +7,7 @@ import type { ApiClient } from '../api/client.ts'
 import type { StayDraft } from '../stay.ts'
 
 import { isApiError } from '../api/client.ts'
+import { ErrorText } from '../components/ErrorText.tsx'
 import { FormError, useFormError } from '../components/FormError.tsx'
 import { StayFields } from '../components/StayFields.tsx'
 import { stayForBurn, stayProblem, stayUpdate } from '../stay.ts'
@@ -105,11 +106,7 @@ const OpenBurnOffer = ({ api, burn }: { api: Pick<InviteApi, 'joinEvent'>; burn:
 
   return (
     <>
-      {failed && (
-        <p class="form-error" role="alert">
-          Could not add you to that burn. You can join it from your own page.
-        </p>
-      )}
+      {failed && <ErrorText message="Could not add you to that burn. You can join it from your own page." />}
 
       <p>
         <button type="button" disabled={adding} onClick={() => void join()}>
@@ -302,9 +299,7 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
     return (
       <section class="page">
         <h1>Your invitation</h1>
-        <p class="form-error" role="alert">
-          Could not check this invitation. Please reload the page.
-        </p>
+        <ErrorText message="Could not check this invitation. Please reload the page." />
       </section>
     )
   }
@@ -322,9 +317,7 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
     return (
       <section class="page">
         <h1>Your invitation</h1>
-        <p class="form-error" role="alert">
-          {explanation}
-        </p>
+        <ErrorText message={explanation} />
         <p class="home-actions">
           <a href="/login">Log in</a>
           <a href="/">Start page</a>

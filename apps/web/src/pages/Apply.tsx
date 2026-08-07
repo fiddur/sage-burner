@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
+import { ErrorText } from '../components/ErrorText.tsx'
 import { FormError, useFormError } from '../components/FormError.tsx'
 import { useInstallationSendsEmail } from '../installation.tsx'
 import { renderMarkdown } from '../markdown.ts'
@@ -202,11 +203,7 @@ export const Apply = ({ api }: ApplyProps) => {
           void submit()
         }}
       >
-        {loadFailed && (
-          <p class="form-error" role="alert">
-            Could not load the questions. Please reload the page.
-          </p>
-        )}
+        {loadFailed && <ErrorText message="Could not load the questions. Please reload the page." />}
 
         <label class="field">
           <span>Your name</span>
@@ -224,11 +221,14 @@ export const Apply = ({ api }: ApplyProps) => {
           />
         </label>
         {hasProblem(identityProblems, 'applicant_name') && (
-          <p class="form-error" role="alert" id="applicant_name-error">
-            {identityProblems.includes('applicant_name:too_long')
-              ? `Please keep this under ${MAX_APPLICANT_NAME_LENGTH} characters.`
-              : 'Please tell us your name.'}
-          </p>
+          <ErrorText
+            id="applicant_name-error"
+            message={
+              identityProblems.includes('applicant_name:too_long')
+                ? `Please keep this under ${MAX_APPLICANT_NAME_LENGTH} characters.`
+                : 'Please tell us your name.'
+            }
+          />
         )}
 
         <label class="field">
@@ -250,13 +250,16 @@ export const Apply = ({ api }: ApplyProps) => {
           />
         </label>
         {hasProblem(identityProblems, 'applicant_email') && (
-          <p class="form-error" role="alert" id="applicant_email-error">
-            {identityProblems.includes('applicant_email:too_long')
-              ? `Please keep this under ${MAX_APPLICANT_EMAIL_LENGTH} characters.`
-              : identityProblems.includes('applicant_email:malformed')
-                ? 'That does not look like an email address.'
-                : 'Please give us an email address — it is where your invite would go.'}
-          </p>
+          <ErrorText
+            id="applicant_email-error"
+            message={
+              identityProblems.includes('applicant_email:too_long')
+                ? `Please keep this under ${MAX_APPLICANT_EMAIL_LENGTH} characters.`
+                : identityProblems.includes('applicant_email:malformed')
+                  ? 'That does not look like an email address.'
+                  : 'Please give us an email address — it is where your invite would go.'
+            }
+          />
         )}
 
         {questions?.length === 0 && (
@@ -334,11 +337,7 @@ export const Apply = ({ api }: ApplyProps) => {
                 />
               )}
 
-              {problem !== undefined && (
-                <p class="form-error" role="alert" id={errorId}>
-                  {problemText(problem.reason)}
-                </p>
-              )}
+              {problem !== undefined && <ErrorText id={errorId} message={problemText(problem.reason)} />}
             </div>
           )
         })}

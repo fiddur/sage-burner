@@ -86,9 +86,7 @@ export const AdminSettings = ({ api }: { api: AdminSettingsApi }) => {
       {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
 
       {loaded.status === 'failed' && (
-        <p class="form-error" role="alert">
-          Could not load the settings. Please reload the page.
-        </p>
+        <ErrorText message="Could not load the settings. Please reload the page." />
       )}
 
       {loaded.status === 'ready' && (

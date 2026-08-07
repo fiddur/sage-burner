@@ -322,11 +322,7 @@ const PlaceFields = ({
 const Notice = ({ loaded }: { loaded: Loaded<Grid> }) => {
   if (loaded.status === 'loading') return <p class="form-note">Loading…</p>
   if (loaded.status === 'failed') {
-    return (
-      <p class="form-error" role="alert">
-        {loaded.message}
-      </p>
-    )
+    return <ErrorText message={loaded.message} />
   }
   if (loaded.data === null) {
     return <NoBurn absent="there is no grid to lay out" />

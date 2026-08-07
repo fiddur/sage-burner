@@ -10,6 +10,7 @@ import type { YourBurnsApi } from '../components/YourBurns.tsx'
 
 import { isApiError } from '../api/client.ts'
 import { AvatarField } from '../components/AvatarField.tsx'
+import { ErrorText } from '../components/ErrorText.tsx'
 import { FormError, useFormError } from '../components/FormError.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { LogOutButton } from '../components/LogOutButton.tsx'
@@ -109,9 +110,7 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
       {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
 
       {loaded.status === 'failed' && (
-        <p class="form-error" role="alert">
-          Could not load your details. Please reload the page.
-        </p>
+        <ErrorText message="Could not load your details. Please reload the page." />
       )}
 
       {loaded.status === 'ready' && (

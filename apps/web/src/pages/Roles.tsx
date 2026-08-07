@@ -277,11 +277,7 @@ export const Roles = ({ api }: { api: RolesApi }) => {
 const Notice = ({ loaded }: { loaded: Loaded<Register> }) => {
   if (loaded.status === 'loading') return <p class="form-note">Loading…</p>
   if (loaded.status === 'failed') {
-    return (
-      <p class="form-error" role="alert">
-        {loaded.message}
-      </p>
-    )
+    return <ErrorText message={loaded.message} />
   }
   if (loaded.data === null) {
     return <NoBurn absent="there is nothing to look after" />
