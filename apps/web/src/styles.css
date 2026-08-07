@@ -140,6 +140,29 @@ a:hover {
   vertical-align: middle;
 }
 
+/*
+  A face and a name as one thing (#301). The name used to sit on its own wherever a
+  list showed people, so the same person read as a circle in one place and a string
+  in another.
+
+  `inline-flex` with the face's own line-height, so a row of these is the height of
+  the circle rather than of the text — which is what makes a list of them line up
+  whether or not anybody in it has a picture.
+*/
+.person-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* Smaller than the corner's, since it sits inside a list row rather than a bar. */
+.person-badge-face {
+  width: 1.5rem;
+  height: 1.5rem;
+  font-size: 0.65rem;
+  flex: none;
+}
+
 /* A placeholder for the avatar image that will replace it, so it is sized like one. */
 .avatar {
   display: inline-flex;
@@ -1307,8 +1330,17 @@ img.avatar {
   min-height: 1.9rem;
 }
 
+/*
+  The name chip, which now holds a face as well (#301). The padding is lopsided on
+  purpose: the circle sits almost against the left edge, the way it does in the
+  corner of the bar, and the name keeps its room on the right.
+
+  Sized off the face rather than the text, so a row of chips lines up whether or not
+  anybody in it has uploaded a picture — `Avatar` draws the initials circle at the
+  same size.
+*/
 .helper-taken > span {
-  padding: 0.1rem 0.5rem;
+  padding: 0.15rem 0.6rem 0.15rem 0.15rem;
   border: 1px solid var(--line);
   border-radius: 1rem;
   font-size: 0.9rem;

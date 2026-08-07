@@ -124,6 +124,7 @@ export const MealDialog = ({
             // A chore takes no new lead, so it offers nobody — whoever is still on one
             // keeps their ✕, which is what the API allows.
             candidates={meal.kind === 'chore' ? [] : attendees}
+            everyone={attendees}
             viewerId={viewerId}
             busy={busy}
             onAdd={onLead}
@@ -197,6 +198,7 @@ const Crew = ({
           ? attendees.filter((who) => role === 'cleanup' || who.account_id !== meal.lead?.account_id)
           : []
       }
+      everyone={attendees}
       viewerId={viewerId}
       busy={busy}
       onAdd={(accountId) => onStand(role, true, accountId)}
