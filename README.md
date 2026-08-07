@@ -82,8 +82,10 @@ sed -i "s|^SESSION_SECRET=$|SESSION_SECRET=$(openssl rand -base64 48)|" .env
 docker compose up -d
 ```
 
-That is the whole of it. No SMTP, no payment gateway, no external database,
-nothing to sign up for. The third line is not optional: `.env.example` ships
+That is the whole of it. No payment gateway, no external database, nothing to
+sign up for. Email is optional and set up from inside the app — with no SMTP
+server named, no invite is posted and no notification is, and nothing else
+changes. The third line is not optional: `.env.example` ships
 `SESSION_SECRET=` with no value, and the app refuses to start without one rather
 than inventing a temporary key that would sign every member out on each
 redeploy. `cp` followed straight by `up` crash-loops with

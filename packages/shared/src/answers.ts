@@ -10,7 +10,7 @@ import { tickBoxRequired } from './enums.ts'
  * form marks its fields with it — and written twice they drift into a form that
  * says everything is fine against an API that answers 400.
  */
-import { MAX_CONTACT, MAX_PERSON_NAME } from './limits.ts'
+import { MAX_EMAIL, MAX_PERSON_NAME } from './limits.ts'
 
 export const MAX_ANSWER_LENGTH = 10_000
 /**
@@ -19,7 +19,23 @@ export const MAX_ANSWER_LENGTH = 10_000
  * copy reads better for it.
  */
 export const MAX_APPLICANT_NAME_LENGTH = MAX_PERSON_NAME
-export const MAX_APPLICANT_CONTACT_LENGTH = MAX_CONTACT
+export const MAX_APPLICANT_EMAIL_LENGTH = MAX_EMAIL
+
+/**
+ * Whether a string is shaped like an address, for the two callers that cannot use
+ * `emailSchema` (#30).
+ *
+ * The application form marks its own field with this before submitting, because a
+ * 400 from the server is a worse way to learn about a typo — and the backend uses it
+ * on `applicant_email` rows written while that column was a free-text "how can we
+ * reach you", which hold phone numbers and Discord handles.
+ *
+ * Deliberately loose: neither caller has to *validate* an address, only tell one from
+ * something that is plainly not one. `emailSchema` is what actually refuses a
+ * submission, and this must not be stricter than it — a rule that rejected a real
+ * address would cost somebody their application.
+ */
+export const looksLikeEmail = (value: string): boolean => /^[^\s@]+@[^\s@.]+\.[^\s@]+$/u.test(value.trim())
 
 /**
  * How many questions one submission may claim it was shown.

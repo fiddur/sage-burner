@@ -213,7 +213,7 @@ describe('listing invites', () => {
       answers: [],
       status: 'approved',
       applicant_name: 'Fredrik',
-      applicant_contact: 'fredrik@example.org',
+      applicant_email: 'fredrik@example.org',
       submitted_at: NOW,
       decided_at: NOW,
     })
@@ -290,7 +290,7 @@ describe('revoking an invite', () => {
       answers: [],
       status: 'approved',
       applicant_name: 'Fredrik',
-      applicant_contact: 'fredrik@example.org',
+      applicant_email: 'fredrik@example.org',
       submitted_at: NOW,
       decided_at: NOW,
     })

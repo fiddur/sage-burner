@@ -37,10 +37,15 @@ expands to an empty string rather than to nothing.
 | `TRUST_PROXY`         | `false`                     | `false`, `true`, a hop count like `1`, or an address/CIDR list                                                                                          |
 | `SESSION_SECRET`      | _(none)_                    | **Required if `NODE_ENV=production`, `HOST` is not loopback, or `WEB_ROOT` is set.** HMAC key for session cookies, 32+ chars. `openssl rand -base64 48` |
 | `SESSION_TTL_SECONDS` | `1209600`                   | How long a session lasts. Two weeks                                                                                                                     |
-| `PUBLIC_ORIGIN`       | _(unset)_                   | Where a browser reaches this installation, e.g. `https://burn.example.org`. Passkeys and the share card read it — see below                             |
+| `PUBLIC_ORIGIN`       | _(unset)_                   | Where a browser reaches this installation, e.g. `https://burn.example.org`. Passkeys, the share card and links in email read it — see below             |
 
 Invalid configuration fails at boot with every problem listed, rather than
 starting and behaving subtly wrong.
+
+`PUBLIC_ORIGIN` is reduced to an actual origin at parse: a trailing slash or a
+path comes off, since the app is served at a domain root and
+`https://burn.example.org/` would otherwise build `https://burn.example.org//api/…`,
+which the router will not match.
 
 **Set `PUBLIC_ORIGIN` if you use passkeys.** WebAuthn binds a credential to one
 domain and hands it to no other, so the domain has to be settled and stay

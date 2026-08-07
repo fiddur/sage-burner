@@ -174,7 +174,7 @@ describe('applicationSchema', () => {
     answers: [anAnswer],
     status: 'pending',
     applicant_name: 'Someone',
-    applicant_contact: 'someone@example.org',
+    applicant_email: 'someone@example.org',
     submitted_at: '2026-07-28T10:00:00Z',
     decided_at: null,
   }
@@ -210,7 +210,7 @@ describe('applicationSchema', () => {
 describe('applicationCreateSchema', () => {
   const aSubmission = {
     applicant_name: 'Someone',
-    applicant_contact: 'someone@example.org',
+    applicant_email: 'someone@example.org',
     answers: { [OTHER_ID]: 'because it sounds wonderful' },
     asked: [OTHER_ID],
   }

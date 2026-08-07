@@ -28,7 +28,7 @@ export const notificationsResponseSchema = z.object({
 export type NotificationsResponse = z.infer<typeof notificationsResponseSchema>
 
 /**
- * Which categories are switched **on**, in full.
+ * Which categories are switched **on**, in full, per channel.
  *
  * Was `muted` — the ones switched off — which worked while every category was on by
  * default. #259 added five that are off by default, and one list of exceptions
@@ -38,6 +38,16 @@ export type NotificationsResponse = z.infer<typeof notificationsResponseSchema>
  *
  * The server fills the defaults in for an account that has never saved, so a client
  * never has to know them either.
+ *
+ * `on` is the bell and the push, whose defaults differ per category. `email` is
+ * **off for every category until somebody asks** (#30), so it needs no defaults at
+ * all — but it is still carried in full rather than as a delta, because two lists
+ * meaning two different things is exactly what the `muted` rewrite got rid of.
  */
-export const notificationSettingsSchema = z.object({ on: z.array(z.enum(notificationCategories)) }).strict()
+export const notificationSettingsSchema = z
+  .object({
+    on: z.array(z.enum(notificationCategories)),
+    email: z.array(z.enum(notificationCategories)),
+  })
+  .strict()
 export type NotificationSettings = z.infer<typeof notificationSettingsSchema>

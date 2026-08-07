@@ -1,0 +1,12 @@
+-- The application asks for an email rather than for "how can we reach you" (#30).
+--
+-- Approving somebody now posts them their invite, so the one thing the app has to
+-- have is an address it can write to. The column is renamed rather than added beside
+-- the old one: every application that has ever been submitted answered this question,
+-- and two columns would be two places to look for the same fact.
+--
+-- No CHECK on the shape. Rows written while this was a free-text box hold phone
+-- numbers and Discord handles, and a constraint the existing data fails is a
+-- migration that will not run. The API refuses anything but an address from here on,
+-- and `looksLikeEmail` is what decides whether an old row is worth posting to.
+ALTER TABLE `application` RENAME COLUMN `applicant_contact` TO `applicant_email`;

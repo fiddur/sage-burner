@@ -204,6 +204,44 @@ export const installationBanner = sqliteTable(
   ],
 )
 
+/**
+ * Where this installation posts from, when somebody has said (#30).
+ *
+ * Its own singleton table rather than columns on `installation` for the reason the
+ * icon has one: that row is read for a title on nearly every page load, and an SMTP
+ * password is not something to carry along on each of them. No row at all is the
+ * ordinary state — nothing in this app requires email, and nothing fails without it.
+ *
+ * The password is stored as given. There is nothing else it could be: SMTP AUTH
+ * sends the password itself, so a digest would be a password this app could not use.
+ * It is the same class of secret as `vapid_private_key`, kept safe by the volume
+ * rather than by the column.
+ */
+export const mailSetting = sqliteTable(
+  'mail_setting',
+  {
+    id: text('id').notNull(),
+    host: text('host').notNull(),
+    port: integer('port').notNull(),
+    /** Implicit TLS from the first byte — port 465. STARTTLS needs no flag. */
+    secure: integer('secure', { mode: 'boolean' }).notNull(),
+    /** Empty for a relay that authenticates by network rather than by password. */
+    username: text('username').notNull(),
+    password: text('password').notNull(),
+    from_email: text('from_email').notNull(),
+    /** Empty falls back to what the installation calls itself. */
+    from_name: text('from_name').notNull(),
+    updated_at: text('updated_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    check('mail_setting_singleton_check', sql`${table.id} = 'installation'`),
+    check('mail_setting_port_check', sql`${table.port} BETWEEN 1 AND 65535`),
+    check('mail_setting_host_check', sql`length(trim(${table.host})) > 0`),
+    check('mail_setting_from_check', sql`length(trim(${table.from_email})) > 0`),
+  ],
+)
+
 /** A single burn. Never assume there is only one — the whole point is recurrence. */
 export const event = sqliteTable(
   'event',
@@ -427,7 +465,15 @@ export const application = sqliteTable(
     answers: text('answers', { mode: 'json' }).$type<StoredAnswers>().notNull(),
     status: text('status', { enum: applicationStatuses }).notNull().default('pending'),
     applicant_name: text('applicant_name').notNull(),
-    applicant_contact: text('applicant_contact').notNull(),
+    /**
+     * Where the invite goes, and the address the account is made under (#30).
+     *
+     * Was `applicant_contact`, a free-text "how can we reach you" that held phone
+     * numbers and Discord handles as often as addresses. No CHECK: rows written
+     * before it was an address still hold whatever they held, and a constraint the
+     * existing data fails is a migration that cannot run.
+     */
+    applicant_email: text('applicant_email').notNull(),
     submitted_at: text('submitted_at').notNull(),
     decided_at: text('decided_at'),
   },
@@ -1170,7 +1216,16 @@ export const notificationSetting = sqliteTable(
       .notNull()
       .references(() => account.id, { onDelete: 'cascade' }),
     category: text('category', { enum: notificationCategories }).notNull(),
+    /** The bell and the push, whose default is `notificationCategoryInfo`'s `on`. */
     enabled: integer('enabled', { mode: 'boolean' }).notNull(),
+    /**
+     * Email, whose default is off for every category (#30).
+     *
+     * Defaulted in SQL as well as written by the route, so the migration adding it
+     * does not have to decide anything for the rows already here — and so a channel
+     * that reaches somebody's inbox is never switched on by an upgrade.
+     */
+    email: integer('email', { mode: 'boolean' }).notNull().default(false),
   },
   (table) => [
     primaryKey({ columns: [table.account_id, table.category] }),
