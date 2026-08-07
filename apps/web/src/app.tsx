@@ -9,6 +9,7 @@ import { createApiClient } from './api/client.ts'
 import { FetchedBurnProvider } from './burn.tsx'
 import { Layout } from './components/Layout.tsx'
 import { NewVersion } from './components/NewVersion.tsx'
+import { RouteOnMessage } from './components/RouteOnMessage.tsx'
 import { StaleData } from './components/StaleData.tsx'
 import { createFreshness, freshnessAt } from './freshness.ts'
 import { FetchedInstallationProvider, InstallationProvider } from './installation.tsx'
@@ -301,6 +302,9 @@ export const App = ({ viewer, title, api }: { viewer?: Viewer; title?: string; a
   return (
     <RememberedProvider remembered={remembered}>
       <LocationProvider>
+        {/* Inside the provider, which is where `route` comes from, and outside the
+            viewer's — a tapped notification goes where it says whoever is looking. */}
+        <RouteOnMessage />
         {viewer === undefined ? (
           <FetchedViewerProvider api={client}>{content}</FetchedViewerProvider>
         ) : (

@@ -817,12 +817,24 @@ three applications on a locked phone should be one line to act on, and that was 
 whole point of a tag, but one tag for everything made a meal role replace a dream
 offer instead.
 
-Tapping one focuses a window already showing that page — a suffix match on the URL,
-which today's links make behave — and otherwise opens a new one. Deliberately **not**
-navigating an open window to it: `client.navigate()` is a
-full page load, so it would discard whatever somebody had typed into a markdown
-editor — the thing the dream panel was rewritten to stop doing. A second window is
-the cheaper mistake.
+Tapping one lands wherever costs least: the window already showing that page, else any
+window of this app asked to route in place, else a new one. A new window is the worst
+of the three and used to be the common one — the match was a suffix of the whole URL,
+so an app open on `/meals` did not count as open for anything else, including a
+notification naming no page at all. On a phone, where the worker belongs to the browser
+rather than to the installed copy, that meant a browser tab beside the app that was
+already on screen.
+
+**A notification naming no page focuses a window without moving it.** `link` is null
+for the categories that are about everywhere — a new version — and that is a different
+instruction from "go to `/`": any window of this app is already the right one, and
+routing it would take somebody off what they were reading.
+
+The move is a `postMessage` the app routes on, never `client.navigate()`, which is a
+full page load and would discard whatever had been typed into a markdown editor — the
+thing the dream panel was rewritten to stop doing. A window loaded before that shipped
+has no listener and simply stays where it is, which is still inside the app rather
+than beside it.
 
 It was hand-written plain JavaScript in `public/` while push was all it did,
 precisely because that put it outside the type-check and the suite — the argument

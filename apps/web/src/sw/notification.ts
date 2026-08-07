@@ -7,8 +7,28 @@
  * applications page — including the ones a member is not allowed to read.
  */
 
-/** Where a notification with no page of its own sends somebody. */
+/** Where a notification with no page of its own opens, when nothing is open already. */
 export const HOME = '/'
+
+/**
+ * What the worker asks an open window to do when a notification names a page it is
+ * not showing.
+ *
+ * A message rather than `client.navigate()`, which is a full page load and would
+ * discard whatever somebody had typed into a markdown editor — the thing the dream
+ * panel was rewritten to stop doing. The app routes it in place instead.
+ */
+export const ROUTE_TO = 'sage-burner:route-to'
+
+/** The path an open window is being asked to show, if that is what a message is. */
+export const routeAsked = (data: unknown): string | undefined => {
+  if (typeof data !== 'object' || data === null) return undefined
+  if (Reflect.get(data, 'type') !== ROUTE_TO) return undefined
+
+  const path = Reflect.get(data, 'path')
+
+  return typeof path === 'string' ? path : undefined
+}
 
 /**
  * What is shown when the payload cannot be read at all.
@@ -21,7 +41,15 @@ export const UNREADABLE = 'Something needs your attention.'
 
 export interface Alert {
   body: string
-  path: string
+  /**
+   * The page it is about, or nothing.
+   *
+   * **Absent is not the homepage.** Several categories have no page of their own — a
+   * new version is everywhere — and the difference decides what a tap does: a named
+   * page is opened, an absent one means any window of this app is already the right
+   * one and must not be navigated away from what somebody was reading.
+   */
+  path?: string
   /**
    * What this collapses with.
    *
@@ -66,15 +94,15 @@ const NOWHERE = 'https://app.invalid'
  * `openWindow` gets is the normalised path — with the query and fragment kept, since
  * a link to a particular thing on a page is still a link to this app.
  */
-const pathIn = (link: string | undefined): string => {
-  if (link === undefined) return HOME
+const pathIn = (link: string | undefined): string | undefined => {
+  if (link === undefined) return undefined
 
   try {
     const asked = new URL(link, NOWHERE)
 
-    return asked.origin === NOWHERE ? `${asked.pathname}${asked.search}${asked.hash}` : HOME
+    return asked.origin === NOWHERE ? `${asked.pathname}${asked.search}${asked.hash}` : undefined
   } catch {
-    return HOME
+    return undefined
   }
 }
 

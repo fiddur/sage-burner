@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { alertFrom, HOME, UNREADABLE } from './notification.ts'
+import { alertFrom, ROUTE_TO, routeAsked, UNREADABLE } from './notification.ts'
 
 describe('reading a push payload', () => {
   it('takes the wording, the page and the category the server sent', () => {
@@ -34,16 +34,20 @@ describe('reading a push payload', () => {
     expect(first.tag).not.toBe(alertFrom({ body: 'x', link: '/meals', category: 'meal_role' }).tag)
   })
 
-  it('sends somebody home rather than nowhere when there is no page for it', () => {
-    // `link` is null for the categories with no page of their own — the schema says
-    // so, and the row carries the same null.
-    expect(alertFrom({ body: 'A new version is out.', link: null, category: 'new_version' }).path).toBe(HOME)
-    expect(alertFrom({ body: 'a', category: 'new_version' }).path).toBe(HOME)
+  it('names no page for the categories that are about everywhere', () => {
+    // `link` is null for those — the schema says so, and the row carries the same
+    // null. **Absent rather than `'/'`**, which is a different instruction to the
+    // worker: any window of this app is already the right one, so a tap focuses it
+    // instead of taking somebody off whatever they were reading (#279).
+    expect(
+      alertFrom({ body: 'A new version is out.', link: null, category: 'new_version' }).path,
+    ).toBeUndefined()
+    expect(alertFrom({ body: 'a', category: 'new_version' }).path).toBeUndefined()
   })
 
   it('says something happened when the payload cannot be read at all', () => {
     // Silence is the worse failure: the push arrived, so something did happen.
-    expect(alertFrom(undefined)).toEqual({ body: UNREADABLE, path: HOME, tag: 'sage-burner' })
+    expect(alertFrom(undefined)).toEqual({ body: UNREADABLE, path: undefined, tag: 'sage-burner' })
     expect(alertFrom('not an object').body).toBe(UNREADABLE)
     expect(alertFrom({ body: 42 }).body).toBe(UNREADABLE)
   })
@@ -51,9 +55,9 @@ describe('reading a push payload', () => {
   it('refuses a link that would leave the app', () => {
     // `openWindow` takes a URL, so `//elsewhere.example` is an address rather than a
     // path. The link is the server's own, so this is a floor rather than a defence.
-    expect(alertFrom({ body: 'a', link: '//elsewhere.example/x' }).path).toBe(HOME)
-    expect(alertFrom({ body: 'a', link: 'https://elsewhere.example/x' }).path).toBe(HOME)
-    expect(alertFrom({ body: 'a', link: 'javascript:alert(1)' }).path).toBe(HOME)
+    expect(alertFrom({ body: 'a', link: '//elsewhere.example/x' }).path).toBeUndefined()
+    expect(alertFrom({ body: 'a', link: 'https://elsewhere.example/x' }).path).toBeUndefined()
+    expect(alertFrom({ body: 'a', link: 'javascript:alert(1)' }).path).toBeUndefined()
   })
 
   it('refuses the ones that walk past a leading-slash check', () => {
@@ -61,9 +65,9 @@ describe('reading a push payload', () => {
     // this was, and both resolve to `https://elsewhere.example/`: WHATWG parsing
     // reads `\` as `/` for special schemes, and strips tab and newline before it
     // parses at all. Run against the old implementation, not reasoned about.
-    expect(alertFrom({ body: 'a', link: '/\\elsewhere.example' }).path).toBe(HOME)
-    expect(alertFrom({ body: 'a', link: '/\t/elsewhere.example' }).path).toBe(HOME)
-    expect(alertFrom({ body: 'a', link: '/\n/elsewhere.example' }).path).toBe(HOME)
+    expect(alertFrom({ body: 'a', link: '/\\elsewhere.example' }).path).toBeUndefined()
+    expect(alertFrom({ body: 'a', link: '/\t/elsewhere.example' }).path).toBeUndefined()
+    expect(alertFrom({ body: 'a', link: '/\n/elsewhere.example' }).path).toBeUndefined()
   })
 
   it('keeps an ordinary path, which is the case the one above must not break', () => {
@@ -73,5 +77,20 @@ describe('reading a push payload', () => {
 
   it('keeps a query and a fragment, which still name something in this app', () => {
     expect(alertFrom({ body: 'a', link: '/schedule?dream=d-1#top' }).path).toBe('/schedule?dream=d-1#top')
+  })
+})
+
+describe('the message asking an open window to move', () => {
+  it('reads the path out of one the worker sent', () => {
+    expect(routeAsked({ type: ROUTE_TO, path: '/meals' })).toBe('/meals')
+  })
+
+  it('ignores anything else on the channel, which is not ours to act on', () => {
+    expect(routeAsked({ type: 'something-else', path: '/meals' })).toBeUndefined()
+    expect(routeAsked({ path: '/meals' })).toBeUndefined()
+    expect(routeAsked({ type: ROUTE_TO })).toBeUndefined()
+    expect(routeAsked({ type: ROUTE_TO, path: 42 })).toBeUndefined()
+    expect(routeAsked('a string')).toBeUndefined()
+    expect(routeAsked(null)).toBeUndefined()
   })
 })
