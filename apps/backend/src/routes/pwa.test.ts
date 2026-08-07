@@ -107,6 +107,18 @@ describe('the web manifest', () => {
     })
   })
 
+  it('names a splash colour from the dark palette, which is where most phones are', async () => {
+    // A manifest colour cannot follow `prefers-color-scheme`, so one of the two is
+    // wrong. The light one showed as a cream strip behind Android's gesture bar for
+    // as long as the app was open; this one is wrong only for the length of a launch.
+    const server = await build()
+
+    expect((await getManifest(server)).json()).toMatchObject({
+      theme_color: '#c2410c',
+      background_color: '#1c1917',
+    })
+  })
+
   it('is readable by somebody who is not signed in', async () => {
     // The homepage is public and so is installing from it, so neither of these may
     // depend on a cookie. Both are also fetched by the browser itself, which does not

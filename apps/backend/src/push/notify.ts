@@ -66,7 +66,14 @@ export const recordAndPush =
       created_at: now().toISOString(),
     })
 
-    const counts = await notifyAccount(deps, accountId, JSON.stringify({ body: told.body }))
+    // The whole of what was told, not just the wording (#279). The row already had
+    // the link and the category; the push carried neither, so the worker had nowhere
+    // to send anybody and hardcoded the one page that existed when it was written.
+    const counts = await notifyAccount(
+      deps,
+      accountId,
+      JSON.stringify({ body: told.body, link: told.link, category: told.category }),
+    )
     if (counts.failed > 0 || counts.gone > 0) log(counts)
 
     return counts

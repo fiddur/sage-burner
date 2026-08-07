@@ -802,7 +802,23 @@ root, which is where a worker has to live to claim `/` as its scope.
 `@fastify/static` serves everything outside `assets/` as `no-cache`, which is what
 lets a redeploy replace it. It handles `push` and `notificationclick` here, and
 caching for [offline](#offline-and-installing); `main.ts` is wiring to browser
-events, and every decision worth asserting is in `cache.ts` beside its tests.
+events, and every decision worth asserting is in `cache.ts` and `notification.ts`
+beside their tests.
+
+**What a push says and where it lands are the server's** (#279). The payload carries
+the wording, the link and the category, so the worker routes by what it was told
+rather than by a page written into it — which is what it did while a new application
+was the only thing that pushed, sending a member told they were on a meal to the
+admin applications page. The category is also what a notification collapses on:
+three applications on a locked phone should be one line to act on, and that was the
+whole point of a tag, but one tag for everything made a meal role replace a dream
+offer instead.
+
+Tapping one focuses a window already showing that page, and otherwise opens a new
+one. Deliberately **not** navigating an open window to it: `client.navigate()` is a
+full page load, so it would discard whatever somebody had typed into a markdown
+editor — the thing the dream panel was rewritten to stop doing. A second window is
+the cheaper mistake.
 
 It was hand-written plain JavaScript in `public/` while push was all it did,
 precisely because that put it outside the type-check and the suite — the argument

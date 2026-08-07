@@ -12,6 +12,7 @@ import {
   trim,
   worthStoring,
 } from './cache.ts'
+import { alertFrom } from './notification.ts'
 
 /**
  * The service worker: push notifications (#248) and offline (#256).
@@ -159,27 +160,24 @@ self.addEventListener('fetch', (event) => {
   if (cacheName !== undefined) event.respondWith(freshFirst(event, plan, cacheName, event.request))
 })
 
-self.addEventListener('push', (event) => {
-  // A payload that will not parse is still worth a notification: something
-  // happened, and silence is the worse failure. The push service cannot read it —
-  // it is encrypted to this browser's key — so a malformed one means our bug.
-  let body = 'Something needs your attention.'
+const payloadOf = (event: SwPushEvent): unknown => {
   try {
-    const data = event.data === undefined ? undefined : event.data.json()
-    if (typeof data === 'object' && data !== null && 'body' in data && typeof data.body === 'string') {
-      body = data.body
-    }
+    return event.data?.json()
   } catch {
-    // Keep the fallback.
+    // A payload that will not parse is still worth a notification; `alertFrom`
+    // answers with the wording that says so.
+    return undefined
   }
+}
+
+self.addEventListener('push', (event) => {
+  const alert = alertFrom(payloadOf(event))
 
   event.waitUntil(
     self.registration.showNotification('Sage Burner', {
-      body,
-      // Collapses repeats: three applications while the phone is locked should be
-      // one line to act on, not three identical ones to dismiss.
-      tag: 'sage-burner-applications',
-      data: { path: '/admin/applications' },
+      body: alert.body,
+      tag: alert.tag,
+      data: { path: alert.path },
     }),
   )
 })
@@ -191,8 +189,15 @@ self.addEventListener('notificationclick', (event) => {
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (windows) => {
-      // Focus a tab that is already open rather than piling up new ones, which is
-      // what happens on a phone otherwise.
+      // Focus a window that is already showing the page rather than piling up new
+      // ones, which is what happens on a phone otherwise.
+      //
+      // **Only an exact match, and it is never navigated.** `client.navigate()` is a
+      // full page load, so pointing an open window at the notification's page would
+      // discard whatever somebody had typed into a markdown editor — the same thing
+      // the dream panel was rewritten to stop doing. A second window is the cheaper
+      // mistake. Routing it in-page by `postMessage` would have both, and is #279's
+      // remaining half.
       for (const client of windows) {
         if (client.url.endsWith(path)) return client.focus()
       }

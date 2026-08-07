@@ -749,6 +749,29 @@ describe('telling somebody a role moved', () => {
     ])
   })
 
+  it('sends the page and the category with the wording, not the wording alone', async () => {
+    // The row always carried the link; the push did not, so the worker had nothing to
+    // route by and sent every notification to the admin applications page (#279).
+    const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
+    const server = await build(deliver)
+    const eventId = await givenEvent()
+    const mover = await givenAccount(['member'], 'Org')
+    const taker = await givenAccount(['member'], 'Ada')
+    await givenComing(eventId, mover.id)
+    await givenComing(eventId, taker.id)
+    await givenSubscribed(taker.id)
+    const roleId = (await add(server, mover.cookie, eventId, { title: 'Sauna' })).json().role.id
+
+    await setLead(server, mover.cookie, roleId, { account_id: taker.id })
+
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1))
+    expect(JSON.parse(String(deliver.mock.calls[0]?.[1]))).toEqual({
+      body: 'You are now Sauna lead.',
+      link: '/roles',
+      category: 'lead_role',
+    })
+  })
+
   it('says nothing to somebody who did it themselves', async () => {
     // Taking a role you want is the common case. A notification for your own click
     // is noise, and noise is what teaches people to ignore the channel.
