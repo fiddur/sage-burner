@@ -11,6 +11,7 @@ import { HelperStrip } from '../components/HelperStrip.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
+import { TheirVersion } from '../components/TheirVersion.tsx'
 import { dayName } from '../datetime.ts'
 import { useAction, useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
@@ -59,7 +60,7 @@ export const Meals = ({ api }: { api: MealsApi }) => {
     { key: burn?.event.id ?? '', fallback: 'Could not load the meal plan.', live: true, remember: 'meals' },
   )
 
-  const { busy, error, run } = useAction(reload)
+  const { busy, error, failure, run } = useAction(reload)
   const plan = loaded.status === 'ready' ? loaded.data : null
 
   return (
@@ -90,6 +91,7 @@ export const Meals = ({ api }: { api: MealsApi }) => {
             <IntroEditor
               intro={plan.intro_markdown}
               busy={busy}
+              failure={failure}
               onCancel={() => setEditingIntro(false)}
               onSave={(meal_intro_markdown) =>
                 run(async () => {
@@ -161,14 +163,18 @@ export const Meals = ({ api }: { api: MealsApi }) => {
 const IntroEditor = ({
   intro,
   busy,
+  failure,
   onSave,
   onCancel,
 }: {
   intro: string
   busy: boolean
+  failure?: unknown
   onSave: (intro: string) => void
   onCancel: () => void
 }) => {
+  // Seeded once. The page re-reads under a refused save (#274), and taking the
+  // fresh words into the box would throw away the ones being written.
   const [draft, setDraft] = useState(intro)
 
   return (
@@ -179,6 +185,7 @@ const IntroEditor = ({
         maxLength={MAX_WELCOME_LENGTH}
         onInput={setDraft}
       />
+      <TheirVersion failure={failure} at={['intro_markdown']} />
       <p class="row">
         <button type="button" disabled={busy} onClick={() => onSave(draft)}>
           Save

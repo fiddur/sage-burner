@@ -1314,6 +1314,26 @@ img.avatar {
   font-size: 0.9rem;
 }
 
+/* What somebody else saved, shown beside what is still being typed (#274). */
+.their-version {
+  margin: 0 0 1rem;
+  padding: 0.6rem 0.8rem;
+  border-left: 3px solid var(--ember);
+  background: color-mix(in srgb, var(--ember) 8%, transparent);
+}
+
+.their-version p {
+  margin: 0;
+}
+
+.their-version blockquote {
+  margin: 0.4rem 0;
+  padding: 0;
+  white-space: pre-wrap;
+  font-family: ui-monospace, monospace;
+  font-size: 0.9rem;
+}
+
 /* Sized in `em` so it follows whatever heading it sits beside. */
 .refreshing {
   display: inline-block;

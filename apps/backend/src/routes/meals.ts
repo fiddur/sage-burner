@@ -24,6 +24,7 @@ import { viewerFor } from '../auth/viewer.ts'
 import { isForeignKeyViolation, isUniqueViolation } from '../db/errors.ts'
 import { account, attendance, event, meal, mealRole, mealSlot } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
+import { refuseIfStale, withVersion } from '../if-match.ts'
 import { accountForAttendance, attendanceFor } from './attendance.ts'
 import { openEvent, todayIso } from './events.ts'
 
@@ -186,6 +187,25 @@ export const registerMealRoutes = (
     return (await openEvent(db, todayIso(now), row.event_id)) === undefined ? undefined : row
   }
 
+  /**
+   * The whole meal plan, as both the `GET` and the `If-Match` guards see it (#274).
+   *
+   * The intro text is part of it, so rewriting the words above the table is guarded
+   * by the same tag as moving a sitting — which is right: they are one page.
+   */
+  const plan = async (eventId: string): Promise<MealsResponse> => {
+    const burn = await burnFor(db, eventId)
+
+    return {
+      // The burn is there — every caller has already 404'd without it. `??` is for
+      // the guard's re-read racing a deletion, where an empty plan simply will not
+      // match and the write is refused, which is the right answer anyway.
+      intro_markdown: burn?.meal_intro_markdown ?? '',
+      slots: await slotsFor(db, eventId),
+      meals: await mealsFor(db, eventId),
+    }
+  }
+
   const answer = async (reply: FastifyReply, id: string) => {
     const found = await oneMeal(db, id)
 
@@ -201,11 +221,7 @@ export const registerMealRoutes = (
       const burn = await burnFor(db, request.params.eventId)
       if (burn === undefined) return sendError(reply, 404)
 
-      return {
-        intro_markdown: burn.meal_intro_markdown,
-        slots: await slotsFor(db, burn.id),
-        meals: await mealsFor(db, burn.id),
-      } satisfies MealsResponse
+      return withVersion(reply, await plan(burn.id))
     },
   )
 
@@ -224,6 +240,8 @@ export const registerMealRoutes = (
       if ((await openEvent(db, todayIso(now), request.params.eventId)) === undefined) {
         return sendError(reply, 404)
       }
+
+      if (await refuseIfStale(request, reply, () => plan(request.params.eventId))) return reply
 
       const [row] = await db
         .update(event)
@@ -436,6 +454,8 @@ export const registerMealRoutes = (
       }
 
       if (Object.keys(body).length > 0) {
+        if (await refuseIfStale(request, reply, () => plan(existing.event_id))) return reply
+
         try {
           await db.update(meal).set(body).where(eq(meal.id, request.params.id))
         } catch (failure) {
@@ -468,6 +488,8 @@ export const registerMealRoutes = (
 
       const existing = await openMeal(request.params.id)
       if (existing === undefined) return sendError(reply, 404)
+
+      if (await refuseIfStale(request, reply, () => plan(existing.event_id))) return reply
 
       await db.update(meal).set({ food_idea: body.food_idea.trim() }).where(eq(meal.id, existing.id))
 

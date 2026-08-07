@@ -13,6 +13,7 @@ import { createConfig } from '../config.ts'
 import { isCheckViolation } from '../db/errors.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, accountRole, event } from '../db/schema.ts'
+import { sendGuarded } from '../if-match.testing.ts'
 
 /**
  * Events, and the rule for which one is "active".
@@ -101,12 +102,14 @@ const setWelcome = (
   id: string,
   payload: Record<string, unknown>,
 ) =>
-  server.inject({
-    method: 'PATCH',
-    url: `/api/events/${id}/welcome`,
-    headers: cookie === undefined ? {} : { cookie },
-    payload,
-  })
+  sendGuarded((extra) =>
+    server.inject({
+      method: 'PATCH',
+      url: `/api/events/${id}/welcome`,
+      headers: { ...(cookie === undefined ? {} : { cookie }), ...extra },
+      payload,
+    }),
+  )
 
 const valid = {
   name: 'Summer Burn 2026',
@@ -855,5 +858,44 @@ describe('the hours a burn is open', () => {
           '2026-01-01T00:00:00.000Z',
         ),
     ).toThrow()
+  })
+})
+
+describe('rewriting a welcome somebody else has just rewritten', () => {
+  const write = (server: FastifyInstance, cookie: string, id: string, text: string, version?: string) =>
+    server.inject({
+      method: 'PATCH',
+      url: `/api/events/${id}/welcome`,
+      headers: { cookie, ...(version === undefined ? {} : { 'if-match': version }) },
+      payload: { welcome_markdown: text },
+    })
+
+  it('refuses one written against no version of the burn, and against an old one', async () => {
+    const server = await build()
+    const id = await givenEvent({ slug: 'summer', start_date: '2026-08-01', end_date: '2026-08-05' })
+    const cookie = await givenAccount(['member'])
+    const other = await givenAccount(['member'])
+
+    // The homepage is what reads this, so the tag comes off `GET /api/events/active`.
+    const asTheySawIt = String((await active(server)).headers.etag)
+
+    expect((await write(server, cookie, id, 'mine')).statusCode).toBe(428)
+
+    expect((await setWelcome(server, other, id, { welcome_markdown: 'theirs' })).statusCode).toBe(200)
+
+    const refused = await write(server, cookie, id, 'mine', asTheySawIt)
+    expect(refused.statusCode).toBe(412)
+    // What the other person wrote, so the page can show it beside what was typed.
+    expect(refused.json().event.welcome_markdown).toBe('theirs')
+  })
+
+  it('takes one written against the version it was handed', async () => {
+    const server = await build()
+    const id = await givenEvent({ slug: 'summer', start_date: '2026-08-01', end_date: '2026-08-05' })
+    const cookie = await givenAccount(['member'])
+
+    const current = String((await active(server)).headers.etag)
+
+    expect((await write(server, cookie, id, 'mine', current)).statusCode).toBe(200)
   })
 })

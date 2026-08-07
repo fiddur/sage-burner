@@ -367,3 +367,43 @@ describe('Home', () => {
     })
   })
 })
+
+describe('somebody else saving the welcome text first', () => {
+  const refused = () =>
+    Promise.reject(
+      apiError(412, 'stale', 'Somebody else changed this while you had it open.', {
+        error: 'stale',
+        event: { ...summer, welcome_markdown: 'Bring a bowl and a cup' },
+      }),
+    )
+
+  it('keeps what was typed and puts theirs beside it', async () => {
+    // The decision behind #274 for the longer fields: a paragraph somebody spent
+    // five minutes on is not thrown away because somebody else pressed Save first.
+    renderHome(summer, asRoles(['member']), refused)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit this text' }))
+    const field = await screen.findByLabelText<HTMLTextAreaElement>('Welcome text')
+    fireEvent.input(field, { target: { value: 'Bring a cup' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByText('Bring a bowl and a cup')).toBeTruthy()
+    // Still open, still holding the draft.
+    expect((await screen.findByLabelText<HTMLTextAreaElement>('Welcome text')).value).toBe('Bring a cup')
+  })
+
+  it('shows no other version when the save failed for some other reason', async () => {
+    // The passing sibling: a 500 carries no other author's words, and inventing a
+    // block saying it does would be worse than saying nothing.
+    renderHome(summer, asRoles(['member']), () =>
+      Promise.reject(apiError(500, 'internal_error', 'Something went wrong at our end.')),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit this text' }))
+    await screen.findByLabelText('Welcome text')
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByText('Something went wrong at our end.')).toBeTruthy()
+    expect(screen.queryByText(/What is saved now/)).toBeNull()
+  })
+})

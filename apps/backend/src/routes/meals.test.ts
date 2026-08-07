@@ -14,6 +14,7 @@ import { createConfig } from '../config.ts'
 import { isForeignKeyViolation, isUniqueViolation } from '../db/errors.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, accountRole, attendance, event, meal as mealTable, pushSubscription } from '../db/schema.ts'
+import { sendGuarded } from '../if-match.testing.ts'
 import { sittingDates } from './meals.ts'
 
 const SECRET = 's'.repeat(40)
@@ -123,7 +124,14 @@ const send = (
   cookie: string | undefined,
   payload?: Record<string, unknown>,
 ) =>
-  server.inject({ method, url, headers: cookie === undefined ? {} : { cookie }, ...(payload && { payload }) })
+  sendGuarded((extra) =>
+    server.inject({
+      method,
+      url,
+      headers: { ...(cookie === undefined ? {} : { cookie }), ...extra },
+      ...(payload && { payload }),
+    }),
+  )
 
 const addSlot = (server: FastifyInstance, cookie: string, body: Record<string, unknown>) =>
   send(server, 'POST', `/api/admin/events/${BURN}/meal-slots`, cookie, body)
@@ -965,5 +973,62 @@ describe('telling somebody a meal role moved', () => {
 
     await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1))
     expect(messagesFrom(deliver)).toEqual(['You are off helper for Dinner'])
+  })
+})
+
+describe('changing a plan somebody else has just changed', () => {
+  const setIdea = (server: FastifyInstance, cookie: string, id: string, version?: string) =>
+    server.inject({
+      method: 'PUT',
+      url: `/api/meals/${id}/idea`,
+      headers: { cookie, ...(version === undefined ? {} : { 'if-match': version }) },
+      payload: { food_idea: 'Dahl' },
+    })
+
+  const givenOneMeal = async (server: FastifyInstance, cookie: string) => {
+    await addSlot(server, cookie, { label: 'Supper', at: '19:00' })
+    await generate(server, cookie)
+
+    return (await listMeals(server, cookie)).meals[0].id
+  }
+
+  it('refuses one written against no version of the plan, and against an old one', async () => {
+    const server = await build()
+    await givenBurn()
+    const admin = await givenAccount(['admin', 'member'])
+    const first = await givenOneMeal(server, admin.cookie)
+
+    const asTheySawIt = String(
+      (await send(server, 'GET', `/api/events/${BURN}/meals`, admin.cookie)).headers.etag,
+    )
+
+    expect((await setIdea(server, admin.cookie, first)).statusCode).toBe(428)
+
+    // The words above the table are part of the same representation, so rewriting
+    // them moves the version an idea is written against. One page, one tag.
+    expect(
+      (
+        await send(server, 'PATCH', `/api/events/${BURN}/meal-intro`, admin.cookie, {
+          meal_intro_markdown: 'Bring a bowl',
+        })
+      ).statusCode,
+    ).toBe(200)
+
+    const refused = await setIdea(server, admin.cookie, first, asTheySawIt)
+    expect(refused.statusCode).toBe(412)
+    expect(refused.json().intro_markdown).toBe('Bring a bowl')
+  })
+
+  it('takes one written against the version it was handed', async () => {
+    const server = await build()
+    await givenBurn()
+    const admin = await givenAccount(['admin', 'member'])
+    const first = await givenOneMeal(server, admin.cookie)
+
+    const current = String(
+      (await send(server, 'GET', `/api/events/${BURN}/meals`, admin.cookie)).headers.etag,
+    )
+
+    expect((await setIdea(server, admin.cookie, first, current)).statusCode).toBe(200)
   })
 })

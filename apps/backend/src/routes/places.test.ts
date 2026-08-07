@@ -11,6 +11,7 @@ import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, accountRole, event, place } from '../db/schema.ts'
+import { sendGuarded } from '../if-match.testing.ts'
 
 const SECRET = 's'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
@@ -97,12 +98,14 @@ const edit = (
   id: string,
   payload: Record<string, unknown>,
 ) =>
-  server.inject({
-    method: 'PATCH',
-    url: `/api/places/${id}`,
-    headers: cookie === undefined ? {} : { cookie },
-    payload,
-  })
+  sendGuarded((extra) =>
+    server.inject({
+      method: 'PATCH',
+      url: `/api/places/${id}`,
+      headers: { ...(cookie === undefined ? {} : { cookie }), ...extra },
+      payload,
+    }),
+  )
 
 const remove = (server: FastifyInstance, cookie: string | undefined, id: string) =>
   server.inject({
@@ -117,12 +120,14 @@ const reorder = (
   eventId: string,
   payload: Record<string, unknown>,
 ) =>
-  server.inject({
-    method: 'PUT',
-    url: `/api/events/${eventId}/places/order`,
-    headers: cookie === undefined ? {} : { cookie },
-    payload,
-  })
+  sendGuarded((extra) =>
+    server.inject({
+      method: 'PUT',
+      url: `/api/events/${eventId}/places/order`,
+      headers: { ...(cookie === undefined ? {} : { cookie }), ...extra },
+      payload,
+    }),
+  )
 
 const sources = (server: FastifyInstance, cookie: string | undefined, eventId: string) =>
   server.inject({
@@ -666,5 +671,167 @@ describe('seeding a burn’s grid from a previous one', () => {
     expect((await sources(server, undefined, eventId)).statusCode).toBe(401)
     expect((await sources(server, roleless.cookie, eventId)).statusCode).toBe(403)
     expect((await list(server, eventId)).statusCode).toBe(200)
+  })
+})
+
+/**
+ * The precondition every guarded write shares (#274), tested here in full.
+ *
+ * The other families get a shorter set: what differs between them is which
+ * representation the tag is over, not what the guard does with it.
+ */
+describe('writing over what somebody else changed', () => {
+  const writeLane = (
+    server: FastifyInstance,
+    cookie: string,
+    id: string,
+    payload: Record<string, unknown>,
+    version?: string,
+  ) =>
+    server.inject({
+      method: 'PATCH',
+      url: `/api/places/${id}`,
+      headers: { cookie, ...(version === undefined ? {} : { 'if-match': version }) },
+      payload,
+    })
+
+  it('tags the grid on the way out, so a writer has something to quote back', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const admin = await givenAccount(['admin'])
+
+    const before = await list(server, eventId)
+    expect(before.headers.etag).toMatch(/^"[\w-]+"$/)
+
+    // Unchanged, the tag is unchanged: it is over the representation, so reading twice
+    // has to answer the same thing or every write would be refused.
+    expect((await list(server, eventId)).headers.etag).toBe(before.headers.etag)
+
+    const [temple] = await givenPlaces(server, admin.cookie, eventId)
+    await edit(server, admin.cookie, temple ?? '', { name: 'Somewhere else' })
+
+    expect((await list(server, eventId)).headers.etag).not.toBe(before.headers.etag)
+  })
+
+  it('refuses a write quoting nothing at all, and says what the grid holds', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const admin = await givenAccount(['admin'])
+    const [, sauna] = await givenPlaces(server, admin.cookie, eventId)
+
+    const response = await writeLane(server, admin.cookie, sauna ?? '', { name: 'Steam Room' })
+
+    expect(response.statusCode).toBe(428)
+    expect(response.json().error).toBe('precondition_required')
+    // Carried so the page can show what is actually there rather than only that it
+    // was refused.
+    expect(response.json().places.map((lane: { name: string }) => lane.name)).toEqual([
+      'Temple',
+      'Sauna',
+      'Front Lawn',
+    ])
+    expect(await names(server, eventId)).toEqual(['Temple', 'Sauna', 'Front Lawn'])
+  })
+
+  it('refuses one quoting a version somebody has since moved past', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAccount(['member'])
+    const bea = await givenAccount(['member'])
+    const [temple, sauna] = await givenPlaces(server, ada.cookie, eventId)
+
+    const asAdaSawIt = (await list(server, eventId)).headers.etag
+    expect(typeof asAdaSawIt).toBe('string')
+
+    // Bea renames a different lane. Ada's copy of the grid is now one edit old.
+    expect((await edit(server, bea.cookie, temple ?? '', { name: 'The Temple' })).statusCode).toBe(200)
+
+    const response = await writeLane(
+      server,
+      ada.cookie,
+      sauna ?? '',
+      { name: 'Steam Room' },
+      String(asAdaSawIt),
+    )
+
+    expect(response.statusCode).toBe(412)
+    expect(response.json().error).toBe('stale')
+    expect(response.json().places.map((lane: { name: string }) => lane.name)).toEqual([
+      'The Temple',
+      'Sauna',
+      'Front Lawn',
+    ])
+    expect(await names(server, eventId)).toEqual(['The Temple', 'Sauna', 'Front Lawn'])
+  })
+
+  it('takes one quoting the version it was given', async () => {
+    // The passing sibling: the guard has to let an ordinary edit through, or every
+    // test above would pass against a route that refused everything.
+    const server = await build()
+    const eventId = await givenEvent()
+    const admin = await givenAccount(['admin'])
+    const [, sauna] = await givenPlaces(server, admin.cookie, eventId)
+
+    const current = (await list(server, eventId)).headers.etag
+    const response = await writeLane(
+      server,
+      admin.cookie,
+      sauna ?? '',
+      { name: 'Steam Room' },
+      String(current),
+    )
+
+    expect(response.statusCode).toBe(200)
+    expect(await names(server, eventId)).toEqual(['Temple', 'Steam Room', 'Front Lawn'])
+  })
+
+  it('hands back a tag the retry can use, so a conflict costs one round trip', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const admin = await givenAccount(['admin'])
+    const [, sauna] = await givenPlaces(server, admin.cookie, eventId)
+
+    const refused = await writeLane(server, admin.cookie, sauna ?? '', { name: 'Steam Room' })
+    expect(refused.statusCode).toBe(428)
+
+    const retried = await writeLane(
+      server,
+      admin.cookie,
+      sauna ?? '',
+      { name: 'Steam Room' },
+      String(refused.headers.etag),
+    )
+
+    expect(retried.statusCode).toBe(200)
+  })
+
+  it('guards the ordering too, which is one write over the whole list', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const admin = await givenAccount(['admin'])
+    const [temple, sauna, lawn] = await givenPlaces(server, admin.cookie, eventId)
+
+    const response = await server.inject({
+      method: 'PUT',
+      url: `/api/events/${eventId}/places/order`,
+      headers: { cookie: admin.cookie },
+      payload: { ids: [lawn, sauna, temple] },
+    })
+
+    expect(response.statusCode).toBe(428)
+    expect(await names(server, eventId)).toEqual(['Temple', 'Sauna', 'Front Lawn'])
+  })
+
+  it('leaves the writes that add or remove alone, which have nothing to overwrite', async () => {
+    // Creating and deleting are not lost updates: nobody's edit disappears into them,
+    // and a precondition on either would only be ceremony.
+    const server = await build()
+    const eventId = await givenEvent()
+    const admin = await givenAccount(['admin'])
+
+    expect((await add(server, admin.cookie, eventId, TEMPLE)).statusCode).toBe(201)
+
+    const [temple] = await givenPlaces(server, admin.cookie, eventId)
+    expect((await remove(server, admin.cookie, temple ?? '')).statusCode).toBe(204)
   })
 })

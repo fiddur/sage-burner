@@ -149,6 +149,11 @@ export const codeFor = (status: number): ErrorCode => {
   if (status === 403) return 'forbidden'
   if (status === 404) return 'not_found'
   if (status === 409) return 'conflict'
+  // The two `If-Match` refusals (#274). Both are answered by `refuseIfStale` with the
+  // current representation beside the code rather than through `sendError`, and are
+  // mapped here so a route that reaches them by throwing still names the right one.
+  if (status === 412) return 'stale'
+  if (status === 428) return 'precondition_required'
   // Its own slug rather than falling into `bad_request` below, which is the reason
   // `rate_limited` exists: a shed request is worth retrying and a malformed one is
   // not, and the status alone does not tell a caller which.

@@ -21,6 +21,7 @@ import { viewerFor } from '../auth/viewer.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
 import { account, attendance, event, leadRole, leadRoleMember } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
+import { refuseIfStale, withVersion } from '../if-match.ts'
 import { displayName, notifyAttendees } from '../push/notify.ts'
 import { accountForAttendance, attendanceFor } from './attendance.ts'
 import { copySourcesFor } from './copy-sources.ts'
@@ -126,6 +127,11 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
   const { db, sessions, now = () => new Date(), notify = async () => undefined } = deps
   const { requireApproved } = createGuards({ db, sessions })
 
+  /** The register, as both the `GET` and the `If-Match` guard see it (#274). */
+  const register = async (eventId: string): Promise<LeadRolesResponse> => ({
+    roles: await rolesFor(db, eventId),
+  })
+
   /**
    * The role, if its burn has not ended.
    *
@@ -172,7 +178,7 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
     async (request, reply) => {
       void noStore(reply)
 
-      return { roles: await rolesFor(db, request.params.eventId) } satisfies LeadRolesResponse
+      return withVersion(reply, await register(request.params.eventId))
     },
   )
 
@@ -236,8 +242,11 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
       if (existing === undefined) return sendError(reply, 404)
 
       // `set({})` is not valid SQL, so an empty body reads instead of writing. A
-      // no-op PATCH is idempotent; answering with the row unchanged is honest.
+      // no-op PATCH is idempotent; answering with the row unchanged is honest — and
+      // a read needs no precondition, which is why the guard is inside the branch.
       if (Object.keys(body).length > 0) {
+        if (await refuseIfStale(request, reply, () => register(existing.event_id))) return reply
+
         await db.update(leadRole).set(body).where(eq(leadRole.id, request.params.id))
       }
 

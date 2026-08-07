@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'preact/hooks'
 
 import { isApiError } from './api/client.ts'
 import { useRemembered } from './remembered.tsx'
+import { isStale } from './stale.ts'
 
 /**
  * The load–mutate–reload skeleton every page was hand-rolling.
@@ -192,28 +193,50 @@ export const useLoad = <T>(
  * The fallback may be a function, for the pages that map a particular status to
  * particular words: a 409 on "say you are coming" means the burn is full, which is
  * worth saying rather than "that did not work".
+ *
+ * `failure` is what was thrown, for the pages that want more from it than a sentence
+ * — today the longer fields, which show what the other author wrote (#274). Held
+ * beside the message rather than derived from it, so `setError` writing a message of
+ * the page's own clears it.
  */
 export const useAction = (onSuccess?: () => void) => {
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | undefined>(undefined)
+  const [problem, setProblem] = useState<{ message?: string; failure?: unknown }>({})
 
   const run = (work: () => Promise<unknown>, fallback: string | ((failure: unknown) => string)) => {
     if (busy) return
 
     setBusy(true)
-    setError(undefined)
+    setProblem({})
 
     void work()
       .then(() => {
         onSuccess?.()
       })
       .catch((failure: unknown) => {
-        setError(typeof fallback === 'function' ? fallback(failure) : errorMessage(failure, fallback))
+        setProblem({
+          message: typeof fallback === 'function' ? fallback(failure) : errorMessage(failure, fallback),
+          failure,
+        })
+
+        // A refused write leaves the page holding exactly the version that was
+        // refused, so re-read: the message says it has been refreshed, and that has
+        // to be true by the time somebody reads it. `onSuccess` is the reload on
+        // every page that has one, which is every page with a guarded write.
+        if (isStale(failure)) onSuccess?.()
       })
       .finally(() => {
         setBusy(false)
       })
   }
 
-  return { busy, error, setError, run }
+  return {
+    busy,
+    error: problem.message,
+    failure: problem.failure,
+    setError: (message: string | undefined) => {
+      setProblem({ message })
+    },
+    run,
+  }
 }

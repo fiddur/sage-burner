@@ -18,6 +18,7 @@ import { createGuards } from '../auth/guards.ts'
 import { isCheckViolation } from '../db/errors.ts'
 import { event } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
+import { refuseIfStale, withVersion } from '../if-match.ts'
 
 export interface EventRouteDeps extends GuardDeps {
   now?: () => Date
@@ -87,6 +88,12 @@ export const registerEventRoutes = (
 ) => {
   const { requireApproved } = createGuards({ db, sessions })
 
+  /**
+   * The burn as the homepage reads it, which is also what the welcome text's
+   * `If-Match` is against (#274) — one shape, so a tag cannot describe the other one.
+   */
+  const asRead = (found: Event | null): ActiveEventResponse => ({ event: found })
+
   app.get(apiRoutes.getActiveEvent.fastify, async (_request, reply) => {
     // `no-cache`, not `no-store`. This is public content, so there is no reason
     // to forbid storing it — but #13 requires an edit to show up without a
@@ -96,11 +103,9 @@ export const registerEventRoutes = (
     // before reuse", which is exactly the requirement.
     void reply.header('cache-control', 'no-cache')
 
-    const found = await activeEvent(db, todayIso(now))
-
     // Null rather than 404: having no event yet is the ordinary state of a
     // fresh deployment, not an error, and the homepage renders an explanation.
-    return { event: found ?? null } satisfies ActiveEventResponse
+    return withVersion(reply, asRead((await activeEvent(db, todayIso(now))) ?? null))
   })
 
   app.get(apiRoutes.getEvents.fastify, async (_request, reply) => {
@@ -155,9 +160,14 @@ export const registerEventRoutes = (
       // it any approved member could rewrite a finished burn's welcome text
       // indefinitely — the one route in this family that took an id and never looked
       // at `end_date`.
-      if ((await openEvent(db, todayIso(now), request.params.id)) === undefined) {
-        return sendError(reply, 404)
-      }
+      const open = await openEvent(db, todayIso(now), request.params.id)
+      if (open === undefined) return sendError(reply, 404)
+
+      // Against `{ event }`, the shape `getActiveEvent` answers with — the page that
+      // writes this is the homepage, which read the burn from there. Editing a burn
+      // that is not the active one therefore cannot match, and is refused rather than
+      // allowed to overwrite blind.
+      if (await refuseIfStale(request, reply, async () => asRead(open))) return reply
 
       const [updated] = await db.update(event).set(body).where(eq(event.id, request.params.id)).returning()
 

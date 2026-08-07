@@ -30,6 +30,7 @@ import {
   sessionSupport,
 } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
+import { refuseIfStale, withVersion } from '../if-match.ts'
 import { displayName, notifyAttendees } from '../push/notify.ts'
 import { attendanceFor } from './attendance.ts'
 import { openEvent, todayIso } from './events.ts'
@@ -254,6 +255,16 @@ export const registerSessionRoutes = (
   const { requireMember } = createGuards({ db, sessions })
 
   /** The caller's attendance at a burn, or nothing if they are not coming to it. */
+  /**
+   * The pool, as both the `GET` and the `If-Match` guard see it (#274).
+   *
+   * Per viewer, because `sessionsFor` is: whether a dream is yours changes the row.
+   * That is fine — each browser quotes back the tag it was given.
+   */
+  const dreamsOf = async (eventId: string, mine: string | undefined): Promise<SessionsResponse> => ({
+    sessions: await sessionsFor(db, eventId, mine),
+  })
+
   const mineAt = async (request: FastifyRequest, eventId: string) => {
     const viewer = await viewerFor(request, { db, sessions })
 
@@ -297,7 +308,7 @@ export const registerSessionRoutes = (
       // nothing is the same answer as for a burn nobody offered anything at.
       const mine = await mineAt(request, request.params.eventId)
 
-      return { sessions: await sessionsFor(db, request.params.eventId, mine) } satisfies SessionsResponse
+      return withVersion(reply, await dreamsOf(request.params.eventId, mine))
     },
   )
 
@@ -416,6 +427,10 @@ export const registerSessionRoutes = (
       }
       const spot = await facilitatorSpot(db, existing.event_id, body.facilitator_account_id)
       if (!spot.ok) return sendError(reply, 400)
+
+      // Last of the refusals and immediately before the write: a malformed body is
+      // still a 400, and nothing between here and the UPDATE can change the pool.
+      if (await refuseIfStale(request, reply, () => dreamsOf(existing.event_id, mine))) return reply
 
       const { facilitator_account_id: _wanted, ...fields } = body
       const patch =

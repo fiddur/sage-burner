@@ -21,6 +21,7 @@ import {
   leadRoleMember,
   pushSubscription,
 } from '../db/schema.ts'
+import { sendGuarded } from '../if-match.testing.ts'
 
 /**
  * The lead-roles register — the spreadsheet's roles tab.
@@ -144,7 +145,9 @@ const add = (
   })
 
 const edit = (server: FastifyInstance, cookie: string, id: string, payload: Record<string, unknown>) =>
-  server.inject({ method: 'PATCH', url: `/api/roles/${id}`, headers: { cookie }, payload })
+  sendGuarded((extra) =>
+    server.inject({ method: 'PATCH', url: `/api/roles/${id}`, headers: { cookie, ...extra }, payload }),
+  )
 
 const remove = (server: FastifyInstance, cookie: string | undefined, id: string) =>
   server.inject({
@@ -895,5 +898,45 @@ describe('a burn that has ended', () => {
     expect((await setLead(server, ada.cookie, id, { account_id: ada.id })).statusCode).toBe(200)
     expect((await joinTeam(server, ada.cookie, id, ada.id)).statusCode).toBe(200)
     expect((await remove(server, ada.cookie, id)).statusCode).toBe(204)
+  })
+})
+
+describe('rewriting a role somebody else has just rewritten', () => {
+  const rename = (server: FastifyInstance, cookie: string, id: string, version?: string) =>
+    server.inject({
+      method: 'PATCH',
+      url: `/api/roles/${id}`,
+      headers: { cookie, ...(version === undefined ? {} : { 'if-match': version }) },
+      payload: { title: 'Sauna keeper' },
+    })
+
+  it('refuses one written against no version of the register, and against an old one', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAccount(['member'])
+    const bea = await givenAccount(['member'], 'Bea')
+    const mine = (await add(server, ada.cookie, eventId)).json().role.id
+    const theirs = (await add(server, bea.cookie, eventId, { title: 'Gate' })).json().role.id
+
+    const asAdaSawIt = String((await list(server, ada.cookie, eventId)).headers.etag)
+
+    expect((await rename(server, ada.cookie, mine)).statusCode).toBe(428)
+
+    expect((await edit(server, bea.cookie, theirs, { title: 'Welcome gate' })).statusCode).toBe(200)
+
+    const refused = await rename(server, ada.cookie, mine, asAdaSawIt)
+    expect(refused.statusCode).toBe(412)
+    expect(refused.json().roles.map((role: { title: string }) => role.title)).toContain('Welcome gate')
+  })
+
+  it('takes one written against the version it was handed', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAccount(['member'])
+    const mine = (await add(server, ada.cookie, eventId)).json().role.id
+
+    const current = String((await list(server, ada.cookie, eventId)).headers.etag)
+
+    expect((await rename(server, ada.cookie, mine, current)).statusCode).toBe(200)
   })
 })

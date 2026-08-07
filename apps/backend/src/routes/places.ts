@@ -18,6 +18,7 @@ import { createGuards } from '../auth/guards.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
 import { event, place } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
+import { refuseIfStale, withVersion } from '../if-match.ts'
 import { copySourcesFor } from './copy-sources.ts'
 import { todayIso } from './events.ts'
 
@@ -85,12 +86,22 @@ export const registerPlaceRoutes = (
 ) => {
   const { requireApproved } = createGuards({ db, sessions })
 
+  /**
+   * The grid, as both the `GET` and every `If-Match` guard below see it (#274).
+   *
+   * One function, because a guard computing its own shape would tag something other
+   * than what the caller was shown and refuse every write forever.
+   */
+  const grid = async (eventId: string): Promise<PlacesResponse> => ({
+    places: await placesFor(db, eventId),
+  })
+
   app.get<{ Params: { eventId: string } }>(apiRoutes.getPlaces.fastify, async (request, reply) => {
     // Same reasoning as the questions and the active event: public, but an edit
     // has to show up without waiting out a heuristic freshness window.
     void reply.header('cache-control', 'no-cache')
 
-    return { places: await placesFor(db, request.params.eventId) } satisfies PlacesResponse
+    return withVersion(reply, await grid(request.params.eventId))
   })
 
   app.post<{ Params: { eventId: string } }>(
@@ -164,6 +175,10 @@ export const registerPlaceRoutes = (
       if (existing === undefined) return sendError(reply, 404)
       if (Object.keys(body).length === 0) return { place: existing }
 
+      // After the lookup, so a lane that is gone answers 404 rather than a grid it is
+      // not in, and after the no-op, which reads rather than writes.
+      if (await refuseIfStale(request, reply, () => grid(existing.event_id))) return reply
+
       const [updated] = await db.update(place).set(body).where(eq(place.id, request.params.id)).returning()
 
       return updated === undefined ? sendError(reply, 404) : { place: updated }
@@ -222,6 +237,8 @@ export const registerPlaceRoutes = (
         return sendError(reply, 404)
       }
 
+      if (await refuseIfStale(request, reply, () => grid(request.params.eventId))) return reply
+
       const existing = await placesFor(db, request.params.eventId)
       const wanted = body.ids
 
@@ -247,7 +264,7 @@ export const registerPlaceRoutes = (
         })
       })
 
-      return { places: await placesFor(db, request.params.eventId) } satisfies PlacesResponse
+      return withVersion(reply, await grid(request.params.eventId))
     },
   )
 

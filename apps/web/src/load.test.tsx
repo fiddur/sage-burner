@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Loaded } from './load.ts'
 import type { Remembered } from './remembered.tsx'
 
-import { apiError } from './api/client.ts'
+import { apiError, isApiError } from './api/client.ts'
 import { errorMessage, useAction, useLoad } from './load.ts'
 import { createRemembered, RememberedProvider } from './remembered.tsx'
 
@@ -64,12 +64,13 @@ const Actor = ({
   fallback?: string | ((failure: unknown) => string)
   onSuccess?: () => void
 }) => {
-  const { busy, error, run } = useAction(onSuccess)
+  const { busy, error, failure, run } = useAction(onSuccess)
 
   return (
     <div>
       <span data-testid="busy">{busy ? 'busy' : 'idle'}</span>
       <span data-testid="error">{error ?? 'none'}</span>
+      <span data-testid="failure">{isApiError(failure) ? String(failure.status) : 'none'}</span>
       <button type="button" onClick={() => run(work, fallback)}>
         Go
       </button>
@@ -567,5 +568,92 @@ describe('errorMessage', () => {
     expect(errorMessage(new Error('stack trace'), 'fallback')).toBe('fallback')
     expect(errorMessage('a string', 'fallback')).toBe('fallback')
     expect(errorMessage(undefined, 'fallback')).toBe('fallback')
+  })
+})
+
+describe('a write refused because somebody else got there first', () => {
+  it('re-reads, so "it has been refreshed" is true by the time it is read', async () => {
+    // The reload is `onSuccess` on every page that has one — which is every page
+    // with a guarded write, since they all re-read after a change anyway.
+    const reload = vi.fn()
+    render(
+      <Actor
+        work={() => Promise.reject(apiError(412, 'stale', 'Somebody else changed this.'))}
+        onSuccess={reload}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Go' }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('error').textContent).toBe('Somebody else changed this.')
+    })
+    expect(reload).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not re-read for an ordinary failure, which looking again would not fix', async () => {
+    // The passing sibling. Without it the test above would pass against a `catch`
+    // that reloaded on everything — and a 409 "the burn is full" reloaded over would
+    // read as the app doing something about it.
+    const reload = vi.fn()
+    render(
+      <Actor
+        work={() => Promise.reject(apiError(409, 'conflict', 'The burn is full.'))}
+        onSuccess={reload}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Go' }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('error').textContent).toBe('The burn is full.')
+    })
+    expect(reload).not.toHaveBeenCalled()
+  })
+
+  it('hands the failure itself over, for the fields that show what the other one says', async () => {
+    render(<Actor work={() => Promise.reject(apiError(412, 'stale', 'Changed.'))} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Go' }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('failure').textContent).toBe('412')
+    })
+  })
+
+  it('drops it again when the page writes a message of its own', async () => {
+    // `setError` is how a page reports something it worked out itself — an empty
+    // title, say — and leaving the last failure under it would put somebody else's
+    // paragraph beside an unrelated complaint.
+    const Both = () => {
+      const { error, failure, setError, run } = useAction()
+
+      return (
+        <div>
+          <span data-testid="error">{error ?? 'none'}</span>
+          <span data-testid="failure">{isApiError(failure) ? String(failure.status) : 'none'}</span>
+          <button
+            type="button"
+            onClick={() => run(() => Promise.reject(apiError(412, 'stale', 'Changed.')), 'x')}
+          >
+            Go
+          </button>
+          <button type="button" onClick={() => setError('Give it a name.')}>
+            Complain
+          </button>
+        </div>
+      )
+    }
+
+    render(<Both />)
+    fireEvent.click(screen.getByRole('button', { name: 'Go' }))
+    await waitFor(() => {
+      expect(screen.getByTestId('failure').textContent).toBe('412')
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Complain' }))
+
+    expect(screen.getByTestId('error').textContent).toBe('Give it a name.')
+    expect(screen.getByTestId('failure').textContent).toBe('none')
   })
 })

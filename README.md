@@ -904,16 +904,34 @@ carries no contact, allergies or payment state.
 
 Two consequences worth knowing rather than discovering.
 
-**The welcome text is last-write-wins, over the whole field.** `PATCH
-…/welcome` overwrites it rather than merging, so two people editing at once means
-one of them loses their paragraph and neither is told. The editor re-reads the
-current text when it opens, which shrinks the window from "since the page loaded"
-to "since Edit was pressed" — that is the difference that matters for a field
-forty-odd people now share, and it does not close it. Closing it properly means
-versioning the field and answering 409, which is more machinery than four burns a
-year justifies. The admin `PATCH` under Organise → Events is partial per field, so
-two admins touching different fields there do not collide; this one is a single
-field, so they always do.
+**The burn's shared furniture is written under a precondition** (#274). Each of the
+reads a shared page makes — the grid, the dream pool, the lead-roles register, the
+meal plan, the lodging and helping lists, the active burn — answers with an `ETag`
+over the representation itself, and each of the writes that _replaces_ a value the
+author was shown quotes it back as `If-Match`. Nothing is stored for it: the tag is
+a hash of the body the `GET` would send, so there is no column to migrate, nothing
+for a write to remember to bump, and reordering a whole collection is covered by the
+same tag as renaming one row in it. The `GET` and the guard go through one function
+per family, which is the only way the two can be kept saying the same thing.
+
+Sending no `If-Match` is refused as well, with 428. That is deliberate rather than
+strict: a write with nothing to assert is a write made against nothing, and treating
+the header as optional would mean forgetting it on one route silently restores
+last-write-wins there.
+
+Both refusals carry the resource **as it now stands**, and its new tag. So a page can
+say what the other person wrote rather than only that somebody did, and a retry costs
+no extra read. The longer fields — the welcome text, the words above the meal table —
+keep what was being typed and show the other version beside it; a refused click just
+warns and catches up, because there is nothing there worth reconciling.
+
+This deliberately reverses the rule that this app does not engineer for races. #256
+made staleness a _designed_ property — what is on screen may be five minutes old, and
+offline arbitrarily older — so a lost update stopped being a same-millisecond
+coincidence. Creating, deleting, and taking or leaving a job are untouched: they add
+or remove rather than replace, and nobody's words disappear into them. So are
+somebody's own record and the admin-only writes, where the only person who could
+collide with you is you on a second device.
 
 And deleting a helping option takes every member's ticks for it with it — `attendance_helping` cascades — so a
 member can now remove something other people signed up for. That follows from the
