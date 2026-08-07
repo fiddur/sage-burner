@@ -570,7 +570,7 @@ a:hover {
   margin: -0.5rem 0 1rem;
 }
 
-.place-list {
+.reorder-list {
   list-style: none;
   margin: 1rem 0;
   padding: 0;
@@ -578,7 +578,20 @@ a:hover {
   gap: 0.5rem;
 }
 
-.place-row {
+/* The three ways to move a row, kept together so they read as one control. */
+.reorder-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  flex: 0 0 auto;
+}
+
+/*
+  A list somebody can drag into order — the lanes, a burn's option lists, the FAQ.
+  One skeleton for all of them, since `ReorderableList` renders it (#146); a list
+  that needs a shape of its own adds a class beside these.
+*/
+.reorder-row {
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -587,7 +600,7 @@ a:hover {
   border-radius: 0.5rem;
 }
 
-.place-dragging {
+.reorder-row.is-dragging {
   opacity: 0.5;
 }
 

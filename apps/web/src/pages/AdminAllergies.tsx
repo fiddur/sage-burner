@@ -104,7 +104,7 @@ export const AdminAllergies = ({ api }: { api: AllergiesApi }) => {
 
       {loaded.status === 'ready' && (
         <>
-          <ul class="place-list">
+          <ul class="reorder-list">
             {items.map((item, index) => (
               <li key={item.id}>
                 {editing === item.id ? (

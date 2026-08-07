@@ -8,8 +8,8 @@ import type { ApiClient } from '../api/client.ts'
 import { useSelectedBurn } from '../burn.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
+import { ReorderableList } from '../components/ReorderableList.tsx'
 import { useAction, useLoad } from '../load.ts'
-import { moveTo, swap } from '../reorder.ts'
 import { isApproved, useViewer } from '../viewer.tsx'
 
 export type OptionsApi = Pick<
@@ -121,12 +121,9 @@ const OptionList = ({
   const [label, setLabel] = useState('')
   const [capacity, setCapacity] = useState('')
   const [editing, setEditing] = useState<string | undefined>(undefined)
-  const [dragging, setDragging] = useState<number | undefined>(undefined)
-  const ids = options.map((row) => row.id)
 
-  const reorderTo = (next: string[] | undefined) => {
-    if (next === undefined) return
-    run(() => api.reorderEventOptions(eventId, kind, next), 'Could not reorder that list.')
+  const reorderTo = (wanted: string[]) => {
+    run(() => api.reorderEventOptions(eventId, kind, wanted), 'Could not reorder that list.')
   }
 
   const add = () => {
@@ -151,40 +148,9 @@ const OptionList = ({
 
       {options.length === 0 && <p class="form-note">Nothing here yet.</p>}
 
-      <ol class="place-list">
-        {options.map((row, index) => (
-          <li
-            key={row.id}
-            class={dragging === index ? 'place-row place-dragging' : 'place-row'}
-            onDragOver={(dragEvent) => dragEvent.preventDefault()}
-            onDrop={(dropEvent) => {
-              dropEvent.preventDefault()
-              if (dragging !== undefined) reorderTo(moveTo(ids, dragging, index))
-              setDragging(undefined)
-            }}
-          >
-            <button
-              type="button"
-              class="drag-handle"
-              draggable={!busy}
-              disabled={busy}
-              aria-label={`Move ${row.label}`}
-              onDragStart={(dragEvent) => {
-                // Firefox will not start a drag whose data store is empty.
-                dragEvent.dataTransfer?.setData('text/plain', row.id)
-                setDragging(index)
-              }}
-              onDragEnd={() => setDragging(undefined)}
-              onKeyDown={(keyEvent) => {
-                const by = keyEvent.key === 'ArrowUp' ? -1 : keyEvent.key === 'ArrowDown' ? 1 : undefined
-                if (by === undefined) return
-                keyEvent.preventDefault()
-                reorderTo(swap(ids, index, by))
-              }}
-            >
-              ⠿
-            </button>
-
+      <ReorderableList rows={options} busy={busy} labelFor={(row) => row.label} onReorder={reorderTo}>
+        {(row) => (
+          <>
             {editing === row.id ? (
               <OptionFields
                 option={row}
@@ -229,9 +195,9 @@ const OptionList = ({
                 </button>
               </>
             )}
-          </li>
-        ))}
-      </ol>
+          </>
+        )}
+      </ReorderableList>
 
       <form
         class="form"
