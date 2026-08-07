@@ -200,7 +200,7 @@ export const QuestionEditor = ({ api }: { api: QuestionsApi }) => {
             />
           ) : (
             <>
-              <span class="question-label">{row.label}</span>
+              <span class="question-label reorder-name">{row.label}</span>
               <span class="form-note">
                 {TYPE_LABELS[row.type]}
                 {row.required ? ' · required' : ''}

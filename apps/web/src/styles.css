@@ -567,6 +567,13 @@ a:hover {
   gap: 0.5rem;
 }
 
+/* The row's name, which takes the slack so the actions sit at the right edge rather
+   than against the text. Every reorderable row wants this; it was `.place-name`, and
+   the two lists that did not know to use it had their buttons in the wrong place. */
+.reorder-name {
+  flex: 1;
+}
+
 /* The three ways to move a row, kept together so they read as one control. */
 .reorder-controls {
   display: inline-flex;
@@ -656,10 +663,6 @@ a:hover {
   border-radius: 50%;
   display: inline-block;
   background: var(--place-color);
-}
-
-.place-name {
-  flex: 1;
 }
 
 .place-color-name {

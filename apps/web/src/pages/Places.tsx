@@ -159,7 +159,7 @@ export const Places = ({ api }: { api: PlacesApi }) => {
                   {row.emoji}
                 </span>
                 <span class={`place-swatch place-${row.color}`} aria-hidden="true" />
-                <span class="place-name">{row.name}</span>
+                <span class="reorder-name">{row.name}</span>
                 <span class="place-color-name">{row.color}</span>
 
                 <IconButton

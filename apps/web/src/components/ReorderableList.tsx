@@ -8,12 +8,13 @@ import { IconButton } from './IconButton.tsx'
 /**
  * A list somebody can put in order (#146).
  *
- * Four pages let you rearrange one — the schedule's lanes, a burn's lodging and
- * helping options, the allergy vocabulary and the FAQ — and each had written out its
- * own: the drop target, the `⠿` handle with its `dataTransfer` workaround, the drag
- * state, the arrow-key fallback. Thirty-odd lines, and the affordances are exactly
- * what goes missing when they are re-derived — the allergy list grew ↑/↓ buttons and
- * no drag, `QuestionEditor` the same, and the other three drag and nothing else.
+ * Five pages let you rearrange one — the schedule's lanes, a burn's lodging and
+ * helping options, the allergy vocabulary, the FAQ and the application questions —
+ * and each had written out its own: the drop target, the `⠿` handle with its
+ * `dataTransfer` workaround, the drag state, the arrow-key fallback. Thirty-odd
+ * lines, and the affordances are exactly what goes missing when they are re-derived:
+ * the allergy list and `QuestionEditor` grew ↑/↓ buttons and no drag, while the other
+ * three had the handle and no buttons.
  *
  * **All three affordances, on every list.** Dragging for a mouse; the arrow keys on
  * the handle for a keyboard; and ↑/↓ buttons, which are the only one of the three
@@ -21,7 +22,10 @@ import { IconButton } from './IconButton.tsx'
  * lists that had a handle alone could not be reordered on the device half of this is
  * read on.
  *
- * The **rows** are the caller's — four different shapes, and only their order is
+ * Both ends are disabled as well as guarded by `swap`, so a control says what it
+ * will do rather than doing nothing when pressed.
+ *
+ * The **rows** are the caller's — five different shapes, and only their order is
  * shared — so this owns the skeleton and takes the body as a function. Deliberately
  * not a generic editable list: the field bodies genuinely differ, which is the line
  * #147 draws.
@@ -95,8 +99,6 @@ export const ReorderableList = <Row extends { id: string }>({
               ⠿
             </button>
 
-            {/* Disabled at the ends as well as guarded by `swap`, so the control says
-                what it will do rather than doing nothing when pressed. */}
             <IconButton
               icon="↑"
               label={`Move ${labelFor(row)} up`}
