@@ -1,4 +1,5 @@
 import type { CachePlan } from './cache.ts'
+import type { WindowClients } from './notification.ts'
 
 import {
   API_CACHE,
@@ -12,7 +13,7 @@ import {
   trim,
   worthStoring,
 } from './cache.ts'
-import { alertFrom } from './notification.ts'
+import { alertFrom, landOn } from './notification.ts'
 
 /**
  * The service worker: push notifications (#248) and offline (#256).
@@ -51,11 +52,6 @@ interface SwNotificationEvent extends ExtendableEvent {
   notification: { close: () => void; data?: { path?: string } }
 }
 
-interface SwClient {
-  focus: () => Promise<SwClient>
-  url: string
-}
-
 interface WorkerScope {
   addEventListener: {
     (type: 'activate' | 'install', handler: (event: ExtendableEvent) => void): void
@@ -64,11 +60,7 @@ interface WorkerScope {
     (type: 'push', handler: (event: SwPushEvent) => void): void
   }
   caches: CacheStorage
-  clients: {
-    claim: () => Promise<void>
-    matchAll: (options: { includeUncontrolled: boolean; type: 'window' }) => Promise<SwClient[]>
-    openWindow: (url: string) => Promise<SwClient | null>
-  }
+  clients: WindowClients & { claim: () => Promise<void> }
   location: { origin: string }
   registration: {
     showNotification: (title: string, options: Record<string, unknown>) => Promise<void>
@@ -185,28 +177,5 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
 
-  const path = event.notification.data?.path ?? '/'
-
-  event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (windows) => {
-      // Focus a window that is already showing the page rather than piling up new
-      // ones, which is what happens on a phone otherwise.
-      //
-      // **A suffix match on the whole URL**, which is looser than it looks: a client
-      // carrying a query or a fragment falls outside it, and so would a future route
-      // that ends in another one's path. Today's links make it behave. Comparing
-      // parsed pathnames is the honest version and is #279's remaining half.
-      //
-      // **Never navigated**, whatever it matches. `client.navigate()` is a full page
-      // load, so pointing an open window at the notification's page would discard
-      // whatever somebody had typed into a markdown editor — the thing the dream
-      // panel was rewritten to stop doing. A second window is the cheaper mistake;
-      // routing in-page by `postMessage` would avoid both.
-      for (const client of windows) {
-        if (client.url.endsWith(path)) return client.focus()
-      }
-
-      return self.clients.openWindow(path)
-    }),
-  )
+  event.waitUntil(landOn(self.clients, self.location.origin, event.notification.data?.path))
 })
