@@ -961,16 +961,10 @@ export const leadRole = sqliteTable(
 )
 
 /**
- * The Q&A the spreadsheet had a tab for: how to get there, what to bring, what
- * taking part actually asks of you (#28).
+ * The Q&A the spreadsheet had a tab for (#28). Why it is per burn: `schemas/faq.ts`.
  *
- * **Per burn**, like the places and the register: the practical answers change with
- * the site and the year, and last summer's directions are wrong for the next one —
- * with a copy action, because most of them do carry over.
- *
- * The order is the admin-editable one every list here has, and it matters more than
- * usual: a FAQ is read top to bottom, and the question somebody has first should be
- * the first one they see.
+ * The order matters more than in the other lists: a FAQ is read top to bottom, and
+ * the question somebody has first should be the first one they see.
  */
 export const faqEntry = sqliteTable(
   'faq_entry',
@@ -979,9 +973,7 @@ export const faqEntry = sqliteTable(
     event_id: text('event_id')
       .notNull()
       .references(() => event.id, { onDelete: 'cascade' }),
-    /** The question as somebody would ask it. Plain text — it is a heading. */
     question: text('question').notNull(),
-    /** The answer. Markdown, like every longer field a member writes for others. */
     answer: text('answer').notNull(),
     order: integer('order').notNull(),
     created_at: text('created_at').notNull(),

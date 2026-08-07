@@ -44,9 +44,10 @@ export const faqFor = (db: Database, eventId: string): Promise<FaqEntry[]> =>
  *
  * **Members, not the public.** The welcome text is this app's public surface; these
  * answers are the practical ones — how to find the gate, what the shower situation
- * is — and they are written for people who are already coming. Opening it later is
- * moving one route out from behind the guard, which is a smaller decision than
- * taking it back.
+ * is — and they are written for people who are already coming. It is the page most
+ * worth reading *before* deciding to come, though, so the reader need not be coming
+ * to this burn: `Faq.tsx` falls back to the open burn when the selector is empty
+ * (#321), and the guard here is unchanged.
  *
  * Reads and writes are both `requireApproved`, and every write needs the burn to be
  * open: a finished burn's Q&A is the record of what was asked, and an id noted while
@@ -295,6 +296,12 @@ export const registerFaqRoutes = (app: FastifyInstance, { db, sessions, now }: F
 
       if (seeded === 'not_found') return sendError(reply, 404)
       if (seeded === 'conflict') return sendError(reply, 409)
+
+      // 201 like `copyPlaces` and `copyLeadRoles` — rows were created — *and* tagged
+      // like every other read of this list, which those two are not: the client holds
+      // one tag per collection and a write that answers the new list may as well hand
+      // it over rather than making the reload fetch it (#323).
+      void reply.code(201)
 
       return withVersion(reply, await questions(request.params.eventId))
     },
