@@ -244,7 +244,7 @@ than one an installed copy holds on to.
 Two caches, and the split is the whole of what stays on a device:
 
 - **`sage-burner-shell-v1`** — the HTML shell, the hashed bundles, the manifest,
-  the icon. None of it is anybody's data. Kept across a sign-out, because
+  the icon, the banner. None of it is anybody's data. Kept across a sign-out, because
   dropping it would mean the next person to open the app offline gets nothing at
   all. Trimmed to the 40 most recently stored entries, oldest first, so old
   builds' chunks do not accumulate forever.

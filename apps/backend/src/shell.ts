@@ -136,9 +136,10 @@ const subjectFor = async (
 /**
  * Serve the shell, card and all.
  *
- * A failed read serves the shell without the card rather than an error: the app is a
- * page that fetches its own data, and a browser that gets HTML can at least say what
- * is wrong. A crawler meeting the same moment gets what it got before this existed.
+ * A failed read still serves a page, with the software's name on it rather than the
+ * installation's: the app fetches its own data and a browser that gets HTML can at
+ * least say what is wrong, while a shell whose `<title>` was taken out and never
+ * replaced would leave the tab wearing a URL.
  *
  * The replacement is a function so the injected text is taken literally — `$&` and
  * `$'` in a replacement string are patterns, and the welcome text is written by
@@ -148,10 +149,10 @@ export const createShellHandler = (deps: ShellDeps) => {
   const { config, template } = deps
 
   return async (request: FastifyRequest, reply: FastifyReply) => {
-    let head = ''
+    let subject: ShareSubject = { installation: FALLBACK_NAME }
 
     try {
-      head = shareHead(await subjectFor(deps, originOf(request, config)))
+      subject = await subjectFor(deps, originOf(request, config))
     } catch (error) {
       request.log.warn({ err: error }, 'building the share card')
     }
@@ -162,6 +163,6 @@ export const createShellHandler = (deps: ShellDeps) => {
     return reply
       .header('content-type', 'text/html; charset=utf-8')
       .header('cache-control', 'no-cache')
-      .send(head === '' ? template : template.replace('</head>', () => `  ${head}\n  </head>`))
+      .send(template.replace('</head>', () => `  ${shareHead(subject)}\n  </head>`))
   }
 }

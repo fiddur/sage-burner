@@ -1,5 +1,5 @@
 import type { FastifyHelmetOptions } from '@fastify/helmet'
-import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
+import type { FastifyInstance } from 'fastify'
 
 import helmet from '@fastify/helmet'
 import fastifyStatic from '@fastify/static'
@@ -468,7 +468,7 @@ export const createApp = async ({
 
   const webRoot = config.web_root
   const servesWebApp = webRoot !== undefined
-  let sendShell: ((request: FastifyRequest, reply: FastifyReply) => Promise<unknown>) | undefined
+  let sendShell: ReturnType<typeof createShellHandler> | undefined
 
   if (webRoot !== undefined) {
     const root = path.resolve(webRoot)
