@@ -1110,23 +1110,61 @@ a:hover {
   border-bottom-width: 2px;
 }
 
+/*
+  The table scrolls itself rather than taking the page with it, and for the same
+  reason the schedule grid does: five columns of crew lists run past the bottom of a
+  phone, and scrolling to the last one used to leave the header names behind.
+
+  `70vh` matches `.schedule-grid-wrap`, and the same rule applies here — an element
+  with one axis set to something other than `visible` computes the other to `auto`,
+  so a height is what gives the sticky header a box that actually scrolls.
+*/
+.meal-table-wrap {
+  overflow: auto;
+  max-height: 70vh;
+}
+
 /* The meal plan's table — the spreadsheet tab it replaces, minus the merged cells. */
 .meal-table {
-  border-collapse: collapse;
+  /*
+    `separate`, like the schedule grid and for the same reason: a collapsed border
+    belongs to the table, so it scrolls out from under the stuck header and leaves it
+    with no line beneath it. Each cell draws its own right and bottom edge, and the
+    table the two outer ones, or every shared edge would be doubled.
+  */
+  border-collapse: separate;
+  border-spacing: 0;
+  border-top: 1px solid var(--line);
+  border-left: 1px solid var(--line);
   width: 100%;
 }
 
 .meal-table th,
 .meal-table td {
-  border: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
   padding: 0.3rem 0.5rem;
   text-align: start;
   vertical-align: top;
 }
 
+.meal-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  /* Load-bearing, as on the grid: without one the rows show straight through it. */
+  background: var(--paper);
+}
+
 .meal-table th[scope='row'] {
   white-space: nowrap;
   font-weight: 600;
+}
+
+/* The time, under the day it belongs to and quieter than it. */
+.meal-at {
+  color: var(--muted);
+  font-weight: 400;
 }
 
 .meal-crew {

@@ -87,6 +87,49 @@ describe('the meal plan', () => {
     expect(screen.getByText('18:00')).toBeTruthy()
   })
 
+  it('gives the sitting one column and what is cooked another', async () => {
+    // Six columns were five too wide on a phone. When and Meal say one thing between
+    // them, and so do the sitting's name and the idea for it.
+    renderPage(stub())
+
+    await screen.findByText('Dinner')
+
+    expect(screen.getAllByRole('columnheader').map((cell) => cell.textContent)).toEqual([
+      'Meal',
+      'Food',
+      'Lead',
+      'Help',
+      'Cleanup',
+    ])
+  })
+
+  it('stacks the day and the time in the first cell, short enough to sit in it', async () => {
+    renderPage(stub())
+
+    const when = await screen.findByRole('rowheader')
+
+    // `Sat 1`, not `Saturday 1`: this column is now as narrow as the table gets.
+    expect(when.textContent).toBe('Sat 118:00')
+  })
+
+  it('repeats the time but not the day, like the sheet’s merged cells', async () => {
+    renderPage(
+      stub({}, [
+        aMeal({ id: 'm-1', at: '08:00', label: 'Breakfast' }),
+        aMeal({ id: 'm-2', at: '18:00', label: 'Dinner' }),
+        aMeal({ id: 'm-3', date: '2026-08-02', at: '08:00', label: 'Breakfast' }),
+      ]),
+    )
+
+    await screen.findByText('Dinner')
+
+    expect(screen.getAllByRole('rowheader').map((cell) => cell.textContent)).toEqual([
+      'Sat 108:00',
+      '18:00',
+      'Sun 208:00',
+    ])
+  })
+
   it('takes the lead for somebody', async () => {
     const setMealLead = vi.fn<MealsApi['setMealLead']>(() => Promise.resolve({ meal: aMeal() }))
     renderPage(stub({ setMealLead }))

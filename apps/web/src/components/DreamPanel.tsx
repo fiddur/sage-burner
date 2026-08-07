@@ -13,16 +13,29 @@ import { useEffect, useRef } from 'preact/hooks'
 export const DreamPanel = ({
   label,
   error,
+  onBack,
   onClose,
   children,
 }: {
   label: string
   /** Shown here rather than on the page, which renders under the overlay. */
   error: string | undefined
+  /**
+   * A step to take before closing, if there is one — Escape and the backdrop take it
+   * instead (#207).
+   *
+   * The form inside is what this is for: #205 stopped a *refused write* discarding
+   * what somebody had typed, and Escape went on doing it silently. With a step to go
+   * back to, the first press leaves the form and the second closes the panel. Without
+   * one, the first press closes — reading a dream and pressing Escape is the common
+   * case, and a press that does nothing would be worse than the thing being guarded.
+   */
+  onBack?: () => void
   onClose: () => void
   children: ComponentChildren
 }) => {
   const panel = useRef<HTMLDivElement>(null)
+  const dismiss = onBack ?? onClose
 
   useEffect(() => {
     panel.current?.focus()
@@ -34,16 +47,16 @@ export const DreamPanel = ({
   // the first thing you did.
   useEffect(() => {
     const onKey = (keyEvent: KeyboardEvent) => {
-      if (keyEvent.key === 'Escape') onClose()
+      if (keyEvent.key === 'Escape') dismiss()
     }
 
     document.addEventListener('keydown', onKey)
 
     return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [dismiss])
 
   return (
-    <div class="dream-modal" onClick={onClose}>
+    <div class="dream-modal" onClick={dismiss}>
       <div
         class="dream-panel"
         role="dialog"

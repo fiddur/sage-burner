@@ -305,12 +305,46 @@ describe('handing on a place that has been paid for', () => {
     await waitFor(() => expect(transferMyPlace).toHaveBeenCalledWith('e-1', { to_account_id: 'a-2' }))
   })
 
-  it('says so when nobody is waiting, rather than an empty picker', async () => {
+  it('says everybody has paid when nobody can take it, rather than an empty picker', async () => {
+    // The words the filter actually supports (#263). It offers every *unpaid* entry,
+    // members above the line included, so "nobody is waiting" described a different
+    // list from the one being built.
     render(<YourBurns api={stub({ getMembers: () => Promise.resolve(roster([])) }, paidBurn())} />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Hand my place to somebody else' }))
 
-    expect(await screen.findByText(/Nobody is waiting/)).toBeTruthy()
+    expect(await screen.findByText(/Everybody at this burn has paid/)).toBeTruthy()
+  })
+
+  it('offers an unpaid member above the line, which is what the words now say', async () => {
+    // The passing sibling for the copy above: an unpaid member is exactly who you
+    // might hand a place to, since paying is what secures one.
+    const getMembers = vi.fn(() =>
+      Promise.resolve(roster([waiting({ account_id: 'a-4', name: 'Dag', waiting: false })])),
+    )
+    render(<YourBurns api={stub({ getMembers }, paidBurn())} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Hand my place to somebody else' }))
+
+    expect(await screen.findByRole('option', { name: 'Dag' })).toBeTruthy()
+  })
+
+  it('drops the list it fetched last time when the picker is reopened', async () => {
+    // *Never mind* then reopening rendered the previous list until the refetch landed,
+    // with whoever had paid in between still on it (#263).
+    let entries = [waiting()]
+    const getMembers = vi.fn(() => Promise.resolve(roster(entries)))
+    render(<YourBurns api={stub({ getMembers }, paidBurn())} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Hand my place to somebody else' }))
+    expect(await screen.findByRole('option', { name: 'Bea' })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Never mind' }))
+    entries = []
+    fireEvent.click(screen.getByRole('button', { name: 'Hand my place to somebody else' }))
+
+    expect(screen.queryByRole('option', { name: 'Bea' })).toBeNull()
+    expect(await screen.findByText(/Everybody at this burn has paid/)).toBeTruthy()
   })
 
   it('reports a hand-over the server refused, rather than looking done', async () => {
