@@ -10,6 +10,7 @@ import { GuardedPage } from '../components/GuardedPage.tsx'
 import { HelperStrip } from '../components/HelperStrip.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
+import { Refreshing } from '../components/Refreshing.tsx'
 import { dayName } from '../datetime.ts'
 import { useAction, useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
@@ -44,7 +45,7 @@ export const Meals = ({ api }: { api: MealsApi }) => {
   const burn = useSelectedBurn()
   const [editingIntro, setEditingIntro] = useState(false)
 
-  const { loaded, reload } = useLoad<Plan>(
+  const { loaded, refreshing, reload } = useLoad<Plan>(
     async (signal) => {
       if (burn === undefined) return null
 
@@ -55,7 +56,7 @@ export const Meals = ({ api }: { api: MealsApi }) => {
 
       return { ...plan, eventId: burn.event.id, attendees: attendees.attendees }
     },
-    { key: burn?.event.id ?? '', fallback: 'Could not load the meal plan.', live: true },
+    { key: burn?.event.id ?? '', fallback: 'Could not load the meal plan.', live: true, remember: 'meals' },
   )
 
   const { busy, error, run } = useAction(reload)
@@ -63,7 +64,9 @@ export const Meals = ({ api }: { api: MealsApi }) => {
 
   return (
     <GuardedPage title="Meals" require="approved">
-      <h1>Meals</h1>
+      <h1>
+        Meals <Refreshing on={refreshing} />
+      </h1>
 
       {error !== undefined && (
         <p class="form-error" role="alert">

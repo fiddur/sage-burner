@@ -8,6 +8,7 @@ import type { ApiClient } from '../api/client.ts'
 import { useSelectedBurn } from '../burn.tsx'
 import { DreamFields } from '../components/DreamFields.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
+import { Refreshing } from '../components/Refreshing.tsx'
 import { shortDayOf } from '../datetime.ts'
 import { useAction, useLoad } from '../load.ts'
 import { isMember, useViewer } from '../viewer.tsx'
@@ -54,7 +55,7 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
   // The burn comes first: since #156 the lanes belong to one. With no burn open
   // there is nothing to offer a dream to either, and `getSessions` says so anyway.
   const burn = useSelectedBurn()
-  const { loaded, reload } = useLoad(
+  const { loaded, refreshing, reload } = useLoad(
     async (signal) => {
       if (burn === undefined) return { sessions: [], places: [], attendees: [] }
 
@@ -66,7 +67,13 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
 
       return { sessions: dreams.sessions, places: places.places, attendees: attendees.attendees }
     },
-    { enabled: member, key: burn?.event.id ?? '', fallback: 'Could not load the dreams.', live: true },
+    {
+      enabled: member,
+      key: burn?.event.id ?? '',
+      fallback: 'Could not load the dreams.',
+      live: true,
+      remember: 'dreams',
+    },
   )
 
   const { busy, error, setError, run } = useAction(reload)
@@ -90,7 +97,9 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
 
   return (
     <GuardedPage title="Dreams" require="member">
-      <h1>Dreams</h1>
+      <h1>
+        Dreams <Refreshing on={refreshing} />
+      </h1>
 
       <p class="form-note">
         Workshops, ceremonies, happenings — whatever you want to offer. Say what it is now and work out when

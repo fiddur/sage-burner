@@ -63,6 +63,14 @@ export const registerPwaRoutes = (app: FastifyInstance, { db, now = () => new Da
       .limit(1)
 
     const icon = await currentIcon()
+    const contentType = icon?.content_type ?? 'image/svg+xml'
+    const entry = {
+      // The version is what makes a new icon a new URL, so an installed copy
+      // picks it up rather than keeping the one it was installed with.
+      src: `${apiRoutes.getInstallationIcon.path()}?v=${icon?.updated_at ?? 'default'}`,
+      type: contentType,
+      sizes: sizesFor(contentType),
+    }
 
     // `no-cache` for the same reason `/api/installation` uses it: a rename or a new
     // icon that sat invisible in a cache would look exactly like the edit not having
@@ -80,13 +88,17 @@ export const registerPwaRoutes = (app: FastifyInstance, { db, now = () => new Da
         theme_color: THEME_COLOR,
         background_color: BACKGROUND_COLOR,
         icons: [
-          {
-            // The version is what makes a new icon a new URL, so an installed copy
-            // picks it up rather than keeping the one it was installed with.
-            src: `${apiRoutes.getInstallationIcon.path()}?v=${icon?.updated_at ?? 'default'}`,
-            type: icon?.content_type ?? 'image/svg+xml',
-            sizes: sizesFor(icon?.content_type ?? 'image/svg+xml'),
-          },
+          { ...entry, purpose: 'any' },
+          // An uploaded icon is offered as maskable as well, and that is what stops
+          // Android drawing a white plate behind it: without a maskable entry the
+          // launcher makes its own adaptive icon by shrinking `any` onto a white
+          // circle, so a logo with its own background comes out ringed in white.
+          // Declaring maskable hands the launcher an edge-to-edge image instead.
+          //
+          // Not offered for the app's own flame, which is an emoji sitting in the top
+          // left of its box: a circular mask would cut it. An admin's file is the
+          // admin's to pad, on the same reasoning as serving their SVG as authored.
+          ...(icon === undefined ? [] : [{ ...entry, purpose: 'maskable' }]),
         ],
       }),
     )

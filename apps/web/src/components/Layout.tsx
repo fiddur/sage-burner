@@ -1,5 +1,7 @@
 import type { ComponentChildren } from 'preact'
 
+import { apiRoutes } from '@sage-burner/shared'
+
 import type { BellApi } from './NotificationBell.tsx'
 
 import { useBurns } from '../burn.tsx'
@@ -36,9 +38,11 @@ export const Layout = ({ api, children }: { api: BellApi; children: ComponentChi
     <div class="layout">
       <header class="site-header">
         <a class="brand" href="/">
-          <span class="brand-mark" aria-hidden="true">
-            🔥
-          </span>
+          {/* The icon route rather than the flame written out here: it answers with
+              whatever an admin uploaded and with the app's own mark when nobody has,
+              so the bar wears what the home screen does without having to ask which
+              it is. Decorative — the name is right beside it. */}
+          <img class="brand-mark" src={apiRoutes.getInstallationIcon.path()} alt="" />
           <span class="brand-name">{title}</span>
         </a>
 

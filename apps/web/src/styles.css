@@ -89,6 +89,17 @@ a:hover {
   text-decoration: none;
 }
 
+/* Sized here rather than left to the file: an admin uploads 512 square, and an SVG
+   logo may declare no size at all. The rounding is so an icon with its own
+   background reads as a mark rather than as a picture that failed to fit. */
+.brand-mark {
+  align-self: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  object-fit: contain;
+  border-radius: 0.35rem;
+}
+
 .brand-name {
   letter-spacing: 0.01em;
 }
@@ -1182,6 +1193,12 @@ a:hover {
   background: var(--paper);
 }
 
+/* What a launcher's mask leaves. Circular because it is the strictest of the shapes
+   Android picks between, so an icon that survives this survives all of them. */
+.app-icon-masked {
+  border-radius: 50%;
+}
+
 /* The corner's circle, now that it may be a picture rather than letters. */
 .avatar-link {
   display: inline-flex;
@@ -1295,6 +1312,33 @@ img.avatar {
   background: color-mix(in srgb, var(--muted) 10%, transparent);
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+/* Sized in `em` so it follows whatever heading it sits beside. */
+.refreshing {
+  display: inline-block;
+  width: 0.6em;
+  height: 0.6em;
+  margin-inline-start: 0.5em;
+  border: 0.12em solid var(--line);
+  border-block-start-color: var(--ember);
+  border-radius: 50%;
+  vertical-align: baseline;
+  animation: turning 0.8s linear infinite;
+}
+
+@keyframes turning {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+/* Slowed rather than stopped: it is the only thing saying a refresh is under way,
+   and a still ring says nothing at all. */
+@media (prefers-reduced-motion: reduce) {
+  .refreshing {
+    animation-duration: 4s;
+  }
 }
 
 /* The faces of whoever gave a dream a ❤️‍🔥. Overlapped, like every stack of avatars. */

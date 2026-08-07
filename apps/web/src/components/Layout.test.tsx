@@ -1,5 +1,6 @@
 import type { AccountRole, MyBurn } from '@sage-burner/shared'
 
+import { apiRoutes } from '@sage-burner/shared'
 import { cleanup, fireEvent, render, screen } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -116,6 +117,19 @@ describe('the nav', () => {
     renderNav(signedInAs())
 
     expectLinks([], ['Your burn', 'Members', 'Dreams', 'Schedule', 'Leads', 'Your details', 'Organise'])
+  })
+})
+
+describe('the brand', () => {
+  it('wears the installation icon rather than a flame written into the bar', () => {
+    // The route answers with the uploaded icon or the app's own mark, so the header
+    // and the home screen cannot end up showing different things.
+    renderNav(signedInAs('member'))
+
+    const mark = document.querySelector('img.brand-mark')
+    expect(mark?.getAttribute('src')).toBe(apiRoutes.getInstallationIcon.path())
+    // Decorative: the name is beside it, and a second reading of it is noise.
+    expect(mark?.getAttribute('alt')).toBe('')
   })
 })
 

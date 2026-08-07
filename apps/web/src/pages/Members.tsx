@@ -8,6 +8,7 @@ import { allergiesOf } from '../allergies.ts'
 import { useSelectedBurn } from '../burn.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
+import { Refreshing } from '../components/Refreshing.tsx'
 import { WaitingListLine, startsTheWaitingList } from '../components/WaitingListLine.tsx'
 import { useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
@@ -30,7 +31,7 @@ export type MembersApi = Pick<ApiClient, 'getMembers'>
 export const Members = ({ api }: { api: MembersApi }) => {
   const viewer = useViewer()
   const burn = useSelectedBurn()
-  const { loaded } = useLoad(
+  const { loaded, refreshing } = useLoad(
     async (signal) =>
       burn === undefined ? { event: null, entries: [] } : await api.getMembers(burn.event.id, signal),
     {
@@ -38,6 +39,7 @@ export const Members = ({ api }: { api: MembersApi }) => {
       key: burn?.event.id ?? '',
       fallback: 'Could not load the list. Please reload the page.',
       live: true,
+      remember: 'members',
     },
   )
 
@@ -46,7 +48,9 @@ export const Members = ({ api }: { api: MembersApi }) => {
 
   return (
     <GuardedPage title="Members" require="approved">
-      <h1>Members</h1>
+      <h1>
+        Members <Refreshing on={refreshing} />
+      </h1>
 
       {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
 

@@ -1,6 +1,7 @@
 import type { ApiClient } from '../api/client.ts'
 
 import { forgetCachedMemberData } from '../offline.ts'
+import { useRemembered } from '../remembered.tsx'
 import { useSetViewer } from '../viewer.tsx'
 
 /**
@@ -23,8 +24,13 @@ export const LogOutButton = ({
   forget?: () => Promise<boolean>
 }) => {
   const setViewer = useSetViewer()
+  const remembered = useRemembered()
 
   const logOut = async () => {
+    // The same reasoning as the cache below, one layer up: the pages held in memory
+    // are the same member data, and the tab is not reloaded on the way out.
+    remembered.forget()
+
     // Before the request, not after: this is the half that has to happen. The cookie
     // expires on its own and a stale one reaches nothing, but a roster left in the
     // browser's cache is member data still on the device — and if the request throws
