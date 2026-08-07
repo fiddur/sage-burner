@@ -185,6 +185,36 @@ A content type rather than a list of paths to skip — a list is a thing to keep
 step with the routes, and the route it goes stale against is the one that breaks
 the app offline.
 
+### Offering to install it
+
+A strip offers a one-tap **Install** where the browser allows one (#281), and says
+nothing where it does not.
+
+**Chromium only, deliberately.** `beforeinstallprompt` is the only API that opens a
+browser's own install flow; Firefox and Safari have no equivalent, and there is no way
+to open Firefox's "Add to Home screen" or iOS Safari's Share sheet from a page. The
+alternative was written instructions, which means naming a menu item that moves
+between releases and goes stale silently — so those browsers get nothing rather than
+directions that may be wrong.
+
+**Watched from before the first render**, in `main.tsx` rather than in an effect.
+`beforeinstallprompt` fires once, when the browser decides the site qualifies, and
+that can happen before any component has mounted — a listener attached on mount would
+miss it and the button would never appear, which is the kind of race that reads as
+"works on my machine". `watchInstalls()` builds an object rather than using a module's
+variables, for the reason `createRemembered` does: two suites in one process would
+otherwise share one.
+
+`preventDefault()` on the event, or Chrome shows its own bar as well and the same
+offer is made twice in two places. The offer is spent after one prompt, so the strip
+goes on click; `appinstalled` clears it too, and an app already running standalone
+never listens at all.
+
+Dismissible, remembered in `localStorage`. The event fires on every visit until the
+app is installed, so a nudge with no "not now" is a nudge for ever. Reading that
+store is wrapped: it throws rather than answering when a browser blocks storage, and a
+page that will not render is worse than a nudge dismissed twice.
+
 ### Saying how old it is
 
 Every answer served from the cache is stamped `x-cached-at`, and the page reads

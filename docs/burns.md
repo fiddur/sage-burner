@@ -244,10 +244,22 @@ which is [#14]'s half of the work.
 so people can put it in their phone rather than reloading a page.
 
 The **Schedule page carries the link**, for the burn selected in the bar, with a
-copy button beside it (#258). The button is the part that works: following the link
-downloads a snapshot in most browsers, where the point is a subscription that keeps
-up. Until then nothing in `apps/web` referenced the feed at all, so it existed and
-was reachable only by typing a URL with a UUID in it.
+copy button beside it (#258). Until then nothing in `apps/web` referenced the feed at
+all, so it existed and was reachable only by typing a URL with a UUID in it.
+
+**The link is `webcal://`, the copy button gives `https://`** (#298), and the split is
+not arbitrary. `webcal` is what asks an operating system to _subscribe_ to a live
+feed; following the `https` URL downloads a snapshot that never updates, which is the
+opposite of the point. Apple Calendar on macOS and iOS, Outlook on the desktop and
+Thunderbird all take `webcal`. Google Calendar on Android does not, and wants a URL
+pasted into _Other calendars → From URL_ — so the copy button keeps the `https` form.
+
+It also fixed a bug it was not chosen for. `preact-iso` takes any click on a
+same-origin `<a>` carrying no `download` or `target`, so the `https` link was routed
+client-side, matched no route and rendered "Nothing here"; only a reload reached the
+backend, which serves it because the last path segment has a dot. A `webcal:` URL has
+origin `"null"`, so the router's `link.origin != location.origin` check leaves the
+click alone.
 
 **Unauthenticated**, because a calendar client cannot hold a session — subscribing
 is a URL a phone re-fetches on its own. The event id is a UUID, so the URL is

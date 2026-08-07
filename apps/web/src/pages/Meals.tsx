@@ -308,7 +308,7 @@ const MealTable = ({
  * reads as vacant while somebody is still on it. Same for a lead who has withdrawn,
  * which is where that rule started.
  */
-/** The sheet's "Food idea?", whose own header says "Not needed". */
+/** The sheet's "Food idea?" column: what somebody thought of cooking, if anything. */
 const FoodIdea = ({
   meal,
   busy,
@@ -330,8 +330,8 @@ const FoodIdea = ({
       type="text"
       class="meal-idea"
       maxLength={MAX_OPTION_LABEL}
+      placeholder="What's cooking?"
       aria-label={`Food idea for ${meal.label} on ${meal.date}`}
-      placeholder="Not needed"
       disabled={busy}
       value={draft}
       onInput={(inputEvent) => setDraft(inputEvent.currentTarget.value)}

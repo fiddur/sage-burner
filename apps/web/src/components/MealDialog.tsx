@@ -94,7 +94,7 @@ export const MealDialog = ({
           type="text"
           maxLength={MAX_OPTION_LABEL}
           aria-label={`Food idea for ${meal.label}`}
-          placeholder="Not needed"
+          placeholder="What's cooking?"
           disabled={busy}
           value={idea}
           onInput={(inputEvent) => setIdea(inputEvent.currentTarget.value)}

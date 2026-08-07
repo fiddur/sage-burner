@@ -1358,6 +1358,22 @@ img.avatar {
   background: color-mix(in srgb, var(--ember) 10%, transparent);
 }
 
+/*
+  The install offer (#281). The sage rather than the ember `.new-version` uses: this
+  is an invitation, and the ember one means the tab is running code the server no
+  longer serves.
+*/
+.install-app {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+  padding: 0.6rem 0.8rem;
+  border-left: 3px solid var(--sage);
+  background: color-mix(in srgb, var(--sage) 10%, transparent);
+}
+
 /* What is on screen has not refreshed in five minutes. Muted rather than alarming:
    the app still works, and this is a caveat on it rather than a failure. */
 .stale-data {

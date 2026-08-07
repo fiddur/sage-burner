@@ -1803,30 +1803,44 @@ describe('pinching the grid', () => {
 })
 
 describe('the calendar feed', () => {
-  it('links the selected burn’s feed, which no page pointed at before', async () => {
+  const feedLink = () => screen.findByRole('link', { name: /Add to calendar/ })
+
+  it('subscribes rather than downloading, and so escapes the SPA router (#298)', async () => {
+    // Two things at once. `webcal` is what asks an OS to *subscribe* to a live feed,
+    // where following the `https` URL downloads a snapshot that never updates — and
+    // a `webcal:` URL has origin `"null"`, so `preact-iso`'s
+    // `link.origin != location.origin` check leaves the click alone. The `https` one
+    // was taken by the router, matched no route, and rendered "Nothing here".
     renderPage(stub())
 
-    const link = await screen.findByRole('link', { name: /Calendar feed/ })
-    expect(link.getAttribute('href')).toBe(`${window.location.origin}/events/e-1/schedule.ics`)
+    expect((await feedLink()).getAttribute('href')).toBe('webcal://localhost:3000/events/e-1/schedule.ics')
   })
 
   it('follows the burn in the selector rather than whichever is active', async () => {
     renderPage(stub(), MEMBER, { event: { ...BURN, id: 'e-2' }, attendance: null })
 
-    const link = await screen.findByRole('link', { name: /Calendar feed/ })
-    expect(link.getAttribute('href')).toContain('/events/e-2/schedule.ics')
+    expect((await feedLink()).getAttribute('href')).toContain('/events/e-2/schedule.ics')
   })
 
-  it('offers the URL to copy, a click being a snapshot rather than a subscription', async () => {
+  it('copies the https URL, which is what Google Calendar wants pasted', async () => {
+    // Not the `webcal` one: Android's Google Calendar does not take that scheme and
+    // asks for a URL under *Other calendars → From URL*.
+    const writeText = vi.fn(() => Promise.resolve(undefined))
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
     renderPage(stub())
 
-    expect(await screen.findByRole('button', { name: 'Copy link' })).toBeTruthy()
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy link' }))
+
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/events/e-1/schedule.ics`),
+    )
+    vi.unstubAllGlobals()
   })
 
   it('says nothing about a feed when there is no burn to have one', async () => {
     renderPage(stub(), MEMBER, null)
 
     await screen.findByText(/there is no timetable to draw/)
-    expect(screen.queryByRole('link', { name: /Calendar feed/ })).toBeNull()
+    expect(screen.queryByRole('link', { name: /Add to calendar/ })).toBeNull()
   })
 })
