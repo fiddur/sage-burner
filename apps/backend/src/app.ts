@@ -3,7 +3,6 @@ import type { FastifyInstance } from 'fastify'
 
 import helmet from '@fastify/helmet'
 import fastifyStatic from '@fastify/static'
-import { errorResponse } from '@sage-burner/shared'
 import Fastify from 'fastify'
 import { existsSync, statSync } from 'node:fs'
 import path from 'node:path'
@@ -18,6 +17,7 @@ import { createGate, SCRYPT_GATE } from './auth/gate.ts'
 import { createGuards } from './auth/guards.ts'
 import { createSessions } from './auth/session.ts'
 import { clientErrorHandler, frameworkErrorHandler, registerErrorHandler } from './errors.ts'
+import { sendError } from './http.ts'
 import { recordAndPush } from './push/notify.ts'
 import { notifyAdmins } from './push/push.ts'
 import { deliverWithWebPush, DEFAULT_PUSH_CONTACT, generateVAPIDKeys } from './push/web-push.ts'
@@ -500,7 +500,7 @@ export const createApp = async ({
   // container (WEB_ROOT set). Frontend error handling written against one
   // would otherwise meet the other in the environment it was not tested in.
   app.setNotFoundHandler((request, reply) => {
-    const notFound = () => reply.code(404).send(errorResponse('not_found'))
+    const notFound = () => sendError(reply, 404)
     const pathname = pathnameOf(request.url)
 
     // An unmatched API path is a real 404 — never the SPA shell. Serving HTML

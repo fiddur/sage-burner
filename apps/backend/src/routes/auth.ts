@@ -12,7 +12,7 @@ import type { Database } from '../db/index.ts'
 import { hashPassword, needsRehash, verifyPassword } from '../auth/password.ts'
 import { SESSION_COOKIE, viewerFor, viewerOf } from '../auth/viewer.ts'
 import { account } from '../db/schema.ts'
-import { noStore } from '../http.ts'
+import { noStore, sendError } from '../http.ts'
 
 /**
  * The cookie carrying the session token.
@@ -143,7 +143,7 @@ export const registerAuthRoutes = (app: FastifyInstance, { db, config, sessions,
     if (!admission.ok) {
       void reply.header('retry-after', gate.retryAfter(admission.reason))
       request.log.warn({ ...gate.stats(), reason: admission.reason }, 'login shed')
-      return reply.code(429).send(errorResponse('rate_limited'))
+      return sendError(reply, 429)
     }
 
     try {

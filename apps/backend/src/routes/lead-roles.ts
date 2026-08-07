@@ -3,7 +3,6 @@ import type { FastifyInstance, FastifyRequest } from 'fastify'
 
 import {
   apiRoutes,
-  errorResponse,
   leadRoleCopySchema,
   leadRoleCreateSchema,
   leadRoleLeadSchema,
@@ -21,7 +20,7 @@ import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
 import { account, attendance, event, leadRole, leadRoleMember } from '../db/schema.ts'
-import { noStore } from '../http.ts'
+import { bodyOf, noStore, sendError } from '../http.ts'
 import { displayName, notifyAttendees } from '../push/notify.ts'
 import { accountForAttendance, attendanceFor } from './attendance.ts'
 import { copySourcesFor } from './copy-sources.ts'
@@ -183,11 +182,11 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
     async (request, reply) => {
       void noStore(reply)
 
-      const parsed = leadRoleCreateSchema.safeParse(request.body)
-      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+      const body = bodyOf(leadRoleCreateSchema, request)
+      if (body === undefined) return sendError(reply, 400)
 
       const fields = {
-        ...parsed.data,
+        ...body,
         id: randomUUID(),
         event_id: request.params.eventId,
         created_at: now().toISOString(),
@@ -201,7 +200,7 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
       } catch (failure) {
         // A burn that does not exist. The foreign key is the authority rather than a
         // pre-read, which would be a second query saying the same thing.
-        if (isForeignKeyViolation(failure)) return reply.code(404).send(errorResponse('not_found'))
+        if (isForeignKeyViolation(failure)) return sendError(reply, 404)
         throw failure
       }
 
@@ -230,21 +229,21 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
     async (request, reply) => {
       void noStore(reply)
 
-      const parsed = leadRoleUpdateSchema.safeParse(request.body)
-      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+      const body = bodyOf(leadRoleUpdateSchema, request)
+      if (body === undefined) return sendError(reply, 400)
 
       const existing = await openRole(request.params.id)
-      if (existing === undefined) return reply.code(404).send(errorResponse('not_found'))
+      if (existing === undefined) return sendError(reply, 404)
 
       // `set({})` is not valid SQL, so an empty body reads instead of writing. A
       // no-op PATCH is idempotent; answering with the row unchanged is honest.
-      if (Object.keys(parsed.data).length > 0) {
-        await db.update(leadRole).set(parsed.data).where(eq(leadRole.id, request.params.id))
+      if (Object.keys(body).length > 0) {
+        await db.update(leadRole).set(body).where(eq(leadRole.id, request.params.id))
       }
 
       const roles = await rolesFor(db, existing.event_id)
       const role = roles.find((candidate) => candidate.id === request.params.id)
-      if (role === undefined) return reply.code(404).send(errorResponse('not_found'))
+      if (role === undefined) return sendError(reply, 404)
 
       return { role } satisfies LeadRoleResponse
     },
@@ -260,7 +259,7 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
       // at all, deleting straight from the id, so it was the one write here that the
       // `openRole` sweep could not reach by replacing a call.
       if ((await openRole(request.params.id)) === undefined) {
-        return reply.code(404).send(errorResponse('not_found'))
+        return sendError(reply, 404)
       }
 
       const deleted = await db
@@ -270,7 +269,7 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
 
       // The team goes with it — `lead_role_member` cascades — which is the point of
       // letting any member remove one: the role is the thing, not the sign-ups.
-      return deleted.length === 0 ? reply.code(404).send(errorResponse('not_found')) : reply.code(204).send()
+      return deleted.length === 0 ? sendError(reply, 404) : reply.code(204).send()
     },
   )
 
@@ -286,19 +285,19 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
     async (request, reply) => {
       void noStore(reply)
 
-      const parsed = leadRoleLeadSchema.safeParse(request.body)
-      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+      const body = bodyOf(leadRoleLeadSchema, request)
+      if (body === undefined) return sendError(reply, 400)
 
       const existing = await openRole(request.params.id)
-      if (existing === undefined) return reply.code(404).send(errorResponse('not_found'))
+      if (existing === undefined) return sendError(reply, 404)
 
       let leadAttendanceId: string | null = null
-      if (parsed.data.account_id !== null) {
-        leadAttendanceId = (await attendanceFor(db, existing.event_id, parsed.data.account_id)) ?? null
+      if (body.account_id !== null) {
+        leadAttendanceId = (await attendanceFor(db, existing.event_id, body.account_id)) ?? null
 
         // Not coming to this burn. A 400 rather than a 404: the account may well
         // exist, and what is wrong is the pairing.
-        if (leadAttendanceId === null) return reply.code(400).send(errorResponse('bad_request'))
+        if (leadAttendanceId === null) return sendError(reply, 400)
       }
 
       await db
@@ -315,25 +314,25 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
           ? undefined
           : await accountForAttendance(db, existing.lead_attendance_id)
 
-      if (before !== undefined && before !== parsed.data.account_id) {
+      if (before !== undefined && before !== body.account_id) {
         await tell(by, before, `You are no longer ${existing.title} lead.`)
       }
-      if (parsed.data.account_id !== null && parsed.data.account_id !== before) {
-        await tell(by, parsed.data.account_id, `You are now ${existing.title} lead.`)
+      if (body.account_id !== null && body.account_id !== before) {
+        await tell(by, body.account_id, `You are now ${existing.title} lead.`)
       }
 
       // The burn-wide half, separate from the two personal notes above: those tell the
       // people it happened *to*, this tells everyone who asked to follow the register
       // filling up (#259). Only on a spot being taken — a role falling vacant is not
       // news worth pushing to forty-two people, and whoever lost it is told directly.
-      if (parsed.data.account_id !== null && parsed.data.account_id !== before) {
+      if (body.account_id !== null && body.account_id !== before) {
         await notifyAttendees(
           db,
           notify,
           existing.event_id,
           {
             category: 'lead_role_filled',
-            body: `${await displayName(db, parsed.data.account_id)} is now ${existing.title} lead.`,
+            body: `${await displayName(db, body.account_id)} is now ${existing.title} lead.`,
             link: '/roles',
           },
           { except: by },
@@ -342,7 +341,7 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
 
       const roles = await rolesFor(db, existing.event_id)
       const role = roles.find((candidate) => candidate.id === request.params.id)
-      if (role === undefined) return reply.code(404).send(errorResponse('not_found'))
+      if (role === undefined) return sendError(reply, 404)
 
       return { role } satisfies LeadRoleResponse
     },
@@ -354,14 +353,14 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
     async (request, reply) => {
       void noStore(reply)
 
-      const parsed = leadRoleTeamSchema.safeParse(request.body)
-      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+      const body = bodyOf(leadRoleTeamSchema, request)
+      if (body === undefined) return sendError(reply, 400)
 
       const existing = await openRole(request.params.id)
-      if (existing === undefined) return reply.code(404).send(errorResponse('not_found'))
+      if (existing === undefined) return sendError(reply, 404)
 
-      const attendanceId = await attendanceFor(db, existing.event_id, parsed.data.account_id)
-      if (attendanceId === undefined) return reply.code(400).send(errorResponse('bad_request'))
+      const attendanceId = await attendanceFor(db, existing.event_id, body.account_id)
+      if (attendanceId === undefined) return sendError(reply, 400)
 
       // Joining twice is the same as joining once. `team_size_wanted` is advisory, so
       // there is deliberately no capacity check here — an extra pair of hands is not
@@ -373,13 +372,13 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
 
       await tell(
         await callerId(request),
-        parsed.data.account_id,
+        body.account_id,
         `You have been added to the ${existing.title} team.`,
       )
 
       const roles = await rolesFor(db, existing.event_id)
       const role = roles.find((candidate) => candidate.id === request.params.id)
-      if (role === undefined) return reply.code(404).send(errorResponse('not_found'))
+      if (role === undefined) return sendError(reply, 404)
 
       return { role } satisfies LeadRoleResponse
     },
@@ -392,7 +391,7 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
       void noStore(reply)
 
       const existing = await openRole(request.params.id)
-      if (existing === undefined) return reply.code(404).send(errorResponse('not_found'))
+      if (existing === undefined) return sendError(reply, 404)
 
       const attendanceId = await attendanceFor(db, existing.event_id, request.params.accountId)
       if (attendanceId !== undefined) {
@@ -469,10 +468,10 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
     async (request, reply) => {
       void noStore(reply)
 
-      const parsed = leadRoleCopySchema.safeParse(request.body)
-      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
-      if (parsed.data.from_event_id === request.params.eventId) {
-        return reply.code(400).send(errorResponse('bad_request'))
+      const body = bodyOf(leadRoleCopySchema, request)
+      if (body === undefined) return sendError(reply, 400)
+      if (body.from_event_id === request.params.eventId) {
+        return sendError(reply, 400)
       }
 
       const stamp = now().toISOString()
@@ -496,7 +495,7 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
         const [from] = tx
           .select({ id: event.id })
           .from(event)
-          .where(eq(event.id, parsed.data.from_event_id))
+          .where(eq(event.id, body.from_event_id))
           .limit(1)
           .all()
 
@@ -514,7 +513,7 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
         const source = tx
           .select()
           .from(leadRole)
-          .where(eq(leadRole.event_id, parsed.data.from_event_id))
+          .where(eq(leadRole.event_id, body.from_event_id))
           .orderBy(asc(leadRole.created_at), asc(leadRole.id))
           .all()
 
@@ -545,8 +544,8 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
         return 'copied' as const
       })
 
-      if (seeded === 'not_found') return reply.code(404).send(errorResponse('not_found'))
-      if (seeded === 'conflict') return reply.code(409).send(errorResponse('conflict'))
+      if (seeded === 'not_found') return sendError(reply, 404)
+      if (seeded === 'conflict') return sendError(reply, 409)
 
       return reply
         .code(201)

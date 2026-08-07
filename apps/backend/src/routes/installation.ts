@@ -1,13 +1,13 @@
 import type { InstallationResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { apiRoutes, errorResponse, installationUpdateSchema } from '@sage-burner/shared'
+import { apiRoutes, installationUpdateSchema } from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 
 import type { GuardDeps } from '../auth/guards.ts'
 
 import { INSTALLATION_ID, installation } from '../db/schema.ts'
-import { noStore } from '../http.ts'
+import { bodyOf, noStore, sendError } from '../http.ts'
 
 /**
  * What this deployment calls itself.
@@ -36,7 +36,7 @@ export const registerInstallationRoutes = (app: FastifyInstance, { db }: GuardDe
     void reply.header('cache-control', 'no-cache')
 
     const found = await current()
-    if (found === undefined) return reply.code(404).send(errorResponse('not_found'))
+    if (found === undefined) return sendError(reply, 404)
 
     return { installation: found } satisfies InstallationResponse
   })
@@ -44,17 +44,17 @@ export const registerInstallationRoutes = (app: FastifyInstance, { db }: GuardDe
   app.patch(apiRoutes.updateInstallation.fastify, async (request, reply) => {
     void noStore(reply)
 
-    const parsed = installationUpdateSchema.safeParse(request.body)
-    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+    const body = bodyOf(installationUpdateSchema, request)
+    if (body === undefined) return sendError(reply, 400)
 
     // `set({})` is not valid SQL, so an empty body would be a 500 rather than
     // the no-op it plainly is.
-    if (Object.keys(parsed.data).length > 0) {
-      await db.update(installation).set(parsed.data).where(eq(installation.id, INSTALLATION_ID))
+    if (Object.keys(body).length > 0) {
+      await db.update(installation).set(body).where(eq(installation.id, INSTALLATION_ID))
     }
 
     const found = await current()
-    if (found === undefined) return reply.code(404).send(errorResponse('not_found'))
+    if (found === undefined) return sendError(reply, 404)
 
     return { installation: found } satisfies InstallationResponse
   })

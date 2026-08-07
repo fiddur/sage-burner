@@ -1,19 +1,14 @@
 import type { NotificationsResponse, NotificationSettings } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import {
-  apiRoutes,
-  errorResponse,
-  notificationCategories,
-  notificationSettingsSchema,
-} from '@sage-burner/shared'
+import { apiRoutes, notificationCategories, notificationSettingsSchema } from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 
 import type { GuardDeps } from '../auth/guards.ts'
 
 import { viewerFor } from '../auth/viewer.ts'
 import { notificationSetting } from '../db/schema.ts'
-import { noStore } from '../http.ts'
+import { bodyOf, noStore, sendError } from '../http.ts'
 import { markSeen, notificationsFor, switchedOn } from '../push/notify.ts'
 
 export interface NotificationDeps extends GuardDeps {
@@ -40,7 +35,7 @@ export const registerNotificationRoutes = (
     void noStore(reply)
 
     const accountId = await mine(request)
-    if (accountId === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
+    if (accountId === undefined) return sendError(reply, 401)
 
     return (await notificationsFor(db, accountId)) satisfies NotificationsResponse
   })
@@ -49,7 +44,7 @@ export const registerNotificationRoutes = (
     void noStore(reply)
 
     const accountId = await mine(request)
-    if (accountId === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
+    if (accountId === undefined) return sendError(reply, 401)
 
     await markSeen(db, accountId, now())
 
@@ -62,7 +57,7 @@ export const registerNotificationRoutes = (
     void noStore(reply)
 
     const accountId = await mine(request)
-    if (accountId === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
+    if (accountId === undefined) return sendError(reply, 401)
 
     return { on: await switchedOn(db, accountId) } satisfies NotificationSettings
   })
@@ -74,10 +69,10 @@ export const registerNotificationRoutes = (
     // body should hear the same 401 as one with a good body, not a 400 telling them
     // about a route they may not use.
     const accountId = await mine(request)
-    if (accountId === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
+    if (accountId === undefined) return sendError(reply, 401)
 
-    const parsed = notificationSettingsSchema.safeParse(request.body)
-    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+    const body = bodyOf(notificationSettingsSchema, request)
+    if (body === undefined) return sendError(reply, 400)
 
     // The whole set, not a delta — the form sends every tick it is showing, and a
     // delta would need the client to know what it had before to say what changed.
@@ -88,7 +83,7 @@ export const registerNotificationRoutes = (
     // complete statement of what this person wants, and storing only half of it
     // would leave the rest reading as "never said" — which is the default, not the
     // choice they just made.
-    const on = new Set(parsed.data.on)
+    const on = new Set(body.on)
     db.transaction((tx) => {
       tx.delete(notificationSetting).where(eq(notificationSetting.account_id, accountId)).run()
       for (const category of notificationCategories) {

@@ -12,7 +12,7 @@ import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
 import { account, attendance, eventOption } from '../db/schema.ts'
-import { noStore } from '../http.ts'
+import { bodyOf, noStore, sendError } from '../http.ts'
 import { allergyTickIdsFor, writeAllergyTicks } from './allergy-ticks.ts'
 import { openEvent, todayIso } from './events.ts'
 import { areHelpingOptions, helpingIdsFor, writeHelping } from './helping.ts'
@@ -196,10 +196,10 @@ export const registerProfileRoutes = (
     void noStore(reply)
 
     const viewer = await viewerFor(request, { db, sessions })
-    if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
+    if (viewer === undefined) return sendError(reply, 401)
 
     const profile = await profileFor(viewer.account_id)
-    if (profile === undefined) return reply.code(404).send(errorResponse('not_found'))
+    if (profile === undefined) return sendError(reply, 404)
 
     return { profile } satisfies ProfileResponse
   })
@@ -207,13 +207,13 @@ export const registerProfileRoutes = (
   app.patch(apiRoutes.updateMyProfile.fastify, { preHandler: requireMember }, async (request, reply) => {
     void noStore(reply)
 
-    const parsed = profileUpdateSchema.safeParse(request.body)
-    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+    const body = bodyOf(profileUpdateSchema, request)
+    if (body === undefined) return sendError(reply, 400)
 
     const viewer = await viewerFor(request, { db, sessions })
-    if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
+    if (viewer === undefined) return sendError(reply, 401)
 
-    const { allergy_item_ids: ticks, ...columns } = parsed.data
+    const { allergy_item_ids: ticks, ...columns } = body
 
     // One transaction, because the columns and the ticks arrive together and a
     // half-saved profile would answer an error over a record that did change.
@@ -235,13 +235,13 @@ export const registerProfileRoutes = (
         // `areHelpingOptions` checks a burn-and-kind pairing the key cannot see;
         // there is no such second rule here.) Both halves are one transaction, so
         // this answers 400 over a profile that did not change.
-        if (isForeignKeyViolation(failure)) return reply.code(400).send(errorResponse('bad_request'))
+        if (isForeignKeyViolation(failure)) return sendError(reply, 400)
         throw failure
       }
     }
 
     const profile = await profileFor(viewer.account_id)
-    if (profile === undefined) return reply.code(404).send(errorResponse('not_found'))
+    if (profile === undefined) return sendError(reply, 404)
 
     return { profile } satisfies ProfileResponse
   })
@@ -252,24 +252,24 @@ export const registerProfileRoutes = (
     async (request, reply) => {
       void noStore(reply)
 
-      const parsed = attendanceUpdateSchema.safeParse(request.body)
-      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+      const body = bodyOf(attendanceUpdateSchema, request)
+      if (body === undefined) return sendError(reply, 400)
 
       const viewer = await viewerFor(request, { db, sessions })
-      if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
+      if (viewer === undefined) return sendError(reply, 401)
 
       // Named by id rather than scoped to the active burn, so a stay at the second
       // burn on the details page can be filled in — and still refused once that
       // burn has ended, which is what `openEvent` decides.
       const found = await openEvent(db, todayIso(now), request.params.eventId)
-      if (found === undefined) return reply.code(404).send(errorResponse('not_found'))
+      if (found === undefined) return sendError(reply, 404)
 
       const mine = and(eq(attendance.event_id, found.id), eq(attendance.account_id, viewer.account_id))
 
       // `helping_option_ids` lives in its own table, so it never reaches `set()`.
-      const { helping_option_ids: helping, ...columns } = parsed.data
+      const { helping_option_ids: helping, ...columns } = body
 
-      const problem = await stayProblem(db, found.id, viewer.account_id, parsed.data)
+      const problem = await stayProblem(db, found.id, viewer.account_id, body)
       if (problem !== undefined) return reply.code(problem).send(errorResponse(problemBody(problem)))
 
       let updated: (typeof attendance.$inferSelect)[]
@@ -280,7 +280,7 @@ export const registerProfileRoutes = (
         // has just been deleted. The foreign key is the authority rather than a
         // pre-read, which would be a second query saying the same — and because
         // both writes are one transaction, neither half survives being told no.
-        if (isForeignKeyViolation(failure)) return reply.code(400).send(errorResponse('bad_request'))
+        if (isForeignKeyViolation(failure)) return sendError(reply, 400)
         throw failure
       }
 
@@ -294,9 +294,7 @@ export const registerProfileRoutes = (
       // would put the departure before the arrival". Asked rather than inferred.
       const [existing] = await db.select().from(attendance).where(mine).limit(1)
 
-      return existing === undefined
-        ? reply.code(404).send(errorResponse('not_found'))
-        : reply.code(400).send(errorResponse('bad_request'))
+      return existing === undefined ? sendError(reply, 404) : sendError(reply, 400)
     },
   )
 }

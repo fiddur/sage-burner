@@ -369,6 +369,12 @@ describe('signing in with a passkey', () => {
     })
 
     expect(response.statusCode).toBe(401)
+    // The slug as well as the status. A passkey login answers `invalid_credentials`
+    // like the password login does, and `unauthenticated` — what a bare 401 maps to —
+    // would be a different promise: the client documents this one as "did not
+    // verify", not "you are signed out". #138's sweep changed it and every test here
+    // stayed green, because they all asserted the status alone.
+    expect(response.json()).toEqual({ error: 'invalid_credentials' })
   })
 
   it('refuses a challenge that has already been spent', async () => {

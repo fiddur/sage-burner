@@ -6,7 +6,6 @@ import {
   allergyItemOrderSchema,
   allergyItemUpdateSchema,
   apiRoutes,
-  errorResponse,
 } from '@sage-burner/shared'
 import { asc, desc, eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
@@ -15,7 +14,7 @@ import type { Database } from '../db/index.ts'
 
 import { isForeignKeyViolation } from '../db/errors.ts'
 import { allergyItem } from '../db/schema.ts'
-import { noStore } from '../http.ts'
+import { bodyOf, noStore, sendError } from '../http.ts'
 
 export const allergyItemsFor = (db: Database): Promise<AllergyItem[]> =>
   db.select().from(allergyItem).orderBy(asc(allergyItem.order), asc(allergyItem.id))
@@ -45,8 +44,8 @@ export const registerAllergyRoutes = (app: FastifyInstance, { db }: { db: Databa
   app.post(apiRoutes.addAllergyItem.fastify, async (request, reply) => {
     void noStore(reply)
 
-    const parsed = allergyItemCreateSchema.safeParse(request.body)
-    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+    const body = bodyOf(allergyItemCreateSchema, request)
+    if (body === undefined) return sendError(reply, 400)
 
     const id = randomUUID()
 
@@ -64,36 +63,36 @@ export const registerAllergyRoutes = (app: FastifyInstance, { db }: { db: Databa
 
       const next = last === undefined ? 0 : last.order + 1
       tx.insert(allergyItem)
-        .values({ ...parsed.data, id, order: next })
+        .values({ ...body, id, order: next })
         .run()
 
       return next
     })
 
-    return reply.code(201).send({ item: { ...parsed.data, id, order } satisfies AllergyItem })
+    return reply.code(201).send({ item: { ...body, id, order } satisfies AllergyItem })
   })
 
   app.patch<{ Params: { id: string } }>(apiRoutes.updateAllergyItem.fastify, async (request, reply) => {
     void noStore(reply)
 
-    const parsed = allergyItemUpdateSchema.safeParse(request.body)
-    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+    const body = bodyOf(allergyItemUpdateSchema, request)
+    if (body === undefined) return sendError(reply, 400)
 
     // `set({})` is not valid SQL, so the one body that never reaches the UPDATE
     // reads instead.
-    if (Object.keys(parsed.data).length === 0) {
+    if (Object.keys(body).length === 0) {
       const [row] = await db.select().from(allergyItem).where(eq(allergyItem.id, request.params.id)).limit(1)
 
-      return row === undefined ? reply.code(404).send(errorResponse('not_found')) : { item: row }
+      return row === undefined ? sendError(reply, 404) : { item: row }
     }
 
     const [updated] = await db
       .update(allergyItem)
-      .set(parsed.data)
+      .set(body)
       .where(eq(allergyItem.id, request.params.id))
       .returning()
 
-    return updated === undefined ? reply.code(404).send(errorResponse('not_found')) : { item: updated }
+    return updated === undefined ? sendError(reply, 404) : { item: updated }
   })
 
   app.delete<{ Params: { id: string } }>(apiRoutes.deleteAllergyItem.fastify, async (request, reply) => {
@@ -111,11 +110,11 @@ export const registerAllergyRoutes = (app: FastifyInstance, { db }: { db: Databa
         .where(eq(allergyItem.id, request.params.id))
         .returning({ id: allergyItem.id })
     } catch (failure) {
-      if (isForeignKeyViolation(failure)) return reply.code(409).send(errorResponse('conflict'))
+      if (isForeignKeyViolation(failure)) return sendError(reply, 409)
       throw failure
     }
 
-    if (deleted.length === 0) return reply.code(404).send(errorResponse('not_found'))
+    if (deleted.length === 0) return sendError(reply, 404)
 
     // Deliberately does not renumber the survivors: `order` only has to sort, not be
     // contiguous, and renumbering here would fight a concurrent reorder for nothing.
@@ -125,11 +124,11 @@ export const registerAllergyRoutes = (app: FastifyInstance, { db }: { db: Databa
   app.put(apiRoutes.reorderAllergyItems.fastify, async (request, reply) => {
     void noStore(reply)
 
-    const parsed = allergyItemOrderSchema.safeParse(request.body)
-    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+    const body = bodyOf(allergyItemOrderSchema, request)
+    if (body === undefined) return sendError(reply, 400)
 
     const existing = await allergyItemsFor(db)
-    const wanted = parsed.data.ids
+    const wanted = body.ids
 
     // Exactly the items there are, no more and no fewer. A partial list would
     // renumber some rows and leave the rest on stale positions, producing an order
@@ -137,7 +136,7 @@ export const registerAllergyRoutes = (app: FastifyInstance, { db }: { db: Databa
     // slots and must contain every existing id, and those are distinct because `id`
     // is the primary key.
     const sameSet = wanted.length === existing.length && existing.every((row) => wanted.includes(row.id))
-    if (!sameSet) return reply.code(400).send(errorResponse('bad_request'))
+    if (!sameSet) return sendError(reply, 400)
 
     // One statement each, in a transaction: a half-applied reorder is an order
     // nobody chose.

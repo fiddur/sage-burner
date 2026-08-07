@@ -1,19 +1,14 @@
 import type { AdminAccount, AdminAccountResponse, AdminAccountsResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import {
-  accountRolesUpdateSchema,
-  adminPasswordResetSchema,
-  apiRoutes,
-  errorResponse,
-} from '@sage-burner/shared'
+import { accountRolesUpdateSchema, adminPasswordResetSchema, apiRoutes } from '@sage-burner/shared'
 import { count, eq } from 'drizzle-orm'
 
 import type { GuardDeps } from '../auth/guards.ts'
 
 import { hashPassword } from '../auth/password.ts'
 import { account, accountRole } from '../db/schema.ts'
-import { noStore } from '../http.ts'
+import { bodyOf, noStore, sendError } from '../http.ts'
 
 export interface AdminDeps extends GuardDeps {
   /** Injected so the suite never pays for scrypt, the same seam redemption uses. */
@@ -61,8 +56,8 @@ export const registerAdminRoutes = (app: FastifyInstance, { db, hash = hashPassw
   app.put<{ Params: { accountId: string } }>(apiRoutes.setAccountRoles.fastify, async (request, reply) => {
     void noStore(reply)
 
-    const parsed = accountRolesUpdateSchema.safeParse(request.body)
-    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+    const body = bodyOf(accountRolesUpdateSchema, request)
+    if (body === undefined) return sendError(reply, 400)
 
     const { accountId } = request.params
     const [found] = await db
@@ -70,9 +65,9 @@ export const registerAdminRoutes = (app: FastifyInstance, { db, hash = hashPassw
       .from(account)
       .where(eq(account.id, accountId))
       .limit(1)
-    if (found === undefined) return reply.code(404).send(errorResponse('not_found'))
+    if (found === undefined) return sendError(reply, 404)
 
-    const { roles } = parsed.data
+    const { roles } = body
 
     // Counted inside the transaction, after the write, so the rule is decided
     // against the state the write actually produced with nothing in between,
@@ -94,7 +89,7 @@ export const registerAdminRoutes = (app: FastifyInstance, { db, hash = hashPassw
         if ((remaining?.admins ?? 0) === 0) throw LAST_ADMIN
       })
     } catch (failure) {
-      if (failure === LAST_ADMIN) return reply.code(409).send(errorResponse('conflict'))
+      if (failure === LAST_ADMIN) return sendError(reply, 409)
       throw failure
     }
 
@@ -118,12 +113,12 @@ export const registerAdminRoutes = (app: FastifyInstance, { db, hash = hashPassw
   app.put<{ Params: { accountId: string } }>(apiRoutes.setAccountPassword.fastify, async (request, reply) => {
     void noStore(reply)
 
-    const parsed = adminPasswordResetSchema.safeParse(request.body)
-    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+    const body = bodyOf(adminPasswordResetSchema, request)
+    if (body === undefined) return sendError(reply, 400)
 
     // Hashed before the row is looked for, so a real account and a made-up one cost
     // the same. Not much of an oracle behind the admin guard, but it is one line.
-    const password_hash = await hash(parsed.data.password)
+    const password_hash = await hash(body.password)
 
     const [updated] = await db
       .update(account)
@@ -133,6 +128,6 @@ export const registerAdminRoutes = (app: FastifyInstance, { db, hash = hashPassw
 
     // Nothing is echoed back: the caller already knows what they set, and a
     // password in a response body is a password in somebody's network log.
-    return updated === undefined ? reply.code(404).send(errorResponse('not_found')) : reply.code(204).send()
+    return updated === undefined ? sendError(reply, 404) : reply.code(204).send()
   })
 }

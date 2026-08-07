@@ -3,7 +3,6 @@ import type { FastifyInstance } from 'fastify'
 
 import {
   apiRoutes,
-  errorResponse,
   eventCreateSchema,
   eventUpdateSchema,
   eventWelcomeUpdateSchema,
@@ -18,7 +17,7 @@ import type { Database } from '../db/index.ts'
 import { createGuards } from '../auth/guards.ts'
 import { isCheckViolation } from '../db/errors.ts'
 import { event } from '../db/schema.ts'
-import { noStore } from '../http.ts'
+import { bodyOf, noStore, sendError } from '../http.ts'
 
 export interface EventRouteDeps extends GuardDeps {
   now?: () => Date
@@ -115,17 +114,17 @@ export const registerEventRoutes = (
   app.post(apiRoutes.createEvent.fastify, async (request, reply) => {
     void noStore(reply)
 
-    const parsed = eventCreateSchema.safeParse(request.body)
-    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+    const body = bodyOf(eventCreateSchema, request)
+    if (body === undefined) return sendError(reply, 400)
 
-    const row = { ...parsed.data, id: randomUUID(), created_at: now().toISOString() }
+    const row = { ...body, id: randomUUID(), created_at: now().toISOString() }
 
     try {
       await db.insert(event).values(row)
     } catch (error) {
       // The slug is in URLs, so a collision is a thing the admin can fix by
       // choosing another — worth its own status rather than a generic 400.
-      if (isSlugConflict(error)) return reply.code(409).send(errorResponse('conflict'))
+      if (isSlugConflict(error)) return sendError(reply, 409)
       throw error
     }
 
@@ -149,26 +148,20 @@ export const registerEventRoutes = (
     async (request, reply) => {
       void noStore(reply)
 
-      const parsed = eventWelcomeUpdateSchema.safeParse(request.body)
-      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+      const body = bodyOf(eventWelcomeUpdateSchema, request)
+      if (body === undefined) return sendError(reply, 400)
 
       // Scoped like every other member-facing write keyed by a bare id (#218). Without
       // it any approved member could rewrite a finished burn's welcome text
       // indefinitely — the one route in this family that took an id and never looked
       // at `end_date`.
       if ((await openEvent(db, todayIso(now), request.params.id)) === undefined) {
-        return reply.code(404).send(errorResponse('not_found'))
+        return sendError(reply, 404)
       }
 
-      const [updated] = await db
-        .update(event)
-        .set(parsed.data)
-        .where(eq(event.id, request.params.id))
-        .returning()
+      const [updated] = await db.update(event).set(body).where(eq(event.id, request.params.id)).returning()
 
-      return updated === undefined
-        ? reply.code(404).send(errorResponse('not_found'))
-        : ({ event: updated } satisfies EventResponse)
+      return updated === undefined ? sendError(reply, 404) : ({ event: updated } satisfies EventResponse)
     },
   )
 
@@ -176,8 +169,8 @@ export const registerEventRoutes = (
     void noStore(reply)
 
     const { id } = request.params
-    const parsed = eventUpdateSchema.safeParse(request.body)
-    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+    const body = bodyOf(eventUpdateSchema, request)
+    if (body === undefined) return sendError(reply, 400)
 
     // The only body that never reaches the `UPDATE`. A body of only unrecognised
     // keys is a 400 from the schema now, so `{}` is the one case left that
@@ -191,12 +184,10 @@ export const registerEventRoutes = (
     // answered by the re-read below. All the pre-read did was spend a third
     // query to produce a 404 the write path produces anyway — and it left the
     // handler holding a pre-write snapshot to build the response from.
-    if (Object.keys(parsed.data).length === 0) {
+    if (Object.keys(body).length === 0) {
       const [existing] = await db.select().from(event).where(eq(event.id, id)).limit(1)
 
-      return existing === undefined
-        ? reply.code(404).send(errorResponse('not_found'))
-        : ({ event: existing } satisfies EventResponse)
+      return existing === undefined ? sendError(reply, 404) : ({ event: existing } satisfies EventResponse)
     }
 
     // The rule applied to the row as it would be, because a body carrying one
@@ -209,10 +200,10 @@ export const registerEventRoutes = (
     // patches reached the database and came back as a 500 from
     // `event_date_order_check`.
     const [before] = await db.select().from(event).where(eq(event.id, id)).limit(1)
-    if (before === undefined) return reply.code(404).send(errorResponse('not_found'))
+    if (before === undefined) return sendError(reply, 404)
 
-    if (!hasOrderedRange({ ...before, ...parsed.data })) {
-      return reply.code(400).send(errorResponse('bad_request'))
+    if (!hasOrderedRange({ ...before, ...body })) {
+      return sendError(reply, 400)
     }
 
     // `.returning()` rather than reading `changes`, for two reasons that turn out
@@ -223,7 +214,7 @@ export const registerEventRoutes = (
     // MySQL does not.
     const updated = await db
       .update(event)
-      .set(parsed.data)
+      .set(body)
       .where(eq(event.id, id))
       .returning()
       .catch((error: unknown) => {
@@ -235,8 +226,8 @@ export const registerEventRoutes = (
         throw error
       })
 
-    if (updated === 'conflict') return reply.code(409).send(errorResponse('conflict'))
-    if (updated === 'unordered') return reply.code(400).send(errorResponse('bad_request'))
+    if (updated === 'conflict') return sendError(reply, 409)
+    if (updated === 'unordered') return sendError(reply, 400)
 
     const [row] = updated
 
@@ -248,8 +239,6 @@ export const registerEventRoutes = (
     // Not reachable under test: `inject` serialises requests, so nothing can
     // delete the row in that gap. Kept because the alternative is answering 200
     // with `{ event: undefined }`, and a 404 is simply what happened.
-    return row === undefined
-      ? reply.code(404).send(errorResponse('not_found'))
-      : ({ event: row } satisfies EventResponse)
+    return row === undefined ? sendError(reply, 404) : ({ event: row } satisfies EventResponse)
   })
 }

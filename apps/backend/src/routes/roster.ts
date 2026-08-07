@@ -6,7 +6,7 @@ import type {
 } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { apiRoutes, errorResponse, paymentUpdateSchema, withPlaces } from '@sage-burner/shared'
+import { apiRoutes, paymentUpdateSchema, withPlaces } from '@sage-burner/shared'
 import { and, eq } from 'drizzle-orm'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -15,7 +15,7 @@ import type { Notifier } from '../push/notify.ts'
 import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
 import { account, attendance, event, eventOption } from '../db/schema.ts'
-import { noStore } from '../http.ts'
+import { bodyOf, noStore, sendError } from '../http.ts'
 import { allergyLabelsFor } from './allergy-ticks.ts'
 import { activeEvent, todayIso } from './events.ts'
 import { helpingIdsFor, helpingLabelsFor } from './helping.ts'
@@ -82,7 +82,7 @@ export const registerRosterRoutes = (
 
     const { eventId } = request.params
     const found = await eventFor(eventId)
-    if (found === undefined) return reply.code(404).send(errorResponse('not_found'))
+    if (found === undefined) return sendError(reply, 404)
 
     return {
       event: { id: found.id, name: found.name, member_cap: found.member_cap },
@@ -109,7 +109,7 @@ export const registerRosterRoutes = (
 
       const { eventId } = request.params
       const found = await eventFor(eventId)
-      if (found === undefined) return reply.code(404).send(errorResponse('not_found'))
+      if (found === undefined) return sendError(reply, 404)
 
       return {
         event: found,
@@ -124,19 +124,17 @@ export const registerRosterRoutes = (
       void noStore(reply)
 
       const { eventId, accountId } = request.params
-      const parsed = paymentUpdateSchema.safeParse(request.body)
-      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+      const body = bodyOf(paymentUpdateSchema, request)
+      if (body === undefined) return sendError(reply, 400)
 
-      if (Object.keys(parsed.data).length === 0) {
+      if (Object.keys(body).length === 0) {
         const [row] = await db
           .select()
           .from(attendance)
           .where(and(eq(attendance.event_id, eventId), eq(attendance.account_id, accountId)))
           .limit(1)
 
-        return row === undefined
-          ? reply.code(404).send(errorResponse('not_found'))
-          : { attendance: await withHelping(row) }
+        return row === undefined ? sendError(reply, 404) : { attendance: await withHelping(row) }
       }
 
       const [before] = await db
@@ -148,15 +146,15 @@ export const registerRosterRoutes = (
       const [updated] = await db
         .update(attendance)
         .set({
-          payment_status: parsed.data.payment_status,
+          payment_status: body.payment_status,
           // Cleared on unmarking, in the same statement that unmarks — so a date
           // cannot outlive the payment it recorded.
-          payment_date: parsed.data.payment_status === 'paid' ? todayIso(now) : null,
+          payment_date: body.payment_status === 'paid' ? todayIso(now) : null,
         })
         .where(and(eq(attendance.event_id, eventId), eq(attendance.account_id, accountId)))
         .returning()
 
-      if (updated === undefined) return reply.code(404).send(errorResponse('not_found'))
+      if (updated === undefined) return sendError(reply, 404)
 
       // Both only on the transition. Re-saving 'paid' over 'paid' — which the
       // roster's checkbox does on a double click — changes no count and must not

@@ -3,7 +3,6 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
 import {
   apiRoutes,
-  errorResponse,
   helperSchema,
   mealCreateSchema,
   mealIdeaUpdateSchema,
@@ -24,7 +23,7 @@ import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
 import { isForeignKeyViolation, isUniqueViolation } from '../db/errors.ts'
 import { account, attendance, event, meal, mealRole, mealSlot } from '../db/schema.ts'
-import { noStore } from '../http.ts'
+import { bodyOf, noStore, sendError } from '../http.ts'
 import { accountForAttendance, attendanceFor } from './attendance.ts'
 import { openEvent, todayIso } from './events.ts'
 
@@ -190,9 +189,7 @@ export const registerMealRoutes = (
   const answer = async (reply: FastifyReply, id: string) => {
     const found = await oneMeal(db, id)
 
-    return found === undefined
-      ? reply.code(404).send(errorResponse('not_found'))
-      : ({ meal: found } satisfies MealResponse)
+    return found === undefined ? sendError(reply, 404) : ({ meal: found } satisfies MealResponse)
   }
 
   app.get<{ Params: { eventId: string } }>(
@@ -202,7 +199,7 @@ export const registerMealRoutes = (
       void noStore(reply)
 
       const burn = await burnFor(db, request.params.eventId)
-      if (burn === undefined) return reply.code(404).send(errorResponse('not_found'))
+      if (burn === undefined) return sendError(reply, 404)
 
       return {
         intro_markdown: burn.meal_intro_markdown,
@@ -219,24 +216,22 @@ export const registerMealRoutes = (
     async (request, reply) => {
       void noStore(reply)
 
-      const parsed = mealIntroUpdateSchema.safeParse(request.body)
-      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+      const body = bodyOf(mealIntroUpdateSchema, request)
+      if (body === undefined) return sendError(reply, 400)
 
       // Scoped like the writes below, and unlike `/events/:id/welcome`, which has the
       // same gap — see #218. New code follows the rule rather than the neighbour.
       if ((await openEvent(db, todayIso(now), request.params.eventId)) === undefined) {
-        return reply.code(404).send(errorResponse('not_found'))
+        return sendError(reply, 404)
       }
 
       const [row] = await db
         .update(event)
-        .set({ meal_intro_markdown: parsed.data.meal_intro_markdown })
+        .set({ meal_intro_markdown: body.meal_intro_markdown })
         .where(eq(event.id, request.params.eventId))
         .returning({ intro: event.meal_intro_markdown })
 
-      return row === undefined
-        ? reply.code(404).send(errorResponse('not_found'))
-        : { meal_intro_markdown: row.intro }
+      return row === undefined ? sendError(reply, 404) : { meal_intro_markdown: row.intro }
     },
   )
 
@@ -262,11 +257,11 @@ export const registerMealRoutes = (
     async (request, reply) => {
       void noStore(reply)
 
-      const parsed = mealLeadSchema.safeParse(request.body)
-      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+      const body = bodyOf(mealLeadSchema, request)
+      if (body === undefined) return sendError(reply, 400)
 
       const existing = await openMeal(request.params.id)
-      if (existing === undefined) return reply.code(404).send(errorResponse('not_found'))
+      if (existing === undefined) return sendError(reply, 404)
 
       // A chore has nobody cooking, so it has nobody leading the cooking. Refused
       // rather than only hidden: the page not offering it is not the rule.
@@ -274,17 +269,17 @@ export const registerMealRoutes = (
       // Vacating stays allowed, like standing down from the crew below: a sitting
       // changed to a chore under whoever was leading it must not strand them there
       // with no way off.
-      if (existing.kind === 'chore' && parsed.data.account_id !== null) {
-        return reply.code(400).send(errorResponse('bad_request'))
+      if (existing.kind === 'chore' && body.account_id !== null) {
+        return sendError(reply, 400)
       }
 
       let taking: string | undefined
-      if (parsed.data.account_id !== null) {
-        taking = await attendanceFor(db, existing.event_id, parsed.data.account_id)
+      if (body.account_id !== null) {
+        taking = await attendanceFor(db, existing.event_id, body.account_id)
 
         // Not coming to this burn. A 400 rather than a 404: the account may well
         // exist, and what is wrong is the pairing.
-        if (taking === undefined) return reply.code(400).send(errorResponse('bad_request'))
+        if (taking === undefined) return sendError(reply, 400)
       }
 
       // Whoever holds it now, read before the write takes it off them.
@@ -313,11 +308,11 @@ export const registerMealRoutes = (
       const viewer = await viewerFor(request, { db, sessions })
       const by = viewer?.account_id ?? ''
 
-      if (held !== undefined && held !== parsed.data.account_id) {
+      if (held !== undefined && held !== body.account_id) {
         await tell(by, held, `You are no longer leading ${existing.label}`)
       }
-      if (parsed.data.account_id !== null && parsed.data.account_id !== held) {
-        await tell(by, parsed.data.account_id, `You are leading ${existing.label}`)
+      if (body.account_id !== null && body.account_id !== held) {
+        await tell(by, body.account_id, `You are leading ${existing.label}`)
       }
 
       return answer(reply, existing.id)
@@ -343,26 +338,26 @@ export const registerMealRoutes = (
       // `role: string`. The lead has its own route, where handing it over is a thing
       // you may do to somebody else.
       const role = STANDING.find((candidate) => candidate === request.params.role)
-      if (role === undefined) return reply.code(404).send(errorResponse('not_found'))
+      if (role === undefined) return sendError(reply, 404)
 
       const existing = await openMeal(request.params.id)
-      if (existing === undefined) return reply.code(404).send(errorResponse('not_found'))
+      if (existing === undefined) return sendError(reply, 404)
 
       // Nothing is cooked at a chore, so there is nothing to help cook. Standing down
       // stays allowed whatever the kind, or a slot changed to a chore would strand
       // whoever had already put their name to it.
       if (existing.kind === 'chore' && role === 'helper' && joining) {
-        return reply.code(400).send(errorResponse('bad_request'))
+        return sendError(reply, 400)
       }
 
       const viewer = await viewerFor(request, { db, sessions })
-      if (viewer === undefined) return reply.code(401).send(errorResponse('unauthenticated'))
+      if (viewer === undefined) return sendError(reply, 401)
 
       const accountId = whoseHands(joining, request)
-      if (accountId === undefined) return reply.code(400).send(errorResponse('bad_request'))
+      if (accountId === undefined) return sendError(reply, 400)
 
       const mine = await attendanceFor(db, existing.event_id, accountId)
-      if (mine === undefined) return reply.code(400).send(errorResponse('bad_request'))
+      if (mine === undefined) return sendError(reply, 400)
 
       const row = { meal_id: existing.id, attendance_id: mine, role }
 
@@ -422,27 +417,27 @@ export const registerMealRoutes = (
     async (request, reply) => {
       void noStore(reply)
 
-      const parsed = mealUpdateSchema.safeParse(request.body)
-      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+      const body = bodyOf(mealUpdateSchema, request)
+      if (body === undefined) return sendError(reply, 400)
 
       const existing = await openMeal(request.params.id)
-      if (existing === undefined) return reply.code(404).send(errorResponse('not_found'))
+      if (existing === undefined) return sendError(reply, 404)
 
       // A sitting the burn does not cover disappears from the schedule, whose rows
       // span the burn's own hours, while still showing on the Meals page — two views
       // disagreeing about whether it exists. Dreams may sit outside the grid because
       // the pool holds whatever it does not draw; meals have no pool.
-      if (parsed.data.date !== undefined) {
+      if (body.date !== undefined) {
         const burn = await burnFor(db, existing.event_id)
-        if (burn === undefined) return reply.code(404).send(errorResponse('not_found'))
-        if (parsed.data.date < burn.start_date || parsed.data.date > burn.end_date) {
-          return reply.code(400).send(errorResponse('bad_request'))
+        if (burn === undefined) return sendError(reply, 404)
+        if (body.date < burn.start_date || body.date > burn.end_date) {
+          return sendError(reply, 400)
         }
       }
 
-      if (Object.keys(parsed.data).length > 0) {
+      if (Object.keys(body).length > 0) {
         try {
-          await db.update(meal).set(parsed.data).where(eq(meal.id, request.params.id))
+          await db.update(meal).set(body).where(eq(meal.id, request.params.id))
         } catch (failure) {
           // Onto a day that already has one by that name, which the unique index
           // refuses. A 409: the body is well formed and the burn already has one.
@@ -450,7 +445,7 @@ export const registerMealRoutes = (
           // database that fell over would send the caller after the wrong thing.
           if (!isUniqueViolation(failure)) throw failure
 
-          return reply.code(409).send(errorResponse('conflict'))
+          return sendError(reply, 409)
         }
       }
 
@@ -468,13 +463,13 @@ export const registerMealRoutes = (
     async (request, reply) => {
       void noStore(reply)
 
-      const parsed = mealIdeaUpdateSchema.safeParse(request.body)
-      if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+      const body = bodyOf(mealIdeaUpdateSchema, request)
+      if (body === undefined) return sendError(reply, 400)
 
       const existing = await openMeal(request.params.id)
-      if (existing === undefined) return reply.code(404).send(errorResponse('not_found'))
+      if (existing === undefined) return sendError(reply, 404)
 
-      await db.update(meal).set({ food_idea: parsed.data.food_idea.trim() }).where(eq(meal.id, existing.id))
+      await db.update(meal).set({ food_idea: body.food_idea.trim() }).where(eq(meal.id, existing.id))
 
       return answer(reply, existing.id)
     },
@@ -491,9 +486,7 @@ const whoseHands = (
 ): string | undefined => {
   if (!joining) return request.params.accountId
 
-  const parsed = helperSchema.safeParse(request.body)
-
-  return parsed.success ? parsed.data.account_id : undefined
+  return bodyOf(helperSchema, request)?.account_id
 }
 
 /**
@@ -517,7 +510,7 @@ export const registerMealAdminRoutes = (app: FastifyInstance, { db }: MealDeps) 
     // Its siblings 404, and whoever reads one route to learn how the others behave
     // should not be told something different by each.
     const burn = await burnFor(db, request.params.eventId)
-    if (burn === undefined) return reply.code(404).send(errorResponse('not_found'))
+    if (burn === undefined) return sendError(reply, 404)
 
     return answerSlots(burn.id)
   })
@@ -525,18 +518,16 @@ export const registerMealAdminRoutes = (app: FastifyInstance, { db }: MealDeps) 
   app.post<{ Params: { eventId: string } }>(apiRoutes.addMealSlot.fastify, async (request, reply) => {
     void noStore(reply)
 
-    const parsed = mealSlotCreateSchema.safeParse(request.body)
-    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+    const body = bodyOf(mealSlotCreateSchema, request)
+    if (body === undefined) return sendError(reply, 400)
 
     const existing = await slotsFor(db, request.params.eventId)
     const order = existing.reduce((highest, slot) => Math.max(highest, slot.order + 1), 0)
 
     try {
-      await db
-        .insert(mealSlot)
-        .values({ ...parsed.data, id: randomUUID(), event_id: request.params.eventId, order })
+      await db.insert(mealSlot).values({ ...body, id: randomUUID(), event_id: request.params.eventId, order })
     } catch (failure) {
-      if (isForeignKeyViolation(failure)) return reply.code(404).send(errorResponse('not_found'))
+      if (isForeignKeyViolation(failure)) return sendError(reply, 404)
       throw failure
     }
 
@@ -546,15 +537,15 @@ export const registerMealAdminRoutes = (app: FastifyInstance, { db }: MealDeps) 
   app.patch<{ Params: { id: string } }>(apiRoutes.updateMealSlot.fastify, async (request, reply) => {
     void noStore(reply)
 
-    const parsed = mealSlotUpdateSchema.safeParse(request.body)
-    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+    const body = bodyOf(mealSlotUpdateSchema, request)
+    if (body === undefined) return sendError(reply, 400)
 
     const [existing] = await db.select().from(mealSlot).where(eq(mealSlot.id, request.params.id)).limit(1)
-    if (existing === undefined) return reply.code(404).send(errorResponse('not_found'))
+    if (existing === undefined) return sendError(reply, 404)
 
     // `set({})` is not valid SQL, so an empty body reads instead of writing.
-    if (Object.keys(parsed.data).length > 0) {
-      await db.update(mealSlot).set(parsed.data).where(eq(mealSlot.id, request.params.id))
+    if (Object.keys(body).length > 0) {
+      await db.update(mealSlot).set(body).where(eq(mealSlot.id, request.params.id))
     }
 
     // The meals already generated are left alone. A slot is a template, and a rename
@@ -572,7 +563,7 @@ export const registerMealAdminRoutes = (app: FastifyInstance, { db }: MealDeps) 
       .returning({ event_id: mealSlot.event_id })
 
     // The meals it made stay, for the same reason a rename does not reach them.
-    return row === undefined ? reply.code(404).send(errorResponse('not_found')) : reply.code(204).send()
+    return row === undefined ? sendError(reply, 404) : reply.code(204).send()
   })
 
   /**
@@ -590,7 +581,7 @@ export const registerMealAdminRoutes = (app: FastifyInstance, { db }: MealDeps) 
     void noStore(reply)
 
     const burn = await burnFor(db, request.params.eventId)
-    if (burn === undefined) return reply.code(404).send(errorResponse('not_found'))
+    if (burn === undefined) return sendError(reply, 404)
 
     const slots = await slotsFor(db, burn.id)
     const existing = await db
@@ -622,27 +613,27 @@ export const registerMealAdminRoutes = (app: FastifyInstance, { db }: MealDeps) 
   app.post<{ Params: { eventId: string } }>(apiRoutes.addMeal.fastify, async (request, reply) => {
     void noStore(reply)
 
-    const parsed = mealCreateSchema.safeParse(request.body)
-    if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
+    const body = bodyOf(mealCreateSchema, request)
+    if (body === undefined) return sendError(reply, 400)
 
     const id = randomUUID()
 
     try {
-      await db.insert(meal).values({ ...parsed.data, id, event_id: request.params.eventId, food_idea: '' })
+      await db.insert(meal).values({ ...body, id, event_id: request.params.eventId, food_idea: '' })
     } catch (failure) {
-      if (isForeignKeyViolation(failure)) return reply.code(404).send(errorResponse('not_found'))
+      if (isForeignKeyViolation(failure)) return sendError(reply, 404)
       // A second sitting of the same name on the same day, which the unique index
       // refuses. A 409 rather than a 400: the body is well formed and the burn simply
       // already has one.
       if (!isUniqueViolation(failure)) throw failure
 
-      return reply.code(409).send(errorResponse('conflict'))
+      return sendError(reply, 409)
     }
 
     const created = await oneMeal(db, id)
 
     return created === undefined
-      ? reply.code(404).send(errorResponse('not_found'))
+      ? sendError(reply, 404)
       : reply.code(201).send({ meal: created } satisfies MealResponse)
   })
 
@@ -653,6 +644,6 @@ export const registerMealAdminRoutes = (app: FastifyInstance, { db }: MealDeps) 
 
     // Everyone signed up goes with it — `meal_role` cascades. That is what dropping a
     // sitting means, and why it is not something any member may do.
-    return deleted.length === 0 ? reply.code(404).send(errorResponse('not_found')) : reply.code(204).send()
+    return deleted.length === 0 ? sendError(reply, 404) : reply.code(204).send()
   })
 }
