@@ -6,6 +6,7 @@ import { useEffect, useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
+import { isAdmin, useViewer } from '../viewer.tsx'
 import { ErrorText } from './ErrorText.tsx'
 import { FormError, useFormError } from './FormError.tsx'
 
@@ -30,8 +31,10 @@ type Channel = keyof NotificationSettings
  * for, so it needs no defaults; the two are independent, so somebody may take the
  * burn-wide ones in their inbox and off their phone.
  *
- * Two sections, from `notificationSections`. The split is a property of the category
- * and lives beside its label, so adding one cannot land it in the wrong half here.
+ * The sections come from `notificationSections`. The split is a property of the
+ * category and lives beside its label, so adding one cannot land it in the wrong half
+ * here. The admin section is only drawn for an admin, because nobody else is ever told
+ * about anything in it — the same argument the email column makes below (#326).
  *
  * Saved on each tick rather than behind a button: there is nothing to review and no
  * way to be half-done, and a settings table with a Save nobody presses is a table
@@ -49,6 +52,7 @@ export const NotificationSettingsField = ({
    */
   sendsEmail?: boolean
 }) => {
+  const admin = isAdmin(useViewer())
   const [settings, setSettings] = useState<NotificationSettings | undefined>(undefined)
   const [unavailable, setUnavailable] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -112,11 +116,13 @@ export const NotificationSettingsField = ({
     ...(sendsEmail ? [{ channel: 'email' as const, heading: 'Email' }] : []),
   ]
 
+  const sections = notificationSections.filter((section) => section.about !== 'admin' || admin)
+
   return (
     <>
       <FormError error={error} />
 
-      {notificationSections.map((section) => (
+      {sections.map((section) => (
         <table class="table notification-settings" key={section.about}>
           <thead>
             <tr>
@@ -155,7 +161,7 @@ export const NotificationSettingsField = ({
       ))}
 
       <p class="form-note">
-        The second list is about the burns you are coming to — nobody hears about a burn they have not said
+        What else is going on means the burns you are coming to — nobody hears about a burn they have not said
         they are attending.
         {sendsEmail && ' Email is off everywhere until you ask for it.'}
       </p>

@@ -1,4 +1,4 @@
-import type { Invite } from '@sage-burner/shared'
+import type { Invite, InviteDelivery } from '@sage-burner/shared'
 
 import { useState } from 'preact/hooks'
 
@@ -26,7 +26,9 @@ const answerText = (value: string | boolean) => {
 export const AdminApplications = ({ api }: { api: ApplicationsApi }) => {
   const viewer = useViewer()
   const admin = isAdmin(viewer)
-  const [invites, setInvites] = useState<Record<string, Invite>>({})
+  // The link and what happened to the emailed copy, kept together: both are answered
+  // once and the reload that follows returns neither (#327).
+  const [invites, setInvites] = useState<Record<string, { invite: Invite; delivery: InviteDelivery }>>({})
   // Which row, not a boolean: two applications can be decided one after the other,
   // and only the one being decided should show it.
   const [deciding, setDeciding] = useState<string | undefined>(undefined)
@@ -50,8 +52,8 @@ export const AdminApplications = ({ api }: { api: ApplicationsApi }) => {
     setDeciding(id)
     run(
       async () => {
-        const { invite } = await api.reissueInvite(id)
-        setInvites((current) => ({ ...current, [id]: invite }))
+        const { invite, delivery } = await api.reissueInvite(id)
+        setInvites((current) => ({ ...current, [id]: { invite, delivery } }))
         setDeciding(undefined)
       },
       (failure: unknown) => {
@@ -72,8 +74,8 @@ export const AdminApplications = ({ api }: { api: ApplicationsApi }) => {
 
         // Kept rather than re-read: the token is shown once, and the reload that
         // follows returns the application without it.
-        const { invite } = response
-        if (invite !== null) setInvites((current) => ({ ...current, [id]: invite }))
+        const { invite, delivery } = response
+        if (invite !== null) setInvites((current) => ({ ...current, [id]: { invite, delivery } }))
         setDeciding(undefined)
       },
       // A 409 means someone else decided it first, so the list on screen is stale —
@@ -154,7 +156,7 @@ export const AdminApplications = ({ api }: { api: ApplicationsApi }) => {
               </p>
             )}
 
-            <InviteLink invite={invites[entry.id]} />
+            <InviteLink invite={invites[entry.id]?.invite} delivery={invites[entry.id]?.delivery} />
           </article>
         ))}
     </GuardedPage>

@@ -51,6 +51,7 @@ describe('AdminApplications', () => {
       Promise.resolve({
         application: anApplication({ status: 'approved', decided_at: '2026-07-03T00:00:00Z' }),
         invite: { token: 'a-very-secret-token', expires_at: '2026-08-02T00:00:00Z' },
+        delivery: null,
       }),
     )
     renderPage(stub({ approveApplication }))
@@ -60,6 +61,47 @@ describe('AdminApplications', () => {
     expect((await screen.findByRole('status')).textContent).toContain('shown once')
     expect(screen.getByText(/a-very-secret-token/)).toBeTruthy()
     expect(approveApplication).toHaveBeenCalledWith('app-1')
+  })
+
+  it('says the invite was emailed, and where to', async () => {
+    // The bug this fixed: the link was already in the applicant's inbox and the page
+    // said to send it, so they got it twice from two people (#327).
+    const approveApplication = vi.fn(() =>
+      Promise.resolve({
+        application: anApplication({ status: 'approved', decided_at: '2026-07-03T00:00:00Z' }),
+        invite: { token: 'a-very-secret-token', expires_at: '2026-08-02T00:00:00Z' },
+        delivery: { sent: true, to: 'fredrik@example.org', reason: null },
+      }),
+    )
+    renderPage(stub({ approveApplication }))
+
+    ;(await screen.findByRole('button', { name: 'Approve' })).click()
+
+    const note = await screen.findByRole('status')
+    expect(note.textContent).toContain('Emailed to fredrik@example.org')
+    // Still shown: a bounce is invisible to this app, and the admin may need it.
+    expect(screen.getByText(/a-very-secret-token/)).toBeTruthy()
+  })
+
+  it('says why the invite was not emailed, and still asks for the link to be sent', async () => {
+    // The other direction, and how a real invite went missing: every send failed with a
+    // TLS record error and the page's answer was unchanged.
+    renderPage(
+      stub({
+        approveApplication: () =>
+          Promise.resolve({
+            application: anApplication({ status: 'approved', decided_at: '2026-07-03T00:00:00Z' }),
+            invite: { token: 'a-very-secret-token', expires_at: '2026-08-02T00:00:00Z' },
+            delivery: { sent: false, to: 'fredrik@example.org', reason: 'wrong version number' },
+          }),
+      }),
+    )
+
+    ;(await screen.findByRole('button', { name: 'Approve' })).click()
+
+    const note = await screen.findByRole('status')
+    expect(note.textContent).toContain('Not sent: wrong version number')
+    expect(note.textContent).toContain('Send this link')
   })
 
   it('does not say "Copied" when the copy failed', async () => {
@@ -74,6 +116,7 @@ describe('AdminApplications', () => {
           Promise.resolve({
             application: anApplication({ status: 'approved', decided_at: '2026-07-03T00:00:00Z' }),
             invite: { token: 't', expires_at: '2026-08-02T00:00:00Z' },
+            delivery: null,
           }),
       }),
     )
@@ -94,6 +137,7 @@ describe('AdminApplications', () => {
           Promise.resolve({
             application: anApplication({ status: 'approved', decided_at: '2026-07-03T00:00:00Z' }),
             invite: { token: 't', expires_at: '2026-08-02T00:00:00Z' },
+            delivery: null,
           }),
       }),
     )
@@ -123,6 +167,7 @@ describe('AdminApplications', () => {
           return Promise.resolve({
             application: anApplication({ status: 'approved', decided_at: '2026-07-03T00:00:00Z' }),
             invite: { token: 't', expires_at: '2026-08-02T00:00:00Z' },
+            delivery: null,
           })
         },
       }),
@@ -136,7 +181,10 @@ describe('AdminApplications', () => {
 
   it('offers a new link on an approved application, and shows it once', async () => {
     const reissueInvite = vi.fn(() =>
-      Promise.resolve({ invite: { token: 'the-replacement', expires_at: '2026-09-02T00:00:00Z' } }),
+      Promise.resolve({
+        invite: { token: 'the-replacement', expires_at: '2026-09-02T00:00:00Z' },
+        delivery: null,
+      }),
     )
     renderPage(
       stub({
@@ -186,6 +234,7 @@ describe('AdminApplications', () => {
       Promise.resolve({
         application: anApplication({ status: 'rejected', decided_at: '2026-07-03T00:00:00Z' }),
         invite: null,
+        delivery: null,
       }),
     )
     renderPage(stub({ rejectApplication }))

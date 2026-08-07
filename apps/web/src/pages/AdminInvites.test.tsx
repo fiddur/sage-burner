@@ -38,7 +38,10 @@ const renderPage = (api: InvitesApi, roles: ('admin' | 'member')[] = ['admin']) 
 describe('AdminInvites', () => {
   it('shows the link once an invite is created', async () => {
     const createInvite = vi.fn(() =>
-      Promise.resolve({ invite: { token: 'a-secret-token', expires_at: '2026-08-01T00:00:00.000Z' } }),
+      Promise.resolve({
+        invite: { token: 'a-secret-token', expires_at: '2026-08-01T00:00:00.000Z' },
+        delivery: null,
+      }),
     )
     renderPage(stub({ createInvite }))
 
@@ -132,8 +135,14 @@ describe('AdminInvites', () => {
     vi.stubGlobal('navigator', { clipboard: { writeText } })
     const createInvite = vi
       .fn()
-      .mockResolvedValueOnce({ invite: { token: 'first', expires_at: '2026-08-01T00:00:00.000Z' } })
-      .mockResolvedValueOnce({ invite: { token: 'second', expires_at: '2026-08-01T00:00:00.000Z' } })
+      .mockResolvedValueOnce({
+        invite: { token: 'first', expires_at: '2026-08-01T00:00:00.000Z' },
+        delivery: null,
+      })
+      .mockResolvedValueOnce({
+        invite: { token: 'second', expires_at: '2026-08-01T00:00:00.000Z' },
+        delivery: null,
+      })
     renderPage(stub({ createInvite }))
 
     ;(await screen.findByRole('button', { name: 'Create an invite' })).click()

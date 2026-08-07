@@ -17,8 +17,8 @@ export interface ApplicationRouteDeps {
    * Tell the admins, if anything is listening.
    *
    * Optional so the route stands alone: a test about applications should not have
-   * to know that notifications exist, and an installation with nobody subscribed
-   * does nothing here either way.
+   * to know that notifications exist. What it reaches is every admin's bell, and a
+   * push where one is subscribed — `app.ts` wires that up (#326).
    */
   notify?: (message: string) => Promise<unknown>
 }
@@ -118,8 +118,8 @@ export const registerApplicationRoutes = (
     //
     // Deliberately says nothing about who applied: a notification is read on a
     // lock screen, and the applicant's name is theirs until an admin opens the
-    // page. `notifyAdmins` sends the same payload to every subscriber for the
-    // same reason — there is nothing in it worth personalising.
+    // page. The bell row carries the same wording — it is a copy of what was
+    // pushed, and an admin who wants the name opens the page anyway.
     if (notify !== undefined) {
       void notify('Someone has applied to join.').catch((failure: unknown) => {
         request.log.error({ err: failure }, 'notifying admins of an application failed')

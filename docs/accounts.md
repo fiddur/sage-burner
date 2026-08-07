@@ -264,6 +264,20 @@ down costs a message rather than an approval, and a refusal is logged rather tha
 turned into a failed decision. A re-issue posts the replacement the same way, which
 is the case that route exists for.
 
+**The admin is told which of those happened** (#327). The response carries
+`delivery` — the same `{ sent, to, reason }` a test message answers with — and the
+paragraph beside the link words itself from it. It said "Send this link" whichever way
+it had gone, and that was wrong in both directions: an applicant got the link twice
+from two people, or every send failed with a TLS record error and nobody learned. The
+link stays visible in all three cases, because a bounce is invisible to this app.
+
+`null` there means nothing was attempted, which needs different words from a refusal:
+a direct invite has nobody to post to, and an application from before #30 may hold a
+Discord handle rather than an address — `looksLikeEmail` is what decides. The third
+silent path was a `Host` that is not hostname-shaped, since a link in an inbox has to
+be absolute; it now answers with a reason naming `PUBLIC_ORIGIN` instead of returning
+quietly.
+
 **A lost link is re-issued, not worked around.**
 `POST /api/admin/applications/:id/invite` mints a replacement and shows it once,
 the same way approving does. The link is shown in a paragraph that vanishes on
@@ -593,14 +607,20 @@ message is gone the moment it is dismissed, which is why the row is the notifica
 rather than the other way round. A member with no browser subscribed still gets the
 bell, which is the ordinary case.
 
-Eleven categories under **Your details → Notifications**, in two sections, and the
-sections default differently:
+Twelve categories under **Your details → Notifications**, in sections that default
+differently:
 
 - **What happens to you** — the original six. On unless you refuse them: being put on
   a meal is not noise, and somebody who never opens the settings should still hear it.
 - **What else is going on** — the five #259 added. **Off unless you ask.** A burn
   where every dream and every arrival pings forty-two people is a channel people learn
   to ignore, which costs the notifications that are actually about them.
+- **What you look after** — an application arriving, and **only an admin is shown it**
+  (#326). Nobody else is ever told, and a switch that cannot do anything reads as a
+  promise. On, like the first section: an application stays open until somebody reviews
+  it. The wire still carries it for everybody, because the settings are per account and
+  know nothing about roles — so a member unticking a row does not switch it off for
+  whoever does hold `admin`.
 
 That split is what decides the storage. `notification_mute` held only the categories
 somebody had switched _off_, and absence meant on — sound while every category was on
@@ -685,7 +705,10 @@ What notifies today:
 - **Being put on or taken off a meal or a dream**, on the same rule.
 - **Your payment being recorded**, and the two waiting-list movements above.
 - **Someone applying**, which goes to every admin, since only an admin can act on
-  one — and which names nobody, because an applicant is not a member yet.
+  one — and which names nobody, because an applicant is not a member yet. A bell row
+  like everything else since #326: it pushed and recorded nothing, so an admin told on
+  a lock screen found an empty bell, and an application is the strongest case for
+  history there is — it stays open until somebody reviews it.
 - **A dream offered, somebody saying they are coming, a lead role added, a lead
   taken** — to everyone attending that burn who asked for them, never to whoever did
   it (#259).
@@ -743,13 +766,13 @@ events, and every decision worth asserting is in `cache.ts` and `notification.ts
 beside their tests.
 
 **What a push says and where it lands are the server's** (#279). The payload carries
-the wording, the link and the category — built by one function, `pushPayload`,
-because there are two senders and they had already drifted: an application is neither
-a bell row nor a per-account setting, so it does not go through `recordAndPush` and
-went on sending a body alone. The worker routes by what it was told rather than by a
-page written into it — which is what it did while a new application
-was the only thing that pushed, sending a member told they were on a meal to the
-admin applications page. The category is also what a notification collapses on:
+the wording, the link and the category — built by one function, `pushPayload`, and
+there is one sender now that an application is a bell row too (#326), so a push cannot
+carry less than the row it copies. It could before: the applications callback built its
+own payload and sent a body alone. The worker routes by what it was told rather than by
+a page written into it — which is what it did while a new application was the only
+thing that pushed, sending a member told they were on a meal to the admin applications
+page. The category is also what a notification collapses on:
 three applications on a locked phone should be one line to act on, and that was the
 whole point of a tag, but one tag for everything made a meal role replace a dream
 offer instead.

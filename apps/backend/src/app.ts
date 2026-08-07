@@ -22,8 +22,7 @@ import { clientErrorHandler, frameworkErrorHandler, registerErrorHandler } from 
 import { sendError } from './http.ts'
 import { emailChannel } from './mail/channel.ts'
 import { sendWithSmtp } from './mail/smtp.ts'
-import { pushPayload, recordAndPush } from './push/notify.ts'
-import { notifyAdmins } from './push/push.ts'
+import { notifyAdmins, recordAndPush } from './push/notify.ts'
 import { deliverWithWebPush, DEFAULT_PUSH_CONTACT, generateVAPIDKeys } from './push/web-push.ts'
 import { registerAdminRoutes } from './routes/admin.ts'
 import { registerAllergyRoutes } from './routes/allergies.ts'
@@ -478,19 +477,16 @@ export const createApp = async ({
   registerApplicationRoutes(app, {
     db,
     now,
-    notify: async (message) => {
-      // Through the same builder as every other push, which is what stops this one
-      // going somewhere else again. No category: an application is not a bell row and
-      // has no switch, so there is nothing to name — see `Pushed`.
-      const counts = await notifyAdmins(push, pushPayload({ body: message, link: '/admin/applications' }))
-
-      // Logged here rather than inside `notifyAdmins`, which has no logger and is
-      // the more testable for it. Only when something went wrong: a quiet success
-      // is the ordinary case and does not need a line per application.
-      if (counts.failed > 0 || counts.gone > 0) app.log.warn({ ...counts }, 'notifying admins')
-
-      return counts
-    },
+    // Through the same notifier as everything else, so it is a bell row before it is a
+    // push (#326). It went straight to the push senders and left nothing behind — an
+    // admin read "Someone has applied to join." on a lock screen and found an empty
+    // bell. The link is the page the review happens on, which is where the row lands.
+    notify: async (message) =>
+      await notifyAdmins(db, tellAccount, {
+        category: 'application',
+        body: message,
+        link: '/admin/applications',
+      }),
   })
   registerApplicationReviewRoutes(app, { db, config, sessions, mail, now })
   registerInviteRoutes(app, { db, sessions, now })

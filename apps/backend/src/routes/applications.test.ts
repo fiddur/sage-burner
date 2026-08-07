@@ -436,12 +436,12 @@ describe('submitting an application', () => {
 })
 
 describe('telling the admins', () => {
-  it('sends the page to open with the wording, like every other push', async () => {
-    // This one does not go through `recordAndPush` — an application is neither a bell
-    // row nor a setting, it predates both — so it builds its payload separately, and
-    // that is exactly how it came to send a body alone. Invisible while the worker
-    // had `/admin/applications` written into it, and the one notification going
-    // nowhere the moment it stopped (#279).
+  it('sends the page to open and the category with the wording, like every other push', async () => {
+    // It went to the push senders directly and carried a body alone, which was
+    // invisible while the worker had `/admin/applications` written into it and the one
+    // notification going nowhere the moment it stopped (#279). Now it is a bell row
+    // first and a push copied from it (#326), so all three fields come from one place
+    // — what the row holds is what the push carries.
     const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
     const server = await build(deliver)
     await givenSubscribedAdmin()
@@ -452,6 +452,7 @@ describe('telling the admins', () => {
     expect(JSON.parse(String(deliver.mock.calls[0]?.[1]))).toEqual({
       body: 'Someone has applied to join.',
       link: '/admin/applications',
+      category: 'application',
     })
   })
 })
