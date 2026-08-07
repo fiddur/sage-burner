@@ -493,10 +493,13 @@ Two compactions paid for that:
 - **The three effort answers are one cell.** They had a column each — three
   headings of two words for one word of content, wider between them than both prose
   columns together. Now an icon per phase (🌱 before, 🔥 during, 🧹 after) and a
-  three-segment bar for how much. The words are still in the `title` and for a
-  screen reader: 🌱 is a guess until somebody tells you, and a register nobody can
-  read is not compact, it is broken. An unfilled bar stays drawn, because "none" has
-  to look like an answer somebody gave rather than a cell nobody filled in.
+  three-segment bar for how much. The words are still in the `title`, for a screen
+  reader, and — since #317 — in a one-line legend under the table, which is the only
+  one of the three a sighted touch user gets: a hover needs a pointer and
+  `.visually-hidden` needs a screen reader, so on the device this compaction was for,
+  🌱🔥🧹 sat under a heading reading only "Effort". A register nobody can read is not
+  compact, it is broken. An unfilled bar stays drawn, because "none" has to look like
+  an answer somebody gave rather than a cell nobody filled in.
 - **The lead and the team share a column.** They are one question — who is on this —
   and side by side they cost the width of two. They sit side by side _inside_ the
   cell where there is room and stack where there is not, so a desktop row is no

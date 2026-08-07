@@ -17,6 +17,7 @@ import type { Database } from '../db/index.ts'
 import { createGuards } from '../auth/guards.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
 import { nextOrder, reorder } from '../db/ordered.ts'
+import { isEmptyPatch, patchRow } from '../db/patch.ts'
 import { event, place } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { refuseIfStale, withCollectionVersion, withVersion } from '../if-match.ts'
@@ -143,20 +144,20 @@ export const registerPlaceRoutes = (app: FastifyInstance, { db, sessions, now }:
       if (body === undefined) return sendError(reply, 400)
 
       // One read answering both "is it there" and "is its burn still open", so the
-      // two cases cannot answer differently. `set({})` is not valid SQL, so the one
-      // body that never reaches the UPDATE returns this row instead.
+      // two cases cannot answer differently. It also answers the one body that never
+      // reaches the UPDATE — see `isEmptyPatch`.
       const existing = await openLane(db, now, request.params.id)
       if (existing === undefined) return sendError(reply, 404)
-      if (Object.keys(body).length === 0) return { place: existing }
+      if (isEmptyPatch(body)) return { place: existing }
 
       // After the lookup, so a lane that is gone answers 404 rather than a grid it is
       // not in, and after the no-op, which reads rather than writes.
       if (await refuseIfStale(request, reply, () => grid(existing.event_id))) return reply
 
-      const [updated] = await db.update(place).set(body).where(eq(place.id, request.params.id)).returning()
-      if (updated === undefined) return sendError(reply, 404)
+      const patched = await patchRow(db, place, eq(place.id, request.params.id), body)
+      if (patched.kind !== 'ok') return sendError(reply, 404)
 
-      return await withCollectionVersion(reply, { place: updated }, () => grid(existing.event_id))
+      return await withCollectionVersion(reply, { place: patched.row }, () => grid(existing.event_id))
     },
   )
 

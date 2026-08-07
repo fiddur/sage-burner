@@ -14,9 +14,8 @@ import { randomUUID } from 'node:crypto'
 
 import type { Database } from '../db/index.ts'
 
-import { allOf } from '../db/conditions.ts'
 import { nextOrder, reorder } from '../db/ordered.ts'
-import { whyNothingWritten } from '../db/refusals.ts'
+import { patchRow } from '../db/patch.ts'
 import { formQuestion } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 
@@ -121,56 +120,25 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db }: { db: Datab
     const body = bodyOf(formQuestionUpdateSchema, request)
     if (body === undefined) return sendError(reply, 400)
 
-    // The only body that never reaches the `UPDATE`, and so the only one that
-    // needs a read of its own. An unrecognised key is a 400 from `.strict()`
-    // above, so `{}` is all that is left that changes nothing — and `set({})` is
-    // not valid SQL. A no-op PATCH is idempotent; returning the row unchanged is
-    // the honest answer.
-    //
-    // The read lives inside this branch rather than above it, for the reason
-    // `events.ts` gives: once `.returning()` supplies the response row and the
-    // re-read below answers a vanished one, an unconditional pre-read only spends
-    // a third query to produce a 404 the write path produces anyway — and leaves
-    // the handler holding a pre-write snapshot to be tempted by.
-    if (Object.keys(body).length === 0) {
-      const [existing] = await db
-        .select()
-        .from(formQuestion)
-        .where(eq(formQuestion.id, request.params.id))
-        .limit(1)
-
-      return existing === undefined
-        ? sendError(reply, 404)
-        : ({ question: existing } satisfies FormQuestionResponse)
-    }
-
     // No merged-row check in JS. A PATCH can break the tick-box rule with a
     // single field from either direction, and the schema cannot decide a lone key
     // — but a read-then-check here is a race (see `tickBoxCondition`), and a JS
     // fail-fast would also pre-empt the statement in every non-racing case, so
-    // nothing would exercise the condition that does the real work.
-    const where = allOf(eq(formQuestion.id, request.params.id), tickBoxCondition(body))
+    // nothing would exercise the condition that does the real work. It goes to
+    // `patchRow` as the condition the write is only allowed under.
+    const patched = await patchRow(
+      db,
+      formQuestion,
+      eq(formQuestion.id, request.params.id),
+      body,
+      tickBoxCondition(body),
+    )
 
-    // `.returning()` rather than reading `changes`, for the reasons `events.ts`
-    // gives: the row it hands back is the row as written, so the response cannot
-    // report a field from the pre-read snapshot that another write has since
-    // changed — two admins patching the same question, one sending `help_text`
-    // and one `label`, would otherwise each be told their own change landed and
-    // the other's did not.
-    const updated = await db.update(formQuestion).set(body).where(where).returning()
+    // `refused` is the tick-box condition saying no, which is the caller's mistake
+    // about this row rather than a missing one.
+    if (patched.kind !== 'ok') return sendError(reply, patched.kind === 'not_found' ? 404 : 400)
 
-    const [row] = updated
-    if (row === undefined) {
-      // Zero rows has three causes here, not two: the id never existed, the row
-      // was deleted a moment ago, or the tick-box condition refused the change. The
-      // first two are the same answer — see `whyNothingWritten` for why this is
-      // asked rather than inferred.
-      const why = await whyNothingWritten(db, formQuestion, eq(formQuestion.id, request.params.id))
-
-      return sendError(reply, why === 'not_found' ? 404 : 400)
-    }
-
-    return { question: row } satisfies FormQuestionResponse
+    return { question: patched.row } satisfies FormQuestionResponse
   })
 
   app.delete<{ Params: { id: string } }>(apiRoutes.deleteQuestion.fastify, async (request, reply) => {

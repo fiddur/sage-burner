@@ -195,6 +195,36 @@ describe('Roles', () => {
     expect(bars[2]?.querySelectorAll('span.is-on')).toHaveLength(0)
   })
 
+  it('says what the effort icons mean, in words, on the page', async () => {
+    // `title` needs a hover and `.visually-hidden` needs a screen reader, so a sighted
+    // touch user — the case #307 exists for — had three icons and a heading reading
+    // only "Effort" (#317).
+    renderPage(stub({}, [aRole({ id: 'r-1', title: 'Build' })]))
+
+    const legend = await screen.findByText(/^Effort: /)
+    expect(legend.textContent).toContain('🌱 before')
+    expect(legend.textContent).toContain('🔥 during')
+    expect(legend.textContent).toContain('🧹 after')
+  })
+
+  it('gives the body row a cell per heading, and the edit row the whole width', async () => {
+    // What the deleted `data-label` test did incidentally: nothing else notices a
+    // column added to the header and not to `RoleRow`, or a `colSpan` that stops
+    // covering the row (#317). The actions column has no heading text, hence the +1.
+    renderPage(stub({}, [aRole({ id: 'r-1', title: 'Build' })]))
+
+    await screen.findByText('Build')
+    const headings = document.querySelectorAll('.lead-table thead th')
+    const cells = (await screen.findByText('Build')).closest('tr')?.children
+
+    expect(cells).toHaveLength(headings.length)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Build' }))
+    const spanning = document.querySelector('.lead-table tbody td[colspan]')
+
+    expect(spanning?.getAttribute('colspan')).toBe(String(headings.length))
+  })
+
   it('keeps the lead and the team apart inside the one column they share', async () => {
     // They were a column each until #307. Merged, the header can no longer say which
     // is which, so each half does — and the two are still two controls with two sets

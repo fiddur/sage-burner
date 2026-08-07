@@ -17,6 +17,7 @@ import type { Database } from '../db/index.ts'
 import { createGuards } from '../auth/guards.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
 import { nextOrder, reorder } from '../db/ordered.ts'
+import { isEmptyPatch, patchRow } from '../db/patch.ts'
 import { attendance, eventOption } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { refuseIfStale, withCollectionVersion, withVersion } from '../if-match.ts'
@@ -125,20 +126,16 @@ export const registerEventOptionRoutes = (app: FastifyInstance, { db, sessions }
 
       if (existing === undefined) return sendError(reply, 404)
 
-      // `set({})` is not valid SQL, and a no-op PATCH is a read — so it answers with
-      // the row rather than writing, and needs no precondition.
-      if (Object.keys(body).length === 0) return { option: existing }
+      // A no-op PATCH is a read — so it answers with the row rather than writing, and
+      // needs no precondition. See `isEmptyPatch`.
+      if (isEmptyPatch(body)) return { option: existing }
 
       if (await refuseIfStale(request, reply, () => choices(existing.event_id))) return reply
 
-      const [updated] = await db
-        .update(eventOption)
-        .set(body)
-        .where(eq(eventOption.id, request.params.id))
-        .returning()
-      if (updated === undefined) return sendError(reply, 404)
+      const patched = await patchRow(db, eventOption, eq(eventOption.id, request.params.id), body)
+      if (patched.kind !== 'ok') return sendError(reply, 404)
 
-      return await withCollectionVersion(reply, { option: updated }, () => choices(existing.event_id))
+      return await withCollectionVersion(reply, { option: patched.row }, () => choices(existing.event_id))
     },
   )
 

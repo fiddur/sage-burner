@@ -659,7 +659,7 @@ reload, because `GET /api/installation` carries `sends_email` and the settings p
 sets it locally when it saves.
 
 A message is the same sentence the bell shows, which is the whole of it — a second
-wording per category would be eleven more things to keep in step. It links to the page
+wording per category would be one more thing per category to keep in step. It links to the page
 the notification belongs to **only when `PUBLIC_ORIGIN` is set**: an email is read
 outside the app, so a relative path is no use, and unlike the share card this runs from
 wherever a role was handed out, with no request to read `Host` from. Without one the
