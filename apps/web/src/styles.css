@@ -1260,25 +1260,12 @@ a:hover {
   }
 }
 
-.role-team-count {
-  margin: 0;
-  opacity: 0.8;
-  font-size: 0.9rem;
-}
-
-.role-team {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.role-team li {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
+/* The legend under the register, because the icons in the Effort column have no
+   words anywhere on a touch screen: `title` needs a hover and `.visually-hidden`
+   needs a screen reader (#317). */
+.lead-effort-legend {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
 }
 
 /* The "seed this burn from a previous one" control, on the places grid and the
