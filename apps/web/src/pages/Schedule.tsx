@@ -98,8 +98,8 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
   // a dream cannot be dropped in the kitchen nor a meal in a lane — the kitchen is
   // for cooking, fetching food and washing up, and that is the whole of it.
   const [draggedMeal, setDraggedMeal] = useState<MealBlock | undefined>(undefined)
-  const [opened, setOpened] = useState<Opened | undefined>(undefined)
-  const [openedMeal, setOpenedMeal] = useState<string | undefined>(undefined)
+  const [opened, setOpenedPanel] = useState<Opened | undefined>(undefined)
+  const [openedMeal, setOpenedMealPanel] = useState<string | undefined>(undefined)
 
   // The burn comes first: since #156 the lanes belong to one, so there is no grid to
   // ask for until we know which.
@@ -132,7 +132,24 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
     },
   )
 
-  const { busy, error, run } = useAction(reload)
+  const { busy, error, run, setError } = useAction(reload)
+
+  /**
+   * Every way a panel opens or closes, so none of them can forget the error (#206).
+   *
+   * `useAction` keeps its message until the next write, and the panel shows whatever
+   * it is holding as its own `role="alert"` — so a drag that failed made the next
+   * dream somebody opened announce "Could not move that dream." about itself.
+   */
+  const setOpened = (next: Opened | undefined) => {
+    setError(undefined)
+    setOpenedPanel(next)
+  }
+
+  const setOpenedMeal = (next: string | undefined) => {
+    setError(undefined)
+    setOpenedMealPanel(next)
+  }
 
   const move = (id: string, changes: Parameters<ScheduleApi['updateSession']>[1]) => {
     run(() => api.updateSession(id, changes), 'Could not move that dream.')

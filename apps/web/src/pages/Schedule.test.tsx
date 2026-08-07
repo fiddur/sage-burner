@@ -1544,6 +1544,106 @@ describe('a chore’s lead, in the panel', () => {
   })
 })
 
+describe('what a panel carries in from before it opened', () => {
+  const placed = () =>
+    aDream({
+      id: 's-1',
+      title: 'Cacao ceremony',
+      place_id: 'p-2',
+      time_slot_start: '2026-08-01T08:00:00.000Z',
+      time_slot_end: '2026-08-01T09:00:00.000Z',
+    })
+
+  it('does not greet a freshly opened dream with the last write’s failure', async () => {
+    // `useAction` holds its error until the next `run`, and the panel presents
+    // whatever it holds as its own `role="alert"`. So a drag that failed made every
+    // dream opened afterwards announce "Could not move that dream." about itself.
+    const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
+      Promise.reject(new Error('the server said no')),
+    )
+    renderPage(stub({ updateSession }, [placed()]))
+
+    fireEvent.keyDown(await screen.findByRole('button', { name: 'Change how long Cacao ceremony is' }), {
+      key: 'ArrowDown',
+    })
+    await screen.findByText('Could not move that dream.')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Cacao ceremony' }))
+    const panel = await screen.findByRole('dialog', { name: 'Cacao ceremony' })
+
+    expect(within(panel).queryByRole('alert')).toBeNull()
+  })
+
+  it('still shows a failure of its own, which is what the panel’s alert is for', async () => {
+    // The passing sibling. Clearing on open is only right if a write made *from* the
+    // panel still reports — that is the whole reason the alert moved in here.
+    const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>
+      Promise.reject(new Error('the server said no')),
+    )
+    renderPage(stub({ updateSession }, [placed()]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
+    const panel = await screen.findByRole('dialog', { name: 'Cacao ceremony' })
+    fireEvent.click(
+      within(panel).getByRole('button', { name: 'Take the spot on Cacao ceremony as facilitator' }),
+    )
+
+    expect(await within(panel).findByRole('alert')).toBeTruthy()
+  })
+})
+
+describe('leaving a dream’s edit form', () => {
+  const open = async () => {
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
+    return screen.findByRole('dialog', { name: 'Cacao ceremony' })
+  }
+
+  it('takes Escape as leaving the form, and only then as closing the panel', async () => {
+    // #205 stopped a *refused write* losing what somebody typed; Escape still did,
+    // silently. Two presses now: out of the form, then out of the panel.
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
+
+    const panel = await open()
+    fireEvent.click(within(panel).getByRole('button', { name: 'Edit Cacao ceremony' }))
+    expect(screen.getByLabelText('Title of Cacao ceremony')).toBeTruthy()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(screen.queryByLabelText('Title of Cacao ceremony')).toBeNull()
+    expect(screen.queryByRole('dialog', { name: 'Cacao ceremony' })).toBeTruthy()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('takes a stray backdrop click the same way', async () => {
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
+
+    const panel = await open()
+    fireEvent.click(within(panel).getByRole('button', { name: 'Edit Cacao ceremony' }))
+
+    const backdrop = document.querySelector('.dream-modal')
+    if (backdrop === null) throw new Error('the panel is open, so there is a backdrop')
+
+    fireEvent.click(backdrop)
+
+    expect(screen.queryByLabelText('Title of Cacao ceremony')).toBeNull()
+    expect(screen.queryByRole('dialog', { name: 'Cacao ceremony' })).toBeTruthy()
+  })
+
+  it('closes on the first Escape when nothing is being edited', async () => {
+    // The passing sibling: swallowing every first Escape would make reading a dream
+    // and pressing it — the common case — do nothing at all.
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
+
+    await open()
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+})
+
 describe('facilitating a dream, in the panel', () => {
   const cacao = (over: Partial<Session> = {}) => aDream({ id: 's-1', title: 'Cacao ceremony', ...over })
 

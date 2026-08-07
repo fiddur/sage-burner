@@ -74,7 +74,12 @@ export const DreamDetails = ({
   const place = places.find((lane) => lane.id === dream.place_id)
 
   return (
-    <DreamPanel label={dream.title} error={error} onClose={onClose}>
+    <DreamPanel
+      label={dream.title}
+      error={error}
+      onBack={editing ? onCancelEdit : undefined}
+      onClose={onClose}
+    >
       <h2>{dream.title}</h2>
 
       {editing ? (
