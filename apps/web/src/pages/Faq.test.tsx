@@ -49,6 +49,9 @@ const TWO: FaqEntry[] = [
 const stub = (over: Partial<FaqApi> = {}, entries: FaqEntry[] = TWO): FaqApi => ({
   getFaq: () => Promise.resolve({ entries }),
   getFaqSources: () => Promise.resolve({ sources: [] }),
+  // The fallback when the bar has nothing (#321). `null` is "no burn planned at all",
+  // which is the only state with nothing to show.
+  getActiveEvent: () => Promise.resolve({ event: null }),
   addFaqEntry: () => Promise.reject(new Error('addFaqEntry is not stubbed here')),
   updateFaqEntry: () => Promise.reject(new Error('updateFaqEntry is not stubbed here')),
   deleteFaqEntry: () => Promise.reject(new Error('deleteFaqEntry is not stubbed here')),
@@ -172,13 +175,29 @@ describe('asking and answering', () => {
     })
   })
 
-  it('removes one', async () => {
+  it('removes one, on the second click', async () => {
+    // Two clicks like a lead role and unlike a lane: one row holds a paragraph somebody
+    // else wrote and nobody has a copy of (#323).
     const deleteFaqEntry = vi.fn<FaqApi['deleteFaqEntry']>(() => Promise.resolve(undefined))
     renderPage(stub({ deleteFaqEntry }))
 
     fireEvent.click(await screen.findByRole('button', { name: 'Remove What do I bring?' }))
+    expect(deleteFaqEntry).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Really remove What do I bring?' }))
 
     await waitFor(() => expect(deleteFaqEntry).toHaveBeenCalledWith('f-2'))
+  })
+
+  it('keeps it when the confirm is dismissed', async () => {
+    const deleteFaqEntry = vi.fn<FaqApi['deleteFaqEntry']>(() => Promise.resolve(undefined))
+    renderPage(stub({ deleteFaqEntry }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove What do I bring?' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Keep it' }))
+
+    expect(deleteFaqEntry).not.toHaveBeenCalled()
+    expect(await screen.findByRole('button', { name: 'Remove What do I bring?' })).toBeTruthy()
   })
 })
 
@@ -226,9 +245,66 @@ describe('seeding from a previous burn', () => {
 })
 
 describe('with no burn selected', () => {
-  it('says so rather than showing an empty list', async () => {
+  it('reads the next burn instead, and says which it is', async () => {
+    // The page most worth browsing before deciding to come, so it does not need a burn
+    // you are in — an approved member who has joined none used to land on `NoBurn` and
+    // could read nothing (#321).
+    const getFaq = vi.fn<FaqApi['getFaq']>(() => Promise.resolve({ entries: TWO }))
+    renderPage(stub({ getFaq, getActiveEvent: () => Promise.resolve({ event: BURN }) }), ADA, null)
+
+    expect(await screen.findByText(/Showing Summer burn/)).toBeTruthy()
+    expect(asked()).toEqual(['How do I get there?', 'What do I bring?'])
+    expect(getFaq).toHaveBeenCalledWith('e-1', expect.anything())
+  })
+
+  it('offers the ask form against that burn', async () => {
+    // Somebody deciding whether to come is exactly who has a question.
+    const addFaqEntry = vi.fn<FaqApi['addFaqEntry']>(() =>
+      Promise.resolve({ entry: anEntry({ id: 'f-9', question: 'Is there a shower?' }) }),
+    )
+    renderPage(stub({ addFaqEntry, getActiveEvent: () => Promise.resolve({ event: BURN }) }, []), ADA, null)
+
+    fireEvent.input(await screen.findByLabelText('What do you want to know?'), {
+      target: { value: 'Is there a shower?' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Add it' }))
+
+    await waitFor(() => {
+      expect(addFaqEntry).toHaveBeenCalledWith('e-1', { question: 'Is there a shower?' })
+    })
+  })
+
+  it('says nothing about a burn when none is planned', async () => {
     renderPage(stub(), ADA, null)
 
-    expect(await screen.findByText(/no questions to answer/)).toBeTruthy()
+    expect(await screen.findByText(/no burn planned yet/)).toBeTruthy()
+  })
+
+  it('names no burn when the bar picked one', async () => {
+    // The passing sibling: the note is for the fallback, and saying it over somebody's
+    // own burn would read as though they were looking at the wrong one.
+    const getActiveEvent = vi.fn<FaqApi['getActiveEvent']>(() => Promise.resolve({ event: BURN }))
+    renderPage(stub({ getActiveEvent }))
+
+    await screen.findByText('How do I get there?')
+    expect(screen.queryByText(/Showing Summer burn/)).toBeNull()
+    // And nothing was asked of it: the bar had the answer already.
+    expect(getActiveEvent).not.toHaveBeenCalled()
+  })
+
+  it('waits for the burns before falling back', async () => {
+    // The burns are fetched once for the session, so a page mounted before they arrive
+    // would otherwise load the next burn and swap it for the reader's a moment later.
+    const getActiveEvent = vi.fn<FaqApi['getActiveEvent']>(() => Promise.resolve({ event: BURN }))
+    render(
+      <ViewerProvider viewer={ADA}>
+        <BurnProvider value={{ status: 'loading', burns: [], selected: undefined }}>
+          <Faq api={stub({ getActiveEvent })} />
+        </BurnProvider>
+      </ViewerProvider>,
+    )
+
+    expect(await screen.findByText('Loading…')).toBeTruthy()
+    expect(getActiveEvent).not.toHaveBeenCalled()
   })
 })

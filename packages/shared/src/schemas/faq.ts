@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { MAX_QUESTION_LABEL, MAX_WELCOME_LENGTH } from '../limits.ts'
+import { MAX_FAQ_ANSWER, MAX_FAQ_QUESTION } from '../limits.ts'
 import { idSchema, nonEmptyText } from './common.ts'
 import { copyFromSchema } from './copy.ts'
 
@@ -20,12 +20,12 @@ import { copyFromSchema } from './copy.ts'
 export const faqFields = z.object({
   id: idSchema,
   event_id: idSchema,
-  question: nonEmptyText(MAX_QUESTION_LABEL),
+  question: nonEmptyText(MAX_FAQ_QUESTION),
   /**
    * Empty is allowed and is not an oversight: a question nobody has answered yet is
    * worth having on the page, so somebody can. The page says so where it is blank.
    */
-  answer: z.string().max(MAX_WELCOME_LENGTH),
+  answer: z.string().max(MAX_FAQ_ANSWER),
   order: z.int().min(0),
   created_at: z.string(),
 })
