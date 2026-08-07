@@ -193,7 +193,7 @@ describe('AdminRoster', () => {
       account: { id: 'a-1', name: null, avatar: null, roles: ['member'] },
     })
 
-    expect(screen.getByText(/for organisers/)).toBeTruthy()
+    expect(screen.getByText(/for admins/)).toBeTruthy()
     expect(getActiveRoster).not.toHaveBeenCalled()
   })
 
@@ -269,7 +269,7 @@ describe('adding somebody to the burn', () => {
   })
 
   it('keeps the roster when the accounts cannot be loaded', async () => {
-    // The picker is the part that fails, not the page: an organiser who came here
+    // The picker is the part that fails, not the page: an admin who came here
     // to record a payment should still be able to.
     renderPage(
       stub(

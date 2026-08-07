@@ -17,7 +17,7 @@ export interface InviteRouteDeps extends GuardDeps {
 }
 
 /**
- * Invites an organiser mints directly, for people already known — returning
+ * Invites an admin mints directly, for people already known — returning
  * members, partners — who should skip the form.
  *
  * The same token shape approval mints, so both redeem through one path: CSPRNG
@@ -54,7 +54,7 @@ export const registerInviteRoutes = (
     if (!parsed.success) return reply.code(400).send(errorResponse('bad_request'))
 
     const expires_at = parsed.data.expires_at ?? defaultExpiry(now())
-    // An invite that is already dead is a link an organiser would send and
+    // An invite that is already dead is a link an admin would send and
     // nobody could use, so it is refused rather than stored.
     if (Date.parse(expires_at) <= now().getTime()) {
       return reply.code(400).send(errorResponse('bad_request'))

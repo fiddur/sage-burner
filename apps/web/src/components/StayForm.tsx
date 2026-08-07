@@ -13,7 +13,7 @@ import { StayFields } from './StayFields.tsx'
  * The details that belong to one burn rather than to the person.
  *
  * Payment is shown by the page around this and not editable here: it is the
- * organiser's to set, and a control a member could touch would be one that
+ * admin's to set, and a control a member could touch would be one that
  * always fails.
  */
 export const StayForm = ({
@@ -29,9 +29,9 @@ export const StayForm = ({
   /** Which burn this stay is at. The page shows more than one. */
   eventId: string
   attendance: Attendance
-  /** This burn's lodging list, in the organiser's order. */
+  /** This burn's lodging list, in the admin's order. */
   lodgingOptions?: readonly EventOption[]
-  /** This burn's helping-out list, in the organiser's order. */
+  /** This burn's helping-out list, in the admin's order. */
   helpingOptions?: readonly EventOption[]
   /** How many have already picked each option, by option id. */
   taken?: Readonly<Record<string, number>>

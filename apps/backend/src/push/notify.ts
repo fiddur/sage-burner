@@ -152,7 +152,7 @@ export const notifyAttendees = async (
  * Tell everybody, for the one thing that is not about a burn at all.
  *
  * Every account rather than every attendee: a redeploy is the app changing under
- * whoever is using it, and an organiser holding `admin` without `member` is using it
+ * whoever is using it, and an account holding `admin` without `member` is using it
  * too. The notifier drops the ones who have not asked, which is nearly everybody —
  * the category is off by default.
  */

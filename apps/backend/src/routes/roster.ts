@@ -32,7 +32,7 @@ export interface RosterDeps extends GuardDeps {
  *
  * Written out field by field rather than spread-and-delete, and that is the whole
  * safety property: this is an object literal against `MemberRosterEntry`, so a
- * column added to the organiser's row reaches members only when somebody names it
+ * column added to the admin's row reaches members only when somebody names it
  * here, and one removed from the member schema stops compiling instead of quietly
  * still being sent.
  */
@@ -65,7 +65,7 @@ const asMemberEntry = (entry: RosterEntry): MemberRosterEntry => ({
  * someone's own profile page is corrected here in the same moment — which is the
  * point of the account/attendance split.
  *
- * Two readers, one query. The organiser's is under `/api/admin/` and carries
+ * Two readers, one query. The admin's is under `/api/admin/` and carries
  * payment; the member's is `/api/events/…/members`, outside that prefix rather than
  * exempted inside it (#159, and #64 for why). They share `rosterFor` so the order —
  * which decides who actually has a place — cannot come out differently on the two
@@ -234,7 +234,7 @@ export const registerRosterRoutes = (
       .from(attendance)
       .innerJoin(account, eq(account.id, attendance.account_id))
       // Left, so someone who has not said where they are sleeping is still on
-      // the roster. An inner join would quietly shorten the list an organiser
+      // the roster. An inner join would quietly shorten the list an admin
       // counts heads from.
       .leftJoin(eventOption, eq(eventOption.id, attendance.lodging_option_id))
       .where(eq(attendance.event_id, eventId))

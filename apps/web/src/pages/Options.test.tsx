@@ -260,7 +260,7 @@ describe('Options', () => {
     await waitFor(() => expect(reorderEventOptions).toHaveBeenCalledWith('e-1', 'lodging', ['o-2', 'o-1']))
   })
 
-  it('tells an organiser to make a burn, since these lists belong to one', async () => {
+  it('tells an admin to make a burn, since these lists belong to one', async () => {
     renderPage(stub({}, []), ADMIN, null)
 
     expect(await screen.findByText(/no burn planned yet/)).toBeTruthy()
@@ -269,8 +269,8 @@ describe('Options', () => {
   })
 
   it('sends a member to their own page rather than to a page they cannot use', async () => {
-    // Creating a burn is admin-only, so the link an organiser gets here would answer
-    // "This is for organisers." to a member — a dead end. And with the selector, a
+    // Creating a burn is admin-only, so the link an admin gets here would answer
+    // "This is for admins." to a member — a dead end. And with the selector, a
     // member seeing this usually has not joined a burn rather than there being none,
     // so their own page is both the likelier fix and one they can do themselves.
     renderPage(

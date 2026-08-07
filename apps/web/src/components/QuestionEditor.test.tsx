@@ -102,7 +102,7 @@ describe('QuestionEditor', () => {
 
   it('reports a saved question whose list reload failed as saved', async () => {
     // The inverse of the failure this component otherwise guards: the write
-    // succeeded, so "Could not add the question." would send an organiser to add
+    // succeeded, so "Could not add the question." would send an admin to add
     // it a second time.
     let calls = 0
     const getQuestions = vi.fn(() => {
@@ -247,7 +247,7 @@ describe('QuestionEditor', () => {
   })
 
   it('re-reads after a failure so the editor can recover', async () => {
-    // The dead end this closes: another organiser adds a question, this list is
+    // The dead end this closes: another admin adds a question, this list is
     // stale, every reorder rebuilds the same short id list and the API answers
     // 400 forever. Without a re-read the only way out was reloading the page,
     // and the message did not say so.
@@ -271,7 +271,7 @@ describe('QuestionEditor', () => {
   it('will not save a question with an empty label', async () => {
     // `QuestionFields` is a div, not a form, and Save is type="button", so there
     // is no constraint validation — without this the request goes out, the shared
-    // schema rejects it, and the organiser reads an unmapped "Request failed
+    // schema rejects it, and the admin reads an unmapped "Request failed
     // (400)". The add form is disabled on the same input, which is what makes the
     // two halves behave alike; `required` alone would not, since `'   '` passes
     // browser validation.

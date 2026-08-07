@@ -5,7 +5,7 @@
  * whatever zone the browser is in. The API stores and transports UTC. So both
  * directions are a conversion, not a reformat, and doing it by slicing the ISO
  * string — which is the obvious-looking shortcut — silently shows a Swedish
- * organiser 16:00 for an 18:00 dream every summer.
+ * admin 16:00 for an 18:00 dream every summer.
  */
 
 const pad = (value: number) => String(value).padStart(2, '0')

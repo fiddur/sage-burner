@@ -401,7 +401,7 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
 
             {/* Ticked, because almost everybody spending an invite is coming to the
                 burn that is next — but offered rather than assumed: being on the list
-                is a commitment, and an organiser setting a burn up need not be
+                is a commitment, and an admin setting a burn up need not be
                 attending it. */}
             <label class="field-inline">
               <input

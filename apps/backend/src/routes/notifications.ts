@@ -25,7 +25,7 @@ export interface NotificationDeps extends GuardDeps {
  *
  * Signed in is the whole guard, like passkeys and for the same reason: these are
  * somebody's own records, and an account with no role yet still has some — an
- * applicant whose invite has been reissued, an organiser holding `admin` alone.
+ * applicant whose invite has been reissued, an account holding `admin` alone.
  * Every route derives whose they are from the session, so there is no id in any
  * path to get wrong or to tamper with.
  */

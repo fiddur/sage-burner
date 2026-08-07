@@ -16,13 +16,13 @@ const withRole = (roles: readonly AccountRole[], role: AccountRole, held: boolea
   held ? [...new Set([...roles, role])] : roles.filter((entry) => entry !== role)
 
 /**
- * ⚙️ — the organiser's landing page, and admin's alone.
+ * ⚙️ — the admin's landing page, and admin's alone.
  *
  * It used to offer a member the two lists they curate, because it was the only way
  * to reach them. #184 gave those their own way in — Places from Schedule, the
  * lodging list from Your burn — so what is left here is the burn's shape, who gets
  * in, and the installation, none of which a member may touch. The links to those two
- * stay, since an organiser holding `admin` without `member` has no Your burn to
+ * stay, since an account holding `admin` without `member` has no Your burn to
  * reach the lodging list from.
  *
  * The role check decides what to *render*. It is not the access control:
@@ -160,11 +160,11 @@ export const Admin = ({ api }: { api: AdminApi }) => {
  *
  * There is no other way to change one: redemption is where a password is chosen,
  * `admin:create` refuses to touch an existing one, and nothing else writes it. So an
- * account whose owner lost the password — or one an organiser made and did not write
+ * account whose owner lost the password — or one an admin made and did not write
  * down — had no way back.
  *
  * Its own state per row rather than the page's, so typing in one row does not blank
- * another. Deliberately not a `type="password"` field: an organiser is setting a
+ * another. Deliberately not a `type="password"` field: an admin is setting a
  * password to read out or paste to somebody, and hiding it from the person choosing
  * it helps nobody.
  */

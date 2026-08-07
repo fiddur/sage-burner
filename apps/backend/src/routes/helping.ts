@@ -85,7 +85,7 @@ export const writeHelping = (writer: Writer, attendanceId: string, optionIds: re
 }
 
 /**
- * The same ticks, with the labels the organiser gave them.
+ * The same ticks, with the labels the admin gave them.
  *
  * The roster and its CSV are read by a person; a column of UUIDs is not.
  */

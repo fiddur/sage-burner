@@ -73,7 +73,7 @@ export const eventFields = z.object({
    */
   welcome_markdown: z.string().max(MAX_WELCOME_LENGTH),
   /**
-   * How to pay for this burn, written by an organiser and shown on the Members
+   * How to pay for this burn, written by an admin and shown on the Members
    * page to whoever has not paid yet (#250).
    *
    * Per burn rather than per installation: the amount, the account and the
@@ -120,7 +120,7 @@ export const DEFAULT_TRANSFER_INFO =
  * Creating an event. `id` and `created_at` are the server's to assign.
  *
  * `welcome_markdown` defaults to empty so the create form is short: an
- * organiser naming a date and a cap should not also have to write the welcome
+ * admin naming a date and a cap should not also have to write the welcome
  * text before the event can exist.
  */
 export const eventCreateSchema = withEventDateOrder(
@@ -130,7 +130,7 @@ export const eventCreateSchema = withEventDateOrder(
       welcome_markdown: eventFields.shape.welcome_markdown.default(''),
       payment_info_markdown: eventFields.shape.payment_info_markdown.default(''),
       transfer_info_markdown: eventFields.shape.transfer_info_markdown.default(DEFAULT_TRANSFER_INFO),
-      // Defaulted so an organiser naming dates and a cap is not stopped by two
+      // Defaulted so an admin naming dates and a cap is not stopped by two
       // fields they may not have decided yet. The whole day, which is what the
       // grid did before the hours existed.
       start_time: eventFields.shape.start_time.default('00:00'),
@@ -156,7 +156,7 @@ export type EventCreateInput = z.input<typeof eventCreateSchema>
 /**
  * Editing one. Every field optional — the welcome text is edited far more often
  * than the dates, and a PATCH that had to restate the whole event would make
- * two organisers editing different fields overwrite each other.
+ * two admins editing different fields overwrite each other.
  *
  * `.strict()` narrows the contract as well as catching typos: a client that
  * reads an event, edits the object and PATCHes the whole thing back now gets a
@@ -183,7 +183,7 @@ export type EventCreateInput = z.input<typeof eventCreateSchema>
  * containing either time — nothing a `WHERE` on the supplied dates can see. Both
  * such patches reached `event_date_order_check` and came back as a 500.
  *
- * The honest cost of the merged-row check is that two organisers patching at the
+ * The honest cost of the merged-row check is that two admins patching at the
  * same moment can each validate against the same pre-update row and produce a
  * combination neither sent. The CHECK still refuses it, and the handler answers
  * 400 rather than 500 — see `isCheckViolation`. Not defended further: this is

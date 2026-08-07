@@ -138,7 +138,7 @@ const RosterTable = ({ entries }: { entries: readonly MemberRosterEntry[] }) => 
           {startsTheWaitingList(entries, index) && <WaitingListLine columns={5} />}
           <tr class={entry.waiting ? 'waiting' : undefined}>
             <td>
-              {/* No fallback to the email address the way the organiser's
+              {/* No fallback to the email address the way the admin's
                       list has, because the response does not carry one. */}
               {entry.name ?? 'Name not filled in yet'}
               {entry.waiting && <span class="form-note"> · waiting</span>}

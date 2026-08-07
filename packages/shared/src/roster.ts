@@ -6,7 +6,7 @@ import type { PaymentStatus } from './enums.ts'
  * Type-only imports, so this module pulls in no Zod and the browser can run it.
  * Today the only caller is the admin roster; it lives here rather than in the
  * route because #79's member-facing list has to give the same answer, and a
- * member told they are 12th while the organiser's list says 9th is worse than
+ * member told they are 12th while the admin's list says 9th is worse than
  * either page being absent.
  */
 

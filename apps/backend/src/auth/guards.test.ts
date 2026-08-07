@@ -223,7 +223,7 @@ describe('the approved guard', () => {
 
   it('lets an admin in who is not also a member', async () => {
     // The roles are independent, so an account can hold `admin` without `member` —
-    // an organiser who is not attending. A `member`-only guard would refuse them.
+    // somebody organising but not attending. A `member`-only guard would refuse them.
     const server = await withApprovedRoute()
 
     expect((await ask(server, cookieFor(await givenAccount(['admin'])))).statusCode).toBe(200)
@@ -364,7 +364,7 @@ describe('GET /api/admin/accounts', () => {
     // `roles: []`, and every other assertion in this file still passes: the
     // guard tests read roles through `viewerFor`'s inline left join, not through
     // this route's
-    // grouping. The organiser would see a roster where nobody is an admin.
+    // grouping. The admin would see a roster where nobody is an admin.
     const find = (id: string) => accounts.find((row: { id: string }) => row.id === id)
     expect(find(admin)).toMatchObject({ roles: ['admin'] })
     expect(find(member)).toMatchObject({ roles: ['member'] })
@@ -382,7 +382,7 @@ describe('GET /api/admin/accounts', () => {
   it('gives an account with no roles an empty list rather than dropping it', async () => {
     // Grouping in memory rather than joining is what makes this work; an inner
     // join would silently hide anyone not yet granted a role, which is exactly
-    // the account an organiser is looking for.
+    // the account an admin is looking for.
     const server = await build()
     const admin = await givenAccount(['admin'])
     const roleless = await givenAccount([])

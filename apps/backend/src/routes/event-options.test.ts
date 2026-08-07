@@ -134,7 +134,7 @@ const labels = (server: FastifyInstance, eventId: string, kind: string) =>
   )
 
 describe('the lists a member picks from', () => {
-  it('is empty before an organiser sets any up', async () => {
+  it('is empty before an admin sets any up', async () => {
     const server = await build()
     const eventId = await givenEvent()
 
@@ -411,7 +411,7 @@ describe('the lists a member picks from', () => {
   it('lets any approved member write these lists, admin or not', async () => {
     // These replace a spreadsheet everyone could edit, so a member curates the
     // lodging and helping lists. The admin case is not redundant: `admin` does not
-    // imply `member`, so an organiser who is not attending holds one and not the
+    // imply `member`, so somebody organising but not attending holds one and not the
     // other.
     const server = await build()
     const eventId = await givenEvent()

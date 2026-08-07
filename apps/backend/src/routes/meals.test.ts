@@ -182,9 +182,9 @@ describe('meal slots', () => {
   it('adds one, and defaults it to a meal rather than a chore', async () => {
     const server = await build()
     await givenBurn()
-    const organiser = await givenAccount(['admin'])
+    const admin = await givenAccount(['admin'])
 
-    const response = await addSlot(server, organiser.cookie, { label: 'Lunch', at: '13:00' })
+    const response = await addSlot(server, admin.cookie, { label: 'Lunch', at: '13:00' })
 
     expect(response.statusCode).toBe(201)
     expect(response.json().slots).toMatchObject([{ label: 'Lunch', at: '13:00', kind: 'meal', order: 0 }])
@@ -193,9 +193,9 @@ describe('meal slots', () => {
   it('takes a chore, which is what a morning cleanup is', async () => {
     const server = await build()
     await givenBurn()
-    const organiser = await givenAccount(['admin'])
+    const admin = await givenAccount(['admin'])
 
-    const response = await addSlot(server, organiser.cookie, {
+    const response = await addSlot(server, admin.cookie, {
       label: 'Morning cleanup',
       at: '09:00',
       kind: 'chore',
@@ -207,10 +207,10 @@ describe('meal slots', () => {
   it('refuses a time that is not one', async () => {
     const server = await build()
     await givenBurn()
-    const organiser = await givenAccount(['admin'])
+    const admin = await givenAccount(['admin'])
 
-    expect((await addSlot(server, organiser.cookie, { label: 'Lunch', at: '1pm' })).statusCode).toBe(400)
-    expect((await addSlot(server, organiser.cookie, { label: '   ', at: '13:00' })).statusCode).toBe(400)
+    expect((await addSlot(server, admin.cookie, { label: 'Lunch', at: '1pm' })).statusCode).toBe(400)
+    expect((await addSlot(server, admin.cookie, { label: '   ', at: '13:00' })).statusCode).toBe(400)
   })
 
   it('says a burn that does not exist does not, rather than answering with no slots', async () => {
@@ -218,13 +218,13 @@ describe('meal slots', () => {
     // siblings looked the burn up and 404'd (#217).
     const server = await build()
     await givenBurn()
-    const organiser = await givenAccount(['admin'])
+    const admin = await givenAccount(['admin'])
 
     const response = await send(
       server,
       'GET',
       `/api/admin/events/2b1f0a9c-0000-4000-8000-000000000000/meal-slots`,
-      organiser.cookie,
+      admin.cookie,
     )
 
     expect(response.statusCode).toBe(404)
@@ -233,10 +233,10 @@ describe('meal slots', () => {
   it('lists them for a burn that does exist', async () => {
     const server = await build()
     await givenBurn()
-    const organiser = await givenAccount(['admin'])
-    await addSlot(server, organiser.cookie, { label: 'Lunch', at: '13:00' })
+    const admin = await givenAccount(['admin'])
+    await addSlot(server, admin.cookie, { label: 'Lunch', at: '13:00' })
 
-    const response = await send(server, 'GET', `/api/admin/events/${BURN}/meal-slots`, organiser.cookie)
+    const response = await send(server, 'GET', `/api/admin/events/${BURN}/meal-slots`, admin.cookie)
 
     expect(response.statusCode).toBe(200)
     expect(response.json().slots).toHaveLength(1)
@@ -247,11 +247,11 @@ describe('generating the sittings', () => {
   it('writes one per slot per day the burn is open for it', async () => {
     const server = await build()
     await givenBurn({ start_time: '16:00', end_time: '12:00' })
-    const organiser = await givenAccount(['admin'])
-    await addSlot(server, organiser.cookie, { label: 'Lunch', at: '13:00' })
-    await addSlot(server, organiser.cookie, { label: 'Dinner', at: '18:00' })
+    const admin = await givenAccount(['admin'])
+    await addSlot(server, admin.cookie, { label: 'Lunch', at: '13:00' })
+    await addSlot(server, admin.cookie, { label: 'Dinner', at: '18:00' })
 
-    const response = await generate(server, organiser.cookie)
+    const response = await generate(server, admin.cookie)
 
     expect(response.statusCode).toBe(201)
     expect(
@@ -268,12 +268,12 @@ describe('generating the sittings', () => {
   it('adds only what is missing when it runs again', async () => {
     const server = await build()
     await givenBurn()
-    const organiser = await givenAccount(['admin'])
-    await addSlot(server, organiser.cookie, { label: 'Lunch', at: '13:00' })
-    await generate(server, organiser.cookie)
+    const admin = await givenAccount(['admin'])
+    await addSlot(server, admin.cookie, { label: 'Lunch', at: '13:00' })
+    await generate(server, admin.cookie)
 
-    await addSlot(server, organiser.cookie, { label: 'Dinner', at: '18:00' })
-    const second = await generate(server, organiser.cookie)
+    await addSlot(server, admin.cookie, { label: 'Dinner', at: '18:00' })
+    const second = await generate(server, admin.cookie)
 
     const labels = second.json().meals.map((meal: { label: string }) => meal.label)
     expect(labels.filter((label: string) => label === 'Lunch')).toHaveLength(3)
@@ -282,18 +282,18 @@ describe('generating the sittings', () => {
 
   it('leaves a sitting that has been moved where it was put', async () => {
     // The point of rows over a rule. A regeneration that rewrote times would undo
-    // every deliberate change an organiser had made.
+    // every deliberate change an admin had made.
     const server = await build()
     await givenBurn()
-    const organiser = await givenAccount(['admin'])
-    await addSlot(server, organiser.cookie, { label: 'Dinner', at: '18:00' })
-    await generate(server, organiser.cookie)
-    const [first] = (await listMeals(server, organiser.cookie)).meals
-    await send(server, 'PATCH', `/api/meals/${first.id}`, organiser.cookie, { at: '19:30' })
+    const admin = await givenAccount(['admin'])
+    await addSlot(server, admin.cookie, { label: 'Dinner', at: '18:00' })
+    await generate(server, admin.cookie)
+    const [first] = (await listMeals(server, admin.cookie)).meals
+    await send(server, 'PATCH', `/api/meals/${first.id}`, admin.cookie, { at: '19:30' })
 
-    await generate(server, organiser.cookie)
+    await generate(server, admin.cookie)
 
-    const after = (await listMeals(server, organiser.cookie)).meals
+    const after = (await listMeals(server, admin.cookie)).meals
     expect(after).toHaveLength(3)
     expect(after.find((meal: { id: string }) => meal.id === first.id).at).toBe('19:30')
   })
@@ -306,16 +306,16 @@ describe('generating the sittings', () => {
     // free to be moved onto.
     const server = await build()
     await givenBurn({ end_time: '12:00' })
-    const organiser = await givenAccount(['admin'])
-    await addSlot(server, organiser.cookie, { label: 'Dinner', at: '18:00' })
-    await generate(server, organiser.cookie)
-    const [first] = (await listMeals(server, organiser.cookie)).meals
+    const admin = await givenAccount(['admin'])
+    await addSlot(server, admin.cookie, { label: 'Dinner', at: '18:00' })
+    await generate(server, admin.cookie)
+    const [first] = (await listMeals(server, admin.cookie)).meals
     expect(first.date).toBe('2026-08-01')
 
-    await send(server, 'PATCH', `/api/meals/${first.id}`, organiser.cookie, { date: '2026-08-03' })
-    await generate(server, organiser.cookie)
+    await send(server, 'PATCH', `/api/meals/${first.id}`, admin.cookie, { date: '2026-08-03' })
+    await generate(server, admin.cookie)
 
-    const after = (await listMeals(server, organiser.cookie)).meals
+    const after = (await listMeals(server, admin.cookie)).meals
     expect(after.map((meal: { date: string }) => meal.date)).toEqual([
       // Remade, because the slot still wants one here.
       '2026-08-01',
@@ -330,30 +330,28 @@ describe('generating the sittings', () => {
     // Somebody may already have signed up to cook it.
     const server = await build()
     await givenBurn()
-    const organiser = await givenAccount(['admin'])
-    const created = await addSlot(server, organiser.cookie, { label: 'Lunch', at: '13:00' })
-    await generate(server, organiser.cookie)
+    const admin = await givenAccount(['admin'])
+    const created = await addSlot(server, admin.cookie, { label: 'Lunch', at: '13:00' })
+    await generate(server, admin.cookie)
 
-    await send(server, 'DELETE', `/api/admin/meal-slots/${created.json().slots[0].id}`, organiser.cookie)
-    await generate(server, organiser.cookie)
+    await send(server, 'DELETE', `/api/admin/meal-slots/${created.json().slots[0].id}`, admin.cookie)
+    await generate(server, admin.cookie)
 
-    expect((await listMeals(server, organiser.cookie)).meals).toHaveLength(3)
+    expect((await listMeals(server, admin.cookie)).meals).toHaveLength(3)
   })
 
   it('leaves what a renamed slot already made alone', async () => {
     const server = await build()
     await givenBurn()
-    const organiser = await givenAccount(['admin'])
-    const created = await addSlot(server, organiser.cookie, { label: 'Lunch', at: '13:00' })
-    await generate(server, organiser.cookie)
+    const admin = await givenAccount(['admin'])
+    const created = await addSlot(server, admin.cookie, { label: 'Lunch', at: '13:00' })
+    await generate(server, admin.cookie)
 
-    await send(server, 'PATCH', `/api/admin/meal-slots/${created.json().slots[0].id}`, organiser.cookie, {
+    await send(server, 'PATCH', `/api/admin/meal-slots/${created.json().slots[0].id}`, admin.cookie, {
       label: 'Brunch',
     })
 
-    const labels = (await listMeals(server, organiser.cookie)).meals.map(
-      (meal: { label: string }) => meal.label,
-    )
+    const labels = (await listMeals(server, admin.cookie)).meals.map((meal: { label: string }) => meal.label)
     expect(labels).toEqual(['Lunch', 'Lunch', 'Lunch'])
   })
 })
@@ -362,13 +360,13 @@ describe('signing up for a meal', () => {
   const setUp = async () => {
     const server = await build()
     await givenBurn()
-    const organiser = await givenAccount(['admin'])
-    await addSlot(server, organiser.cookie, { label: 'Dinner', at: '18:00' })
-    await generate(server, organiser.cookie)
+    const admin = await givenAccount(['admin'])
+    await addSlot(server, admin.cookie, { label: 'Dinner', at: '18:00' })
+    await generate(server, admin.cookie)
     const ada = await givenAttending('Ada')
     const [meal] = (await listMeals(server, ada.cookie)).meals
 
-    return { server, organiser, ada, meal }
+    return { server, admin, ada, meal }
   }
 
   it('takes the lead, hands it on, and vacates it', async () => {
@@ -450,12 +448,12 @@ describe('the plan itself', () => {
   const setUp = async () => {
     const server = await build()
     await givenBurn()
-    const organiser = await givenAccount(['admin'])
-    await addSlot(server, organiser.cookie, { label: 'Dinner', at: '18:00' })
-    await generate(server, organiser.cookie)
-    const [meal] = (await listMeals(server, organiser.cookie)).meals
+    const admin = await givenAccount(['admin'])
+    await addSlot(server, admin.cookie, { label: 'Dinner', at: '18:00' })
+    await generate(server, admin.cookie)
+    const [meal] = (await listMeals(server, admin.cookie)).meals
 
-    return { server, organiser, meal }
+    return { server, admin, meal }
   }
 
   it('lets any member move one, because the schedule is theirs', async () => {
@@ -485,9 +483,9 @@ describe('the plan itself', () => {
   })
 
   it('adds one the slots never made', async () => {
-    const { server, organiser } = await setUp()
+    const { server, admin } = await setUp()
 
-    const response = await send(server, 'POST', `/api/admin/events/${BURN}/meals`, organiser.cookie, {
+    const response = await send(server, 'POST', `/api/admin/events/${BURN}/meals`, admin.cookie, {
       date: '2026-08-02',
       at: '22:00',
       label: 'Late supper',
@@ -498,9 +496,9 @@ describe('the plan itself', () => {
   })
 
   it('refuses a second sitting of the same name on the same day', async () => {
-    const { server, organiser, meal } = await setUp()
+    const { server, admin, meal } = await setUp()
 
-    const response = await send(server, 'POST', `/api/admin/events/${BURN}/meals`, organiser.cookie, {
+    const response = await send(server, 'POST', `/api/admin/events/${BURN}/meals`, admin.cookie, {
       date: meal.date,
       at: '20:00',
       label: meal.label,
@@ -545,8 +543,8 @@ describe('the plan itself', () => {
     // The route's own catch cannot be tested both ways — a transient database error
     // is not something this suite can provoke mid-UPDATE — so the narrowing is
     // pinned here, on the predicate the catch asks.
-    const { server, organiser, meal } = await setUp()
-    await send(server, 'GET', `/api/events/${BURN}/meals`, organiser.cookie)
+    const { server, admin, meal } = await setUp()
+    await send(server, 'GET', `/api/events/${BURN}/meals`, admin.cookie)
 
     let duplicate: unknown
     try {
@@ -575,16 +573,16 @@ describe('the plan itself', () => {
   it('allows moving one to another day inside the burn', async () => {
     // The passing sibling the refusals need: three tests saying no, and none saying
     // an ordinary move still works, is where the gap lands.
-    const { server, organiser } = await setUp()
+    const { server, admin } = await setUp()
     const supper = (
-      await send(server, 'POST', `/api/admin/events/${BURN}/meals`, organiser.cookie, {
+      await send(server, 'POST', `/api/admin/events/${BURN}/meals`, admin.cookie, {
         date: '2026-08-02',
         at: '22:00',
         label: 'Late supper',
       })
     ).json().meal
 
-    const response = await send(server, 'PATCH', `/api/meals/${supper.id}`, organiser.cookie, {
+    const response = await send(server, 'PATCH', `/api/meals/${supper.id}`, admin.cookie, {
       date: '2026-08-03',
     })
 
@@ -593,14 +591,12 @@ describe('the plan itself', () => {
   })
 
   it('drops one, and everybody signed up for it', async () => {
-    const { server, organiser, meal } = await setUp()
+    const { server, admin, meal } = await setUp()
     const ada = await givenAttending()
     await send(server, 'PUT', `/api/meals/${meal.id}/crew/helper`, ada.cookie, { account_id: ada.id })
 
-    expect((await send(server, 'DELETE', `/api/admin/meals/${meal.id}`, organiser.cookie)).statusCode).toBe(
-      204,
-    )
-    expect((await listMeals(server, organiser.cookie)).meals).toHaveLength(2)
+    expect((await send(server, 'DELETE', `/api/admin/meals/${meal.id}`, admin.cookie)).statusCode).toBe(204)
+    expect((await listMeals(server, admin.cookie)).meals).toHaveLength(2)
   })
 
   it('writes a food idea, and clears it', async () => {
@@ -651,55 +647,54 @@ describe('a burn that has ended', () => {
       member_cap: 42,
       created_at: NOW,
     })
-    const organiser = await givenAccount(['admin', 'member'])
+    const admin = await givenAccount(['admin', 'member'])
     await db().insert(attendance).values({
       id: randomUUID(),
       event_id: ENDED,
-      account_id: organiser.id,
+      account_id: admin.id,
       joined_at: NOW,
       payment_status: 'unpaid',
     })
-    await send(server, 'POST', `/api/admin/events/${ENDED}/meal-slots`, organiser.cookie, {
+    await send(server, 'POST', `/api/admin/events/${ENDED}/meal-slots`, admin.cookie, {
       label: 'Dinner',
       at: '18:00',
     })
-    await send(server, 'POST', `/api/admin/events/${ENDED}/meals/generate`, organiser.cookie)
-    const [meal] = (await send(server, 'GET', `/api/events/${ENDED}/meals`, organiser.cookie)).json().meals
+    await send(server, 'POST', `/api/admin/events/${ENDED}/meals/generate`, admin.cookie)
+    const [meal] = (await send(server, 'GET', `/api/events/${ENDED}/meals`, admin.cookie)).json().meals
 
-    return { server, organiser, meal }
+    return { server, admin, meal }
   }
 
   it('refuses every member-facing write', async () => {
-    const { server, organiser, meal } = await setUp()
+    const { server, admin, meal } = await setUp()
 
     expect(
-      (await send(server, 'PATCH', `/api/meals/${meal.id}`, organiser.cookie, { at: '19:00' })).statusCode,
+      (await send(server, 'PATCH', `/api/meals/${meal.id}`, admin.cookie, { at: '19:00' })).statusCode,
     ).toBe(404)
     expect(
       (
-        await send(server, 'PUT', `/api/meals/${meal.id}/lead`, organiser.cookie, {
-          account_id: organiser.id,
+        await send(server, 'PUT', `/api/meals/${meal.id}/lead`, admin.cookie, {
+          account_id: admin.id,
         })
       ).statusCode,
     ).toBe(404)
     expect(
       (
-        await send(server, 'PUT', `/api/meals/${meal.id}/crew/helper`, organiser.cookie, {
-          account_id: organiser.id,
+        await send(server, 'PUT', `/api/meals/${meal.id}/crew/helper`, admin.cookie, {
+          account_id: admin.id,
         })
       ).statusCode,
     ).toBe(404)
     expect(
-      (await send(server, 'DELETE', `/api/meals/${meal.id}/crew/cleanup/${organiser.id}`, organiser.cookie))
+      (await send(server, 'DELETE', `/api/meals/${meal.id}/crew/cleanup/${admin.id}`, admin.cookie))
         .statusCode,
     ).toBe(404)
     expect(
-      (await send(server, 'PUT', `/api/meals/${meal.id}/idea`, organiser.cookie, { food_idea: 'x' }))
-        .statusCode,
+      (await send(server, 'PUT', `/api/meals/${meal.id}/idea`, admin.cookie, { food_idea: 'x' })).statusCode,
     ).toBe(404)
     expect(
       (
-        await send(server, 'PATCH', `/api/events/${ENDED}/meal-intro`, organiser.cookie, {
+        await send(server, 'PATCH', `/api/events/${ENDED}/meal-intro`, admin.cookie, {
           meal_intro_markdown: 'x',
         })
       ).statusCode,
@@ -707,20 +702,20 @@ describe('a burn that has ended', () => {
   })
 
   it('leaves the record alone when a write is refused', async () => {
-    const { server, organiser, meal } = await setUp()
+    const { server, admin, meal } = await setUp()
 
-    await send(server, 'PATCH', `/api/meals/${meal.id}`, organiser.cookie, { at: '19:00' })
-    await send(server, 'PUT', `/api/meals/${meal.id}/idea`, organiser.cookie, { food_idea: 'Tacos' })
+    await send(server, 'PATCH', `/api/meals/${meal.id}`, admin.cookie, { at: '19:00' })
+    await send(server, 'PUT', `/api/meals/${meal.id}/idea`, admin.cookie, { food_idea: 'Tacos' })
 
-    const after = (await send(server, 'GET', `/api/events/${ENDED}/meals`, organiser.cookie)).json().meals[0]
+    const after = (await send(server, 'GET', `/api/events/${ENDED}/meals`, admin.cookie)).json().meals[0]
     expect(after.at).toBe('18:00')
     expect(after.food_idea).toBe('')
   })
 
   it('still reads it, because a finished burn’s meals are its record', async () => {
-    const { server, organiser } = await setUp()
+    const { server, admin } = await setUp()
 
-    const response = await send(server, 'GET', `/api/events/${ENDED}/meals`, organiser.cookie)
+    const response = await send(server, 'GET', `/api/events/${ENDED}/meals`, admin.cookie)
 
     expect(response.statusCode).toBe(200)
     expect(response.json().meals).toHaveLength(3)
@@ -731,10 +726,10 @@ describe('a burn that has ended', () => {
     // satisfy the test above while making the feature useless.
     const server = await build()
     await givenBurn()
-    const organiser = await givenAccount(['admin'])
+    const admin = await givenAccount(['admin'])
     const ada = await givenAttending()
-    await addSlot(server, organiser.cookie, { label: 'Dinner', at: '18:00' })
-    await generate(server, organiser.cookie)
+    await addSlot(server, admin.cookie, { label: 'Dinner', at: '18:00' })
+    await generate(server, admin.cookie)
     const [meal] = (await listMeals(server, ada.cookie)).meals
 
     expect(
@@ -774,10 +769,10 @@ describe('a chore', () => {
   const setUp = async () => {
     const server = await build()
     await givenBurn()
-    const organiser = await givenAccount(['admin'])
-    await addSlot(server, organiser.cookie, { label: 'Morning cleanup', at: '09:00', kind: 'chore' })
-    await addSlot(server, organiser.cookie, { label: 'Dinner', at: '18:00' })
-    await generate(server, organiser.cookie)
+    const admin = await givenAccount(['admin'])
+    await addSlot(server, admin.cookie, { label: 'Morning cleanup', at: '09:00', kind: 'chore' })
+    await addSlot(server, admin.cookie, { label: 'Dinner', at: '18:00' })
+    await generate(server, admin.cookie)
     const ada = await givenAttending()
     const meals = (await listMeals(server, ada.cookie)).meals
     const chore = meals.find((one: { kind: string }) => one.kind === 'chore')
@@ -851,9 +846,9 @@ describe('a lead stranded by a slot becoming a chore', () => {
     // whoever was leading it must not trap them there with no way off.
     const server = await build()
     await givenBurn()
-    const organiser = await givenAccount(['admin'])
-    await addSlot(server, organiser.cookie, { label: 'Dinner', at: '18:00' })
-    await generate(server, organiser.cookie)
+    const admin = await givenAccount(['admin'])
+    await addSlot(server, admin.cookie, { label: 'Dinner', at: '18:00' })
+    await generate(server, admin.cookie)
     const ada = await givenAttending()
     const [meal] = (await listMeals(server, ada.cookie)).meals
     await send(server, 'PUT', `/api/meals/${meal.id}/lead`, ada.cookie, { account_id: ada.id })
@@ -877,13 +872,13 @@ describe('telling somebody a meal role moved', () => {
   const setUp = async (deliver: Delivery) => {
     const server = await build(deliver)
     await givenBurn()
-    const organiser = await givenAccount(['admin'])
-    await addSlot(server, organiser.cookie, { label: 'Dinner', at: '18:00' })
-    await generate(server, organiser.cookie)
+    const admin = await givenAccount(['admin'])
+    await addSlot(server, admin.cookie, { label: 'Dinner', at: '18:00' })
+    await generate(server, admin.cookie)
     const ada = await givenAttending('Ada')
     const [meal] = (await listMeals(server, ada.cookie)).meals
 
-    return { server, organiser, ada, meal }
+    return { server, admin, ada, meal }
   }
 
   it('tells the one handed the lead, and the one it came off', async () => {
@@ -891,14 +886,14 @@ describe('telling somebody a meal role moved', () => {
     // as well as being given it. A third person moves it, or the one who did it
     // would be the one not told — which is the next test.
     const deliver = vi.fn<Delivery>(() => Promise.resolve('sent'))
-    const { server, organiser, ada, meal } = await setUp(deliver)
+    const { server, admin, ada, meal } = await setUp(deliver)
     const bea = await givenAttending('Bea')
     await givenSubscribed(ada.id)
     await givenSubscribed(bea.id)
     await send(server, 'PUT', `/api/meals/${meal.id}/lead`, ada.cookie, { account_id: ada.id })
     deliver.mockClear()
 
-    await send(server, 'PUT', `/api/meals/${meal.id}/lead`, organiser.cookie, { account_id: bea.id })
+    await send(server, 'PUT', `/api/meals/${meal.id}/lead`, admin.cookie, { account_id: bea.id })
 
     await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(2))
     expect(messagesFrom(deliver).toSorted()).toEqual([

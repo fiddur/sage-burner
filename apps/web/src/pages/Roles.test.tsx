@@ -17,7 +17,7 @@ const ADA: Viewer = {
   status: 'signed-in',
   account: { id: 'a-1', name: null, avatar: null, roles: ['member'] },
 }
-const ORGANISER: Viewer = {
+const ADMIN: Viewer = {
   status: 'signed-in',
   account: { id: 'a-9', name: null, avatar: null, roles: ['admin'] },
 }
@@ -357,10 +357,10 @@ describe('Roles', () => {
     })
   })
 
-  it('offers no "join the team" to an organiser who is not coming', async () => {
-    // An admin who is not attending can still set the register up — the roles are
+  it('offers no "join the team" to an admin who is not coming', async () => {
+    // Somebody organising but not attending can still set the register up — the roles are
     // held by an attendance, so there is nothing for them to join.
-    renderPage(stub({}, [aRole({ id: 'r-1', title: 'Sauna' })]), ORGANISER)
+    renderPage(stub({}, [aRole({ id: 'r-1', title: 'Sauna' })]), ADMIN)
 
     expect(await screen.findByText('Sauna')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Take the spot on Sauna' })).toBeNull()

@@ -11,7 +11,7 @@ import { useSetViewer } from '../viewer.tsx'
  * beside the sentence naming the account it ends.
  *
  * Rendered on **two** pages, for the reason ⚙️ keeps the Places and lodging links:
- * the details page is `require="member"`, and an organiser holding `admin` without
+ * the details page is `require="member"`, and an account holding `admin` without
  * `member` is refused from it. Leaving them no way to sign out is worse than a
  * second button most people never see.
  */

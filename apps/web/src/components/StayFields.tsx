@@ -30,9 +30,9 @@ export const StayFields = ({
 }: {
   draft: StayDraft
   onChange: (next: StayDraft) => void
-  /** This burn's lodging list, in the organiser's order. */
+  /** This burn's lodging list, in the admin's order. */
   lodgingOptions?: readonly EventOption[]
-  /** This burn's helping-out list, in the organiser's order. */
+  /** This burn's helping-out list, in the admin's order. */
   helpingOptions?: readonly EventOption[]
   /** How many have already picked each option, by option id. */
   lodgingTaken?: Readonly<Record<string, number>>

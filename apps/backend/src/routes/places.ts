@@ -240,7 +240,7 @@ export const registerPlaceRoutes = (
       if (!sameSet) return reply.code(400).send(errorResponse('bad_request'))
 
       // One statement per place, but in a transaction: a half-applied reorder is
-      // an order the organiser never chose. Scoped by event as well as id, so an id
+      // an order the admin never chose. Scoped by event as well as id, so an id
       // from another burn could not renumber it even if the set check above were
       // wrong.
       db.transaction((tx) => {

@@ -52,7 +52,7 @@ export const createGuards = ({ db, sessions }: GuardDeps) => {
      *
      * `admin` counts, and has to: the two roles are independent, so an account can
      * hold `admin` without `member` — the accounts table under Organise grants
-     * either on its own, and an organiser who is not attending is coherent. A
+     * either on its own, and somebody organising but not attending is coherent. A
      * `member`-only guard would lock that person out of setting the burn up.
      *
      * A third guard rather than a change to `requireMember`, because neither role

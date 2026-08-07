@@ -67,7 +67,7 @@ const tickBoxCondition = ({ type, required }: { type?: string; required?: boolea
 /**
  * The application form's questions — one central set, not one per event.
  *
- * Rows, not code: organisers retune them between burns, so adding, editing or
+ * Rows, not code: admins retune them between burns, so adding, editing or
  * reordering one must never need a redeploy, and the web app renders whatever it
  * is handed rather than knowing the questions.
  *
@@ -235,7 +235,7 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db }: GuardDeps) 
     if (!sameSet) return reply.code(400).send(errorResponse('bad_request'))
 
     // One statement per question, but inside a transaction: a half-applied
-    // reorder is an order the organiser never chose, and this is the one write
+    // reorder is an order the admin never chose, and this is the one write
     // here that touches several rows at once.
     db.transaction((tx) => {
       wanted.forEach((id, index) => {

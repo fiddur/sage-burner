@@ -159,7 +159,7 @@ describe('migrations', () => {
   it('refuses to finish if a migration left a dangling reference', () => {
     // Simulates what a table rebuild does with foreign keys off: the parent
     // goes, the children stay and point at nothing. Without the
-    // foreign_key_check this commits silently and an organiser opens an empty
+    // foreign_key_check this commits silently and an admin opens an empty
     // member list; with it, the boot fails instead.
     seedInvite(ids.invite)
     seedAttendance(ids.attendance, ids.account)

@@ -156,7 +156,7 @@ describe('AdminSettings', () => {
       account: { id: 'a-9', name: null, avatar: null, roles: ['member'] },
     })
 
-    expect(screen.getByText(/for organisers/)).toBeTruthy()
+    expect(screen.getByText(/for admins/)).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'Log in' })).toBeNull()
     expect(getInstallation).not.toHaveBeenCalled()
   })

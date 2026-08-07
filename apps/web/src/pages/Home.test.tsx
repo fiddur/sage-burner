@@ -58,7 +58,7 @@ describe('Home', () => {
   })
 
   it('renders the welcome markdown', async () => {
-    // The acceptance criterion for #13: what an organiser typed, on the public
+    // The acceptance criterion for #13: what an admin typed, on the public
     // page, with no deploy in between.
     renderHome(summer)
 
@@ -185,7 +185,7 @@ describe('Home', () => {
     for (const roles of [['member'], ['admin'], ['member', 'admin']] as const) {
       it(`offers it to ${roles.join(' + ')}`, async () => {
         // `admin` counts as well as `member`, because the roles are independent:
-        // an organiser who is not attending still writes the welcome text.
+        // somebody organising but not attending still writes the welcome text.
         renderHome(summer, asRoles([...roles]))
 
         expect(await screen.findByRole('button', { name: 'Edit this text' })).toBeTruthy()

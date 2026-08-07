@@ -90,7 +90,7 @@ describe('Members', () => {
 
   it('lists them in the order the API gives, rather than re-sorting', async () => {
     // That order decides who has a place. A page that sorted for itself would
-    // disagree with the organiser's list about who is on the waiting line.
+    // disagree with the admin's list about who is on the waiting line.
     renderPage(stub(aRoster({ entries: [anEntry({ name: 'Second' }), anEntry({ name: 'First' })] })))
 
     await screen.findByText('Second')
@@ -138,7 +138,7 @@ describe('Members', () => {
   })
 
   it('says a name is missing rather than falling back to an address it was not sent', async () => {
-    // The organiser's list falls back to the email. This response carries none, so
+    // The admin's list falls back to the email. This response carries none, so
     // a fallback written the same way would print `undefined`.
     renderPage(stub(aRoster({ entries: [anEntry({ name: null, contact: null })] })))
 
@@ -159,7 +159,7 @@ describe('Members', () => {
     expect(getMembers).not.toHaveBeenCalled()
   })
 
-  it('opens to an organiser holding admin without member', async () => {
+  it('opens to an account holding admin without member', async () => {
     renderPage(stub(aRoster({ entries: [anEntry({ name: 'Ana' })] })), {
       status: 'signed-in',
       account: { id: 'a-2', name: null, avatar: null, roles: ['admin'] },
@@ -221,7 +221,7 @@ describe('how to pay', () => {
     expect(screen.queryByText('Swish')).toBeNull()
   })
 
-  it('says nothing when no organiser has written any', async () => {
+  it('says nothing when no admin has written any', async () => {
     renderPage(stub(aRoster({ entries: [paying()] })))
 
     await screen.findByText('Summer burn')

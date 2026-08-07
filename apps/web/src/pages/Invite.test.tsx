@@ -472,7 +472,7 @@ describe('joining the upcoming burn from the form', () => {
   })
 
   it('asks nothing about the stay once the box is unticked', async () => {
-    // An organiser who is setting the burn up without attending it.
+    // An admin who is setting the burn up without attending it.
     const redeemInvite = vi.fn(() => Promise.resolve({ viewer: null, attendance: null }))
     renderPage(withBurn({ redeemInvite }))
 

@@ -21,20 +21,20 @@ export interface AdminDeps extends GuardDeps {
 }
 
 /** Thrown to roll the transaction back; never leaves this module. */
-const LAST_ADMIN = new Error('the last organiser cannot give up the role')
+const LAST_ADMIN = new Error('the last admin cannot give up the role')
 
 /**
  * Who exists, and who holds which role.
  *
- * The list is the first thing an organiser needs after bootstrapping themselves
+ * The list is the first thing an admin needs after bootstrapping themselves
  * in: whether anyone else is here yet. Editing the roles is the second — the only
  * way to change a role from inside the app. `admin:create` can grant both to an
  * address that already exists, but that is a shell on the server, not something an
- * organiser does.
+ * admin does.
  */
 export const registerAdminRoutes = (app: FastifyInstance, { db, hash = hashPassword }: AdminDeps) => {
   app.get(apiRoutes.getAdminAccounts.fastify, async (_request, reply) => {
-    // Every account's email address. An organiser opening this on a shared
+    // Every account's email address. An admin opening this on a shared
     // laptop would otherwise leave the whole roster in the browser's on-disk
     // cache, which outlives the session — logging out clears the cookie, not
     // the cache entry.
@@ -43,7 +43,7 @@ export const registerAdminRoutes = (app: FastifyInstance, { db, hash = hashPassw
     // Two queries and a group, rather than a join. A left join would work but
     // returns one row per role to unpick, and at 42 members the simpler shape
     // wins. An *inner* join would be wrong outright: it drops accounts with no
-    // role, which is precisely who an organiser is looking for.
+    // role, which is precisely who an admin is looking for.
     const rows = await db
       .select({ id: account.id, email: account.email, created_at: account.created_at })
       .from(account)
@@ -104,7 +104,7 @@ export const registerAdminRoutes = (app: FastifyInstance, { db, hash = hashPassw
   /**
    * Setting somebody's password for them.
    *
-   * No old password, because an organiser does not have it — which is the point, and
+   * No old password, because an admin does not have it — which is the point, and
    * also what makes this the most powerful route here. Under `/api/admin/`, so the
    * prefix hook is the only thing that lets it through.
    *

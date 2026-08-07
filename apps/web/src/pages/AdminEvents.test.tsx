@@ -80,7 +80,7 @@ describe('AdminEvents', () => {
 
   it('lets the hours the burn is open be set', async () => {
     // The grid runs between these, so they are on the create form rather than
-    // hidden behind an edit — an organiser who has to find them later gets a
+    // hidden behind an edit — an admin who has to find them later gets a
     // schedule covering three whole days for a burn that is two half ones.
     const created: Event = { ...summer, id: 'e-3', slug: 'winter-2026' }
     const createEvent = vi.fn(() => Promise.resolve({ event: created }))
@@ -134,7 +134,7 @@ describe('AdminEvents', () => {
   })
 
   it('explains a taken slug rather than showing the raw error', async () => {
-    // 409 is the one failure an organiser can act on unaided.
+    // 409 is the one failure an admin can act on unaided.
     renderPage(
       stub({ createEvent: () => Promise.reject(apiError(409, 'conflict', 'Request failed (409).')) }),
     )
@@ -331,7 +331,7 @@ describe('AdminEvents', () => {
     // running: it over-promised, then hedged with an issue number that went
     // stale, then over-promised again for a new reason — the list offers "Edit
     // welcome text" on every event, while only the soonest-ending unfinished
-    // one reaches the homepage. So an organiser editing last year's burn was
+    // one reaches the homepage. So an admin editing last year's burn was
     // told the homepage shows text it does not and never will.
     //
     // The wording is conditional, which makes it true for every event rather
@@ -370,7 +370,7 @@ describe('AdminEvents', () => {
       </ViewerProvider>,
     )
 
-    expect(await screen.findByText(/for organisers/)).toBeTruthy()
+    expect(await screen.findByText(/for admins/)).toBeTruthy()
     expect(getEvents).not.toHaveBeenCalled()
   })
 })

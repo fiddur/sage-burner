@@ -28,7 +28,7 @@ import { Apply } from './Apply.tsx'
  * The public application form.
  *
  * The property #14 exists for is that nothing about the questions is hardcoded:
- * an organiser adds one in the admin UI and it appears here with no deploy. So
+ * an admin adds one in the admin UI and it appears here with no deploy. So
  * these tests never name a field the way the app would — they assert that
  * whatever the API returns is what gets rendered and sent.
  */

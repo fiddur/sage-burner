@@ -20,7 +20,7 @@ export const messageForFailure = (failure: unknown): string => {
   if (failure.status === 415) return 'That is not an image we can use. A PNG or an SVG works best.'
   if (failure.status === 413) return 'That image is too large to send.'
   if (failure.status === 401) return 'You have been signed out. Sign in again and have another go.'
-  if (failure.status === 403) return 'Only an organiser can change the icon.'
+  if (failure.status === 403) return 'Only an admin can change the icon.'
   if (failure.code === 'network') return failure.message
 
   return 'Could not save that icon. Please try again.'

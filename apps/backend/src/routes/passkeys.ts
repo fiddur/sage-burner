@@ -45,8 +45,8 @@ const CHALLENGE_TTL_SECONDS = 300
  * it (#9).
  *
  * Outside `/api/admin` and outside `requireApproved` both: the guard here is
- * being signed in at all. An account with no role yet — an applicant waiting, an
- * organiser who is not attending — still has to be able to add a passkey and get
+ * being signed in at all. An account with no role yet — an applicant waiting,
+ * somebody organising but not attending — still has to be able to add a passkey and get
  * back in with it, and a role check on the way to your own credentials would be a
  * lockout with no way round it.
  *

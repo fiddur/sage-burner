@@ -170,7 +170,7 @@ describe('a member reading and editing who they are', () => {
     expect(row?.name).toBe('Someone Else')
   })
 
-  it('refuses to set an empty name, since an organiser has to reach them', async () => {
+  it('refuses to set an empty name, since an admin has to reach them', async () => {
     const server = await build()
     const member = await givenMember()
 
@@ -645,7 +645,7 @@ describe('what someone will help with', () => {
     expect(response.json().attendance.helping_other).toBe('Chopping wood')
   })
 
-  it('lets an organiser remove an option someone ticked, unlike a bed', async () => {
+  it('lets an admin remove an option someone ticked, unlike a bed', async () => {
     // Nobody is displaced by "kitchen" ceasing to be offered, so this cascades
     // where lodging refuses.
     const server = await build()
@@ -667,7 +667,7 @@ describe('what someone will help with', () => {
 })
 
 describe('a helping option that vanishes mid-save', () => {
-  // The window `stayProblem` cannot close: an organiser deletes a chore between
+  // The window `stayProblem` cannot close: an admin deletes a chore between
   // the pre-check and the write. `inject` serialises requests, so the HTTP route
   // cannot open it — `writeStay` is exported and driven directly instead, which
   // is the same code the route runs.

@@ -17,8 +17,8 @@ export const GuardedPage = ({
 }: {
   title: string
   /**
-   * `approved` is `member` or `admin`, matching `requireApproved` on the API — an
-   * organiser who is not attending holds `admin` alone, and the burn's shared
+   * `approved` is `member` or `admin`, matching `requireApproved` on the API —
+   * somebody organising but not attending holds `admin` alone, and the burn's shared
    * furniture has to stay open to them.
    */
   require: 'admin' | 'approved' | 'member'
@@ -48,11 +48,11 @@ export const GuardedPage = ({
         </p>
       ) : (
         // Signed in without the role — an applicant checking on their application,
-        // or an organiser who holds one role and not the other. Telling them to log
+        // or an admin who holds one role and not the other. Telling them to log
         // in would be advice they have already taken.
         <p>
-          This is for {require === 'admin' ? 'organisers' : 'members'}. If it should be open to you, ask
-          someone who already has access.
+          This is for {require === 'admin' ? 'admins' : 'members'}. If it should be open to you, ask someone
+          who already has access.
         </p>
       )}
     </section>

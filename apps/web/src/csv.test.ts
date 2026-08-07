@@ -7,7 +7,7 @@ describe('toCsv', () => {
     expect(toCsv(['name', 'paid'], [{ name: 'Ana', paid: true }])).toBe('"name","paid"\r\n"Ana","true"')
   })
 
-  it('survives the free text organisers actually write', () => {
+  it('survives the free text admins actually write', () => {
     // Allergies and notes are where commas, quotes and newlines live, and any of
     // the three silently breaks a spreadsheet that reads a naive join.
     const row = { notes: 'gluten, dairy\nand "nuts"' }
@@ -31,7 +31,7 @@ describe('toCsv', () => {
 
   it('leaves ordinary text alone, apostrophe and all', () => {
     // The prefix must not appear where it is not needed, or every export grows a
-    // stray quote an organiser has to strip.
+    // stray quote an admin has to strip.
     expect(toCsv(['a'], [{ a: "Ana's tent" }])).toBe('"a"\r\n"Ana\'s tent"')
   })
 

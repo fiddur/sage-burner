@@ -56,7 +56,7 @@ describe('the timetable rows', () => {
   })
 
   it('runs past midnight when the burn does, without an extra day of empties', () => {
-    // What `dayAfter` used to guess at. The organiser says 04:00 on the 3rd and
+    // What `dayAfter` used to guess at. The admin says 04:00 on the 3rd and
     // gets exactly that.
     const rows = hoursOf('2026-08-01', '2026-08-03', '18:00', '04:00')
 
@@ -158,7 +158,7 @@ describe('a lane as table cells', () => {
   })
 
   it('keeps a dream that starts inside another, rather than dropping it', () => {
-    // An overlap in one lane is an organiser's mistake to see. The covered rows
+    // An overlap in one lane is an admin's mistake to see. The covered rows
     // render no cell of their own, so the only place left is the block above.
     const cells = laneCells(ROWS, [placed('long', at(8), at(11)), placed('inside', at(9), at(10))])
     const anchor = cells[ROWS.indexOf('2026-08-01T10:00')]

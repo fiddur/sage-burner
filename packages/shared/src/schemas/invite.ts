@@ -5,7 +5,7 @@ import { inviteStatuses } from '../enums.ts'
 import { dateTimeSchema, idSchema } from './common.ts'
 
 /**
- * An invite as an organiser sees it — never the token.
+ * An invite as an admin sees it — never the token.
  *
  * Only the digest is stored, so there is nothing to show here even if it were
  * wanted: the raw value existed in the one response that minted it. `status` is

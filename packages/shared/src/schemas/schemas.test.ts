@@ -294,7 +294,7 @@ describe('profileSchema', () => {
     expect(profileSchema.safeParse({ ...aProfile, allergies_notes: null }).success).toBe(true)
   })
 
-  it('requires a name and a contact, since an organiser has to reach them', () => {
+  it('requires a name and a contact, since an admin has to reach them', () => {
     expect(profileSchema.safeParse({ ...aProfile, name: '  ' }).success).toBe(false)
     expect(profileSchema.safeParse({ ...aProfile, contact: '' }).success).toBe(false)
   })
@@ -341,7 +341,7 @@ describe('attendanceSchema', () => {
 
   it('takes lodging as a reference and refuses anything that is not one', () => {
     // Free text until the per-event lists existed. The point of the reference is
-    // that an organiser can count who is sleeping where, which a typed-in string
+    // that an admin can count who is sleeping where, which a typed-in string
     // cannot support — so an id is the only thing that parses.
     expect(attendanceSchema.safeParse({ ...aMember, lodging_option_id: null }).success).toBe(true)
     expect(attendanceSchema.safeParse({ ...aMember, lodging_option_id: 'Hammock' }).success).toBe(false)

@@ -241,7 +241,7 @@ describe('registering a passkey', () => {
   })
 
   it('turns nobody away for having no role', async () => {
-    // An applicant waiting on a decision, or an organiser who is not attending.
+    // An applicant waiting on a decision, or somebody organising but not attending.
     // A role check on the way to your own credentials is a lockout with no way
     // round it, so the guard here is being signed in and nothing more.
     const server = await build()

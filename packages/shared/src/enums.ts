@@ -1,7 +1,7 @@
 /**
  * Domain enumerations shared by the API, the database layer and the web app.
  *
- * Only genuinely fixed vocabularies live here. Things organisers change between
+ * Only genuinely fixed vocabularies live here. Things admins change between
  * burns are rows instead — `event_option` holds the lodging and helping-out
  * lists, per event, so a new option never needs a code change. The kinds of list
  * are fixed; what is in them is not.
@@ -20,7 +20,7 @@ export const isAccountRole = (value: unknown): value is AccountRole => isOneOf(a
  * Lane colours for the scheduling grid.
  *
  * A fixed vocabulary rather than free hex, so the grid can be styled once and
- * stay legible: an organiser picking `#fefefe` for a lane would produce
+ * stay legible: an admin picking `#fefefe` for a lane would produce
  * unreadable text nothing in the app could correct. Named rather than valued so
  * light and dark themes can each choose their own shade of `red`.
  */
@@ -76,7 +76,7 @@ export const isFormQuestionType = (value: unknown): value is FormQuestionType =>
   isOneOf(formQuestionTypes, value)
 
 /**
- * What `required` must be for a type, or `undefined` when it is the organiser's
+ * What `required` must be for a type, or `undefined` when it is the admin's
  * choice.
  *
  * An `agreement` is a checkbox that blocks submission until ticked, so

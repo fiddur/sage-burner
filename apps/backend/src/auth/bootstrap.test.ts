@@ -91,7 +91,7 @@ describe('ensureAdmin', () => {
 
   it('never changes an existing password', async () => {
     // Otherwise the bootstrap command is an offline password reset for any
-    // account, and anyone who can run it can take over the organiser's login.
+    // account, and anyone who can run it can take over the admin's login.
     const db = database()
     const first = await ensureAdmin({
       db,
@@ -109,7 +109,7 @@ describe('ensureAdmin', () => {
 
   it('matches an existing account case-insensitively', async () => {
     // The account table's UNIQUE is BINARY, so without normalising here the
-    // organiser gets a second account rather than the role they asked for.
+    // admin gets a second account rather than the role they asked for.
     const db = database()
     const first = await ensureAdmin({
       db,

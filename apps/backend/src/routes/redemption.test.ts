@@ -657,7 +657,7 @@ describe('the name an invite carries', () => {
     })
   })
 
-  it('has none for an invite an organiser minted directly', async () => {
+  it('has none for an invite an admin minted directly', async () => {
     const server = await build()
     const token = await givenInvite()
 

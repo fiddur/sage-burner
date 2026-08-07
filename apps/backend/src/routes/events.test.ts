@@ -334,7 +334,7 @@ describe('admin event routes', () => {
   })
 
   it('reject a duplicate slug with 409 rather than 500', async () => {
-    // The slug is in URLs, so this is a thing the organiser fixes by picking
+    // The slug is in URLs, so this is a thing the admin fixes by picking
     // another — it needs to be distinguishable from a server fault.
     const server = await build()
     const cookie = await givenAdmin()
@@ -374,7 +374,7 @@ describe('admin event routes', () => {
   })
 
   it('edit the welcome text without restating the event', async () => {
-    // The whole point of #11: an organiser changes the welcome text and the
+    // The whole point of #11: an admin changes the welcome text and the
     // public page reflects it, with no redeploy and no risk of clobbering the
     // dates someone else just fixed.
     const server = await build('2026-06-01')
@@ -414,7 +414,7 @@ describe('admin event routes', () => {
 
   it('rejects an unrecognised key on create too, not only on update', async () => {
     // Otherwise `welcome` for `welcome_markdown` is stripped and the event is
-    // created with the `.default('')`, so an organiser gets a 201 for an event
+    // created with the `.default('')`, so an admin gets a 201 for an event
     // whose welcome text is silently empty. Same argument as the update path; the
     // two schemas should not differ for no stated reason.
     const server = await build()
@@ -509,7 +509,7 @@ describe('admin event routes', () => {
   })
 
   it('answers 200 when the welcome text is re-saved unchanged', async () => {
-    // The realistic path: an organiser opens the editor, changes nothing, clicks
+    // The realistic path: an admin opens the editor, changes nothing, clicks
     // Save. What it pins is that a write which changes no values is still a
     // success — not an error, and not "no such event".
     //
@@ -678,7 +678,7 @@ describe('the hours a burn is open', () => {
     expect(response.json().event).toMatchObject({ start_time: '00:00', end_time: '23:59' })
   })
 
-  it('takes the hours an organiser gives it', async () => {
+  it('takes the hours an admin gives it', async () => {
     const server = await build()
     const cookie = await givenAdmin()
 

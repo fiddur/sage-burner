@@ -29,7 +29,7 @@ export interface EventRouteDeps extends GuardDeps {
  *
  * UTC rather than a configured zone, deliberately: the only thing this decides
  * is when an event stops being the active one, and being a few hours out on the
- * day it ends changes nothing an organiser would notice. A timezone setting
+ * day it ends changes nothing an admin would notice. A timezone setting
  * would be a configuration knob, a migration and a test matrix bought for that.
  */
 export const todayIso = (now: () => Date) => now().toISOString().slice(0, 10)
@@ -46,7 +46,7 @@ export const todayIso = (now: () => Date) => now().toISOString().slice(0, 10)
  * so.** The alternative — falling back to the most recent past event — was
  * rejected: it leaves last year's welcome text on the public page indefinitely,
  * which reads as a live invitation to a burn that already happened. Creating
- * the next event is what fills the gap, and that is the action the organiser
+ * the next event is what fills the gap, and that is the action the admin
  * wants prompting toward anyway.
  */
 export const activeEvent = async (db: Database, today: string): Promise<Event | undefined> => {
@@ -92,7 +92,7 @@ export const registerEventRoutes = (
     // `no-cache`, not `no-store`. This is public content, so there is no reason
     // to forbid storing it — but #13 requires an edit to show up without a
     // redeploy, and with no `ETag` or `Last-Modified` the response would
-    // otherwise be *heuristically* fresh and an organiser's correction could sit
+    // otherwise be *heuristically* fresh and an admin's correction could sit
     // invisible in a browser cache. `no-cache` means "store it, but revalidate
     // before reuse", which is exactly the requirement.
     void reply.header('cache-control', 'no-cache')
@@ -123,7 +123,7 @@ export const registerEventRoutes = (
     try {
       await db.insert(event).values(row)
     } catch (error) {
-      // The slug is in URLs, so a collision is a thing the organiser can fix by
+      // The slug is in URLs, so a collision is a thing the admin can fix by
       // choosing another — worth its own status rather than a generic 400.
       if (isSlugConflict(error)) return reply.code(409).send(errorResponse('conflict'))
       throw error

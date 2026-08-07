@@ -42,7 +42,7 @@ const MEMBER: Viewer = {
   status: 'signed-in',
   account: { id: 'a-1', name: null, avatar: null, roles: ['member'] },
 }
-const ORGANISER: Viewer = {
+const ADMIN: Viewer = {
   status: 'signed-in',
   account: { id: 'a-2', name: null, avatar: null, roles: ['admin'] },
 }
@@ -79,8 +79,8 @@ describe('choosableBurns', () => {
     expect(choosableBurns(false, [joined, other])).toEqual([joined])
   })
 
-  it('gives an organiser every burn still to come', () => {
-    // The passing sibling, and the case that matters: an organiser holding `admin`
+  it('gives an admin every burn still to come', () => {
+    // The passing sibling, and the case that matters: an account holding `admin`
     // without `member` has no attendance anywhere, so the member rule would leave
     // them with an empty selector on the burn they are setting up.
     const joined = aBurn('e-1', 'Summer', true)
@@ -132,8 +132,8 @@ describe('the burn choice', () => {
     await waitFor(() => expect(screen.getByText(/^failed:/).textContent).toBe('failed::none'))
   })
 
-  it('offers an organiser a burn nobody has joined', async () => {
-    renderChoice([aBurn('e-1', 'Summer', false)], ORGANISER)
+  it('offers an admin a burn nobody has joined', async () => {
+    renderChoice([aBurn('e-1', 'Summer', false)], ADMIN)
 
     expect((await screen.findByText(/^ready:/)).textContent).toBe('ready:Summer:Summer')
   })
