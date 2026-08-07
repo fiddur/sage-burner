@@ -1,5 +1,6 @@
 import { useState } from 'preact/hooks'
 
+import { IconButton } from './IconButton.tsx'
 import { NAMELESS, PersonBadge } from './PersonBadge.tsx'
 
 export interface Person {
@@ -105,15 +106,12 @@ export const HelperStrip = ({
             name={person.name}
             avatar={everyone.find((who) => who.account_id === person.account_id)?.avatar ?? null}
           />
-          <button
-            type="button"
-            class="link-button"
+          <IconButton
+            icon="✕"
+            label={`Take ${nameOf(person)} off ${label}`}
             disabled={busy}
-            aria-label={`Take ${nameOf(person)} off ${label}`}
             onClick={() => onRemove(person.account_id)}
-          >
-            ✕
-          </button>
+          />
         </li>
       ))}
 

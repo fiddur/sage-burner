@@ -8,10 +8,12 @@ import type { Loaded } from '../load.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
 import { CopyFrom } from '../components/CopyFrom.tsx'
+import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
+import { IconButton } from '../components/IconButton.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
+import { ReorderableList } from '../components/ReorderableList.tsx'
 import { useAction, useLoad } from '../load.ts'
-import { moveTo, swap } from '../reorder.ts'
 import { isApproved, useViewer } from '../viewer.tsx'
 
 export type PlacesApi = Pick<
@@ -58,7 +60,6 @@ export const Places = ({ api }: { api: PlacesApi }) => {
   const approved = isApproved(viewer)
   const [draft, setDraft] = useState<Draft>(BLANK)
   const [editing, setEditing] = useState<string | undefined>(undefined)
-  const [dragging, setDragging] = useState<number | undefined>(undefined)
 
   const burn = useSelectedBurn()
   const { loaded, reload } = useLoad<Grid>(
@@ -80,9 +81,9 @@ export const Places = ({ api }: { api: PlacesApi }) => {
 
   const ready = loaded.status === 'ready' ? (loaded.data ?? undefined) : undefined
 
-  const reorderTo = (ids: string[] | undefined) => {
-    if (ids === undefined || ready === undefined) return
-    run(() => api.reorderPlaces(ready.eventId, ids), 'Could not reorder the places.')
+  const reorderTo = (wanted: string[]) => {
+    if (ready === undefined) return
+    run(() => api.reorderPlaces(ready.eventId, wanted), 'Could not reorder the places.')
   }
 
   const add = () => {
@@ -103,7 +104,6 @@ export const Places = ({ api }: { api: PlacesApi }) => {
   }
 
   const places = ready?.places ?? []
-  const ids = places.map((row) => row.id)
 
   return (
     <GuardedPage title="Places" require="approved">
@@ -114,11 +114,7 @@ export const Places = ({ api }: { api: PlacesApi }) => {
         schedule, so give each one of its own.
       </p>
 
-      {error !== undefined && (
-        <p class="form-error" role="alert">
-          {error}
-        </p>
-      )}
+      <ErrorText message={error} />
 
       <Notice loaded={loaded} />
 
@@ -134,47 +130,9 @@ export const Places = ({ api }: { api: PlacesApi }) => {
         />
       )}
 
-      <ol class="place-list">
-        {places.map((row, index) => (
-          <li
-            key={row.id}
-            class={dragging === index ? 'place-row place-dragging' : 'place-row'}
-            onDragOver={(dragEvent) => {
-              // Without this the drop never fires — the default is "not a drop
-              // target".
-              dragEvent.preventDefault()
-            }}
-            onDrop={(dropEvent) => {
-              dropEvent.preventDefault()
-              if (dragging !== undefined) reorderTo(moveTo(ids, dragging, index))
-              setDragging(undefined)
-            }}
-          >
-            <button
-              type="button"
-              class="drag-handle"
-              draggable
-              disabled={busy}
-              aria-label={`Move ${row.name}`}
-              onDragStart={(dragEvent) => {
-                // Firefox will not start a drag whose data store is empty.
-                dragEvent.dataTransfer?.setData('text/plain', row.id)
-                setDragging(index)
-              }}
-              onDragEnd={() => setDragging(undefined)}
-              onKeyDown={(keyEvent) => {
-                // The handle is the keyboard route too. Dragging is a pointer
-                // gesture, and a reorder nobody can do without a mouse is a
-                // reorder half the people here cannot do.
-                const by = keyEvent.key === 'ArrowUp' ? -1 : keyEvent.key === 'ArrowDown' ? 1 : undefined
-                if (by === undefined) return
-                keyEvent.preventDefault()
-                reorderTo(swap(ids, index, by))
-              }}
-            >
-              ⠿
-            </button>
-
+      <ReorderableList rows={places} busy={busy} labelFor={(row) => row.name} onReorder={reorderTo}>
+        {(row) => (
+          <>
             {editing === row.id ? (
               <PlaceFields
                 place={row}
@@ -204,29 +162,23 @@ export const Places = ({ api }: { api: PlacesApi }) => {
                 <span class="place-name">{row.name}</span>
                 <span class="place-color-name">{row.color}</span>
 
-                <button
-                  type="button"
-                  class="link-button"
+                <IconButton
+                  icon="✏️"
+                  label={`Edit ${row.name}`}
                   disabled={busy}
-                  aria-label={`Edit ${row.name}`}
                   onClick={() => setEditing(row.id)}
-                >
-                  ✏️
-                </button>
-                <button
-                  type="button"
-                  class="link-button"
+                />
+                <IconButton
+                  icon="🗑️"
+                  label={`Remove ${row.name}`}
                   disabled={busy}
-                  aria-label={`Remove ${row.name}`}
                   onClick={() => run(() => api.deletePlace(row.id), 'Could not remove the place.')}
-                >
-                  🗑️
-                </button>
+                />
               </>
             )}
-          </li>
-        ))}
-      </ol>
+          </>
+        )}
+      </ReorderableList>
 
       {/* Only once the burn is known: the lane belongs to one, so a form rendered
           before then would take a name and have nowhere to put it. */}
@@ -365,11 +317,7 @@ const PlaceFields = ({
 const Notice = ({ loaded }: { loaded: Loaded<Grid> }) => {
   if (loaded.status === 'loading') return <p class="form-note">Loading…</p>
   if (loaded.status === 'failed') {
-    return (
-      <p class="form-error" role="alert">
-        {loaded.message}
-      </p>
-    )
+    return <ErrorText message={loaded.message} />
   }
   if (loaded.data === null) {
     return <NoBurn absent="there is no grid to lay out" />

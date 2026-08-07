@@ -7,7 +7,9 @@ import type { ApiClient } from '../api/client.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
 import { DreamFields } from '../components/DreamFields.tsx'
+import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
+import { IconButton } from '../components/IconButton.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { WithdrawDream } from '../components/WithdrawDream.tsx'
 import { shortDayOf } from '../datetime.ts'
@@ -107,19 +109,11 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
         later; most dreams have no time until quite close to the burn.
       </p>
 
-      {error !== undefined && (
-        <p class="form-error" role="alert">
-          {error}
-        </p>
-      )}
+      <ErrorText message={error} />
 
       {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
 
-      {loaded.status === 'failed' && (
-        <p class="form-error" role="alert">
-          {loaded.message}
-        </p>
-      )}
+      {loaded.status === 'failed' && <ErrorText message={loaded.message} />}
 
       {loaded.status === 'ready' && dreams.length === 0 && (
         <p class="form-note">Nobody has offered a dream yet. Yours can be the first.</p>
@@ -157,15 +151,12 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
                 <span class="dream-when">{when(dream) ?? 'not scheduled yet'}</span>
                 <span class="dream-place">{placeLabel(places, dream.place_id) ?? '—'}</span>
 
-                <button
-                  type="button"
-                  class="link-button"
+                <IconButton
+                  icon="✏️"
+                  label={`Edit ${dream.title}`}
                   disabled={busy}
-                  aria-label={`Edit ${dream.title}`}
                   onClick={() => setEditing(dream.id)}
-                >
-                  ✏️
-                </button>
+                />
                 <WithdrawDream
                   title={dream.title}
                   busy={busy}

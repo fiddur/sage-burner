@@ -14,8 +14,10 @@ import type { Loaded } from '../load.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
 import { CopyFrom } from '../components/CopyFrom.tsx'
+import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { HelperStrip } from '../components/HelperStrip.tsx'
+import { IconButton } from '../components/IconButton.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
@@ -173,11 +175,7 @@ export const Roles = ({ api }: { api: RolesApi }) => {
         and anyone can change or remove one, so talk to each other first.
       </p>
 
-      {error !== undefined && (
-        <p class="form-error" role="alert">
-          {error}
-        </p>
-      )}
+      <ErrorText message={error} />
 
       <Notice loaded={loaded} />
 
@@ -280,11 +278,7 @@ export const Roles = ({ api }: { api: RolesApi }) => {
 const Notice = ({ loaded }: { loaded: Loaded<Register> }) => {
   if (loaded.status === 'loading') return <p class="form-note">Loading…</p>
   if (loaded.status === 'failed') {
-    return (
-      <p class="form-error" role="alert">
-        {loaded.message}
-      </p>
-    )
+    return <ErrorText message={loaded.message} />
   }
   if (loaded.data === null) {
     return <NoBurn absent="there is nothing to look after" />
@@ -418,15 +412,7 @@ const RoleRow = ({
       </td>
 
       <td class="lead-actions">
-        <button
-          type="button"
-          class="link-button"
-          disabled={busy}
-          aria-label={`Edit ${role.title}`}
-          onClick={onEdit}
-        >
-          ✏️
-        </button>
+        <IconButton icon="✏️" label={`Edit ${role.title}`} disabled={busy} onClick={onEdit} />
 
         {confirming ? (
           <>
@@ -444,15 +430,12 @@ const RoleRow = ({
             </button>
           </>
         ) : (
-          <button
-            type="button"
-            class="link-button"
+          <IconButton
+            icon="🗑️"
+            label={`Remove ${role.title}`}
             disabled={busy}
-            aria-label={`Remove ${role.title}`}
             onClick={() => setConfirming(true)}
-          >
-            🗑️
-          </button>
+          />
         )}
       </td>
     </tr>

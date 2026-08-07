@@ -39,14 +39,21 @@ describe('NoBurn', () => {
     // was the thing that broke — and sent them to a page that could not help.
     renderIt(FAILED)
 
-    expect(screen.getByRole('alert').textContent).toContain('Could not load your burns')
+    // The whole sentence, not a prefix of it. `toContain('Could not load your burns')`
+    // passed against a version that rendered the literal text `{absent}`, because the
+    // part it checked came before the hole.
+    expect(screen.getByRole('alert').textContent).toBe(
+      'Could not load your burns, so there is no grid to lay out. Please reload the page.',
+    )
     expect(screen.queryByText(/not coming to a burn/)).toBeNull()
   })
 
   it('says the same to an admin, the failure not being about who is reading it', () => {
     renderIt(FAILED, ADMIN)
 
-    expect(screen.getByRole('alert').textContent).toContain('Could not load your burns')
+    expect(screen.getByRole('alert').textContent).toBe(
+      'Could not load your burns, so there is no grid to lay out. Please reload the page.',
+    )
     expect(screen.queryByText(/no burn planned/)).toBeNull()
   })
 

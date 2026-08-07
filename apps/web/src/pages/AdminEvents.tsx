@@ -7,9 +7,11 @@ import type { ApiClient } from '../api/client.ts'
 import type { MealSlotsApi } from '../components/MealSlots.tsx'
 
 import { isApiError } from '../api/client.ts'
+import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
 import { MealSlots } from '../components/MealSlots.tsx'
+import { PendingButton } from '../components/PendingButton.tsx'
 import { isAdmin, useViewer } from '../viewer.tsx'
 
 type Events =
@@ -271,11 +273,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
 
       {events.status === 'loading' && <p class="form-note">Loading…</p>}
 
-      {events.status === 'failed' && (
-        <p class="form-error" role="alert">
-          {events.message}
-        </p>
-      )}
+      {events.status === 'failed' && <ErrorText message={events.message} />}
 
       {events.status === 'ready' && (
         <>
@@ -429,20 +427,20 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
                     }}
                   />
 
-                  {saveError !== undefined && (
-                    <p class="form-error" role="alert">
-                      {saveError}
-                    </p>
-                  )}
+                  <ErrorText message={saveError} />
                   {saved && (
                     <p class="form-note" role="status">
                       Saved. It appears on the homepage while this is the current burn.
                     </p>
                   )}
 
-                  <button type="button" disabled={saving} onClick={() => void saveEvent(row.id)}>
-                    {saving ? 'Saving…' : 'Save event'}
-                  </button>
+                  <PendingButton
+                    busy={saving}
+                    label="Save event"
+                    busyLabel="Saving…"
+                    type="button"
+                    onClick={() => void saveEvent(row.id)}
+                  />
                   <button type="button" class="link-button" onClick={() => setEditing(undefined)}>
                     Done
                   </button>
@@ -459,11 +457,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
 
       <h2>New event</h2>
       <form class="form" onSubmit={(submitEvent) => void submitNew(submitEvent)}>
-        {createError !== undefined && (
-          <p class="form-error" role="alert">
-            {createError}
-          </p>
-        )}
+        <ErrorText message={createError} />
 
         <label class="field">
           <span>Name</span>
@@ -560,9 +554,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
           />
         </label>
 
-        <button type="submit" disabled={creating}>
-          {creating ? 'Creating…' : 'Create event'}
-        </button>
+        <PendingButton busy={creating} label="Create event" busyLabel="Creating…" type="submit" />
       </form>
     </GuardedPage>
   )

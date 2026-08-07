@@ -172,14 +172,40 @@ describe('Places', () => {
     const reorderPlaces = vi.fn<PlacesApi['reorderPlaces']>(() => Promise.resolve({ places: THREE }))
     renderPage(stub({ reorderPlaces }))
 
-    const handles = await screen.findAllByRole('button', { name: /^Move / })
-    const rows = document.querySelectorAll('.place-row')
+    // By name, not by position: every row now carries three controls — the handle
+    // and the two buttons — so the third `/^Move /` button is the first row's ↓.
+    const handle = await screen.findByRole('button', { name: 'Move Front Lawn' })
+    const rows = document.querySelectorAll('.reorder-row')
 
-    fireEvent.dragStart(handles[2] ?? handles[0]!)
+    fireEvent.dragStart(handle)
     fireEvent.dragOver(rows[0]!)
     fireEvent.drop(rows[0]!)
 
     await waitFor(() => expect(reorderPlaces).toHaveBeenCalledWith('e-1', ['p-3', 'p-1', 'p-2']))
+  })
+
+  it('moves a row with the buttons, which is the only way on a phone', async () => {
+    // HTML5 drag-and-drop does not fire for touch at all, so a list with a handle
+    // and nothing else cannot be reordered on the device half of this is read on
+    // (#146).
+    const reorderPlaces = vi.fn<PlacesApi['reorderPlaces']>(() => Promise.resolve({ places: THREE }))
+    renderPage(stub({ reorderPlaces }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Move Sauna up' }))
+
+    await waitFor(() => expect(reorderPlaces).toHaveBeenCalledWith('e-1', ['p-2', 'p-1', 'p-3']))
+  })
+
+  it('offers no way past either end', async () => {
+    // The passing sibling for the guard: disabled says what the control will do,
+    // rather than doing nothing when pressed.
+    renderPage(stub())
+
+    expect((await screen.findByRole('button', { name: 'Move Temple up' })).hasAttribute('disabled')).toBe(
+      true,
+    )
+    expect(screen.getByRole('button', { name: 'Move Front Lawn down' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.getByRole('button', { name: 'Move Sauna up' }).hasAttribute('disabled')).toBe(false)
   })
 
   it('writes to the drag data store, which Firefox needs to start a drag at all', async () => {

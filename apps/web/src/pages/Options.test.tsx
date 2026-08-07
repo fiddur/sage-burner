@@ -255,7 +255,7 @@ describe('Options', () => {
     fireEvent.dragStart(await screen.findByRole('button', { name: 'Move Own tent' }), {
       dataTransfer: { setData },
     })
-    fireEvent.drop(document.querySelectorAll('.place-row')[0]!)
+    fireEvent.drop(document.querySelectorAll('.reorder-row')[0]!)
 
     expect(setData).toHaveBeenCalledWith('text/plain', 'o-2')
     await waitFor(() => expect(reorderEventOptions).toHaveBeenCalledWith('e-1', 'lodging', ['o-2', 'o-1']))

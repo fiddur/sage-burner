@@ -8,6 +8,7 @@ import { isApiError } from '../api/client.ts'
 import { useBurns } from '../burn.tsx'
 import { useAction, useLoad } from '../load.ts'
 import { useViewer } from '../viewer.tsx'
+import { ErrorText } from './ErrorText.tsx'
 import { HandOverPlace } from './HandOverPlace.tsx'
 import { StayForm } from './StayForm.tsx'
 
@@ -95,17 +96,9 @@ export const YourBurns = ({ api }: { api: YourBurnsApi }) => {
     <>
       {loaded.status === 'loading' && <p class="form-note">Loading your burns…</p>}
 
-      {loaded.status === 'failed' && (
-        <p class="form-error" role="alert">
-          {loaded.message}
-        </p>
-      )}
+      {loaded.status === 'failed' && <ErrorText message={loaded.message} />}
 
-      {error !== undefined && (
-        <p class="form-error" role="alert">
-          {error}
-        </p>
-      )}
+      <ErrorText message={error} />
 
       {loaded.status === 'ready' && loaded.data.burns.length === 0 && (
         <>

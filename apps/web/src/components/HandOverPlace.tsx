@@ -4,6 +4,9 @@ import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
+import { ErrorText } from './ErrorText.tsx'
+import { PendingButton } from './PendingButton.tsx'
+
 export type HandOverApi = Pick<ApiClient, 'getMembers' | 'transferMyPlace'>
 
 /**
@@ -80,11 +83,7 @@ export const HandOverPlace = ({
         you signed up for here goes with it.
       </p>
 
-      {error !== undefined && (
-        <p class="form-error" role="alert">
-          {error}
-        </p>
-      )}
+      <ErrorText message={error} />
 
       {candidates === undefined && error === undefined && <p class="form-note">One moment…</p>}
 
@@ -109,9 +108,14 @@ export const HandOverPlace = ({
             </select>
           </label>
 
-          <button type="button" disabled={busy || chosen === ''} onClick={() => void handOver()}>
-            {busy ? 'Handing it over…' : 'Hand it over'}
-          </button>
+          <PendingButton
+            busy={busy}
+            label="Hand it over"
+            busyLabel="Handing it over…"
+            type="button"
+            disabled={chosen === ''}
+            onClick={() => void handOver()}
+          />
         </p>
       )}
 

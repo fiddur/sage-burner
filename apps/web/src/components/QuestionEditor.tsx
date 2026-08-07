@@ -12,8 +12,9 @@ import { useEffect, useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
-import { swap } from '../reorder.ts'
+import { ErrorText } from './ErrorText.tsx'
 import { MarkdownField } from './MarkdownField.tsx'
+import { ReorderableList } from './ReorderableList.tsx'
 
 export type QuestionsApi = Pick<
   ApiClient,
@@ -157,99 +158,70 @@ export const QuestionEditor = ({ api }: { api: QuestionsApi }) => {
     }, 'Could not add the question.')
   }
 
-  const move = (questions: readonly FormQuestion[], index: number, by: -1 | 1) => {
-    const ids = swap(
-      questions.map((row) => row.id),
-      index,
-      by,
-    )
-    if (ids === undefined) return
-
+  const reorderTo = (ids: string[]) => {
     void run(() => api.reorderQuestions(ids).then(() => undefined), 'Could not reorder.')
   }
 
   if (loaded.status === 'loading') return <p class="form-note">Loading questions…</p>
 
   if (loaded.status === 'failed') {
-    return (
-      <p class="form-error" role="alert">
-        {loaded.message}
-      </p>
-    )
+    return <ErrorText message={loaded.message} />
   }
 
   return (
     <section class="questions">
       <h3>Application questions</h3>
 
-      {error !== undefined && (
-        <p class="form-error" role="alert">
-          {error}
-        </p>
-      )}
+      <ErrorText message={error} />
 
       {loaded.questions.length === 0 && (
         <p class="form-note">No questions yet. The application form will be empty until you add one.</p>
       )}
 
-      <ol class="question-list">
-        {loaded.questions.map((row, index) => (
-          <li key={row.id}>
-            {editing === row.id ? (
-              <QuestionFields
-                question={row}
-                busy={busy}
-                onCancel={() => setEditing(undefined)}
-                onSave={(changes) =>
-                  void run(async () => {
-                    await api.updateQuestion(row.id, changes)
-                    setEditing(undefined)
-                  }, 'Could not save the question.')
+      <ReorderableList
+        rows={loaded.questions}
+        busy={busy}
+        rowClass="question-row"
+        labelFor={(row) => `"${row.label}"`}
+        onReorder={reorderTo}
+      >
+        {(row) =>
+          editing === row.id ? (
+            <QuestionFields
+              question={row}
+              busy={busy}
+              onCancel={() => setEditing(undefined)}
+              onSave={(changes) =>
+                void run(async () => {
+                  await api.updateQuestion(row.id, changes)
+                  setEditing(undefined)
+                }, 'Could not save the question.')
+              }
+            />
+          ) : (
+            <>
+              <span class="question-label">{row.label}</span>
+              <span class="form-note">
+                {TYPE_LABELS[row.type]}
+                {row.required ? ' · required' : ''}
+              </span>
+              <button type="button" class="link-button" disabled={busy} onClick={() => setEditing(row.id)}>
+                Edit
+              </button>
+              <button
+                type="button"
+                class="link-button"
+                disabled={busy}
+                onClick={() =>
+                  void run(() => api.deleteQuestion(row.id).then(() => undefined), 'Could not delete.')
                 }
-              />
-            ) : (
-              <div class="question-row">
-                <span class="question-label">{row.label}</span>
-                <span class="form-note">
-                  {TYPE_LABELS[row.type]}
-                  {row.required ? ' · required' : ''}
-                </span>
-                <button
-                  type="button"
-                  class="link-button"
-                  disabled={busy || index === 0}
-                  aria-label={`Move "${row.label}" up`}
-                  onClick={() => move(loaded.questions, index, -1)}
-                >
-                  ↑
-                </button>
-                <button
-                  type="button"
-                  class="link-button"
-                  disabled={busy || index === loaded.questions.length - 1}
-                  aria-label={`Move "${row.label}" down`}
-                  onClick={() => move(loaded.questions, index, 1)}
-                >
-                  ↓
-                </button>
-                <button type="button" class="link-button" disabled={busy} onClick={() => setEditing(row.id)}>
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  class="link-button"
-                  disabled={busy}
-                  onClick={() =>
-                    void run(() => api.deleteQuestion(row.id).then(() => undefined), 'Could not delete.')
-                  }
-                >
-                  Remove
-                </button>
-              </div>
-            )}
-          </li>
-        ))}
-      </ol>
+              >
+                Remove
+              </button>
+            </>
+          )
+        }
+      </ReorderableList>
 
       <form class="form" onSubmit={addQuestion}>
         <label class="field">

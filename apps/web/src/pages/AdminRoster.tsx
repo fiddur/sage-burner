@@ -6,6 +6,7 @@ import { useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { allergiesOf } from '../allergies.ts'
+import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { WaitingListLine, startsTheWaitingList } from '../components/WaitingListLine.tsx'
 import { toCsv } from '../csv.ts'
@@ -78,17 +79,9 @@ export const AdminRoster = ({ api }: { api: RosterApi }) => {
 
       {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
 
-      {loaded.status === 'failed' && (
-        <p class="form-error" role="alert">
-          {loaded.message}
-        </p>
-      )}
+      {loaded.status === 'failed' && <ErrorText message={loaded.message} />}
 
-      {error !== undefined && (
-        <p class="form-error" role="alert">
-          {error}
-        </p>
-      )}
+      <ErrorText message={error} />
 
       {roster !== undefined && roster.event === null && (
         <p class="form-note">There is no burn open at the moment.</p>
@@ -218,11 +211,7 @@ const AddToBurn = ({
         unpaid, and can change the rest themselves.
       </p>
 
-      {error !== undefined && (
-        <p class="form-error" role="alert">
-          {error}
-        </p>
-      )}
+      <ErrorText message={error} />
 
       {missing.length === 0 ? (
         <p class="form-note">Everybody with an account is already on this burn.</p>

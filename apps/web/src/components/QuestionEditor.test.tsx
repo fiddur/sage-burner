@@ -54,13 +54,16 @@ describe('QuestionEditor', () => {
       }),
     )
 
-    const items = await waitFor(() => {
-      const found = screen.getAllByRole('listitem')
-      expect(found).toHaveLength(3)
-      return found
+    await waitFor(() => {
+      expect(screen.getAllByRole('listitem')).toHaveLength(3)
     })
-    expect(items.map((node) => node.textContent?.startsWith('First') ?? false)[0]).toBe(true)
-    expect(items[2]?.textContent).toContain('Third')
+    // By the label element rather than the row's text: the row leads with the three
+    // reorder controls, so `startsWith` here answered the wrong question.
+    expect([...document.querySelectorAll('.question-label')].map((node) => node.textContent)).toEqual([
+      'First',
+      'Second',
+      'Third',
+    ])
   })
 
   it('adds a question, sending null for an empty help text', async () => {

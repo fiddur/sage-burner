@@ -9,10 +9,12 @@ import type { PushApi } from '../components/PushToggle.tsx'
 
 import { isApiError } from '../api/client.ts'
 import { BannerField } from '../components/BannerField.tsx'
+import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { IconField } from '../components/IconField.tsx'
 import { LogOutButton } from '../components/LogOutButton.tsx'
 import { MailField } from '../components/MailField.tsx'
+import { PendingButton } from '../components/PendingButton.tsx'
 import { PushToggle } from '../components/PushToggle.tsx'
 import { useSetInstallationTitle } from '../installation.tsx'
 import { isAdmin, useViewer } from '../viewer.tsx'
@@ -85,9 +87,7 @@ export const AdminSettings = ({ api }: { api: AdminSettingsApi }) => {
       {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
 
       {loaded.status === 'failed' && (
-        <p class="form-error" role="alert">
-          Could not load the settings. Please reload the page.
-        </p>
+        <ErrorText message="Could not load the settings. Please reload the page." />
       )}
 
       {loaded.status === 'ready' && (
@@ -98,11 +98,7 @@ export const AdminSettings = ({ api }: { api: AdminSettingsApi }) => {
             void save()
           }}
         >
-          {error !== undefined && (
-            <p class="form-error" role="alert">
-              {error}
-            </p>
-          )}
+          <ErrorText message={error} />
 
           <label class="field">
             <span>What these burns are called</span>
@@ -127,9 +123,7 @@ export const AdminSettings = ({ api }: { api: AdminSettingsApi }) => {
             </p>
           )}
 
-          <button type="submit" disabled={saving}>
-            {saving ? 'Saving…' : 'Save'}
-          </button>
+          <PendingButton busy={saving} label="Save" busyLabel="Saving…" type="submit" />
         </form>
       )}
 

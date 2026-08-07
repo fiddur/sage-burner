@@ -6,6 +6,7 @@ import { useEffect, useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
+import { ErrorText } from './ErrorText.tsx'
 import { FormError, useFormError } from './FormError.tsx'
 
 export type NotificationSettingsApi = Pick<
@@ -79,11 +80,7 @@ export const NotificationSettingsField = ({
    * settings. There is no state worth inventing, so there is none.
    */
   if (unavailable) {
-    return (
-      <p class="form-error" role="alert">
-        Could not load your notification settings. Please reload the page.
-      </p>
-    )
+    return <ErrorText message="Could not load your notification settings. Please reload the page." />
   }
 
   if (settings === undefined) return <p class="form-note">Loading…</p>

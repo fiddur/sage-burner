@@ -13,6 +13,7 @@ import { CalendarFeed } from '../components/CalendarFeed.tsx'
 import { DreamDetails } from '../components/DreamDetails.tsx'
 import { DreamFields } from '../components/DreamFields.tsx'
 import { DreamPanel } from '../components/DreamPanel.tsx'
+import { ErrorText } from '../components/ErrorText.tsx'
 import { MealDialog } from '../components/MealDialog.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
@@ -174,9 +175,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
   if (loaded.status === 'failed') {
     return (
       <Framed>
-        <p class="form-error" role="alert">
-          {loaded.message}
-        </p>
+        <ErrorText message={loaded.message} />
       </Framed>
     )
   }
@@ -349,9 +348,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
         shownMeal === undefined && (
           // Only when no panel is open: the overlay covers this, and the panel shows
           // the same message itself. Two would also be announced twice.
-          <p class="form-error" role="alert">
-            {error}
-          </p>
+          <ErrorText message={error} />
         )}
 
       <div class="schedule">

@@ -9,6 +9,7 @@ import type { Ceremony, PasskeyApi } from '../passkey.ts'
 import { isApiError } from '../api/client.ts'
 import { addPasskey, messageForCeremony, passkeysWork } from '../passkey.ts'
 import { FormError, useFormError } from './FormError.tsx'
+import { PendingButton } from './PendingButton.tsx'
 
 export type PasskeysApi = PasskeyApi & Pick<ApiClient, 'getMyPasskeys' | 'removePasskey'>
 
@@ -164,9 +165,13 @@ export const PasskeysField = ({
               />
             </label>
 
-            <button type="submit" disabled={busy || label.trim() === ''}>
-              {busy ? 'One moment…' : 'Add a passkey'}
-            </button>
+            <PendingButton
+              busy={busy}
+              label="Add a passkey"
+              busyLabel="One moment…"
+              type="submit"
+              disabled={label.trim() === ''}
+            />
           </form>
         </>
       )}

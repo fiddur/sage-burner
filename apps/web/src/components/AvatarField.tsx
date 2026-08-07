@@ -6,6 +6,7 @@ import { isApiError } from '../api/client.ts'
 import { AVATAR_TYPE, resizedAvatar } from '../avatar.ts'
 import { useSetViewer, useViewer } from '../viewer.tsx'
 import { Avatar } from './Avatar.tsx'
+import { ErrorText } from './ErrorText.tsx'
 
 /**
  * Why the picture did not go up.
@@ -119,11 +120,7 @@ export const AvatarField = ({ api }: { api: Pick<ApiClient, 'removeMyAvatar' | '
         )}
       </p>
 
-      {error !== undefined && (
-        <p class="form-error" role="alert">
-          {error}
-        </p>
-      )}
+      <ErrorText message={error} />
 
       <p class="form-note">
         Cut to a square and sized down in your browser before it is sent, as {AVATAR_TYPE}.

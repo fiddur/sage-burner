@@ -10,10 +10,12 @@ import type { YourBurnsApi } from '../components/YourBurns.tsx'
 
 import { isApiError } from '../api/client.ts'
 import { AvatarField } from '../components/AvatarField.tsx'
+import { ErrorText } from '../components/ErrorText.tsx'
 import { FormError, useFormError } from '../components/FormError.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { LogOutButton } from '../components/LogOutButton.tsx'
 import { PasskeysField } from '../components/PasskeysField.tsx'
+import { PendingButton } from '../components/PendingButton.tsx'
 import { PushToggle } from '../components/PushToggle.tsx'
 import { YourBurns } from '../components/YourBurns.tsx'
 import { isMember, useViewer } from '../viewer.tsx'
@@ -109,9 +111,7 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
       {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
 
       {loaded.status === 'failed' && (
-        <p class="form-error" role="alert">
-          Could not load your details. Please reload the page.
-        </p>
+        <ErrorText message="Could not load your details. Please reload the page." />
       )}
 
       {loaded.status === 'ready' && (
@@ -193,9 +193,7 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
 
           <FormError error={error} />
 
-          <button type="submit" disabled={saving}>
-            {saving ? 'Saving…' : 'Save'}
-          </button>
+          <PendingButton busy={saving} label="Save" busyLabel="Saving…" type="submit" />
         </form>
       )}
 
