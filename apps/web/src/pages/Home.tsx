@@ -9,7 +9,7 @@ import { isApiError } from '../api/client.ts'
 import { FormError, useFormError } from '../components/FormError.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
 import { TheirVersion } from '../components/TheirVersion.tsx'
-import { useInstallationBanner } from '../installation.tsx'
+import { useInstallationBanner, useInstallationTitle } from '../installation.tsx'
 import { renderMarkdown } from '../markdown.ts'
 import { isApproved, isMember, useViewer } from '../viewer.tsx'
 
@@ -40,6 +40,34 @@ const Banner = ({ version }: { version?: string | null }) =>
   )
 
 /**
+ * Everything the page says when it has no burn to show yet, and nothing when it has.
+ *
+ * The heading included: the burn's name is normally the `h1`, so with no burn the
+ * public page had none at all (#309), and this is the one state where the
+ * installation's name is not then on screen twice. Not while either answer is still
+ * coming — a heading that turns into a different one is worse than a late one.
+ */
+const NoOpenBurn = ({ active, title }: { active: Active; title?: string }) => {
+  if (active.status === 'loading') return <p class="form-note">One moment…</p>
+
+  if (active.status === 'failed') {
+    return <p class="notice">Could not load the current burn just now. Please try again shortly.</p>
+  }
+
+  if (active.event !== null) return null
+
+  return (
+    <>
+      {title !== undefined && <h1>{title}</h1>}
+      {/* Before the first event exists, and again once the last has ended. Says so
+          rather than showing a stale welcome text — see the active-event rule in
+          `docs/burns.md`. */}
+      <p class="notice">There is no burn scheduled at the moment. Check back later.</p>
+    </>
+  )
+}
+
+/**
  * The public landing page.
  *
  * Almost nothing here is written by us: the banner is uploaded, and everything below
@@ -56,6 +84,7 @@ const Banner = ({ version }: { version?: string | null }) =>
 export const Home = ({ api }: { api: HomeApi }) => {
   const viewer = useViewer()
   const banner = useInstallationBanner()
+  const title = useInstallationTitle()
   const [active, setActive] = useState<Active>({ status: 'loading' })
   const [editing, setEditing] = useState<string | undefined>(undefined)
   const [saving, setSaving] = useState(false)
@@ -156,19 +185,7 @@ export const Home = ({ api }: { api: HomeApi }) => {
     <article class="prose">
       <Banner version={banner} />
 
-      {active.status === 'loading' && <p class="form-note">One moment…</p>}
-
-      {active.status === 'failed' && (
-        <p class="notice">Could not load the current burn just now. Please try again shortly.</p>
-      )}
-
-      {active.status === 'ready' &&
-        active.event === null && (
-          // Before the first event exists, and again once the last has ended.
-          // Says so rather than showing a stale welcome text — see the
-          // active-event rule in `docs/burns.md`.
-          <p class="notice">There is no burn scheduled at the moment. Check back later.</p>
-        )}
+      <NoOpenBurn active={active} title={title} />
 
       {openEvent !== null && (
         <>

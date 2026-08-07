@@ -73,6 +73,10 @@ squeezed into a sliver with the rest of the screen empty. The schedule used to e
 that with a `:has()` override, which is the shape of a default that is wrong: one
 page opting out, and the next wide thing having to remember to.
 
+`.prose` is also the only thing **centred**. A bounded column of paragraphs pinned to
+the left of a wide screen reads as a page that failed to load the rest of itself,
+which is not a problem the wide pages have — they use the room.
+
 Hiding a link is presentation. Every page behind these is guarded again server-side,
 and `Layout.test.tsx` asserts each absence by name — a negated `arrayContaining`
 passes when any _one_ of the named links is missing, which is not the question.
@@ -114,6 +118,11 @@ away the reason it was an SVG, so anything else is cut to a square and resized i
 the browser instead, which is what lets this process store what it is given
 without an image library. Nothing here decodes an image.
 
+**Upload a PNG if iOS matters to you.** Safari does not accept an SVG for
+`apple-touch-icon`, so an installation that has uploaded nothing gets a screenshot
+tile on an iOS home screen rather than the flame — the default icon is the emoji
+SVG. Every other platform, and any installation that has uploaded a PNG, is fine.
+
 **That means an admin can upload a file carrying script, and that is the settled
 trade** (#256): it is their own installation to break. Two things bound it. An
 SVG cannot execute as a manifest icon or inside an `<img>` — only as a top-level
@@ -143,10 +152,7 @@ nothing at all.
 
 The mark itself is `flameIcon` in `@sage-burner/shared`, which the backend serves
 when nothing has been uploaded. The dot's numbers are `favicon.ts`'s own, because
-that is the only thing that draws them: they lived in `@sage-burner/shared` while
-`flameIcon` had a badged variant drawing a `<circle>`, and came back when that variant
-went — nothing called it once the dot moved onto the canvas, and a shared constant
-with one consumer is a description to keep in step for nothing.
+that is the only thing that draws them.
 
 ### The card a shared link shows
 
@@ -162,11 +168,11 @@ plain sentences, and a picture. `share.ts` builds the tags and is tested as a
 string in, a string out.
 
 **Both entry points, from one handler.** `@fastify/static` serves a route per
-file, so `/` and `/index.html` come from there, while `/apply`, `/login` and every
-other client-side route come from the not-found handler. Injecting into one of the
-two makes sharing the bare domain work while sharing a deep link does not, or the
-reverse — so `index.html` is kept out of the static glob and both paths call
-`createShellHandler`. `app.test.ts` asserts the two answer identically.
+file, so `/` and `/index.html` _would_ come from there, while `/apply`, `/login`
+and every other client-side route come from the not-found handler. Injecting into
+one of the two makes sharing the bare domain work while sharing a deep link does
+not, or the reverse — so `index.html` is kept out of the static glob and both paths
+call `createShellHandler`. `app.test.ts` asserts the two answer identically.
 
 What goes in:
 
@@ -332,6 +338,8 @@ The size modifiers — `.person-badge-face`, and the schedule chip's
 class, as `.avatar` is, so specificity ties and source order decides: above the base
 rule they set nothing at all and every circle draws at the bar's 2rem. Both did, and
 a screenshot showed it without anybody noticing — `getComputedStyle` is the check.
+The one place the stack overrides a modifier is `.dream-supporter .dream-facilitator`,
+which zeroes the chip's leading gap so the faces actually overlap.
 
 `HelperStrip` takes the burn's attendees as `everyone` for this, separately from
 `candidates`: candidates is filtered — a chore offers nobody, a dream's helpers
