@@ -94,12 +94,16 @@ const givenComing = async (accountId: string, eventId = BURN) => {
 }
 
 /** Switch a category on for somebody, which is what makes any of these arrive. */
-const switchOn = (server: FastifyInstance, cookie: string, category: string) =>
+/**
+ * Replaces the whole set, which is what the route takes — so anything a test still
+ * wants on has to be named here too.
+ */
+const switchOn = (server: FastifyInstance, cookie: string, ...categories: string[]) =>
   server.inject({
     method: 'PUT',
     url: '/api/me/notification-settings',
     headers: { cookie },
-    payload: { on: [category], email: [] },
+    payload: { on: categories, email: [] },
   })
 
 const bodiesFor = async (server: FastifyInstance, cookie: string): Promise<string[]> => {
@@ -263,6 +267,54 @@ describe('the lead-roles register filling up', () => {
       payload: { account_id: cai.id },
     })
     expect(taken.statusCode).toBe(200)
+
+    expect(await bodiesFor(server, bea.cookie)).toEqual(['Cai is now Kitchen lead.'])
+  })
+
+  it('does not tell the appointee about themselves twice', async () => {
+    // #270. Ada appoints Cai, so Cai gets the personal "You are now Kitchen lead" —
+    // and, with the burn-wide category on, used to get "Cai is now Kitchen lead."
+    // about themselves as well. Excluded like the actor is.
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const cai = await givenAccount('Cai')
+    await givenComing(ada.id)
+    await givenComing(cai.id)
+    const role = (await addRole(server, ada.cookie, 'Kitchen')).json().role
+    // Both on: the personal one is what they *should* get, the burn-wide one is what
+    // they should not. With only the second, this would pass for the wrong reason.
+    await switchOn(server, cai.cookie, 'lead_role', 'lead_role_filled')
+
+    await server.inject({
+      method: 'PUT',
+      url: `/api/roles/${role.id}/lead`,
+      headers: { cookie: ada.cookie },
+      payload: { account_id: cai.id },
+    })
+
+    expect(await bodiesFor(server, cai.cookie)).toEqual(['You are now Kitchen lead.'])
+  })
+
+  it('still tells everybody else, which is what the category is for', async () => {
+    // The passing sibling: excluding the appointee must not silence the note.
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    const cai = await givenAccount('Cai')
+    await givenComing(ada.id)
+    await givenComing(bea.id)
+    await givenComing(cai.id)
+    const role = (await addRole(server, ada.cookie, 'Kitchen')).json().role
+    await switchOn(server, bea.cookie, 'lead_role_filled')
+
+    await server.inject({
+      method: 'PUT',
+      url: `/api/roles/${role.id}/lead`,
+      headers: { cookie: ada.cookie },
+      payload: { account_id: cai.id },
+    })
 
     expect(await bodiesFor(server, bea.cookie)).toEqual(['Cai is now Kitchen lead.'])
   })

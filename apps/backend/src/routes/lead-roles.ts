@@ -21,7 +21,7 @@ import { viewerFor } from '../auth/viewer.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
 import { account, attendance, event, leadRole, leadRoleMember } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
-import { refuseIfStale, withVersion } from '../if-match.ts'
+import { refuseIfStale, withCollectionVersion, withVersion } from '../if-match.ts'
 import { displayName, notifyAttendees } from '../push/notify.ts'
 import { accountForAttendance, attendanceFor } from './attendance.ts'
 import { copySourcesFor } from './copy-sources.ts'
@@ -217,7 +217,7 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
         notify,
         fields.event_id,
         { category: 'lead_role_added', body: `A new lead role: ${fields.title}`, link: '/roles' },
-        { except: await callerId(request) },
+        { except: [await callerId(request)] },
       )
 
       // Built from what was written rather than read back: a new role is vacant and
@@ -254,7 +254,9 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
       const role = roles.find((candidate) => candidate.id === request.params.id)
       if (role === undefined) return sendError(reply, 404)
 
-      return { role } satisfies LeadRoleResponse
+      return await withCollectionVersion(reply, { role } satisfies LeadRoleResponse, () =>
+        register(existing.event_id),
+      )
     },
   )
 
@@ -344,7 +346,9 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
             body: `${await displayName(db, body.account_id)} is now ${existing.title} lead.`,
             link: '/roles',
           },
-          { except: by },
+          // The appointee too: they already have the personal "You are now …", and
+          // hearing about themselves twice is how a channel stops being read (#270).
+          { except: [by, body.account_id] },
         )
       }
 

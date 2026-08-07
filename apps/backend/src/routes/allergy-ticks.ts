@@ -69,7 +69,7 @@ export const allergyLabelsFor = async (db: Database, accountIds: readonly string
     .from(accountAllergy)
     .innerJoin(allergyItem, eq(allergyItem.id, accountAllergy.item_id))
     .where(inArray(accountAllergy.account_id, [...accountIds]))
-    .orderBy(asc(allergyItem.order), asc(allergyItem.label))
+    .orderBy(asc(allergyItem.order), asc(allergyItem.id))
 
   const byAccount = new Map<string, string[]>()
   for (const row of rows) {

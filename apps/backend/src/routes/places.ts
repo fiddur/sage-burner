@@ -19,7 +19,7 @@ import { isForeignKeyViolation } from '../db/errors.ts'
 import { nextOrder, reorder } from '../db/ordered.ts'
 import { event, place } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
-import { refuseIfStale, withVersion } from '../if-match.ts'
+import { refuseIfStale, withCollectionVersion, withVersion } from '../if-match.ts'
 import { copySourcesFor } from './copy-sources.ts'
 import { openEventNow, todayIso } from './events.ts'
 
@@ -31,20 +31,13 @@ export const placesFor = (db: Database, eventId: string): Promise<Place[]> =>
   db.select().from(place).where(eq(place.event_id, eventId)).orderBy(asc(place.order), asc(place.id))
 
 /**
- * Whether a burn is still open to changes to its grid: it has not ended.
+ * The lane, when the burn it belongs to is open — the id alone does not say which.
  *
  * A finished burn's grid is the record of what happened there, and an id noted while
- * it was current should not still be a way to rewrite it. **Not `activeEvent`**,
- * which the dreams routes scope to: a lane is laid down per burn, and that is how a
- * burn still months off gets its grid set up, so scoping to the single soonest-ending
- * burn would refuse the setup the copy exists for. Every write here is scoped the
- * same way — closing the two that take a bare id and leaving the rest would be an
- * archive only half shut.
- *
- * Reading stays open, including reading a finished grid to copy it into the next
- * burn.
+ * it was current should not still be a way to rewrite it. Every write here is scoped
+ * the same way; reading stays open, including reading a finished grid to copy it into
+ * the next burn.
  */
-/** The lane, when the burn it belongs to is open — the id alone does not say which burn. */
 const openLane = async (db: Database, now: () => Date, placeId: string): Promise<Place | undefined> => {
   const [row] = await db
     .select()
@@ -161,8 +154,9 @@ export const registerPlaceRoutes = (app: FastifyInstance, { db, sessions, now }:
       if (await refuseIfStale(request, reply, () => grid(existing.event_id))) return reply
 
       const [updated] = await db.update(place).set(body).where(eq(place.id, request.params.id)).returning()
+      if (updated === undefined) return sendError(reply, 404)
 
-      return updated === undefined ? sendError(reply, 404) : { place: updated }
+      return await withCollectionVersion(reply, { place: updated }, () => grid(existing.event_id))
     },
   )
 

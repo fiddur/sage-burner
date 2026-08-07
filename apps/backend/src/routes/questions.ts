@@ -9,14 +9,15 @@ import {
   formQuestionUpdateSchema,
   tickBoxRequired,
 } from '@sage-burner/shared'
-import { and, asc, eq, notInArray } from 'drizzle-orm'
+import { asc, eq, notInArray } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { Database } from '../db/index.ts'
 
+import { allOf } from '../db/conditions.ts'
 import { nextOrder, reorder } from '../db/ordered.ts'
+import { whyNothingWritten } from '../db/refusals.ts'
 import { formQuestion } from '../db/schema.ts'
-import { whyNothingWritten } from '../db/write.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 
 /**
@@ -148,8 +149,7 @@ export const registerQuestionRoutes = (app: FastifyInstance, { db }: { db: Datab
     // — but a read-then-check here is a race (see `tickBoxCondition`), and a JS
     // fail-fast would also pre-empt the statement in every non-racing case, so
     // nothing would exercise the condition that does the real work.
-    const where = and(eq(formQuestion.id, request.params.id), tickBoxCondition(body))
-    if (where === undefined) throw new Error('refusing an unfiltered UPDATE on form_question')
+    const where = allOf(eq(formQuestion.id, request.params.id), tickBoxCondition(body))
 
     // `.returning()` rather than reading `changes`, for the reasons `events.ts`
     // gives: the row it hands back is the row as written, so the response cannot

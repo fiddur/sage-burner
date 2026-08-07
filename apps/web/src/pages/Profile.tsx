@@ -169,8 +169,6 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
           )}
 
           <label class="field">
-            {/* The Other beside the ticks: a vocabulary is never complete, and the
-                cost of it being wrong here is somebody's dinner. */}
             <span>
               {items.length > 0 ? 'Anything else you cannot eat' : 'Allergies or food you cannot eat'}
             </span>

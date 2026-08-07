@@ -1,22 +1,18 @@
+/**
+ * Lists a person put in an order, and the two writes that keep them in one.
+ *
+ * Three tables carry an `order` somebody drags around: `place`, `form_question` and
+ * `event_option`. Both invariants live here rather than once per table — **the
+ * server assigns the position**, and **a reorder names every row exactly once or is
+ * refused**.
+ */
+
 import type { SQL } from 'drizzle-orm'
 import type { SQLiteColumn, SQLiteTable } from 'drizzle-orm/sqlite-core'
 
 import { and, desc, eq } from 'drizzle-orm'
 
 import type { Database, Transaction } from './index.ts'
-
-/**
- * Lists a person put in an order, and the two writes that keep them in one.
- *
- * Three tables carry an `order` an admin drags around — `place`, `form_question`,
- * `event_option` — and each had written out the same two blocks: read the last
- * position and insert after it, and renumber a whole list from a set of ids. Six
- * blocks, three copies of the "the server assigns `order`" argument, and three
- * chances for the same-set rule to be a little different from the other two.
- *
- * The invariants live here now: **the server assigns the position**, and **a reorder
- * names every row exactly once or is refused**.
- */
 
 /**
  * Enough of a table to be ordered: something to name a row by, and somewhere to put
@@ -34,8 +30,8 @@ export interface OrderedColumns {
  * not true: two adds can observe the same last row between separate awaits and claim
  * the same position. The caller owns the transaction rather than this — each has
  * something else to do inside it, and each answers a foreign key violation
- * differently — so this is the read alone, and it takes a `tx` to make that hard to
- * get wrong.
+ * differently — so this is the read alone, and takes a `tx` to make that hard to get
+ * wrong.
  *
  * `scope` is what the list is numbered within: a burn for places, a burn and a kind
  * for the options, nothing at all for the application's questions. Numbering across
@@ -60,7 +56,7 @@ export const nextOrder = (tx: Transaction, table: SQLiteTable & OrderedColumns, 
  *
  * One statement per row, but in a transaction: a half-applied reorder is an order
  * nobody chose. `scope` is ANDed into every one of them, so an id from another burn
- * could not renumber it even if the set check were wrong.
+ * could not renumber that burn's list even if the set check were wrong.
  */
 export const reorder = (
   db: Database,
