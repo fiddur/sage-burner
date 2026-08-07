@@ -8,7 +8,7 @@ import {
   placeOrderSchema,
   placeUpdateSchema,
 } from '@sage-burner/shared'
-import { and, asc, desc, eq, gte } from 'drizzle-orm'
+import { and, asc, eq, gte } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -16,6 +16,7 @@ import type { Database } from '../db/index.ts'
 
 import { createGuards } from '../auth/guards.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
+import { nextOrder, reorder } from '../db/ordered.ts'
 import { event, place } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { refuseIfStale, withVersion } from '../if-match.ts'
@@ -120,15 +121,7 @@ export const registerPlaceRoutes = (app: FastifyInstance, { db, sessions, now }:
       let order: number
       try {
         order = db.transaction((tx) => {
-          const [last] = tx
-            .select({ order: place.order })
-            .from(place)
-            .where(eq(place.event_id, event_id))
-            .orderBy(desc(place.order))
-            .limit(1)
-            .all()
-
-          const next = last === undefined ? 0 : last.order + 1
+          const next = nextOrder(tx, place, eq(place.event_id, event_id))
           tx.insert(place)
             .values({ ...body, id, event_id, order: next })
             .run()
@@ -227,30 +220,17 @@ export const registerPlaceRoutes = (app: FastifyInstance, { db, sessions, now }:
 
       if (await refuseIfStale(request, reply, () => grid(request.params.eventId))) return reply
 
-      const existing = await placesFor(db, request.params.eventId)
-      const wanted = body.ids
-
-      // Exactly the places this burn has, no more and no fewer. A partial list
-      // would renumber some rows and leave the rest on stale positions, producing an
-      // order nobody chose; another burn's id would reach into a grid this request
-      // is not about. Distinctness is implied rather than checked: `wanted` has
-      // exactly `existing.length` slots and must contain every existing id, and
-      // those are distinct because `id` is the primary key.
-      const sameSet = wanted.length === existing.length && existing.every((row) => wanted.includes(row.id))
-      if (!sameSet) return sendError(reply, 400)
-
-      // One statement per place, but in a transaction: a half-applied reorder is
-      // an order the admin never chose. Scoped by event as well as id, so an id
-      // from another burn could not renumber it even if the set check above were
-      // wrong.
-      db.transaction((tx) => {
-        wanted.forEach((id, index) => {
-          tx.update(place)
-            .set({ order: index })
-            .where(and(eq(place.id, id), eq(place.event_id, request.params.eventId)))
-            .run()
-        })
-      })
+      // Exactly the places this burn has — `reorder` argues that rule out, and
+      // scoping by event as well as id is what keeps another burn's grid out of
+      // reach even if the set check were wrong.
+      const renumbered = reorder(
+        db,
+        place,
+        await placesFor(db, request.params.eventId),
+        body.ids,
+        eq(place.event_id, request.params.eventId),
+      )
+      if (renumbered === 'mismatch') return sendError(reply, 400)
 
       return withVersion(reply, await grid(request.params.eventId))
     },

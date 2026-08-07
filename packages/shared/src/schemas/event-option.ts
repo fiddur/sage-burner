@@ -1,8 +1,10 @@
 import { z } from 'zod'
 
+import type { IdOrder } from './common.ts'
+
 import { eventOptionKinds } from '../enums.ts'
 import { MAX_OPTION_LABEL } from '../limits.ts'
-import { idSchema, nonEmptyText } from './common.ts'
+import { idOrderSchema, idSchema, nonEmptyText } from './common.ts'
 
 /**
  * One entry in a per-event list: somewhere to sleep, or something to help with.
@@ -57,6 +59,6 @@ export const eventOptionUpdateSchema = eventOptionSchema
   .strict()
 export type EventOptionUpdate = z.infer<typeof eventOptionUpdateSchema>
 
-/** The whole ordering for one kind, as ids. */
-export const eventOptionOrderSchema = z.object({ ids: z.array(idSchema) }).strict()
-export type EventOptionOrder = z.infer<typeof eventOptionOrderSchema>
+/** The whole ordering for one kind, as ids. See `idOrderSchema`. */
+export const eventOptionOrderSchema = idOrderSchema
+export type EventOptionOrder = IdOrder

@@ -81,3 +81,12 @@ export const createDb = ({ url }: CreateDbOptions): DbHandle => {
 }
 
 export type Database = DbHandle['db']
+
+/**
+ * What a `db.transaction(tx => …)` callback is handed.
+ *
+ * Derived rather than named, so it cannot drift from whatever drizzle hands over.
+ * Needed by anything that takes a transaction as an argument — `db/ordered.ts` does,
+ * because read-then-insert is only one decision if it is one transaction.
+ */
+export type Transaction = Parameters<Parameters<Database['transaction']>[0]>[0]
