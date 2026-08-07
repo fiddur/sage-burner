@@ -140,9 +140,8 @@ const detailsOf = (error: unknown): { code?: string; reason?: string } => {
 /**
  * The slug that goes with a status, and the only place the pairing is decided.
  *
- * Exported for `sendError` in `http.ts`, which is what the routes call. Before
- * that, every route spelled the pair out at the call site — 35 of them — so
- * nothing stopped a `404` being sent with `conflict` beside it (#138).
+ * Exported for `sendError` in `http.ts`, which is what the routes call — so no route
+ * names a slug beside a status and none of them can disagree with this.
  */
 export const codeFor = (status: number): ErrorCode => {
   if (status === 401) return 'unauthenticated'
@@ -154,9 +153,7 @@ export const codeFor = (status: number): ErrorCode => {
   // mapped here so a route that reaches them by throwing still names the right one.
   if (status === 412) return 'stale'
   if (status === 428) return 'precondition_required'
-  // Its own slug rather than falling into `bad_request` below, which is the reason
-  // `rate_limited` exists: a shed request is worth retrying and a malformed one is
-  // not, and the status alone does not tell a caller which.
+  // Its own slug rather than falling into `bad_request` below — `errorCodes` says why.
   if (status === 429) return 'rate_limited'
   if (status >= 400 && status < 500) return 'bad_request'
   return 'internal_error'

@@ -200,10 +200,12 @@ export const displayName = async (db: Database, accountId: string): Promise<stri
  * that burn, however they have set their switches. A member who leaves stops hearing
  * about it the moment their row goes.
  *
- * `except` is whoever did the thing. Never notifying somebody about their own click
- * is the rule #247 set for the roles and it applies harder here: offering your own
- * dream and being told you offered a dream is the fastest way to teach somebody that
- * the bell is noise.
+ * `except` is whoever the burn-wide note would be noise for. Whoever did the thing,
+ * always — never notifying somebody about their own click is the rule #247 set for
+ * the roles, and it applies harder here: offering your own dream and being told you
+ * offered a dream is the fastest way to teach somebody the bell is noise. A **list**,
+ * because appointing somebody makes them the subject as well, and they already have
+ * the personal "You are now Kitchen lead" (#270).
  *
  * Sequential rather than `Promise.all`. It is at most forty-two people, once, and
  * each one writes a row and reaches a push service — this is the least interesting
@@ -214,16 +216,18 @@ export const notifyAttendees = async (
   notify: Notifier,
   eventId: string,
   told: Told,
-  { except }: { except?: string } = {},
+  { except = [] }: { except?: readonly (string | undefined)[] } = {},
 ): Promise<number> => {
   const rows = await db
     .select({ account_id: attendance.account_id })
     .from(attendance)
     .where(eq(attendance.event_id, eventId))
 
+  const silent = new Set(except)
+
   let told_count = 0
   for (const row of rows) {
-    if (row.account_id === except) continue
+    if (silent.has(row.account_id)) continue
     await notify(row.account_id, told)
     told_count += 1
   }

@@ -8,9 +8,9 @@ import { randomUUID } from 'node:crypto'
 import type { GuardDeps } from '../auth/guards.ts'
 
 import { viewerFor } from '../auth/viewer.ts'
+import { whyNothingWritten } from '../db/refusals.ts'
 import { application, inviteToken } from '../db/schema.ts'
-import { whyNothingWritten } from '../db/write.ts'
-import { noStore, sendError } from '../http.ts'
+import { bodyOf, noStore, sendError } from '../http.ts'
 import { defaultExpiry, mintToken } from '../invites.ts'
 
 export interface InviteRouteDeps extends GuardDeps {
@@ -48,10 +48,10 @@ export const registerInviteRoutes = (app: FastifyInstance, { db, sessions, now }
   app.post(apiRoutes.createInvite.fastify, async (request, reply) => {
     void noStore(reply)
 
-    const parsed = inviteCreateSchema.safeParse(request.body ?? {})
-    if (!parsed.success) return sendError(reply, 400)
+    const body = bodyOf(inviteCreateSchema, request)
+    if (body === undefined) return sendError(reply, 400)
 
-    const expires_at = parsed.data.expires_at ?? defaultExpiry(now())
+    const expires_at = body.expires_at ?? defaultExpiry(now())
     // An invite that is already dead is a link an admin would send and
     // nobody could use, so it is refused rather than stored.
     if (Date.parse(expires_at) <= now().getTime()) {

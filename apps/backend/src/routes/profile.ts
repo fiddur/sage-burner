@@ -10,9 +10,10 @@ import type { Database } from '../db/index.ts'
 
 import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
+import { allOf } from '../db/conditions.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
+import { whyNothingWritten } from '../db/refusals.ts'
 import { account, attendance, eventOption } from '../db/schema.ts'
-import { whyNothingWritten } from '../db/write.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { allergyTickIdsFor, writeAllergyTicks } from './allergy-ticks.ts'
 import { openEventNow } from './events.ts'
@@ -262,12 +263,9 @@ export const registerProfileRoutes = (app: FastifyInstance, { db, sessions, now 
       const found = await openEventNow(db, now, request.params.eventId)
       if (found === undefined) return sendError(reply, 404)
 
-      const mine = and(eq(attendance.event_id, found.id), eq(attendance.account_id, viewer.account_id))
-      // `and` is typed `SQL | undefined` however many conditions it is given, and
-      // this one reaches an `UPDATE` as well as two reads — the same guard
-      // `questions.ts` puts on its own composed `WHERE`, and unreachable for the
-      // same reason.
-      if (mine === undefined) throw new Error('refusing an unfiltered write on attendance')
+      // `allOf` rather than `and`: this reaches an `UPDATE` as well as two reads, and
+      // drizzle types `and` as possibly undefined — which there is the whole table.
+      const mine = allOf(eq(attendance.event_id, found.id), eq(attendance.account_id, viewer.account_id))
 
       // `helping_option_ids` lives in its own table, so it never reaches `set()`.
       const { helping_option_ids: helping, ...columns } = body

@@ -127,10 +127,6 @@ export const Home = ({ api }: { api: HomeApi }) => {
    *
    * A failed re-read falls back to what is on screen: refusing to open the editor
    * because the network hiccuped would be the worse answer.
-   *
-   * The window it leaves — between pressing Edit and pressing Save — is closed by
-   * `If-Match` (#274) rather than by this: the save quotes the version this read
-   * handed over, and a burn edited in between is refused with what it now says.
    */
   const openEditor = async (fallback: string) => {
     setError(undefined)

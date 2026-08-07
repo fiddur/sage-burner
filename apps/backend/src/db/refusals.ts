@@ -1,3 +1,11 @@
+/**
+ * Reading a refusal: why a write that should have landed did not.
+ *
+ * Beside `errors.ts`, which interprets the failures a driver *throws*. This one is
+ * about the quieter kind — a statement that ran, matched nothing, and said nothing
+ * about why.
+ */
+
 import type { SQL } from 'drizzle-orm'
 import type { SQLiteColumn, SQLiteTable } from 'drizzle-orm/sqlite-core'
 
@@ -14,9 +22,7 @@ import type { Database } from './index.ts'
  *
  * **Asked rather than inferred.** Guessing from whether a condition was present
  * answered "Request failed (400)" for a question that was simply not there, which is
- * the wrong end of the problem to send somebody looking at. Four routes each wrote
- * this select out with a paragraph explaining it; the paragraph is here now and the
- * select is one line at each of them.
+ * the wrong end of the problem to send somebody looking at.
  *
  * `row` is how to find it again, which is not always the id: an attendance is found
  * by the pair it belongs to, not by a key anybody sent.

@@ -13,6 +13,7 @@ import { createConfig } from '../config.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, accountRole, attendance, attendanceHelping, event, eventOption } from '../db/schema.ts'
+import { writeAllergyTicks } from './allergy-ticks.ts'
 import { helpingIdsFor, writeHelping } from './helping.ts'
 import { writeStay } from './profile.ts'
 
@@ -29,8 +30,6 @@ const NOW = '2026-07-02T00:00:00.000Z'
 
 let handle: DbHandle | undefined
 let app: FastifyInstance | undefined
-
-import { writeAllergyTicks } from './allergy-ticks.ts'
 
 afterEach(async () => {
   await app?.close()
