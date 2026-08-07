@@ -330,6 +330,7 @@ const FoodIdea = ({
       type="text"
       class="meal-idea"
       maxLength={MAX_OPTION_LABEL}
+      placeholder="What's cooking?"
       aria-label={`Food idea for ${meal.label} on ${meal.date}`}
       disabled={busy}
       value={draft}
