@@ -1026,7 +1026,6 @@ a:hover {
   border-radius: 0.5rem;
 }
 
-/* The leads register, laid out as the spreadsheet tab it replaces. */
 /*
   The register, one table at every width (#307).
 
@@ -1070,17 +1069,25 @@ a:hover {
 }
 
 /*
-  The role's name, held still while the rest scrolls under it. Load-bearing
-  background, as on the grid: without one the cells show straight through.
+  The role's name, held still while the rest scrolls under it — **and its heading with
+  it**. Sticking the body cell alone desyncs the two on the one gesture this layout is
+  built around: "Title" slides away and whatever heading has arrived in its place ends
+  up sitting over the frozen column, naming it as something it is not.
+
+  Load-bearing background, as on the grid: without one the cells show straight
+  through. The corner outranks the row header, which outranks nothing else.
 */
-.lead-table th[scope='row'] {
+.lead-table th[scope='row'],
+.lead-table thead th:first-child {
   position: sticky;
   inset-inline-start: 0;
   z-index: 1;
   min-width: 8ch;
   background: var(--paper);
-  /* Its own right edge, drawn over whatever is sliding under it. */
-  box-shadow: 1px 0 0 var(--line);
+}
+
+.lead-table thead th:first-child {
+  z-index: 2;
 }
 
 /* Prose gets room; nothing else needs any. Positional, so check these against the
