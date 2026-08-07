@@ -254,7 +254,6 @@ export const registerSessionRoutes = (
 ) => {
   const { requireMember } = createGuards({ db, sessions })
 
-  /** The caller's attendance at a burn, or nothing if they are not coming to it. */
   /**
    * The pool, as both the `GET` and the `If-Match` guard see it (#274).
    *
@@ -265,6 +264,7 @@ export const registerSessionRoutes = (
     sessions: await sessionsFor(db, eventId, mine),
   })
 
+  /** The caller's attendance at a burn, or nothing if they are not coming to it. */
   const mineAt = async (request: FastifyRequest, eventId: string) => {
     const viewer = await viewerFor(request, { db, sessions })
 
@@ -369,7 +369,7 @@ export const registerSessionRoutes = (
           body: `${await displayName(db, viewer.account_id)} offered a dream: ${row.title}`,
           link: '/dreams',
         },
-        { except: viewer.account_id },
+        { except: [viewer.account_id] },
       )
 
       // Built from what was written rather than read back: a new dream has nobody
