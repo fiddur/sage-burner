@@ -20,6 +20,7 @@ import type {
   EventResponse,
   EventsResponse,
   FaqListResponse,
+  FeedResponse,
   FaqResponse,
   FormQuestionOrder,
   FormQuestionResponse,
@@ -605,6 +606,14 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
       request<MailTestResponse>(apiRoutes.sendTestEmail.path(), {
         method: apiRoutes.sendTestEmail.method,
       }),
+
+    /**
+     * Members only: what everyone has been doing, across burns (#303).
+     *
+     * Not per burn, unlike everything else about a burn — the quiet between them is
+     * what the page is for.
+     */
+    getFeed: (signal?: AbortSignal) => request<FeedResponse>(apiRoutes.getFeed.path(), { signal }),
 
     /** Members only, per burn: the Q&A the spreadsheet had a tab for (#28). */
     getFaq: (eventId: string, signal?: AbortSignal) =>

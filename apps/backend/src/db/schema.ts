@@ -1257,3 +1257,44 @@ export const notificationSetting = sqliteTable(
     check('notification_setting_category_check', oneOf(table.category, notificationCategories)),
   ],
 )
+
+/**
+ * What has been going on, for the feed to show (#303).
+ *
+ * The same events the burn-wide notifications carry, written once for everybody rather
+ * than once per person: a notification is per account and switched off by most people,
+ * so between burns the app looked empty even while things were happening in it. This is
+ * the other half of #248's rule — a notification is a row, a push is a copy of it, and
+ * this is the copy that belongs to nobody.
+ *
+ * Written where `notifyAttendees` fans out, which is what stops the two drifting: a
+ * line here exists exactly when a burn-wide notification was sent, whether or not
+ * anybody had that category switched on.
+ *
+ * `category` is a notification category because the feed's chip offers to switch it on,
+ * so it has to name something a member can actually turn on and be told about.
+ *
+ * **Cascades with the burn, which is the whole retention rule.** An audit log grows
+ * without bound; this is bounded by the burns it belongs to, and the page reads the
+ * newest few. Nothing else deletes from it, and nothing edits it.
+ */
+export const activity = sqliteTable(
+  'activity',
+  {
+    id: text('id').notNull(),
+    event_id: text('event_id')
+      .notNull()
+      .references(() => event.id, { onDelete: 'cascade' }),
+    category: text('category', { enum: notificationCategories }).notNull(),
+    /** The line, in the third person — the same wording the notification carries. */
+    body: text('body').notNull(),
+    link: text('link'),
+    created_at: text('created_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    // Newest first across every burn, which is the one way this is read.
+    index('activity_recent_idx').on(table.created_at),
+    check('activity_category_check', oneOf(table.category, notificationCategories)),
+  ],
+)

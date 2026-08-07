@@ -26,6 +26,7 @@ import { AdminSettings } from './pages/AdminSettings.tsx'
 import { Apply } from './pages/Apply.tsx'
 import { Dreams } from './pages/Dreams.tsx'
 import { Faq } from './pages/Faq.tsx'
+import { Feed } from './pages/Feed.tsx'
 import { Home } from './pages/Home.tsx'
 import { Invite } from './pages/Invite.tsx'
 import { Login } from './pages/Login.tsx'
@@ -56,6 +57,7 @@ export type RoutesApi = Pick<
   | 'createEvent'
   | 'deleteQuestion'
   | 'getActiveEvent'
+  | 'getFeed'
   | 'getAllergyItems'
   | 'addAllergyItem'
   | 'updateAllergyItem'
@@ -215,6 +217,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
   const ScheduleRoute = useMemo(() => () => <Schedule api={api} />, [api])
   const RolesRoute = useMemo(() => () => <Roles api={api} />, [api])
   const FaqRoute = useMemo(() => () => <Faq api={api} />, [api])
+  const FeedRoute = useMemo(() => () => <Feed api={api} />, [api])
   const MealsRoute = useMemo(() => () => <Meals api={api} />, [api])
   const ProfileRoute = useMemo(() => () => <ProfilePage api={api} />, [api])
   const ApplyRoute = useMemo(() => () => <Apply api={api} />, [api])
@@ -236,6 +239,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
       <Route path="/schedule" component={ScheduleRoute} />
       <Route path="/roles" component={RolesRoute} />
       <Route path="/faq" component={FaqRoute} />
+      <Route path="/going-on" component={FeedRoute} />
       <Route path="/profile" component={ProfileRoute} />
       <Route path="/invite/:token" component={InviteRoute} />
       <Route path="/login" component={LoginRoute} />

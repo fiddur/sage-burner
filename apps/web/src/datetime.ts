@@ -58,3 +58,35 @@ export const shortDayOf = (iso: string): string | undefined => {
 
   return WEEKDAYS[at.getDay()]?.slice(0, 3)
 }
+
+/**
+ * The month names, written out for the reason `WEEKDAYS` is: a Swedish laptop would
+ * read `aug.` on a page that is English in every sentence around it.
+ */
+const MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+] as const
+
+/**
+ * `7 Aug` — an instant as the day it happened, in the reader's own zone.
+ *
+ * Local rather than the ISO string's first ten characters, which is the shortcut that
+ * shows the previous day to anybody whose evening is the next day in UTC.
+ */
+export const localDay = (iso: string): string => {
+  const at = new Date(iso)
+  if (Number.isNaN(at.getTime())) return iso
+
+  return `${at.getDate()} ${MONTHS[at.getMonth()] ?? ''}`.trim()
+}

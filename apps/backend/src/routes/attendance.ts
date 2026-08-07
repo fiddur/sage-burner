@@ -284,7 +284,7 @@ export const registerAttendanceRoutes = (
             body: `${await displayName(db, viewer.account_id)} is coming.`,
             link: '/members',
           },
-          { except: [viewer.account_id] },
+          { except: [viewer.account_id], at: now() },
         )
       }
 

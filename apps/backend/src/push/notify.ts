@@ -7,7 +7,14 @@ import { randomUUID } from 'node:crypto'
 import type { Database } from '../db/index.ts'
 import type { DeliveryCounts, PushDeps } from './push.ts'
 
-import { account, accountRole, attendance, notification, notificationSetting } from '../db/schema.ts'
+import {
+  account,
+  accountRole,
+  activity,
+  attendance,
+  notification,
+  notificationSetting,
+} from '../db/schema.ts'
 import { notifyAccount } from './push.ts'
 
 /** What a route says happened. The wording and the page it belongs to. */
@@ -180,7 +187,31 @@ export const displayName = async (db: Database, accountId: string): Promise<stri
 }
 
 /**
- * Tell everybody coming to a burn that something happened at it (#259).
+ * One line in the feed, for something that happened at a burn (#303).
+ *
+ * Written where the burn-wide notification is sent and nowhere else, which is what
+ * keeps the two describing one event the same way — and written whether or not anybody
+ * has that category switched on, because that is the whole point of the feed: most of
+ * these are off by default, so the ordinary way to learn somebody offered a dream was
+ * to go looking at the schedule.
+ *
+ * Belongs to nobody, unlike a notification. Nothing reads it per account and reading
+ * the feed writes nothing.
+ */
+export const recordActivity = async (db: Database, eventId: string, told: Told, at: Date) => {
+  await db.insert(activity).values({
+    id: randomUUID(),
+    event_id: eventId,
+    category: told.category,
+    body: told.body,
+    link: told.link,
+    created_at: at.toISOString(),
+  })
+}
+
+/**
+ * Tell everybody coming to a burn that something happened at it (#259), and put it in
+ * the feed (#303).
  *
  * **Attendance is the whole audience**, which is what "only for burns you are
  * attending" means: somebody who has not said they are coming hears nothing about
@@ -203,8 +234,13 @@ export const notifyAttendees = async (
   notify: Notifier,
   eventId: string,
   told: Told,
-  { except = [] }: { except?: readonly (string | undefined)[] } = {},
+  { except = [], at }: { at: Date; except?: readonly (string | undefined)[] },
 ): Promise<number> => {
+  // Before the fan-out, and outside it: the feed line is one row for the burn, not one
+  // per person, and it is there even when nobody is coming yet or everybody has the
+  // category off.
+  await recordActivity(db, eventId, told, at)
+
   const rows = await db
     .select({ account_id: attendance.account_id })
     .from(attendance)

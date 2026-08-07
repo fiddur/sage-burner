@@ -45,6 +45,7 @@ const clientWith = (
     Promise.reject(new Error('removeInstallationBanner is not stubbed in this file')),
   getMailSettings: () => Promise.reject(new Error('getMailSettings is not stubbed in this file')),
   getFaq: () => Promise.reject(new Error('getFaq is not stubbed in this file')),
+  getFeed: () => Promise.reject(new Error('getFeed is not stubbed in this file')),
   addFaqEntry: () => Promise.reject(new Error('addFaqEntry is not stubbed in this file')),
   updateFaqEntry: () => Promise.reject(new Error('updateFaqEntry is not stubbed in this file')),
   deleteFaqEntry: () => Promise.reject(new Error('deleteFaqEntry is not stubbed in this file')),

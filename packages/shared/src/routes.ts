@@ -293,6 +293,11 @@ export const apiRoutes = {
     fastify: '/api/admin/invites',
     path: () => '/api/admin/invites',
   },
+  getFeed: {
+    method: 'GET',
+    fastify: '/api/feed',
+    path: () => '/api/feed',
+  },
   getFaq: {
     method: 'GET',
     fastify: '/api/events/:eventId/faq',

@@ -1281,6 +1281,51 @@ a:hover {
   gap: 0.25rem;
 }
 
+/* What everyone has been doing (#303). A column of short lines rather than a table:
+   each is one sentence, and the chip beside it is the door onto the setting. */
+.feed {
+  list-style: none;
+  margin: 1rem 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.feed-line {
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.feed-what {
+  margin: 0;
+}
+
+.feed-when {
+  margin: 0.1rem 0 0.4rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* A chip, not a button-shaped button: it is a label that happens to be pressable, and
+   it sits under a sentence rather than in a row of controls. */
+.feed-chip {
+  border: 1px dashed var(--line);
+  border-radius: 1rem;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 0.1rem 0.6rem;
+  cursor: pointer;
+}
+
+.feed-chip.is-on {
+  border-style: solid;
+  border-color: var(--ember);
+  color: var(--ink);
+}
+
 /* The "seed this burn from a previous one" control, on the places grid and the
    roles register both. One class rather than one per list: it is the same control. */
 .copy-from {
