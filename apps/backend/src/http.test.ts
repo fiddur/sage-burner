@@ -67,18 +67,6 @@ describe('refusing a request', () => {
       [429, 429, 'rate_limited'],
     ])
   })
-
-  it('gives a shed request its own slug rather than bad_request', async () => {
-    // The hole #138 found: `codeFor` had no case for 429, so it fell through to
-    // `bad_request` while the two shedding routes wrote `rate_limited` by hand. The
-    // difference matters to a caller — a shed request is worth retrying and a
-    // malformed one is not, and the status alone does not say which.
-    const server = await build()
-
-    expect((await server.inject({ method: 'GET', url: '/test/429' })).json()).toEqual({
-      error: 'rate_limited',
-    })
-  })
 })
 
 describe('reading a body', () => {

@@ -19,7 +19,7 @@ import { isForeignKeyViolation } from '../db/errors.ts'
 import { nextOrder, reorder } from '../db/ordered.ts'
 import { attendance, eventOption } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
-import { refuseIfStale, withVersion } from '../if-match.ts'
+import { refuseIfStale, withCollectionVersion, withVersion } from '../if-match.ts'
 
 const optionsFor = async (db: Database, eventId: string): Promise<EventOptionTaken[]> => {
   const rows = await db
@@ -136,8 +136,9 @@ export const registerEventOptionRoutes = (app: FastifyInstance, { db, sessions }
         .set(body)
         .where(eq(eventOption.id, request.params.id))
         .returning()
+      if (updated === undefined) return sendError(reply, 404)
 
-      return updated === undefined ? sendError(reply, 404) : { option: updated }
+      return await withCollectionVersion(reply, { option: updated }, () => choices(existing.event_id))
     },
   )
 

@@ -27,7 +27,10 @@ const app = await createApp({ db: handle.db, config })
  * announcing.
  *
  * After `listen` would be tidier to read and wrong to do: a member who reloads on the
- * strength of the notification should find the new version already serving.
+ * strength of the notification should find the new version already serving. The whole
+ * fan-out is awaited before the port opens, sequentially and per account — which is
+ * bounded by forty-two people, on a category that is off until somebody asks for it.
+ * If it ever shows up in boot time, this is the line to revisit (#270).
  */
 await announceDeploy(
   handle.db,

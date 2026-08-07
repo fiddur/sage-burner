@@ -33,9 +33,6 @@ export const isForeignKeyViolation = (failure: unknown): boolean =>
  * message names columns rather than the index, so that is as far as this can go
  * without being told which.
  *
- * Three routes had a regex of their own for exactly this, one of them with a doc
- * comment saying it mirrored another — which is what the file's own opening
- * paragraph exists to prevent.
  */
 export const isUniqueViolation = (failure: unknown, column?: string): boolean => {
   if (!(failure instanceof Error)) return false

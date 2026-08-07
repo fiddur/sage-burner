@@ -7,12 +7,13 @@ import {
   allergyItemUpdateSchema,
   apiRoutes,
 } from '@sage-burner/shared'
-import { asc, desc, eq } from 'drizzle-orm'
+import { asc, eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { Database } from '../db/index.ts'
 
 import { isForeignKeyViolation } from '../db/errors.ts'
+import { nextOrder, reorder } from '../db/ordered.ts'
 import { allergyItem } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 
@@ -49,19 +50,11 @@ export const registerAllergyRoutes = (app: FastifyInstance, { db }: { db: Databa
 
     const id = randomUUID()
 
-    // Read and insert in one transaction, or "the server assigns `order`" is not
-    // true: two requests can observe the same last row between separate awaits and
-    // claim the same position. Returned from the callback rather than assigned into
-    // a row inside it, for the reason `places.ts` gives.
+    // One transaction, for the reason `nextOrder` gives. Returned from the callback
+    // rather than read back off a row inside it, for the reason `places.ts` gives.
+    // No scope: there is one list of these, shared by every burn.
     const order = db.transaction((tx) => {
-      const [last] = tx
-        .select({ order: allergyItem.order })
-        .from(allergyItem)
-        .orderBy(desc(allergyItem.order))
-        .limit(1)
-        .all()
-
-      const next = last === undefined ? 0 : last.order + 1
+      const next = nextOrder(tx, allergyItem)
       tx.insert(allergyItem)
         .values({ ...body, id, order: next })
         .run()
@@ -127,24 +120,11 @@ export const registerAllergyRoutes = (app: FastifyInstance, { db }: { db: Databa
     const body = bodyOf(allergyItemOrderSchema, request)
     if (body === undefined) return sendError(reply, 400)
 
-    const existing = await allergyItemsFor(db)
-    const wanted = body.ids
-
-    // Exactly the items there are, no more and no fewer. A partial list would
-    // renumber some rows and leave the rest on stale positions, producing an order
-    // nobody chose. Distinctness is implied: `wanted` has exactly `existing.length`
-    // slots and must contain every existing id, and those are distinct because `id`
-    // is the primary key.
-    const sameSet = wanted.length === existing.length && existing.every((row) => wanted.includes(row.id))
-    if (!sameSet) return sendError(reply, 400)
-
-    // One statement each, in a transaction: a half-applied reorder is an order
-    // nobody chose.
-    db.transaction((tx) => {
-      wanted.forEach((id, index) => {
-        tx.update(allergyItem).set({ order: index }).where(eq(allergyItem.id, id)).run()
-      })
-    })
+    // Exactly the items there are — `reorder` argues that rule out, and owns it for
+    // the four lists that have one.
+    if (reorder(db, allergyItem, await allergyItemsFor(db), body.ids) === 'mismatch') {
+      return sendError(reply, 400)
+    }
 
     return { items: await allergyItemsFor(db) } satisfies AllergyItemsResponse
   })

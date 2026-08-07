@@ -38,6 +38,32 @@ export const withVersion = <T>(reply: FastifyReply, payload: T): T => {
 }
 
 /**
+ * Send a *row*, tagged with the version of the collection its guard reads (#277).
+ *
+ * A single-row write answers with the row, but the precondition is over the whole
+ * collection — so the tag the caller has to quote next is the collection's and not
+ * the row's, and `withVersion` cannot compute it from what is being sent.
+ *
+ * Without it these writes answered 200 with no `ETag` at all, leaving the client
+ * holding the tag it had just invalidated: a second edit before the page reloaded
+ * refused itself with "somebody else changed this", when the somebody was them. It
+ * healed — the refusal carries the fresh tag and the page reloads — but the message
+ * was a lie for as long as it was on screen.
+ *
+ * The cost is one more read of the collection, which the guard has already made once
+ * this request. That is the trade this whole file states up front.
+ */
+export const withCollectionVersion = async <T>(
+  reply: FastifyReply,
+  payload: T,
+  collection: () => Promise<unknown>,
+): Promise<T> => {
+  void reply.header('etag', versionOf(await collection()))
+
+  return payload
+}
+
+/**
  * The precondition, answered rather than thrown.
  *
  * `If-Match` is **required** on a guarded write rather than honoured when present.

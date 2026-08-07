@@ -40,14 +40,9 @@ export type ClientStatus = 400 | 401 | 403 | 404 | 409 | 415 | 429
 /**
  * Refuse a request, with the slug that goes with the status (#138).
  *
- * This was written out at 35 call sites as `reply.code(404).send(errorResponse(
- * 'not_found'))` — the status and its slug named separately, every time, with
- * nothing tying them together. `codeFor` already owned the mapping for the error
- * handler; nothing made the routes go through it, so `reply.code(404).send(
- * errorResponse('conflict'))` compiled and would have answered exactly that.
- *
- * Now the slug is not spelled at the call site at all, which is what makes the
- * wrong pairing unrepresentable rather than merely unlikely.
+ * The slug is not spelled at the call site at all, which is what makes the wrong
+ * pairing unrepresentable rather than merely unlikely: `reply.code(404).send(
+ * errorResponse('conflict'))` compiles perfectly well and answers exactly that.
  *
  * **Not every refusal goes through here**, and the exceptions are the point rather
  * than leftovers. Both logins — password and passkey — answer 401 with

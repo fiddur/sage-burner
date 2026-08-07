@@ -24,7 +24,7 @@ import { viewerFor } from '../auth/viewer.ts'
 import { isForeignKeyViolation, isUniqueViolation } from '../db/errors.ts'
 import { account, attendance, event, meal, mealRole, mealSlot } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
-import { refuseIfStale, withVersion } from '../if-match.ts'
+import { refuseIfStale, withCollectionVersion, withVersion } from '../if-match.ts'
 import { accountForAttendance, attendanceFor } from './attendance.ts'
 import { openEventNow } from './events.ts'
 
@@ -248,8 +248,11 @@ export const registerMealRoutes = (
         .set({ meal_intro_markdown: body.meal_intro_markdown })
         .where(eq(event.id, request.params.eventId))
         .returning({ intro: event.meal_intro_markdown })
+      if (row === undefined) return sendError(reply, 404)
 
-      return row === undefined ? sendError(reply, 404) : { meal_intro_markdown: row.intro }
+      return await withCollectionVersion(reply, { meal_intro_markdown: row.intro }, () =>
+        plan(request.params.eventId),
+      )
     },
   )
 

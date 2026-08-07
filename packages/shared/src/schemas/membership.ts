@@ -50,27 +50,13 @@ export const profileFields = z.object({
 })
 
 /**
- * What someone fills in when redeeming an invite.
- *
- * `.strict()` for the reason the event and question schemas give: an
- * unrecognised key is a 400 rather than a silent success.
- */
-export const profileCreateSchema = profileFields
-  .extend({
-    // Defaulted so redeeming an invite is not blocked on a list the form may not
-    // show yet. Nothing said is an empty set, not a missing answer.
-    allergy_item_ids: profileFields.shape.allergy_item_ids.default([]),
-  })
-  .strict()
-
-/**
  * A profile as it is read back.
  *
- * `name` and `contact` are nullable here but required by `profileCreateSchema`,
- * and the asymmetry is the table's: an account can exist before anyone fills them
- * in — the CLI bootstrap admin is created with an email and nothing else. So
- * "required to set" and "may not be there yet" are both true, and a reader that
- * assumed non-null would be wrong for exactly that account.
+ * `name` and `contact` are nullable here and required by `profileFields`, and the
+ * asymmetry is the table's: an account can exist before anyone fills them in — the
+ * CLI bootstrap admin is created with an email and nothing else. So "required to
+ * set" and "may not be there yet" are both true, and a reader that assumed non-null
+ * would be wrong for exactly that account.
  */
 export const profileSchema = profileFields.extend({
   account_id: idSchema,
@@ -168,7 +154,6 @@ export const attendanceUpdateSchema = withStayOrder(
 )
 
 export type Profile = z.infer<typeof profileSchema>
-export type ProfileCreate = z.infer<typeof profileCreateSchema>
 export type ProfileResponse = z.infer<typeof profileResponseSchema>
 export type Attendance = z.infer<typeof attendanceSchema>
 export type ProfileUpdate = z.infer<typeof profileUpdateSchema>

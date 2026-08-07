@@ -47,6 +47,11 @@ export const announceDeploy = async (
   // was already running, would announce a version nobody deployed.
   if (buildSha === 'unknown') return 'unchanged'
 
+  // Recorded **before** the fan-out, so a crash halfway through it loses the
+  // announcements rather than repeating them on every restart until one succeeds
+  // (#270). The trade is deliberate: a missed "there is a new version" costs a
+  // reload somebody would have done anyway, and the alternative is a boot loop that
+  // pings forty-two people each time round.
   await db.update(installation).set({ last_build_sha: buildSha }).where(eq(installation.id, INSTALLATION_ID))
 
   if (row.seen === null) return 'first-boot'
