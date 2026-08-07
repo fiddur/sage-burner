@@ -135,10 +135,7 @@ export const DreamDetails = ({
           <h3>Facilitating</h3>
 
           {/* The same control as everywhere else somebody takes a job (#247), rather
-              than a line of prose only the edit form could change: running a dream is
-              a spot to put your hand up for, and the offer is where the dream is read.
-              One person, so a filled spot offers only ✕ and a handover is two steps —
-              which is what tells both ends it happened. */}
+              than a line of prose only the edit form could change. */}
           <HelperStrip
             label={`${dream.title} as facilitator`}
             people={facilitator === undefined ? [] : [facilitator]}

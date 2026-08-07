@@ -1125,13 +1125,10 @@ a:hover {
 }
 
 /*
-  The table scrolls itself rather than taking the page with it, and for the same
-  reason the schedule grid does: five columns of crew lists run past the bottom of a
-  phone, and scrolling to the last one used to leave the header names behind.
-
-  `70vh` matches `.schedule-grid-wrap`, and the same rule applies here — an element
-  with one axis set to something other than `visible` computes the other to `auto`,
-  so a height is what gives the sticky header a box that actually scrolls.
+  Scrolls itself rather than taking the page with it, like `.schedule-grid-wrap`. The
+  height is not decoration: an element with one axis set to something other than
+  `visible` computes the other to `auto`, so without it the sticky header would pin to
+  a box that never scrolls.
 */
 .meal-table-wrap {
   overflow: auto;

@@ -37,9 +37,8 @@ type definitions. All layers import from it — never duplicate a schema.
   not pull Zod in — today `enums.ts` (the vocabularies and `tickBoxRequired`),
   `answers.ts` (`answerProblems`, `isTickBox`, the application form's `MAX_*`
   limits), `limits.ts` (bounds the schemas and the forms share), `media.ts`
-  (what an uploaded icon may be, `flameIcon` — the app's own mark, which the
-  backend serves and the tab falls back to — and `notificationBadge`, the dot's
-  numbers, which the SVG and the tab's canvas both draw from), and `routes.ts` (`apiRoutes`, every
+  (what an uploaded icon may be, and `flameIcon` — the app's own mark, which the
+  backend serves when nobody has uploaded one), and `routes.ts` (`apiRoutes`, every
   endpoint's path and verb). Nothing under `schemas/`.
 - **Every endpoint lives in `routes.ts` and nowhere else.** The client builds its
   path from it and the route file registers `fastify` from it, so the two spellings

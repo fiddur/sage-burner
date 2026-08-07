@@ -78,9 +78,9 @@ const showing = (client: OpenWindow, path: string, origin: string): boolean => {
  * window loaded before this shipped has no listener for it and simply stays where it
  * is, which is still inside the app rather than beside it.
  *
- * Any window will do, and the first is taken rather than the focused one: at one
- * window per phone the difference is not worth declaring more of the API than is
- * touched.
+ * Any window will do, and the first is taken: `Clients.matchAll` is specified to
+ * sort top-level window clients most-recently-focused first, so on a phone the first
+ * *is* the focused one, and nothing more of the API needs declaring to say so.
  */
 export const landOn = async (
   clients: WindowClients,
@@ -153,7 +153,7 @@ const stringAt = (raw: unknown, key: string): string | undefined => {
 const NOWHERE = 'https://app.invalid'
 
 /**
- * A path this app can open, or home.
+ * A path this app can open, or nothing.
  *
  * The link is the server's own, so this is a floor rather than a defence — but
  * `openWindow` takes a URL, and a link that resolves elsewhere would leave the app
@@ -168,8 +168,12 @@ const NOWHERE = 'https://app.invalid'
  * cannot be one escape behind.
  *
  * The answer is rebuilt from the parse rather than handed back as written, so what
- * `openWindow` gets is the normalised path — with the query and fragment kept, since
+ * `landOn` is given is the normalised path — with the query and fragment kept, since
  * a link to a particular thing on a page is still a link to this app.
+ *
+ * **Nothing, not home.** A link that leaves the app means "no page of its own" here,
+ * which focuses a window somebody is already looking at rather than taking them to
+ * the homepage — see `Alert.path`.
  */
 const pathIn = (link: string | undefined): string | undefined => {
   if (link === undefined) return undefined

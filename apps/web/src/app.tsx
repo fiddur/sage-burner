@@ -303,7 +303,8 @@ export const App = ({ viewer, title, api }: { viewer?: Viewer; title?: string; a
     <RememberedProvider remembered={remembered}>
       <LocationProvider>
         {/* Inside the provider, which is where `route` comes from, and outside the
-            viewer's — a tapped notification goes where it says whoever is looking. */}
+            viewer's, so a tapped notification routes whether or not anyone is signed
+            in yet. */}
         <RouteOnMessage />
         {viewer === undefined ? (
           <FetchedViewerProvider api={client}>{content}</FetchedViewerProvider>
