@@ -7,9 +7,8 @@ import { dismissedInstall, dismissInstall } from '../install.ts'
 /**
  * A strip offering to install the app, where the browser will let us (#281).
  *
- * **Chromium only.** `beforeinstallprompt` is the only way to open a browser's own
- * install flow, and Firefox and Safari have no equivalent — so this renders nothing
- * there rather than instructions naming a menu item that moves between releases.
+ * Renders nothing where there is no offer, which is every browser outside Chromium —
+ * `install.ts` says why that is the whole answer rather than half of one.
  *
  * Dismissible, and remembered: the event fires on every visit until the app is
  * installed, so a nudge with no "not now" is a nudge for ever. Installing drops it

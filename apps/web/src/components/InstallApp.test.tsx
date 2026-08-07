@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { InstallOffer, InstallWatch } from '../install.ts'
 
-import { DISMISSED_AT } from '../install.ts'
+import { DISMISSED_KEY } from '../install.ts'
 import { InstallApp } from './InstallApp.tsx'
 
 afterEach(() => {
@@ -119,7 +119,7 @@ describe('offering to install the app', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Not now' }))
 
     expect(screen.queryByRole('button', { name: 'Install' })).toBeNull()
-    expect(globalThis.localStorage.getItem(DISMISSED_AT)).not.toBeNull()
+    expect(globalThis.localStorage.getItem(DISMISSED_KEY)).not.toBeNull()
   })
 
   it('still renders where the browser throws on reading storage', () => {
@@ -141,7 +141,7 @@ describe('offering to install the app', () => {
   it('stays quiet on the next visit after a no', () => {
     // The event fires on every load until the app is installed, so a nudge with no
     // memory is a nudge for ever.
-    globalThis.localStorage.setItem(DISMISSED_AT, 'yes')
+    globalThis.localStorage.setItem(DISMISSED_KEY, 'yes')
     const { watch } = aWatch({ prompt: () => Promise.resolve(undefined) })
 
     render(<InstallApp watch={watch} />)

@@ -15,9 +15,7 @@ if (root === null) {
 // a property of the real page, and an effect doing it would run in every test.
 registerServiceWorker()
 
-// Before the first render, not in an effect (#281). `beforeinstallprompt` fires once,
-// when the browser decides the site qualifies, and that can be before any component
-// has mounted — a listener attached on mount would miss it and the offer would never
-// appear. Built here for the same reason `createRemembered` is built in `App`: a
-// module holding it would be shared by two suites in one process.
+// Before the first render, not in an effect — `InstallWatch` says why (#281). Built
+// here for the same reason `createRemembered` is built in `App`: a module holding it
+// would be shared by two suites in one process.
 render(<App installs={watchInstalls()} />, root)

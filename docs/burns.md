@@ -267,9 +267,9 @@ pasted into _Other calendars → From URL_ — so the copy button keeps the `htt
 It also fixed a bug it was not chosen for. `preact-iso` takes any click on a
 same-origin `<a>` carrying no `download` or `target`, so the `https` link was routed
 client-side, matched no route and rendered "Nothing here"; only a reload reached the
-backend, which serves it because the last path segment has a dot. A `webcal:` URL has
-origin `"null"`, so the router's `link.origin != location.origin` check leaves the
-click alone.
+backend, where `scheduleFeed` is a registered route and answers directly. A `webcal:`
+URL has origin `"null"`, so the router's `link.origin != location.origin` check leaves
+the click alone.
 
 **Unauthenticated**, because a calendar client cannot hold a session — subscribing
 is a URL a phone re-fetches on its own. The event id is a UUID, so the URL is

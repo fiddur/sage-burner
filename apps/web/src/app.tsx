@@ -263,10 +263,8 @@ export const App = ({
   /**
    * The install offer, watched from before the first render (#281).
    *
-   * Built in `main.tsx` rather than here, because `beforeinstallprompt` fires once
-   * and can do so before any effect has run — a listener attached on mount would
-   * miss it and the button would never appear. `null` in every test that does not
-   * ask for one.
+   * Built in `main.tsx` rather than here, for the reason `InstallWatch` gives. `null`
+   * in every test that does not ask for one.
    */
   installs?: InstallWatch | null
 }) => {

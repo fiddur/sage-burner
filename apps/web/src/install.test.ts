@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { DISMISSED_AT, dismissedInstall, dismissInstall, offerIn, watchInstalls } from './install.ts'
+import { DISMISSED_KEY, dismissedInstall, dismissInstall, offerIn, watchInstalls } from './install.ts'
 
 /** A page that records what it was asked to listen for, and can fire it. */
 const aPage = () => {
@@ -170,7 +170,7 @@ describe('remembering a no', () => {
     dismissInstall(store)
 
     expect(dismissedInstall(store)).toBe(true)
-    expect(store.getItem(DISMISSED_AT)).not.toBeNull()
+    expect(store.getItem(DISMISSED_KEY)).not.toBeNull()
   })
 
   it('says no rather than throwing when reading the property itself throws', () => {
