@@ -2,6 +2,8 @@ import type { EventAttendeesResponse, Place, Session, SessionUpdate } from '@sag
 
 import { useState } from 'preact/hooks'
 
+import type { Person } from './HelperStrip.tsx'
+
 import { toLocalInput } from '../datetime.ts'
 import { renderMarkdown } from '../markdown.ts'
 import { Avatar } from './Avatar.tsx'
@@ -18,7 +20,7 @@ export const DreamDetails = ({
   dream,
   places,
   attendees,
-  facilitatorName,
+  facilitator,
   viewerId,
   busy,
   error,
@@ -26,6 +28,7 @@ export const DreamDetails = ({
   onEdit,
   onCancelEdit,
   onClose,
+  onFacilitate,
   onHelp,
   onSupport,
   onSave,
@@ -34,7 +37,8 @@ export const DreamDetails = ({
   dream: Session
   places: readonly Place[]
   attendees: readonly EventAttendeesResponse['attendees'][number][]
-  facilitatorName: string | null | undefined
+  /** Whoever is running it, resolved to a name by the page. Absent while nobody is. */
+  facilitator: Person | undefined
   /** Who is reading it, so the button can say "I cannot help after all". */
   viewerId: string | undefined
   busy: boolean
@@ -48,6 +52,8 @@ export const DreamDetails = ({
   onEdit: () => void
   onCancelEdit: () => void
   onClose: () => void
+  /** Who is running it now, or `null` to leave it to nobody. */
+  onFacilitate: (accountId: string | null) => void
   /** `true` to offer, `false` to take the offer back. */
   onHelp: (helping: boolean, accountId: string) => void
   onSupport: (supporting: boolean) => void
@@ -83,12 +89,7 @@ export const DreamDetails = ({
         />
       ) : (
         <>
-          <p class="form-note">
-            {whenAndWhere(dream, place)}
-            {dream.facilitator_account_id !== null && (
-              <> · Facilitated by {facilitatorName ?? 'somebody who has no name filled in'}</>
-            )}
-          </p>
+          <p class="form-note">{whenAndWhere(dream, place)}</p>
 
           {dream.description.trim() !== '' && (
             // Safe by construction: `renderMarkdown` escapes raw HTML rather than filtering it.
@@ -137,6 +138,24 @@ export const DreamDetails = ({
               </span>
             )}
           </p>
+
+          <h3>Facilitating</h3>
+
+          {/* The same control as everywhere else somebody takes a job (#247), rather
+              than a line of prose only the edit form could change: running a dream is
+              a spot to put your hand up for, and the offer is where the dream is read.
+              One person, so a filled spot offers only ✕ and a handover is two steps —
+              which is what tells both ends it happened. */}
+          <HelperStrip
+            label={`${dream.title} as facilitator`}
+            people={facilitator === undefined ? [] : [facilitator]}
+            max={1}
+            candidates={attendees}
+            viewerId={viewerId}
+            busy={busy}
+            onAdd={(accountId) => onFacilitate(accountId)}
+            onRemove={() => onFacilitate(null)}
+          />
 
           <h3>Helping out</h3>
 

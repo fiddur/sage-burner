@@ -285,6 +285,12 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
     )
   }
 
+  // The panel stays open: taking the spot is not finishing with the dream, and the
+  // reload puts the name into the strip where the click was.
+  const facilitate = (id: string, accountId: string | null) => {
+    run(() => api.updateSession(id, { facilitator_account_id: accountId }), 'Could not save that.')
+  }
+
   /**
    * Every write the panel makes closes it **only once the write has landed**.
    *
@@ -404,6 +410,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
         onEdit={(id) => setOpened({ kind: 'dream', id, editing: true })}
         onCancelEdit={(id) => setOpened({ kind: 'dream', id, editing: false })}
         onClose={() => setOpened(undefined)}
+        onFacilitate={facilitate}
         onHelp={help}
         onSupport={support}
         onSave={save}
@@ -432,6 +439,7 @@ const Opened = ({
   onEdit,
   onCancelEdit,
   onClose,
+  onFacilitate,
   onHelp,
   onSupport,
   onSave,
@@ -449,6 +457,7 @@ const Opened = ({
   onEdit: (id: string) => void
   onCancelEdit: (id: string) => void
   onClose: () => void
+  onFacilitate: (id: string, accountId: string | null) => void
   onHelp: (id: string, helping: boolean, accountId: string) => void
   onSupport: (id: string, supporting: boolean) => void
   onSave: (id: string, changes: SessionUpdate) => void
@@ -493,8 +502,15 @@ const Opened = ({
       dream={dream}
       places={places}
       attendees={attendees}
-      facilitatorName={
-        dream.facilitator_account_id === null ? undefined : people.get(dream.facilitator_account_id)?.name
+      facilitator={
+        dream.facilitator_account_id === null
+          ? undefined
+          : // Falling back to the bare id keeps whoever is running it visible — and
+            // removable — if they are no longer among the burn's attendees.
+            (people.get(dream.facilitator_account_id) ?? {
+              account_id: dream.facilitator_account_id,
+              name: null,
+            })
       }
       viewerId={viewerId}
       busy={busy}
@@ -503,6 +519,7 @@ const Opened = ({
       onEdit={() => onEdit(dream.id)}
       onCancelEdit={() => onCancelEdit(dream.id)}
       onClose={onClose}
+      onFacilitate={(accountId) => onFacilitate(dream.id, accountId)}
       onHelp={(helping, accountId) => onHelp(dream.id, helping, accountId)}
       onSupport={(supporting) => onSupport(dream.id, supporting)}
       onSave={(changes) => onSave(dream.id, changes)}
