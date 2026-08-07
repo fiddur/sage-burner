@@ -350,6 +350,63 @@ describe('seeding it from a previous burn', () => {
     return past
   }
 
+  /**
+   * A burn that has **ended**, with questions written straight into the table.
+   *
+   * `givenPrevious` above dates its burn after `NOW` and has to: it seeds through the
+   * route, and every write there needs an open burn. So the case the copy action exists
+   * for — seed the next burn from the one that just finished — went untested (#323).
+   */
+  const givenFinished = async () => {
+    const over = await givenEvent('The burn that ended', '2026-06-01')
+    await db()
+      .insert(faqEntry)
+      .values([
+        {
+          id: randomUUID(),
+          event_id: over,
+          question: 'What do I bring?',
+          answer: 'A sleeping bag.',
+          order: 0,
+          created_at: NOW,
+        },
+        {
+          id: randomUUID(),
+          event_id: over,
+          question: 'How do I get there?',
+          answer: '',
+          order: 1,
+          created_at: NOW,
+        },
+      ])
+
+    return over
+  }
+
+  it('copies out of a burn that has ended, which is the case it exists for', async () => {
+    const server = await build()
+    const ada = await givenAccount()
+    const over = await givenFinished()
+    const next = await givenEvent('Autumn burn')
+
+    const copied = await copy(server, ada.cookie, next, over)
+
+    expect(copied.statusCode).toBe(201)
+    expect(questions(copied)).toEqual(['What do I bring?', 'How do I get there?'])
+    expect(copied.json().entries[0].answer).toBe('A sleeping bag.')
+  })
+
+  it('refuses to copy into one that has ended', async () => {
+    // The other side of the same rule: seeding a burn nothing can afterwards edit,
+    // reorder or remove would leave rows stranded.
+    const server = await build()
+    const ada = await givenAccount()
+    const past = await givenPrevious(server, ada.cookie)
+    const over = await givenFinished()
+
+    expect((await copy(server, ada.cookie, over, past)).statusCode).toBe(404)
+  })
+
   it('copies the questions and their answers, in the order they were arranged', async () => {
     // The order is most of what the copy is for: this list is read top to bottom.
     const server = await build()
@@ -359,7 +416,8 @@ describe('seeding it from a previous burn', () => {
 
     const copied = await copy(server, ada.cookie, next, past)
 
-    expect(copied.statusCode).toBe(200)
+    // 201, like the places and the register: rows were created (#323).
+    expect(copied.statusCode).toBe(201)
     expect(questions(copied)).toEqual(['What do I bring?', 'How do I get there?'])
     expect(copied.json().entries[0].answer).toBe('A sleeping bag.')
   })

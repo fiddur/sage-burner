@@ -287,6 +287,24 @@ surface; these are the answers written for people who are already coming, and so
 them say exactly where the gate is. Opening it later is moving one route out from
 behind the guard, which is a smaller decision than taking it back.
 
+**But it does not need a burn you are in** (#321). Every burn-scoped page takes its
+burn from the bar, which lists the ones you have said you are coming to — so an
+approved member who had joined none landed on "you are not coming to a burn yet" and
+could read nothing. This is the page that answers "what does taking part actually ask
+of me?", which is read _before_ deciding, so when the bar has nothing the next burn
+answers instead: `GET /api/events/active`, which is public, so nothing is disclosed
+that was not already. The page says which burn it is showing whenever the bar did not
+choose it — two burns' answers read alike — and it says it as a fact about the bar
+rather than about the reader, since a failed burns fetch leaves what they are coming to
+unknown here too.
+
+Writes are unchanged and still any approved member's, on an open burn: somebody who
+knows how the bus works can answer the question whether or not they are coming, and the
+guard was never attendance.
+
+**Removing one takes two clicks** (#323), like a lead role and unlike a schedule lane.
+One row holds a paragraph somebody else wrote and nobody has another copy of.
+
 ## The calendar feed
 
 `GET /events/:eventId/schedule.ics` is the programme as a calendar subscription,
