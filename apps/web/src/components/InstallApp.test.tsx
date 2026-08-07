@@ -122,6 +122,22 @@ describe('offering to install the app', () => {
     expect(globalThis.localStorage.getItem(DISMISSED_AT)).not.toBeNull()
   })
 
+  it('still renders where the browser throws on reading storage', () => {
+    // The consequence, not just the read: this is called from `useState` during
+    // render and nothing above it is an error boundary, so a throw here paints an
+    // empty page instead of the app. Chromium with site data blocked for the origin
+    // is where that happens.
+    const store = vi.spyOn(globalThis, 'localStorage', 'get').mockImplementation(() => {
+      throw new Error('SecurityError')
+    })
+    const { watch } = aWatch({ prompt: () => Promise.resolve(undefined) })
+
+    expect(() => render(<InstallApp watch={watch} />)).not.toThrow()
+    expect(screen.getByRole('button', { name: 'Install' })).toBeTruthy()
+
+    store.mockRestore()
+  })
+
   it('stays quiet on the next visit after a no', () => {
     // The event fires on every load until the app is installed, so a nudge with no
     // memory is a nudge for ever.

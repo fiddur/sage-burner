@@ -108,21 +108,32 @@ export const DISMISSED_AT = 'sage-burner:install-dismissed'
 /**
  * Whether somebody has already said no.
  *
- * Wrapped because `localStorage` throws rather than returning nothing when a browser
- * is set to block storage, and a page that will not render is a worse answer than a
- * nudge somebody has to dismiss twice.
+ * **Read inside the `try`, not in a default parameter.** `globalThis.localStorage` is
+ * a getter that *throws* where a browser blocks storage for the origin — Chromium with
+ * site data blocked, Brave's "block all cookies" — and a default parameter is
+ * evaluated during argument binding, before the body runs. This is called from
+ * `InstallApp`'s render with no error boundary above it, so a throw here paints an
+ * empty page rather than the app.
+ *
+ * Absence is a no, not a yes. `store?.getItem(…) !== null` reads `undefined !== null`
+ * as `true` when there is no storage at all, which suppresses the offer for exactly
+ * the people whose browser never stored anything.
  */
-export const dismissedInstall = (store = globalThis.localStorage): boolean => {
+export const dismissedInstall = (store?: Storage): boolean => {
   try {
-    return store?.getItem(DISMISSED_AT) !== null
+    const held = store ?? globalThis.localStorage
+
+    return typeof held?.getItem(DISMISSED_AT) === 'string'
   } catch {
     return false
   }
 }
 
-export const dismissInstall = (store = globalThis.localStorage): void => {
+export const dismissInstall = (store?: Storage): void => {
   try {
-    store?.setItem(DISMISSED_AT, 'yes')
+    const held = store ?? globalThis.localStorage
+
+    held?.setItem(DISMISSED_AT, 'yes')
   } catch {
     // Nothing to do about it, and nothing worth saying: the offer comes back next
     // visit, which is the same as never having stored it.

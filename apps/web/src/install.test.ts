@@ -173,6 +173,30 @@ describe('remembering a no', () => {
     expect(store.getItem(DISMISSED_AT)).not.toBeNull()
   })
 
+  it('says no rather than throwing when reading the property itself throws', () => {
+    // Chromium with site data blocked for the origin, and Brave's "block all
+    // cookies": `globalThis.localStorage` is a *getter* that throws `SecurityError`.
+    // This is read during `InstallApp`'s render, and there is no error boundary, so a
+    // throw here paints nothing at all.
+    const store = vi.spyOn(globalThis, 'localStorage', 'get').mockImplementation(() => {
+      throw new Error('SecurityError')
+    })
+
+    expect(() => dismissedInstall()).not.toThrow()
+    expect(dismissedInstall()).toBe(false)
+    expect(() => dismissInstall()).not.toThrow()
+
+    store.mockRestore()
+  })
+
+  it('says no when there is no storage at all, rather than reading absence as a yes', () => {
+    const store = vi.spyOn(globalThis, 'localStorage', 'get').mockReturnValue(undefined as unknown as Storage)
+
+    expect(dismissedInstall()).toBe(false)
+
+    store.mockRestore()
+  })
+
   it('says no rather than throwing where storage is blocked', () => {
     // Safari in private mode and anything with site data turned off. A page that will
     // not render is a worse answer than a nudge dismissed twice.
