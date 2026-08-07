@@ -6,6 +6,7 @@ import { useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { useAction, useLoad } from '../load.ts'
+import { ErrorText } from './ErrorText.tsx'
 
 export type MealSlotsApi = Pick<
   ApiClient,
@@ -36,17 +37,9 @@ export const MealSlots = ({ api, eventId }: { api: MealSlotsApi; eventId: string
 
   return (
     <div class="meal-slots">
-      {error !== undefined && (
-        <p class="form-error" role="alert">
-          {error}
-        </p>
-      )}
+      <ErrorText message={error} />
 
-      {loaded.status === 'failed' && (
-        <p class="form-error" role="alert">
-          {loaded.message}
-        </p>
-      )}
+      {loaded.status === 'failed' && <ErrorText message={loaded.message} />}
 
       {loaded.status === 'ready' && slots.length === 0 && (
         <p class="form-note">No meal times yet. A burn with none gets no kitchen in the schedule.</p>

@@ -5,6 +5,7 @@ import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
 import { ICON_ACCEPT, preparedIcon } from '../icon.ts'
+import { ErrorText } from './ErrorText.tsx'
 
 export type IconApi = Pick<ApiClient, 'removeInstallationIcon' | 'setInstallationIcon'>
 
@@ -119,11 +120,7 @@ export const IconField = ({ api }: { api: IconApi }) => {
         </button>
       </p>
 
-      {error !== undefined && (
-        <p class="form-error" role="alert">
-          {error}
-        </p>
-      )}
+      <ErrorText message={error} />
 
       <p class="form-note">
         An SVG is kept as it is; anything else is cut to a square and sized down in your browser. Fill the

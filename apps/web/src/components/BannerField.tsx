@@ -6,6 +6,7 @@ import type { ApiClient } from '../api/client.ts'
 import { isApiError } from '../api/client.ts'
 import { BANNER_ACCEPT, preparedBanner } from '../banner.ts'
 import { useInstallationBanner, useSetInstallationBanner } from '../installation.tsx'
+import { ErrorText } from './ErrorText.tsx'
 
 export type BannerApi = Pick<ApiClient, 'removeInstallationBanner' | 'setInstallationBanner'>
 
@@ -107,11 +108,7 @@ export const BannerField = ({ api }: { api: BannerApi }) => {
         )}
       </p>
 
-      {error !== undefined && (
-        <p class="form-error" role="alert">
-          {error}
-        </p>
-      )}
+      <ErrorText message={error} />
 
       <p class="form-note">
         1200 × 630 works best. Facebook shows a large card above about 600 × 315 and a small thumbnail below

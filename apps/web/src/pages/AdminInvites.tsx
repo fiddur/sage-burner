@@ -5,6 +5,7 @@ import { useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
+import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { InviteLink } from '../components/InviteLink.tsx'
 import { useAction, useLoad } from '../load.ts'
@@ -65,11 +66,7 @@ export const AdminInvites = ({ api }: { api: InvitesApi }) => {
         </button>
       </p>
 
-      {error !== undefined && (
-        <p class="form-error" role="alert">
-          {error}
-        </p>
-      )}
+      <ErrorText message={error} />
 
       {/* Keyed on the token so a new mint remounts: `copied` lives in the
           component, and a button still reading "Copied" after minting a second
@@ -79,11 +76,7 @@ export const AdminInvites = ({ api }: { api: InvitesApi }) => {
 
       {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
 
-      {loaded.status === 'failed' && (
-        <p class="form-error" role="alert">
-          {loaded.message}
-        </p>
-      )}
+      {loaded.status === 'failed' && <ErrorText message={loaded.message} />}
 
       {loaded.status === 'ready' && loaded.data.invites.length === 0 && (
         <p class="form-note">No invites yet.</p>

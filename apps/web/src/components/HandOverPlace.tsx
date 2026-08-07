@@ -4,6 +4,8 @@ import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
+import { ErrorText } from './ErrorText.tsx'
+
 export type HandOverApi = Pick<ApiClient, 'getMembers' | 'transferMyPlace'>
 
 /**
@@ -80,11 +82,7 @@ export const HandOverPlace = ({
         you signed up for here goes with it.
       </p>
 
-      {error !== undefined && (
-        <p class="form-error" role="alert">
-          {error}
-        </p>
-      )}
+      <ErrorText message={error} />
 
       {candidates === undefined && error === undefined && <p class="form-note">One moment…</p>}
 

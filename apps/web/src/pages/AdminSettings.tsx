@@ -9,6 +9,7 @@ import type { PushApi } from '../components/PushToggle.tsx'
 
 import { isApiError } from '../api/client.ts'
 import { BannerField } from '../components/BannerField.tsx'
+import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { IconField } from '../components/IconField.tsx'
 import { LogOutButton } from '../components/LogOutButton.tsx'
@@ -98,11 +99,7 @@ export const AdminSettings = ({ api }: { api: AdminSettingsApi }) => {
             void save()
           }}
         >
-          {error !== undefined && (
-            <p class="form-error" role="alert">
-              {error}
-            </p>
-          )}
+          <ErrorText message={error} />
 
           <label class="field">
             <span>What these burns are called</span>

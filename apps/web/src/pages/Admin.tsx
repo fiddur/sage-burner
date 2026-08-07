@@ -6,6 +6,7 @@ import { useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
+import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { errorMessage, useAction, useLoad } from '../load.ts'
 import { isAdmin, useViewer } from '../viewer.tsx'
@@ -95,17 +96,9 @@ export const Admin = ({ api }: { api: AdminApi }) => {
 
       {roster.status === 'loading' && <p class="form-note">Loading…</p>}
 
-      {roster.status === 'failed' && (
-        <p class="form-error" role="alert">
-          {roster.message}
-        </p>
-      )}
+      {roster.status === 'failed' && <ErrorText message={roster.message} />}
 
-      {error !== undefined && (
-        <p class="form-error" role="alert">
-          {error}
-        </p>
-      )}
+      <ErrorText message={error} />
 
       {roster.status === 'ready' && (
         <table class="table">

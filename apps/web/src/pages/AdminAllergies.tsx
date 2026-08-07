@@ -6,9 +6,10 @@ import { useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
+import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
+import { ReorderableList } from '../components/ReorderableList.tsx'
 import { useAction, useLoad } from '../load.ts'
-import { swap } from '../reorder.ts'
 
 export type AllergiesApi = Pick<
   ApiClient,
@@ -66,19 +67,6 @@ export const AdminAllergies = ({ api }: { api: AllergiesApi }) => {
     )
   }
 
-  // `swap` answers undefined at either end rather than throwing, so the guard is
-  // here and the buttons are disabled there — belt and braces, cheaply.
-  const move = (index: number, by: -1 | 1) => {
-    const ids = swap(
-      items.map((one) => one.id),
-      index,
-      by,
-    )
-    if (ids === undefined) return
-
-    run(async () => await api.reorderAllergyItems(ids), 'Could not reorder the list.')
-  }
-
   return (
     <GuardedPage title="Allergy list" require="admin">
       <h1>Allergy list</h1>
@@ -90,23 +78,20 @@ export const AdminAllergies = ({ api }: { api: AllergiesApi }) => {
 
       {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
 
-      {loaded.status === 'failed' && (
-        <p class="form-error" role="alert">
-          {loaded.message}
-        </p>
-      )}
+      {loaded.status === 'failed' && <ErrorText message={loaded.message} />}
 
-      {error !== undefined && (
-        <p class="form-error" role="alert">
-          {error}
-        </p>
-      )}
+      <ErrorText message={error} />
 
       {loaded.status === 'ready' && (
         <>
-          <ul class="reorder-list">
-            {items.map((item, index) => (
-              <li key={item.id}>
+          <ReorderableList
+            rows={items}
+            busy={busy}
+            labelFor={(item) => item.label}
+            onReorder={(wanted) => run(() => api.reorderAllergyItems(wanted), 'Could not reorder the list.')}
+          >
+            {(item) => (
+              <>
                 {editing === item.id ? (
                   <>
                     <input
@@ -126,24 +111,6 @@ export const AdminAllergies = ({ api }: { api: AllergiesApi }) => {
                 ) : (
                   <>
                     <span>{item.label}</span>
-                    <button
-                      type="button"
-                      class="link-button"
-                      aria-label={`Move ${item.label} up`}
-                      disabled={busy || index === 0}
-                      onClick={() => move(index, -1)}
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      class="link-button"
-                      aria-label={`Move ${item.label} down`}
-                      disabled={busy || index === items.length - 1}
-                      onClick={() => move(index, 1)}
-                    >
-                      ↓
-                    </button>
                     <button
                       type="button"
                       class="link-button"
@@ -167,9 +134,9 @@ export const AdminAllergies = ({ api }: { api: AllergiesApi }) => {
                     </button>
                   </>
                 )}
-              </li>
-            ))}
-          </ul>
+              </>
+            )}
+          </ReorderableList>
 
           <form
             class="form"

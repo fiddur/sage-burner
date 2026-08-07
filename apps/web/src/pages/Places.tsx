@@ -8,6 +8,7 @@ import type { Loaded } from '../load.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
 import { CopyFrom } from '../components/CopyFrom.tsx'
+import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
 import { ReorderableList } from '../components/ReorderableList.tsx'
@@ -112,11 +113,7 @@ export const Places = ({ api }: { api: PlacesApi }) => {
         schedule, so give each one of its own.
       </p>
 
-      {error !== undefined && (
-        <p class="form-error" role="alert">
-          {error}
-        </p>
-      )}
+      <ErrorText message={error} />
 
       <Notice loaded={loaded} />
 

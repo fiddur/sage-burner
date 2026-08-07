@@ -2,6 +2,8 @@ import type { ComponentChildren } from 'preact'
 
 import { useEffect, useRef } from 'preact/hooks'
 
+import { ErrorText } from './ErrorText.tsx'
+
 /**
  * The panel the grid opens over itself — for reading a dream, editing one, or
  * offering one.
@@ -68,11 +70,7 @@ export const DreamPanel = ({
         // Reading the description must not close the thing you opened to read it.
         onClick={(clickEvent) => clickEvent.stopPropagation()}
       >
-        {error !== undefined && (
-          <p class="form-error" role="alert">
-            {error}
-          </p>
-        )}
+        <ErrorText message={error} />
         {children}
       </div>
     </div>

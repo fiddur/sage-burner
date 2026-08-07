@@ -6,6 +6,7 @@ import type { ApiClient } from '../api/client.ts'
 
 import { allergiesOf } from '../allergies.ts'
 import { useSelectedBurn } from '../burn.tsx'
+import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
@@ -54,11 +55,7 @@ export const Members = ({ api }: { api: MembersApi }) => {
 
       {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
 
-      {loaded.status === 'failed' && (
-        <p class="form-error" role="alert">
-          {loaded.message}
-        </p>
-      )}
+      {loaded.status === 'failed' && <ErrorText message={loaded.message} />}
 
       {roster !== undefined && roster.event === null && <NoBurn absent="there is nobody to list" />}
 

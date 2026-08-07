@@ -6,6 +6,7 @@ import { useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
+import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
 import { ReorderableList } from '../components/ReorderableList.tsx'
@@ -61,19 +62,11 @@ export const Options = ({ api }: { api: OptionsApi }) => {
     <GuardedPage title="Lodging and helping" require="approved">
       <h1>Lodging and helping</h1>
 
-      {error !== undefined && (
-        <p class="form-error" role="alert">
-          {error}
-        </p>
-      )}
+      <ErrorText message={error} />
 
       {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
 
-      {loaded.status === 'failed' && (
-        <p class="form-error" role="alert">
-          {loaded.message}
-        </p>
-      )}
+      {loaded.status === 'failed' && <ErrorText message={loaded.message} />}
 
       {loaded.status === 'ready' && loaded.data.event === null && (
         <NoBurn absent="these lists have no burn to belong to" />

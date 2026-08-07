@@ -14,6 +14,7 @@ import type { Loaded } from '../load.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
 import { CopyFrom } from '../components/CopyFrom.tsx'
+import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { HelperStrip } from '../components/HelperStrip.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
@@ -173,11 +174,7 @@ export const Roles = ({ api }: { api: RolesApi }) => {
         and anyone can change or remove one, so talk to each other first.
       </p>
 
-      {error !== undefined && (
-        <p class="form-error" role="alert">
-          {error}
-        </p>
-      )}
+      <ErrorText message={error} />
 
       <Notice loaded={loaded} />
 

@@ -6,6 +6,7 @@ import { useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
+import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { HelperStrip } from '../components/HelperStrip.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
@@ -69,19 +70,11 @@ export const Meals = ({ api }: { api: MealsApi }) => {
         Meals <Refreshing on={refreshing} />
       </h1>
 
-      {error !== undefined && (
-        <p class="form-error" role="alert">
-          {error}
-        </p>
-      )}
+      <ErrorText message={error} />
 
       {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
 
-      {loaded.status === 'failed' && (
-        <p class="form-error" role="alert">
-          {loaded.message}
-        </p>
-      )}
+      {loaded.status === 'failed' && <ErrorText message={loaded.message} />}
 
       {loaded.status === 'ready' && plan === null && <NoBurn absent="there is no meal plan to draw" />}
 

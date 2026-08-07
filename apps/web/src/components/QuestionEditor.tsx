@@ -13,6 +13,7 @@ import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
 import { swap } from '../reorder.ts'
+import { ErrorText } from './ErrorText.tsx'
 import { MarkdownField } from './MarkdownField.tsx'
 
 export type QuestionsApi = Pick<
@@ -182,11 +183,7 @@ export const QuestionEditor = ({ api }: { api: QuestionsApi }) => {
     <section class="questions">
       <h3>Application questions</h3>
 
-      {error !== undefined && (
-        <p class="form-error" role="alert">
-          {error}
-        </p>
-      )}
+      <ErrorText message={error} />
 
       {loaded.questions.length === 0 && (
         <p class="form-note">No questions yet. The application form will be empty until you add one.</p>
