@@ -9,7 +9,7 @@ import {
   verifyRegistrationResponse,
 } from '@simplewebauthn/server'
 import { decodeClientDataJSON, isoBase64URL } from '@simplewebauthn/server/helpers'
-import { and, eq, gt, lt } from 'drizzle-orm'
+import { and, asc, eq, gt, lt, sql } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { Sessions } from '../auth/session.ts'
@@ -113,6 +113,11 @@ export const registerPasskeyRoutes = (
       })
       .from(passkey)
       .where(eq(passkey.account_id, accountId))
+      // Oldest first, so a newly added one lands at the bottom where the member was
+      // just looking (#240). Without it the order is whatever the query plan
+      // produced, and the list re-renders from this after every add and remove — so
+      // rows appeared to jump for no reason anybody could see.
+      .orderBy(asc(passkey.created_at), asc(passkey.id))
 
     return { passkeys: rows }
   }
@@ -267,25 +272,44 @@ export const registerPasskeyRoutes = (
     // something a member has any business learning about another's devices.
     if (mine === undefined) return sendError(reply, 404)
 
-    const [holder] = await db
-      .select({ password_hash: account.password_hash })
-      .from(account)
-      .where(eq(account.id, viewer.account_id))
-      .limit(1)
+    /**
+     * The one refusal in this file that is not about authentication: removing the
+     * last passkey from an account with no password locks its owner out for good.
+     * Nothing in the app lets them back in — the reset is an admin's, from the
+     * accounts page, so it needs somebody else and a shell or a signed-in browser.
+     *
+     * **In the statement's own `WHERE`, not in a read before it** (#239). Counting
+     * the survivors and reading the password in separate statements let two removals
+     * from two tabs each see two passkeys, both pass, and together leave the account
+     * with no way in at all — exactly the lockout the 409 exists to prevent. Here
+     * the count is taken by the same statement that deletes, so the second one
+     * matches nothing.
+     *
+     * This is the one place in the app that engineers for a race, against the rule
+     * the rest of it follows. It is not that the window is realistic — it needs one
+     * person removing their own two passkeys in the same second — but that the
+     * consequence is permanent and there is no way back through the app.
+     *
+     * Untestable through `inject`, which serialises requests. What the suite pins is
+     * the refusal itself, and that an account with a password or a spare key is not
+     * refused.
+     */
+    const canLoseOne = sql`(
+      exists (
+        select 1 from ${account}
+        where ${account.id} = ${viewer.account_id} and ${account.password_hash} is not null
+      )
+      or (select count(*) from ${passkey} where ${passkey.account_id} = ${viewer.account_id}) > 1
+    )`
 
-    const remaining = await db
-      .select({ id: passkey.id })
-      .from(passkey)
-      .where(eq(passkey.account_id, viewer.account_id))
+    const removed = await db
+      .delete(passkey)
+      .where(and(eq(passkey.id, mine.id), eq(passkey.account_id, viewer.account_id), canLoseOne))
+      .returning({ id: passkey.id })
 
-    // The one refusal in this file that is not about authentication: removing the
-    // last passkey from an account with no password locks its owner out for good,
-    // and there is no mail service to send a reset through (#30).
-    if (remaining.length <= 1 && holder?.password_hash == null) {
-      return sendError(reply, 409)
-    }
-
-    await db.delete(passkey).where(eq(passkey.id, mine.id))
+    // The row was there a moment ago and this is the owner's own request, so the
+    // only thing that matches nothing is the guard.
+    if (removed.length === 0) return sendError(reply, 409)
 
     return reply.code(200).send(await listFor(viewer.account_id))
   })

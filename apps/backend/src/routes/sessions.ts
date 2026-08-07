@@ -30,7 +30,7 @@ import {
   sessionSupport,
 } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
-import { refuseIfStale, withVersion } from '../if-match.ts'
+import { refuseIfStale, withCollectionVersion, withVersion } from '../if-match.ts'
 import { displayName, notifyAttendees } from '../push/notify.ts'
 import { attendanceFor } from './attendance.ts'
 import { openEvent, todayIso } from './events.ts'
@@ -454,7 +454,11 @@ export const registerSessionRoutes = (
 
       await facilitatorMoved(request, existing, body.facilitator_account_id)
 
-      return { session: await oneDream(db, row, mine) } satisfies SessionResponse
+      return await withCollectionVersion(
+        reply,
+        { session: await oneDream(db, row, mine) } satisfies SessionResponse,
+        () => dreamsOf(existing.event_id, mine),
+      )
     },
   )
 

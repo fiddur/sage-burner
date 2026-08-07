@@ -467,6 +467,46 @@ describe('removing a passkey', () => {
     expect(response.json().passkeys).toMatchObject([{ label: 'Phone' }])
   })
 
+  it('lists them oldest first, whatever order the rows went in', async () => {
+    // #240. Without an `ORDER BY` the answer is whatever the query plan produced —
+    // insertion order, here — and the list re-renders from this response after every
+    // add and remove, so rows appeared to move for no reason anybody could see.
+    //
+    // The newer one is added *first*, so the two orders disagree. Added in the
+    // obvious order they agree, and this would pass against no `ORDER BY` at all.
+    const server = await build()
+    await givenAccount('ada@example.org', 'a good long passphrase')
+    const cookie = await signIn(server, 'ada@example.org', 'a good long passphrase')
+
+    clock = new Date(NOW.getTime() + 60 * 1000)
+    await givenPasskey(server, cookie, 'Newer')
+    clock = NOW
+    const { added } = await givenPasskey(server, cookie, 'Older')
+
+    expect(added.json().passkeys.map((row: { label: string }) => row.label)).toEqual(['Older', 'Newer'])
+  })
+
+  it('lets a passkey-only account remove one while it has a spare', async () => {
+    // The other arm of the guard (#239): the refusal below is about the *last* way
+    // in, not about having no password. Removing a second phone is ordinary.
+    const server = await build()
+    const id = await givenAccount('ada@example.org', 'a good long passphrase')
+    const cookie = await signIn(server, 'ada@example.org', 'a good long passphrase')
+    await givenPasskey(server, cookie, 'Phone')
+    const { added } = await givenPasskey(server, cookie, 'Laptop')
+    await db().update(account).set({ password_hash: null }).where(eq(account.id, id))
+
+    const laptop = added.json().passkeys.find((row: { label: string }) => row.label === 'Laptop')
+    const response = await server.inject({
+      method: 'DELETE',
+      url: `/api/me/passkeys/${laptop.id}`,
+      headers: { cookie },
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().passkeys).toMatchObject([{ label: 'Phone' }])
+  })
+
   it('refuses the last one when there is no password to fall back on', async () => {
     const server = await build()
     const id = await givenAccount('ada@example.org', 'a good long passphrase')
@@ -474,8 +514,8 @@ describe('removing a passkey', () => {
     const { added } = await givenPasskey(server, cookie)
     const only = added.json().passkeys[0].id
 
-    // Passkey-only from here: removing this would leave no way in at all, and
-    // there is no mail service to send a reset through.
+    // Passkey-only from here: removing this would leave no way in at all. Nothing in
+    // the app lets them back — the reset is an admin's, from the accounts page.
     await db().update(account).set({ password_hash: null }).where(eq(account.id, id))
 
     const response = await server.inject({

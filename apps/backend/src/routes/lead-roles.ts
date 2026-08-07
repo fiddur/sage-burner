@@ -21,7 +21,7 @@ import { viewerFor } from '../auth/viewer.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
 import { account, attendance, event, leadRole, leadRoleMember } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
-import { refuseIfStale, withVersion } from '../if-match.ts'
+import { refuseIfStale, withCollectionVersion, withVersion } from '../if-match.ts'
 import { displayName, notifyAttendees } from '../push/notify.ts'
 import { accountForAttendance, attendanceFor } from './attendance.ts'
 import { copySourcesFor } from './copy-sources.ts'
@@ -254,7 +254,9 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
       const role = roles.find((candidate) => candidate.id === request.params.id)
       if (role === undefined) return sendError(reply, 404)
 
-      return { role } satisfies LeadRoleResponse
+      return await withCollectionVersion(reply, { role } satisfies LeadRoleResponse, () =>
+        register(existing.event_id),
+      )
     },
   )
 

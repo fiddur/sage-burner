@@ -18,7 +18,7 @@ import { createGuards } from '../auth/guards.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
 import { event, place } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
-import { refuseIfStale, withVersion } from '../if-match.ts'
+import { refuseIfStale, withCollectionVersion, withVersion } from '../if-match.ts'
 import { copySourcesFor } from './copy-sources.ts'
 import { todayIso } from './events.ts'
 
@@ -181,8 +181,9 @@ export const registerPlaceRoutes = (
       if (await refuseIfStale(request, reply, () => grid(existing.event_id))) return reply
 
       const [updated] = await db.update(place).set(body).where(eq(place.id, request.params.id)).returning()
+      if (updated === undefined) return sendError(reply, 404)
 
-      return updated === undefined ? sendError(reply, 404) : { place: updated }
+      return await withCollectionVersion(reply, { place: updated }, () => grid(existing.event_id))
     },
   )
 
