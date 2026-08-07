@@ -887,7 +887,7 @@ describe('a burn that has ended', () => {
   })
 
   it('refuses every write keyed by the role itself', async () => {
-    // The README said this was already so. It was not — the register was the one
+    // `docs/burns.md` said this was already so. It was not — the register was the one
     // bare-id family with no `openEvent` check, so a finished burn's record of who
     // looked after what stayed rewritable by anybody with a role id.
     const { server, ada, id } = await setUp()

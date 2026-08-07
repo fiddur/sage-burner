@@ -76,7 +76,7 @@ const openLane = async (db: Database, today: string, placeId: string): Promise<P
  *
  * Reads are public. The ICS feed publishes a session's location to anyone with the
  * link, so the list of places is already public by design — see the ICS paragraph
- * in the README's security section. Every write is open to any approved member: this
+ * in `docs/http.md`. Every write is open to any approved member: this
  * is the burn's furniture, not admin's. Every write also needs the burn to be open;
  * see `burnIsOpen`.
  */

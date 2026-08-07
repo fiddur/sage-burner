@@ -140,7 +140,7 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
    * ahead. A finished burn's register is the record of who looked after what, and an
    * id noted while it was current should not still be a way to rewrite it.
    *
-   * The README said this was already so (#219). It was not: the register was the one
+   * `docs/burns.md` said this was already so (#219). It was not: the register was the one
    * bare-id family with no such check, while `places.ts`, `sessions.ts` and `meals.ts`
    * all had one.
    */

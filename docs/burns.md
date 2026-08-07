@@ -1,6 +1,7 @@
 # Burns
 
-Events, who is coming to one, where they sleep, what they help with, and the calendar feed.
+Events, who is coming to one and who has a place, where they sleep, what they help
+with, and the calendar feed.
 
 [← back to the README](../README.md)
 
@@ -198,7 +199,7 @@ text belongs in the help text below it.
 
 Rendering is the same `renderMarkdown` the welcome text uses — raw HTML escaped
 rather than filtered, link and image URLs checked against an allowlist. See
-[Markdown is escaped, not filtered](./schedule.md#markdown-is-escaped-not-filtered).
+[Markdown is escaped, not filtered](./the-app.md#markdown-is-escaped-not-filtered).
 
 **`required` is decided by the type for the two tick-box kinds, not chosen.**
 
@@ -295,6 +296,214 @@ nothing to say why.
 Folding counts **octets, not characters**, per RFC 5545: a place emoji is four
 bytes, so a line that looks short can be well over the 75-octet limit, and a fold
 in the middle of a multi-byte sequence corrupts it.
+
+## Coming to a burn
+
+Being in the community and coming to a _particular_ burn are separate acts.
+Approval admits you once; then you decide, burn by burn. `attendance` is that
+second decision, keyed `(event, account)`, and it is what arrival dates, dreams
+and shifts hang off later.
+
+A member says it for themselves on their own details page, one section per burn:
+
+- `GET /api/events/mine` — `{ coming, past }`. `coming` is every burn that has not
+  ended, joined or not, since joining is what the page is for; `past` is only the
+  ones they actually came to, because a burn somebody never joined is not their
+  history. The **server** splits them: that is a comparison against a clock, and a
+  browser deciding it from `end_date` would answer differently either side of
+  midnight depending on the reader's timezone.
+- `POST /api/events/:eventId/attendance/me` — **idempotent**. Saying it twice is the
+  same statement, not an error: a double click, a retried request and a second tab
+  all land there.
+- `DELETE /api/events/:eventId/attendance/me` — withdrawing, but **only while nothing
+  has been paid**. What a refund means is a real decision and #31 owns it; deleting
+  the row here would quietly discard the record that money changed hands.
+- `PATCH /api/events/:eventId/attendance/me` — the stay itself.
+
+**Named by event id, not by "active"** (#184). These were `…/events/active/attendance`
+while there was one place to see a burn and it was whichever came next. The details
+page lists every burn still to come and offers to join any of them, and the second
+one on that list is by definition not the soonest-ending — so an active-scoped join
+could not say yes to it. All three refuse a burn that has **ended**, and answer 404
+for that and for an id that never existed alike, so an id cannot be probed for
+existence.
+
+An admin can do it for someone, because people ask over Discord and an
+admin should not have to talk them through a UI:
+`POST|DELETE /api/admin/events/:eventId/attendance`. The admin delete carries **no
+payment guard** — undoing a mistaken add has to be possible, and an admin
+doing it is making the call deliberately.
+
+**Being able to sign in is not being a member.** These routes are behind
+`requireMember`, so an account with no roles — invited but not yet redeemed — and
+an admin who is not also a member are both refused. The two roles are separate
+rows in `account_role`, and redemption grants only `member`. `admin:create`
+grants both, and the accounts table under Organise is where either is added or
+taken away afterwards.
+
+## A stay starts as the whole burn
+
+Joining writes `arrival_date` and `departure_date` from the event, rather than
+leaving them null for everyone to type in what the event already knows. The
+admin adding someone gets the same default.
+
+Written on join, not merely prefilled in the form. Prefilling keeps "never said"
+distinguishable from "said the whole burn", but it leaves the roster showing
+blanks for almost everyone — which is the column an admin is reading it for.
+The people arriving late or leaving early are the ones who should have to change
+something.
+
+It is a default, not a decision: the dates stay editable, and the ordering rule
+still applies to whatever replaces them.
+
+## Every date pair binds to its partner
+
+`arrival`/`departure`, a burn's `start`/`end`, and a dream's slot each set `min`
+or `max` from the other end, so the picker will not offer an inverted range. No
+date library — two native inputs bound to each other were enough, which is worth
+knowing before anyone reaches for a dependency.
+
+**A hint, not a rule.** A `max` is something a keyboard can walk straight past and
+an API client never sees, so `withStayOrder`, `withEventDateOrder` and
+`hasValidTimeSlot` all still decide it, along with their CHECKs. What this removes
+is the ordinary way to produce an invalid pair and be told off afterwards.
+
+One detail with a test on it: an unset partner means the attribute is **absent**,
+not empty. `max=""` is not reliably "no maximum".
+
+## Members maintain their own record
+
+Two pages, because the record has two lifetimes.
+
+`/profile` edits the **person**: name, contact, allergies. These follow you from
+burn to burn, so correcting an allergy corrects it everywhere — which is the
+whole reason they live on `account` rather than per stay.
+
+The same page edits the **stay**, in a section per burn: arrival, departure,
+lodging, shift preference, notes, for each burn you have said you are coming to.
+
+**Whose row is written comes from the session, never from the body.** There is no
+id in either request to guess at or tamper with, and `account_id` in a profile
+PATCH is a 400 rather than a redirect of the write.
+
+`payment_status` and `payment_date` are omitted from what a member may send. A
+member who could write them could mark themselves paid, so the page shows the
+status and offers no control for it — a control that always failed would be worse
+than none.
+
+`email` is not editable here either: it is the login identity, and changing it is
+a different act with verification nothing implements yet. The page says so rather
+than offering a field that fails.
+
+**A partial date edit is checked against the row, not against the body.** A PATCH
+carrying only `departure_date` can invert the stored pair without ever containing
+both values, so the schema's refinement cannot see it. The condition is composed
+into the `UPDATE ... WHERE`, which is sound here because both are fixed-width
+calendar dates. `events.ts` and `sessions.ts` read the row and check the merge
+instead, their rules having grown to span fields a string comparison cannot
+judge.
+
+## Who is coming, and who has a place
+
+`/admin/roster` is the spreadsheet's Members tab. Person-level fields are joined
+in from `account` rather than copied, so an allergy corrected on someone's own
+profile page is corrected here in the same moment.
+
+**The order decides who gets a place:**
+
+> Paid first, then unpaid. Within each group, order of joining that burn. The
+> first `member_cap` entries have a place; everything below the line is waiting.
+
+The consequence is the point rather than a side effect: **paying moves you above
+every unpaid member**, regardless of who joined first — so an unpaid member can
+be pushed onto the waiting list by someone else paying, without doing anything
+themselves. That is what makes paying the thing that secures a place, and it is
+why recording a payment reloads the whole list rather than ticking one row.
+
+**The cut is derived, never stored.** A `waiting` flag would go stale the moment
+anyone paid, and the whole rule is that paying re-sorts the list. `withPlaces` in
+`packages/shared` computes it — placed there rather than in the route because
+#79's member-facing list has to give the same answer, and two pages telling
+someone different things about where they stand is worse than one of them being
+absent.
+
+Both lists **draw the line where the places run out** (#23), as a row inside the
+one table rather than a second table below it: the order is the answer to who has
+a place, so splitting it in two would be two chances to disagree about that.
+
+**Ordered by `joined_at` within each group, not by payment time.** #23's sketch
+said payment timestamp; `payment_date` is written as `todayIso(now)` — a date, not
+a timestamp — so an admin recording a batch in one sitting gives every one of
+them the same key and the tie breaks on nothing.
+
+## Handing a place over
+
+Withdrawing is refused once you have paid, because what a refund means is #31's
+question. That left a paid member who could not come with no way out and their
+place unreachable by the waiting list, so `POST
+/api/events/:eventId/attendance/me/transfer` is the exit: it moves the payment to
+somebody unpaid at that burn and **deletes the giver's attendance row**.
+
+One-sided and immediate — the money is settled between the two of them offline,
+which is what the burn's transfer text tells them to do, so an accept step would
+only let a place sit in limbo. The taker is notified; the giver is not, having
+clicked it themselves.
+
+**Leaving takes you off everything you signed up for there.** The row's foreign
+keys do it: helping ticks, meal shifts, lead-role teams and dream helpers cascade,
+a `lead_attendance_id` is set null, and since #23 so is the dream you were
+facilitating — that column named an `account` until then and was the one role a
+withdrawal left behind. The dream itself stays, vacant, and #247's control is what
+lets somebody pick it up.
+
+The payment date is **carried over rather than restamped**: the burn received one
+payment, on that date, and the place changing hands is not a second one.
+
+Once `member_cap` **paid** members are in, the Members page shows the burn's
+`transfer_info_markdown` in place of `payment_info_markdown` — telling somebody
+how to pay when paying no longer gets them in is the wrong thing to leave up. Both
+are per-burn and admin-editable; the transfer text defaults to
+`DEFAULT_TRANSFER_INFO` rather than being blank, so a burn always has something to
+say there — which means the create form must **not** send the field at all, since
+`.default(…)` only applies to an absent key. `AdminEvents.tsx` sends
+`payment_info_markdown: ''` and deliberately omits this one; the exact-body
+assertion in its test is what stops the key coming back.
+
+Counted on `payment_status`, not on `waiting`. `withPlaces` sets `waiting` by
+position alone, so a **full list is not a paid-full burn** — and while places
+remain unpaid, paying still secures one, which makes the payment instructions
+exactly what the members above the line need. The first version of this counted
+non-waiting entries and got it backwards; `HowToPay` owns the decision now, so
+there is one place that knows the rule.
+
+Recording a payment sends **the status and nothing else** — an admin
+recording money received has no business rewriting an arrival date in the same
+request. `payment_date` is not accepted at all: it is derived from the status and
+the server's clock in the same statement that writes the status, the way
+`joined_at` already is, so unmarking clears the date and one can never outlive the
+payment it recorded.
+
+That is the invariant as a property of the write rather than of the caller. It
+used to be neither: the schema was `.partial()` over both columns, so
+`{ payment_status: 'unpaid' }` alone left yesterday's date standing and a date
+alone recorded a payment the status denied. Nothing enforced it and no `CHECK`
+linked the columns — it held because the one caller always sent both.
+
+**Backdating is deliberately not supported.** An admin recording a transfer
+that landed last week is a real need, and the answer to it is a field with the
+status validated against it, not one the server silently overrides. Sending
+`payment_date` is a `400` rather than an ignored key, so nobody can believe they
+backdated something that in fact reads as today.
+
+**`partial` is gone from the payment vocabulary.** Two values, not three: a
+half-payment is chased out of band. It was never set by anything, drove a
+database CHECK and a branch in the member's page, and an unreachable value every
+consumer has to handle is the trap the error-code vocabulary already argues
+against.
+
+CSV export quotes every field unconditionally rather than only when needed.
+Allergies and notes are free text that will contain commas, quotes and newlines,
+and a rule applied some of the time is one that gets tested some of the time.
 
 ## Lodging, and helping out
 

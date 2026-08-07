@@ -38,18 +38,6 @@ export const ICON_PIXELS = 512
 export const MAX_ICON_BYTES = 512 * 1024
 
 /**
- * The mark this app wears until somebody uploads their own.
- *
- * Here rather than in either half because both draw it: the backend serves it as
- * the icon a home screen installs, and the tab draws the badged variant when a
- * notification is waiting (#248). Two copies of one emoji would be two things to
- * keep in step for no gain — and the whole point of the badge is that it is the
- * *same* mark with a dot on it.
- *
- * An emoji rather than an asset, so there is no file to ship, none to cache, and
- * no second image to redraw when the first changes.
- */
-/**
  * The unseen-notification dot, in the icon's own square.
  *
  * Here rather than written into the SVG below, because it is drawn twice: as a
@@ -70,6 +58,18 @@ export const notificationBadge = {
   strokeWidth: 3,
 } as const
 
+/**
+ * The mark this app wears until somebody uploads their own.
+ *
+ * Here rather than in either half because both draw it: the backend serves it as
+ * the icon a home screen installs, and the tab draws the badged variant when a
+ * notification is waiting (#248). Two copies of one emoji would be two things to
+ * keep in step for no gain — and the whole point of the badge is that it is the
+ * *same* mark with a dot on it.
+ *
+ * An emoji rather than an asset, so there is no file to ship, none to cache, and
+ * no second image to redraw when the first changes.
+ */
 export const flameIcon = ({ badged = false }: { badged?: boolean } = {}): string =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${notificationBadge.box} ${notificationBadge.box}">` +
   `<text y="52" font-size="52">🔥</text>` +

@@ -109,7 +109,7 @@ describe('createConfig', () => {
     it('requires a secret when WEB_ROOT is set, even on loopback outside production', () => {
       // The hole the first two signals left, and it is the deployment this repo
       // documents: a reverse proxy in front means the app binds *loopback*. So
-      // `pnpm start` behind the README's Apache vhost with NODE_ENV unset
+      // `pnpm start` behind docs/deploying.md's Apache vhost with NODE_ENV unset
       // satisfied both "not production" and "loopback", and would have booted on
       // the development key that is committed to this repository — serving a
       // non-Secure cookie over Apache's TLS.
@@ -233,7 +233,7 @@ describe('createConfig', () => {
     it('reports a malformed value here rather than letting Fastify throw later', () => {
       // Without validating, `TRUE` reaches proxy-addr.compile() from inside
       // Fastify() and surfaces as a bare `invalid IP address: TRUE`, not the
-      // configuration block this module and the README promise.
+      // configuration block this module and docs/configuration.md promise.
       expect(() => createConfig({ TRUST_PROXY: 'TRUE' })).toThrow(/Invalid environment configuration/)
       expect(() => createConfig({ TRUST_PROXY: 'TRUE' })).toThrow(/TRUST_PROXY/)
       expect(() => createConfig({ TRUST_PROXY: '10.0.0.0/nonsense' })).toThrow(/TRUST_PROXY/)

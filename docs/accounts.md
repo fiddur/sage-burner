@@ -1,6 +1,7 @@
 # Accounts and sessions
 
-Applying, being invited, signing in, passkeys, and what a session is.
+Applying, being invited, redeeming an invite, signing in, passkeys, roles, and what
+a session is.
 
 [← back to the README](../README.md)
 
@@ -118,6 +119,296 @@ minutes after a merge.
 [#17]: https://github.com/fiddur/sage-burner/issues/17
 [#57]: https://github.com/fiddur/sage-burner/issues/57
 [#58]: https://github.com/fiddur/sage-burner/issues/58
+
+## Applying
+
+`POST /api/applications` is the only public write in the app, and that is the
+point — an applicant has no account yet. Everything in the body is therefore
+attacker-controlled, so two things are true by construction:
+
+- **The submitter names their answers and which questions they were shown, and
+  nothing else.** `id`, `status` and the timestamps are the server's. The schema
+  is `.strict()`, so an attempt at any of them is a 400 rather than a quietly
+  dropped key — a request that tried to approve itself must not look like it
+  succeeded. What `asked` is allowed to decide — and what it is not — is set out
+  below.
+- **The questions are re-read from the database on every submission**, never
+  taken from the request.
+
+**Answers store the question, not a reference to it.** Each entry is
+`{ question_id, label, type, value }`: the id so a reviewer can line the same
+question up across applications, and the wording exactly as that applicant saw
+it. A bare reference does not survive the form changing, and the form is meant to
+change — questions are rows precisely so admins can retune them between
+burns. Without the snapshot, editing a question would silently re-file every past
+answer under wording nobody was shown, and deleting one would leave answers that
+cannot be labelled at all. Neither is recoverable afterwards, which is why the
+cost is paid on write.
+
+One entry is stored per question **asked**, answered or not, so a reviewer can
+tell "said no" from "was never asked". An absent tick box stores `false`; an
+absent optional text answer stores `""`.
+
+**"Asked" means the form said so, not that the question exists now.** The
+submission carries `asked` — the ids the page actually rendered — and only those
+get an entry. Without it, a question an admin added while someone was filling
+the form in was stored against them as `""` or `false`, which reads as "asked and
+declined" about a question they never saw.
+
+`asked` narrows what is **stored**, never what is **checked**. Validation runs
+against the server's own list, or "I wasn't shown that" would be the way to skip a
+required question or an agreement — so a required question added in that window
+still answers 400, and the form still says to reload rather than to try again.
+
+An answer naming a question outside `asked` is a **400** rather than a dropped
+key: the body disagrees with itself, and silently discarding it would lose what
+somebody typed.
+
+An id in `asked` that the server no longer has is a question deleted while the
+form was open, and what happens then depends on whether it was answered:
+
+- **with no answer key in the body, it is a 201** with no entry. There is nothing
+  to store — the wording comes from the question row, and the row is gone.
+- **with a key, it is a 400**, and not by the `asked` rule at all: `answerProblems`
+  sees an answer naming no question it holds and says `unknown`, before the
+  filtering is reached. The form's advice for a 400 — reload and send again — is
+  right for it.
+
+The distinction is the key, not what the field looked like. `Apply.tsx` writes
+`answers[id]` on every keystroke, so a text question typed into and then cleared
+sends `''` — a key, and therefore the 400 — while one never touched sends
+nothing.
+
+**The wording is still read at submission, not sent.** All of the above is about
+which questions get an entry; the label on each one comes from the question row
+as it is when the application lands. So an admin who _edits_ a question's text
+while someone is filling the form in has that answer stored under the new
+wording, against a question they were shown the old one for. That is the trade
+`asked` does not touch and deliberately: taking the wording from the body would
+let a submission record a question in words nobody wrote, which is the worse of
+the two. #85's fix narrows what is stored, not where the words come from.
+
+What this does _not_ claim: a crafted body can omit an optional question it was
+shown and left blank, so it records as never-asked rather than as `false` or
+`""`. Understating your own application is not an attack worth defending against,
+and the direction that matters is closed — nothing can be recorded as answered
+that the body does not claim was asked.
+
+**What makes a submission valid** lives in `answerProblems`, in
+`packages/shared`, and both sides use it: the server refuses on it, and the form
+marks its fields with it. Written twice they drift, and the drift is a form that
+says everything is fine against an API that answers 400. The rules:
+
+- a `required` question must have a non-blank answer — trimmed, so `required`
+  means "said something" rather than "sent the key";
+- an `agreement` must be ticked, which is the entire reason the type exists.
+  Absent counts as unticked, because that is what a browser sends for a box
+  nobody touched;
+- a tick box takes a boolean and a text question a string — `'false'` is truthy,
+  so accepting a string for a tick box would tick an agreement nobody ticked;
+- an answer to a question that was not asked is refused rather than stored.
+
+The module is deliberately free of Zod so the browser can import it — see the
+`sideEffects` note under [Shared schemas and types](AGENTS.md#shared-schemas-and-types-packagesshared).
+
+The form itself hardcodes nothing about the questions: it renders whatever
+`GET /api/questions` returns, in `order`. Adding a question in the admin UI makes
+it appear on the public form with no deploy, which is the acceptance criterion
+`form_question` exists for.
+
+There is **no email**. Nothing is sent on submission and nothing is sent on
+approval, so the confirmation screen says so outright rather than leaving an
+applicant waiting for a message that will never arrive.
+
+## Reviewing applications
+
+`GET /api/admin/applications` lists everything sent in, newest first, with the
+answers as stored — the question wording included, so an admin reads what the
+applicant was actually asked rather than what the form says today.
+
+Approving and rejecting are the same shape, and the shape is the point:
+
+```sql
+UPDATE application SET status = ?, decided_at = ? WHERE id = ? AND status = 'pending'
+```
+
+Zero affected rows means someone already decided it, which is answered `409`
+rather than silently re-deciding. The decision and the guard against
+re-deciding are **one statement**, so there is no window between them — a
+double-clicked Approve mints one invite, not two. `invite_token_application_idx`
+is the backstop underneath that, and the page tells the admin to reload
+rather than to try again, since retrying cannot help.
+
+**Approval mints the invite.** 32 CSPRNG bytes, base64url, valid 30 days. Only
+the SHA-256 digest is stored, so the raw token exists in that one response and
+nowhere else — a leaked backup or a stray copy of the volume hands out no
+invites. The admin copies it into Discord or Messenger themselves; there is
+no email.
+
+**A lost link is re-issued, not worked around.**
+`POST /api/admin/applications/:id/invite` mints a replacement and shows it once,
+the same way approving does. The link is shown in a paragraph that vanishes on
+reload and the admin has to paste it into Discord before navigating away, so
+losing it is a realistic accident rather than carelessness.
+
+**The row is updated, not replaced**, which is what makes this safe. One invite per
+application stays the invariant `invite_token_application_idx` already enforces, and
+rewriting `token_hash` kills the lost link in the same statement that mints its
+replacement — the old token no longer hashes to anything stored.
+
+That matters because of what the previous workaround cost. Until this route,
+recovery meant minting a _direct_ invite with `POST /api/admin/invites`, and:
+
+- **the original link stayed live.** It is the token that is lost, not the row, and
+  `DELETE /api/admin/invites/:id` refuses an application's invite precisely because
+  it belongs to one. A lost link turning up later could still be redeemed — with a
+  _different_ email, since the same address answers `409` against the account they
+  now have. An invite is forwardable and whoever holds it is a stranger, so that was
+  the likelier shape anyway: a second, unrelated account off an approval meant for
+  one person (#137).
+- **the answers were orphaned.** A direct invite carries no `application_id`, so
+  what they wrote was not tied to the account they ended up with.
+
+Re-issuing closes both by construction. Direct invites remain, for the person who
+never applied through the form.
+
+**Refused once the invite has been used.** By then they are already in, and a fresh
+link would be a second account by another name — the same hole from the other end.
+An application that is pending or rejected is refused too: pending is approved
+instead, and rejected is not reopened by a side door.
+
+The copy button is deliberately silent on failure rather than claiming a copy
+that did not happen.
+
+The link is assembled in the browser from `window.location.origin`, so the API
+needs no notion of its own public URL.
+
+**An invite carries no `event_id`.** It admits you to the community, not to a
+burn — the application has no event either — and which burns you then come to is
+a separate decision each time.
+
+## Direct invites
+
+For people already known — returning members, partners — who should skip the form
+entirely. `POST /api/admin/invites` mints the **same** token an approval does, so
+both kinds redeem through one path: CSPRNG bytes, digest stored, raw value
+returned once. The default is 30 days; an admin can set `expires_at`, and one
+already in the past is refused rather than stored, since it would be a link
+nobody could use.
+
+`GET /api/admin/invites` lists them with a **derived** status — `outstanding`,
+`used`, `expired`. Derived rather than stored, because an invite becomes expired
+by time passing, not by anyone writing to it, and a stored status would be a
+value in the database that quietly stops being true. `used` beats `expired`: a
+redeemed invite that later lapses is spent, and calling it expired would suggest
+re-issuing a link to someone who is already in.
+
+The list never carries the digest, let alone the token.
+
+**Only an unredeemed direct invite can be revoked.** The other two cases are
+refused with `409`, for different reasons:
+
+- a **redeemed** invite is the record of how someone got in, and `account`
+  references it — deleting it would rewrite how the group formed;
+- an **application's** invite is the only one that application will ever have, so
+  revoking it would leave that applicant with nothing to redeem. A direct invite
+  gets them in; what cannot be recovered is the tie back to what they wrote, and
+  #91 owns re-issuing against the application itself.
+
+The admin UI offers Revoke on exactly those — every unredeemed direct invite,
+**expired ones included**, since an expired link is still a row worth clearing
+out and the route deletes it happily.
+
+## Redeeming an invite
+
+`/invite/:token` is where both membership paths converge. Unauthenticated, and the
+token is the only credential — an invite is unguessable but **forwardable**, so
+whoever holds it is a stranger until they redeem.
+
+`GET /api/invites/:token` answers `200` with one of four statuses —
+`outstanding`, `expired`, `used`, `unknown` — and **nothing else**. Not a 404 for
+an unknown token, and not who the invite was minted for: either would turn a
+leaked link into a way of probing for live ones, or into a disclosure. The page
+needs the distinction because the three dead ends want three different things
+done about them: an expired link can be re-sent, a used one usually means you
+already have an account, an unknown one is usually a truncated paste.
+
+`POST /api/invites/:token/redeem` creates the account, fills in the person-level
+fields, grants the `member` role and signs them in. **One transaction**, because
+half a redemption is the worst outcome: a spent token with no account behind it
+leaves the person unable to finish with the link they were sent, and that link
+cannot be re-sent — somebody with admin has to notice and mint a direct invite
+(#91).
+
+Two races are closed, and each has a test that fails without it:
+
+- **Two people, one link.** Both requests read the invite as outstanding, then
+  both spend ~230ms in `scrypt` before writing, so they genuinely interleave. The
+  stamp is `UPDATE … WHERE id = ? AND used_at IS NULL` requiring one affected
+  row, so the loser's transaction rolls back whole.
+- **Two links, one email.** Both pass the email pre-check before either writes, so
+  the loser's insert meets the `UNIQUE` and its stamp rolls back with it — leaving
+  that invite still usable.
+
+The password is hashed _outside_ the transaction. Holding a write transaction open
+across 230ms of scrypt would block every other writer for that long.
+
+It is also hashed **before** the check for an address that already has an
+account, so the refusal costs what a success costs. `POST /api/auth/login` is
+shaped the same way.
+
+**This throttles an enumeration channel; it does not close one, and the
+difference is worth stating plainly.** A `409` does not spend the token, so
+whoever holds one unspent invite can ask "does this address have an account?"
+about address after address — and the _status code_ answers that regardless of
+timing: `409` for a member, `201` for anyone else. Latency was a redundant second
+copy of an answer the status line already gives. What the ordering buys is cost:
+each probe now spends a gated scrypt. With `SCRYPT_GATE`'s two slots and scrypt at
+~230ms that is a ceiling of **about nine probes a second**, shared with every
+login — against thousands a second when the refusal was free. #57 is what would bound it
+properly, and there is a test that pins the residual so this paragraph cannot
+quietly go stale.
+
+Spending the token on the taken-address refusal would cap a held invite at one
+probe. It is deliberately not done: someone who typos an address that happens to
+belong to a member would lose their invite over it, and a new one needs an admin.
+
+That hash goes through the **same gate as login**, not one of its own — the gate
+bounds concurrent scrypt against libuv's four threads, so two gates of two slots
+would spend the whole pool between them. There is a test holding the only slot
+from the redemption side and asserting login is shed, which fails if they ever
+drift apart. Over the bound both answer `429` with `Retry-After`.
+
+The `POST` gives **one answer** — `409` — for unknown, expired and spent alike.
+Not to hide which it is: the `GET` above says so plainly to anyone who asks, and
+could not usefully do otherwise. It is that the client has nothing to do with the
+difference at this point — the page has already read the status, and by the time
+it POSTs all three mean the same thing, that this link cannot be spent.
+
+**The form offers the upcoming burn, ticked** (#224). Almost everybody spending an
+invite is coming to the burn that is next, so the form says so by name and asks for
+the stay — arrival, lodging, helping — in the same breath, rather than leaving a new
+member to find a second page. Offered rather than assumed: being on the list is a
+commitment, and an admin setting a burn up need not be attending it, so the box
+unticks and the stay questions go with it. No burn coming, no checkbox.
+
+It needs no new disclosure to do this. `/api/events/active` and
+`/api/events/:eventId/options` are **already public** — the second for the reason the
+places are, that nothing in it is about a person — so an unauthenticated form can name
+the burn and draw its lodging list without the invite route learning to hand out
+anything new. Both reads fail soft: somebody who cannot be offered a burn can still
+become a member and pick one afterwards.
+
+**Joining happens after the transaction, never inside it.** That transaction spends a
+token which cannot be spent again, so nothing optional may be given the power to roll
+it back. A burn that ended while the form was open leaves the account made and the
+response's `attendance` null, and the page says which happened. The stay details are a
+second write for the same reason — their failure reads "you are in, but…" rather than
+as a signup that failed. Redeeming with the box unticked still creates no `attendance`
+at all: being a member and coming to a particular burn stay separate acts.
+
+A signed-in visitor is not offered the form — redeeming would create a second
+account for the same human, and the page cannot tell whether that was meant.
 
 ## Creating the first admin
 

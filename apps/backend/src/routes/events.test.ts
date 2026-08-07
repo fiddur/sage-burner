@@ -442,7 +442,7 @@ describe('admin event routes', () => {
     expect(response.json()).toEqual({ error: 'not_found' })
   })
 
-  it('rejects a whole event object patched back, the round-trip the README warns about', async () => {
+  it('rejects a whole event object patched back, the round-trip docs/burns.md warns about', async () => {
     // The documented contract — "reading an event, editing the object and sending
     // the whole thing back is a 400 on `id` and `created_at`" — rests on two
     // independent facts: `.strict()`, and `id`/`created_at` being omitted from the

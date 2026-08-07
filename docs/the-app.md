@@ -1,6 +1,7 @@
 # The app itself
 
-Getting around it, what it calls itself, installing it, and the faces in it.
+Getting around it, what it calls itself, installing it, the faces in it, and how
+anything anybody writes gets rendered.
 
 [← back to the README](../README.md)
 
@@ -238,3 +239,62 @@ The crop is `squareCrop`, and it takes the **middle**: a portrait cut from the c
 keeps the face far more often than one squashed to fit. The resize itself is not
 unit-tested and cannot usefully be — happy-dom has no canvas that draws, so a test
 would assert against a stub of the thing under test.
+
+## Markdown is escaped, not filtered
+
+`welcome_markdown` is written by **any approved member** and rendered to every
+public visitor, so it is treated as untrusted. That is the plain reason now rather
+than a hypothetical one: forty-odd people can edit it. It was already treated this
+way when only admins could — an admin account is one phished password away from
+belonging to someone else — which is why opening the field widened who writes it
+without widening what the renderer has to withstand.
+
+**Raw HTML in the welcome text is escaped and shows as visible text.** The usual
+build is `marked` + DOMPurify, and that was the first attempt — but DOMPurify
+needs a real DOM, and under happy-dom (the test environment) it reports
+`isSupported: true` while doing nothing useful:
+`sanitize('<h1>a</h1><script>b</script>')` returns `a<script>b</script>`,
+dropping the safe tag and keeping the dangerous one. A sanitiser the suite cannot
+exercise is a security control held on trust, and that one was actively wrong
+where the tests run.
+
+Escaping needs no DOM, so it behaves identically in Node, in tests and in the
+browser — and the tests prove it rather than assuming it. It is also the stricter
+rule: no allowlist to get wrong, and no gap between how a sanitiser parses the
+input and how the browser does.
+
+Link and image URLs are checked separately against a scheme allowlist
+(`https:`, `http:`, `mailto:`, site-relative and anchors), because escaping does
+nothing about `[click](javascript:…)` — that is markdown, not HTML. A denylist
+would have to know about `data:text/html`, `vbscript:` and friends individually.
+
+The cost is that a literal `<br>` renders as text. Markdown already has emphasis,
+headings, lists and links, which is the whole vocabulary this field needs.
+
+Content headings are shifted down one level: a `#` renders as `<h2>`, clamped at
+`<h6>`. The page owns `<h1>` (the site name) and `<h2>` (the event name), so an
+unshifted `#` would put a second `<h1>` underneath an `<h2>` and break the outline
+screen readers navigate by.
+
+Site-relative links must be genuinely site-relative: `//evil.com` and
+`/\evil.com` are rejected, since both navigate off-site while reading as local
+in the markdown source. Control characters are stripped before the check —
+`marked`'s angle-bracket destination form accepts tabs, and the browser discards
+them while parsing a URL, so `</\t/evil.com>` would otherwise arrive as
+`//evil.com`. No privilege is gained either way — whoever writes this
+field could link `https://evil.com` outright — but the allowlist should mean what
+it says.
+
+**Remote images are allowed, and that is a deliberate trade.** `img-src` is
+`'self' data: https:` rather than helmet's default `'self' data:`, because the
+URL allowlist admits `https://` image sources and the two disagreeing meant an
+image was rendered into the page and then blocked by the browser — which reads as
+a bug rather than a policy. Images therefore have a _stricter_ allowlist than
+links: `https://` or site-relative only, since a plain `http://` image would hit
+that same mismatch. Links still accept `http://` — `img-src` does not govern
+navigation. There is no upload feature, so the alternative is
+that images do not work at all. The cost: an image host a member links to sees the
+IP of every homepage visitor. It is the only external request a _visitor's browser_
+makes; the server makes one of its own when it sends a push notification, which is
+under Notifications above. Narrow this back to `'self' data:` if uploads ever
+land.

@@ -97,7 +97,7 @@ export const registerRedemptionRoutes = (
     // Before the taken-address check, and gated, so a refusal costs what a success
     // costs and neither is free. That throttles member enumeration rather than
     // closing it — the status codes still answer the question, and the 409 does
-    // not spend the token — which the README argues out under "Redeeming".
+    // not spend the token — which `docs/accounts.md` argues out under "Redeeming".
     //
     // Outside the transaction: holding a write transaction open across scrypt
     // would block every other writer for that long.

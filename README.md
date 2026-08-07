@@ -93,15 +93,15 @@ reverse proxies, `TRUST_PROXY`, fail2ban and the upgrade path are in
 The README is the quickstart. Each area's decisions — what it does, and why it
 does it that way rather than the obvious other way — live in `docs/`:
 
-| Document                                    | What is in it                                                              |
-| ------------------------------------------- | -------------------------------------------------------------------------- |
-| [configuration.md](./docs/configuration.md) | Every environment variable, the database file, migrations                  |
-| [deploying.md](./docs/deploying.md)         | Running it for real: proxy, backups, restore, fail2ban, upgrades           |
-| [accounts.md](./docs/accounts.md)           | Applying, invites, sessions, passwords, passkeys, roles                    |
-| [the-app.md](./docs/the-app.md)             | Getting around, what the installation calls itself, installing it, avatars |
-| [burns.md](./docs/burns.md)                 | Events, attendance, lodging, helping out, the calendar feed                |
-| [schedule.md](./docs/schedule.md)           | Meals, dreams, the lead roles register, places and the grid                |
-| [http.md](./docs/http.md)                   | Security headers, and the shape every API error takes                      |
+| Document                                    | What is in it                                                                        |
+| ------------------------------------------- | ------------------------------------------------------------------------------------ |
+| [configuration.md](./docs/configuration.md) | Every environment variable, the database file, migrations                            |
+| [deploying.md](./docs/deploying.md)         | Running it for real: proxy, backups, restore, fail2ban, upgrades                     |
+| [accounts.md](./docs/accounts.md)           | Applying, invites, sessions, passwords, passkeys, roles                              |
+| [the-app.md](./docs/the-app.md)             | Getting around, what the installation calls itself, installing it, avatars, markdown |
+| [burns.md](./docs/burns.md)                 | Events, attendance, lodging, helping out, the calendar feed                          |
+| [schedule.md](./docs/schedule.md)           | Meals, dreams, the lead roles register, places and the grid                          |
+| [http.md](./docs/http.md)                   | Security headers, and the shape every API error takes                                |
 
 ## Repository layout
 

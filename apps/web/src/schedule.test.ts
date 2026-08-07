@@ -43,7 +43,7 @@ describe('the timetable rows', () => {
     expect(rows).toHaveLength(23)
   })
 
-  it('is 49 rows for midday Friday to midday Sunday, the figure the README quotes', () => {
+  it('is 49 rows for midday Friday to midday Sunday, the figure docs/schedule.md quotes', () => {
     // A number in prose goes stale silently, so it is asserted here.
     expect(hoursOf('2026-08-01', '2026-08-03', '12:00', '12:00')).toHaveLength(49)
   })
