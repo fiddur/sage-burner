@@ -71,7 +71,7 @@ export const inviteMessage = ({
  * One thing that happened, for somebody who asked to hear about it by email.
  *
  * The same sentence the bell shows, because it is the same notification — a second
- * wording per category would be eleven more things to keep in step, and the bell's is
+ * wording per category would be one more thing per category to keep in step, and the bell's is
  * already written to stand alone.
  */
 export const notificationMessage = ({

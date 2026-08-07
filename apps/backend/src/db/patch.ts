@@ -71,11 +71,7 @@ export const patchRow = async <T extends SQLiteTable & { id: SQLiteColumn }>(
   condition?: SQL,
 ) => {
   if (!isEmptyPatch(patch)) {
-    const written = await db
-      .update(table)
-      .set(patch)
-      .where(allOf(row, condition))
-      .returning({ id: table.id })
+    const written = await db.update(table).set(patch).where(allOf(row, condition)).returning({ id: table.id })
 
     if (written.length === 0) return { kind: await whyNothingWritten(db, table, row) }
   }

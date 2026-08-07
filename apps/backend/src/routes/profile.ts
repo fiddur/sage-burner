@@ -12,8 +12,8 @@ import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
 import { allOf } from '../db/conditions.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
-import { whyNothingWritten } from '../db/refusals.ts'
 import { isEmptyPatch } from '../db/patch.ts'
+import { whyNothingWritten } from '../db/refusals.ts'
 import { account, attendance, eventOption } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { allergyTickIdsFor, writeAllergyTicks } from './allergy-ticks.ts'
@@ -146,15 +146,14 @@ export const writeStay = (
     // the helping ticks, which live in their own table. Both read instead of writing —
     // see `isEmptyPatch`. Not `patchRow`, which is one statement per call and would
     // commit the columns outside this transaction.
-    const rows =
-      isEmptyPatch(columns)
-        ? tx.select().from(attendance).where(mine).limit(1).all()
-        : tx
-            .update(attendance)
-            .set(columns)
-            .where(and(mine, stayOrderCondition(columns)))
-            .returning()
-            .all()
+    const rows = isEmptyPatch(columns)
+      ? tx.select().from(attendance).where(mine).limit(1).all()
+      : tx
+          .update(attendance)
+          .set(columns)
+          .where(and(mine, stayOrderCondition(columns)))
+          .returning()
+          .all()
 
     const [first] = rows
     if (first !== undefined && helping !== undefined) writeHelping(tx, first.id, helping)
