@@ -15,9 +15,12 @@ import { account, accountRole, attendance, event } from '../db/schema.ts'
 /**
  * What is going on around you, for whoever asked to hear it (#259).
  *
- * Every one of these is **off** unless somebody switches it on, so each test turns
- * the category on first. That is the behaviour, not test scaffolding: an installation
- * where nobody opens the settings sends none of these, which is the point.
+ * The burn-wide ones are **off** unless somebody switches them on, so each of those
+ * tests turns the category on first. That is the behaviour, not test scaffolding: an
+ * installation where nobody opens the settings sends none of them, which is the point.
+ *
+ * The exception is the admin one at the bottom — an application is on for whoever
+ * reviews applications, and switching it on is what those tests never do (#326).
  */
 
 const SECRET = 's'.repeat(40)
@@ -351,6 +354,92 @@ describe('the lead-roles register filling up', () => {
   })
 })
 
+describe('somebody applies to join', () => {
+  /**
+   * The one notification that goes to admins rather than to a burn's attendees.
+   *
+   * On by default and switched on by nobody in these tests, which is the behaviour:
+   * an application stays open until somebody reviews it, so a push missed on a lock
+   * screen costs the applicant the wait. It pushed and wrote no row at all until
+   * #326 — an admin found an empty bell after being told.
+   */
+  const apply = (server: FastifyInstance) =>
+    server.inject({
+      method: 'POST',
+      url: '/api/applications',
+      payload: { applicant_name: 'Wren', applicant_email: 'wren@example.org', answers: {}, asked: [] },
+    })
+
+  it('fills every admin bell, without being asked for', async () => {
+    const server = await build()
+    const ada = await givenAccount('Ada', ['admin'])
+    const bea = await givenAccount('Bea', ['admin'])
+
+    expect((await apply(server)).statusCode).toBe(201)
+
+    expect(await bodiesFor(server, ada.cookie)).toEqual(['Someone has applied to join.'])
+    expect(await bodiesFor(server, bea.cookie)).toEqual(['Someone has applied to join.'])
+  })
+
+  it('lands on the page the review happens on', async () => {
+    const server = await build()
+    const ada = await givenAccount('Ada', ['admin'])
+
+    await apply(server)
+
+    const response = await server.inject({
+      method: 'GET',
+      url: '/api/me/notifications',
+      headers: { cookie: ada.cookie },
+    })
+    expect(response.json().notifications[0].link).toBe('/admin/applications')
+  })
+
+  it('says nothing about who applied', async () => {
+    // A notification is read on a lock screen, and the applicant's name is theirs
+    // until an admin opens the page. The bell row is a copy of the push, so the same
+    // holds of it.
+    const server = await build()
+    const ada = await givenAccount('Ada', ['admin'])
+
+    await apply(server)
+
+    const bodies = await bodiesFor(server, ada.cookie)
+    expect(bodies).toHaveLength(1)
+    expect(bodies.join()).not.toContain('Wren')
+  })
+
+  it('reaches no member, who is offered no switch for it either', async () => {
+    const server = await build()
+    const bea = await givenAccount('Bea')
+
+    await apply(server)
+
+    expect(await bodiesFor(server, bea.cookie)).toEqual([])
+  })
+
+  it('stops for an admin who switches it off', async () => {
+    const server = await build()
+    const ada = await givenAccount('Ada', ['admin'])
+    // Replaces the whole set, so naming nothing switches every category off.
+    await switchOn(server, ada.cookie)
+
+    await apply(server)
+
+    expect(await bodiesFor(server, ada.cookie)).toEqual([])
+  })
+
+  it('tells an admin who also holds member exactly once', async () => {
+    // The fan-out selects `account_role`, where one account can hold two rows.
+    const server = await build()
+    const ada = await givenAccount('Ada', ['admin', 'member'])
+
+    await apply(server)
+
+    expect(await bodiesFor(server, ada.cookie)).toHaveLength(1)
+  })
+})
+
 describe('the vocabulary the database will accept', () => {
   it('takes the categories #259 added', async () => {
     // The rebuilt CHECK, proved by a write that skips the API. Without the rebuild
@@ -365,6 +454,8 @@ describe('the vocabulary the database will accept', () => {
       'lead_role_added',
       'lead_role_filled',
       'new_version',
+      // #326's, and the reason the tables were rebuilt a second time.
+      'application',
     ]) {
       client()
         .prepare(
@@ -373,7 +464,7 @@ describe('the vocabulary the database will accept', () => {
         .run(randomUUID(), ada.id, category, 'something happened', NOW)
     }
 
-    expect(await bodiesFor(server, ada.cookie)).toHaveLength(5)
+    expect(await bodiesFor(server, ada.cookie)).toHaveLength(6)
   })
 
   it('refuses one it has never heard of', async () => {

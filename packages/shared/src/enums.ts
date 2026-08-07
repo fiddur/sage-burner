@@ -177,6 +177,7 @@ export const notificationCategories = [
   'lead_role_added',
   'lead_role_filled',
   'new_version',
+  'application',
 ] as const
 export type NotificationCategory = (typeof notificationCategories)[number]
 
@@ -195,13 +196,14 @@ export type NotificationCategory = (typeof notificationCategories)[number]
  *   and somebody who never opens the settings should still hear it. What happens
  *   *around you* is off, because a burn where every dream and every arrival pings
  *   forty-two people is a channel people learn to ignore (#259).
- * - `about` — which of the two sections it belongs in. Not derived from `on`: that
- *   they line up today is a coincidence, and the first category that breaks it would
- *   land in the wrong section silently. `else` is "not about you personally", which
- *   is a wider net than "about a burn" — a redeploy is neither.
+ * - `about` — which section it belongs in. Not derived from `on`: that they line up
+ *   today is a coincidence, and the first category that breaks it would land in the
+ *   wrong section silently. `else` is "not about you personally", which is a wider
+ *   net than "about a burn" — a redeploy is neither. `admin` is narrower than either:
+ *   only an admin is ever told, so only an admin is offered the switch (#326).
  */
 export interface NotificationCategoryInfo {
-  about: 'else' | 'you'
+  about: 'admin' | 'else' | 'you'
   label: string
   on: boolean
 }
@@ -226,16 +228,25 @@ export const notificationCategoryInfo = {
   lead_role_added: { label: 'A lead role is added', on: false, about: 'else' },
   lead_role_filled: { label: 'Somebody takes the lead of a role', on: false, about: 'else' },
   new_version: { label: 'A new version of the app is out', on: false, about: 'else' },
+  // On, and about the one thing that waits for somebody: an application nobody
+  // reviews leaves the applicant waiting (#326).
+  application: { label: 'Somebody applies to join', on: true, about: 'admin' },
 } as const satisfies Record<NotificationCategory, NotificationCategoryInfo>
 
 /** Whether a category is on for somebody who has never touched the settings. */
 export const notifiesByDefault = (category: NotificationCategory): boolean =>
   notificationCategoryInfo[category].on
 
-/** The settings table's two sections, in the order it renders them. */
+/**
+ * The settings table's sections, in the order it renders them.
+ *
+ * The last one is only ever rendered for an admin, because nobody else is told about
+ * anything in it — a switch that cannot do anything reads as a promise (#326).
+ */
 export const notificationSections = [
   { about: 'you', heading: 'What happens to you' },
   { about: 'else', heading: 'What else is going on' },
+  { about: 'admin', heading: 'What you look after' },
 ] as const satisfies readonly { about: NotificationCategoryInfo['about']; heading: string }[]
 
 export const categoriesAbout = (about: NotificationCategoryInfo['about']): NotificationCategory[] =>

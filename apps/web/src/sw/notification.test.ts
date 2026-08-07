@@ -23,16 +23,27 @@ describe('reading a push payload', () => {
     expect(alertFrom({ body: 'c', link: '/meals', category: 'meal_role' }).tag).toBe(meal.tag)
   })
 
-  it('collapses the ones with no category together, which is what applications are', () => {
-    // A new application is neither a bell row nor a setting — it predates both — so
-    // it carries a link and no category. Those share one tag, which is the behaviour
-    // it always had back when the worker had a page written into it.
+  it('collapses the ones with no category together', () => {
+    // Every push the server sends names one (#326), so this is what a payload from
+    // before that looks like — a page still opens, and three of them are one line to
+    // act on rather than three identical ones to dismiss.
     const first = alertFrom({ body: 'Someone has applied.', link: '/admin/applications' })
     const second = alertFrom({ body: 'Someone else has applied.', link: '/admin/applications' })
 
     expect(first.tag).toBe(second.tag)
     expect(first.path).toBe('/admin/applications')
     expect(first.tag).not.toBe(alertFrom({ body: 'x', link: '/meals', category: 'meal_role' }).tag)
+  })
+
+  it('gives an application its own tag, so it cannot replace a meal role', () => {
+    const application = alertFrom({
+      body: 'Someone has applied to join.',
+      link: '/admin/applications',
+      category: 'application',
+    })
+
+    expect(application.tag).toBe('sage-burner-application')
+    expect(application.path).toBe('/admin/applications')
   })
 
   it('names no page for the categories that are about everywhere', () => {
