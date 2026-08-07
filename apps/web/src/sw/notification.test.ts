@@ -46,11 +46,12 @@ describe('reading a push payload', () => {
     expect(application.path).toBe('/admin/applications')
   })
 
-  it('names no page for the categories that are about everywhere', () => {
-    // `link` is null for those — the schema says so, and the row carries the same
-    // null. **Absent rather than `'/'`**, which is a different instruction to the
-    // worker: any window of this app is already the right one, so a tap focuses it
-    // instead of taking somebody off whatever they were reading (#279).
+  it('names no page for a payload that carries no link', () => {
+    // What a row written before the redeploy notice took a page (#325) comes out as,
+    // and what an off-origin link is reduced to. **Absent rather than `'/'`**, which is
+    // a different instruction to the worker: any window of this app is already the
+    // right one, so a tap focuses it instead of taking somebody off whatever they were
+    // reading (#279).
     expect(
       alertFrom({ body: 'A new version is out.', link: null, category: 'new_version' }).path,
     ).toBeUndefined()

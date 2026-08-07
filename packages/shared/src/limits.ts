@@ -57,7 +57,7 @@ export const MAX_SLUG = 64
 /** A burn's welcome text. Long enough for a page of markdown, short of a book. */
 export const MAX_WELCOME_LENGTH = 100_000
 
-/** A question on the burn's FAQ. A heading, so shorter than the form's questions. */
+/** A question on the burn's FAQ. A heading somebody scans, not a paragraph. */
 export const MAX_FAQ_QUESTION = 500
 
 /** An answer on the burn's FAQ. Markdown, and some of them are a page of it. */

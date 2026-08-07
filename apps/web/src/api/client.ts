@@ -51,6 +51,7 @@ import type {
   RosterResponse,
   SessionResponse,
   SessionsResponse,
+  ChangelogResponse,
   VersionResponse,
 } from '@sage-burner/shared'
 import type {
@@ -332,6 +333,10 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
   return {
     request,
     getVersion: () => request<VersionResponse>(apiRoutes.getVersion.path()),
+
+    /** Public: what changed, as the new-version notification's page shows it (#325). */
+    getChangelog: (signal?: AbortSignal) =>
+      request<ChangelogResponse>(apiRoutes.getChangelog.path(), { signal }),
 
     /** Public: the title is in the header of every page, signed in or not. */
     getInstallation: (signal?: AbortSignal) =>
@@ -643,9 +648,6 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
       request<FaqListResponse>(apiRoutes.copyFaq.path(eventId), {
         method: apiRoutes.copyFaq.method,
         body: { from_event_id },
-        // The route tags what it answers, so the tag is taken here rather than left to
-        // the reload that follows (#323).
-        version: 'faq',
       }),
 
     /** Members only. Scheduled dreams first, then the ones only offered. */

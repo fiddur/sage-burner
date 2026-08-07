@@ -61,6 +61,8 @@ describe('what the worker does with a request', () => {
     // The banner is the installation's own picture on a public page, so it belongs
     // with the icon rather than with the reads it shares a prefix with.
     expect(cacheFor(asked(apiRoutes.getInstallationBanner.path()))).toBe(SHELL_CACHE)
+    // And the changelog, on the same argument: release notes are nobody's data (#325).
+    expect(cacheFor(asked(apiRoutes.getChangelog.path()))).toBe(SHELL_CACHE)
     expect(cacheFor(asked(apiRoutes.getMyProfile.path()))).toBe(API_CACHE)
   })
 

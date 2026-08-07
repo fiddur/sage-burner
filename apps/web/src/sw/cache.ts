@@ -82,6 +82,9 @@ export const planFor = (
   // installation's own picture, on a page anybody can see, and the cache that goes at
   // sign-out is the one holding somebody's data.
   if (pathname === apiRoutes.getInstallationBanner.path()) return 'app'
+  // Same argument for the changelog (#325): release notes, on a page anybody can see,
+  // so there is nothing in it a sign-out should take away.
+  if (pathname === apiRoutes.getChangelog.path()) return 'app'
   if (NEVER_CACHED.includes(pathname)) return 'skip'
   if (pathname.startsWith('/api/')) return 'api'
 

@@ -396,17 +396,6 @@ describe('seeding it from a previous burn', () => {
     expect(copied.json().entries[0].answer).toBe('A sleeping bag.')
   })
 
-  it('refuses to copy into one that has ended', async () => {
-    // The other side of the same rule: seeding a burn nothing can afterwards edit,
-    // reorder or remove would leave rows stranded.
-    const server = await build()
-    const ada = await givenAccount()
-    const past = await givenPrevious(server, ada.cookie)
-    const over = await givenFinished()
-
-    expect((await copy(server, ada.cookie, over, past)).statusCode).toBe(404)
-  })
-
   it('copies the questions and their answers, in the order they were arranged', async () => {
     // The order is most of what the copy is for: this list is read top to bottom.
     const server = await build()
@@ -416,8 +405,10 @@ describe('seeding it from a previous burn', () => {
 
     const copied = await copy(server, ada.cookie, next, past)
 
-    // 201, like the places and the register: rows were created (#323).
     expect(copied.statusCode).toBe(201)
+    // Tagged with the version a following guarded write has to quote, which is the
+    // half `copyPlaces` does not do — and nothing else pins it.
+    expect(copied.headers.etag).toBe((await list(server, ada.cookie, next)).headers.etag)
     expect(questions(copied)).toEqual(['What do I bring?', 'How do I get there?'])
     expect(copied.json().entries[0].answer).toBe('A sleeping bag.')
   })

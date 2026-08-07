@@ -16,7 +16,7 @@ import { Refreshing } from '../components/Refreshing.tsx'
 import { ReorderableList } from '../components/ReorderableList.tsx'
 import { useAction, useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
-import { isApproved, useViewer } from '../viewer.tsx'
+import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
 
 export type FaqApi = Pick<
   ApiClient,
@@ -297,24 +297,35 @@ const FaqRow = ({
  * Which burn this is, and whether there is anything on it yet.
  *
  * Says the name whenever the bar did not choose it, because two burns' answers read
- * alike and somebody who has not picked one cannot otherwise tell which they got
- * (#321). A fact about the bar rather than about the reader: the burns fetch may have
- * failed, in which case what they are coming to is not known here either.
+ * alike (#321). It says only that, and nothing about the reader: the bar is empty
+ * either because they are signed up to no burn or because the burns fetch failed, and
+ * #193's rule is that the second must not be described as a fact about them.
+ *
+ * With no burn at all, the admin gets the one pointer that leads somewhere — they are
+ * the only person who can make one.
  */
 const Notice = ({ loaded }: { loaded: Loaded<Questions> }) => {
+  const admin = isAdmin(useViewer())
+
   if (loaded.status === 'loading') return <p class="form-note">Loading…</p>
   if (loaded.status === 'failed') return <ErrorText message={loaded.message} />
   if (loaded.data === null) {
-    return <p class="form-note">There is no burn planned yet, so there is nothing to ask about.</p>
+    return (
+      <p class="form-note">
+        There is no burn planned yet, so there is nothing to ask about.
+        {admin && (
+          <>
+            {' '}
+            Make one under <a href="/admin/events">Events</a>.
+          </>
+        )}
+      </p>
+    )
   }
 
   return (
     <>
-      {!loaded.data.picked && (
-        <p class="form-note">
-          Showing {loaded.data.name}, the next burn — you have not picked one in the bar.
-        </p>
-      )}
+      {!loaded.data.picked && <p class="form-note">Showing {loaded.data.name}, the next burn.</p>}
       {loaded.data.entries.length === 0 && <p class="form-note">Nobody has asked anything yet.</p>}
     </>
   )

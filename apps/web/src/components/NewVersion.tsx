@@ -15,6 +15,9 @@ import { watchForNewVersion } from '../version.ts'
  * No dismiss. The tab is running code the server no longer serves, and a bar that can
  * be waved away is one somebody waves away and then reports the resulting oddity as
  * a bug.
+ *
+ * The changelog sits beside the reload rather than instead of it: what changed is worth
+ * knowing, and a link cannot throw away what is half-typed (#325).
  */
 export const NewVersion = ({ api }: { api: VersionApi }) => {
   const [stale, setStale] = useState(false)
@@ -29,6 +32,7 @@ export const NewVersion = ({ api }: { api: VersionApi }) => {
       <button type="button" onClick={() => globalThis.location.reload()}>
         Reload
       </button>
+      <a href="/changelog">What's new</a>
     </p>
   )
 }

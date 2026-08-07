@@ -313,12 +313,16 @@ Two caches, and the split is the whole of what stays on a device:
 - **`sage-burner-api-v1`** — every API read: the roster, the schedule, who you
   are. **This is member data on disk, and signing out deletes the whole cache.**
   Not entries picked from it by URL, which would be a list to keep in step with
-  the routes.
+  the routes. The three `/api/` reads that are _not_ somebody's data — the icon, the
+  banner and the changelog — are named into the shell cache instead, on the argument
+  that what a sign-out takes away should be what a sign-out was about.
 
 Reads are network-first with the cache as a floor under being offline; hashed
 assets are cache-first, since their names change with their bytes. `/api/version`
 is never cached — a stale answer there is the one reply that makes the redeploy
-check pointless. Nothing cross-origin is touched.
+check pointless. `/api/changelog` is, and is `no-cache` at the HTTP layer for the same
+family of reasons: it answers what the _server_ is running, and the notification that
+sends somebody to it fires precisely when that has changed. Nothing cross-origin is touched.
 
 **A navigation is only stored if it answered with HTML.** Not every same-origin
 navigation returns the app: the ICS feed is a plain `<a href>` in the page, so
