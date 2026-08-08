@@ -73,6 +73,9 @@ burn-scoped page already reads this.
   an account with no role at all, because an applicant is told things too.
 - **The lodging and helping lists** are reached from that page, from
   _(edit lodging alternatives)_ beside the question they answer.
+- **The rideshare board** is reached from that page too, beside the arrival dates —
+  which is where somebody is standing when they think about getting there (#26).
+  `docs/burns.md` has the shape.
 - **⚙️** is admin's alone. It used to be `Organise` and open to any approved member,
   because it was the only way to reach the two lists above; now those have their own
   way in, and what is left behind ⚙️ — the burn's shape, who gets in, payment, the

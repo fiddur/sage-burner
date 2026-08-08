@@ -653,3 +653,47 @@ trap as `required` versus `aria-required`, reaching the opposite conclusion: for
 name the page must be the authority because it has something to say, for a count
 the browser already says it. There is a test asserting the form does not submit,
 which is what proves the guard would have been dead.
+
+## Getting there and back
+
+`/rides` replaces the spreadsheet's Rideshares tab (#26): who is **looking for a
+lift** and who has **room in a car**, for the burn the selector is pointing at.
+
+One table with a `kind` rather than two. Everything else about a journey is the same
+whichever way it is going — where from, roughly when, how much room, anything else
+worth saying — and two tables would be one schema written twice with a word changed.
+The two halves get headings of their own on the page, which is where the split
+belongs.
+
+**Where from and when are text**, not a place picker and a date. A lift is arranged
+around a time of day and a willingness to wait, and a date field would ask for
+precision nobody has three weeks out — the arrival date on somebody's stay is the
+precise one. `seats` is a count somebody reads to decide whether it is worth asking,
+not a capacity to book against: nothing on this page claims a seat, because the board
+is two lists and the next step is a conversation.
+
+**The contact is not on the row.** It lives on the account, where the details page
+already asks for it and the roster already shows it to every approved member — so a
+copy here would be a number to keep in step, wrong in exactly the moment somebody most
+needs it. The board resolves the name and the contact at read time.
+
+That is the whole privacy change from the spreadsheet, and it is a change of _audience_
+rather than of content: the tab was a publicly linked document with phone numbers in
+it, and this is behind `requireApproved`. Inside that gate the number is the point of
+the page, and `contact` is the one field on an account that exists to be given out.
+
+**Your own journey is yours.** Unlike the lanes, the lead-roles register or the
+timetable — the burn's shared furniture, which any approved member may rearrange — a
+row here is somebody's statement about their own travel and carries their contact. The
+update and delete routes ask whose it is and answer **403** for somebody else's, not
+404: every member can already read the row, so hiding that it exists would say nothing
+and explain less.
+
+No `If-Match`. That exists for the fields several people edit at once (#274), and one
+of these has exactly one author. Writes need the burn to be open, like every other
+per-burn write; reading a finished burn's board is reading the record of who travelled
+with whom.
+
+Reached from **(looking for a lift, or offering one?)** beside the arrival dates on the
+details page — where somebody is standing when they think about getting there. Not from
+the bar: that carries one entry per thing and is already full at six on a phone (#337).

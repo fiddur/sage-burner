@@ -86,3 +86,12 @@ export const MAX_EMAIL = 254
 
 /** The name beside the from address — "The Burning Sage", not a sentence. */
 export const MAX_FROM_NAME = 200
+
+/**
+ * Where a journey starts, and when — "Göteborg", "Friday afternoon" (#26).
+ *
+ * One bound for both, because they are the same kind of thing: a short phrase somebody
+ * types so that another member knows whether to ask. Anything longer belongs in the
+ * notes beside them.
+ */
+export const MAX_RIDE_PLACE = 120

@@ -47,6 +47,8 @@ import type {
   ProfileUpdate,
   PushSubscriptionCreate,
   RedeemRequestInput,
+  RideCreate,
+  RideUpdate,
   SessionCreateInput,
   SessionUpdate,
 } from './index.ts'
@@ -123,6 +125,11 @@ export const apiRoutes = {
     method: 'POST',
     fastify: '/api/events/:eventId/places',
     path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/places`,
+  },
+  addRide: {
+    method: 'POST',
+    fastify: '/api/events/:eventId/rides',
+    path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/rides`,
   },
   addQuestion: {
     method: 'POST',
@@ -209,6 +216,11 @@ export const apiRoutes = {
     method: 'DELETE',
     fastify: '/api/places/:id',
     path: (id: string) => `/api/places/${encodeURIComponent(id)}`,
+  },
+  deleteRide: {
+    method: 'DELETE',
+    fastify: '/api/rides/:id',
+    path: (id: string) => `/api/rides/${encodeURIComponent(id)}`,
   },
   deleteQuestion: {
     method: 'DELETE',
@@ -393,6 +405,11 @@ export const apiRoutes = {
     method: 'GET',
     fastify: '/api/events/:eventId/places',
     path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/places`,
+  },
+  getRides: {
+    method: 'GET',
+    fastify: '/api/events/:eventId/rides',
+    path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/rides`,
   },
   getPushKey: {
     method: 'GET',
@@ -714,6 +731,11 @@ export const apiRoutes = {
     fastify: '/api/admin/allergy-items/:id',
     path: (id: string) => `/api/admin/allergy-items/${encodeURIComponent(id)}`,
   },
+  updateRide: {
+    method: 'PATCH',
+    fastify: '/api/rides/:id',
+    path: (id: string) => `/api/rides/${encodeURIComponent(id)}`,
+  },
   updatePlace: {
     method: 'PATCH',
     fastify: '/api/places/:id',
@@ -784,6 +806,7 @@ export interface RouteBodies {
   addPasskey: PasskeyRegistration
   addAllergyItem: AllergyItemCreate
   addPlace: PlaceCreate
+  addRide: RideCreate
   addQuestion: FormQuestionCreateInput
   adminAddAttendance: AttendanceCreate
   copyFaq: CopyFrom
@@ -827,6 +850,7 @@ export interface RouteBodies {
   updateMyStay: AttendanceUpdate
   updateAllergyItem: AllergyItemUpdate
   updatePlace: PlaceUpdate
+  updateRide: RideUpdate
   updateQuestion: FormQuestionUpdate
   updateSession: SessionUpdate
   updateWelcome: EventWelcomeUpdate

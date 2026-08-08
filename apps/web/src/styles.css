@@ -1426,6 +1426,44 @@ a:hover {
   position: relative;
 }
 
+/* Getting to the burn and back (#26) — one row per journey somebody has posted. */
+.ride-list {
+  list-style: none;
+  margin: 0.5rem 0 1.5rem;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.ride-row {
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+}
+
+.ride-journey {
+  margin: 0;
+}
+
+.ride-notes {
+  margin: 0.35rem 0 0;
+  white-space: pre-wrap;
+}
+
+/* The actions run together without it — two emoji read as one control. */
+.ride-actions {
+  margin: 0.35rem 0 0;
+}
+
+.ride-actions > * + * {
+  margin-inline-start: 0.6rem;
+}
+
+.ride-edit {
+  display: grid;
+  gap: 0.5rem;
+}
+
 /* The shared table: the members list, the roster, the accounts list, the invites. */
 .table {
   border-collapse: collapse;
