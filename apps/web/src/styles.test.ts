@@ -44,7 +44,7 @@ describe('the stylesheet', () => {
     // ☰ landed halfway across the bar the day it became a third child, on the ordinary
     // one-burn viewer. happy-dom lays nothing out, so this is the only place it shows.
     const header = rules.find((rule) => rule.selector === '.site-header')
-    const nav = rules.find((rule) => rule.selector === '.site-header nav')
+    const nav = rules.find((rule) => rule.selector === '.top-nav')
 
     expect(header?.body).not.toMatch(/justify-content:\s*space-between/)
     expect(nav?.body).toMatch(/margin-inline-start:\s*auto/)

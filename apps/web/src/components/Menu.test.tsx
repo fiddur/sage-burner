@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
+import { LocationProvider } from 'preact-iso'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import type { NavPage } from './Layout.tsx'
@@ -6,11 +7,25 @@ import type { NavPage } from './Layout.tsx'
 import { Menu } from './Menu.tsx'
 
 afterEach(cleanup)
+// The history outlives one test, and `LocationProvider` reads it on mount.
+afterEach(() => history.replaceState(null, '', '/'))
 
 const RIDES: NavPage[] = [{ href: '/rides', label: 'Rideshares', icon: '🛻' }]
 
-const opened = async (pages: readonly NavPage[] = RIDES) => {
-  render(<Menu pages={pages} />)
+/**
+ * Inside a `LocationProvider`, so `useLocation().path` is the address rather than the
+ * empty default context — which is what makes the close-on-route-change effect run at
+ * all. `at` is where the drawer is opened from, so a test can tell following a link
+ * *elsewhere* from following one to the page already open.
+ */
+const opened = async (pages: readonly NavPage[] = RIDES, at = '/') => {
+  history.replaceState(null, '', at)
+  render(
+    <LocationProvider>
+      <Menu pages={pages} />
+      <a href="/members">Members</a>
+    </LocationProvider>,
+  )
   // `fireEvent` rather than `.click()`, because it runs inside `act` — which is what
   // flushes the effect attaching the dismissal listeners.
   fireEvent.click(screen.getByRole('button', { name: 'Menu' }))
@@ -48,6 +63,7 @@ describe('the menu beside the logo', () => {
     if (backdrop !== null) fireEvent.pointerDown(backdrop)
 
     await waitFor(() => expect(screen.queryByRole('link', { name: /Rideshares/ })).toBeNull())
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Menu' }))
   })
 
   it('stays open when the press lands inside it', async () => {
@@ -58,10 +74,23 @@ describe('the menu beside the logo', () => {
     expect(screen.queryByRole('link', { name: /Rideshares/ })).toBeTruthy()
   })
 
-  it('closes on following a link, including to the page already open', async () => {
-    // There is no route change to react to when the link is where you already are.
-    fireEvent.click(await opened())
+  it('closes on following a link to the page already open', async () => {
+    // Opened *from* `/rides`, so the router has no route change to give the effect —
+    // the link's own handler is the only thing that can close it.
+    fireEvent.click(await opened(RIDES, '/rides'))
 
+    await waitFor(() => expect(screen.queryByRole('link', { name: /Rideshares/ })).toBeNull())
+    expect(location.pathname).toBe('/rides')
+  })
+
+  it('closes when the route changes under it', async () => {
+    // A link outside the drawer: the drawer covers the page, but nothing in this suite
+    // lays anything out, and what is under test is the effect watching the address.
+    await opened()
+
+    fireEvent.click(screen.getByRole('link', { name: 'Members' }))
+
+    await waitFor(() => expect(location.pathname).toBe('/members'))
     await waitFor(() => expect(screen.queryByRole('link', { name: /Rideshares/ })).toBeNull())
   })
 
@@ -78,6 +107,8 @@ describe('the menu beside the logo', () => {
     fireEvent.click(screen.getByRole('button', { name: /Close/ }))
 
     await waitFor(() => expect(screen.queryByRole('link', { name: /Rideshares/ })).toBeNull())
+    // Focus was inside the drawer, and closing unmounts it.
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Menu' }))
   })
 
   it('closes on Escape and hands focus back to ☰', async () => {

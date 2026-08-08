@@ -11,6 +11,13 @@ export const Menu = ({ pages }: { pages: readonly NavPage[] }) => {
   const drawer = useRef<HTMLElement>(null)
   const { path } = useLocation()
 
+  // Focus is inside the drawer, and closing unmounts it — so every way out has to hand
+  // focus back rather than let it fall to `<body>`.
+  const close = () => {
+    setOpen(false)
+    button.current?.focus()
+  }
+
   useEffect(() => setOpen(false), [path])
 
   useEffect(() => {
@@ -19,9 +26,7 @@ export const Menu = ({ pages }: { pages: readonly NavPage[] }) => {
     drawer.current?.querySelector('a')?.focus()
 
     const escape = (key: KeyboardEvent) => {
-      if (key.key !== 'Escape') return
-      setOpen(false)
-      button.current?.focus()
+      if (key.key === 'Escape') close()
     }
 
     document.addEventListener('keydown', escape)
@@ -39,8 +44,7 @@ export const Menu = ({ pages }: { pages: readonly NavPage[] }) => {
         class="menu-button"
         aria-label="Menu"
         aria-expanded={open}
-        aria-controls="menu-drawer"
-        aria-haspopup="true"
+        aria-controls={open ? 'menu-drawer' : undefined}
         onClick={() => setOpen((was) => !was)}
       >
         <span aria-hidden="true">☰</span>
@@ -50,7 +54,7 @@ export const Menu = ({ pages }: { pages: readonly NavPage[] }) => {
           the time without `inert` or a visibility dance. */}
       {open && (
         <>
-          <div class="menu-backdrop" onPointerDown={() => setOpen(false)} />
+          <div class="menu-backdrop" onPointerDown={close} />
           <nav id="menu-drawer" ref={drawer} class="menu-drawer" aria-label="More">
             {pages.map((page) => (
               // Closed here as well as on a route change, since following a link to the
@@ -62,7 +66,7 @@ export const Menu = ({ pages }: { pages: readonly NavPage[] }) => {
 
             {/* The drawer covers ☰ itself, so without this the only pointer way out is
                 the strip of backdrop beside it. */}
-            <button type="button" class="menu-close" onClick={() => setOpen(false)}>
+            <button type="button" class="menu-close" onClick={close}>
               ✕ Close
             </button>
           </nav>

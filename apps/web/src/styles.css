@@ -110,8 +110,12 @@ a:hover {
 /* `margin-inline-start: auto` rather than `space-between` on the bar: the bar's
    children come and go — ☰ only for a member, the selector only for a second burn —
    and `space-between` moves every one of them when another appears. Pinning the nav
-   to the end is the only arrangement that holds for all four combinations. */
-.site-header nav {
+   to the end is the only arrangement that holds for all four combinations.
+
+   By class, not `.site-header nav`: ☰'s drawer is a `nav` and lands inside the header
+   too, where a descendant selector would beat `.menu-drawer` on specificity and lay a
+   row of column entries out centred, wrapped and gapped. */
+.top-nav {
   display: flex;
   margin-inline-start: auto;
   flex-wrap: wrap;
@@ -1139,7 +1143,7 @@ a:hover {
 /*
   Over the timetable rather than beside it — the grid is as wide as the screen — and
   above the bottom bar, which is the whole of why this is 40 (#344). The scale:
-  bar 20, popdown 30, ☰'s drawer 35, modal 40. `docs/the-app.md` says what happened
+  bar 20, popdown 30, ☰'s backdrop 34 and its drawer 35, modal 40. `docs/the-app.md` says what happened
   when two of them shared a number.
 */
 .dream-modal {

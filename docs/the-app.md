@@ -111,8 +111,9 @@ costs.
 **The drawer slides over the page, and the page does not move.** Pushing the site aside
 would mean a `transform` on a wrapper, and a transform makes `position: fixed` resolve
 against that wrapper instead of the viewport — which is `.bottom-bar` and `.bell-panel`,
-and exactly the class of bug #344 and #348 were. The z-index scale gains a fourth: bar
-20, popdown 30, drawer 35, modal 40.
+and exactly the class of bug #344 and #348 were. The z-index scale gains two: bar 20,
+popdown 30, the drawer's backdrop 34, the drawer 35, modal 40 — the backdrop one rung
+under what it sits behind rather than a round number of its own.
 
 It is **rendered only while open** rather than hidden with CSS, so its links are out of
 the tab order the rest of the time with no `inert` to keep in step with an animation.
@@ -131,6 +132,10 @@ entry on open and back to ☰ on Escape.
 
 There is no ☰ at all when it would open onto nothing — a signed-out visitor may follow
 none of it.
+
+**The bar's nav is styled by class**, not as `.site-header nav`. The drawer is a `nav`
+and it lands inside the header, where a descendant selector beats `.menu-drawer` on
+specificity and lays a column of full-width entries out centred, wrapped and gapped.
 
 **The bar pins its nav rather than spreading itself.** `justify-content: space-between`
 put whatever was in the middle _in the middle_, and the bar's children come and go — ☰

@@ -139,7 +139,7 @@ const TopNav = ({ api, pages }: { api: BellApi; pages: readonly NavPage[] }) => 
   const viewer = useViewer()
 
   return (
-    <nav aria-label="Main">
+    <nav class="top-nav" aria-label="Main">
       {viewer.status === 'signed-out' && (
         <>
           <a href="/apply">Apply</a>
