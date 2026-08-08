@@ -16,10 +16,11 @@ const OFF_SWITCH = 'You can turn these emails off under Your details → Notific
 /**
  * Absolute, because an email is read outside the app.
  *
- * The origin is the one the request arrived on, or `PUBLIC_ORIGIN` where an operator
- * named one — the same pair the share card uses, and for the same reason: this app
- * has no notion of its own address. Without one there is no link worth writing, so
- * the caller passes `undefined` and the message says the path in words instead.
+ * The origin is `PUBLIC_ORIGIN` and nothing else — unlike the share card, which is
+ * built inside a request and can read `Host`, this runs from wherever a role was
+ * handed out. Without one there is no link worth writing, and the message carries
+ * none at all: `notificationMessage` leaves the line out rather than printing a path
+ * nobody can follow.
  */
 export const absolute = (origin: string | undefined, path: string): string | undefined =>
   origin === undefined ? undefined : `${origin}${path}`

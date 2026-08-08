@@ -49,8 +49,7 @@ const draftFrom = (mail: MailSettings): Draft => ({
   port: String(mail.port),
   secure: mail.secure,
   username: mail.username,
-  // Never filled in from the server, which does not send it. Blank means "leave what
-  // is stored", which is what the route reads an absent password as.
+  // The read never carries it, and blank is how the route is told to keep what it has.
   password: '',
   from_email: mail.from_email,
   from_name: mail.from_name,

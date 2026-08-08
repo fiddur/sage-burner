@@ -41,6 +41,14 @@ export type ErrorResponse = z.infer<typeof errorResponseSchema>
  * Their responses carry the current representation beside the code, which is what
  * lets the page show what the other person wrote.
  *
+ * `not_approved` and `invite_used` are the two ways reissuing an invite is refused
+ * (#178). Both are 409 and they mean opposite things to whoever is reading the page —
+ * "this application has not been approved" against "they are already in" — and a
+ * single `conflict` left the page wording every refusal as the second. That was honest
+ * only because `approved` is terminal and the button renders on approved rows alone,
+ * so the first was unreachable through the UI; two load-bearing facts nothing wrote
+ * down, and both would go the day an un-approve path arrives.
+ *
  * `errorResponseSchema` deliberately accepts codes outside this list, so an
  * older client can still parse a newer API's response rather than failing to
  * read the error explaining what went wrong.
@@ -56,6 +64,8 @@ export const errorCodes = [
   'rate_limited',
   'stale',
   'precondition_required',
+  'not_approved',
+  'invite_used',
 ] as const
 export type ErrorCode = (typeof errorCodes)[number]
 

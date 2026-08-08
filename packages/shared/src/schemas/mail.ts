@@ -29,7 +29,7 @@ export const mailSettingsFields = z.object({
   username: z.string().trim().max(MAX_SMTP_USERNAME),
   /** What the envelope and the `From:` header say. */
   from_email: z.email().max(MAX_EMAIL),
-  /** The name beside it. Empty falls back to what the installation calls itself. */
+  /** The name beside it, or empty for the bare address. */
   from_name: z.string().trim().max(MAX_FROM_NAME),
 })
 

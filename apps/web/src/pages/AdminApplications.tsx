@@ -58,9 +58,18 @@ export const AdminApplications = ({ api }: { api: ApplicationsApi }) => {
       },
       (failure: unknown) => {
         setDeciding(undefined)
-        return isApiError(failure) && failure.status === 409
-          ? 'That invite has already been used, so they are already in.'
-          : 'Could not make a new link. Please try again.'
+        if (!isApiError(failure)) return 'Could not make a new link. Please try again.'
+
+        // Both are 409, and they say opposite things (#178). Told apart by the slug
+        // rather than by the status, so this does not depend on `approved` being
+        // terminal and the button rendering on approved rows alone — two facts that
+        // are true today and are nothing to hang a message on.
+        return (
+          {
+            invite_used: 'That invite has already been used, so they are already in.',
+            not_approved: 'That application has not been approved, so there is nobody to invite yet.',
+          }[failure.code] ?? 'Could not make a new link. Please try again.'
+        )
       },
     )
   }

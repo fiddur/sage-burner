@@ -284,6 +284,15 @@ the same way approving does. The link is shown in a paragraph that vanishes on
 reload and the admin has to paste it into Discord before navigating away, so
 losing it is a realistic accident rather than carelessness.
 
+**The two ways it is refused carry different slugs** (#178). Both are `409` —
+`not_approved` for an application nobody has approved or that was rejected, and
+`invite_used` once the link has been redeemed — and they mean opposite things to
+whoever is reading the page: "there is nobody to invite yet" against "they are already
+in". One shared `conflict` had the page wording every refusal as the second, which was
+honest only because `approved` is terminal and the button renders on approved rows
+alone. Two load-bearing facts nothing wrote down, and both stop being true the day an
+un-approve path arrives.
+
 **The row is updated, not replaced**, which is what makes this safe. One invite per
 application stays the invariant `invite_token_application_idx` already enforces, and
 rewriting `token_hash` kills the lost link in the same statement that mints its
@@ -684,7 +693,19 @@ message says what happened and stops there.
 
 Posting never fails a write. The send starts beside the bell's row and is awaited after
 it, so a mail server that is down costs a message rather than somebody's record — the
-rule push already follows here.
+rule push already follows here. It is also **caught where it is started**, not only
+where it is awaited: the insert between the two can throw, and Node's default for a
+rejection nobody is holding is to exit the process. Nothing is lost by swallowing it,
+since a failed _send_ is answered rather than thrown and the only way it rejects is a
+database error — the same failure the insert is about to report.
+
+**A burn-wide notification posts to everybody at once** (#313). It went one after
+another, which was fine while the only slow part was a push service and stopped being
+fine when an email leg arrived: `smtp.ts` waits up to fifteen seconds on a host that
+drops packets rather than refusing, and one after another that is fifteen seconds _per
+attendee_ — something like ten minutes at the forty-two cap, with no request timeout
+above it. Side by side it is fifteen seconds however many people are coming. Still all
+awaited before the route answers, so a response means the work is done.
 
 Anything somebody else can put you on or take you off notifies you — a dream's
 helpers, a meal's crew, a meal's lead, a lead role and its team, a dream's

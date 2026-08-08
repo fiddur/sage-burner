@@ -239,22 +239,47 @@ describe('AdminApplications', () => {
     expect(screen.queryByRole('button', { name: 'Send a new link' })).toBeNull()
   })
 
-  it('says so when the invite has already been used', async () => {
-    // A 409 here means they are already in, which is worth saying rather than
-    // "please try again".
+  /** An approved application, which is the only row that offers a new link. */
+  const withReissue = (reissueInvite: ApplicationsApi['reissueInvite']) =>
     renderPage(
       stub({
         getApplications: () =>
           Promise.resolve({
             applications: [anApplication({ status: 'approved', decided_at: '2026-07-03T00:00:00Z' })],
           }),
-        reissueInvite: () => Promise.reject(apiError(409, 'conflict', 'Request failed (409).')),
+        reissueInvite,
       }),
     )
+
+  it('says so when the invite has already been used', async () => {
+    // Worth saying rather than "please try again": they are already in, and trying
+    // again would fail the same way.
+    withReissue(() => Promise.reject(apiError(409, 'invite_used', 'Request failed (409).')))
 
     ;(await screen.findByRole('button', { name: 'Send a new link' })).click()
 
     expect((await screen.findByRole('alert')).textContent).toContain('already in')
+  })
+
+  it('says something else when the application was never approved', async () => {
+    // The same 409 (#178). Told apart by the slug, so this does not rest on the
+    // button rendering only on approved rows — which is the sort of fact that stops
+    // being true the day an un-approve path arrives, quietly, somewhere else.
+    withReissue(() => Promise.reject(apiError(409, 'not_approved', 'Request failed (409).')))
+
+    ;(await screen.findByRole('button', { name: 'Send a new link' })).click()
+
+    const said = (await screen.findByRole('alert')).textContent
+    expect(said).toContain('has not been approved')
+    expect(said).not.toContain('already in')
+  })
+
+  it('falls back to try-again for a refusal it has no words for', async () => {
+    withReissue(() => Promise.reject(apiError(409, 'conflict', 'Request failed (409).')))
+
+    ;(await screen.findByRole('button', { name: 'Send a new link' })).click()
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Please try again')
   })
 
   it('rejects without showing an invite', async () => {

@@ -111,7 +111,15 @@ export const recordAndPush =
     // Independent of the bell, and after it: somebody may want the burn-wide ones in
     // their inbox and nowhere else, and the write must not fail because a mail server
     // did — the rule push already follows here (#30).
-    const posting = channels.email && byEmail !== undefined ? byEmail(accountId, told) : undefined
+    //
+    // Caught where it is started rather than only where it is awaited (#313). The
+    // insert below can throw, and then nothing ever awaits this — which for Node is
+    // an unhandled rejection and, by default, the process exiting. Nothing is lost by
+    // swallowing it: `post` already answers a failed *send* rather than throwing, so
+    // the only way this rejects is a database error, which is the same failure the
+    // insert is about to report.
+    const posting =
+      channels.email && byEmail !== undefined ? byEmail(accountId, told).catch(() => undefined) : undefined
 
     if (!channels.bell) return await posting
 
@@ -219,9 +227,15 @@ export const recordActivity = async (db: Database, eventId: string, told: Told, 
  * because appointing somebody makes them the subject as well, and they already have
  * the personal "You are now Kitchen lead" (#270).
  *
- * Sequential rather than `Promise.all`. It is at most forty-two people, once, and
- * each one writes a row and reaches a push service — this is the least interesting
- * place in the app to be clever about concurrency.
+ * **Together rather than one after another**, which it was until #313. Each `notify`
+ * writes a row, reaches a push service and — since #30 — may post an email, and that
+ * last one waits up to `smtp.ts`'s fifteen seconds on a host that drops packets
+ * rather than refusing. One after another that is fifteen seconds *per attendee*, so
+ * a mistyped host held a request open for something like ten minutes at the cap. Side
+ * by side it is fifteen seconds however many people are coming.
+ *
+ * Still all awaited before this returns, so a route's response means the work is
+ * done and a test can assert on it without racing.
  */
 export const notifyAttendees = async (
   db: Database,
@@ -239,15 +253,11 @@ export const notifyAttendees = async (
     .where(eq(attendance.event_id, eventId))
 
   const silent = new Set(except)
+  const audience = rows.filter((row) => !silent.has(row.account_id))
 
-  let told_count = 0
-  for (const row of rows) {
-    if (silent.has(row.account_id)) continue
-    await notify(row.account_id, told)
-    told_count += 1
-  }
+  await Promise.all(audience.map(async (row) => await notify(row.account_id, told)))
 
-  return told_count
+  return audience.length
 }
 
 /**
