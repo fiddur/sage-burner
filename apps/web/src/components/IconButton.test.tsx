@@ -39,3 +39,32 @@ describe('a button whose face is an emoji', () => {
     expect(screen.getByRole('button', { name: 'Edit Temple' })).toHaveProperty('disabled', true)
   })
 })
+
+describe('one that waits on a round trip', () => {
+  it('keeps its name while its face changes', () => {
+    // The whole reason this belongs here rather than at `PendingButton`, where the
+    // label *is* the wording: the homepage's pen has to stay findable by what it
+    // does while it is wearing an hourglass (#335).
+    render(<IconButton icon="✏️" busyIcon="⌛" busy label="Edit this text" />)
+
+    const button = screen.getByRole('button', { name: 'Edit this text' })
+    expect(button.textContent).toBe('⌛')
+    expect(button.getAttribute('aria-busy')).toBe('true')
+    expect(button).toHaveProperty('disabled', true)
+  })
+
+  it('wears its own face and says nothing of being busy when it is not', () => {
+    render(<IconButton icon="✏️" busyIcon="⌛" busy={false} label="Edit this text" />)
+
+    const button = screen.getByRole('button', { name: 'Edit this text' })
+    expect(button.textContent).toBe('✏️')
+    expect(button.getAttribute('aria-busy')).toBe('false')
+    expect(button).toHaveProperty('disabled', false)
+  })
+
+  it('leaves the icon put when there is no second one to wear', () => {
+    render(<IconButton icon="🗑️" busy label="Remove Temple" />)
+
+    expect(screen.getByRole('button', { name: 'Remove Temple' }).textContent).toBe('🗑️')
+  })
+})

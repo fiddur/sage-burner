@@ -43,7 +43,7 @@ month's grid with nothing on screen to say why.
 | Viewer                   | Bar                                                            |
 | ------------------------ | -------------------------------------------------------------- |
 | Signed out               | Apply, Log in                                                  |
-| An account, neither role | nothing — an applicant waiting on a decision                   |
+| An account, neither role | 🔔 alone — an applicant, who is still told when it is decided  |
 | `member`                 | Going on, Members, Schedule, Leads, Meals, FAQ, and the circle |
 | `admin` without `member` | Going on, Members, Schedule, Leads, Meals, FAQ, ⚙️             |
 
@@ -64,6 +64,9 @@ month's grid with nothing on screen to say why.
   still to come — join it, or fill in your stay at it — then past burns behind
   _…show past burns_. It absorbed the page called "Your burn", singular, which was
   from when there was one burn worth showing and it was whichever came next.
+- **🔔** is a link to `/notifications` that a wide viewport intercepts to open the
+  panel instead (#336). `docs/accounts.md` has the why. It is the one entry offered to
+  an account with no role at all, because an applicant is told things too.
 - **The lodging and helping lists** are reached from that page, from
   _(edit lodging alternatives)_ beside the question they answer.
 - **⚙️** is admin's alone. It used to be `Organise` and open to any approved member,
@@ -86,6 +89,65 @@ which is not a problem the wide pages have — they use the room.
 Hiding a link is presentation. Every page behind these is guarded again server-side,
 and `Layout.test.tsx` asserts each absence by name — a negated `arrayContaining`
 passes when any _one_ of the named links is missing, which is not the question.
+
+### On a phone
+
+Nine entries do not fit a phone's width. A member's bar was brand, burn selector, six
+links, 🔔, 🙂 and ⚙️ with no responsive rule at all, so it wrapped to two or three rows
+— which is also what put the bell's panel off-screen (#336).
+
+Below `45rem` the six pages move to a **fixed bar along the bottom**, one icon each:
+
+| 📜       | 🧑‍🤝‍🧑      | 🗓️       | 🕴️    | 🍽️    | ❓  |
+| -------- | ------- | -------- | ----- | ----- | --- |
+| Going on | Members | Schedule | Leads | Meals | FAQ |
+
+The topbar keeps the brand, the burn selector and the three things that are about the
+session rather than any page — the bell, ⚙️ and the face — and scrolls away with the
+content as it always has. A signed-out visitor gets no bottom bar: Apply and Log in
+are two entries and fit where they are, and a bar of six pages none of them may open
+would be six refusals.
+
+**Six is the ceiling**, not a coincidence: six by ~3.5rem fits a 360px phone and
+nothing wider does. The pages still to come — the map (#315), the bring list (#24),
+Leave No Trace (#29), rideshare (#26), music (#316) — will have to hang off one of
+these rather than take a seventh seat.
+
+The entries are **one list in `Layout.tsx`**, drawn as words on a wide screen and as
+icons here, so the two cannot come to offer different pages. Which layout is drawn is
+decided in JavaScript by `usePhone`, not by `display: none`: a nav hidden with CSS
+leaves a second copy of every link in the accessibility tree, and a bell that only hid
+its panel would still have opened one off-screen. The stylesheet carries the same
+`45rem`, and `viewport.ts` says so where somebody changing one would read it.
+
+**Hiding the bar on scroll** is #340, and deliberately not here. It is the half that
+is easy to ship subtly wrong — the schedule grid and the meal table scroll internally
+against a `max-height`, so `window` never fires on exactly the two pages that most
+want the vertical room.
+
+### Wide things, and large text
+
+Three rules the pages follow, all of them things a phone found first:
+
+- **A table scrolls itself, not the page.** `Table.tsx` is the only thing that draws
+  `.table`, and it draws the `overflow-x` box around it, so a roster wider than the
+  screen cannot be added without one (#339). The schedule grid, the meal plan and the
+  leads register each solved this separately first; this is the fourth copy turned
+  into a component.
+- **A heading that is a sentence is a `<caption>`, not a `<th>`.** `.table thead th`
+  is `white-space: nowrap`, which is right for _Status_ and _Expires_ and wrong for
+  _What happens to you_ — it cannot wrap, so it overflowed into the column beside it
+  and the two words sat on top of each other at a larger text size (#341). A caption
+  spans the table and has nothing to collide with. Column widths given in `rem` grow
+  with the reader's text while the viewport does not, so the notification switches ask
+  for `min(5.5rem, 22%)`: the percentage is of the table and cannot outrun it.
+- **An editor opens as tall as what it holds.** Every text box opened at three lines
+  whatever was in it, so editing a page of welcome text began by scrolling inside a
+  sliver (#338). `rowsFor` in `textarea.ts` sizes them from the value and grows them as
+  somebody types; `rows` on `MarkdownField` is a floor now rather than a size.
+  `field-sizing: content` would measure it exactly and is not used — it makes the
+  browser ignore `rows`, so the fields that ask for a taller empty box would open at
+  the stylesheet's floor in Chrome and at their own everywhere else.
 
 ## Going on
 

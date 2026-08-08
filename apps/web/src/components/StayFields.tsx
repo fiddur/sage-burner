@@ -4,6 +4,8 @@ import { MAX_NOTES, MAX_OPTION_LABEL } from '@sage-burner/shared'
 
 import type { StayDraft } from '../stay.ts'
 
+import { rowsFor } from '../textarea.ts'
+
 /**
  * The questions one burn asks, without a form around them.
  *
@@ -153,6 +155,7 @@ export const StayFields = ({
         <textarea
           name="notes"
           maxLength={MAX_NOTES}
+          rows={rowsFor(draft.notes)}
           value={draft.notes}
           onInput={(event) => change({ notes: event.currentTarget.value })}
         />

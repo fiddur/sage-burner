@@ -30,6 +30,23 @@ describe('a button that says what it is doing', () => {
     expect(screen.getByRole('button', { name: 'Save' })).toHaveProperty('disabled', true)
   })
 
+  it('says it is busy where a screen reader can find it', () => {
+    // Not announced — `aria-busy` outside a live region rarely is — but it is the
+    // only answer to "why is this button dead" for anybody who cannot see the
+    // wording change, and `disabled` alone does not give one.
+    render(<PendingButton busy label="Save" busyLabel="Saving…" />)
+
+    expect(screen.getByRole('button', { name: 'Saving…' }).getAttribute('aria-busy')).toBe('true')
+  })
+
+  it('does not claim to be busy when nothing is in flight', () => {
+    // The side nothing pinned: a button stuck at `aria-busy="true"` reads as
+    // permanently unavailable to whoever it was written for.
+    render(<PendingButton busy={false} label="Save" busyLabel="Saving…" />)
+
+    expect(screen.getByRole('button', { name: 'Save' }).getAttribute('aria-busy')).toBe('false')
+  })
+
   it('passes the rest through, so it is still an ordinary button', () => {
     render(<PendingButton busy={false} label="Save" busyLabel="Saving…" type="submit" class="wide" />)
 

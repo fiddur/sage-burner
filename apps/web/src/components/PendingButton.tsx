@@ -12,9 +12,12 @@ import type { JSX } from 'preact'
  * different things about how long to expect, and a shared "One moment…" would lose
  * that for nothing.
  *
- * `aria-busy` says the same thing the wording does, for the callers whose face is an
- * emoji: the homepage's pen becomes an hourglass, which changes nothing a screen reader
- * can read, and `disabled` alone does not say *why* it cannot be pressed.
+ * `aria-busy` makes the state **discoverable**, which is less than the wording does and
+ * is worth being exact about: flipping it on a button outside a live region is not
+ * announced by most screen readers, and the accessible name does not change with it —
+ * so somebody landing on the button hears "Save, button, unavailable" and can find out
+ * why, rather than being told. The alternative is no answer to "why is this dead", so
+ * it stays. `IconButton` carries the same attribute for the same reason.
  */
 export const PendingButton = ({
   busy,

@@ -9,6 +9,21 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-08
 
+- **The app fits a phone.** The six pages — Going on, Members, Schedule, Leads, Meals,
+  FAQ — are a row of icons along the bottom of the screen now, instead of a bar that
+  wrapped onto three lines and pushed the page down. The name, the burn you are looking
+  at, 🔔, ⚙️ and your face stay at the top. Nothing changes on a laptop.
+- **🔔 has a page of its own.** Tapping the bell on a phone opens Notifications rather
+  than a list that, on some screens, opened off the side and could not be reached at
+  all. Reading it counts as having seen them, exactly as opening the list did.
+- **A wide list scrolls by itself.** Dragging the Members list sideways used to take
+  the whole page with it, nav and all. Now the list moves and the page stays put.
+- **The notification settings hold up at a large text size.** "What happens to you" ran
+  into the column beside it and the words sat on top of each other. It is a heading
+  above the table now.
+- **An edit box opens as tall as the text in it.** Editing the welcome text, a FAQ
+  answer or the meal plan's intro started with a three-line box you had to scroll
+  inside. It opens at the size of what is already written, and grows as you type.
 - **The way into a text block is a pen.** "Edit these words" under the meal plan's
   intro, and the same under the homepage's welcome text, read as the last line of the
   paragraph they sat under. Both are ✏️ now.

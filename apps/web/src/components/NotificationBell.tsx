@@ -1,10 +1,13 @@
 import type { Notification } from '@sage-burner/shared'
 
+import { useLocation } from 'preact-iso'
 import { useEffect, useRef, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
 import { markFavicon } from '../favicon.ts'
+import { usePhone } from '../viewport.ts'
+import { NotificationList } from './NotificationList.tsx'
 
 export type BellApi = Pick<ApiClient, 'getMyNotifications' | 'markNotificationsSeen'>
 
@@ -23,13 +26,22 @@ const ASK_EVERY_MS = 60_000
  *
  * The list stays after it goes grey. What the bubble counts is what is *new*, not
  * what is outstanding: a notification is a thing that happened, not a task.
+ *
+ * **It is a link to `/notifications` that a wide viewport intercepts** (#336). One
+ * control rather than two: on a phone the panel does not exist, so it cannot open
+ * off-screen the way it did whenever the header wrapped and the bell stopped being
+ * top-right; a tapped push lands on a real page on any device; and a middle-click or
+ * an open-in-new-tab does what the underline promises. The interception is left
+ * alone for a modified click for the same reason.
  */
 export const NotificationBell = ({ api }: { api: BellApi }) => {
   const [items, setItems] = useState<readonly Notification[]>([])
   const [unseen, setUnseen] = useState(0)
   const [open, setOpen] = useState(false)
   const wrap = useRef<HTMLSpanElement>(null)
-  const button = useRef<HTMLButtonElement>(null)
+  const bell = useRef<HTMLAnchorElement>(null)
+  const phone = usePhone()
+  const { path } = useLocation()
 
   useEffect(() => {
     const controller = new AbortController()
@@ -54,7 +66,11 @@ export const NotificationBell = ({ api }: { api: BellApi }) => {
       controller.abort()
       clearInterval(timer)
     }
-  }, [api])
+    // On the path as well as the client, so leaving `/notifications` re-reads a count
+    // that page has just zeroed. It does not clear the bubble *while* the page is
+    // being read: this fires as the route changes, before the page's own effect has
+    // posted anything.
+  }, [api, path])
 
   // On the boolean, not the count. Keyed by `unseen`, going from one to two re-ran
   // the effect: the cleanup put the plain icon back and the new call redrew the dot
@@ -62,6 +78,12 @@ export const NotificationBell = ({ api }: { api: BellApi }) => {
   // would notice (#295).
   const badged = unseen > 0
   useEffect(() => markFavicon(badged), [badged])
+
+  // A window narrowed while the panel is open would leave it hanging off a bell that
+  // is no longer where it was drawn — and the page it belongs on is one tap away.
+  useEffect(() => {
+    if (phone) setOpen(false)
+  }, [phone])
 
   /**
    * Anywhere else, or Escape, puts it away.
@@ -86,7 +108,7 @@ export const NotificationBell = ({ api }: { api: BellApi }) => {
     const escape = (key: KeyboardEvent) => {
       if (key.key !== 'Escape') return
       setOpen(false)
-      button.current?.focus()
+      bell.current?.focus()
     }
 
     document.addEventListener('pointerdown', outside)
@@ -112,15 +134,31 @@ export const NotificationBell = ({ api }: { api: BellApi }) => {
       .catch(() => undefined)
   }
 
+  const follow = (click: MouseEvent) => {
+    if (phone) return
+    // A new tab or a new window means the page, not a panel in a document the reader
+    // is about to leave behind.
+    if (click.metaKey || click.ctrlKey || click.shiftKey || click.altKey) return
+
+    // Both, and the second is the load-bearing one. `preact-iso` listens for clicks on
+    // `window` and its handler never looks at `defaultPrevented`, so `preventDefault`
+    // alone stopped the browser navigating and left the router pushing
+    // `/notifications` regardless — a panel over a page nobody asked for, and
+    // `markNotificationsSeen` sent twice.
+    click.preventDefault()
+    click.stopPropagation()
+    toggle()
+  }
+
   return (
     <span class="bell-wrap" ref={wrap}>
-      <button
-        ref={button}
-        type="button"
+      <a
+        ref={bell}
+        href="/notifications"
         class={unseen > 0 ? 'bell has-unseen' : 'bell'}
-        aria-expanded={open}
+        aria-expanded={phone ? undefined : open}
         aria-label={unseen === 0 ? 'Notifications' : `Notifications, ${unseen} new`}
-        onClick={toggle}
+        onClick={follow}
       >
         <span aria-hidden="true">🔔</span>
         {unseen > 0 && (
@@ -128,27 +166,11 @@ export const NotificationBell = ({ api }: { api: BellApi }) => {
             {unseen}
           </span>
         )}
-      </button>
+      </a>
 
       {open && (
         <div class="bell-panel">
-          {items.length === 0 ? (
-            <p class="form-note">Nothing yet.</p>
-          ) : (
-            <ul class="bell-list">
-              {items.map((item) => (
-                <li key={item.id} class={item.seen_at === null ? 'is-new' : undefined}>
-                  {item.link === null ? (
-                    <span>{item.body}</span>
-                  ) : (
-                    <a href={item.link} onClick={() => setOpen(false)}>
-                      {item.body}
-                    </a>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
+          <NotificationList items={items} onFollow={() => setOpen(false)} />
         </div>
       )}
     </span>

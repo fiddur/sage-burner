@@ -607,6 +607,23 @@ message is gone the moment it is dismissed, which is why the row is the notifica
 rather than the other way round. A member with no browser subscribed still gets the
 bell, which is the ordinary case.
 
+**The bell is a link to `/notifications` that a wide viewport intercepts** (#336). It
+used to be a button dropping a panel hung off its own right edge, which worked only
+while it was near the right margin — wrapped onto the header's second row on a phone
+it opened past the edge of the screen and could not be reached at all. One control
+rather than two: on a phone there is no panel to misplace, a tapped push lands on a
+page that can be scrolled and shared, and a middle-click or an open-in-new-tab does
+what the `href` promises. On a wide screen the click is intercepted and the panel
+opens as before — hung off the header now rather than the button, so no future layout
+change can put it off-screen again.
+
+The page is open to **anybody signed in**, not to approved members: an applicant is
+told when their application is decided, and refusing them the page announcing it would
+be the app hiding a message it sent them. Reading it marks everything seen, exactly as
+opening the panel does, and the list it was read with keeps its emphasis — the marking
+is for the next visit. The panel and the page draw the same component, so the peek and
+the page cannot come to say different things about one row.
+
 Twelve categories under **Your details → Notifications**, in sections that default
 differently:
 

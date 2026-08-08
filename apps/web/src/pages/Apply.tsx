@@ -18,6 +18,7 @@ import { FormError, useFormError } from '../components/FormError.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
 import { useInstallationSendsEmail } from '../installation.tsx'
 import { renderMarkdown } from '../markdown.ts'
+import { rowsFor } from '../textarea.ts'
 
 /**
  * The public application form.
@@ -279,6 +280,7 @@ export const Apply = ({ api }: ApplyProps) => {
           // description would drop the explanation of how to answer.
           const describedBy = [helpId, errorId].filter((id) => id !== undefined).join(' ')
           const described = describedBy === '' ? undefined : describedBy
+          const written = typeof answers[question.id] === 'string' ? String(answers[question.id]) : ''
 
           return (
             <div key={question.id}>
@@ -305,10 +307,11 @@ export const Apply = ({ api }: ApplyProps) => {
                   <textarea
                     name={question.id}
                     maxLength={MAX_ANSWER_LENGTH}
+                    rows={rowsFor(written)}
                     aria-required={question.required}
                     aria-invalid={problem !== undefined}
                     aria-describedby={described}
-                    value={typeof answers[question.id] === 'string' ? String(answers[question.id]) : ''}
+                    value={written}
                     onInput={(event) => answer(question.id, event.currentTarget.value)}
                   />
                 )}

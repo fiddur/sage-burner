@@ -67,6 +67,21 @@ describe('what to be told about', () => {
     expect(screen.queryByLabelText('Somebody applies to join — Here')).toBeNull()
   })
 
+  it('names each section in a caption rather than a column header', async () => {
+    // The defect (#341): as a `<th>` under `.table thead th { white-space: nowrap }`
+    // the sentence could not wrap, so at a larger text size "What happens to you"
+    // ran straight over the Here column beside it. The rows carry their own
+    // `<th scope="row">`, so it never was a column header.
+    render(<NotificationSettingsField api={stub()} />)
+
+    const heading = await screen.findByText('What happens to you')
+    expect(heading.tagName).toBe('CAPTION')
+    // The corner beside Here and Email is empty, not missing: a header row one cell
+    // short would put every switch column under the wrong heading.
+    expect(screen.queryByRole('columnheader', { name: 'What happens to you' })).toBeNull()
+    expect(heading.closest('table')?.querySelectorAll('thead th')).toHaveLength(2)
+  })
+
   it('adds the admin section for an admin', async () => {
     render(asAdmin(stub()))
 

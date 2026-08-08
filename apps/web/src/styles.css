@@ -69,7 +69,10 @@ a:hover {
   min-height: 100vh;
 }
 
+/* `relative` so the bell's panel can hang off this rather than off the bell — see
+   `.bell-panel`, which is what stopped it opening off the side of the screen. */
 .site-header {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   gap: 1rem;
@@ -221,6 +224,46 @@ a:hover {
 
 .site-footer p {
   max-width: var(--measure);
+}
+
+/* The phone's nav (#337) — `docs/the-app.md` has the shape and the why. Always
+   visible; hiding it on scroll down is #340. */
+.bottom-bar {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  justify-content: space-around;
+  /* iOS draws the home indicator over anything down here without it. */
+  padding-bottom: env(safe-area-inset-bottom);
+  border-top: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.bottom-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3.5rem;
+  font-size: 1.4rem;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.bottom-tab.is-current {
+  border-top: 2px solid var(--ember);
+  background: color-mix(in srgb, var(--ember) 10%, transparent);
+}
+
+/*
+  Room for the bar to sit over, on the last thing in the column rather than on `main`:
+  the footer is below it, so padding on `main` alone leaves the bar covering the line
+  about the licence instead of the schedule's last row.
+*/
+.has-bottom-bar .site-footer {
+  padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
 }
 
 .prose h1 {
@@ -1323,10 +1366,28 @@ a:hover {
   border-radius: 0.5rem;
 }
 
+/*
+  What scrolls when a shared table is wider than the screen (#339) — itself, rather
+  than the page under it, nav and all. `Table.tsx` is the only thing that draws it,
+  so a `.table` cannot be added without one.
+*/
+.table-wrap {
+  overflow-x: auto;
+}
+
 /* The shared table: the members list, the roster, the accounts list, the invites. */
 .table {
   border-collapse: collapse;
   width: 100%;
+}
+
+/* A section title above the table, not a cell in it — see `.notification-settings`. */
+.table caption {
+  margin-bottom: 0.35rem;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: start;
 }
 
 .table th,
@@ -1354,9 +1415,18 @@ a:hover {
   table-layout: fixed;
 }
 
+/*
+  `min()`, and the `rem` half is only the desktop half (#341).
+
+  At `5.5rem` flat these grew with the reader's text size while the viewport did not,
+  so the bigger the text the less was left for the labels — at 200% two switch columns
+  wanted more room than the whole screen had. A percentage is of the table, so it
+  cannot outrun it; the `rem` keeps them from sprawling on a wide screen. The smaller
+  wins, which is the right one either way.
+*/
 .notification-settings thead th:not(:first-child),
 .notification-settings tbody td {
-  width: 5.5rem;
+  width: min(5.5rem, 22%);
   text-align: center;
 }
 
@@ -1708,17 +1778,21 @@ img.avatar {
 
 /* The bell, and what it drops down. */
 .bell-wrap {
-  position: relative;
   display: inline-flex;
 }
 
+/* A link to `/notifications` rather than a button (#336), so it wears none of a
+   link's clothes: an underline under an emoji reads as a mistake. */
 .bell {
   position: relative;
+  display: inline-flex;
   padding: 0.2rem 0.3rem;
   border: 0;
   background: none;
+  color: inherit;
   font-size: 1.1rem;
   line-height: 1;
+  text-decoration: none;
   cursor: pointer;
   /* Grey until something has happened, which is the whole signal. */
   filter: grayscale(1);
@@ -1745,12 +1819,28 @@ img.avatar {
   text-align: center;
 }
 
+/*
+  Hung off the header, not off the bell (#336).
+
+  `inset-inline-end: 0` inside `.bell-wrap` anchored it to the bell's own right edge,
+  which only worked while the bell was near the right margin. Wrapped onto a second
+  row the bell sits far left, so the panel's other edge went past the viewport — and
+  nothing clipped it, so it could not be reached at all. The header's right edge is
+  the viewport's, wherever the bell has ended up on it.
+
+  Absolute against the header rather than fixed against the viewport, because the
+  header scrolls away with the page: a fixed panel would still be floating over the
+  content long after the bell it belongs to had gone. On a phone it does not exist —
+  the bell is a link to the page instead.
+*/
 .bell-panel {
   position: absolute;
   top: 100%;
-  inset-inline-end: 0;
+  inset-inline-end: clamp(1rem, 5vw, 3rem);
   z-index: 30;
-  width: min(22rem, 80vw);
+  width: min(22rem, calc(100vw - 2rem));
+  max-height: 70vh;
+  overflow-y: auto;
   margin-top: 0.4rem;
   padding: 0.6rem 0.8rem;
   border: 1px solid var(--line);
@@ -1759,15 +1849,24 @@ img.avatar {
   box-shadow: 0 4px 16px rgb(0 0 0 / 18%);
 }
 
-.bell-list {
+/* The panel's list and the page's, which are one component (#336). */
+.notification-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 0.5rem;
+  gap: 0.75rem;
   font-size: 0.9rem;
 }
 
-.bell-list li.is-new {
+.notification-list li.is-new {
   font-weight: 600;
+}
+
+.notification-when {
+  margin: 0.1rem 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  /* `.is-new` bolds the row; the date is not the part that is new. */
+  font-weight: 400;
 }

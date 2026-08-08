@@ -10,6 +10,7 @@ import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
+import { Table } from '../components/Table.tsx'
 import { WaitingListLine, startsTheWaitingList } from '../components/WaitingListLine.tsx'
 import { useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
@@ -123,7 +124,7 @@ const HowToPay = ({
  * were pushing that over the complexity ceiling.
  */
 const RosterTable = ({ entries }: { entries: readonly MemberRosterEntry[] }) => (
-  <table class="table">
+  <Table>
     <thead>
       <tr>
         <th scope="col">Who</th>
@@ -168,5 +169,5 @@ const RosterTable = ({ entries }: { entries: readonly MemberRosterEntry[] }) => 
         </Fragment>
       ))}
     </tbody>
-  </table>
+  </Table>
 )

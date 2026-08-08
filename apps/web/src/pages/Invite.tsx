@@ -12,6 +12,7 @@ import { FormError, useFormError } from '../components/FormError.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
 import { StayFields } from '../components/StayFields.tsx'
 import { stayForBurn, stayProblem, stayUpdate } from '../stay.ts'
+import { rowsFor } from '../textarea.ts'
 import { useSetViewer, useViewer } from '../viewer.tsx'
 
 export type InviteApi = Pick<
@@ -384,6 +385,7 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
           <textarea
             name="allergies_notes"
             maxLength={MAX_NOTES}
+            rows={rowsFor(allergies)}
             value={allergies}
             onInput={(event) => setAllergies(event.currentTarget.value)}
           />
