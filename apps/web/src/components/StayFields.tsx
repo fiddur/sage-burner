@@ -78,6 +78,14 @@ export const StayFields = ({
         />
       </label>
 
+      {/* Beside the dates, which is where somebody is standing when they think about
+          getting there — the same reasoning that puts the lodging list beside the
+          question it answers. Not in the bar: that carries one entry per thing and is
+          already full at six on a phone (#26). */}
+      <p class="form-note">
+        <a href="/rides">Looking for a lift, or offering one?</a>
+      </p>
+
       <label class="field">
         <span>Where are you sleeping?</span>
         <select

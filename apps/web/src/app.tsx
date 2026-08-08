@@ -38,6 +38,7 @@ import { Notifications } from './pages/Notifications.tsx'
 import { Options } from './pages/Options.tsx'
 import { Places } from './pages/Places.tsx'
 import { ProfilePage } from './pages/Profile.tsx'
+import { Rides } from './pages/Rides.tsx'
 import { Roles } from './pages/Roles.tsx'
 import { Schedule } from './pages/Schedule.tsx'
 import { createRemembered, RememberedProvider } from './remembered.tsx'
@@ -113,6 +114,10 @@ export type RoutesApi = Pick<
   | 'getMembers'
   | 'setPayment'
   | 'getPlaces'
+  | 'getRides'
+  | 'addRide'
+  | 'updateRide'
+  | 'deleteRide'
   | 'addPlace'
   | 'updatePlace'
   | 'deletePlace'
@@ -222,6 +227,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
   const DreamsRoute = useMemo(() => () => <Dreams api={api} />, [api])
   const ScheduleRoute = useMemo(() => () => <Schedule api={api} />, [api])
   const RolesRoute = useMemo(() => () => <Roles api={api} />, [api])
+  const RidesRoute = useMemo(() => () => <Rides api={api} />, [api])
   const FaqRoute = useMemo(() => () => <Faq api={api} />, [api])
   const FeedRoute = useMemo(() => () => <Feed api={api} />, [api])
   const MealsRoute = useMemo(() => () => <Meals api={api} />, [api])
@@ -246,6 +252,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
       <Route path="/dreams" component={DreamsRoute} />
       <Route path="/schedule" component={ScheduleRoute} />
       <Route path="/roles" component={RolesRoute} />
+      <Route path="/rides" component={RidesRoute} />
       <Route path="/faq" component={FaqRoute} />
       <Route path="/going-on" component={FeedRoute} />
       <Route path="/notifications" component={NotificationsRoute} />

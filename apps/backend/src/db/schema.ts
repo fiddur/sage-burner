@@ -14,6 +14,7 @@ import {
   mealSlotKinds,
   paymentStatuses,
   placeColors,
+  rideKinds,
   tickBoxRequired,
 } from '@sage-burner/shared'
 import { sql } from 'drizzle-orm'
@@ -443,6 +444,47 @@ export const place = sqliteTable(
     check('place_order_check', sql`${table.order} >= 0`),
     check('place_name_check', sql`length(trim(${table.name})) > 0`),
     check('place_emoji_check', sql`length(trim(${table.emoji})) > 0`),
+  ],
+)
+
+/**
+ * Getting to the burn and back — the spreadsheet's Rideshares tab (#26).
+ *
+ * One row per journey somebody has said something about, with `kind` deciding which
+ * half of the board it appears on. `docs/burns.md` has the shape.
+ *
+ * No contact column: it lives on the account, which is the one place it is kept
+ * current. Cascades with the burn and with the account, so leaving takes your
+ * journeys with you.
+ */
+export const ride = sqliteTable(
+  'ride',
+  {
+    id: text('id').notNull(),
+    event_id: text('event_id')
+      .notNull()
+      .references(() => event.id, { onDelete: 'cascade' }),
+    account_id: text('account_id')
+      .notNull()
+      .references(() => account.id, { onDelete: 'cascade' }),
+    kind: text('kind', { enum: rideKinds }).notNull(),
+    from: text('from').notNull(),
+    when: text('when').notNull(),
+    /** Spare room in a car. Zero on a request, where it would mean nothing. */
+    seats: integer('seats').notNull().default(0),
+    notes: text('notes').notNull().default(''),
+    created_at: text('created_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    // The one way the board reads: a burn's rows, oldest first within each half.
+    index('ride_event_idx').on(table.event_id, table.kind, table.created_at),
+    // For the cascade, which without it scans once per row of the account going.
+    index('ride_account_idx').on(table.account_id),
+    check('ride_kind_check', oneOf(table.kind, rideKinds)),
+    check('ride_from_check', sql`length(trim(${table.from})) > 0`),
+    check('ride_when_check', sql`length(trim(${table.when})) > 0`),
+    check('ride_seats_check', sql`${table.seats} >= 0`),
   ],
 )
 

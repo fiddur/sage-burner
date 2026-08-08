@@ -9,6 +9,10 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-08
 
+- **A rideshare board.** Who is looking for a lift and who has room in a car, per burn,
+  with everyone's contact details right there — the Rideshares tab from the spreadsheet,
+  without being a publicly linked document. Your own posting is yours to change or take
+  down. Find it beside the arrival dates on your details page.
 - **A line on Going on opens the burn it is about.** Following one about the autumn burn
   while the bar was showing the summer one took you to the summer page — the right page,
   the wrong burn.

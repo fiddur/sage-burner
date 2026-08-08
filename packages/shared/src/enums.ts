@@ -29,6 +29,15 @@ export type PlaceColor = (typeof placeColors)[number]
 export const isPlaceColor = (value: unknown): value is PlaceColor => isOneOf(placeColors, value)
 
 /**
+ * Which half of the rideshare board a row is on (#26).
+ *
+ * One vocabulary rather than two tables: everything else about a journey is the same
+ * whichever way it is going, and the board draws the two under headings of their own.
+ */
+export const rideKinds = ['needs', 'offers'] as const
+export type RideKind = (typeof rideKinds)[number]
+
+/**
  * The two per-event lists in `event_option`.
  *
  * `lodging` is a single choice and can carry a capacity — "Temple mattress: 9".

@@ -51,6 +51,7 @@ import { registerPushRoutes } from './routes/push.ts'
 import { registerPwaRoutes } from './routes/pwa.ts'
 import { registerQuestionRoutes } from './routes/questions.ts'
 import { registerRedemptionRoutes } from './routes/redemption.ts'
+import { registerRideRoutes } from './routes/rides.ts'
 import { registerRosterRoutes } from './routes/roster.ts'
 import { registerScheduleRoutes } from './routes/schedule.ts'
 import { registerSessionRoutes } from './routes/sessions.ts'
@@ -475,6 +476,7 @@ export const createApp = async ({
   registerEventOptionRoutes(app, { db, sessions })
   registerQuestionRoutes(app, { db })
   registerPlaceRoutes(app, { db, sessions, now })
+  registerRideRoutes(app, { db, sessions, now })
   registerAvatarRoutes(app, { db, sessions, now })
   registerPwaRoutes(app, { db, sessions, now })
   registerBannerRoutes(app, { db, sessions, now })
