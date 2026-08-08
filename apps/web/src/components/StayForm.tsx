@@ -84,7 +84,7 @@ export const StayForm = ({
         helpingOptions={helpingOptions}
         lodgingTaken={taken}
         heldLodging={attendance.lodging_option_id}
-        offerListEditing
+        signedInMember
       />
 
       {saved && (

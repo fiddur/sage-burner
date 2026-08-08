@@ -144,6 +144,31 @@ describe('the nav', () => {
   })
 })
 
+describe('the menu beside the logo', () => {
+  it('carries the pages the bar has no room for', async () => {
+    renderNav(signedInAs('member'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }))
+
+    expect((await screen.findByRole('link', { name: /Rideshares/ })).getAttribute('href')).toBe('/rides')
+  })
+
+  it('is offered on a phone as well, where the bar is fullest', () => {
+    onAPhone()
+    renderNav(signedInAs('member'))
+
+    expect(screen.getByRole('button', { name: 'Menu' })).toBeTruthy()
+  })
+
+  it('is not offered to somebody who may open none of it', () => {
+    // Rideshares is `requireApproved`, so for a signed-out visitor ☰ would open onto
+    // one link to a page that refuses them.
+    renderNav({ status: 'signed-out' })
+
+    expect(screen.queryByRole('button', { name: 'Menu' })).toBeNull()
+  })
+})
+
 describe('the nav on a phone', () => {
   /**
    * The six pages, by the accessible name they carry in both layouts.

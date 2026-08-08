@@ -9,6 +9,12 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-08
 
+- **A menu beside the name at the top left.** ☰ slides out the pages the bar has no
+  room for — 🛻 Rideshares to begin with, and more as they arrive. The logo still takes
+  you to the start page.
+- **The rideshare board is reachable without having joined a burn.** It was linked only
+  from your arrival dates, which is a form you do not have until you have said you are
+  coming.
 - **A rideshare board.** Who is looking for a lift and who has room in a car, per burn,
   with everyone's contact details right there — the Rideshares tab from the spreadsheet,
   without being a publicly linked document. Your own posting is yours to change or take

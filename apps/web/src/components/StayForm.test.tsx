@@ -351,4 +351,19 @@ describe('StayForm', () => {
 
     expect(screen.queryByLabelText(/pay/i)).toBeNull()
   })
+
+  it('offers the way to the rideshare board, beside the dates it is about', () => {
+    // Here and not on the invite page, which draws the same fields before the account
+    // exists — a link to a members-only page is one that cannot be followed (#26).
+    render(
+      <StayForm
+        eventId="e-1"
+        api={{ updateMyStay: vi.fn() }}
+        attendance={anAttendance()}
+        onSaved={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('link', { name: /Looking for a lift/ }).getAttribute('href')).toBe('/rides')
+  })
 })

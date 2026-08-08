@@ -28,7 +28,7 @@ export const StayFields = ({
   helpingOptions = [],
   lodgingTaken = {},
   heldLodging,
-  offerListEditing = false,
+  signedInMember = false,
 }: {
   draft: StayDraft
   onChange: (next: StayDraft) => void
@@ -41,12 +41,12 @@ export const StayFields = ({
   /** The lodging they are already down for, which is never offered as full. */
   heldLodging?: string | null
   /**
-   * Whether to offer the link to the lodging list itself.
+   * Whether the person filling this in is a signed-in member.
    *
-   * Off where nobody is signed in yet: the invite page draws these fields before the
-   * account exists, and a link to a members-only page is one that cannot be followed.
+   * Off on the invite page, which draws these fields before the account exists — and
+   * a link to a members-only page is one that cannot be followed.
    */
-  offerListEditing?: boolean
+  signedInMember?: boolean
 }) => {
   const change = (part: Partial<StayDraft>) => onChange({ ...draft, ...part })
 
@@ -79,12 +79,13 @@ export const StayFields = ({
       </label>
 
       {/* Beside the dates, which is where somebody is standing when they think about
-          getting there — the same reasoning that puts the lodging list beside the
-          question it answers. Not in the bar: that carries one entry per thing and is
-          already full at six on a phone (#26). */}
-      <p class="form-note">
-        <a href="/rides">Looking for a lift, or offering one?</a>
-      </p>
+          getting there. ☰ carries it as well, for everyone who has not joined a burn
+          and so has no stay to read this from (#26). */}
+      {signedInMember && (
+        <p class="form-note">
+          <a href="/rides">Looking for a lift, or offering one?</a>
+        </p>
+      )}
 
       <label class="field">
         <span>Where are you sleeping?</span>
@@ -116,7 +117,7 @@ export const StayFields = ({
           beside the question it answers rather than on a page of its own. Offered to
           everyone signed in, because everyone there may edit it — the page refuses
           anyone who may not, and so does the API. */}
-      {offerListEditing && (
+      {signedInMember && (
         <p class="form-note">
           <a href="/options">(edit lodging alternatives)</a>
         </p>

@@ -73,7 +73,7 @@ burn-scoped page already reads this.
   an account with no role at all, because an applicant is told things too.
 - **The lodging and helping lists** are reached from that page, from
   _(edit lodging alternatives)_ beside the question they answer.
-- **The rideshare board** is reached from that page too, beside the arrival dates —
+- **The rideshare board** is in ☰, and beside the arrival dates on the details page —
   which is where somebody is standing when they think about getting there (#26).
   `docs/burns.md` has the shape.
 - **⚙️** is admin's alone. It used to be `Organise` and open to any approved member,
@@ -96,6 +96,54 @@ which is not a problem the wide pages have — they use the room.
 Hiding a link is presentation. Every page behind these is guarded again server-side,
 and `Layout.test.tsx` asserts each absence by name — a negated `arrayContaining`
 passes when any _one_ of the named links is missing, which is not the question.
+
+### ☰, beside the logo
+
+The bar carries one entry per thing and the bottom bar caps at six, so everything else
+has been reached from the page it belongs to. That worked until a page belonged to no
+other page: the rideshare board is linked from a form that only renders for a burn you
+have already joined, so somebody who has not joined one could not get there at all.
+
+**☰ is where those live**, starting with 🛻 Rideshares. Beside the logo rather than on
+it: the logo goes home, which is a convention worth more than the space a second target
+costs.
+
+**The drawer slides over the page, and the page does not move.** Pushing the site aside
+would mean a `transform` on a wrapper, and a transform makes `position: fixed` resolve
+against that wrapper instead of the viewport — which is `.bottom-bar` and `.bell-panel`,
+and exactly the class of bug #344 and #348 were. The z-index scale gains two: bar 20,
+popdown 30, the drawer's backdrop 34, the drawer 35, modal 40 — the backdrop one rung
+under what it sits behind rather than a round number of its own.
+
+It is **rendered only while open** rather than hidden with CSS, so its links are out of
+the tab order the rest of the time with no `inert` to keep in step with an animation.
+
+**The backdrop dismisses it**, not a document listener like the bell's. The backdrop
+covers the viewport, so every press outside the drawer lands on it — and an "is this
+inside?" check against a wrapper that contains the backdrop answers _yes_ to every press
+on the page, leaving the drawer stuck open with only Escape as a way out. On a phone,
+which is the viewport this is for, that is no way out at all. Escape still works and
+hands focus back to ☰, and following a link closes it too, since a link to the page
+already open changes no route to react to.
+
+The drawer covers ☰ while it is open, so a **✕ inside it** is the pointer way out that
+does not depend on hitting the strip of backdrop beside it. Focus moves to the first
+entry on open and back to ☰ on Escape.
+
+There is no ☰ at all when it would open onto nothing — a signed-out visitor may follow
+none of it.
+
+**The bar's nav is styled by class**, not as `.site-header nav`. The drawer is a `nav`
+and it lands inside the header, where a descendant selector beats `.menu-drawer` on
+specificity and lays a column of full-width entries out centred, wrapped and gapped.
+
+**The bar pins its nav rather than spreading itself.** `justify-content: space-between`
+put whatever was in the middle _in the middle_, and the bar's children come and go — ☰
+only for a member, the burn selector only for a second burn — so ☰ landed halfway across
+the bar for the ordinary one-burn viewer the day it was added. `margin-inline-start:
+auto` on the nav holds for every combination; a second auto margin would split the free
+space between the two and move the selector instead. Nothing in the suite lays anything
+out, so `styles.test.ts` asserts it against the stylesheet as text.
 
 ### On a phone
 
