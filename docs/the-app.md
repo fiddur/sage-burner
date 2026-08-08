@@ -520,10 +520,14 @@ Two caches, and the split is the whole of what stays on a device:
   #311 — and only a URL with a query can pile up that way, since one without is a single
   key that a store replaces in place. The query is what the rule turns on rather than
   the path, because `/api/installation/icon` is asked for **both ways**: bare by the
-  header's mark and the favicon, versioned by the settings page and the manifest. Those
-  are two live entries under one path, not two versions of one. A count over the lot
-  would be the obvious single rule and is the one thing this must not do — it could
-  evict the shell, which is what makes the app open offline at all (#268).
+  header's mark and the favicon, versioned by the manifest and the settings page. Those
+  are two live entries under one path, not two versions of one. Among the _versioned_
+  spellings only the newest survives, which is why `/api/installation` answers
+  `icon_updated_at` and both quote it — the settings page used to invent a literal
+  `?v=current`, which was a third live spelling evicting the manifest's on every store
+  (#376). A count over the lot would be the obvious single rule and is the one thing
+  this must not do — it could evict the shell, which is what makes the app open offline
+  at all (#268).
 - **`sage-burner-api-v1`** — every API read: the roster, the schedule, who you
   are. **This is member data on disk, and signing out deletes the whole cache.**
   Not entries picked from it by URL, which would be a list to keep in step with

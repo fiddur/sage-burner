@@ -18,7 +18,14 @@ const ADMIN: Viewer = {
 
 const stub = (over: Partial<AdminSettingsApi> = {}): AdminSettingsApi => ({
   getInstallation: () =>
-    Promise.resolve({ installation: { title: 'Sage Burner', banner_updated_at: null, sends_email: false } }),
+    Promise.resolve({
+      installation: {
+        title: 'Sage Burner',
+        banner_updated_at: null,
+        icon_updated_at: null,
+        sends_email: false,
+      },
+    }),
   // The mail form mounted here has its own tests; this keeps it from reaching the API
   // when the page under test is about the title.
   getMailSettings: () => Promise.resolve({ mail: null }),
@@ -96,7 +103,12 @@ describe('AdminSettings', () => {
   it('renames it', async () => {
     const updateInstallation = vi.fn<AdminSettingsApi['updateInstallation']>(() =>
       Promise.resolve({
-        installation: { title: 'The Burning Sage', banner_updated_at: null, sends_email: false },
+        installation: {
+          title: 'The Burning Sage',
+          banner_updated_at: null,
+          icon_updated_at: null,
+          sends_email: false,
+        },
       }),
     )
     renderPage(stub({ updateInstallation }))
@@ -111,7 +123,12 @@ describe('AdminSettings', () => {
   it('trims what it sends, so a stray space is not a rename', async () => {
     const updateInstallation = vi.fn<AdminSettingsApi['updateInstallation']>(() =>
       Promise.resolve({
-        installation: { title: 'The Burning Sage', banner_updated_at: null, sends_email: false },
+        installation: {
+          title: 'The Burning Sage',
+          banner_updated_at: null,
+          icon_updated_at: null,
+          sends_email: false,
+        },
       }),
     )
     renderPage(stub({ updateInstallation }))
@@ -126,7 +143,9 @@ describe('AdminSettings', () => {
     // `aria-required` rather than `required`, so the browser does not block the
     // submit before this message can be shown. The page is the only authority.
     const updateInstallation = vi.fn<AdminSettingsApi['updateInstallation']>(() =>
-      Promise.resolve({ installation: { title: '', banner_updated_at: null, sends_email: false } }),
+      Promise.resolve({
+        installation: { title: '', banner_updated_at: null, icon_updated_at: null, sends_email: false },
+      }),
     )
     renderPage(stub({ updateInstallation }))
 
@@ -150,7 +169,12 @@ describe('AdminSettings', () => {
             api={stub({
               updateInstallation: () =>
                 Promise.resolve({
-                  installation: { title: 'The Burning Sage', banner_updated_at: null, sends_email: false },
+                  installation: {
+                    title: 'The Burning Sage',
+                    banner_updated_at: null,
+                    icon_updated_at: null,
+                    sends_email: false,
+                  },
                 }),
             })}
           />
@@ -190,7 +214,12 @@ describe('AdminSettings', () => {
     // once, in `GuardedPage`, rather than five times.
     const getInstallation = vi.fn<AdminSettingsApi['getInstallation']>(() =>
       Promise.resolve({
-        installation: { title: 'Sage Burner', banner_updated_at: null, sends_email: false },
+        installation: {
+          title: 'Sage Burner',
+          banner_updated_at: null,
+          icon_updated_at: null,
+          sends_email: false,
+        },
       }),
     )
     renderPage(stub({ getInstallation }), { status: 'signed-out' })
@@ -203,7 +232,12 @@ describe('AdminSettings', () => {
   it('tells somebody signed in without the role to ask, not to log in again', async () => {
     const getInstallation = vi.fn<AdminSettingsApi['getInstallation']>(() =>
       Promise.resolve({
-        installation: { title: 'Sage Burner', banner_updated_at: null, sends_email: false },
+        installation: {
+          title: 'Sage Burner',
+          banner_updated_at: null,
+          icon_updated_at: null,
+          sends_email: false,
+        },
       }),
     )
     renderPage(stub({ getInstallation }), {

@@ -159,9 +159,11 @@ export const cachedAt = (response: Pick<Response, 'headers'>): string | undefine
  *
  * The query is what the rule turns on, and that is load-bearing rather than incidental.
  * `/api/installation/icon` is asked for **both ways** — bare by the header's mark and
- * the favicon, versioned by the settings page and the manifest — so those are two live
+ * the favicon, versioned by the manifest and the settings page — so those are two live
  * entries under one path rather than two versions of one, and a rule keyed on pathname
- * alone would drop whichever was stored first on every put.
+ * alone would drop whichever was stored first on every put. Among the *versioned*
+ * spellings only the newest survives, which is why the manifest and the settings page
+ * quote the same `?v=`: the page used to invent a literal of its own (#376).
  *
  * A count-based trim over the lot would be the obvious single rule and is the one thing
  * this must not do: it could evict the shell, which is what makes the app open offline
