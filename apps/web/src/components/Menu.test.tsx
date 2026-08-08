@@ -37,20 +37,32 @@ describe('the menu beside the logo', () => {
     expect(screen.queryByRole('button', { name: 'Menu' })).toBeNull()
   })
 
-  it('puts itself away when something else on the page is pressed', async () => {
+  it('puts itself away when the page behind it is pressed', async () => {
+    // The backdrop, not `document.body`. It covers the viewport, so it *is* what a
+    // press outside the drawer lands on — and `fireEvent.pointerDown(document.body)`
+    // sets the target directly, so it never goes through the element a person hits.
     await opened()
+    const backdrop = document.querySelector('.menu-backdrop')
 
-    fireEvent.pointerDown(document.body)
+    expect(backdrop).not.toBeNull()
+    if (backdrop !== null) fireEvent.pointerDown(backdrop)
 
     await waitFor(() => expect(screen.queryByRole('link', { name: /Rideshares/ })).toBeNull())
   })
 
   it('stays open when the press lands inside it', async () => {
-    // The success path the test above cannot show: ☰ is itself a press inside, so a
-    // listener that did not check would fight its own toggle.
+    // The success path the test above cannot show: dismissal must be the backdrop's,
+    // not everything's.
     fireEvent.pointerDown(await opened())
 
     expect(screen.queryByRole('link', { name: /Rideshares/ })).toBeTruthy()
+  })
+
+  it('closes on following a link, including to the page already open', async () => {
+    // There is no route change to react to when the link is where you already are.
+    fireEvent.click(await opened())
+
+    await waitFor(() => expect(screen.queryByRole('link', { name: /Rideshares/ })).toBeNull())
   })
 
   it('closes on Escape and hands focus back to ☰', async () => {

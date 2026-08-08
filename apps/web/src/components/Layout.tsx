@@ -40,10 +40,8 @@ const memberPages: readonly NavPage[] = [
 ]
 
 /**
- * What ☰ holds: the pages the bar has no room for.
- *
- * The bar is one entry per thing and the bottom bar caps at six, so this is where the
- * rest go — starting with the one that had no way in at all.
+ * What ☰ holds: the pages the bar has no room for, beside the logo rather than on it —
+ * the logo goes home. `docs/the-app.md` has the rest.
  */
 const menuPages: readonly NavPage[] = [{ href: '/rides', label: 'Rideshares', icon: '🛻' }]
 
@@ -93,9 +91,7 @@ export const Layout = ({ api, children }: { api: BellApi; children: ComponentChi
           <span class="brand-name">{title}</span>
         </a>
 
-        {/* Beside the logo rather than on it: the logo goes home, which is a convention
-            worth more than the space a second target costs. */}
-        <Menu pages={pages.length > 0 ? menuPages : []} />
+        <Menu pages={isApproved(viewer) ? menuPages : []} />
 
         {/* Leftmost, because everything to the right of it is about the burn it
             names. Hidden when there is nothing to choose between: one burn is the

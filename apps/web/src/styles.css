@@ -226,14 +226,8 @@ a:hover {
   max-width: var(--measure);
 }
 
-/*
-  ☰ and what it slides out — the pages the bar has no room for.
-
-  Over the page rather than pushing it aside: sliding the site would mean a `transform`
-  on a wrapper, and a transform makes `position: fixed` resolve against that wrapper
-  instead of the viewport — which is `.bottom-bar` and `.bell-panel`, and the class of
-  bug #344 and #348 already were.
-*/
+/* ☰ and what it slides out. Over the page rather than pushing it aside —
+   `docs/the-app.md` says why that is not a taste question. */
 .menu-wrap {
   display: inline-flex;
   align-self: center;

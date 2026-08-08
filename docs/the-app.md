@@ -116,9 +116,17 @@ and exactly the class of bug #344 and #348 were. The z-index scale gains a fourt
 
 It is **rendered only while open** rather than hidden with CSS, so its links are out of
 the tab order the rest of the time with no `inert` to keep in step with an animation.
-Dismissal is the bell's: a press outside, or Escape, which hands focus back to ☰. There
-is no ☰ at all when it would open onto nothing — a signed-out visitor may follow none of
-it.
+
+**The backdrop dismisses it**, not a document listener like the bell's. The backdrop
+covers the viewport, so every press outside the drawer lands on it — and an "is this
+inside?" check against a wrapper that contains the backdrop answers _yes_ to every press
+on the page, leaving the drawer stuck open with only Escape as a way out. On a phone,
+which is the viewport this is for, that is no way out at all. Escape still works and
+hands focus back to ☰, and following a link closes it too, since a link to the page
+already open changes no route to react to.
+
+There is no ☰ at all when it would open onto nothing — a signed-out visitor may follow
+none of it.
 
 ### On a phone
 

@@ -4,23 +4,16 @@ import { useEffect, useRef, useState } from 'preact/hooks'
 import type { NavPage } from './Layout.tsx'
 
 /**
- * The pages the bar has no room for.
+ * The pages the bar has no room for — `docs/the-app.md` has the why.
  *
- * The bar carries one entry per thing and the bottom bar caps at six, so everything
- * else has been reached from the page it belongs to — which worked until a page
- * belonged to no other page. Rideshares is reachable only from a form that renders
- * for a burn you have already joined, so somebody who has not joined one cannot get
- * there at all. This is where those live.
- *
- * A drawer over the page rather than one that pushes it aside: sliding the site would
- * mean a `transform` on a wrapper, and a transform makes `position: fixed` resolve
- * against that wrapper instead of the viewport — which is the bottom bar and the
- * bell's panel, and the class of bug #344 and #348 already were.
+ * Dismissal is the backdrop's own, not a document listener like the bell's. The
+ * backdrop covers the viewport, so every press outside the drawer lands on it: an
+ * "is this inside?" check against a wrapper containing the backdrop answers yes to
+ * every press on the page, and the drawer never closes at all.
  */
 export const Menu = ({ pages }: { pages: readonly NavPage[] }) => {
   const [open, setOpen] = useState(false)
   const button = useRef<HTMLButtonElement>(null)
-  const wrap = useRef<HTMLDivElement>(null)
   const { path } = useLocation()
 
   useEffect(() => setOpen(false), [path])
@@ -28,31 +21,21 @@ export const Menu = ({ pages }: { pages: readonly NavPage[] }) => {
   useEffect(() => {
     if (!open) return undefined
 
-    const outside = (pointer: Event) => {
-      const target = pointer.target
-      if (target instanceof Node && wrap.current?.contains(target) === true) return
-      setOpen(false)
-    }
-
     const escape = (key: KeyboardEvent) => {
       if (key.key !== 'Escape') return
       setOpen(false)
       button.current?.focus()
     }
 
-    document.addEventListener('pointerdown', outside)
     document.addEventListener('keydown', escape)
 
-    return () => {
-      document.removeEventListener('pointerdown', outside)
-      document.removeEventListener('keydown', escape)
-    }
+    return () => document.removeEventListener('keydown', escape)
   }, [open])
 
   if (pages.length === 0) return null
 
   return (
-    <div class="menu-wrap" ref={wrap}>
+    <div class="menu-wrap">
       <button
         ref={button}
         type="button"
@@ -68,10 +51,12 @@ export const Menu = ({ pages }: { pages: readonly NavPage[] }) => {
           the time without `inert` or a visibility dance. */}
       {open && (
         <>
-          <div class="menu-backdrop" />
+          <div class="menu-backdrop" onPointerDown={() => setOpen(false)} />
           <nav class="menu-drawer" aria-label="More">
             {pages.map((page) => (
-              <a key={page.href} class="menu-entry" href={page.href}>
+              // Closed here as well as on a route change, since following a link to the
+              // page already open changes no route to react to.
+              <a key={page.href} class="menu-entry" href={page.href} onClick={() => setOpen(false)}>
                 <span aria-hidden="true">{page.icon}</span> {page.label}
               </a>
             ))}
