@@ -94,11 +94,19 @@ The workshops, ceremonies and happenings members offer each other. **A dream wit
 no time slot is offered but not yet scheduled** — that is where most of them sit
 right up until the burn, and it is the normal state, not an error.
 
-**Members**, not admins. `/api/events/:eventId/sessions` and `/api/sessions/:id` are
-behind `requireMember`, because the schedule belongs to the people coming: any
-member may reschedule any dream, not only the one who offered it. Gated on the
-`member` role rather than on having an `attendance` row, so someone can help plan
-next burn's programme before they have said they are coming.
+**Anyone who is in.** `/api/events/:eventId/sessions` and `/api/sessions/:id` are
+behind `requireApproved`, because the schedule belongs to the people coming: any
+member may reschedule any dream, not only the one who offered it. Gated on a role
+rather than on having an `attendance` row, so someone can help plan next burn's
+programme before they have said they are coming.
+
+`requireApproved` rather than `requireMember` since #200. The two roles are
+independent, so an organiser can hold `admin` without `member` — and `getMyBurns` is
+`requireApproved`, so that account gets a working burn selector and then found every
+page it chose a burn for turning it away, while the lanes, the register and the
+options beside them were open. Putting a hand up still needs an `attendance` at that
+burn: the checks behind the guard answer that with a **400**, which is a different
+sentence from "you are not welcome here".
 
 The **facilitator** is who runs it, and is **assignable** (#198). It was
 `host_account_id` — whoever wrote the dream down, taken from the session and refused
@@ -187,8 +195,8 @@ it; `supported_by_me` exists because the supporters are a count and nothing more
 
 Clicking a dream opens a panel over the grid: when and where, the description as
 markdown, the ❤️‍🔥, and two 🙋/👉 strips — one for whoever is facilitating, one for
-the helpers. It edits and withdraws too, so nothing about a dream needs the Dreams
-page; that page keeps the same form for its list view.
+the helpers. It edits and withdraws too, and the Dreams page opens this
+same panel (#342) rather than a form of its own — see below.
 
 **A drag leaves a click behind, and that click is not a click** — Google Calendar's
 rule. A ref is set on `dragstart` and cleared on `mousedown`, so the click ending a

@@ -1,4 +1,4 @@
-import type { EventAttendeesResponse, Meal, MyBurn, Place, Session } from '@sage-burner/shared'
+import type { EventAttendeesResponse, Meal, MyBurn, Place, Session, SessionUpdate } from '@sage-burner/shared'
 import type { ComponentChildren } from 'preact'
 
 import { useRef, useState } from 'preact/hooks'
@@ -14,6 +14,7 @@ import { CalendarFeed } from '../components/CalendarFeed.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { MealDialog } from '../components/MealDialog.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
+import { NotForYou } from '../components/NotForYou.tsx'
 import { dreamActions, OpenedDream } from '../components/OpenedDream.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { dayName, fromLocalInput, toLocalInput } from '../datetime.ts'
@@ -29,7 +30,7 @@ import {
   resizedEnd,
   rowsDragged,
 } from '../schedule.ts'
-import { isMember, useViewer } from '../viewer.tsx'
+import { isApproved, useViewer } from '../viewer.tsx'
 
 export type ScheduleApi = Pick<
   ApiClient,
@@ -84,7 +85,7 @@ const dayOf = (row: string) => row.slice(0, 10)
  */
 export const Schedule = ({ api }: { api: ScheduleApi }) => {
   const viewer = useViewer()
-  const member = isMember(viewer)
+  const approved = isApproved(viewer)
   const [dragged, setDragged] = useState<string | undefined>(undefined)
   // A meal's block, when that is what is being dragged. Held apart from `dragged` so
   // a dream cannot be dropped in the kitchen nor a meal in a lane — the kitchen is
@@ -116,7 +117,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
       }
     },
     {
-      enabled: member,
+      enabled: approved,
       key: burn?.event.id ?? '',
       fallback: 'Could not load the schedule.',
       live: true,
@@ -149,12 +150,10 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
 
   if (viewer.status === 'loading') return <Framed>{<p class="form-note">One moment…</p>}</Framed>
 
-  if (!member) {
+  if (!approved) {
     return (
       <Framed>
-        <p>
-          This is for members. <a href="/login">Log in</a> to see it.
-        </p>
+        <NotForYou signedOut={viewer.status === 'signed-out'} who="members" />
       </Framed>
     )
   }
@@ -275,12 +274,23 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
   const blocks = meals.flatMap((meal) => mealBlocks(meal))
   const shownMeal = meals.find((meal) => meal.id === openedMeal)
 
-  const { support, help, facilitate, offer, save, remove } = dreamActions({
-    api,
-    eventId: event.id,
-    run,
-    setOpened,
-  })
+  const { support, help, facilitate, save, remove } = dreamActions({ api, run, setOpened })
+
+  /**
+   * The one write that needs a burn to write to, so it stays here where there is one —
+   * `event` is resolved by the time this runs, which is not true on every page that
+   * opens the panel.
+   *
+   * The fallback title is unreachable: the form disables its own button until there is
+   * one, and if that stopped being true an empty title is a 400 the panel reports with
+   * the text still in it.
+   */
+  const offer = ({ title = '', ...fields }: SessionUpdate) => {
+    run(async () => {
+      await api.offerSession(event.id, { ...fields, title })
+      setOpened(undefined)
+    }, 'Could not offer that.')
+  }
 
   return (
     <Framed eventId={event.id} refreshing={refreshing}>

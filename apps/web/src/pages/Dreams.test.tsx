@@ -517,11 +517,24 @@ describe('Dreams', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('Could not load')
   })
 
-  it('does not fetch for someone who is not a member', async () => {
+  it('does not fetch for someone who is neither a member nor an admin', async () => {
     const getSessions = vi.fn<DreamsApi['getSessions']>(() => Promise.resolve({ sessions: [] }))
     renderPage(stub({ getSessions }), { status: 'signed-out' })
 
     expect(screen.getByText(/for members/)).toBeTruthy()
     expect(getSessions).not.toHaveBeenCalled()
+  })
+
+  it('opens to an organiser who holds admin alone', async () => {
+    // #200: the burn selector is `requireApproved`, so this account could choose a
+    // burn and was then turned away from the pages about it. The dreams are the
+    // burn's shared furniture, like the lanes and the register beside them.
+    const organiser: Viewer = {
+      status: 'signed-in',
+      account: { id: 'a-9', name: null, avatar: null, roles: ['admin'] },
+    }
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Opening circle' })]), organiser)
+
+    expect(await screen.findByRole('button', { name: 'Open Opening circle' })).toBeTruthy()
   })
 })

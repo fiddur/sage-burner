@@ -776,9 +776,8 @@ a:hover {
 }
 
 /*
-  The whole row is the way in (#342), which is why the padding is on the button and
-  not on the row around it — a tap anywhere but the 0.5rem of border used to do
-  nothing at all.
+  The whole row is the way in (#342), which is why the padding is on the button rather
+  than on the row around it: anything outside the button is a tap that does nothing.
 
   Styled back down to text, as `.dream-open` is in the grid: the bordered row is
   already the affordance, and a button frame inside it would read as two controls.
@@ -1065,17 +1064,11 @@ a:hover {
   opacity: 1;
 }
 
-/* Over the timetable rather than beside it — the grid is as wide as the screen. */
 /*
-  Above the bottom bar, which is the whole of why this is 40 (#344).
-
-  The three things that float over a page share one stacking context — `.layout`
-  creates none — so source order decides ties, and `.bottom-bar` comes later in this
-  file than the modal did at the same `20`. On a phone the nav painted over the
-  backdrop: a tall panel had its last 3.5rem behind the bar, and the bar's links
-  stayed tappable through an overlay meant to be modal.
-
-  The scale, so a fourth thing has somewhere to go: bar 20, popdown 30, modal 40.
+  Over the timetable rather than beside it — the grid is as wide as the screen — and
+  above the bottom bar, which is the whole of why this is 40 (#344). The scale, so a
+  fourth thing has somewhere to go: bar 20, popdown 30, modal 40.
+  `docs/the-app.md` says what happened at the same 20.
 */
 .dream-modal {
   position: fixed;
@@ -1182,14 +1175,9 @@ a:hover {
 */
 .lead-table-wrap {
   overflow-x: auto;
-  /*
-    Load-bearing, and not for anything drawn here: `.visually-hidden` is
-    `position: absolute`, so without a positioned ancestor its containing block is the
-    *initial* one. Sitting at its static position inside a table scrolled sideways,
-    a 1px box then reached x=575 on a 360px screen and dragged the whole document's
-    scroll width out with it — so the Leads page scrolled sideways beside its table,
-    and the fixed bottom bar went with the layout viewport (#348).
-  */
+  /* Load-bearing, and not for anything drawn here — every box that scrolls sideways
+     is a containing block (#348). `docs/the-app.md` says why, and `styles.test.ts`
+     is what stops the next one being added without it. */
   position: relative;
   margin: 1rem 0;
 }

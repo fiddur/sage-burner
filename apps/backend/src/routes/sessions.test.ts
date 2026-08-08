@@ -584,16 +584,16 @@ describe('dreams', () => {
     expect(row?.title).toBe('Last year')
   })
 
-  it('refuses everyone who is not a member', async () => {
+  it('refuses everyone who is neither a member nor an admin', async () => {
     const server = await build()
     await givenEvent()
     const member = await givenAccount(['member'])
-    const admin = await givenAccount(['admin'])
+    const applicant = await givenAccount([])
     const id = (await offer(server, member.cookie, { title: 'Sunrise yoga' })).json().session.id
 
     for (const [cookie, expected] of [
       [undefined, 401],
-      [admin.cookie, 403],
+      [applicant.cookie, 403],
     ] as const) {
       expect((await list(server, cookie)).statusCode).toBe(expected)
       expect((await offer(server, cookie, { title: 'Theirs' })).statusCode).toBe(expected)
@@ -602,6 +602,26 @@ describe('dreams', () => {
     }
 
     expect((await list(server, member.cookie)).json().sessions).toHaveLength(1)
+  })
+
+  it('lets an organiser holding admin alone arrange the burn they are setting up', async () => {
+    // #200: `getMyBurns` is `requireApproved`, so this account gets a working burn
+    // selector — and then every page it chose a burn for turned it away. The lanes,
+    // the register and the options were already open to them; the timetable is the
+    // same shared furniture.
+    const server = await build()
+    await givenEvent()
+    const organiser = await givenAccount(['admin'])
+
+    const offered = await offer(server, organiser.cookie, { title: 'Opening circle' })
+    expect(offered.statusCode).toBe(201)
+    const id = offered.json().session.id
+
+    expect((await list(server, organiser.cookie)).json().sessions).toHaveLength(1)
+    expect((await editDream(server, organiser.cookie, id, { title: 'Opening ceremony' })).statusCode).toBe(
+      200,
+    )
+    expect((await drop(server, organiser.cookie, id)).statusCode).toBe(204)
   })
 
   it('refuses a stray key rather than silently ignoring it', async () => {
@@ -787,14 +807,31 @@ describe('helping with a dream', () => {
     expect((await selfService(server, ada.cookie, old, 'support', 'POST')).statusCode).toBe(404)
   })
 
-  it('needs a member, like everything else on the schedule', async () => {
+  it('needs somebody who is in, like everything else on the schedule', async () => {
     const server = await build()
     const eventId = await givenEvent()
     const ada = await givenAttending(eventId)
+    const applicant = await givenAccount([])
     const id = (await offer(server, ada.cookie, { title: 'Sunrise yoga' })).json().session.id
 
     expect((await helping(server, undefined, id, 'POST')).statusCode).toBe(401)
     expect((await selfService(server, undefined, id, 'support', 'POST')).statusCode).toBe(401)
+    expect((await helping(server, applicant, id, 'POST')).statusCode).toBe(403)
+    expect((await selfService(server, applicant.cookie, id, 'support', 'POST')).statusCode).toBe(403)
+  })
+
+  it('tells an organiser who is not coming that they are not coming, rather than refusing the role', async () => {
+    // The guard opens to `approved` (#200), and the attendance check behind it still
+    // does its job — a hand put up on a burn nobody said they were attending is the
+    // pairing being wrong, not the account being unwelcome.
+    const server = await build()
+    const eventId = await givenEvent()
+    const ada = await givenAttending(eventId)
+    const organiser = await givenAccount(['admin'])
+    const id = (await offer(server, ada.cookie, { title: 'Sunrise yoga' })).json().session.id
+
+    expect((await helping(server, organiser, id, 'POST')).statusCode).toBe(400)
+    expect((await selfService(server, organiser.cookie, id, 'support', 'POST')).statusCode).toBe(400)
   })
 })
 

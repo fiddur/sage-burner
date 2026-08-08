@@ -101,6 +101,50 @@ describe('what has happened to you', () => {
     await waitFor(() => expect(line.closest('li')?.className).toBe('is-new'))
   })
 
+  it('keeps it through the refetch that comes back with them all seen', async () => {
+    // The half the test above cannot show, and the one `live: true` broke: every
+    // refetch after the page has marked them answers with `seen_at` set, so without
+    // remembering what arrived new the bold vanished a minute in.
+    const seen = TWO.map((item) => ({ ...item, seen_at: '2026-08-06T11:00:00.000Z' }))
+    let asked = 0
+    renderPage(
+      stub({
+        getMyNotifications: () => {
+          asked += 1
+          return Promise.resolve({ notifications: asked === 1 ? TWO : seen, unseen: asked === 1 ? 2 : 0 })
+        },
+      }),
+    )
+    const line = await screen.findByText('You are on helper for Dinner')
+
+    fireEvent(window, new Event('focus'))
+
+    await waitFor(() => expect(asked).toBeGreaterThan(1))
+    expect(line.closest('li')?.className).toBe('is-new')
+  })
+
+  it('marks one that arrives while the page is open as new', async () => {
+    // The set is only ever seeded from the first answer, so a later arrival is judged
+    // on its own `seen_at` rather than being read as old for not having been there.
+    let asked = 0
+    renderPage(
+      stub({
+        getMyNotifications: () => {
+          asked += 1
+          return asked === 1
+            ? Promise.resolve({ notifications: [], unseen: 0 })
+            : Promise.resolve({ notifications: [one({ id: 'n-9', body: 'Bea is coming.' })], unseen: 1 })
+        },
+      }),
+    )
+    await screen.findByText('Nothing yet.')
+
+    fireEvent(window, new Event('focus'))
+
+    const line = await screen.findByText('Bea is coming.')
+    expect(line.closest('li')?.className).toBe('is-new')
+  })
+
   it('is open to an account with no role, since it is told things too', async () => {
     // An applicant hears when their application is decided. Telling them the page
     // announcing it is for members would be the app refusing to show somebody a

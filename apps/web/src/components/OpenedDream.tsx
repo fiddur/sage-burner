@@ -8,7 +8,6 @@ import { DreamPanel } from './DreamPanel.tsx'
 
 export type OpenedDreamApi = Pick<
   ApiClient,
-  | 'offerSession'
   | 'updateSession'
   | 'withdrawSession'
   | 'helpWithSession'
@@ -42,12 +41,10 @@ export type Opened =
  */
 export const dreamActions = ({
   api,
-  eventId,
   run,
   setOpened,
 }: {
   api: OpenedDreamApi
-  eventId: string
   run: (work: () => Promise<unknown>, fallback: string) => void
   setOpened: (next: Opened | undefined) => void
 }) => ({
@@ -72,18 +69,6 @@ export const dreamActions = ({
   // reload puts the name into the strip where the click was.
   facilitate: (id: string, accountId: string | null) => {
     run(() => api.updateSession(id, { facilitator_account_id: accountId }), 'Could not save that.')
-  },
-
-  /**
-   * The fallback title is unreachable — the form disables its own button until there
-   * is one — and if that stopped being true, an empty title is a 400 the panel now
-   * reports with the text still in it.
-   */
-  offer: ({ title = '', ...fields }: SessionUpdate) => {
-    run(async () => {
-      await api.offerSession(eventId, { ...fields, title })
-      setOpened(undefined)
-    }, 'Could not offer that.')
   },
 
   save: (id: string, changes: SessionUpdate) => {
@@ -140,12 +125,19 @@ export const OpenedDream = ({
   onHelp: (id: string, helping: boolean, accountId: string) => void
   onSupport: (id: string, supporting: boolean) => void
   onSave: (id: string, changes: SessionUpdate) => void
-  onOffer: (fields: SessionUpdate) => void
+  /**
+   * Absent on a page that never opens `{ kind: 'new' }`. The Dreams page offers by
+   * name from a form of its own, so wiring it an unreachable handler meant inventing
+   * an event id it does not always have.
+   */
+  onOffer?: (fields: SessionUpdate) => void
   onRemove: (id: string) => void
 }) => {
   if (opened === undefined) return null
 
   if (opened.kind === 'new') {
+    if (onOffer === undefined) return null
+
     return (
       <DreamPanel
         label="Offer a dream"

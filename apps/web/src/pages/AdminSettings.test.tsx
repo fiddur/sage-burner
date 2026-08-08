@@ -58,6 +58,19 @@ describe('AdminSettings', () => {
     expect(await titleField()).toHaveProperty('value', 'Sage Burner')
   })
 
+  it('offers the way out, for the account the details page refuses', async () => {
+    // The whole justification for a second Log out button (#195): the details page is
+    // `require="member"`, so an account holding `admin` without `member` is turned
+    // away from the only other one. Nothing asserted it, so deleting this button left
+    // the suite green and stranded that account signed in.
+    renderPage(stub(), {
+      status: 'signed-in',
+      account: { id: 'a-9', name: null, avatar: null, roles: ['admin'] },
+    })
+
+    expect(await screen.findByRole('button', { name: 'Log out' })).toBeTruthy()
+  })
+
   it('is where both pictures are chosen — the home screen’s and a shared link’s', async () => {
     // Two uploads on one page, and neither is inside the form that saves the title:
     // they save on choosing a file, and a file input in that form would be two ways
