@@ -179,7 +179,7 @@ export const YourBurns = ({ api }: { api: YourBurnsApi }) => {
                     myAccountId={viewer.account?.id}
                     onDone={() => {
                       refreshBurns()
-                      reload()
+                      void reload()
                     }}
                   />
                 ) : (

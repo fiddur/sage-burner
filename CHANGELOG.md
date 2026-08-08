@@ -9,6 +9,11 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-08
 
+- **A change on an admin page cannot be undone by the next click.** The buttons stay
+  put until the list has been read back, so a second change made in the moment between
+  the two is no longer computed from what was on screen before the first — which could
+  quietly write it away. A click refused while something else is saving no longer marks
+  the row it landed on as busy either.
 - **Somebody organising a burn can put people down to help with a dream without
   coming to it themselves.** 👉 on a dream's Helping-out strip used to fail for
   them, which is what the lead-roles register has always allowed. Whoever is named

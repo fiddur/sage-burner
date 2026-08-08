@@ -48,8 +48,6 @@ const download = (name: string, csv: string) => {
 export const AdminRoster = ({ api }: { api: RosterApi }) => {
   const viewer = useViewer()
   const admin = isAdmin(viewer)
-  // Which row, not a boolean: only the person being recorded should show it.
-  const [recording, setRecording] = useState<string | undefined>(undefined)
 
   const { loaded, reload } = useLoad((signal) => api.getActiveRoster(signal), {
     enabled: admin,
@@ -58,17 +56,18 @@ export const AdminRoster = ({ api }: { api: RosterApi }) => {
 
   // Reloaded rather than patched in place: paying re-sorts the whole list and can
   // move someone else across the waiting line.
-  const { error, run } = useAction(reload)
+  // `busyWith` is the row, not a boolean: only the person being recorded should show it.
+  const { busyWith, error, run } = useAction(reload)
 
   const record = (eventId: string, entry: RosterEntry, paid: boolean) => {
-    setRecording(entry.account_id)
     // The date is the server's to stamp, from its own clock: a browser's idea of
     // today can differ by a day, and the two fields could disagree at all only
     // because this was the one caller keeping them in step.
-    run(async () => {
-      await api.setPayment(eventId, entry.account_id, { payment_status: paid ? 'paid' : 'unpaid' })
-      setRecording(undefined)
-    }, 'Could not record that. Please try again.')
+    run(
+      () => api.setPayment(eventId, entry.account_id, { payment_status: paid ? 'paid' : 'unpaid' }),
+      'Could not record that. Please try again.',
+      entry.account_id,
+    )
   }
 
   const roster = loaded.status === 'ready' ? loaded.data : undefined
@@ -150,7 +149,7 @@ export const AdminRoster = ({ api }: { api: RosterApi }) => {
                           <input
                             type="checkbox"
                             checked={entry.payment_status === 'paid'}
-                            disabled={recording === entry.account_id}
+                            disabled={busyWith === entry.account_id}
                             aria-label={`Paid — ${entry.name ?? entry.email}`}
                             onChange={(changeEvent) =>
                               void record(roster.event?.id ?? '', entry, changeEvent.currentTarget.checked)

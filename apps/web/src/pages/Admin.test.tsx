@@ -216,6 +216,44 @@ describe('Admin', () => {
   })
 })
 
+describe('the window between a write and the re-read', () => {
+  it('keeps the boxes disabled until the re-read has landed (#176)', async () => {
+    // `toggle` computes the new set from the row on screen. Between the write
+    // resolving and the re-read arriving, that row is the pre-write one — so a second
+    // box ticked in the window would send roles computed without the grant just made,
+    // writing it away. The boxes stay disabled across the whole of it.
+    let answer: (value: AdminAccountsResponse) => void = () => undefined
+    const getAdminAccounts = vi.fn(() => new Promise<AdminAccountsResponse>((resolve) => (answer = resolve)))
+    const ada = {
+      id: 'a-1',
+      email: 'ada@example.org',
+      created_at: '2026-01-01T00:00:00.000Z',
+    }
+    const setAccountRoles = vi.fn<AdminApi['setAccountRoles']>(() =>
+      Promise.resolve({ account: { ...ada, roles: ['member'] } }),
+    )
+    renderAdmin(getAdminAccounts, ADMIN, setAccountRoles)
+
+    answer({ accounts: [{ ...ada, roles: [] }] })
+    const box = await screen.findByRole('checkbox', { name: 'member — ada@example.org' })
+
+    fireEvent.click(box)
+
+    await waitFor(() => expect(setAccountRoles).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(getAdminAccounts).toHaveBeenCalledTimes(2))
+    expect(screen.getByRole('checkbox', { name: 'admin — ada@example.org' })).toHaveProperty('disabled', true)
+
+    answer({ accounts: [{ ...ada, roles: ['member'] }] })
+
+    await waitFor(() =>
+      expect(screen.getByRole('checkbox', { name: 'admin — ada@example.org' })).toHaveProperty(
+        'disabled',
+        false,
+      ),
+    )
+  })
+})
+
 describe('setting somebody’s password', () => {
   const ONE = { id: 'a-9', email: 'ada@example.org', roles: [], created_at: '2026-01-01T00:00:00.000Z' }
 
