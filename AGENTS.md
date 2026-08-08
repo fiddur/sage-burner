@@ -285,10 +285,13 @@ These are member records, so treat them as such:
   password itself, and it never leaves the process: the read answers `has_password`,
   and a save that omits the field keeps what is stored. The test button posts to the
   **admin's own** address rather than one they type, since a send-to box on an admin
-  page is an open relay with extra steps. Posting is started beside the write and
-  awaited after it, so a mail server that is down costs a message rather than a
-  record — the rule push already follows. `mail/smtp.ts` is the only module that
-  opens a socket, exactly as `web-push.ts` is.
+  page is an open relay with extra steps. A mail server that is down costs a message
+  rather than a record — the rule push already follows — and since #356 a
+  notification's send does not happen inside the request at all: it goes on a queue,
+  one message at a time, so a burn's fan-out cannot dial the relay once per attendee.
+  A route answering therefore no longer means the posting has happened, which is why
+  `createApp` takes `defer`. `mail/smtp.ts` is the only module that opens a socket,
+  exactly as `web-push.ts` is.
 - **The email column on the notification settings is a channel of its own** (#30),
   independent of the bell, and **off for every category until somebody asks** — so
   it needs no defaults, and an upgrade is never what starts posting to somebody's

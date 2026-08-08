@@ -77,8 +77,8 @@ describe('the route manifest', () => {
 
 describe('the installation pictures, which several callers have to spell alike', () => {
   it('builds one URL for the icon, encoded, whoever is asking', () => {
-    // Four spellings of one picture reached `develop` before this existed (#376, #378),
-    // and two *versioned* ones under a path evict each other in the offline cache.
+    // Two disagreeing versioned spellings reached `develop` before this existed, and
+    // two of those under one path evict each other in the offline cache (#376, #378).
     expect(iconSrc('2026-08-01T00:00:00.000Z')).toBe('/api/installation/icon?v=2026-08-01T00%3A00%3A00.000Z')
   })
 

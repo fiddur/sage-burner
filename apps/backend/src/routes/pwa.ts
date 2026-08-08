@@ -99,7 +99,7 @@ export const registerPwaRoutes = (app: FastifyInstance, { db, now }: PwaDeps) =>
     const entry = {
       // The version is what makes a new icon a new URL, so an installed copy
       // picks it up rather than keeping the one it was installed with.
-      src: iconSrc(icon?.updated_at ?? null),
+      src: iconSrc(icon?.updated_at),
       type: contentType,
       sizes: sizesFor(contentType),
     }

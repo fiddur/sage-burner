@@ -113,7 +113,7 @@ const imageFor = (
     }
   }
 
-  const path = iconSrc(icon?.updated_at ?? null)
+  const path = iconSrc(icon?.updated_at)
 
   return icon === undefined || icon.content_type === 'image/svg+xml'
     ? { path, type: icon?.content_type ?? 'image/svg+xml' }

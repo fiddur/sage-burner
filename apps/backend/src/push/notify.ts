@@ -5,6 +5,7 @@ import { and, count, desc, eq, isNull } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { Database } from '../db/index.ts'
+import type { EmailQueue } from '../mail/queue.ts'
 import type { DeliveryCounts, PushDeps } from './push.ts'
 
 import {
@@ -35,6 +36,12 @@ export type Notifier = (accountId: string, told: Told) => Promise<unknown>
  * passes nothing and this whole branch costs a comparison.
  */
 export type EmailChannel = (accountId: string, told: Told) => Promise<unknown>
+
+/** The email leg: how to post one, and where to put it so nobody waits (#356). */
+export interface Email {
+  post: EmailChannel
+  defer: EmailQueue['defer']
+}
 
 /**
  * What a push carries, and the one place it is built (#279).
@@ -95,32 +102,24 @@ export const wants = async (
  * **Email is a channel of its own, not a copy of the bell** (#30). The two switches
  * are independent, so somebody may take the burn-wide ones in their inbox and off
  * their phone — and switching the bell off is then not also an instruction to stop
- * posting. It is started before the row is written and awaited after, so a mail
- * server that is slow costs nobody their record.
+ * posting. It goes on a queue rather than being awaited here (#356): a request must
+ * not wait on SMTP, and the queue runs one message at a time so a burn's fan-out does
+ * not dial the relay once per attendee at once.
  */
 export const recordAndPush =
-  (
-    deps: PushDeps,
-    now: () => Date,
-    log: (counts: DeliveryCounts) => void,
-    byEmail?: EmailChannel,
-  ): Notifier =>
+  (deps: PushDeps, now: () => Date, log: (counts: DeliveryCounts) => void, email?: Email): Notifier =>
   async (accountId, told) => {
     const channels = await wants(deps.db, accountId, told.category)
 
-    // Independent of the bell, and after it: somebody may want the burn-wide ones in
-    // their inbox and nowhere else, and the write must not fail because a mail server
-    // did — the rule push already follows here (#30).
-    //
-    // Caught where it is started rather than only where it is awaited (#313): the
-    // insert below can throw, and then nothing ever awaits this — which for Node is an
-    // unhandled rejection and, by default, the process exiting. A guard rather than
-    // where a reason goes to die, since `emailChannel` reports its own and does not
-    // throw (#357).
-    const posting =
-      channels.email && byEmail !== undefined ? byEmail(accountId, told).catch(() => undefined) : undefined
+    // Independent of the bell: somebody may want the burn-wide ones in their inbox and
+    // nowhere else, and the write must not fail because a mail server did — the rule
+    // push already follows here (#30). Queued rather than started, so the connection
+    // happens after the request and behind whatever is already posting (#356).
+    if (channels.email && email !== undefined) {
+      email.defer(async () => await email.post(accountId, told))
+    }
 
-    if (!channels.bell) return await posting
+    if (!channels.bell) return undefined
 
     await deps.db.insert(notification).values({
       id: randomUUID(),
@@ -136,8 +135,6 @@ export const recordAndPush =
     // to send anybody and hardcoded the one page that existed when it was written.
     const counts = await notifyAccount(deps, accountId, pushPayload(told))
     if (counts.failed > 0 || counts.gone > 0) log(counts)
-
-    await posting
 
     return counts
   }
@@ -227,14 +224,13 @@ export const recordActivity = async (db: Database, eventId: string, told: Told, 
  * the personal "You are now Kitchen lead" (#270).
  *
  * **Together rather than one after another**, which it was until #313. Each `notify`
- * writes a row, reaches a push service and — since #30 — may post an email, and that
- * last one waits up to `smtp.ts`'s fifteen seconds on a host that drops packets
- * rather than refusing. One after another that is fifteen seconds *per attendee*, so
- * a mistyped host held a request open for something like ten minutes at the cap. Side
- * by side it is fifteen seconds however many people are coming.
+ * writes a row and reaches a push service, and one after another that is one round
+ * trip *per attendee* inside a single request.
  *
- * Still all awaited before this returns, so a route's response means the work is
- * done and a test can assert on it without racing.
+ * The email leg is no longer among what this waits for (#356): it goes on a queue, so
+ * a route's response means the rows are written and the pushes attempted, and says
+ * nothing about what has reached a mail server. A test asserting on a posted message
+ * has to drain that queue.
  */
 export const notifyAttendees = async (
   db: Database,

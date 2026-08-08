@@ -85,7 +85,7 @@ export const IconField = ({ api }: { api: IconApi }) => {
       <p class="row">
         <img
           class="app-icon"
-          src={iconSrc(stored ?? null)}
+          src={iconSrc(stored)}
           alt="This installation's app icon"
           width={64}
           height={64}
@@ -96,7 +96,7 @@ export const IconField = ({ api }: { api: IconApi }) => {
             way to see beforehand what it takes off the corners. */}
         <img
           class="app-icon app-icon-masked"
-          src={iconSrc(stored ?? null)}
+          src={iconSrc(stored)}
           alt="The same icon as a home screen will cut it"
           width={64}
           height={64}

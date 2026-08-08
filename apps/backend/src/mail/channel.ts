@@ -43,10 +43,10 @@ const titleOf = async (db: Database): Promise<string> => {
 }
 
 /**
- * **Never throws**, which is the rule `post` already follows and for the same reason
- * (#357). A notification is written beside this, and the caller starts it before that
- * write and awaits it after — so anything thrown here is a rejection nobody is holding
- * for as long as the write takes, and Node's default for one of those is to exit.
+ * **Never throws**, which is the rule `post` already follows (#357). The queue this
+ * runs on reports a failure rather than rethrowing it, so a throw here would be a
+ * message lost with only the queue's own line about it — where a refused send carries
+ * the server's reason, which is what somebody fixing it needs.
  *
  * The reads below are the only way it could: `post` answers a failed send rather than
  * throwing. Reported through the same `log` a refused send goes to, so a database that
