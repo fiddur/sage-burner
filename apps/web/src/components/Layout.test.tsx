@@ -9,10 +9,14 @@ import type { Viewer } from '../viewer.tsx'
 import { BurnProvider } from '../burn.tsx'
 import { initials } from '../initials.ts'
 import { InstallationProvider } from '../installation.tsx'
+import { onADesktop, onAPhone } from '../testing/viewport.ts'
 import { ViewerProvider } from '../viewer.tsx'
 import { Layout } from './Layout.tsx'
 
 afterEach(cleanup)
+// The viewport belongs to the window, which outlives one test — a narrow one left
+// behind reads as a phone in everything below it.
+afterEach(onADesktop)
 
 const renderNav = (viewer: Viewer) =>
   render(
@@ -139,6 +143,74 @@ describe('the nav', () => {
       [],
       ['Your burn', 'Going on', 'Members', 'Dreams', 'Schedule', 'Leads', 'FAQ', 'Your details', 'Organise'],
     )
+  })
+})
+
+describe('the nav on a phone', () => {
+  /**
+   * The six pages, by the accessible name they carry in both layouts.
+   *
+   * The bar draws them as emoji, so `aria-label` is the only name there — which is
+   * the point of naming them: an icon bar nobody can read is six identical buttons.
+   */
+  const pages = ['Going on', 'Members', 'Schedule', 'Leads', 'Meals', 'FAQ']
+
+  const inTheBottomBar = () =>
+    [...screen.getByRole('navigation', { name: 'Pages' }).querySelectorAll('a')].map((link) =>
+      link.getAttribute('aria-label'),
+    )
+
+  const inTheTopBar = () =>
+    [...screen.getByRole('navigation', { name: 'Main' }).querySelectorAll('a')].map(
+      (link) => link.getAttribute('aria-label') ?? link.textContent,
+    )
+
+  it('moves the pages to a bar along the bottom', () => {
+    onAPhone()
+    renderNav(signedInAs('member'))
+
+    expect(inTheBottomBar()).toEqual(pages)
+  })
+
+  it('leaves the topbar what is about the session rather than a page', () => {
+    // Nine entries do not fit a phone, which is the whole of #337: the six pages go
+    // down, and the bell, ⚙️ and the face — none of which is a page — stay up.
+    onAPhone()
+    renderNav(signedInAs('admin', 'member'))
+
+    const top = inTheTopBar()
+    for (const label of pages) expect(top, `${label} should have moved down`).not.toContain(label)
+    for (const label of ['Notifications', 'Organise', 'Your details']) {
+      expect(top, `${label} should have stayed up`).toContain(label)
+    }
+  })
+
+  it('keeps the words where there is room for them', () => {
+    // The success path the two above cannot show: a wide viewport is unchanged, and
+    // there is no second copy of any link hiding in a bar nobody can see.
+    onADesktop()
+    renderNav(signedInAs('member'))
+
+    for (const label of pages) expect(inTheTopBar(), `${label} should be in the bar`).toContain(label)
+    expect(screen.queryByRole('navigation', { name: 'Pages' })).toBeNull()
+  })
+
+  it('gives a signed-out visitor no bottom bar at all', () => {
+    // Apply and Log in are two entries, which fit — and a bar of six pages none of
+    // them may open would be six refusals.
+    onAPhone()
+    renderNav({ status: 'signed-out' })
+
+    expect(screen.queryByRole('navigation', { name: 'Pages' })).toBeNull()
+    expect(inTheTopBar()).toContain('Apply')
+  })
+
+  it('gives an account with no roles none either', () => {
+    // An applicant waiting on a decision, and the case where a leak would matter.
+    onAPhone()
+    renderNav(signedInAs())
+
+    expect(screen.queryByRole('navigation', { name: 'Pages' })).toBeNull()
   })
 })
 

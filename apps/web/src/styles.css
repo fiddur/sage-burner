@@ -223,6 +223,59 @@ a:hover {
   max-width: var(--measure);
 }
 
+/*
+  The phone's nav (#337): one icon per page, held along the bottom.
+
+  Nine entries did not fit a phone's width and the header wrapped to three rows rather
+  than saying so — which is also what put the bell's panel off-screen. The six pages
+  come down here and the topbar keeps what is about the session rather than a page.
+
+  Always visible. Hiding it on scroll down is #340, and it is the half that is easy to
+  ship subtly wrong: the two pages that most want the vertical room scroll internally,
+  so `window` never fires on exactly the pages it was for.
+*/
+.bottom-bar {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  justify-content: space-around;
+  /* iOS draws the home indicator over anything down here without it. */
+  padding-bottom: env(safe-area-inset-bottom);
+  border-top: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.bottom-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3.5rem;
+  font-size: 1.4rem;
+  line-height: 1;
+  text-decoration: none;
+}
+
+/*
+  Where you are. A bar with nothing lit offers six equally plausible places, and the
+  page's own heading is off the top of anything that has been scrolled.
+*/
+.bottom-tab.is-current {
+  border-top: 2px solid var(--ember);
+  background: color-mix(in srgb, var(--ember) 10%, transparent);
+}
+
+/*
+  Room for the bar to sit over, on the last thing in the column rather than on `main`:
+  the footer is below it, so padding on `main` alone leaves the bar covering the line
+  about the licence instead of the schedule's last row.
+*/
+.has-bottom-bar .site-footer {
+  padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+}
+
 .prose h1 {
   margin-top: 0;
   font-size: clamp(1.75rem, 5vw, 2.5rem);

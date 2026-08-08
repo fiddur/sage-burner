@@ -1,14 +1,46 @@
 import type { ComponentChildren } from 'preact'
 
 import { apiRoutes } from '@sage-burner/shared'
+import { useLocation } from 'preact-iso'
 
 import type { BellApi } from './NotificationBell.tsx'
 
 import { useBurns } from '../burn.tsx'
 import { useInstallationTitle } from '../installation.tsx'
 import { isAdmin, isApproved, isMember, useViewer } from '../viewer.tsx'
+import { usePhone } from '../viewport.ts'
 import { Avatar } from './Avatar.tsx'
 import { NotificationBell } from './NotificationBell.tsx'
+
+interface NavPage {
+  href: string
+  label: string
+  /** The face it wears in the bottom bar. `label` is its name in both. */
+  icon: string
+}
+
+/**
+ * The pages an approved member moves between — words in the bar on a wide screen,
+ * icons in the bottom bar on a phone (#337).
+ *
+ * One list, drawn twice, so the two cannot come to offer different pages. Six is the
+ * ceiling the bottom bar sets: six by ~3.5rem fits a 360px phone and nothing wider
+ * fits beside it, so the pages still to come — the map, the bring list, Leave No
+ * Trace — will have to hang off one of these rather than take a seventh seat.
+ *
+ * Going on is first for the reason it is first on a desktop: it answers the question
+ * somebody opening the app between burns has, which is whether anything is happening.
+ */
+const memberPages: readonly NavPage[] = [
+  { href: '/going-on', label: 'Going on', icon: '📜' },
+  { href: '/members', label: 'Members', icon: '🧑‍🤝‍🧑' },
+  { href: '/schedule', label: 'Schedule', icon: '🗓️' },
+  // The path stays `/roles`: it is what any link already shared points at, and it is
+  // not what anybody reads.
+  { href: '/roles', label: 'Leads', icon: '🕴️' },
+  { href: '/meals', label: 'Meals', icon: '🍽️' },
+  { href: '/faq', label: 'FAQ', icon: '❓' },
+]
 
 /**
  * The frame every page sits in.
@@ -22,6 +54,12 @@ import { NotificationBell } from './NotificationBell.tsx'
  * the lanes are what the grid draws; the lodging list from Your burn, beside the
  * question it answers. Somebody organising but not attending reaches both from ⚙️.
  *
+ * **On a phone the six move to a fixed bar along the bottom** (#337). Nine entries do
+ * not fit a phone's width, and the header wrapped to three rows rather than saying so.
+ * The topbar keeps the brand, the burn selector and the three things that are about
+ * the session rather than a page — the bell, ⚙️ and the face — and scrolls away with
+ * the content as it always has.
+ *
  * Every entry here is a **place**, which is why signing out is not among them: it is
  * an action, and it lives beside the sentence naming the account it ends.
  *
@@ -33,9 +71,15 @@ export const Layout = ({ api, children }: { api: BellApi; children: ComponentChi
   const viewer = useViewer()
   const { burns, selected, select } = useBurns()
   const title = useInstallationTitle()
+  const phone = usePhone()
+
+  // Open to `approved`, so an account holding `admin` alone reaches them from the nav
+  // rather than by typing the URL — which is what the pages themselves allow.
+  const pages = isApproved(viewer) ? memberPages : []
+  const bottomBar = phone && pages.length > 0
 
   return (
-    <div class="layout">
+    <div class={bottomBar ? 'layout has-bottom-bar' : 'layout'}>
       <header class="site-header">
         <a class="brand" href="/">
           {/* The icon route rather than the flame written out here: it answers with
@@ -64,51 +108,7 @@ export const Layout = ({ api, children }: { api: BellApi; children: ComponentChi
           </select>
         )}
 
-        <nav aria-label="Main">
-          {viewer.status === 'signed-out' && (
-            <>
-              <a href="/apply">Apply</a>
-              <a href="/login">Log in</a>
-            </>
-          )}
-
-          {/* Open to `approved`, so an account holding `admin` alone reaches them
-              from the nav rather than by typing the URL — which is what the pages
-              themselves allow. */}
-          {isApproved(viewer) && (
-            <>
-              {/* First, because it answers the question somebody opening the app
-                  between burns has: is anything happening? (#303) */}
-              <a href="/going-on">Going on</a>
-              <a href="/members">Members</a>
-              <a href="/schedule">Schedule</a>
-              {/* The path stays `/roles`: it is what any link already shared points at,
-                  and it is not what anybody reads. */}
-              <a href="/roles">Leads</a>
-              <a href="/meals">Meals</a>
-              <a href="/faq">FAQ</a>
-            </>
-          )}
-
-          {/* Signed in is the whole guard, so it sits outside the approved block. */}
-          {viewer.account !== undefined && <NotificationBell api={api} />}
-
-          {isAdmin(viewer) && (
-            <a class="nav-icon" href="/admin" aria-label="Organise" title="Organise">
-              ⚙️
-            </a>
-          )}
-
-          {isMember(viewer) && (
-            <a class="nav-icon" href="/profile" aria-label="Your details" title="Your details">
-              <Avatar
-                accountId={viewer.account?.id ?? ''}
-                name={viewer.account?.name ?? null}
-                avatar={viewer.account?.avatar ?? null}
-              />
-            </a>
-          )}
-        </nav>
+        <TopNav api={api} pages={bottomBar ? [] : pages} />
       </header>
 
       <main class="site-main">{children}</main>
@@ -119,6 +119,87 @@ export const Layout = ({ api, children }: { api: BellApi; children: ComponentChi
           which is free software under the AGPL.
         </p>
       </footer>
+
+      {bottomBar && <BottomBar pages={pages} />}
     </div>
+  )
+}
+
+/**
+ * The bar across the top: the pages as words, and the three things that are about
+ * the session rather than any page.
+ *
+ * `pages` is empty when the bottom bar has them, which is the whole of the mobile
+ * split — the bell, ⚙️ and the face are here on every viewport, because none of them
+ * is a place and a bar of six places is already full.
+ */
+const TopNav = ({ api, pages }: { api: BellApi; pages: readonly NavPage[] }) => {
+  const viewer = useViewer()
+
+  return (
+    <nav aria-label="Main">
+      {viewer.status === 'signed-out' && (
+        <>
+          <a href="/apply">Apply</a>
+          <a href="/login">Log in</a>
+        </>
+      )}
+
+      {pages.map((page) => (
+        <a key={page.href} href={page.href}>
+          {page.label}
+        </a>
+      ))}
+
+      {/* Signed in is the whole guard, so it sits outside the approved block. */}
+      {viewer.account !== undefined && <NotificationBell api={api} />}
+
+      {isAdmin(viewer) && (
+        <a class="nav-icon" href="/admin" aria-label="Organise" title="Organise">
+          ⚙️
+        </a>
+      )}
+
+      {isMember(viewer) && (
+        <a class="nav-icon" href="/profile" aria-label="Your details" title="Your details">
+          <Avatar
+            accountId={viewer.account?.id ?? ''}
+            name={viewer.account?.name ?? null}
+            avatar={viewer.account?.avatar ?? null}
+          />
+        </a>
+      )}
+    </nav>
+  )
+}
+
+/**
+ * The phone's nav: one icon per page, fixed along the bottom.
+ *
+ * Named rather than lettered — an emoji is not a word, so each carries the label the
+ * bar spells out on a wide screen, which is also what a screen reader reads and what
+ * a long press shows.
+ *
+ * `aria-current` marks where you are. A tab bar with nothing lit says six equally
+ * plausible places, and the page heading is off the top of a scrolled page.
+ */
+const BottomBar = ({ pages }: { pages: readonly NavPage[] }) => {
+  const { path } = useLocation()
+
+  return (
+    <nav class="bottom-bar" aria-label="Pages">
+      {pages.map((page) => (
+        <a
+          key={page.href}
+          class={path === page.href ? 'bottom-tab is-current' : 'bottom-tab'}
+          href={page.href}
+          aria-label={page.label}
+          aria-current={path === page.href ? 'page' : undefined}
+          title={page.label}
+        >
+          <span aria-hidden="true">{page.icon}</span>
+        </a>
+      ))}
+    </nav>
   )
 }
