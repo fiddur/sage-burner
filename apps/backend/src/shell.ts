@@ -1,6 +1,13 @@
 import type { FastifyReply, FastifyRequest } from 'fastify'
 
-import { apiRoutes, BANNER_HEIGHT, BANNER_TYPE, BANNER_WIDTH, ICON_PIXELS } from '@sage-burner/shared'
+import {
+  BANNER_HEIGHT,
+  BANNER_TYPE,
+  BANNER_WIDTH,
+  bannerSrc,
+  ICON_PIXELS,
+  iconSrc,
+} from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 
 import type { Config } from './config.ts'
@@ -99,14 +106,14 @@ const imageFor = (
 ): ShareImage => {
   if (banner !== undefined) {
     return {
-      path: `${apiRoutes.getInstallationBanner.path()}?v=${encodeURIComponent(banner)}`,
+      path: bannerSrc(banner),
       type: BANNER_TYPE,
       width: BANNER_WIDTH,
       height: BANNER_HEIGHT,
     }
   }
 
-  const path = `${apiRoutes.getInstallationIcon.path()}?v=${encodeURIComponent(icon?.updated_at ?? 'default')}`
+  const path = iconSrc(icon?.updated_at ?? null)
 
   return icon === undefined || icon.content_type === 'image/svg+xml'
     ? { path, type: icon?.content_type ?? 'image/svg+xml' }

@@ -67,15 +67,15 @@ describe('choosing the icon on a home screen', () => {
     // and the newest-wins rule then drops one on every store (#376).
     renderField(stub(), '2026-08-01T00:00:00.000Z')
 
-    // Unencoded, because that is how `pwa.ts` writes it into the manifest and the two
-    // spellings have to match exactly. An ISO timestamp is legal in a query as it is.
-    expect(icon().getAttribute('src')).toBe('/api/installation/icon?v=2026-08-01T00:00:00.000Z')
+    // The literal, so the one spelling every caller shares is pinned somewhere rather
+    // than only asserted against the builder that produces it.
+    expect(icon().getAttribute('src')).toBe('/api/installation/icon?v=2026-08-01T00%3A00%3A00.000Z')
   })
 
   it('says default before anybody has uploaded one, as the manifest does', () => {
     renderField(stub())
 
-    expect(icon().getAttribute('src')).toBe(`${apiRoutes.getInstallationIcon.path()}?v=default`)
+    expect(icon().getAttribute('src')).toBe('/api/installation/icon?v=default')
   })
 
   it('shows the new one rather than whatever was under that URL', async () => {

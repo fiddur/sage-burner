@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 
-import { apiRoutes, flameIcon, isIconType, MAX_ICON_BYTES } from '@sage-burner/shared'
+import { apiRoutes, flameIcon, iconSrc, isIconType, MAX_ICON_BYTES } from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -99,7 +99,7 @@ export const registerPwaRoutes = (app: FastifyInstance, { db, now }: PwaDeps) =>
     const entry = {
       // The version is what makes a new icon a new URL, so an installed copy
       // picks it up rather than keeping the one it was installed with.
-      src: `${apiRoutes.getInstallationIcon.path()}?v=${icon?.updated_at ?? 'default'}`,
+      src: iconSrc(icon?.updated_at ?? null),
       type: contentType,
       sizes: sizesFor(contentType),
     }
