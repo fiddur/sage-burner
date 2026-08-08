@@ -1,7 +1,7 @@
 import type { Event } from '@sage-burner/shared'
 
 import { MAX_LOCATION, MAX_SLUG, MAX_TITLE, MAX_WELCOME_LENGTH } from '@sage-burner/shared'
-import { useEffect, useRef, useState } from 'preact/hooks'
+import { useRef, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 import type { MealSlotsApi } from '../components/MealSlots.tsx'
@@ -12,12 +12,8 @@ import { GuardedPage } from '../components/GuardedPage.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
 import { MealSlots } from '../components/MealSlots.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
+import { useAction, useLoad } from '../load.ts'
 import { isAdmin, useViewer } from '../viewer.tsx'
-
-type Events =
-  | { status: 'loading' }
-  | { status: 'ready'; events: readonly Event[] }
-  | { status: 'failed'; message: string }
 
 export type EventsApi = MealSlotsApi & Pick<ApiClient, 'createEvent' | 'getEvents' | 'updateEvent'>
 
@@ -87,10 +83,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
   const viewer = useViewer()
   const admin = isAdmin(viewer)
 
-  const [events, setEvents] = useState<Events>({ status: 'loading' })
   const [draft, setDraft] = useState(BLANK)
-  const [creating, setCreating] = useState(false)
-  const [createError, setCreateError] = useState<string | undefined>(undefined)
 
   const [editing, setEditing] = useState<string | undefined>(undefined)
   // Which row the form is on *now*, readable from inside an awaited save whose
@@ -110,73 +103,50 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
     location: '',
     member_cap: '',
   })
-  const [saving, setSaving] = useState(false)
-  const [saveError, setSaveError] = useState<string | undefined>(undefined)
   const [saved, setSaved] = useState(false)
 
-  useEffect(() => {
-    if (!admin) return undefined
+  const { loaded: events, reload } = useLoad(async (signal) => (await api.getEvents(signal)).events, {
+    enabled: admin,
+    fallback: 'Could not load the events.',
+  })
 
-    const controller = new AbortController()
-    api
-      .getEvents(controller.signal)
-      .then((response) => {
-        if (!controller.signal.aborted) setEvents({ status: 'ready', events: response.events })
-      })
-      .catch((failure: unknown) => {
-        if (controller.signal.aborted) return
-        setEvents({ status: 'failed', message: messageFor(failure, 'Could not load the events.') })
-      })
+  // Two, because the page has two forms in flight independently: the one that makes a
+  // burn and the one that edits it. Sharing a busy flag would grey out whichever the
+  // other was using.
+  const { busy: creating, error: createError, run: runCreate } = useAction(reload)
+  const { busy: saving, error: saveError, setError: setSaveError, run: runSave } = useAction(reload)
 
-    return () => {
-      controller.abort()
-    }
-  }, [api, admin])
-
-  const submitNew = async (submitEvent: SubmitEvent) => {
+  const submitNew = (submitEvent: SubmitEvent) => {
     submitEvent.preventDefault()
-    if (creating) return
 
-    setCreating(true)
-    setCreateError(undefined)
-    try {
-      const created = await api.createEvent({
-        name: draft.name,
-        slug: draft.slug,
-        start_date: draft.start_date,
-        end_date: draft.end_date,
-        start_time: draft.start_time,
-        end_time: draft.end_time,
-        location: draft.location,
-        welcome_markdown: '',
-        // Sent rather than left to the schema's default, like the welcome text and
-        // for the same reason: both are written after the burn exists.
-        payment_info_markdown: '',
-        // `transfer_info_markdown` is deliberately *not* sent. Its default is a real
-        // sentence rather than an empty string, and sending '' would override it —
-        // leaving every new burn with nothing to say at the moment it fills, which is
-        // the one moment this field exists for.
-        member_cap: Number(draft.member_cap),
-      })
-      // Inserted in start-date order rather than appended, because that is how
-      // `GET /api/admin/events` returns them — appending shows a winter event
-      // above a summer one until the next reload.
-      setEvents((current) =>
-        current.status === 'ready'
-          ? {
-              status: 'ready',
-              events: [...current.events, created.event].sort((a, b) =>
-                a.start_date.localeCompare(b.start_date),
-              ),
-            }
-          : current,
-      )
-      setDraft(BLANK)
-    } catch (failure) {
-      setCreateError(messageFor(failure, 'Could not create the event.'))
-    } finally {
-      setCreating(false)
-    }
+    runCreate(
+      async () => {
+        await api.createEvent({
+          name: draft.name,
+          slug: draft.slug,
+          start_date: draft.start_date,
+          end_date: draft.end_date,
+          start_time: draft.start_time,
+          end_time: draft.end_time,
+          location: draft.location,
+          welcome_markdown: '',
+          // Sent rather than left to the schema's default, like the welcome text and
+          // for the same reason: both are written after the burn exists.
+          payment_info_markdown: '',
+          // `transfer_info_markdown` is deliberately *not* sent. Its default is a real
+          // sentence rather than an empty string, and sending '' would override it —
+          // leaving every new burn with nothing to say at the moment it fills, which is
+          // the one moment this field exists for.
+          member_cap: Number(draft.member_cap),
+        })
+        setDraft(BLANK)
+        // The list comes back from the server rather than being patched here. It used
+        // to be spliced in start-date order by hand, because appending showed a winter
+        // burn above a summer one — an ordering rule written twice, once here and once
+        // in the route.
+      },
+      (failure) => messageFor(failure, 'Could not create the event.'),
+    )
   }
 
   const startEditing = (row: Event) => {
@@ -199,72 +169,56 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
     setSaved(false)
   }
 
-  const saveEvent = async (id: string) => {
-    if (saving) return
-
+  const saveEvent = (id: string) => {
     const cap = Number(details.member_cap)
     if (!Number.isInteger(cap) || cap < 1) {
       setSaveError('The member cap has to be a whole number, at least one.')
       return
     }
 
-    setSaving(true)
-    setSaveError(undefined)
     setSaved(false)
-    try {
-      const changes = changedFields(original.current, {
-        name: details.name,
-        start_date: details.start_date,
-        end_date: details.end_date,
-        start_time: details.start_time,
-        end_time: details.end_time,
-        location: details.location,
-        member_cap: cap,
-        welcome_markdown: welcome,
-        payment_info_markdown: payment,
-        transfer_info_markdown: transfer,
-      })
-
-      const { event: updated } = await api.updateEvent(id, changes)
-
-      // The still-open form gets the canonical row too. Updating only the list
-      // leaves the header showing what was stored and the inputs showing what was
-      // typed — the same inconsistency this avoids one level down.
-      //
-      // Only if the form is still on this row: clicking Edit on another event
-      // while a save is in flight would otherwise drop this response into that
-      // form and report "Saved." under fields nobody sent.
-      if (editingNow.current === id) {
-        original.current = updated
-        setDetails({
-          name: updated.name,
-          start_date: updated.start_date,
-          end_date: updated.end_date,
-          start_time: updated.start_time,
-          end_time: updated.end_time,
-          location: updated.location,
-          member_cap: String(updated.member_cap),
+    runSave(
+      async () => {
+        const changes = changedFields(original.current, {
+          name: details.name,
+          start_date: details.start_date,
+          end_date: details.end_date,
+          start_time: details.start_time,
+          end_time: details.end_time,
+          location: details.location,
+          member_cap: cap,
+          welcome_markdown: welcome,
+          payment_info_markdown: payment,
+          transfer_info_markdown: transfer,
         })
-        setWelcome(updated.welcome_markdown)
-      }
 
-      setEvents((current) =>
-        current.status === 'ready'
-          ? {
-              status: 'ready',
-              // The row as written, rather than the draft: the server trims and
-              // may refuse part of it, and echoing the draft would show a save
-              // that did not happen the way it is drawn.
-              events: current.events.map((row) => (row.id === id ? updated : row)),
-            }
-          : current,
-      )
-      setSaved(true)
-    } catch (failure) {
-      setSaveError(messageFor(failure, 'Could not save the event.'))
-    } finally {
-      setSaving(false)
-    }
+        const { event: updated } = await api.updateEvent(id, changes)
+
+        // The still-open form gets the canonical row too. Updating only the list
+        // leaves the header showing what was stored and the inputs showing what was
+        // typed — the same inconsistency this avoids one level down.
+        //
+        // Only if the form is still on this row: clicking Edit on another event
+        // while a save is in flight would otherwise drop this response into that
+        // form and report "Saved." under fields nobody sent.
+        if (editingNow.current === id) {
+          original.current = updated
+          setDetails({
+            name: updated.name,
+            start_date: updated.start_date,
+            end_date: updated.end_date,
+            start_time: updated.start_time,
+            end_time: updated.end_time,
+            location: updated.location,
+            member_cap: String(updated.member_cap),
+          })
+          setWelcome(updated.welcome_markdown)
+        }
+
+        setSaved(true)
+      },
+      (failure) => messageFor(failure, 'Could not save the event.'),
+    )
   }
 
   return (
@@ -277,9 +231,9 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
 
       {events.status === 'ready' && (
         <>
-          {events.events.length === 0 && <p class="form-note">No events yet. Create the first one below.</p>}
+          {events.data.length === 0 && <p class="form-note">No events yet. Create the first one below.</p>}
 
-          {events.events.map((row) => (
+          {events.data.map((row) => (
             <article key={row.id} class="event-row">
               <h2>{row.name}</h2>
               <p class="form-note">

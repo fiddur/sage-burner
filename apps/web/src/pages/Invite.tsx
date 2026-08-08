@@ -1,16 +1,17 @@
 import type { Event, EventOptionTaken, InviteState } from '@sage-burner/shared'
 
 import { MAX_NOTES, MAX_PERSON_NAME } from '@sage-burner/shared'
-import { useEffect, useState } from 'preact/hooks'
+import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 import type { StayDraft } from '../stay.ts'
 
 import { isApiError } from '../api/client.ts'
 import { ErrorText } from '../components/ErrorText.tsx'
-import { FormError, useFormError } from '../components/FormError.tsx'
+import { FormError } from '../components/FormError.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
 import { StayFields } from '../components/StayFields.tsx'
+import { useAction, useLoadInto } from '../load.ts'
 import { stayForBurn, stayProblem, stayUpdate } from '../stay.ts'
 import { rowsFor } from '../textarea.ts'
 import { useSetViewer, useViewer } from '../viewer.tsx'
@@ -26,10 +27,35 @@ interface Upcoming {
   options: readonly EventOptionTaken[]
 }
 
-type Loaded =
-  | { status: 'loading' }
-  | { status: 'ready'; state: InviteState; upcoming: Upcoming | undefined }
-  | { status: 'failed' }
+/** What this page is about: the invite, and the burn it can offer alongside it. */
+interface Invited {
+  state: InviteState
+  upcoming: Upcoming | undefined
+}
+
+/**
+ * The burn to offer, or nothing.
+ *
+ * `/events/active` and its options are both public — the second for the reason the
+ * places are, that nothing in it is about a person — so the form can name the burn and
+ * draw its lodging list without this page's unauthenticated route learning to hand out
+ * anything new.
+ *
+ * Its own failure is swallowed rather than failing the page: the invite is what this
+ * page is for, and somebody who cannot be offered a burn can still become a member and
+ * pick one afterwards.
+ */
+const upcomingBurn = async (api: InviteApi, signal: AbortSignal): Promise<Upcoming | undefined> => {
+  try {
+    const { event } = await api.getActiveEvent(signal)
+    if (event === null) return undefined
+
+    const { options } = await api.getEventOptions(event.id, signal)
+    return { event, options }
+  } catch {
+    return undefined
+  }
+}
 
 /**
  * The failures redeeming can produce, each wanting different behaviour.
@@ -131,68 +157,42 @@ const OpenBurnOffer = ({ api, burn }: { api: Pick<InviteApi, 'joinEvent'>; burn:
 export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
   const viewer = useViewer()
   const setViewer = useSetViewer()
-  const [loaded, setLoaded] = useState<Loaded>({ status: 'loading' })
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
   const [allergies, setAllergies] = useState('')
   const [coming, setComing] = useState(true)
   const [stay, setStay] = useState<StayDraft | undefined>(undefined)
-  const [error, setError] = useFormError()
-  const [sending, setSending] = useState(false)
   const [done, setDone] = useState<'joined' | 'member' | undefined>(undefined)
 
-  useEffect(() => {
-    const controller = new AbortController()
+  // Keyed on the token rather than on a role: this is the one page whose load is
+  // about what is in the URL, so a second invite opened in the same tab reloads.
+  const { loaded } = useLoadInto(
+    async (signal): Promise<Invited> => {
+      const [state, upcoming] = await Promise.all([
+        api.getInviteState(token, signal),
+        upcomingBurn(api, signal),
+      ])
 
-    /**
-     * The burn to offer, or nothing.
-     *
-     * `/events/active` and its options are both public — the second for the reason
-     * the places are, that nothing in it is about a person — so the form can name the
-     * burn and draw its lodging list without this page's unauthenticated route
-     * learning to hand out anything new.
-     *
-     * Its own failure is swallowed rather than failing the page: the invite is what
-     * this page is for, and somebody who cannot be offered a burn can still become a
-     * member and pick one afterwards.
-     */
-    const upcomingBurn = async (): Promise<Upcoming | undefined> => {
-      try {
-        const { event } = await api.getActiveEvent(controller.signal)
-        if (event === null) return undefined
-
-        const { options } = await api.getEventOptions(event.id, controller.signal)
-        return { event, options }
-      } catch {
-        return undefined
+      return { state, upcoming }
+    },
+    ({ state, upcoming }) => {
+      // What they typed on the application. Asked for it twice, a form reads as one
+      // that was not listening the first time — and the address doubly so once the
+      // invite arrives at it (#30). Still editable: this becomes the login, and
+      // somebody may want a different address for that than the one they applied with.
+      if (state.name !== null) setName(state.name)
+      if (state.email !== null) setEmail(state.email)
+      if (upcoming !== undefined) {
+        setStay(stayForBurn(upcoming.event.start_date, upcoming.event.end_date))
       }
-    }
+    },
+    { key: token, fallback: 'Could not load this invitation. Please reload the page.' },
+  )
 
-    Promise.all([api.getInviteState(token, controller.signal), upcomingBurn()])
-      .then(([state, upcoming]) => {
-        if (controller.signal.aborted) return
+  const { busy: sending, formError: error, setError, run } = useAction()
 
-        setLoaded({ status: 'ready', state, upcoming })
-        // What they typed on the application. Asked for it twice, a form reads as
-        // one that was not listening the first time — and the address doubly so once
-        // the invite arrives at it (#30). Still editable: this becomes the login, and
-        // somebody may want a different address for that than the one they applied
-        // with.
-        if (state.name !== null) setName(state.name)
-        if (state.email !== null) setEmail(state.email)
-        if (upcoming !== undefined) {
-          setStay(stayForBurn(upcoming.event.start_date, upcoming.event.end_date))
-        }
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setLoaded({ status: 'failed' })
-      })
-
-    return () => controller.abort()
-  }, [api, token])
-
-  const offered = loaded.status === 'ready' ? loaded.upcoming : undefined
+  const offered = loaded.status === 'ready' ? loaded.data.upcoming : undefined
 
   const joining = offered !== undefined && coming
 
@@ -205,13 +205,12 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
     return joining && stay !== undefined ? stayProblem(stay) : undefined
   }
 
-  const submit = async () => {
+  const submit = () => {
     const wrong = problem()
     setError(wrong)
     if (wrong !== undefined) return
 
-    setSending(true)
-    try {
+    run(async () => {
       const { viewer: signedIn, attendance } = await api.redeemInvite(token, {
         email,
         password,
@@ -246,11 +245,7 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
       }
 
       setDone(attendance === null ? 'member' : 'joined')
-    } catch (failure) {
-      setError(messageForFailure(failure))
-    } finally {
-      setSending(false)
-    }
+    }, messageForFailure)
   }
 
   if (done !== undefined) {
@@ -306,7 +301,7 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
     )
   }
 
-  if (loaded.state.status !== 'outstanding') {
+  if (loaded.data.state.status !== 'outstanding') {
     // Three different dead ends, three different things to do about them — an
     // expired link can be re-sent, a used one probably means you already have an
     // account, and an unknown one is usually a truncated paste.
@@ -314,7 +309,7 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
       expired: 'This invitation has expired. Ask someone with admin for a fresh one.',
       used: 'This invitation has already been used. If that was you, log in instead.',
       unknown: 'We do not recognise this invitation link. Check you copied all of it.',
-    }[loaded.state.status]
+    }[loaded.data.state.status]
 
     return (
       <section class="page">
@@ -341,7 +336,7 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
         class="form"
         onSubmit={(event) => {
           event.preventDefault()
-          void submit()
+          submit()
         }}
       >
         <label class="field">

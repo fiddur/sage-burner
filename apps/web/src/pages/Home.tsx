@@ -1,21 +1,23 @@
 import type { Event } from '@sage-burner/shared'
 
 import { apiRoutes, BANNER_HEIGHT, BANNER_WIDTH, MAX_WELCOME_LENGTH } from '@sage-burner/shared'
-import { useEffect, useState } from 'preact/hooks'
+import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
+import type { Loaded } from '../load.ts'
 
-import { isApiError } from '../api/client.ts'
-import { FormError, useFormError } from '../components/FormError.tsx'
+import { FormError } from '../components/FormError.tsx'
 import { IconButton } from '../components/IconButton.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
 import { TheirVersion } from '../components/TheirVersion.tsx'
 import { useInstallationBanner, useInstallationTitle } from '../installation.tsx'
+import { useAction, useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
 import { isApproved, isMember, useViewer } from '../viewer.tsx'
 
-type Active = { status: 'loading' } | { status: 'ready'; event: Event | null } | { status: 'failed' }
+/** The burn the page is about, or `null` when there is none open. */
+type Active = Loaded<Event | null>
 
 export type HomeApi = Pick<ApiClient, 'getActiveEvent' | 'updateWelcome'>
 
@@ -52,11 +54,14 @@ const Banner = ({ version }: { version?: string | null }) =>
 const NoOpenBurn = ({ active, title }: { active: Active; title?: string }) => {
   if (active.status === 'loading') return <p class="form-note">One moment…</p>
 
+  // The message `useLoad` carries is deliberately dropped. A visitor who cannot reach
+  // the API can do nothing with the reason, and this is also what an offline first
+  // paint looks like — an error banner would be worse than "come back later".
   if (active.status === 'failed') {
     return <p class="notice">Could not load the current burn just now. Please try again shortly.</p>
   }
 
-  if (active.event !== null) return null
+  if (active.data !== null) return null
 
   return (
     <>
@@ -87,34 +92,18 @@ export const Home = ({ api }: { api: HomeApi }) => {
   const viewer = useViewer()
   const banner = useInstallationBanner()
   const title = useInstallationTitle()
-  const [active, setActive] = useState<Active>({ status: 'loading' })
   const [editing, setEditing] = useState<string | undefined>(undefined)
-  const [saving, setSaving] = useState(false)
   const [opening, setOpening] = useState(false)
-  const [error, setError] = useFormError()
-  const [refused, setRefused] = useState<unknown>(undefined)
 
-  useEffect(() => {
-    const controller = new AbortController()
+  const { loaded: active, reload } = useLoad(
+    async (signal) => (await api.getActiveEvent(signal)).event,
+    // Never rendered: `NoOpenBurn` says "come back later" instead, and says why.
+    { fallback: 'never shown — the page keeps its own wording for a failed load' },
+  )
 
-    api
-      .getActiveEvent(controller.signal)
-      .then((response) => {
-        if (!controller.signal.aborted) setActive({ status: 'ready', event: response.event })
-      })
-      .catch(() => {
-        // No code, no detail. A visitor who cannot reach the API can do nothing
-        // with the reason, and this is also what an offline first paint looks
-        // like — an error banner would be worse than "come back later".
-        if (!controller.signal.aborted) setActive({ status: 'failed' })
-      })
+  const { busy: saving, formError, setError, failure: refused, run } = useAction(reload)
 
-    return () => {
-      controller.abort()
-    }
-  }, [api])
-
-  const openEvent = active.status === 'ready' ? active.event : null
+  const openEvent = active.status === 'ready' ? active.data : null
 
   /**
    * Open the editor on the text as it is now, not as it was when the page loaded.
@@ -132,7 +121,6 @@ export const Home = ({ api }: { api: HomeApi }) => {
    */
   const openEditor = async (fallback: string) => {
     setError(undefined)
-    setRefused(undefined)
     // Said out loud, because the re-read is a round trip with nothing else
     // changing on screen. Without it this is a button that appears to do nothing
     // for as long as the network takes — the symptom `FormError` exists for,
@@ -143,15 +131,17 @@ export const Home = ({ api }: { api: HomeApi }) => {
 
       // No active burn means the last one ended while this page sat open. Opening
       // the editor would write to a burn nobody is looking at any more — and the
-      // save would put it back on screen as though it were still open. The page
-      // falls into its no-burn state instead, which is the whole section
+      // save would put it back on screen as though it were still open. Re-reading
+      // drops the page into its no-burn state instead, which is the whole section
       // disappearing and so is its own explanation.
       if (event === null) {
-        setActive({ status: 'ready', event: null })
+        reload()
         return
       }
 
-      setActive({ status: 'ready', event })
+      // Not written back over `active`: the editor replaces the text on screen, so
+      // the only thing this read is for is what the form is seeded with — and the
+      // version the save's `If-Match` quotes, which the client took from it.
       setEditing(event.welcome_markdown)
     } catch {
       setEditing(fallback)
@@ -160,23 +150,17 @@ export const Home = ({ api }: { api: HomeApi }) => {
     }
   }
 
-  const save = async (id: string, welcome_markdown: string) => {
-    setSaving(true)
-    setError(undefined)
-    setRefused(undefined)
-    try {
-      const { event } = await api.updateWelcome(id, { welcome_markdown })
-      setActive({ status: 'ready', event })
+  /**
+   * The editor stays open with what was typed still in it when a save is refused. A
+   * paragraph somebody wrote is not something to throw away because somebody else
+   * saved first — `TheirVersion` puts the other one beside it to be reconciled
+   * against, which is what `useAction` holds `failure` for.
+   */
+  const save = (id: string, welcome_markdown: string) => {
+    run(async () => {
+      await api.updateWelcome(id, { welcome_markdown })
       setEditing(undefined)
-    } catch (failure) {
-      setError(isApiError(failure) ? failure.message : 'Could not save that. Please try again.')
-      // The editor stays open with what was typed still in it. A paragraph somebody
-      // wrote is not something to throw away because somebody else saved first —
-      // `TheirVersion` puts the other one beside it to be reconciled against.
-      setRefused(failure)
-    } finally {
-      setSaving(false)
-    }
+    }, 'Could not save that. Please try again.')
   }
 
   return (
@@ -227,7 +211,7 @@ export const Home = ({ api }: { api: HomeApi }) => {
               class="form"
               onSubmit={(submitEvent) => {
                 submitEvent.preventDefault()
-                void save(openEvent.id, editing)
+                save(openEvent.id, editing)
               }}
             >
               <MarkdownField
@@ -237,7 +221,7 @@ export const Home = ({ api }: { api: HomeApi }) => {
                 onInput={setEditing}
               />
 
-              <FormError error={error} />
+              <FormError error={formError} />
               <TheirVersion failure={refused} at={['event', 'welcome_markdown']} />
 
               <PendingButton busy={saving} label="Save" busyLabel="Saving…" type="submit" />

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Viewer } from '../viewer.tsx'
@@ -49,7 +49,22 @@ const renderPage = (api: AdminSettingsApi, viewer: Viewer = ADMIN) =>
     </ViewerProvider>,
   )
 
-const titleField = async () => await screen.findByRole('textbox')
+/**
+ * The title form, and only it.
+ *
+ * Scoped because the mail form mounted below has a Save of its own and several text
+ * boxes. A bare `findByRole('textbox')` passed only by racing that form's load, which
+ * a change in how this page fetches was enough to lose.
+ */
+const titleForm = async () => {
+  const form = (await screen.findByText('What these burns are called')).closest('form')
+  if (form === null) throw new Error('the title field has no form around it')
+
+  return within(form)
+}
+
+const titleField = async () => (await titleForm()).getByRole('textbox')
+const saveTitle = async () => (await titleForm()).getByRole('button', { name: 'Save' })
 
 describe('AdminSettings', () => {
   it('shows what the installation is called now', async () => {
@@ -90,7 +105,7 @@ describe('AdminSettings', () => {
     renderPage(stub({ updateInstallation }))
 
     fireEvent.input(await titleField(), { target: { value: 'The Burning Sage' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    fireEvent.click(await saveTitle())
 
     await waitFor(() => expect(updateInstallation).toHaveBeenCalledWith({ title: 'The Burning Sage' }))
     expect((await screen.findByRole('status')).textContent).toContain('Saved')
@@ -105,7 +120,7 @@ describe('AdminSettings', () => {
     renderPage(stub({ updateInstallation }))
 
     fireEvent.input(await titleField(), { target: { value: '  The Burning Sage  ' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    fireEvent.click(await saveTitle())
 
     await waitFor(() => expect(updateInstallation).toHaveBeenCalledWith({ title: 'The Burning Sage' }))
   })
@@ -119,7 +134,7 @@ describe('AdminSettings', () => {
     renderPage(stub({ updateInstallation }))
 
     fireEvent.input(await titleField(), { target: { value: '   ' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    fireEvent.click(await saveTitle())
 
     expect((await screen.findByRole('alert')).textContent).toContain('Give it a name')
     expect(updateInstallation).not.toHaveBeenCalled()
@@ -147,7 +162,7 @@ describe('AdminSettings', () => {
     )
 
     fireEvent.input(await titleField(), { target: { value: 'The Burning Sage' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    fireEvent.click(await saveTitle())
 
     await waitFor(() =>
       expect(screen.getByRole('status', { name: 'brand' }).textContent).toBe('The Burning Sage'),
@@ -161,7 +176,7 @@ describe('AdminSettings', () => {
     )
 
     fireEvent.input(await titleField(), { target: { value: 'Something' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    fireEvent.click(await saveTitle())
 
     expect((await screen.findByRole('alert')).textContent).toContain('That will not do')
   })

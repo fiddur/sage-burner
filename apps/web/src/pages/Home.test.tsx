@@ -259,13 +259,28 @@ describe('Home', () => {
       })
     }
 
-    it('saves the text and shows what came back, not what was typed', async () => {
-      // The response is the row as written, so rendering it rather than the local
-      // draft is what stops the page claiming a save that landed differently.
-      const updateWelcome = vi.fn<HomeApi['updateWelcome']>(() =>
-        Promise.resolve({ event: { ...summer, welcome_markdown: 'Saved server-side' } }),
+    it('saves the text and shows what the server has, not what was typed', async () => {
+      // Rendering the local draft would let the page claim a save that landed
+      // differently. It re-reads instead, so the stub answers as a server would —
+      // which is also what pins that the re-read happens at all.
+      const saved = { ...summer, welcome_markdown: 'Saved server-side' }
+      const updateWelcome = vi.fn<HomeApi['updateWelcome']>(() => Promise.resolve({ event: saved }))
+      let written = false
+      render(
+        <InstallationProvider title="The Burning Sage" banner={null}>
+          <ViewerProvider viewer={asRoles(['member'])}>
+            <Home
+              api={{
+                getActiveEvent: () => Promise.resolve({ event: written ? saved : summer }),
+                updateWelcome: async (id, body) => {
+                  written = true
+                  return await updateWelcome(id, body)
+                },
+              }}
+            />
+          </ViewerProvider>
+        </InstallationProvider>,
       )
-      renderHome(summer, asRoles(['member']), updateWelcome)
 
       fireEvent.click(await screen.findByRole('button', { name: 'Edit this text' }))
       fireEvent.input(await screen.findByLabelText('Welcome text'), { target: { value: 'Bring a cup' } })
