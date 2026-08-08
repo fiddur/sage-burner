@@ -71,11 +71,23 @@ describe('what everyone has been doing', () => {
     expect(await screen.findByText(/Autumn burn/)).toBeTruthy()
   })
 
-  it('links a line to the page it is about', async () => {
-    renderPage(stub({}, [aLine({ id: 'x-1', body: 'Ada offered a dream: Sauna' })]))
+  it('links a line to the page it is about, at the burn it is about', async () => {
+    // The page alone was the defect (#333): the links are the notification's, and
+    // those are burn-agnostic — so a line about the autumn burn followed while the
+    // selector sat on the summer one opened the summer page.
+    renderPage(stub({}, [aLine({ id: 'x-1', body: 'Ada offered a dream: Sauna', event_id: 'e-2' })]))
 
     const link = await screen.findByRole('link', { name: 'Ada offered a dream: Sauna' })
-    expect(link.getAttribute('href')).toBe('/dreams')
+    expect(link.getAttribute('href')).toBe('/dreams?burn=e-2')
+  })
+
+  it('keeps a query the link already had', async () => {
+    // None carries one today. The joiner is a `&` rather than a second `?` so that
+    // stays true of a link somebody adds rather than of this one.
+    renderPage(stub({}, [aLine({ id: 'x-1', body: 'Ada offered a dream: Sauna', link: '/dreams?open=s-1' })]))
+
+    const link = await screen.findByRole('link', { name: 'Ada offered a dream: Sauna' })
+    expect(link.getAttribute('href')).toBe('/dreams?open=s-1&burn=e-1')
   })
 
   it('leaves a line with no page of its own as plain text', async () => {

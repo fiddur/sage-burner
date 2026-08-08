@@ -9,6 +9,9 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-08
 
+- **A line on Going on opens the burn it is about.** Following one about the autumn burn
+  while the bar was showing the summer one took you to the summer page — the right page,
+  the wrong burn.
 - **A mail server that is not answering no longer holds a page up.** With email
   configured to a host that had stopped responding, anything told to everybody at a
   burn — a dream offered, a lead role taken — waited on it once per person, which at a

@@ -40,6 +40,10 @@ The choice is **not persisted**. A reload landing on the soonest burn is the rig
 default every time, and a remembered choice would leave somebody looking at last
 month's grid with nothing on screen to say why.
 
+**A `?burn=<id>` in the address chooses one** (#333), which is how a line in the feed
+lands on the burn it is about. Read here rather than by each page, because every
+burn-scoped page already reads this.
+
 | Viewer                   | Bar                                                            |
 | ------------------------ | -------------------------------------------------------------- |
 | Signed out               | Apply, Log in                                                  |
@@ -201,6 +205,15 @@ burn-wide notification writes to it.
 (#184): the gap between burns is exactly what the page fills, and "somebody joined the
 Autumn Burn" is news to people still thinking about the summer one. Each line names its
 own burn instead.
+
+**And each link carries it** (#333). The links are the notification's — `/dreams`,
+`/members`, `/roles` — and those are burn-agnostic, so following a line about the
+autumn burn while the selector sat on the summer one opened the summer page. The line
+appends `?burn=<id>`, and `burn.tsx` is what reads it: every burn-scoped page already
+reads the selector, so **the selector following the URL is the whole of the fix** rather
+than a parameter each page has to learn. Added when the line is drawn rather than stored
+on the row, so the lines already written land right too. It is a choice, not a lock —
+the bar's own selector still wins afterwards.
 
 **The chip is half of it.** Every line carries the category's own settings-table label
 as a toggle button, so somebody meets the switch in the moment they have just found the

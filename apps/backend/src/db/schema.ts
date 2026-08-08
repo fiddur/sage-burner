@@ -1288,6 +1288,9 @@ export const activity = sqliteTable(
     primaryKey({ columns: [table.id] }),
     // Newest first across every burn, which is the one way this is read.
     index('activity_recent_idx').on(table.created_at),
+    // Not for a read — nothing filters by burn — but for the cascade, which without
+    // it scans the table once per row of the burn being deleted (#333).
+    index('activity_event_idx').on(table.event_id),
     check('activity_category_check', oneOf(table.category, notificationCategories)),
   ],
 )

@@ -1,6 +1,7 @@
 import type { Attendance, MyBurn, MyBurnsResponse } from '@sage-burner/shared'
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
+import { LocationProvider } from 'preact-iso'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Viewer } from './viewer.tsx'
@@ -9,6 +10,8 @@ import { choosableBurns, FetchedBurnProvider, useBurns } from './burn.tsx'
 import { ViewerProvider } from './viewer.tsx'
 
 afterEach(cleanup)
+// The history outlives one test, and `LocationProvider` reads it on mount.
+afterEach(() => history.replaceState(null, '', '/'))
 
 const anAttendance = (): Attendance => ({
   id: 'att-1',
@@ -75,6 +78,54 @@ const renderChoice = (coming: MyBurn[], viewer: Viewer = MEMBER) => {
 
   return getMyBurns
 }
+
+/**
+ * The same, under the router — which is where a link naming a burn is read from.
+ *
+ * Bare above, because most of these are about what the fetch answers rather than about
+ * the URL. `LocationProvider` reads `location` on mount, so the address is set first.
+ */
+const renderChoiceAt = (at: string, coming: MyBurn[], viewer: Viewer = MEMBER) => {
+  history.replaceState(null, '', at)
+  const getMyBurns = vi.fn(() => Promise.resolve({ coming, past: [] }))
+  render(
+    <LocationProvider>
+      <ViewerProvider viewer={viewer}>
+        <FetchedBurnProvider api={{ getMyBurns }}>
+          <Shown />
+        </FetchedBurnProvider>
+      </ViewerProvider>
+    </LocationProvider>,
+  )
+
+  return getMyBurns
+}
+
+describe('a link that names a burn', () => {
+  it('chooses it, rather than leaving the selector where it was', async () => {
+    // The whole of #333: every burn-scoped page reads the selector, so the selector
+    // reading the URL is what makes one line's link land on the right page.
+    renderChoiceAt('/dreams?burn=e-2', [aBurn('e-1', 'Summer', true), aBurn('e-2', 'Winter', true)])
+
+    await waitFor(() => expect(screen.getByText(/^ready:/).textContent).toContain(':Winter'))
+  })
+
+  it('leaves the default alone when it names one that is not on offer', async () => {
+    // A burn the viewer is not coming to, or one that has gone. Falling back to the
+    // soonest is what every other page already does with no selection at all.
+    renderChoiceAt('/dreams?burn=e-9', [aBurn('e-1', 'Summer', true), aBurn('e-2', 'Winter', true)])
+
+    await waitFor(() => expect(screen.getByText(/^ready:/).textContent).toContain(':Summer'))
+  })
+
+  it('leaves the default alone when there is no such parameter', async () => {
+    // The passing sibling: reading the URL must not disturb the ordinary case, which
+    // is every page reached from the bar.
+    renderChoiceAt('/dreams', [aBurn('e-1', 'Summer', true), aBurn('e-2', 'Winter', true)])
+
+    await waitFor(() => expect(screen.getByText(/^ready:/).textContent).toContain(':Summer'))
+  })
+})
 
 describe('choosableBurns', () => {
   it('gives a member the burns they are coming to, and not the rest', () => {
