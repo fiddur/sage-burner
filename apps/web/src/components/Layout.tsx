@@ -8,7 +8,7 @@ import type { BellApi } from './NotificationBell.tsx'
 import { useBurns } from '../burn.tsx'
 import { useInstallationTitle } from '../installation.tsx'
 import { isAdmin, isApproved, isMember, useViewer } from '../viewer.tsx'
-import { usePhone } from '../viewport.ts'
+import { useHidingBar, usePhone } from '../viewport.ts'
 import { Avatar } from './Avatar.tsx'
 import { NotificationBell } from './NotificationBell.tsx'
 
@@ -70,6 +70,7 @@ export const Layout = ({ api, children }: { api: BellApi; children: ComponentChi
   // rather than by typing the URL — which is what the pages themselves allow.
   const pages = isApproved(viewer) ? memberPages : []
   const bottomBar = phone && pages.length > 0
+  const hidden = useHidingBar(bottomBar)
 
   return (
     <div class={bottomBar ? 'layout has-bottom-bar' : 'layout'}>
@@ -113,7 +114,7 @@ export const Layout = ({ api, children }: { api: BellApi; children: ComponentChi
         </p>
       </footer>
 
-      {bottomBar && <BottomBar pages={pages} />}
+      {bottomBar && <BottomBar pages={pages} hidden={hidden} />}
     </div>
   )
 }
@@ -171,12 +172,16 @@ const TopNav = ({ api, pages }: { api: BellApi; pages: readonly NavPage[] }) => 
  * bar spells out on a wide screen, which is what a screen reader reads and what a long
  * press shows. `aria-current` marks where you are, since a scrolled page has its own
  * heading off the top.
+ *
+ * `hidden` slides it away while somebody reads down a page (#340). The stylesheet takes
+ * `visibility` with it once the slide is over, so a bar that is off the screen holds no
+ * focusable links — a transform alone leaves six of them in the tab order.
  */
-const BottomBar = ({ pages }: { pages: readonly NavPage[] }) => {
+const BottomBar = ({ pages, hidden }: { pages: readonly NavPage[]; hidden: boolean }) => {
   const { path } = useLocation()
 
   return (
-    <nav class="bottom-bar" aria-label="Pages">
+    <nav class={hidden ? 'bottom-bar is-hidden' : 'bottom-bar'} aria-label="Pages">
       {pages.map((page) => (
         <a
           key={page.href}

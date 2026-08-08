@@ -226,8 +226,7 @@ a:hover {
   max-width: var(--measure);
 }
 
-/* The phone's nav (#337) — `docs/the-app.md` has the shape and the why. Always
-   visible; hiding it on scroll down is #340. */
+/* The phone's nav (#337) — `docs/the-app.md` has the shape and the why. */
 .bottom-bar {
   position: fixed;
   inset-inline: 0;
@@ -239,6 +238,25 @@ a:hover {
   padding-bottom: env(safe-area-inset-bottom);
   border-top: 1px solid var(--line);
   background: var(--paper);
+  transition:
+    transform 0.2s ease,
+    visibility 0s;
+}
+
+/*
+  Out of the way while somebody reads down a page (#340).
+
+  `visibility` as well as the transform, delayed by exactly the length of the slide:
+  a bar that is off the screen must hold no focusable links, and a transform alone
+  leaves six of them in the tab order and in the accessibility tree. Delayed rather
+  than immediate, or it would vanish instead of sliding.
+*/
+.bottom-bar.is-hidden {
+  transform: translateY(100%);
+  visibility: hidden;
+  transition:
+    transform 0.2s ease,
+    visibility 0s linear 0.2s;
 }
 
 .bottom-tab {
@@ -753,13 +771,36 @@ a:hover {
 }
 
 .dream-row {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 0.75rem;
   border: 1px solid var(--line);
   border-radius: 0.5rem;
+}
+
+/*
+  The whole row is the way in (#342), which is why the padding is on the button and
+  not on the row around it — a tap anywhere but the 0.5rem of border used to do
+  nothing at all.
+
+  Styled back down to text, as `.dream-open` is in the grid: the bordered row is
+  already the affordance, and a button frame inside it would read as two controls.
+*/
+.dream-row-open {
+  display: flex;
+  align-items: center;
   flex-wrap: wrap;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.dream-row-open:hover {
+  background: color-mix(in srgb, var(--sage) 8%, transparent);
 }
 
 .dream-title {
@@ -1024,10 +1065,21 @@ a:hover {
 }
 
 /* Over the timetable rather than beside it — the grid is as wide as the screen. */
+/*
+  Above the bottom bar, which is the whole of why this is 40 (#344).
+
+  The three things that float over a page share one stacking context — `.layout`
+  creates none — so source order decides ties, and `.bottom-bar` comes later in this
+  file than the modal did at the same `20`. On a phone the nav painted over the
+  backdrop: a tall panel had its last 3.5rem behind the bar, and the bar's links
+  stayed tappable through an overlay meant to be modal.
+
+  The scale, so a fourth thing has somewhere to go: bar 20, popdown 30, modal 40.
+*/
 .dream-modal {
   position: fixed;
   inset: 0;
-  z-index: 20;
+  z-index: 40;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1745,6 +1797,14 @@ img.avatar {
 @media (prefers-reduced-motion: reduce) {
   .refreshing {
     animation-duration: 4s;
+  }
+
+  /* The bar still goes; it just goes at once. What somebody asked to be spared is the
+     movement, not the room it makes. `visibility` loses its delay with the slide it
+     was waiting for. */
+  .bottom-bar,
+  .bottom-bar.is-hidden {
+    transition: none;
   }
 }
 
