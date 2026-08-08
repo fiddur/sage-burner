@@ -8,6 +8,7 @@ import type { PushDeps } from './push.ts'
 
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, attendance, event, notification, notificationSetting } from '../db/schema.ts'
+import { createEmailQueue } from '../mail/queue.ts'
 import { notifyAttendees, recordAndPush } from './notify.ts'
 
 /**
@@ -87,70 +88,74 @@ const givenBurn = async () => {
 const TOLD: Told = { category: 'dream_offered', body: 'Ada offered a dream', link: '/dreams' }
 
 describe('telling everybody coming to a burn', () => {
-  it('posts to them all at once rather than one mail server wait per person', async () => {
-    // This deadlocks if the fan-out is sequential: nothing resolves until every
-    // posting has started, and one after another the second never does. Which is the
-    // defect in its own shape — fifteen seconds each against a host that drops
-    // packets was ten minutes at the cap (#313).
+  it('does not make the request wait on one mail server wait per person', async () => {
+    // What #313 was about, kept: forty-two fifteen-second waits inside one request is
+    // about ten minutes at the cap. What #356 changed is that it is now *no* waits —
+    // the fan-out queues its posts and answers.
     const deps = build()
     await givenBurn()
     for (let made = 0; made < 3; made += 1) await givenAttendee()
 
-    let started = 0
-    let release: () => void = () => undefined
-    const allStarted = new Promise<void>((resolve) => (release = resolve))
-    const byEmail: EmailChannel = async () => {
-      started += 1
-      if (started === 3) release()
-
-      return await allStarted
-    }
-
-    const told = await notifyAttendees(
-      deps.db,
-      recordAndPush(deps, NOW_AT, () => undefined, byEmail),
-      BURN,
-      TOLD,
-      { at: new Date(NOW) },
-    )
-
-    expect(told).toBe(3)
-    expect(started).toBe(3)
-  })
-
-  it('still waits for all of them, so a route answering means the work is done', async () => {
-    // The other half: side by side is not the same as unawaited. A test asserting on
-    // what was sent must not have to race the response.
-    const deps = build()
-    await givenBurn()
-    for (let made = 0; made < 3; made += 1) await givenAttendee()
-
+    const queue = createEmailQueue(() => undefined)
     const posted: string[] = []
     const byEmail: EmailChannel = async (accountId) => {
       await new Promise((resolve) => setTimeout(resolve, 1))
       posted.push(accountId)
     }
 
-    await notifyAttendees(
+    const told = await notifyAttendees(
       deps.db,
-      recordAndPush(deps, NOW_AT, () => undefined, byEmail),
+      recordAndPush(deps, NOW_AT, () => undefined, { post: byEmail, defer: queue.defer }),
       BURN,
       TOLD,
-      {
-        at: new Date(NOW),
-      },
+      { at: new Date(NOW) },
     )
 
+    expect(told).toBe(3)
+    expect(posted).toEqual([])
+
+    await queue.drain()
+
     expect(posted).toHaveLength(3)
+  })
+
+  it('posts them one at a time, so a burn does not dial the relay once per attendee at once', async () => {
+    // `sendWithSmtp` opens a connection per message. Small relays cap concurrent
+    // connections and refuse the overflow, which `post` turns into a quiet `sent:
+    // false` — so the failure mode was missing email rather than slow email (#356).
+    const deps = build()
+    await givenBurn()
+    for (let made = 0; made < 3; made += 1) await givenAttendee()
+
+    const queue = createEmailQueue(() => undefined)
+    let open = 0
+    let most = 0
+    const byEmail: EmailChannel = async () => {
+      open += 1
+      most = Math.max(most, open)
+      await new Promise((resolve) => setTimeout(resolve, 1))
+      open -= 1
+    }
+
+    await notifyAttendees(
+      deps.db,
+      recordAndPush(deps, NOW_AT, () => undefined, { post: byEmail, defer: queue.defer }),
+      BURN,
+      TOLD,
+      { at: new Date(NOW) },
+    )
+    await queue.drain()
+
+    expect(most).toBe(1)
   })
 })
 
 describe('the email leg beside a bell row', () => {
   it('does not leave the email in flight when the row cannot be written', async () => {
-    // Node's default for an unhandled rejection is to exit the process. The email is
-    // started before the insert and awaited after it, so anything thrown in between
-    // used to leave it floating — and it rejects on a database error, which is the
-    // same failure that makes the insert throw (#313).
+    // Node's default for an unhandled rejection is to exit the process, and a database
+    // that has gone away fails the insert *and* the posting (#313). The queue is what
+    // holds the rejection now — it is queued before the insert, so a throw in between
+    // cannot leave it floating, and the queue reports rather than rethrows.
     const unhandled: unknown[] = []
     const watch = (reason: unknown) => unhandled.push(reason)
     process.on('unhandledRejection', watch)
@@ -158,22 +163,26 @@ describe('the email leg beside a bell row', () => {
     try {
       const deps = build()
       const accountId = await givenAsking()
+      const failures: unknown[] = []
+      const queue = createEmailQueue((failure) => failures.push(failure))
       const byEmail: EmailChannel = () => Promise.reject(new Error('the database went away'))
       // Spied rather than stubbed, so the read that decides the channels still works:
-      // the posting is only started after it, which is the window this is about.
+      // the posting is only queued after it, which is the window this is about.
       vi.spyOn(deps.db, 'insert').mockImplementation(() => {
         throw new Error('the database went away')
       })
 
-      await expect(recordAndPush(deps, NOW_AT, () => undefined, byEmail)(accountId, TOLD)).rejects.toThrow(
-        'the database went away',
-      )
+      await expect(
+        recordAndPush(deps, NOW_AT, () => undefined, { post: byEmail, defer: queue.defer })(accountId, TOLD),
+      ).rejects.toThrow('the database went away')
 
+      await queue.drain()
       // `unhandledRejection` fires once the microtask queue has drained, so a tick of
       // real time is what makes its absence mean anything.
       await new Promise((resolve) => setTimeout(resolve, 10))
 
       expect(unhandled).toEqual([])
+      expect(failures).toHaveLength(1)
     } finally {
       process.off('unhandledRejection', watch)
     }
@@ -185,9 +194,11 @@ describe('the email leg beside a bell row', () => {
     // refused still leaves the bell row behind.
     const deps = build()
     const accountId = await givenAsking()
+    const queue = createEmailQueue(() => undefined)
     const byEmail = vi.fn<EmailChannel>(() => Promise.resolve({ sent: false, reason: 'refused' }))
 
-    await recordAndPush(deps, NOW_AT, () => undefined, byEmail)(accountId, TOLD)
+    await recordAndPush(deps, NOW_AT, () => undefined, { post: byEmail, defer: queue.defer })(accountId, TOLD)
+    await queue.drain()
 
     expect(byEmail).toHaveBeenCalledWith(accountId, TOLD)
     const rows = await db().select().from(notification).where(eq(notification.account_id, accountId))

@@ -493,6 +493,25 @@ interpolated into markup on the way out. The `From:` display name is quoted per 
 5322 and stripped of anything that could end a header, since an installation calls
 itself whatever it likes.
 
+**A notification's email leaves the request** (#356). `sendWithSmtp` opens a
+connection per message and `notifyBurn` fans out over the whole attendance, so a full
+burn dialled the relay once per attendee — and every one of those waits was inside the
+request that caused it. Small relays cap concurrent connections and refuse the
+overflow, which `post` turns into a quiet `sent: false`, so the failure mode was
+_missing_ email rather than slow email.
+
+The email leg goes on a queue instead: one message at a time, after the answer, drained
+on shutdown. Nothing on screen depends on it — the row is written first and always —
+so being slow now costs nobody anything, which is what makes serial the right shape
+rather than a bounded pool. Nothing retries; a message that could not be posted is
+logged and gone, the same promise the bell already makes.
+
+That reverses something the tests relied on: **a route answering no longer means the
+posting has happened.** `createApp` takes `defer` for exactly that reason, so a test
+holds the queue and drains it where it asserts. An invite is still posted inside its
+request — one message to one person is not a burst, and the raw token is in that
+response anyway.
+
 **Links in email need `PUBLIC_ORIGIN`.** An invite is posted from a request and
 takes the origin that request arrived on, so it always has one. A notification is
 posted from wherever a role was handed out, with no request to read `Host` from — so
@@ -522,9 +541,9 @@ Two caches, and the split is the whole of what stays on a device:
   the path, because `/api/installation/icon` is asked for **both ways**: bare by the
   header's mark and the favicon, versioned by everything that wants a particular one.
   Those are two live entries under one path, not two versions of one. Among the
-  _versioned_ spellings only the newest survives, so they all have to agree — and they
-  had grown to four that did not: the manifest raw, the settings page a literal
-  `?v=current`, the share card percent-encoded. `/api/installation` answers
+  _versioned_ spellings only the newest survives, so they all have to agree — and the
+  spelling drifted three times before they did: the manifest raw, the settings page a
+  literal `?v=current`, the share card percent-encoded. `/api/installation` answers
   `icon_updated_at`, and `iconSrc` in `routes.ts` is the one builder every caller goes
   through, for the reason the per-segment encoding lives there too (#376, #378). A count
   over the lot would be the obvious single rule and is the one thing this must not do —

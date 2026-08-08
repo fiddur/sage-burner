@@ -12,6 +12,7 @@ import type { GuardDeps } from './auth/guards.ts'
 import type { Config } from './config.ts'
 import type { Database } from './db/index.ts'
 import type { Send } from './mail/mail.ts'
+import type { EmailQueue } from './mail/queue.ts'
 import type { Delivery, VapidKeys } from './push/push.ts'
 
 import { createGate, SCRYPT_GATE } from './auth/gate.ts'
@@ -21,6 +22,7 @@ import { refuseEnvelopeStrippers } from './envelope.ts'
 import { clientErrorHandler, frameworkErrorHandler, registerErrorHandler } from './errors.ts'
 import { sendError } from './http.ts'
 import { emailChannel } from './mail/channel.ts'
+import { createEmailQueue } from './mail/queue.ts'
 import { sendWithSmtp } from './mail/smtp.ts'
 import { notifyAdmins, recordAndPush } from './push/notify.ts'
 import { deliverWithWebPush, DEFAULT_PUSH_CONTACT, generateVAPIDKeys } from './push/web-push.ts'
@@ -89,6 +91,14 @@ export interface AppDeps {
    * configures one has this and sends nothing.
    */
   send?: Send
+  /**
+   * Where the email leg of a notification goes (#356).
+   *
+   * Injected so a test can hold the work and run it when it chooses. Production makes
+   * its own queue and drains it on shutdown; a route answering no longer means the
+   * posting has happened, and that is the whole of what this changed.
+   */
+  defer?: EmailQueue['defer']
   /**
    * The scrypt gate. Injected so a test can shrink it to one slot and assert
    * shedding without spending the real thing's five-second window.
@@ -356,6 +366,7 @@ export const createApp = async ({
   deliver = deliverWithWebPush(DEFAULT_PUSH_CONTACT),
   mintKeys = generateVAPIDKeys,
   send = sendWithSmtp,
+  defer,
   hash,
   now = () => new Date(),
   changelog = readChangelog(),
@@ -459,13 +470,24 @@ export const createApp = async ({
       app.log.warn({ reason: posted.reason, account_id }, 'posting a notification'),
   })
 
+  // Off the request, and one at a time (#356). `notifyBurn` fans out over the whole
+  // attendance and `sendWithSmtp` opens a connection per message, so a full burn used
+  // to dial the relay once per attendee at once — and every one of those waits was
+  // inside the request that caused it.
+  const emails = createEmailQueue((failure: unknown) => {
+    app.log.warn({ err: failure }, 'posting a notification')
+  })
+
+  // Drained on the way down, so a redeploy does not drop what was still going out.
+  app.addHook('onClose', async () => await emails.drain())
+
   const tellAccount = recordAndPush(
     push,
     now,
     (counts) => {
       app.log.warn({ ...counts }, 'notifying a member')
     },
-    byEmail,
+    { post: byEmail, defer: defer ?? emails.defer },
   )
 
   registerAuthRoutes(app, { db, config, sessions, gate })

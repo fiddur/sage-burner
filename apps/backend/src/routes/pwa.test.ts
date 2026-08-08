@@ -143,7 +143,7 @@ describe('the web manifest', () => {
     expect((await putIcon(server, root.cookie, PNG)).statusCode).toBe(200)
 
     const after = (await getManifest(server)).json()
-    expect(after.icons[0].src).toBe(`/api/installation/icon?v=${encodeURIComponent(NOW)}`)
+    expect(after.icons[0].src).toBe('/api/installation/icon?v=2026-07-02T00%3A00%3A00.000Z')
     expect(after.icons[0]).toMatchObject({ type: 'image/png', sizes: '512x512' })
   })
 

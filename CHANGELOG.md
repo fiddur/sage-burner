@@ -9,6 +9,12 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-08
 
+- **Recording a payment, or anything else that emails a burn, answers straight away.**
+  The send used to happen inside the request, so a mail server that was slow or busy
+  made whoever pressed the button wait for it — and a burn-wide message opened one
+  connection per person at once, which some mail servers refuse. They go out one at a
+  time now, after the page has answered.
+
 - **Changing the banner no longer leaves the old one on your phone forever.** Every
   upload was kept, about a megabyte each, with nothing to clear them.
 - **The page no longer jumps sideways when a menu or a dream opens** on a desktop, and

@@ -786,16 +786,15 @@ export type RouteKey = keyof typeof apiRoutes
  * The installation's own pictures, with the `?v=` that makes a new one a new URL.
  *
  * Here for the reason the per-segment encoding is: it was a chore at each call site,
- * and the icon had grown **four** spellings of one picture — the manifest raw, the
- * settings page a literal `current`, the share card percent-encoded (#376, #378). Two
- * versioned spellings under one path evict each other in the offline cache, which is
- * what made a drift here cost something rather than merely look untidy.
+ * and the icon's spelling had drifted three times over (#376, #378). Two versioned
+ * spellings under one path evict each other in the offline cache, which is what makes
+ * a drift here cost something rather than merely look untidy.
  *
  * `null` is "nobody has uploaded one", which the icon route answers with the app's own
  * flame. The bare path is a separate live URL on purpose — the header's mark and the
  * favicon quote it, and nothing about them changes when an admin uploads.
  */
-export const iconSrc = (version: string | null): string =>
+export const iconSrc = (version: string | null | undefined): string =>
   `${apiRoutes.getInstallationIcon.path()}?v=${encodeURIComponent(version ?? 'default')}`
 
 /** The same for the homepage's banner, which has no default: there is one or there is none. */

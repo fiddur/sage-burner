@@ -23,6 +23,7 @@ import {
   notification,
   pushSubscription,
 } from '../db/schema.ts'
+import { createEmailQueue } from '../mail/queue.ts'
 
 const SECRET = 's'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
@@ -47,8 +48,19 @@ const db = () => {
 /** Every send in this file lands here. Nothing in the suite opens a socket. */
 const posted: Message[] = []
 
+/**
+ * The queue the email leg goes on, held so a test can wait for it (#356).
+ *
+ * A route answering no longer means the posting has happened. Without `settled()` the
+ * assertions below would be racing the queue — and winning most of the time, which is
+ * the worst of the three outcomes.
+ */
+let emails = createEmailQueue(() => undefined)
+const settled = async () => await emails.drain()
+
 const build = async (deliver: Delivery = () => Promise.resolve('sent'), env: Record<string, string> = {}) => {
   posted.length = 0
+  emails = createEmailQueue(() => undefined)
   handle = createDb({ url: ':memory:' })
   runMigrations(handle)
   app = await createApp({
@@ -57,6 +69,7 @@ const build = async (deliver: Delivery = () => Promise.resolve('sent'), env: Rec
     now: () => new Date(NOW),
     deliver,
     mintKeys: () => ({ publicKey: 'a-public-key', privateKey: 'a-private-key' }),
+    defer: emails.defer,
     send: (_transport, message) => {
       posted.push(message)
       return Promise.resolve()
@@ -531,6 +544,7 @@ describe('the email channel', () => {
     await setPaid(server, admin.cookie, ada.id)
 
     expect((await list(server, ada.cookie)).json().notifications).toHaveLength(1)
+    await settled()
     expect(posted).toHaveLength(0)
   })
 
@@ -544,6 +558,7 @@ describe('the email channel', () => {
 
     await setPaid(server, admin.cookie, ada.id)
 
+    await settled()
     expect(posted).toHaveLength(1)
     expect(posted[0]?.to).toBe(ADDRESS)
     const [row] = (await list(server, ada.cookie)).json().notifications
@@ -561,6 +576,7 @@ describe('the email channel', () => {
     await setPaid(server, admin.cookie, ada.id)
 
     expect((await list(server, ada.cookie)).json().notifications).toHaveLength(0)
+    await settled()
     expect(posted).toHaveLength(1)
   })
 
@@ -573,6 +589,7 @@ describe('the email channel', () => {
 
     await setPaid(server, admin.cookie, ada.id)
 
+    await settled()
     expect(posted).toHaveLength(0)
   })
 
@@ -588,6 +605,7 @@ describe('the email channel', () => {
 
     await setPaid(server, admin.cookie, ada.id)
 
+    await settled()
     expect(posted[0]?.text).not.toContain('http')
   })
 
@@ -603,22 +621,27 @@ describe('the email channel', () => {
 
     await setPaid(server, admin.cookie, ada.id)
 
+    await settled()
     expect(posted[0]?.text).toContain('https://burn.example.org/')
   })
 
-  it('is finished before the route answers, rather than left in flight', async () => {
-    // The send is started beside the bell and awaited after it, so a request that has
-    // returned has already tried. Left unawaited it would still usually arrive — which
-    // is exactly why this uses a `send` that does not resolve immediately.
+  it('is queued rather than waited on, and posted once the route has answered', async () => {
+    // The property this reverses (#356): the send used to be awaited inside the
+    // request. Nothing on screen depends on it, and a relay that is down or capped was
+    // costing the member the wait. A `send` that does not resolve immediately is what
+    // makes the difference visible — left unawaited it would otherwise usually arrive
+    // before the assertion anyway.
     handle = createDb({ url: ':memory:' })
     runMigrations(handle)
     const slow: Message[] = []
+    const queue = createEmailQueue(() => undefined)
     app = await createApp({
       db: handle.db,
       config: createConfig({ LOG_LEVEL: 'silent', SESSION_SECRET: SECRET }),
       now: () => new Date(NOW),
       deliver: () => Promise.resolve('sent'),
       mintKeys: () => ({ publicKey: 'a-public-key', privateKey: 'a-private-key' }),
+      defer: queue.defer,
       send: (_transport, message) =>
         new Promise((resolve) => {
           setTimeout(() => {
@@ -634,6 +657,10 @@ describe('the email channel', () => {
     await setOn(app, ada.cookie, ['payment'], ['payment'])
 
     await setPaid(app, admin.cookie, ada.id)
+
+    expect(slow).toEqual([])
+
+    await queue.drain()
 
     expect(slow).toHaveLength(1)
   })
