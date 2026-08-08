@@ -14,8 +14,6 @@ import { ViewerProvider } from '../viewer.tsx'
 import { Layout } from './Layout.tsx'
 
 afterEach(cleanup)
-// The viewport belongs to the window, which outlives one test — a narrow one left
-// behind reads as a phone in everything below it.
 afterEach(onADesktop)
 
 const renderNav = (viewer: Viewer) =>
@@ -193,6 +191,16 @@ describe('the nav on a phone', () => {
 
     for (const label of pages) expect(inTheTopBar(), `${label} should be in the bar`).toContain(label)
     expect(screen.queryByRole('navigation', { name: 'Pages' })).toBeNull()
+  })
+
+  it('starts the bar shown, whatever it does on a scroll', () => {
+    // The half a unit test can hold: happy-dom lays nothing out, so no scroll here is
+    // distinguishable from being at the end of a page — `viewport.test.ts` has the
+    // arithmetic, and the bar arriving hidden is the failure that would matter most.
+    onAPhone()
+    renderNav(signedInAs('member'))
+
+    expect(screen.getByRole('navigation', { name: 'Pages' }).className).toBe('bottom-bar')
   })
 
   it('gives a signed-out visitor no bottom bar at all', () => {

@@ -9,6 +9,15 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-08
 
+- **Tapping a dream opens it.** On the Dreams page a dream was a title and a time, and
+  what it actually _was_ — the description, who is running it, who is helping, who
+  wants it — could only be found by going to the Schedule. The row opens the same panel
+  the grid opens now, and editing and withdrawing live inside it, so the pen and the
+  bin no longer wrap onto a line of their own on a phone.
+- **The bottom bar gets out of the way.** It slides away as you read down a page and
+  comes back the moment you scroll up. It stays put on the Schedule and the meal plan,
+  which scroll inside themselves.
+- **A dream opened on a phone is no longer half behind the nav bar.**
 - **The app fits a phone.** The six pages — Going on, Members, Schedule, Leads, Meals,
   FAQ — are a row of icons along the bottom of the screen now, instead of a bar that
   wrapped onto three lines and pushed the page down. The name, the burn you are looking

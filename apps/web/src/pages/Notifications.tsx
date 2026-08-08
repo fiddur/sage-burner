@@ -30,6 +30,9 @@ export const Notifications = ({ api }: { api: NotificationsApi }) => {
   const { loaded, refreshing } = useLoad(async (signal) => await api.getMyNotifications(signal), {
     enabled: signedIn,
     fallback: 'Could not load what has happened. Please reload the page.',
+    // The same beat the bell polls on, so a page left open catches up rather than
+    // going quietly stale beside a bubble that is counting.
+    live: true,
   })
 
   const unseen = loaded.status === 'ready' ? loaded.data.unseen : 0

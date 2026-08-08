@@ -63,6 +63,10 @@ const stub = (over: Partial<DreamsApi> = {}, sessions: Session[] = []): DreamsAp
         { account_id: 'a-2', name: 'Bea', avatar: null },
       ],
     }),
+  helpWithSession: () => Promise.reject(new Error('helpWithSession is not stubbed here')),
+  stopHelpingWithSession: () => Promise.reject(new Error('stopHelpingWithSession is not stubbed here')),
+  supportSession: () => Promise.reject(new Error('supportSession is not stubbed here')),
+  withdrawSupportForSession: () => Promise.reject(new Error('withdrawSupportForSession is not stubbed here')),
   ...over,
 })
 
@@ -81,6 +85,22 @@ const renderPage = (api: DreamsApi, viewer: Viewer = MEMBER, burn: MyBurn | null
       </BurnProvider>
     </ViewerProvider>,
   )
+
+/**
+ * The row, which opens the panel — the same one the grid opens (#342).
+ *
+ * Editing and withdrawing are inside it now, so the tests below take two steps where
+ * they took one. That is the change, not an accident of the tests: the list used to
+ * carry a second edit form that had none of what #205 and #207 gave the panel.
+ */
+const openDream = async (title: string) => {
+  fireEvent.click(await screen.findByRole('button', { name: `Open ${title}` }))
+}
+
+const openEditor = async (title: string) => {
+  await openDream(title)
+  fireEvent.click(await screen.findByRole('button', { name: `Edit ${title}` }))
+}
 
 describe('Dreams', () => {
   it('says so when nobody has offered one', async () => {
@@ -151,7 +171,7 @@ describe('Dreams', () => {
     )
     renderPage(stub({ updateSession }, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Sunrise yoga' }))
+    await openEditor('Sunrise yoga')
     fireEvent.change(screen.getByRole('combobox', { name: 'Place for Sunrise yoga' }), {
       target: { value: 'p-1' },
     })
@@ -184,7 +204,7 @@ describe('Dreams', () => {
       ]),
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Cacao ceremony' }))
+    await openEditor('Cacao ceremony')
 
     expect(screen.getByLabelText('Start of Cacao ceremony')).toHaveProperty('value', '2026-08-02T20:00')
   })
@@ -205,7 +225,7 @@ describe('Dreams', () => {
       ]),
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Cacao ceremony' }))
+    await openEditor('Cacao ceremony')
     fireEvent.change(screen.getByRole('combobox', { name: 'Place for Cacao ceremony' }), {
       target: { value: '' },
     })
@@ -241,7 +261,7 @@ describe('Dreams', () => {
       ]),
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Cacao ceremony' }))
+    await openEditor('Cacao ceremony')
     fireEvent.input(screen.getByLabelText('Title of Cacao ceremony'), { target: { value: 'Renamed' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
@@ -266,7 +286,7 @@ describe('Dreams', () => {
       ]),
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Cacao ceremony' }))
+    await openEditor('Cacao ceremony')
     fireEvent.input(screen.getByLabelText('Title of Cacao ceremony'), { target: { value: 'Renamed' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
@@ -281,7 +301,7 @@ describe('Dreams', () => {
     )
     renderPage(stub({ updateSession }, [aDream({ id: 's-1', title: 'Cacao ceremony', place_id: 'p-1' })]))
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Cacao ceremony' }))
+    await openEditor('Cacao ceremony')
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => expect(updateSession).toHaveBeenCalledWith('s-1', {}))
@@ -299,7 +319,7 @@ describe('Dreams', () => {
       ]),
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Cacao ceremony' }))
+    await openEditor('Cacao ceremony')
 
     // Local time, since the suite is pinned to Europe/Stockholm.
     expect(screen.getByLabelText('Start of Cacao ceremony').getAttribute('max')).toBe('2026-08-02T22:00')
@@ -312,7 +332,7 @@ describe('Dreams', () => {
     )
     renderPage(stub({ updateSession }, [aDream({ id: 's-1', title: 'Check in' })]))
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Check in' }))
+    await openEditor('Check in')
     fireEvent.click(screen.getByLabelText('Plan Check in more than once'))
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
@@ -328,7 +348,7 @@ describe('Dreams', () => {
     )
     renderPage(stub({ updateSession }, [aDream({ id: 's-1', title: 'Check in', repeatable: true })]))
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Check in' }))
+    await openEditor('Check in')
     fireEvent.input(screen.getByLabelText('Title of Check in'), { target: { value: 'Renamed' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
@@ -357,7 +377,7 @@ describe('Dreams', () => {
     // while the id is still stored. What is shown and what would be saved disagreed.
     renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony', facilitator_account_id: 'a-9' })]))
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Cacao ceremony' }))
+    await openEditor('Cacao ceremony')
     const select = screen.getByLabelText('Facilitator for Cacao ceremony')
 
     expect(select).toHaveProperty('value', 'a-9')
@@ -369,7 +389,7 @@ describe('Dreams', () => {
     // above and put "no longer coming" beside every name on the list.
     renderPage(stub({}, [aDream({ id: 's-1', title: 'Cacao ceremony', facilitator_account_id: 'a-2' })]))
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit Cacao ceremony' }))
+    await openEditor('Cacao ceremony')
 
     expect(screen.getByLabelText('Facilitator for Cacao ceremony').textContent).not.toContain(
       'no longer coming',
@@ -383,6 +403,7 @@ describe('Dreams', () => {
     const withdrawSession = vi.fn<DreamsApi['withdrawSession']>(() => Promise.resolve(undefined))
     renderPage(stub({ withdrawSession }, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))
 
+    await openDream('Sunrise yoga')
     fireEvent.click(await screen.findByRole('button', { name: 'Withdraw Sunrise yoga' }))
     expect(withdrawSession).not.toHaveBeenCalled()
 
@@ -395,6 +416,7 @@ describe('Dreams', () => {
     const withdrawSession = vi.fn<DreamsApi['withdrawSession']>(() => Promise.resolve(undefined))
     renderPage(stub({ withdrawSession }, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))
 
+    await openDream('Sunrise yoga')
     fireEvent.click(await screen.findByRole('button', { name: 'Withdraw Sunrise yoga' }))
     fireEvent.click(screen.getByRole('button', { name: 'Keep it' }))
 
@@ -402,9 +424,10 @@ describe('Dreams', () => {
     expect(screen.getByRole('button', { name: 'Withdraw Sunrise yoga' })).toBeTruthy()
   })
 
-  it('asks about the row that was clicked, not about every row', async () => {
-    // The question is one component's own state, so two rows cannot share it. Written
-    // out per page it was a single flag, which would have asked about both.
+  it('asks about the dream that was opened, not about the one beside it', async () => {
+    // One panel at a time, so the question can only be about what is in it. The list
+    // used to carry a bin per row, where a single shared flag would have asked about
+    // both — and where the neighbouring row was easiest to hit (#209).
     renderPage(
       stub({}, [
         aDream({ id: 's-1', title: 'Sunrise yoga' }),
@@ -412,23 +435,66 @@ describe('Dreams', () => {
       ]),
     )
 
+    await openDream('Sunrise yoga')
     fireEvent.click(await screen.findByRole('button', { name: 'Withdraw Sunrise yoga' }))
 
     expect(screen.getByRole('button', { name: 'Really withdraw Sunrise yoga' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Really withdraw Cacao ceremony' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Withdraw Cacao ceremony' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Withdraw Cacao ceremony' })).toBeNull()
   })
 
   it('lets a member edit a dream someone else offered', async () => {
     // #20: the schedule belongs to the members, not to the dream's host.
-    const updateSession = vi.fn<DreamsApi['updateSession']>(() =>
-      Promise.resolve({ session: aDream({ id: 's-1', title: 'Theirs' }) }),
-    )
-    renderPage(
-      stub({ updateSession }, [aDream({ id: 's-1', title: 'Theirs', facilitator_account_id: 'a-9' })]),
-    )
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Theirs', facilitator_account_id: 'a-9' })]))
+
+    await openDream('Theirs')
 
     expect(await screen.findByRole('button', { name: 'Edit Theirs' })).toBeTruthy()
+  })
+
+  it('opens the panel the grid opens, with what the row never showed', async () => {
+    // The point of #342: the row is a title and a time, and the description, the
+    // helpers and the supporters were only ever reachable from the Schedule.
+    renderPage(
+      stub({}, [
+        aDream({
+          id: 's-1',
+          title: 'Cacao ceremony',
+          description: 'Bring a cup you like.',
+          facilitator_account_id: 'a-2',
+        }),
+      ]),
+    )
+
+    await openDream('Cacao ceremony')
+
+    expect(await screen.findByText('Bring a cup you like.')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Facilitating' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Helping out' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Show support' })).toBeTruthy()
+  })
+
+  it('carries no pen and no bin on the row itself', async () => {
+    // Both went with the second edit form. On a phone they wrapped onto a third line,
+    // under a title they no longer sat beside.
+    renderPage(stub({}, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))
+
+    await screen.findByRole('button', { name: 'Open Sunrise yoga' })
+
+    expect(screen.queryByRole('button', { name: 'Edit Sunrise yoga' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Withdraw Sunrise yoga' })).toBeNull()
+  })
+
+  it('shows support from the list, which the row could not', async () => {
+    const supportSession = vi.fn<DreamsApi['supportSession']>(() =>
+      Promise.resolve({ session: aDream({ id: 's-1', title: 'Sunrise yoga', supported_by_me: true }) }),
+    )
+    renderPage(stub({ supportSession }, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))
+
+    await openDream('Sunrise yoga')
+    fireEvent.click(await screen.findByRole('button', { name: 'Show support' }))
+
+    await waitFor(() => expect(supportSession).toHaveBeenCalledWith('s-1'))
   })
 
   it('shows what the server said when a write is refused', async () => {
@@ -438,6 +504,7 @@ describe('Dreams', () => {
       ]),
     )
 
+    await openDream('Sunrise yoga')
     fireEvent.click(await screen.findByRole('button', { name: 'Withdraw Sunrise yoga' }))
     fireEvent.click(screen.getByRole('button', { name: 'Really withdraw Sunrise yoga' }))
 

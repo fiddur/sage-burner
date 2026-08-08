@@ -13,9 +13,9 @@ import { NAMELESS } from './PersonBadge.tsx'
 import { WithdrawDream } from './WithdrawDream.tsx'
 
 /**
- * One dream, opened from the grid — read, edited or withdrawn without leaving it.
+ * One dream — read, edited or withdrawn without leaving the page it was opened from.
  *
- * The Dreams page keeps the same form for the list view; both use `DreamFields`.
+ * The grid and the Dreams page both open this, through `OpenedDream` (#342).
  */
 export const DreamDetails = ({
   dream,

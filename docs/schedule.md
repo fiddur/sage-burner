@@ -221,11 +221,19 @@ it after the first thing you did, which is when you most want it.
 
 ### Everything a dream needs, without leaving the grid
 
-The panel edits and withdraws as well as reads. **✏️** swaps in the same form the
-Dreams page uses — `DreamFields`, one component, so the two cannot drift — and **🗑️**
-withdraws behind a confirmation, for scheduled and unscheduled dreams alike. The
-confirmation is `WithdrawDream`, which both pages use, so the same act cannot end up
-guarded on one and not the other (#209).
+The panel edits and withdraws as well as reads. **✏️** swaps in `DreamFields`, and
+**🗑️** withdraws behind a confirmation, for scheduled and unscheduled dreams alike.
+
+**The Dreams page opens this same panel** (#342), through `OpenedDream` — the state,
+the writes and the markup are one thing rather than two. It used to swap a row for an
+edit form of its own, so a dream had two ways to be read and two to be edited, and
+only this one had #205's "keep what was typed when the save is refused" and #207's
+two-step Escape. The list showed a title, a time and a place: the description, the
+supporters and both helper strips were reachable only from the grid, and the row's own
+✏️ and 🗑️ wrapped onto a third line on a phone, under a title they no longer sat
+beside. The row is a single button that opens the panel now, and withdrawing is inside
+it — one confirmation, `WithdrawDream`, so the same act cannot end up guarded on one
+page and not the other (#209).
 
 **Facilitating is a 🙋/👉 strip like every other job** (#283), not a field only the
 edit form could reach. One person holds it, so a filled spot offers only ✕ and a
@@ -433,8 +441,8 @@ start there. Test it in Firefox as well as Chrome.
 
 **Dragging is not really unit-tested, and cannot be.** `fireEvent.drop` exercises
 these handlers, not a browser's drag implementation — so the tests prove the
-wiring and the drag itself wants one click-through in a browser. The Dreams page
-is the precise route and the accessible one: a form with a place and two datetime
+wiring and the drag itself wants one click-through in a browser. The panel is the
+precise route and the accessible one — from either page: a place and two datetime
 fields, reachable by keyboard, which is what anyone who cannot drag should use.
 
 ### Times are UTC, wall clocks are not

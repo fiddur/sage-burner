@@ -1,6 +1,6 @@
 import type { Notification } from '@sage-burner/shared'
 
-import { cleanup, render, screen, waitFor } from '@testing-library/preact'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Viewer } from '../viewer.tsx'
@@ -122,6 +122,23 @@ describe('what has happened to you', () => {
     await screen.findByText('You are on helper for Dinner')
 
     expect(screen.queryByRole('link', { name: 'your details' })).toBeNull()
+  })
+
+  it('catches up when the tab comes back, rather than going stale beside a counting bell', async () => {
+    let asked = 0
+    const getMyNotifications = vi.fn(() => {
+      asked += 1
+      return Promise.resolve({
+        notifications: asked === 1 ? TWO : [...TWO, one({ id: 'n-3', body: 'Bea is coming.' })],
+        unseen: 0,
+      })
+    })
+    renderPage(stub({ getMyNotifications }, TWO, 0))
+    await screen.findByText('You are on helper for Dinner')
+
+    fireEvent(window, new Event('focus'))
+
+    expect(await screen.findByText('Bea is coming.')).toBeTruthy()
   })
 
   it('says so when nothing has happened yet', async () => {

@@ -10,9 +10,8 @@ import { onADesktop, onAPhone } from '../testing/viewport.ts'
 import { NotificationBell } from './NotificationBell.tsx'
 
 afterEach(cleanup)
-// The viewport belongs to the window, which outlives one test.
 afterEach(onADesktop)
-// So does the history, and the router pushes to it.
+// The history outlives one test too, and the router pushes to it.
 afterEach(() => history.replaceState(null, '', '/'))
 
 const one = (over: Partial<Notification> = {}): Notification => ({
