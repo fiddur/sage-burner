@@ -3,6 +3,7 @@ import type { ComponentChildren } from 'preact'
 import type { Viewer } from '../viewer.tsx'
 
 import { isAdmin, isApproved, isMember, useViewer } from '../viewer.tsx'
+import { NotForYou } from './NotForYou.tsx'
 
 /** What a page may ask of whoever is looking, and how each is answered. */
 const holds = {
@@ -56,19 +57,10 @@ export const GuardedPage = ({
   return (
     <section class="page">
       <h1>{title}</h1>
-      {viewer.status === 'signed-out' ? (
-        <p>
-          This is for members. <a href="/login">Log in</a> to see it.
-        </p>
-      ) : (
-        // Signed in without the role — an applicant checking on their application,
-        // or an admin who holds one role and not the other. Telling them to log
-        // in would be advice they have already taken.
-        <p>
-          This is for {require === 'admin' ? 'admins' : 'members'}. If it should be open to you, ask someone
-          who already has access.
-        </p>
-      )}
+      <NotForYou
+        signedOut={viewer.status === 'signed-out'}
+        who={require === 'admin' ? 'admins' : 'members'}
+      />
     </section>
   )
 }

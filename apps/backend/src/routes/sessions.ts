@@ -244,15 +244,23 @@ const facilitatorSpot = async (
  * A null time slot means *offered but not yet scheduled*, which is the normal
  * state for most of them right up until the burn, not an error.
  *
- * Members rather than admins, because the schedule is theirs to arrange: #20
- * says any member can administrate it — including handing a dream to the member who
- * will facilitate it, which is a body field rather than something to prevent.
+ * Open to anyone who is in, not to admins: the schedule is the members' to arrange
+ * (#20), including handing a dream to whoever will facilitate it, which is a body
+ * field rather than something to prevent.
+ *
+ * `requireApproved` rather than `requireMember`, so an organiser holding `admin`
+ * without `member` is not shut out of the burn they are setting up (#200). The
+ * selector already offers them every coming burn, so a `member`-only guard let them
+ * choose one and then refused them its timetable — while the lanes, the register and
+ * the options next to it were open. Putting a hand up still needs an attendance at
+ * that burn; the checks below answer that with a 400, which is a different sentence
+ * from "you are not welcome here".
  */
 export const registerSessionRoutes = (
   app: FastifyInstance,
   { db, sessions, now, notify = async () => undefined }: SessionDeps,
 ) => {
-  const { requireMember } = createGuards({ db, sessions })
+  const { requireApproved } = createGuards({ db, sessions })
 
   /**
    * The pool, as both the `GET` and the `If-Match` guard see it (#274).
@@ -299,7 +307,7 @@ export const registerSessionRoutes = (
 
   app.get<{ Params: { eventId: string } }>(
     apiRoutes.getSessions.fastify,
-    { preHandler: requireMember },
+    { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)
 
@@ -314,7 +322,7 @@ export const registerSessionRoutes = (
 
   app.post<{ Params: { eventId: string } }>(
     apiRoutes.offerSession.fastify,
-    { preHandler: requireMember },
+    { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)
 
@@ -388,7 +396,7 @@ export const registerSessionRoutes = (
 
   app.patch<{ Params: { id: string } }>(
     apiRoutes.updateSession.fastify,
-    { preHandler: requireMember },
+    { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)
 
@@ -464,7 +472,7 @@ export const registerSessionRoutes = (
 
   app.delete<{ Params: { id: string } }>(
     apiRoutes.withdrawSession.fastify,
-    { preHandler: requireMember },
+    { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)
 
@@ -525,7 +533,7 @@ export const registerSessionRoutes = (
    */
   app.post<{ Params: { id: string } }>(
     apiRoutes.helpWithSession.fastify,
-    { preHandler: requireMember },
+    { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)
 
@@ -556,7 +564,7 @@ export const registerSessionRoutes = (
 
   app.delete<{ Params: { id: string; accountId: string } }>(
     apiRoutes.stopHelpingWithSession.fastify,
-    { preHandler: requireMember },
+    { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)
 
@@ -593,7 +601,7 @@ export const registerSessionRoutes = (
    */
   app.post<{ Params: { id: string } }>(
     apiRoutes.supportSession.fastify,
-    { preHandler: requireMember },
+    { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)
 
@@ -611,7 +619,7 @@ export const registerSessionRoutes = (
 
   app.delete<{ Params: { id: string } }>(
     apiRoutes.withdrawSupportForSession.fastify,
-    { preHandler: requireMember },
+    { preHandler: requireApproved },
     async (request, reply) => {
       void noStore(reply)
 

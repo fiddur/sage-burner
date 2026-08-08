@@ -1230,12 +1230,37 @@ describe('Schedule', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('Could not load')
   })
 
-  it('does not fetch for someone who is not a member', async () => {
+  it('does not fetch for someone who is neither a member nor an admin', async () => {
     const getSessions = vi.fn<ScheduleApi['getSessions']>(() => Promise.resolve({ sessions: [] }))
     renderPage(stub({ getSessions }), { status: 'signed-out' })
 
     expect(screen.getByText(/for members/)).toBeTruthy()
     expect(getSessions).not.toHaveBeenCalled()
+  })
+
+  it('tells an applicant to ask rather than to log in again', async () => {
+    // Signed in without a role. "Log in to see it" is advice they have already
+    // taken, which is the split `GuardedPage` makes on every other page.
+    renderPage(stub(), {
+      status: 'signed-in',
+      account: { id: 'a-3', name: null, avatar: null, roles: [] },
+    })
+
+    expect(screen.getByText(/ask someone who already has access/)).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Log in' })).toBeNull()
+  })
+
+  it('opens to an organiser who holds admin alone', async () => {
+    // #200: the selector offers them every coming burn, and then the grid it is for
+    // turned them away. The lanes and the register beside it were already open.
+    const getSessions = vi.fn<ScheduleApi['getSessions']>(() => Promise.resolve({ sessions: [] }))
+    renderPage(stub({ getSessions }), {
+      status: 'signed-in',
+      account: { id: 'a-9', name: null, avatar: null, roles: ['admin'] },
+    })
+
+    await waitFor(() => expect(getSessions).toHaveBeenCalled())
+    expect(screen.queryByText(/for members/)).toBeNull()
   })
 })
 

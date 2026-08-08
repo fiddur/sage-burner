@@ -13,7 +13,7 @@ import { dreamActions, OpenedDream } from '../components/OpenedDream.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { shortDayOf } from '../datetime.ts'
 import { useAction, useLoad } from '../load.ts'
-import { isMember, useViewer } from '../viewer.tsx'
+import { isApproved, useViewer } from '../viewer.tsx'
 
 export type DreamsApi = Pick<
   ApiClient,
@@ -66,7 +66,7 @@ const when = (dream: Session) => {
  */
 export const Dreams = ({ api }: { api: DreamsApi }) => {
   const viewer = useViewer()
-  const member = isMember(viewer)
+  const approved = isApproved(viewer)
   const [title, setTitle] = useState('')
   const [opened, setOpenedPanel] = useState<Opened | undefined>(undefined)
 
@@ -86,7 +86,7 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
       return { sessions: dreams.sessions, places: places.places, attendees: attendees.attendees }
     },
     {
-      enabled: member,
+      enabled: approved,
       key: burn?.event.id ?? '',
       fallback: 'Could not load the dreams.',
       live: true,
@@ -104,12 +104,7 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
     setOpenedPanel(next)
   }
 
-  const { support, help, facilitate, offer, save, remove } = dreamActions({
-    api,
-    eventId: burn?.event.id ?? '',
-    run,
-    setOpened,
-  })
+  const { support, help, facilitate, save, remove } = dreamActions({ api, run, setOpened })
 
   const offerByTitle = () => {
     if (title.trim() === '') {
@@ -129,7 +124,7 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
   const attendees = loaded.status === 'ready' ? loaded.data.attendees : []
 
   return (
-    <GuardedPage title="Dreams" require="member">
+    <GuardedPage title="Dreams" require="approved">
       <h1>
         Dreams <Refreshing on={refreshing} />
       </h1>
@@ -222,7 +217,6 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
         onHelp={help}
         onSupport={support}
         onSave={save}
-        onOffer={offer}
         onRemove={remove}
       />
     </GuardedPage>
