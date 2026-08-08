@@ -40,8 +40,8 @@ const memberPages: readonly NavPage[] = [
 ]
 
 /**
- * What ☰ holds: the pages the bar has no room for, beside the logo rather than on it —
- * the logo goes home. `docs/the-app.md` has the rest.
+ * What ☰ holds: the pages the bar has no room for, at the leading edge of the bar
+ * rather than on the logo — the logo goes home. `docs/the-app.md` has the rest.
  */
 const menuPages: readonly NavPage[] = [{ href: '/rides', label: 'Rideshares', icon: '🛻' }]
 
@@ -83,6 +83,9 @@ export const Layout = ({ api, children }: { api: BellApi; children: ComponentChi
   return (
     <div class={bottomBar ? 'layout has-bottom-bar' : 'layout'}>
       <header class="site-header">
+        {/* Ahead of the logo, at the edge its drawer slides in from. */}
+        <Menu pages={approved ? menuPages : []} />
+
         <a class="brand" href="/">
           {/* The icon route rather than the flame written out here: it answers with
               whatever an admin uploaded and with the app's own mark when nobody has,
@@ -92,11 +95,9 @@ export const Layout = ({ api, children }: { api: BellApi; children: ComponentChi
           <span class="brand-name">{title}</span>
         </a>
 
-        <Menu pages={approved ? menuPages : []} />
-
-        {/* Leftmost, because everything to the right of it is about the burn it
-            names. Hidden when there is nothing to choose between: one burn is the
-            ordinary case and a select with a single option is furniture. */}
+        {/* Ahead of the nav, because everything after it is about the burn it names.
+            Hidden when there is nothing to choose between: one burn is the ordinary
+            case and a select with a single option is furniture. */}
         {burns.length > 1 && selected !== undefined && (
           <select
             class="burn-selector"
@@ -153,23 +154,31 @@ const TopNav = ({ api, pages }: { api: BellApi; pages: readonly NavPage[] }) => 
         </a>
       ))}
 
-      {/* Signed in is the whole guard, so it sits outside the approved block. */}
-      {viewer.account !== undefined && <NotificationBell api={api} />}
+      {/* One group, so a bar too narrow for everything drops the *pages* rather than
+          leaving the face on a row of its own — an admin's corner is a third icon wide
+          and was the first to go over. Signed in is the whole guard, so it sits
+          outside the approved block; a visitor gets no empty box holding the end of
+          the bar open. */}
+      {viewer.account !== undefined && (
+        <span class="nav-session">
+          <NotificationBell api={api} />
 
-      {isAdmin(viewer) && (
-        <a class="nav-icon" href="/admin" aria-label="Organise" title="Organise">
-          ⚙️
-        </a>
-      )}
+          {isAdmin(viewer) && (
+            <a class="nav-icon" href="/admin" aria-label="Organise" title="Organise">
+              ⚙️
+            </a>
+          )}
 
-      {isMember(viewer) && (
-        <a class="nav-icon" href="/profile" aria-label="Your details" title="Your details">
-          <Avatar
-            accountId={viewer.account?.id ?? ''}
-            name={viewer.account?.name ?? null}
-            avatar={viewer.account?.avatar ?? null}
-          />
-        </a>
+          {isMember(viewer) && (
+            <a class="nav-icon" href="/profile" aria-label="Your details" title="Your details">
+              <Avatar
+                accountId={viewer.account.id}
+                name={viewer.account.name}
+                avatar={viewer.account.avatar}
+              />
+            </a>
+          )}
+        </span>
       )}
     </nav>
   )

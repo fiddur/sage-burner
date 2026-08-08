@@ -9,6 +9,11 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-08
 
+- **The bar across the top fits on one row on a phone.** 🔔, ⚙️ and your face sat on a
+  second row under the logo — most often for admins, who have one icon more — and ☰ has
+  moved to the far left, where the menu it opens comes from. An installation whose name
+  is too long for the row now gets an ellipsis rather than pushing the icons off.
+
 - **Recording a payment, or anything else that emails a burn, answers straight away.**
   The send used to happen inside the request, so a mail server that was slow or busy
   made whoever pressed the button wait for it — and a burn-wide message opened one

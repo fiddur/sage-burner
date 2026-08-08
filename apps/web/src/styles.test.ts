@@ -29,6 +29,35 @@ const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([, selector, body]
   body: body ?? '',
 }))
 
+/**
+ * Every `@media (max-width: 45rem)` block, joined — the file has several.
+ *
+ * The parse above flattens at-rules away, so a rule inside one is indistinguishable
+ * from a global rule of the same selector — and "the bar does not wrap" is true only
+ * on a phone, where the pages have already moved to the bottom bar.
+ */
+const phone = (() => {
+  const query = '@media (max-width: 45rem)'
+  const blocks: string[] = []
+
+  for (let at = css.indexOf(query); at !== -1; at = css.indexOf(query, at + 1)) {
+    let depth = 0
+
+    for (let index = css.indexOf('{', at); index < css.length; index += 1) {
+      if (css[index] === '{') depth += 1
+      else if (css[index] === '}') {
+        depth -= 1
+        if (depth === 0) {
+          blocks.push(css.slice(at, index))
+          break
+        }
+      }
+    }
+  }
+
+  return blocks.join('\n')
+})()
+
 describe('the stylesheet', () => {
   it('has rules to read at all', () => {
     // The parse is a regex, so a change to the file that broke it would otherwise turn
@@ -48,6 +77,25 @@ describe('the stylesheet', () => {
 
     expect(header?.body).not.toMatch(/justify-content:\s*space-between/)
     expect(nav?.body).toMatch(/margin-inline-start:\s*auto/)
+  })
+
+  it("keeps a phone's bar to one row, and gives way with the name rather than the corner", () => {
+    // What the bar dropped to a second row on a phone was 🔔, ⚙️ and the face — an
+    // admin's corner is a third icon wide, so theirs went over first — leaving the
+    // whole right half of the first row empty. So: no wrapping where the pages have
+    // already moved to the bottom bar, and the installation's name is what shortens.
+    expect(phone).toMatch(/\.site-header\s*\{[^}]*flex-wrap:\s*nowrap/)
+    expect(rules.find((rule) => rule.selector === '.brand-name')?.body).toMatch(/text-overflow:\s*ellipsis/)
+  })
+
+  it('holds the bell, ⚙️ and the face together at every width', () => {
+    // They are the session rather than a page, and where a hand goes without looking.
+    // Above 45rem the bar still wraps — the six page words need the room — and this is
+    // what stops that wrap falling between the words and the corner.
+    const session = rules.find((rule) => rule.selector === '.nav-session')
+
+    expect(session?.body).toMatch(/flex-wrap:\s*nowrap/)
+    expect(session?.body).toMatch(/flex:\s*none/)
   })
 
   it('positions every box that scrolls sideways', () => {

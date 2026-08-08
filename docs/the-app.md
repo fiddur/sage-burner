@@ -97,7 +97,7 @@ Hiding a link is presentation. Every page behind these is guarded again server-s
 and `Layout.test.tsx` asserts each absence by name — a negated `arrayContaining`
 passes when any _one_ of the named links is missing, which is not the question.
 
-### ☰, beside the logo
+### ☰, at the leading edge of the bar
 
 The bar carries one entry per thing and the bottom bar caps at six, so everything else
 has been reached from the page it belongs to. That worked until a page belonged to no
@@ -106,7 +106,9 @@ have already joined, so somebody who has not joined one could not get there at a
 
 **☰ is where those live**, starting with 🛻 Rideshares. Beside the logo rather than on
 it: the logo goes home, which is a convention worth more than the space a second target
-costs.
+costs. **Ahead of the logo**, at the edge its drawer slides in from — a control that
+opens from the left, sitting to the right of something else, reads as belonging to that
+something else.
 
 **The drawer slides over the page, and the page does not move.** Pushing the site aside
 would mean a `transform` on a wrapper, and a transform makes `position: fixed` resolve
@@ -160,11 +162,26 @@ Below `45rem` the six pages move to a **fixed bar along the bottom**, one icon e
 | -------- | ------- | -------- | ----- | ----- | --- |
 | Going on | Members | Schedule | Leads | Meals | FAQ |
 
-The topbar keeps the brand, ☰, the burn selector and the three things that are about
+The topbar keeps ☰, the brand, the burn selector and the three things that are about
 the session rather than any page — the bell, ⚙️ and the face — and scrolls away with
 the content as it always has. A signed-out visitor gets no bottom bar: Apply and Log in
 are two entries and fit where they are, and a bar of six pages none of them may open
 would be six refusals.
+
+**And it does not wrap.** With the pages downstairs the only thing left to drop was the
+corner, so on a narrow phone 🔔 ⚙️ and the face sat on a second row under the logo with
+the whole right half of the first row empty — an admin's corner is a third icon wide, so
+theirs went over first. Below `45rem` nothing in the bar wraps and the gaps tighten;
+what gives way instead is the **installation's name**, which ellipsises, being the one
+thing in the row that is a label rather than a control. Measured in Chromium with an
+admin's three icons and "The Burning Sage": at 390px the name fits whole with 0.2rem to
+spare, where the wide gaps leave it 1.8rem over; at 360px it is cut by 1.5rem and the
+page still does not scroll sideways — which it does if the name is allowed to refuse.
+
+Above `45rem` the bar wraps as it always did, because that is where the six words are:
+too narrow for words and corner together, and the nav drops to a second row **whole**.
+`.nav-session` is what makes that true — the bell, ⚙️ and the face are one group that
+cannot be split, at any width.
 
 **Six is the ceiling**, not a coincidence: six by ~3.5rem fits a 360px phone and
 nothing wider does. The pages still to come — the map (#315), the bring list (#24),
