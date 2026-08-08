@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { createEmailQueue } from './queue.ts'
+import { createEmailQueue, drainWithin } from './queue.ts'
 
 /** A promise somebody else settles, which is what a slow relay looks like from here. */
 const held = () => {
@@ -87,5 +87,33 @@ describe('the queue the email leg goes on', () => {
 
   it('is settled when nothing has been asked of it', async () => {
     await expect(createEmailQueue(() => undefined).drain()).resolves.toBeUndefined()
+  })
+})
+
+describe('draining on the way down', () => {
+  it('gives up on a relay that never answers rather than holding the shutdown', async () => {
+    // `smtp.ts` waits up to fifteen seconds on a host that drops packets, so an
+    // unbounded drain outlasts a container's stop grace and is killed anyway — which
+    // is the case draining exists for.
+    const queue = createEmailQueue(() => undefined)
+    queue.defer(() => new Promise<void>(() => undefined))
+
+    await expect(drainWithin(queue, 5)).resolves.toBeUndefined()
+  })
+
+  it('returns as soon as the work is done rather than sitting out the deadline', async () => {
+    // The deadline is a minute and the work is a millisecond, so an implementation
+    // that waited it out would hang here rather than quietly pass — which is what a
+    // deadline generous enough to matter would do to every shutdown.
+    const queue = createEmailQueue(() => undefined)
+    let posted = false
+    queue.defer(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 1))
+      posted = true
+    })
+
+    await drainWithin(queue, 60_000)
+
+    expect(posted).toBe(true)
   })
 })

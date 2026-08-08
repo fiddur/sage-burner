@@ -790,8 +790,8 @@ export type RouteKey = keyof typeof apiRoutes
  * spellings under one path evict each other in the offline cache, which is what makes
  * a drift here cost something rather than merely look untidy.
  *
- * `null` is "nobody has uploaded one", which the icon route answers with the app's own
- * flame. The bare path is a separate live URL on purpose — the header's mark and the
+ * `null` — or `undefined`, since callers hold both — is "nobody has uploaded one",
+ * which the icon route answers with the app's own flame. The bare path is a separate live URL on purpose — the header's mark and the
  * favicon quote it, and nothing about them changes when an admin uploads.
  */
 export const iconSrc = (version: string | null | undefined): string =>

@@ -224,14 +224,13 @@ export const recordActivity = async (db: Database, eventId: string, told: Told, 
  * the personal "You are now Kitchen lead" (#270).
  *
  * **Together rather than one after another**, which it was until #313. Each `notify`
- * writes a row, reaches a push service and — since #30 — may post an email, and that
- * last one waits up to `smtp.ts`'s fifteen seconds on a host that drops packets
- * rather than refusing. One after another that is fifteen seconds *per attendee*, so
- * a mistyped host held a request open for something like ten minutes at the cap. Side
- * by side it is fifteen seconds however many people are coming.
+ * writes a row and reaches a push service, and one after another that is one round
+ * trip *per attendee* inside a single request.
  *
- * Still all awaited before this returns, so a route's response means the work is
- * done and a test can assert on it without racing.
+ * The email leg is no longer among what this waits for (#356): it goes on a queue, so
+ * a route's response means the rows are written and the pushes attempted, and says
+ * nothing about what has reached a mail server. A test asserting on a posted message
+ * has to drain that queue.
  */
 export const notifyAttendees = async (
   db: Database,

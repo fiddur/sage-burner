@@ -686,21 +686,26 @@ outside the app, so a relative path is no use, and unlike the share card this ru
 wherever a role was handed out, with no request to read `Host` from. Without one the
 message says what happened and stops there.
 
-Posting never fails a write. The send starts beside the bell's row and is awaited after
-it, so a mail server that is down costs a message rather than somebody's record — the
-rule push already follows here. It is also **caught where it is started**, not only
-where it is awaited: the insert between the two can throw, and Node's default for a
-rejection nobody is holding is to exit the process. Nothing is lost by swallowing it,
-since a failed _send_ is answered rather than thrown and the only way it rejects is a
-database error — the same failure the insert is about to report.
+Posting never fails a write, and never delays one. The send goes on a queue rather than
+being awaited beside the bell's row (#356), so a mail server that is down costs a
+message rather than somebody's record — the rule push already follows here — and costs
+nobody the wait either. The queue reports a failed message rather than rethrowing it,
+which is what keeps a rejection nobody is holding from taking the process down with it;
+Node's default for one of those is to exit.
 
-**A burn-wide notification posts to everybody at once** (#313). It went one after
-another, which was fine while the only slow part was a push service and stopped being
-fine when an email leg arrived: `smtp.ts` waits up to fifteen seconds on a host that
-drops packets rather than refusing, and one after another that is fifteen seconds _per
-attendee_ — something like ten minutes at the forty-two cap, with no request timeout
-above it. Side by side it is fifteen seconds however many people are coming. Still all
-awaited before the route answers, so a response means the work is done.
+**The email leg leaves the request** (#356), and it was a burn-wide notification that
+made that necessary. Sent one after another it was fifteen seconds _per attendee_ on a
+host that drops packets — something like ten minutes at the forty-two cap, with no
+request timeout above it. #313 made them go side by side, which is one wait however
+many people are coming, and traded that for forty-two connections opened at once: small
+relays cap those per user or per IP and refuse the overflow, which is answered as a
+failed send and logged. So the queue is **serial** — one message at a time, after the
+answer — because the relay is what has the limit and slowness costs nothing once nobody
+is waiting.
+
+**A route answering therefore says nothing about what has reached a mail server.** It
+means the rows are written and the pushes attempted. A test asserting on a posted
+message drains the queue first, which is what `createApp`'s `defer` is for.
 
 Anything somebody else can put you on or take you off notifies you — a dream's
 helpers, a meal's crew, a meal's lead, a lead role and its team, a dream's

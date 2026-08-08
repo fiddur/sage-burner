@@ -9,9 +9,9 @@
  * nothing on screen depends on.
  *
  * **One at a time, and after the answer.** Serial because the relay is what has the
- * limit, and being slow costs nothing once nobody is waiting. The row is already
- * written by the time anything here runs, so a mail server that is down costs a
- * message rather than a record — the rule #30 set and this keeps.
+ * limit, and being slow costs nothing once nobody is waiting. Nothing here can fail a
+ * write — the caller has handed the work over and is not holding it — so a mail server
+ * that is down costs a message rather than a record, the rule #30 set and this keeps.
  *
  * Nothing retries. A message that could not be posted is logged and gone, which is the
  * same promise the bell makes: the row is the record, and the email is a copy of it.
@@ -20,12 +20,30 @@ export interface EmailQueue {
   /** Put work on the end of the queue. Returns at once; nothing here is awaited. */
   defer: (work: () => Promise<unknown>) => void
   /**
-   * Everything queued so far, run to completion.
+   * Everything queued **as of this call**, run to completion.
    *
    * For shutdown, and for tests — which can no longer assume that a route answering
    * means the posting has happened, because that is exactly what this changed.
+   *
+   * Work deferred by work already on the queue is not included, so one call is not
+   * always enough; nothing in the app does that, and `queue.test.ts` proves the limit
+   * by calling it twice rather than leaving it to be discovered.
    */
   drain: () => Promise<void>
+}
+
+/**
+ * How long a shutdown waits for what is still going out.
+ *
+ * `smtp.ts` waits up to fifteen seconds on a host that drops packets, so an unbounded
+ * drain against a dead relay outlasts a container's stop grace and is SIGKILLed —
+ * which is the case that made draining worth doing at all.
+ */
+export const DRAIN_DEADLINE_MS = 5000
+
+/** The queue, or the deadline, whichever comes first. */
+export const drainWithin = async (queue: EmailQueue, ms = DRAIN_DEADLINE_MS): Promise<void> => {
+  await Promise.race([queue.drain(), new Promise<void>((resolve) => setTimeout(resolve, ms).unref())])
 }
 
 export const createEmailQueue = (onFailure: (failure: unknown) => void): EmailQueue => {

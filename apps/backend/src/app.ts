@@ -22,7 +22,7 @@ import { refuseEnvelopeStrippers } from './envelope.ts'
 import { clientErrorHandler, frameworkErrorHandler, registerErrorHandler } from './errors.ts'
 import { sendError } from './http.ts'
 import { emailChannel } from './mail/channel.ts'
-import { createEmailQueue } from './mail/queue.ts'
+import { createEmailQueue, drainWithin } from './mail/queue.ts'
 import { sendWithSmtp } from './mail/smtp.ts'
 import { notifyAdmins, recordAndPush } from './push/notify.ts'
 import { deliverWithWebPush, DEFAULT_PUSH_CONTACT, generateVAPIDKeys } from './push/web-push.ts'
@@ -475,11 +475,12 @@ export const createApp = async ({
   // to dial the relay once per attendee at once — and every one of those waits was
   // inside the request that caused it.
   const emails = createEmailQueue((failure: unknown) => {
-    app.log.warn({ err: failure }, 'posting a notification')
+    app.log.warn({ err: failure }, 'a queued notification email')
   })
 
-  // Drained on the way down, so a redeploy does not drop what was still going out.
-  app.addHook('onClose', async () => await emails.drain())
+  // Drained on the way down so a redeploy does not drop what was still going out, and
+  // bounded so a dead relay cannot hold the shutdown past the grace period instead.
+  app.addHook('onClose', async () => await drainWithin(emails))
 
   const tellAccount = recordAndPush(
     push,

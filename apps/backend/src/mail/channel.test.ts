@@ -13,9 +13,9 @@ import { emailChannel } from './channel.ts'
  * The email half of a notification, and the one promise the caller depends on: it
  * **never throws**.
  *
- * `recordAndPush` starts this before writing the bell row and awaits it after, so a
- * rejection here is one nobody is holding for as long as the write takes — and Node's
- * default for that is to exit the process. What goes in a message is
+ * The queue it runs on reports a failure rather than rethrowing (#356), so a throw
+ * here would be a message lost with only the queue's own line about it — where a
+ * refused send carries the server's reason. What goes in a message is
  * `messages.test.ts`; this is about what happens when something underneath gives way.
  */
 
