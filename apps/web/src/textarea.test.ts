@@ -48,8 +48,6 @@ describe('how tall a text box opens', () => {
   })
 
   it('does not clamp a floor above its own ceiling', () => {
-    // A caller asking for forty rows has said what the empty box should look like,
-    // and answering with twenty-four would be this module overruling it.
     expect(rowsFor('', MAX_ROWS + 16)).toBe(MAX_ROWS + 16)
   })
 })

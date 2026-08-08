@@ -29,7 +29,6 @@ export const MIN_ROWS = 3
  */
 export const MAX_ROWS = 24
 
-/** The width the wrapping estimate assumes, in characters. */
 const NOMINAL_COLUMNS = 72
 
 export const rowsFor = (value: string, min: number = MIN_ROWS): number => {
@@ -37,8 +36,5 @@ export const rowsFor = (value: string, min: number = MIN_ROWS): number => {
     .split('\n')
     .reduce((lines, line) => lines + Math.max(1, Math.ceil(line.length / NOMINAL_COLUMNS)), 0)
 
-  // `min` wins over the ceiling as well: a caller asking for twelve rows has said
-  // what the empty box should look like, and clamping that down to a smaller maximum
-  // would be this module overruling it.
   return Math.min(Math.max(wrapped, min), Math.max(MAX_ROWS, min))
 }

@@ -120,10 +120,25 @@ leaves a second copy of every link in the accessibility tree, and a bell that on
 its panel would still have opened one off-screen. The stylesheet carries the same
 `45rem`, and `viewport.ts` says so where somebody changing one would read it.
 
-**Hiding the bar on scroll** is #340, and deliberately not here. It is the half that
-is easy to ship subtly wrong — the schedule grid and the meal table scroll internally
-against a `max-height`, so `window` never fires on exactly the two pages that most
-want the vertical room.
+**The bar slides away as you read down a page** and comes back the moment you scroll
+up (#340). The direction comes from a run of movement rather than one event, since a
+flick arrives as a burst of small deltas that no per-event threshold would ever cross;
+the top of the page always shows it, and nothing near the bottom may flip it, because
+iOS reports movement in both directions at either end while the finger is still. The
+slide takes `visibility` with it once it is over, so a bar that is off the screen holds
+no focusable links.
+
+**It does nothing on the schedule grid or the meal plan**, and that is a decision.
+Both scroll internally against a `max-height` so their sticky headers have a box to
+stick to, and `window` never scrolls on them. Letting the page scroll instead would
+take those headers away on exactly the pages whose rows are unreadable without them,
+which is a worse trade than a 3.5rem bar.
+
+**Three things float over a page**, and they share one stacking context — `.layout`
+creates none — so source order decides ties. The scale is written down because it was
+discovered rather than chosen: bar 20, the bell's popdown 30, a modal 40. At the same
+`20` the nav painted over a dream's backdrop on a phone, with its links still tappable
+through an overlay meant to be modal (#344).
 
 ### Wide things, and large text
 

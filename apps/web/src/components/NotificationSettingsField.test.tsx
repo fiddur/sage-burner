@@ -76,8 +76,9 @@ describe('what to be told about', () => {
 
     const heading = await screen.findByText('What happens to you')
     expect(heading.tagName).toBe('CAPTION')
-    // The corner beside Here and Email is empty, not missing: a header row one cell
-    // short would put every switch column under the wrong heading.
+    // The corner beside the switch columns — Here alone here, since this render has
+    // no mail server — is empty rather than missing: a header row one cell short
+    // would put every switch column under the wrong heading.
     expect(screen.queryByRole('columnheader', { name: 'What happens to you' })).toBeNull()
     expect(heading.closest('table')?.querySelectorAll('thead th')).toHaveLength(2)
   })
