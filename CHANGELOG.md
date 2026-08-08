@@ -9,6 +9,10 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-08
 
+- **The Leads page no longer drags sideways, and its bottom bar is back.** The page
+  slid left and right beside its table, which pushed the row of icons at the bottom off
+  the edge of the screen — on that page it was missing entirely until you scrolled to
+  the very end.
 - **Tapping a dream opens it.** On the Dreams page a dream was a title and a time, and
   what it actually _was_ — the description, who is running it, who is helping, who
   wants it — could only be found by going to the Schedule. The row opens the same panel

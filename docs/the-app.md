@@ -134,6 +134,16 @@ stick to, and `window` never scrolls on them. Letting the page scroll instead wo
 take those headers away on exactly the pages whose rows are unreadable without them,
 which is a worse trade than a 3.5rem bar.
 
+**A box that scrolls sideways is a containing block**, and that is load-bearing rather
+than tidiness (#348). `.visually-hidden` is `position: absolute`, so without a
+positioned ancestor its containing block is the _initial_ one: inside a table scrolled
+sideways it sits at its static position, past the right edge of a phone, and a 1px box
+there drags the whole document's scroll width out with it. The Leads page then scrolled
+sideways beside its own table — and since a document wider than the viewport widens the
+layout viewport on mobile, the fixed bottom bar went with it, too wide to fit and below
+the visible area until the page was scrolled to its end. `styles.test.ts` asserts the
+rule, because happy-dom applies no CSS and nothing else in the suite can see it.
+
 **Three things float over a page**, and they share one stacking context — `.layout`
 creates none — so source order decides ties. The scale is written down because it was
 discovered rather than chosen: bar 20, the bell's popdown 30, a modal 40. At the same
