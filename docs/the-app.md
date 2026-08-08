@@ -128,7 +128,10 @@ already open changes no route to react to.
 
 The drawer covers ☰ while it is open, so a **✕ inside it** is the pointer way out that
 does not depend on hitting the strip of backdrop beside it. Focus moves to the first
-entry on open and back to ☰ on Escape.
+entry on open and back to ☰ on every way out. While it is up the page behind it does not
+scroll and Tab cannot reach into it — `useOverlay`, which the dream panel uses too:
+an overlay that covers the page while the page scrolls under it, or hands focus to a
+control behind an opaque backdrop, is telling two stories about what is interactive.
 
 There is no ☰ at all when it would open onto nothing — a signed-out visitor may follow
 none of it.

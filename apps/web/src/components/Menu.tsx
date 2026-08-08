@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from 'preact/hooks'
 
 import type { NavPage } from './Layout.tsx'
 
+import { useOverlay } from '../overlay.ts'
+
 /** The pages the bar has no room for. `docs/the-app.md` has the why, and why
  * dismissal is the backdrop's own rather than a document listener like the bell's. */
 export const Menu = ({ pages }: { pages: readonly NavPage[] }) => {
@@ -18,6 +20,8 @@ export const Menu = ({ pages }: { pages: readonly NavPage[] }) => {
     button.current?.focus()
   }
 
+  useOverlay(drawer, open)
+
   useEffect(() => setOpen(false), [path])
 
   useEffect(() => {
@@ -25,8 +29,8 @@ export const Menu = ({ pages }: { pages: readonly NavPage[] }) => {
 
     drawer.current?.querySelector('a')?.focus()
 
-    const escape = (pressed: KeyboardEvent) => {
-      if (pressed.key === 'Escape') close()
+    const escape = (keyEvent: KeyboardEvent) => {
+      if (keyEvent.key === 'Escape') close()
     }
 
     document.addEventListener('keydown', escape)
@@ -50,6 +54,8 @@ export const Menu = ({ pages }: { pages: readonly NavPage[] }) => {
         <span aria-hidden="true">☰</span>
       </button>
 
+      {/* Rendered only while open rather than hidden: no `inert` to keep in step with
+          the animation, and the links are out of the tab order the rest of the time. */}
       {open && (
         <>
           <div class="menu-backdrop" onPointerDown={close} />

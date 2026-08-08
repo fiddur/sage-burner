@@ -2,15 +2,17 @@ import type { ComponentChildren } from 'preact'
 
 import { useEffect, useRef } from 'preact/hooks'
 
+import { useOverlay } from '../overlay.ts'
 import { ErrorText } from './ErrorText.tsx'
 
 /**
  * The panel the grid opens over itself — for reading a dream, editing one, or
  * offering one.
  *
- * Not a `<dialog>`: `showModal` is an imperative call on a ref, and the focus trap
- * it brings is then a second thing to keep in step with the caller's own open
- * state. `role="dialog"` with `aria-modal` says the same to a screen reader.
+ * Not a `<dialog>`: `showModal` is an imperative call on a ref, so what is showing
+ * would be a second thing to keep in step with the caller's own open state.
+ * `role="dialog"` with `aria-modal` says the same to a screen reader, and what
+ * `showModal` would have brought along is `useOverlay`.
  */
 export const DreamPanel = ({
   label,
@@ -39,6 +41,8 @@ export const DreamPanel = ({
 }) => {
   const panel = useRef<HTMLDivElement>(null)
   const dismiss = onBack ?? onClose
+
+  useOverlay(panel)
 
   useEffect(() => {
     panel.current?.focus()

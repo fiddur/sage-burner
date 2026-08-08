@@ -813,10 +813,10 @@ describe('helping with a dream', () => {
     const ada = await givenAttending(eventId)
     const id = (await offer(server, ada.cookie, { title: 'Sunrise yoga' })).json().session.id
 
-    const put = await helping(server, elsewhere, id, 'POST', ada.id)
+    const posted = await helping(server, elsewhere, id, 'POST', ada.id)
 
-    expect(put.statusCode).toBe(200)
-    expect(put.json().session.helpers).toEqual([{ account_id: ada.id, name: null }])
+    expect(posted.statusCode).toBe(200)
+    expect(posted.json().session.helpers).toEqual([{ account_id: ada.id, name: null }])
   })
 
   it('still refuses to put down somebody who is not coming', async () => {

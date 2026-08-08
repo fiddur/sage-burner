@@ -212,10 +212,12 @@ drag is swallowed and the next real press opens as usual. `dragend` would not do
 it fires _before_ any click, so a flag cleared there is already false by the time the
 click arrives.
 
-Not a `<dialog>`: `showModal` is an imperative call on a ref, and the focus trap it
-brings is then a second thing to keep in step with the component's own open state.
+Not a `<dialog>`: `showModal` is an imperative call on a ref, so what is showing would
+be a second thing to keep in step with the component's own open state.
 `role="dialog"` with `aria-modal` says the same to a screen reader, and Escape and
-the backdrop are the two ways out people reach for. A click on the panel stops
+the backdrop are the two ways out people reach for. What `showModal` would have brought
+along — the page behind held still, and Tab kept inside — is `useOverlay` (#364), which
+☰'s drawer uses too. A click on the panel stops
 there — without that, reading the description would close the thing you opened to
 read it.
 

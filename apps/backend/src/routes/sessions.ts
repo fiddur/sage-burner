@@ -534,9 +534,11 @@ export const registerSessionRoutes = (
   ): Promise<Refusal | Attending> => {
     const found = await onOpenBurn(request)
     if ('code' in found) return found
-    if (found.mine === undefined) return { code: 400, error: 'bad_request' }
 
-    return { ...found, mine: found.mine }
+    const mine = found.mine
+    if (mine === undefined) return { code: 400, error: 'bad_request' }
+
+    return { ...found, mine }
   }
 
   /**

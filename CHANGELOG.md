@@ -9,6 +9,9 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-08
 
+- **The menu and a dream's panel now hold the page behind them still.** It used to
+  scroll under them, and tabbing from inside walked out to buttons hidden behind the
+  backdrop.
 - **A page that is not yours now offers the application form beside the log-in link.**
   Somebody sent a link to the burn by a friend, before they have applied, was told only
   to log in — which is not a door they have.
