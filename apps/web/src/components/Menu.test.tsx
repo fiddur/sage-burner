@@ -58,6 +58,13 @@ describe('the menu beside the logo', () => {
     rerender(<Menu pages={[]} />)
 
     expect(document.body.style.overflow).toBe('')
+
+    // And it does not spring open again when they come back: `open` is state, and
+    // nothing between here and there was a press.
+    rerender(<Menu pages={RIDES} />)
+
+    expect(screen.queryByRole('link', { name: /Rideshares/ })).toBeNull()
+    expect(document.body.style.overflow).toBe('')
   })
 
   it('is not there at all when it would be empty', () => {

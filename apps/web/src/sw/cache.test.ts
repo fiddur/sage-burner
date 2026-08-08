@@ -212,6 +212,26 @@ describe('keeping the asset cache from growing forever', () => {
     expect(cache.kept()).toEqual(['/api/installation/icon?v=1', '/api/installation/banner?v=3'])
   })
 
+  it('keeps both spellings of the icon, which are two live entries rather than two versions', async () => {
+    // `/api/installation/icon` is asked for bare by the header's brand mark and by the
+    // favicon, and with `?v=` by the settings page and the manifest. Both are live, and
+    // a one-per-path rule that did not look at the query would drop whichever was
+    // stored first — offline, the header's mark then draws as a broken image.
+    const cache = fakeCache([
+      '/api/installation/icon',
+      '/api/installation/icon?v=2',
+      '/api/installation/banner?v=1',
+      '/api/installation/banner?v=2',
+    ])
+
+    expect(await trim(cache, ASSET_LIMIT)).toBe(1)
+    expect(cache.kept()).toEqual([
+      '/api/installation/icon',
+      '/api/installation/icon?v=2',
+      '/api/installation/banner?v=2',
+    ])
+  })
+
   it('leaves the shell alone however many times it has been stored', async () => {
     // One entry per pathname is what makes the rule above safe: the shell has exactly
     // one, so no number of re-puts can bring it near an eviction.

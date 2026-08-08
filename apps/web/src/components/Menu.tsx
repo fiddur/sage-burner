@@ -29,6 +29,11 @@ export const Menu = ({ pages }: { pages: readonly NavPage[] }) => {
 
   useEffect(() => setOpen(false), [path])
 
+  // So it does not spring open again if the roles come back.
+  useEffect(() => {
+    if (pages.length === 0) setOpen(false)
+  }, [pages.length])
+
   useEffect(() => {
     if (!showing) return undefined
 
@@ -52,8 +57,8 @@ export const Menu = ({ pages }: { pages: readonly NavPage[] }) => {
         type="button"
         class="menu-button"
         aria-label="Menu"
-        aria-expanded={open}
-        aria-controls={open ? 'menu-drawer' : undefined}
+        aria-expanded={showing}
+        aria-controls={showing ? 'menu-drawer' : undefined}
         onClick={() => setOpen((was) => !was)}
       >
         <span aria-hidden="true">☰</span>
