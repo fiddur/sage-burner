@@ -8,6 +8,7 @@ import type { ApiClient } from '../api/client.ts'
 import { allergiesOf } from '../allergies.ts'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
+import { Table } from '../components/Table.tsx'
 import { WaitingListLine, startsTheWaitingList } from '../components/WaitingListLine.tsx'
 import { toCsv } from '../csv.ts'
 import { useAction, useLoad } from '../load.ts'
@@ -118,7 +119,7 @@ export const AdminRoster = ({ api }: { api: RosterApi }) => {
           {roster.entries.length === 0 ? (
             <p class="form-note">Nobody has said they are coming yet.</p>
           ) : (
-            <table class="table">
+            <Table>
               <thead>
                 <tr>
                   <th scope="col">Who</th>
@@ -162,7 +163,7 @@ export const AdminRoster = ({ api }: { api: RosterApi }) => {
                   </Fragment>
                 ))}
               </tbody>
-            </table>
+            </Table>
           )}
         </>
       )}

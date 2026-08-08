@@ -1379,10 +1379,28 @@ a:hover {
   border-radius: 0.5rem;
 }
 
+/*
+  What scrolls when a shared table is wider than the screen (#339) — itself, rather
+  than the page under it, nav and all. `Table.tsx` is the only thing that draws it,
+  so a `.table` cannot be added without one.
+*/
+.table-wrap {
+  overflow-x: auto;
+}
+
 /* The shared table: the members list, the roster, the accounts list, the invites. */
 .table {
   border-collapse: collapse;
   width: 100%;
+}
+
+/* A section title above the table, not a cell in it — see `.notification-settings`. */
+.table caption {
+  margin-bottom: 0.35rem;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: start;
 }
 
 .table th,
@@ -1410,9 +1428,18 @@ a:hover {
   table-layout: fixed;
 }
 
+/*
+  `min()`, and the `rem` half is only the desktop half (#341).
+
+  At `5.5rem` flat these grew with the reader's text size while the viewport did not,
+  so the bigger the text the less was left for the labels — at 200% two switch columns
+  wanted more room than the whole screen had. A percentage is of the table, so it
+  cannot outrun it; the `rem` keeps them from sprawling on a wide screen. The smaller
+  wins, which is the right one either way.
+*/
 .notification-settings thead th:not(:first-child),
 .notification-settings tbody td {
-  width: 5.5rem;
+  width: min(5.5rem, 22%);
   text-align: center;
 }
 

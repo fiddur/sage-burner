@@ -8,6 +8,7 @@ import type { ApiClient } from '../api/client.ts'
 import { isApiError } from '../api/client.ts'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
+import { Table } from '../components/Table.tsx'
 import { errorMessage, useAction, useLoad } from '../load.ts'
 import { isAdmin, useViewer } from '../viewer.tsx'
 
@@ -101,7 +102,7 @@ export const Admin = ({ api }: { api: AdminApi }) => {
       <ErrorText message={error} />
 
       {roster.status === 'ready' && (
-        <table class="table">
+        <Table>
           <thead>
             <tr>
               <th scope="col">Email</th>
@@ -136,7 +137,7 @@ export const Admin = ({ api }: { api: AdminApi }) => {
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
       )}
 
       <p class="form-note">

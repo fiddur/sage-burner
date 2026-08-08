@@ -8,6 +8,7 @@ import { isApiError } from '../api/client.ts'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { InviteLink } from '../components/InviteLink.tsx'
+import { Table } from '../components/Table.tsx'
 import { useAction, useLoad } from '../load.ts'
 import { isAdmin, useViewer } from '../viewer.tsx'
 
@@ -83,7 +84,7 @@ export const AdminInvites = ({ api }: { api: InvitesApi }) => {
       )}
 
       {loaded.status === 'ready' && loaded.data.invites.length > 0 && (
-        <table class="table">
+        <Table>
           <thead>
             <tr>
               <th scope="col">For</th>
@@ -113,7 +114,7 @@ export const AdminInvites = ({ api }: { api: InvitesApi }) => {
               </tr>
             ))}
           </tbody>
-        </table>
+        </Table>
       )}
     </GuardedPage>
   )
