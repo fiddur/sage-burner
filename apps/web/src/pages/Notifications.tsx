@@ -24,11 +24,12 @@ export type NotificationsApi = Pick<ApiClient, 'getMyNotifications' | 'markNotif
  * new stays bold for as long as this page is open, because taking the emphasis away in
  * front of somebody would undo the thing they came to look at.
  *
- * That is what `newOnArrival` is for. The page keeps the bell's beat so a tab left open
+ * That is what `arrivedNew` is for. The page keeps the bell's beat so a tab left open
  * catches up — and every one of those refetches comes back with `seen_at` set on the
  * rows this page just marked, so without it the bold would vanish a minute in, or the
- * moment the tab was focused. The set is only ever added to from the first answer, so a
- * notification that arrives *while* the page is open is new and says so.
+ * moment the tab was focused. It only ever *grows*: one that arrives while the page is
+ * open is new on the answer that brings it and stays new through the next, which is the
+ * same promise as for the ones that were there on opening.
  */
 export const Notifications = ({ api }: { api: NotificationsApi }) => {
   const viewer = useViewer()
@@ -52,18 +53,13 @@ export const Notifications = ({ api }: { api: NotificationsApi }) => {
   }, [api, unseen])
 
   // A ref rather than state: nothing should re-render because of it, and it is written
-  // during the render that first reads the answer it describes.
-  const newOnArrival = useRef<ReadonlySet<string> | undefined>(undefined)
+  // during the render that reads the answer it describes.
+  const arrivedNew = useRef<Set<string>>(new Set())
 
   const items = loaded.status === 'ready' ? loaded.data.notifications : []
-  newOnArrival.current ??=
-    loaded.status === 'ready'
-      ? new Set(items.filter((item) => item.seen_at === null).map((item) => item.id))
-      : undefined
+  for (const item of items) if (item.seen_at === null) arrivedNew.current.add(item.id)
 
-  const asRead = items.map((item) =>
-    newOnArrival.current?.has(item.id) === true ? { ...item, seen_at: null } : item,
-  )
+  const asRead = items.map((item) => (arrivedNew.current.has(item.id) ? { ...item, seen_at: null } : item))
 
   return (
     <GuardedPage title="Notifications" require="signed-in">

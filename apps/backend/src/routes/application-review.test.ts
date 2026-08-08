@@ -428,8 +428,7 @@ describe('a fresh link when the first one was lost', () => {
     const response = await reissue(server, cookie, id)
 
     expect(response.statusCode).toBe(409)
-    // Its own slug, not the shared `conflict` (#178): the page words this one "they
-    // are already in", which is the opposite of what the other 409 here means.
+    // Its own slug, not the shared `conflict` — see `errorCodes` (#178).
     expect(response.json().error).toBe('invite_used')
   })
 
@@ -444,8 +443,7 @@ describe('a fresh link when the first one was lost', () => {
       const response = await reissue(server, cookie, id)
 
       expect(response.statusCode).toBe(409)
-      // The other slug. Both are 409, and a page that could not tell them apart told
-      // an admin looking at a rejected application that the person was already in.
+      // The other slug, and the failing half of the pair.
       expect(response.json().error).toBe('not_approved')
     }
 

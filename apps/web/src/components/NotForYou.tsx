@@ -1,13 +1,10 @@
 /**
- * What somebody is told when a page is not theirs — and it differs by *why*.
+ * What somebody is told when a page is not theirs, which differs by *why*: signed in
+ * without the role, telling them to log in is advice they have already taken.
  *
- * Signed out, the way in is the way in. Signed in without the role — an applicant
- * waiting on a decision, or an admin who holds one role and not the other — telling
- * them to log in would be advice they have already taken.
- *
- * Its own component because `GuardedPage` is not the only page that has to say this:
- * the Schedule renders its own frame around the grid, so it cannot be wrapped in one,
- * and it had drifted to offering an applicant a log-in link (#200).
+ * Its own component because `GuardedPage` is not the only page that says it — the
+ * Schedule renders its own frame around the grid, so it cannot be wrapped in one, and
+ * its copy had drifted to offering an applicant that log-in link (#200).
  */
 export const NotForYou = ({ signedOut, who }: { signedOut: boolean; who: 'admins' | 'members' }) =>
   signedOut ? (

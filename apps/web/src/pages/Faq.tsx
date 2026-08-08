@@ -1,9 +1,10 @@
-import type { CopySourcesResponse, FaqEntry } from '@sage-burner/shared'
+import type { FaqEntry } from '@sage-burner/shared'
 
 import { MAX_FAQ_ANSWER, MAX_FAQ_QUESTION } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
+import type { CopySource } from '../components/CopyFrom.tsx'
 import type { Loaded } from '../load.ts'
 
 import { useBurns, useSelectedBurn } from '../burn.tsx'
@@ -30,15 +31,13 @@ export type FaqApi = Pick<
   | 'getActiveEvent'
 >
 
-type Source = CopySourcesResponse['sources'][number]
-
 interface Shown {
   eventId: string
   name: string
   /** Whether the bar picked it, as opposed to the fallback below (#321). */
   picked: boolean
   entries: readonly FaqEntry[]
-  sources: readonly Source[]
+  sources: readonly CopySource[]
 }
 
 /** Null rather than a fourth status: "there is no burn at all" is data, not an outcome. */

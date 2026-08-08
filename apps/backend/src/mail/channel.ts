@@ -5,7 +5,7 @@ import type { EmailChannel } from '../push/notify.ts'
 import type { MailDeps, Posted } from './mail.ts'
 
 import { account, INSTALLATION_ID, installation } from '../db/schema.ts'
-import { mailSettingsFor, post } from './mail.ts'
+import { mailSettingsFor, post, reasonFor } from './mail.ts'
 import { absolute, notificationMessage } from './messages.ts'
 
 /**
@@ -42,32 +42,49 @@ const titleOf = async (db: Database): Promise<string> => {
   return row?.title ?? ''
 }
 
+/**
+ * **Never throws**, which is the rule `post` already follows and for the same reason
+ * (#357). A notification is written beside this, and the caller starts it before that
+ * write and awaits it after — so anything thrown here is a rejection nobody is holding
+ * for as long as the write takes, and Node's default for one of those is to exit.
+ *
+ * The reads below are the only way it could: `post` answers a failed send rather than
+ * throwing. Reported through the same `log` a refused send goes to, so a database that
+ * has gone away is said out loud here rather than swallowed by the caller's guard.
+ */
 export const emailChannel = (deps: ChannelDeps): EmailChannel => {
   return async (accountId, told) => {
-    // First, because nearly every installation has no mail server and the two reads
-    // below would then be building a message nothing can post.
-    if ((await mailSettingsFor(deps.db)) === undefined) return
+    try {
+      // First, because nearly every installation has no mail server and the two reads
+      // below would then be building a message nothing can post.
+      if ((await mailSettingsFor(deps.db)) === undefined) return
 
-    const [who] = await deps.db
-      .select({ email: account.email })
-      .from(account)
-      .where(eq(account.id, accountId))
-      .limit(1)
+      const [who] = await deps.db
+        .select({ email: account.email })
+        .from(account)
+        .where(eq(account.id, accountId))
+        .limit(1)
 
-    if (who === undefined) return
+      if (who === undefined) return
 
-    const posted = await post(
-      deps,
-      notificationMessage({
-        installation: await titleOf(deps.db),
-        to: who.email,
-        body: told.body,
-        link: told.link === null ? undefined : absolute(deps.origin, told.link),
-      }),
-    )
+      const posted = await post(
+        deps,
+        notificationMessage({
+          installation: await titleOf(deps.db),
+          to: who.email,
+          body: told.body,
+          link: told.link === null ? undefined : absolute(deps.origin, told.link),
+        }),
+      )
 
-    if (!posted.sent) deps.log(posted, accountId)
+      if (!posted.sent) deps.log(posted, accountId)
 
-    return posted
+      return posted
+    } catch (failure) {
+      const posted = { sent: false, reason: reasonFor(failure) }
+      deps.log(posted, accountId)
+
+      return posted
+    }
   }
 }

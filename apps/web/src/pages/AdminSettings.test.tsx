@@ -78,10 +78,7 @@ describe('AdminSettings', () => {
     // `require="member"`, so an account holding `admin` without `member` is turned
     // away from the only other one. Nothing asserted it, so deleting this button left
     // the suite green and stranded that account signed in.
-    renderPage(stub(), {
-      status: 'signed-in',
-      account: { id: 'a-9', name: null, avatar: null, roles: ['admin'] },
-    })
+    renderPage(stub())
 
     expect(await screen.findByRole('button', { name: 'Log out' })).toBeTruthy()
   })

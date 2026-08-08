@@ -34,7 +34,8 @@ describe('the stylesheet', () => {
     // The parse is a regex, so a change to the file that broke it would otherwise turn
     // every check below into a vacuous pass over an empty list.
     expect(rules.length).toBeGreaterThan(100)
-    expect(rules.some((rule) => rule.selector.includes('.visually-hidden'))).toBe(true)
+    const selectors = rules.flatMap((rule) => rule.selector.split(',').map((one) => one.trim()))
+    expect(selectors).toContain('.visually-hidden')
   })
 
   it('positions every box that scrolls sideways', () => {

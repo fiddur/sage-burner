@@ -1,15 +1,10 @@
-import type {
-  CopySourcesResponse,
-  EffortLevel,
-  EventAttendeesResponse,
-  LeadRole,
-  LeadRoleUpdate,
-} from '@sage-burner/shared'
+import type { EffortLevel, EventAttendeesResponse, LeadRole, LeadRoleUpdate } from '@sage-burner/shared'
 
 import { effortLevels, MAX_NOTES, MAX_TITLE } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
+import type { CopySource } from '../components/CopyFrom.tsx'
 import type { Loaded } from '../load.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
@@ -40,14 +35,13 @@ export type RolesApi = Pick<
 >
 
 type Person = EventAttendeesResponse['attendees'][number]
-type Source = CopySourcesResponse['sources'][number]
 
 /** Null rather than a fourth status: "no burn is open" is data, not a load outcome. */
 type Register = {
   eventId: string
   roles: readonly LeadRole[]
   attendees: readonly Person[]
-  sources: readonly Source[]
+  sources: readonly CopySource[]
 } | null
 
 const EFFORT_LABEL: Record<EffortLevel, string> = {

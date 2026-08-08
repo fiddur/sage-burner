@@ -7,10 +7,9 @@ export type CopySource = CopySourcesResponse['sources'][number]
 /**
  * "Or start from a previous burn" — the control both per-burn lists offer.
  *
- * The schema, the query and the CSS class were already shared; this was the last
- * copy, identical on the roles register and the places grid apart from three
- * strings. A fix to the disabled state or the empty-sources case would otherwise
- * have landed on one page and not the other.
+ * One control, three lists — the roles register, the places grid and the FAQ — which
+ * differ by three strings. A fix to the disabled state or the empty-sources case
+ * otherwise lands on one of them and not the others.
  *
  * The caller renders it only while its list is empty, because the API refuses a
  * copy into one that is not — merging two is a decision nobody asked for.

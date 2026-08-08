@@ -123,25 +123,34 @@ describe('what has happened to you', () => {
     expect(line.closest('li')?.className).toBe('is-new')
   })
 
-  it('marks one that arrives while the page is open as new', async () => {
-    // The set is only ever seeded from the first answer, so a later arrival is judged
-    // on its own `seen_at` rather than being read as old for not having been there.
+  it('marks one that arrives while the page is open as new, and keeps it that way', async () => {
+    // The set grows rather than being seeded once (#352). Seeded once, an arrival
+    // during the visit was bold on the answer that brought it and plain on the next —
+    // the same disappearing act, narrowed to in-session arrivals.
+    const later = one({ id: 'n-9', body: 'Bea is coming.' })
     let asked = 0
     renderPage(
       stub({
         getMyNotifications: () => {
           asked += 1
-          return asked === 1
-            ? Promise.resolve({ notifications: [], unseen: 0 })
-            : Promise.resolve({ notifications: [one({ id: 'n-9', body: 'Bea is coming.' })], unseen: 1 })
+          if (asked === 1) return Promise.resolve({ notifications: [], unseen: 0 })
+
+          return Promise.resolve({
+            notifications: [asked === 2 ? later : { ...later, seen_at: '2026-08-06T11:00:00.000Z' }],
+            unseen: asked === 2 ? 1 : 0,
+          })
         },
       }),
     )
     await screen.findByText('Nothing yet.')
 
     fireEvent(window, new Event('focus'))
-
     const line = await screen.findByText('Bea is coming.')
+    expect(line.closest('li')?.className).toBe('is-new')
+
+    fireEvent(window, new Event('focus'))
+
+    await waitFor(() => expect(asked).toBeGreaterThan(2))
     expect(line.closest('li')?.className).toBe('is-new')
   })
 

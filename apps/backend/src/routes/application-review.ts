@@ -261,9 +261,8 @@ export const registerApplicationReviewRoutes = (
     })
 
     if (outcome === 'not_found') return sendError(reply, 404)
-    // `errorResponse` rather than `sendError`, which pairs one slug with each status:
-    // both of these are 409 and they mean opposite things to whoever is reading the
-    // page, so the page needs to tell them apart (#178).
+    // `errorResponse` rather than `sendError`, which pairs one slug with each status.
+    // `errorCodes` says why these two need telling apart (#178).
     if (outcome !== 'issued') {
       return reply.code(409).send(errorResponse(outcome === 'not_approved' ? 'not_approved' : 'invite_used'))
     }

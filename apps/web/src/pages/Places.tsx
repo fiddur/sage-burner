@@ -1,9 +1,10 @@
-import type { CopySourcesResponse, Place, PlaceColor } from '@sage-burner/shared'
+import type { Place, PlaceColor } from '@sage-burner/shared'
 
 import { MAX_EMOJI, MAX_PLACE_NAME, placeColors } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
+import type { CopySource } from '../components/CopyFrom.tsx'
 import type { Loaded } from '../load.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
@@ -27,10 +28,8 @@ export type PlacesApi = Pick<
   | 'copyPlaces'
 >
 
-type Source = CopySourcesResponse['sources'][number]
-
 /** Null rather than a fourth status: "no burn is open" is data, not a load outcome. */
-type Grid = { eventId: string; places: readonly Place[]; sources: readonly Source[] } | null
+type Grid = { eventId: string; places: readonly Place[]; sources: readonly CopySource[] } | null
 
 interface Draft {
   name: string

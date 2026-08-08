@@ -88,10 +88,9 @@ it('registers every route the manifest declares', async () => {
 })
 
 it('registers nothing the manifest does not declare', async () => {
-  // The direction that makes the manifest a source rather than a list. Without it a
+  // The direction that makes the manifest a source rather than a list: without it a
   // route added straight to a route file would never appear in it, and the client
-  // could only reach it by spelling the path a second time — which is the whole of
-  // what #152 set out to stop.
+  // could only reach it by spelling the path a second time.
   const live = await registered()
   const known = new Set(declared().map(({ pair }) => pair))
 

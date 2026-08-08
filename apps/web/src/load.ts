@@ -268,14 +268,17 @@ export const useAction = (onSuccess?: () => void) => {
  * can write it inline — the same reason `useLoad` holds its fetcher in one. It runs
  * again after a `reload()`, which is what makes a save show what the server kept.
  *
- * **Not for a `live` page.** Re-seeding on a background poll would take away whatever
- * somebody was halfway through typing, so nothing here passes `live` and this does not
- * offer it.
+ * **Neither `live` nor `remember`**, and for one reason: both re-seed without anybody
+ * asking, and a seed lands in the fields somebody is typing in. `live` polls in the
+ * background; `remember` is quieter and worse — `useLoad` starts `ready` from the
+ * remembered value, so the form seeds from it and again from the fetch a moment later,
+ * with a keystroke possibly in between. Refused in the type rather than in a paragraph,
+ * so it cannot be passed by somebody who has not read this one.
  */
 export const useLoadInto = <T>(
   fetcher: (signal: AbortSignal) => Promise<T>,
   seed: (data: T) => void,
-  options: { enabled?: boolean; fallback: string; key?: string; remember?: string },
+  options: { enabled?: boolean; fallback: string; key?: string },
 ): { loaded: Loaded<T>; refreshing: boolean; reload: () => void } => {
   const { loaded, refreshing, reload } = useLoad(fetcher, options)
   const latest = useRef(seed)
