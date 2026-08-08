@@ -204,8 +204,19 @@ export const registerRedemptionRoutes = (
     // re-sent — so nothing optional may be given the power to roll it back. A burn
     // that ended while the form was open, or an id that names nothing, leaves the
     // account made and the box unticked; the page reads `attendance` and says so.
+    //
+    // The catch is the same rule for an *unexpected* failure (#230): the account, the
+    // role, the spent token and the cookie are all committed by now, so letting one
+    // out turns a redemption that worked into a 500 and an error page.
     const wanted = body.join_event_id ?? undefined
-    const joined = wanted === undefined ? undefined : await joinBurn(db, wanted, accountId, now)
+    const joined =
+      wanted === undefined
+        ? undefined
+        : await joinBurn(db, wanted, accountId, now).catch((failure: unknown) => {
+            request.log.error({ err: failure, event_id: wanted }, 'redeemed but could not join')
+
+            return undefined
+          })
 
     return reply.code(201).send({
       // The whole viewer, with `satisfies`: the page reads every field, and

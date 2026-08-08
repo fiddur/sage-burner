@@ -25,8 +25,8 @@ export const Menu = ({ pages }: { pages: readonly NavPage[] }) => {
 
     drawer.current?.querySelector('a')?.focus()
 
-    const escape = (key: KeyboardEvent) => {
-      if (key.key === 'Escape') close()
+    const escape = (pressed: KeyboardEvent) => {
+      if (pressed.key === 'Escape') close()
     }
 
     document.addEventListener('keydown', escape)
@@ -50,8 +50,6 @@ export const Menu = ({ pages }: { pages: readonly NavPage[] }) => {
         <span aria-hidden="true">☰</span>
       </button>
 
-      {/* Rendered only while open, so the links are out of the tab order the rest of
-          the time without `inert` or a visibility dance. */}
       {open && (
         <>
           <div class="menu-backdrop" onPointerDown={close} />

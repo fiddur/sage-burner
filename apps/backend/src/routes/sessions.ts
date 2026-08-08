@@ -195,7 +195,7 @@ interface Arranging {
 }
 
 interface Attending extends Arranging {
-  attendanceId: string
+  mine: string
 }
 
 /**
@@ -257,9 +257,10 @@ const facilitatorSpot = async (
  * without `member` is not shut out of the burn they are setting up (#200). The
  * selector already offers them every coming burn, so a `member`-only guard let them
  * choose one and then refused them its timetable — while the lanes, the register and
- * the options next to it were open. Putting a hand up still needs an attendance at
- * that burn; the checks below answer that with a 400, which is a different sentence
- * from "you are not welcome here".
+ * the options next to it were open. Taking a job **yourself** still needs an attendance
+ * at that burn, and so does whoever somebody else is put down for (#350); the checks
+ * below answer that with a 400, which is a different sentence from "you are not welcome
+ * here".
  */
 export const registerSessionRoutes = (
   app: FastifyInstance,
@@ -516,8 +517,9 @@ export const registerSessionRoutes = (
     if (open === undefined) return { code: 404, error: 'not_found' }
 
     const viewer = await viewerFor(request, { db, sessions })
+    const mine = viewer === undefined ? undefined : await attendanceFor(db, dream.event_id, viewer.account_id)
 
-    return { dream, mine: await mineAt(request, dream.event_id), callerId: viewer?.account_id }
+    return { dream, mine, callerId: viewer?.account_id }
   }
 
   /**
@@ -534,7 +536,7 @@ export const registerSessionRoutes = (
     if ('code' in found) return found
     if (found.mine === undefined) return { code: 400, error: 'bad_request' }
 
-    return { ...found, attendanceId: found.mine }
+    return { ...found, mine: found.mine }
   }
 
   /**
@@ -629,10 +631,10 @@ export const registerSessionRoutes = (
 
       await db
         .insert(sessionSupport)
-        .values({ session_id: found.dream.id, attendance_id: found.attendanceId })
+        .values({ session_id: found.dream.id, attendance_id: found.mine })
         .onConflictDoNothing()
 
-      return { session: await oneDream(db, found.dream, found.attendanceId) } satisfies SessionResponse
+      return { session: await oneDream(db, found.dream, found.mine) } satisfies SessionResponse
     },
   )
 
@@ -648,13 +650,10 @@ export const registerSessionRoutes = (
       await db
         .delete(sessionSupport)
         .where(
-          and(
-            eq(sessionSupport.session_id, found.dream.id),
-            eq(sessionSupport.attendance_id, found.attendanceId),
-          ),
+          and(eq(sessionSupport.session_id, found.dream.id), eq(sessionSupport.attendance_id, found.mine)),
         )
 
-      return { session: await oneDream(db, found.dream, found.attendanceId) } satisfies SessionResponse
+      return { session: await oneDream(db, found.dream, found.mine) } satisfies SessionResponse
     },
   )
 }

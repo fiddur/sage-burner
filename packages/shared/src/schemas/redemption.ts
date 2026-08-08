@@ -77,9 +77,11 @@ export const redeemRequestSchema = z
      * the server resolving "the upcoming one" a second time could pick a different
      * burn from the one somebody read.
      *
-     * Failing to join never fails the redemption: the token is spent and cannot be
-     * spent again, so a half-finished signup strands somebody with no way to finish.
-     * The response says which happened.
+     * Failing to join never fails the redemption, whatever the failure: the token is
+     * spent and cannot be spent again, so a half-finished signup strands somebody with
+     * no way to finish. A burn that ended and an id naming nothing are both skipped, and
+     * an unexpected error is logged and skipped too (#230). The response says which
+     * happened.
      */
     join_event_id: idSchema.nullable().optional(),
   })

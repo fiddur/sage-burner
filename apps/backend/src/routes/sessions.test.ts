@@ -804,6 +804,21 @@ describe('helping with a dream', () => {
     expect(off.json().session.helpers).toEqual([])
   })
 
+  it('lets a member who is not coming appoint too, not only an admin', async () => {
+    // The wider door #350 actually opened: `requireApproved`, not the admin role. A
+    // member who is not at this burn is still somebody the register would let appoint.
+    const server = await build()
+    const eventId = await givenEvent()
+    const elsewhere = await givenAccount(['member'])
+    const ada = await givenAttending(eventId)
+    const id = (await offer(server, ada.cookie, { title: 'Sunrise yoga' })).json().session.id
+
+    const put = await helping(server, elsewhere, id, 'POST', ada.id)
+
+    expect(put.statusCode).toBe(200)
+    expect(put.json().session.helpers).toEqual([{ account_id: ada.id, name: null }])
+  })
+
   it('still refuses to put down somebody who is not coming', async () => {
     // The other half of #350: the caller's attendance stopped mattering, the named
     // person's did not — a dream is run by people who are there.

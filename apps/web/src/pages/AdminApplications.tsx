@@ -29,9 +29,6 @@ export const AdminApplications = ({ api }: { api: ApplicationsApi }) => {
   // The link and what happened to the emailed copy, kept together: both are answered
   // once and the reload that follows returns neither (#327).
   const [invites, setInvites] = useState<Record<string, { invite: Invite; delivery: InviteDelivery }>>({})
-  // Which row, not a boolean: two applications can be decided one after the other,
-  // and only the one being decided should show it.
-
   const { loaded, reload } = useLoad((signal) => api.getApplications(signal), {
     enabled: admin,
     fallback: 'Could not load the applications.',

@@ -125,6 +125,39 @@ describe('AdminRoster', () => {
     await waitFor(() => expect(getActiveRoster).toHaveBeenCalledTimes(2))
   })
 
+  it('locks every box while one payment is being recorded, not just its own', async () => {
+    // A controlled checkbox that is clicked and refused keeps the tick the browser
+    // drew: `run` changes no state, and Preact restores nothing without a diff. Only
+    // the box that started the write was disabled, so the other row could be clicked
+    // and left showing a payment that was never recorded (#369).
+    let settle: () => void = () => undefined
+    const setPayment = vi.fn(
+      (_eventId: string, _accountId: string, _body: PaymentUpdate) =>
+        new Promise<never>((resolve) => (settle = resolve as () => void)),
+    )
+    renderPage(
+      stub(
+        { setPayment },
+        aRoster({
+          entries: [
+            anEntry({ account_id: 'a-2', name: 'Ana' }),
+            anEntry({ account_id: 'a-3', name: 'Bo', email: 'bo@example.org' }),
+          ],
+        }),
+      ),
+    )
+
+    ;(await screen.findByLabelText('Paid — Ana')).click()
+
+    await waitFor(() => expect(setPayment).toHaveBeenCalledTimes(1))
+    const other = screen.getByLabelText('Paid — Bo')
+    expect(other.hasAttribute('disabled')).toBe(true)
+
+    settle()
+
+    await waitFor(() => expect(screen.getByLabelText('Paid — Bo').hasAttribute('disabled')).toBe(false))
+  })
+
   it('sends the status alone, leaving the date to the server', async () => {
     // The page used to send `payment_date: null` to clear it, which made the
     // invariant a habit of this one caller. The date is derived from the status

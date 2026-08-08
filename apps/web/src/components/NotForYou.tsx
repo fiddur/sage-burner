@@ -5,11 +5,16 @@
  * Its own component because `GuardedPage` is not the only page that says it — the
  * Schedule renders its own frame around the grid, so it cannot be wrapped in one, and
  * its copy had drifted to offering an applicant that log-in link (#200).
+ *
+ * **Applying is offered beside logging in** (#180). `/my-burn` used to say so and lost
+ * it when these words were unified; a friend sending somebody a link to one of these
+ * pages before they have applied is exactly the visitor here, and log-in is not the
+ * door they need. True of every page this renders on, so it is not a prop.
  */
 export const NotForYou = ({ signedOut, who }: { signedOut: boolean; who: 'admins' | 'members' }) =>
   signedOut ? (
     <p>
-      This is for {who}. <a href="/login">Log in</a> to see it.
+      This is for {who}. <a href="/login">Log in</a> to see it, or <a href="/apply">apply to join</a>.
     </p>
   ) : (
     <p>This is for {who}. If it should be open to you, ask someone who already has access.</p>

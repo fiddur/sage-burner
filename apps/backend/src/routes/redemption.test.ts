@@ -625,6 +625,24 @@ describe('joining the ticked burn while redeeming', () => {
     expect(await db().select().from(attendance)).toHaveLength(0)
   })
 
+  it('still makes the account when joining fails for a reason nobody planned for', async () => {
+    // #230. The two failures above are `joinBurn` answering `undefined`; this is it
+    // throwing. By this point the account, the `member` role, the spent token and the
+    // cookie are all committed, so letting the throw out turns a redemption that
+    // worked into a 500 and an error page — with no way to try again.
+    const server = await build()
+    const burn = await givenBurn()
+    const token = await givenInvite()
+    handle?.client.exec('DROP TABLE attendance')
+
+    const response = await redeem(server, token, { ...applicant, join_event_id: burn })
+
+    expect(response.statusCode).toBe(201)
+    expect(response.json().attendance).toBeNull()
+    expect(response.json().viewer.roles).toEqual(['member'])
+    expect(await db().select().from(account)).toHaveLength(2)
+  })
+
   it('still makes the account when the id names no burn at all', async () => {
     const server = await build()
     const token = await givenInvite()
