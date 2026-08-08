@@ -47,9 +47,7 @@ describe('GuardedPage', () => {
       const { unmount } = renderShell(require, SIGNED_OUT)
 
       expect(screen.getByRole('link', { name: 'Log in' }), require).toBeTruthy()
-      // And the way in for somebody who has no account yet. A friend sends a link to
-      // one of these pages before they have applied — which is what /my-burn is for —
-      // and log-in is not the door they need (#180).
+      // And the way in for somebody with no account to log into (#180).
       expect(screen.getByRole('link', { name: 'apply to join' }), require).toBeTruthy()
       expect(screen.queryByText('the content')).toBeNull()
       unmount()

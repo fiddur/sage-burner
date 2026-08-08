@@ -133,7 +133,9 @@ describe('AdminRoster', () => {
     let settle: () => void = () => undefined
     const setPayment = vi.fn(
       (_eventId: string, _accountId: string, _body: PaymentUpdate) =>
-        new Promise<never>((resolve) => (settle = resolve as () => void)),
+        new Promise<{ attendance: never }>((resolve) => {
+          settle = () => resolve({ attendance: {} as never })
+        }),
     )
     renderPage(
       stub(
