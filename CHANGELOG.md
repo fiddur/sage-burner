@@ -9,6 +9,9 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-08
 
+- **A page that is not yours now offers the application form beside the log-in link.**
+  Somebody sent a link to the burn by a friend, before they have applied, was told only
+  to log in — which is not a door they have.
 - **A change on an admin page cannot be undone by the next click.** The buttons stay
   put until the list has been read back, so a second change made in the moment between
   the two is no longer computed from what was on screen before the first — which could
