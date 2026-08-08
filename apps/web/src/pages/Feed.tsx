@@ -119,11 +119,14 @@ export const Feed = ({ api }: { api: FeedApi }) => {
 /**
  * The same page, about the burn the line belongs to rather than whichever is selected.
  *
- * Split on `#` first: no notification link carries a fragment today, and appending to
- * one would put the query inside it, where it is not a query at all.
+ * Cut at the first `#`: no notification link carries a fragment today, and appending to
+ * one would put the query inside it, where it is not a query at all. `split` would drop
+ * everything past a second `#`.
  */
 const atItsBurn = (link: string, eventId: string) => {
-  const [path = '', fragment] = link.split('#')
+  const hash = link.indexOf('#')
+  const path = hash === -1 ? link : link.slice(0, hash)
+  const fragment = hash === -1 ? undefined : link.slice(hash + 1)
   const joined = `${path}${path.includes('?') ? '&' : '?'}${BURN_PARAM}=${encodeURIComponent(eventId)}`
 
   return fragment === undefined ? joined : `${joined}#${fragment}`

@@ -776,33 +776,6 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
      * is not secret. Per burn since #156 — a summer-only spot is not a lane in the
      * winter grid.
      */
-    /**
-     * Getting to the burn and back (#26). Any approved member, both halves in one list.
-     *
-     * No `version`: an `If-Match` guard is for the fields several people edit at once
-     * (#274), and one of these has exactly one author.
-     */
-    getRides: (eventId: string, signal?: AbortSignal) =>
-      request<RidesResponse>(apiRoutes.getRides.path(eventId), { signal }),
-
-    /** Your own journey. The burn and the poster are the server's, so neither is offered. */
-    addRide: (eventId: string, body: BodyOf<'addRide'>) =>
-      request<{ ride: Ride }>(apiRoutes.addRide.path(eventId), {
-        method: apiRoutes.addRide.method,
-        body,
-      }),
-
-    /** Your own journey, partial — omitted fields are left as they are. */
-    updateRide: (id: string, body: BodyOf<'updateRide'>) =>
-      request<{ ride: Ride }>(apiRoutes.updateRide.path(id), {
-        method: apiRoutes.updateRide.method,
-        body,
-      }),
-
-    /** Your own journey. */
-    deleteRide: (id: string) =>
-      request<undefined>(apiRoutes.deleteRide.path(id), { method: apiRoutes.deleteRide.method }),
-
     getPlaces: (eventId: string, signal?: AbortSignal) =>
       request<PlacesResponse>(apiRoutes.getPlaces.path(eventId), { signal, version: 'places' }),
 
@@ -843,6 +816,33 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
         method: apiRoutes.copyPlaces.method,
         body: { from_event_id: fromEventId } satisfies CopyFrom,
       }),
+
+    /**
+     * Getting to the burn and back (#26). Any approved member, both halves in one list.
+     *
+     * No `version`: an `If-Match` guard is for the fields several people edit at once
+     * (#274), and one of these has exactly one author.
+     */
+    getRides: (eventId: string, signal?: AbortSignal) =>
+      request<RidesResponse>(apiRoutes.getRides.path(eventId), { signal }),
+
+    /** Your own journey. The burn and the poster are the server's, so neither is offered. */
+    addRide: (eventId: string, body: BodyOf<'addRide'>) =>
+      request<{ ride: Ride }>(apiRoutes.addRide.path(eventId), {
+        method: apiRoutes.addRide.method,
+        body,
+      }),
+
+    /** Your own journey, partial — omitted fields are left as they are. */
+    updateRide: (id: string, body: BodyOf<'updateRide'>) =>
+      request<{ ride: Ride }>(apiRoutes.updateRide.path(id), {
+        method: apiRoutes.updateRide.method,
+        body,
+      }),
+
+    /** Your own journey. */
+    deleteRide: (id: string) =>
+      request<undefined>(apiRoutes.deleteRide.path(id), { method: apiRoutes.deleteRide.method }),
 
     /** Public, like the places: nothing in either list is about a person. */
     getEventOptions: (eventId: string, signal?: AbortSignal) =>

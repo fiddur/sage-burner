@@ -75,10 +75,11 @@ export const errorMessage = (failure: unknown, fallback: string) =>
  * otherwise collide silently, and the burn's id joins it so switching burns is not
  * shown one burn's grid under the other's name.
  *
- * `fallback` is optional because two pages have no use for one: `Home` and `Apply`
- * write their own sentence for a failed load and never render `loaded.message`. Absent
- * in the type rather than present as a string saying it is never shown — which is a
- * string a member would see the day somebody did render it.
+ * `fallback` is optional because a page that writes its own sentence for a failed load
+ * never renders `loaded.message`. Absent in the type rather than present as a string
+ * saying it is never shown — which is a string a member would see the day somebody did
+ * render it. Named rather than counted: the list of such pages was already four the day
+ * it was written down as two.
  */
 export const useLoad = <T>(
   fetcher: (signal: AbortSignal) => Promise<T>,

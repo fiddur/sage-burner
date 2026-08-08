@@ -306,11 +306,18 @@ describe('the rideshare board', () => {
 
   it('goes when the burn does, and when the person does', async () => {
     const server = await build()
-    await givenEvent()
+    const eventId = await givenEvent()
     const ada = await givenAccount()
     await post(server, ada.cookie)
 
     await db().delete(account).where(eq(account.id, ada.id))
+
+    expect(await db().select().from(ride)).toEqual([])
+
+    const bob = await givenAccount()
+    await post(server, bob.cookie)
+
+    await db().delete(event).where(eq(event.id, eventId))
 
     expect(await db().select().from(ride)).toEqual([])
   })

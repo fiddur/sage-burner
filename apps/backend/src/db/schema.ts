@@ -477,8 +477,9 @@ export const ride = sqliteTable(
   },
   (table) => [
     primaryKey({ columns: [table.id] }),
-    // The one way the board reads: a burn's rows, oldest first within each half.
-    index('ride_event_idx').on(table.event_id, table.kind, table.created_at),
+    // The one way the board reads: a burn's rows, oldest first. The halving is the
+    // browser's, so `kind` in the middle would only stop the index serving the order.
+    index('ride_event_idx').on(table.event_id, table.created_at),
     // For the cascade, which without it scans once per row of the account going.
     index('ride_account_idx').on(table.account_id),
     check('ride_kind_check', oneOf(table.kind, rideKinds)),

@@ -782,16 +782,53 @@ describe('helping with a dream', () => {
     expect(response.json().session.helpers).toEqual([])
   })
 
-  it('refuses a member who is not coming to that burn', async () => {
-    // A 400, not a 403: they are a member in good standing; the pairing is wrong.
+  it('lets somebody organising but not coming put a pair of hands down (#350)', async () => {
+    // Arranging the burn is a job you can hold without attending it, and the lead-roles
+    // register has always let any approved account appoint. The 👉 on this strip used to
+    // be a button that always failed.
+    const server = await build()
+    const eventId = await givenEvent()
+    const organiser = await givenAccount(['admin'])
+    const ada = await givenAttending(eventId)
+    await db().update(account).set({ name: 'Ada' }).where(eq(account.id, ada.id))
+    const id = (await offer(server, ada.cookie, { title: 'Sunrise yoga' })).json().session.id
+
+    const put = await helping(server, organiser, id, 'POST', ada.id)
+
+    expect(put.statusCode).toBe(200)
+    expect(put.json().session.helpers).toEqual([{ account_id: ada.id, name: 'Ada' }])
+
+    const off = await helping(server, organiser, id, 'DELETE', ada.id)
+
+    expect(off.statusCode).toBe(200)
+    expect(off.json().session.helpers).toEqual([])
+  })
+
+  it('still refuses to put down somebody who is not coming', async () => {
+    // The other half of #350: the caller's attendance stopped mattering, the named
+    // person's did not — a dream is run by people who are there.
+    const server = await build()
+    const eventId = await givenEvent()
+    const organiser = await givenAccount(['admin'])
+    const elsewhere = await givenAccount(['member'])
+    const coming = await givenAttending(eventId)
+    const id = (await offer(server, coming.cookie, { title: 'Sunrise yoga' })).json().session.id
+
+    expect((await helping(server, organiser, id, 'POST', elsewhere.id)).statusCode).toBe(400)
+    expect((await helping(server, organiser, id, 'DELETE', elsewhere.id)).statusCode).toBe(400)
+  })
+
+  it('refuses a heart from a member who is not coming to that burn', async () => {
+    // A 400, not a 403: they are a member in good standing; the pairing is wrong. A
+    // heart is keyed by the caller's own attendance, so unlike appointing it needs one.
     const server = await build()
     await givenEvent()
     const elsewhere = await givenAccount(['member'])
     const coming = await givenAttending(OPEN_BURN)
     const id = (await offer(server, coming.cookie, { title: 'Sunrise yoga' })).json().session.id
 
-    expect((await helping(server, elsewhere, id, 'POST')).statusCode).toBe(400)
     expect((await selfService(server, elsewhere.cookie, id, 'support', 'POST')).statusCode).toBe(400)
+    expect((await selfService(server, elsewhere.cookie, id, 'support', 'DELETE')).statusCode).toBe(400)
   })
 
   it('refuses a dream that does not exist, and one at a burn that has ended', async () => {
@@ -820,10 +857,11 @@ describe('helping with a dream', () => {
     expect((await selfService(server, applicant.cookie, id, 'support', 'POST')).statusCode).toBe(403)
   })
 
-  it('tells an organiser who is not coming that they are not coming, rather than refusing the role', async () => {
-    // The guard opens to `approved` (#200), and the attendance check behind it still
-    // does its job — a hand put up on a burn nobody said they were attending is the
-    // pairing being wrong, not the account being unwelcome.
+  it('tells an organiser putting their own hand up that they are not coming, rather than refusing the role', async () => {
+    // The guard opens to `approved` (#200), and the named person's attendance still
+    // does its job — here the organiser names themselves, so a hand put up on a burn
+    // nobody said they were attending is the pairing being wrong, not the account
+    // being unwelcome. Naming somebody who *is* coming works, which is #350.
     const server = await build()
     const eventId = await givenEvent()
     const ada = await givenAttending(eventId)

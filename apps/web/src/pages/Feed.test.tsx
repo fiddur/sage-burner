@@ -90,6 +90,14 @@ describe('what everyone has been doing', () => {
     expect(link.getAttribute('href')).toBe('/schedule?burn=e-1#s-1')
   })
 
+  it('keeps everything past a second # rather than dropping it', async () => {
+    // Also none today. `split('#')` kept the first two pieces and threw the rest away.
+    renderPage(stub({}, [aLine({ id: 'x-1', body: 'Ada offered a dream: Sauna', link: '/schedule#s-1#b' })]))
+
+    const link = await screen.findByRole('link', { name: 'Ada offered a dream: Sauna' })
+    expect(link.getAttribute('href')).toBe('/schedule?burn=e-1#s-1#b')
+  })
+
   it('keeps a query the link already had', async () => {
     // None carries one today. The joiner is a `&` rather than a second `?` so that
     // stays true of a link somebody adds rather than of this one.
