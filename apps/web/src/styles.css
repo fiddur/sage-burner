@@ -1143,8 +1143,8 @@ a:hover {
 /*
   Over the timetable rather than beside it — the grid is as wide as the screen — and
   above the bottom bar, which is the whole of why this is 40 (#344). The scale:
-  bar 20, popdown 30, ☰'s backdrop 34 and its drawer 35, modal 40. `docs/the-app.md` says what happened
-  when two of them shared a number.
+  bar 20, popdown 30, ☰'s backdrop 34 and its drawer 35, modal 40. `docs/the-app.md`
+  says what happened when two of them shared a number.
 */
 .dream-modal {
   position: fixed;

@@ -157,16 +157,16 @@ Below `45rem` the six pages move to a **fixed bar along the bottom**, one icon e
 | -------- | ------- | -------- | ----- | ----- | --- |
 | Going on | Members | Schedule | Leads | Meals | FAQ |
 
-The topbar keeps the brand, the burn selector and the three things that are about the
-session rather than any page — the bell, ⚙️ and the face — and scrolls away with the
-content as it always has. A signed-out visitor gets no bottom bar: Apply and Log in
+The topbar keeps the brand, ☰, the burn selector and the three things that are about
+the session rather than any page — the bell, ⚙️ and the face — and scrolls away with
+the content as it always has. A signed-out visitor gets no bottom bar: Apply and Log in
 are two entries and fit where they are, and a bar of six pages none of them may open
 would be six refusals.
 
 **Six is the ceiling**, not a coincidence: six by ~3.5rem fits a 360px phone and
 nothing wider does. The pages still to come — the map (#315), the bring list (#24),
-Leave No Trace (#29), rideshare (#26), music (#316) — will have to hang off one of
-these rather than take a seventh seat.
+Leave No Trace (#29), music (#316) — go behind ☰ rather than take a seventh seat, which
+is what ☰ was built for and where rideshares (#26) already are.
 
 The entries are **one list in `Layout.tsx`**, drawn as words on a wide screen and as
 icons here, so the two cannot come to offer different pages. Which layout is drawn is

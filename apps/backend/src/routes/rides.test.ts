@@ -310,12 +310,19 @@ describe('the rideshare board', () => {
     const ada = await givenAccount()
     await post(server, ada.cookie)
 
+    // Asserted before each delete as well as after: without it both `toEqual([])`
+    // hold just as well for a `post` that started answering 4xx, and the cascade
+    // would be the one thing the test is not measuring.
+    expect(await db().select().from(ride)).toHaveLength(1)
+
     await db().delete(account).where(eq(account.id, ada.id))
 
     expect(await db().select().from(ride)).toEqual([])
 
     const bob = await givenAccount()
     await post(server, bob.cookie)
+
+    expect(await db().select().from(ride)).toHaveLength(1)
 
     await db().delete(event).where(eq(event.id, eventId))
 

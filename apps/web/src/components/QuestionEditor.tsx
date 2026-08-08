@@ -114,7 +114,7 @@ export const QuestionEditor = ({ api }: { api: QuestionsApi }) => {
   //
   // Awaited, which is why this keeps its own loop rather than `useLoad`/`useAction`
   // (#175): the branches below need to tell "saved, but could not reload" from "the
-  // write failed", and `reload()` returns nothing.
+  // write failed", and `reload()` resolves either way.
   const refresh = async () => {
     const response = await api.getQuestions()
     setLoaded({ status: 'ready', questions: response.questions })

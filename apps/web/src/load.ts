@@ -78,8 +78,7 @@ export const errorMessage = (failure: unknown, fallback: string) =>
  * `fallback` is optional because a page that writes its own sentence for a failed load
  * never renders `loaded.message`. Absent in the type rather than present as a string
  * saying it is never shown — which is a string a member would see the day somebody did
- * render it. Named rather than counted: the list of such pages was already four the day
- * it was written down as two.
+ * render it. Named rather than counted, so it cannot go one page stale.
  */
 export const useLoad = <T>(
   fetcher: (signal: AbortSignal) => Promise<T>,
@@ -290,11 +289,6 @@ export const useAction = (onSuccess?: () => void | Promise<void>) => {
 
   return {
     busy,
-    /**
-     * Which row is being written, for a list where only one should say so — the
-     * argument `run` was given, and only when it actually started. A refused click used
-     * to leave the page's own state on a row nothing was happening to.
-     */
     busyWith: active?.tag,
     error: problem.message,
     failure: problem.failure,

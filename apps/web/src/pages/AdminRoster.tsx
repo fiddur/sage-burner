@@ -56,8 +56,9 @@ export const AdminRoster = ({ api }: { api: RosterApi }) => {
 
   // Reloaded rather than patched in place: paying re-sorts the whole list and can
   // move someone else across the waiting line.
-  // `busyWith` is the row, not a boolean: only the person being recorded should show it.
-  const { busyWith, error, run } = useAction(reload)
+  // Every box, not just the one clicked: a controlled checkbox that `run` refuses keeps
+  // the tick the browser drew, since nothing re-renders to put it back (#369).
+  const { busy, error, run } = useAction(reload)
 
   const record = (eventId: string, entry: RosterEntry, paid: boolean) => {
     // The date is the server's to stamp, from its own clock: a browser's idea of
@@ -66,7 +67,6 @@ export const AdminRoster = ({ api }: { api: RosterApi }) => {
     run(
       () => api.setPayment(eventId, entry.account_id, { payment_status: paid ? 'paid' : 'unpaid' }),
       'Could not record that. Please try again.',
-      entry.account_id,
     )
   }
 
@@ -149,7 +149,7 @@ export const AdminRoster = ({ api }: { api: RosterApi }) => {
                           <input
                             type="checkbox"
                             checked={entry.payment_status === 'paid'}
-                            disabled={busyWith === entry.account_id}
+                            disabled={busy}
                             aria-label={`Paid — ${entry.name ?? entry.email}`}
                             onChange={(changeEvent) =>
                               void record(roster.event?.id ?? '', entry, changeEvent.currentTarget.checked)
