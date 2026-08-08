@@ -21,15 +21,7 @@ export const installationSchema = z.object({
    * a banner at all — without a request that 404s in the ordinary case.
    */
   banner_updated_at: dateTimeSchema.nullable(),
-  /**
-   * The same, for the app icon — so the one `?v=` the manifest quotes is the one the
-   * settings page quotes too (#376).
-   *
-   * Without it that page opened at a literal `?v=current`, which is a second live URL
-   * for one picture: the offline cache keeps the newest versioned spelling per path,
-   * so the two evicted each other, and the preview could show what somebody else's
-   * upload had replaced.
-   */
+  /** The same for the app icon, which every caller spells through `iconSrc` (#376). */
   icon_updated_at: dateTimeSchema.nullable(),
   /**
    * Whether an SMTP server has been set up, and nothing else about it (#30).

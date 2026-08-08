@@ -1,4 +1,4 @@
-import { apiRoutes } from '@sage-burner/shared'
+import { iconSrc } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -49,9 +49,6 @@ export const messageForFailure = (failure: unknown): string => {
 export const IconField = ({ api }: { api: IconApi }) => {
   const stored = useInstallationIcon()
   const setStored = useSetInstallationIcon()
-  // `default` is the manifest's word for "nobody has uploaded one", so the two agree
-  // before an upload as well as after.
-  const version = stored ?? 'default'
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | undefined>(undefined)
 
@@ -88,7 +85,7 @@ export const IconField = ({ api }: { api: IconApi }) => {
       <p class="row">
         <img
           class="app-icon"
-          src={`${apiRoutes.getInstallationIcon.path()}?v=${version}`}
+          src={iconSrc(stored ?? null)}
           alt="This installation's app icon"
           width={64}
           height={64}
@@ -99,7 +96,7 @@ export const IconField = ({ api }: { api: IconApi }) => {
             way to see beforehand what it takes off the corners. */}
         <img
           class="app-icon app-icon-masked"
-          src={`${apiRoutes.getInstallationIcon.path()}?v=${version}`}
+          src={iconSrc(stored ?? null)}
           alt="The same icon as a home screen will cut it"
           width={64}
           height={64}

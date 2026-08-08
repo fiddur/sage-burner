@@ -1,4 +1,4 @@
-import { apiRoutes } from '@sage-burner/shared'
+import { bannerSrc } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -75,11 +75,7 @@ export const BannerField = ({ api }: { api: BannerApi }) => {
       <span>The picture a shared link shows</span>
 
       {banner !== undefined && banner !== null && (
-        <img
-          class="banner-preview"
-          src={`${apiRoutes.getInstallationBanner.path()}?v=${encodeURIComponent(banner)}`}
-          alt="The banner as it is now"
-        />
+        <img class="banner-preview" src={bannerSrc(banner)} alt="The banner as it is now" />
       )}
 
       <p class="row">

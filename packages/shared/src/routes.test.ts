@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { ApiRoute, RouteKey } from './routes.ts'
 
-import { apiRoutes } from './routes.ts'
+import { apiRoutes, bannerSrc, iconSrc } from './routes.ts'
 
 const keys = Object.keys(apiRoutes) as RouteKey[]
 
@@ -72,5 +72,24 @@ describe('the route manifest', () => {
       expect(seen.has(pair), pair).toBe(false)
       seen.add(pair)
     }
+  })
+})
+
+describe('the installation pictures, which several callers have to spell alike', () => {
+  it('builds one URL for the icon, encoded, whoever is asking', () => {
+    // Four spellings of one picture reached `develop` before this existed (#376, #378),
+    // and two *versioned* ones under a path evict each other in the offline cache.
+    expect(iconSrc('2026-08-01T00:00:00.000Z')).toBe('/api/installation/icon?v=2026-08-01T00%3A00%3A00.000Z')
+  })
+
+  it('says default for an installation nobody has uploaded an icon to', () => {
+    // The manifest names an icon unconditionally — the route answers the app's flame.
+    expect(iconSrc(null)).toBe('/api/installation/icon?v=default')
+  })
+
+  it('has no such word for the banner, which is there or is not', () => {
+    expect(bannerSrc('2026-08-01T00:00:00.000Z')).toBe(
+      '/api/installation/banner?v=2026-08-01T00%3A00%3A00.000Z',
+    )
   })
 })

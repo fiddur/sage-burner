@@ -1,6 +1,6 @@
 import type { Event } from '@sage-burner/shared'
 
-import { apiRoutes, BANNER_HEIGHT, BANNER_WIDTH, MAX_WELCOME_LENGTH } from '@sage-burner/shared'
+import { BANNER_HEIGHT, BANNER_WIDTH, bannerSrc, MAX_WELCOME_LENGTH } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -34,13 +34,7 @@ export type HomeApi = Pick<ApiClient, 'getActiveEvent' | 'updateWelcome'>
  */
 const Banner = ({ version }: { version?: string | null }) =>
   version === undefined || version === null ? null : (
-    <img
-      class="burn-banner"
-      src={`${apiRoutes.getInstallationBanner.path()}?v=${encodeURIComponent(version)}`}
-      alt=""
-      width={BANNER_WIDTH}
-      height={BANNER_HEIGHT}
-    />
+    <img class="burn-banner" src={bannerSrc(version)} alt="" width={BANNER_WIDTH} height={BANNER_HEIGHT} />
   )
 
 /**

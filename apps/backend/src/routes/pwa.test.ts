@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 
-import { flameIcon, MAX_ICON_BYTES } from '@sage-burner/shared'
+import { flameIcon, iconSrc, MAX_ICON_BYTES } from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -143,7 +143,7 @@ describe('the web manifest', () => {
     expect((await putIcon(server, root.cookie, PNG)).statusCode).toBe(200)
 
     const after = (await getManifest(server)).json()
-    expect(after.icons[0].src).toBe(`/api/installation/icon?v=${NOW}`)
+    expect(after.icons[0].src).toBe(`/api/installation/icon?v=${encodeURIComponent(NOW)}`)
     expect(after.icons[0]).toMatchObject({ type: 'image/png', sizes: '512x512' })
   })
 
@@ -160,7 +160,9 @@ describe('the web manifest', () => {
 
     const said = (await getInstallation(server)).json().installation.icon_updated_at
     expect(said).toBe(NOW)
-    expect((await getManifest(server)).json().icons[0].src).toBe(`/api/installation/icon?v=${said}`)
+    // Through the shared builder, since agreement is the property — the manifest, the
+    // settings page and the share card all go through it now (#378).
+    expect((await getManifest(server)).json().icons[0].src).toBe(iconSrc(said))
   })
 
   it('offers an uploaded icon as maskable, so Android does not plate it in white', async () => {
