@@ -66,9 +66,10 @@ export const NotificationBell = ({ api }: { api: BellApi }) => {
       controller.abort()
       clearInterval(timer)
     }
-    // On the path as well as the client: reading `/notifications` marks everything
-    // seen from there, and without this the bubble would sit on a count of nothing
-    // for up to a minute afterwards.
+    // On the path as well as the client, so leaving `/notifications` re-reads a count
+    // that page has just zeroed. It does not clear the bubble *while* the page is
+    // being read: this fires as the route changes, before the page's own effect has
+    // posted anything.
   }, [api, path])
 
   // On the boolean, not the count. Keyed by `unseen`, going from one to two re-ran
@@ -135,11 +136,17 @@ export const NotificationBell = ({ api }: { api: BellApi }) => {
 
   const follow = (click: MouseEvent) => {
     if (phone) return
-    // A new tab, a new window, or the middle button: all of them mean the page rather
-    // than a panel in a document the reader is about to leave behind.
-    if (click.metaKey || click.ctrlKey || click.shiftKey || click.altKey || click.button !== 0) return
+    // A new tab or a new window means the page, not a panel in a document the reader
+    // is about to leave behind.
+    if (click.metaKey || click.ctrlKey || click.shiftKey || click.altKey) return
 
+    // Both, and the second is the load-bearing one. `preact-iso` listens for clicks on
+    // `window` and its handler never looks at `defaultPrevented`, so `preventDefault`
+    // alone stopped the browser navigating and left the router pushing
+    // `/notifications` regardless — a panel over a page nobody asked for, and
+    // `markNotificationsSeen` sent twice.
     click.preventDefault()
+    click.stopPropagation()
     toggle()
   }
 

@@ -1,6 +1,7 @@
 import type { Notification } from '@sage-burner/shared'
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
+import { LocationProvider, useLocation } from 'preact-iso'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { BellApi } from './NotificationBell.tsx'
@@ -11,6 +12,8 @@ import { NotificationBell } from './NotificationBell.tsx'
 afterEach(cleanup)
 // The viewport belongs to the window, which outlives one test.
 afterEach(onADesktop)
+// So does the history, and the router pushes to it.
+afterEach(() => history.replaceState(null, '', '/'))
 
 const one = (over: Partial<Notification> = {}): Notification => ({
   id: 'n-1',
@@ -221,6 +224,52 @@ describe('the bell', () => {
       // document they are leaving is not it.
       fireEvent.click(await withOne(), { metaKey: true })
 
+      expect(screen.queryByText('You are on helper for Dinner')).toBeNull()
+    })
+
+    /**
+     * The bell under the router that is actually around it in the app.
+     *
+     * The suite above renders it bare, which is where the defect hid: `preact-iso`
+     * listens for clicks on `window` and its handler does not look at
+     * `defaultPrevented` — so `preventDefault` alone stopped the browser navigating
+     * and did nothing at all about the router, which pushed `/notifications` anyway.
+     * A panel over a page nobody asked for, and `markNotificationsSeen` twice.
+     */
+    const underTheRouter = async () => {
+      const Where = () => <p data-testid="where">{useLocation().path}</p>
+
+      render(
+        <LocationProvider>
+          <NotificationBell
+            api={stub({
+              getMyNotifications: () =>
+                Promise.resolve({
+                  notifications: [one({ seen_at: '2026-08-06T11:00:00.000Z' })],
+                  unseen: 0,
+                }),
+            })}
+          />
+          <Where />
+        </LocationProvider>,
+      )
+
+      return await screen.findByRole('link', { name: 'Notifications' })
+    }
+
+    it('opens the panel where it is a panel, and stays on the page it is on', async () => {
+      fireEvent.click(await underTheRouter())
+
+      expect(await screen.findByText('You are on helper for Dinner')).toBeTruthy()
+      expect(screen.getByTestId('where').textContent).toBe('/')
+    })
+
+    it('lets the router have the click on a phone, which is the whole point of the href', async () => {
+      onAPhone()
+
+      fireEvent.click(await underTheRouter())
+
+      await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/notifications'))
       expect(screen.queryByText('You are on helper for Dinner')).toBeNull()
     })
 

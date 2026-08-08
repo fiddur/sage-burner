@@ -226,17 +226,8 @@ a:hover {
   max-width: var(--measure);
 }
 
-/*
-  The phone's nav (#337): one icon per page, held along the bottom.
-
-  Nine entries did not fit a phone's width and the header wrapped to three rows rather
-  than saying so — which is also what put the bell's panel off-screen. The six pages
-  come down here and the topbar keeps what is about the session rather than a page.
-
-  Always visible. Hiding it on scroll down is #340, and it is the half that is easy to
-  ship subtly wrong: the two pages that most want the vertical room scroll internally,
-  so `window` never fires on exactly the pages it was for.
-*/
+/* The phone's nav (#337) — `docs/the-app.md` has the shape and the why. Always
+   visible; hiding it on scroll down is #340. */
 .bottom-bar {
   position: fixed;
   inset-inline: 0;
@@ -261,10 +252,6 @@ a:hover {
   text-decoration: none;
 }
 
-/*
-  Where you are. A bar with nothing lit offers six equally plausible places, and the
-  page's own heading is off the top of anything that has been scrolled.
-*/
 .bottom-tab.is-current {
   border-top: 2px solid var(--ember);
   background: color-mix(in srgb, var(--ember) 10%, transparent);
@@ -1880,6 +1867,6 @@ img.avatar {
   margin: 0.1rem 0 0;
   color: var(--muted);
   font-size: 0.8rem;
-  /* The date is never the new part; the line above it is. */
+  /* `.is-new` bolds the row; the date is not the part that is new. */
   font-weight: 400;
 }

@@ -15,7 +15,6 @@ import { NotificationBell } from './NotificationBell.tsx'
 interface NavPage {
   href: string
   label: string
-  /** The face it wears in the bottom bar. `label` is its name in both. */
   icon: string
 }
 
@@ -23,13 +22,10 @@ interface NavPage {
  * The pages an approved member moves between — words in the bar on a wide screen,
  * icons in the bottom bar on a phone (#337).
  *
- * One list, drawn twice, so the two cannot come to offer different pages. Six is the
- * ceiling the bottom bar sets: six by ~3.5rem fits a 360px phone and nothing wider
- * fits beside it, so the pages still to come — the map, the bring list, Leave No
- * Trace — will have to hang off one of these rather than take a seventh seat.
- *
- * Going on is first for the reason it is first on a desktop: it answers the question
- * somebody opening the app between burns has, which is whether anything is happening.
+ * One list, drawn twice, so the two cannot come to offer different pages. **Six is the
+ * ceiling**: six by ~3.5rem fits a 360px phone and nothing wider fits beside it, so a
+ * seventh page has to hang off one of these rather than take a seat.
+ * `docs/the-app.md` has the rest, including why Going on is first.
  */
 const memberPages: readonly NavPage[] = [
   { href: '/going-on', label: 'Going on', icon: '📜' },
@@ -54,11 +50,8 @@ const memberPages: readonly NavPage[] = [
  * the lanes are what the grid draws; the lodging list from Your burn, beside the
  * question it answers. Somebody organising but not attending reaches both from ⚙️.
  *
- * **On a phone the six move to a fixed bar along the bottom** (#337). Nine entries do
- * not fit a phone's width, and the header wrapped to three rows rather than saying so.
- * The topbar keeps the brand, the burn selector and the three things that are about
- * the session rather than a page — the bell, ⚙️ and the face — and scrolls away with
- * the content as it always has.
+ * **On a phone the six move to a fixed bar along the bottom** (#337), and the topbar
+ * keeps what is about the session rather than a page.
  *
  * Every entry here is a **place**, which is why signing out is not among them: it is
  * an action, and it lives beside the sentence naming the account it ends.
@@ -126,12 +119,10 @@ export const Layout = ({ api, children }: { api: BellApi; children: ComponentChi
 }
 
 /**
- * The bar across the top: the pages as words, and the three things that are about
- * the session rather than any page.
+ * The bar across the top: the pages as words, and the bell, ⚙️ and the face.
  *
- * `pages` is empty when the bottom bar has them, which is the whole of the mobile
- * split — the bell, ⚙️ and the face are here on every viewport, because none of them
- * is a place and a bar of six places is already full.
+ * `pages` is empty when the bottom bar has them, which is the whole of the split. The
+ * other three stay here on every viewport, none of them being a place.
  */
 const TopNav = ({ api, pages }: { api: BellApi; pages: readonly NavPage[] }) => {
   const viewer = useViewer()
@@ -177,11 +168,9 @@ const TopNav = ({ api, pages }: { api: BellApi; pages: readonly NavPage[] }) => 
  * The phone's nav: one icon per page, fixed along the bottom.
  *
  * Named rather than lettered — an emoji is not a word, so each carries the label the
- * bar spells out on a wide screen, which is also what a screen reader reads and what
- * a long press shows.
- *
- * `aria-current` marks where you are. A tab bar with nothing lit says six equally
- * plausible places, and the page heading is off the top of a scrolled page.
+ * bar spells out on a wide screen, which is what a screen reader reads and what a long
+ * press shows. `aria-current` marks where you are, since a scrolled page has its own
+ * heading off the top.
  */
 const BottomBar = ({ pages }: { pages: readonly NavPage[] }) => {
   const { path } = useLocation()
