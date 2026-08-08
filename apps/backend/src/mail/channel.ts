@@ -18,16 +18,16 @@ import { absolute, notificationMessage } from './messages.ts'
  * because an admin who sets them up should not have to restart the container.
  */
 
-/**
- * Where a link in an email can point.
- *
- * `PUBLIC_ORIGIN` and nothing else. An email is read outside the app, so a relative
- * path is no use — and unlike the share card, which is built inside a request and can
- * read `Host`, this runs from wherever a role was handed out. An installation that
- * has not named its address gets messages that say what happened and stop there,
- * which is why the README asks for one alongside email.
- */
 export interface ChannelDeps extends MailDeps {
+  /**
+   * Where a link in an email can point.
+   *
+   * `PUBLIC_ORIGIN` and nothing else. An email is read outside the app, so a relative
+   * path is no use — and unlike the share card, which is built inside a request and
+   * can read `Host`, this runs from wherever a role was handed out. An installation
+   * that has not named its address gets messages that say what happened and stop
+   * there, which is why the README asks for one alongside email.
+   */
   origin?: string
   log: (posted: Posted, accountId: string) => void
 }
@@ -44,9 +44,8 @@ const titleOf = async (db: Database): Promise<string> => {
 
 export const emailChannel = (deps: ChannelDeps): EmailChannel => {
   return async (accountId, told) => {
-    // Before anything else, and cheap: nearly every installation has no mail server,
-    // and the alternative is two more reads per notification to build a message
-    // nothing can post.
+    // First, because nearly every installation has no mail server and the two reads
+    // below would then be building a message nothing can post.
     if ((await mailSettingsFor(deps.db)) === undefined) return
 
     const [who] = await deps.db

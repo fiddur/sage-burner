@@ -59,24 +59,18 @@ export const registerMailRoutes = (app: FastifyInstance, { db, sessions, mail, n
       .where(eq(mailSetting.id, INSTALLATION_ID))
       .limit(1)
 
+    const row = {
+      ...settings,
+      // Absent leaves what is stored — and, on a first save, is empty rather than an
+      // error: a relay on the same machine may authenticate by network alone.
+      password: password ?? held?.password ?? '',
+      updated_at: now().toISOString(),
+    }
+
     await db
       .insert(mailSetting)
-      .values({
-        id: INSTALLATION_ID,
-        ...settings,
-        // Absent leaves what is stored — and, on a first save, is empty rather than
-        // an error: a relay on the same machine may authenticate by network alone.
-        password: password ?? held?.password ?? '',
-        updated_at: now().toISOString(),
-      })
-      .onConflictDoUpdate({
-        target: mailSetting.id,
-        set: {
-          ...settings,
-          password: password ?? held?.password ?? '',
-          updated_at: now().toISOString(),
-        },
-      })
+      .values({ id: INSTALLATION_ID, ...row })
+      .onConflictDoUpdate({ target: mailSetting.id, set: row })
 
     return { mail: await current() } satisfies MailSettingsResponse
   })

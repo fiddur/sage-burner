@@ -229,7 +229,7 @@ export const mailSetting = sqliteTable(
     username: text('username').notNull(),
     password: text('password').notNull(),
     from_email: text('from_email').notNull(),
-    /** Empty falls back to what the installation calls itself. */
+    /** The name beside `from_email`, or empty for the bare address. */
     from_name: text('from_name').notNull(),
     updated_at: text('updated_at').notNull(),
   },

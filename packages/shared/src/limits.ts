@@ -79,8 +79,8 @@ export const MAX_SMTP_PASSWORD = 500
  * An email address.
  *
  * 254 rather than RFC 5321's 320: that is the length of a path in an SMTP envelope,
- * angle brackets included, and 254 is what the address inside one can be. Same bound
- * as `emailSchema`, which is what actually refuses one.
+ * angle brackets included, and 254 is what the address inside one can be. This is the
+ * number `emailSchema` bounds by, rather than a second copy of it beside one.
  */
 export const MAX_EMAIL = 254
 

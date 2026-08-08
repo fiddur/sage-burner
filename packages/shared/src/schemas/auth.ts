@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { accountRoles } from '../enums.ts'
+import { MAX_EMAIL } from '../limits.ts'
 import { idSchema } from './common.ts'
 
 /**
@@ -12,7 +13,7 @@ import { idSchema } from './common.ts'
  * and memberships. The CHECK constraint in the database catches a wrong *write*
  * but cannot fix a wrong *lookup*, which is the half that silently fails login.
  */
-export const emailSchema = z.string().trim().toLowerCase().pipe(z.email().max(254))
+export const emailSchema = z.string().trim().toLowerCase().pipe(z.email().max(MAX_EMAIL))
 
 /**
  * A password at login, not at registration.
