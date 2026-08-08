@@ -144,7 +144,33 @@ describe('the nav', () => {
   })
 })
 
-describe('the menu beside the logo', () => {
+describe('the shape of the bar', () => {
+  it('opens with ☰, at the edge its drawer comes from', () => {
+    renderNav(signedInAs('member'))
+
+    const bar = document.querySelector('.site-header')
+
+    expect([...(bar?.children ?? [])].map((child) => child.className)).toEqual([
+      'menu-wrap',
+      'brand',
+      'top-nav',
+    ])
+  })
+
+  it('holds the bell, ⚙️ and the face in one group a narrow bar cannot break up', () => {
+    renderNav(signedInAs('admin', 'member'))
+
+    const group = document.querySelector('.nav-session')
+
+    expect([...(group?.children ?? [])].map((child) => child.className)).toEqual([
+      'bell-wrap',
+      'nav-icon',
+      'nav-icon',
+    ])
+  })
+})
+
+describe('the menu at the edge of the bar', () => {
   it('carries the pages the bar has no room for', async () => {
     renderNav(signedInAs('member'))
 

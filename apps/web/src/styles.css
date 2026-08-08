@@ -76,13 +76,23 @@ a:hover {
 }
 
 /* `relative` so the bell's panel can hang off this rather than off the bell — see
-   `.bell-panel`, which is what stopped it opening off the side of the screen. */
+   `.bell-panel`, which is what stopped it opening off the side of the screen.
+
+   It **wraps above 45rem and not below**, which is where the six page words are: a
+   bar too narrow for words and corner together drops the nav whole to a second row,
+   and the corner goes with it. On a phone the words are in the bottom bar, so the
+   only thing left to drop is the corner itself — which is what it did, under the
+   logo, and what the phone block below stops.
+
+   `align-items: center` rather than `baseline`: nothing in the row is a line of text
+   any more — a mark, a select, a bell and a circle — and the name has to be able to
+   run out of room, which takes an `overflow` that has no baseline to give. */
 .site-header {
   position: relative;
   display: flex;
   flex-wrap: wrap;
   gap: 1rem;
-  align-items: baseline;
+  align-items: center;
   justify-content: flex-start;
   padding: 1rem clamp(1rem, 5vw, 3rem);
   border-bottom: 1px solid var(--line);
@@ -90,8 +100,9 @@ a:hover {
 
 .brand {
   display: inline-flex;
+  min-width: 0;
   gap: 0.5rem;
-  align-items: baseline;
+  align-items: center;
   font-size: 1.25rem;
   font-weight: 700;
   color: var(--ink);
@@ -102,15 +113,23 @@ a:hover {
    logo may declare no size at all. The rounding is so an icon with its own
    background reads as a mark rather than as a picture that failed to fit. */
 .brand-mark {
-  align-self: center;
+  flex: none;
   width: 1.75rem;
   height: 1.75rem;
   object-fit: contain;
   border-radius: 0.35rem;
 }
 
+/* The one thing in the bar that may be cut off. `min-width: 0` as well as the
+   ellipsis: a flex item's floor is its own content, so without it a long name pushes
+   the corner off the screen instead of shortening — at 360px, measured, far enough
+   that the page scrolls sideways. */
 .brand-name {
+  min-width: 0;
+  overflow: hidden;
   letter-spacing: 0.01em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 /* `margin-inline-start: auto` rather than `space-between` on the bar: the bar's
@@ -131,9 +150,52 @@ a:hover {
   font-size: 0.95rem;
 }
 
+/* 🔔, ⚙️ and the face, as one thing. The nav's words wrap when they must; these
+   three are the session rather than a page, they are where a hand goes without
+   looking, and one of them arriving on a row of its own is what this stops. */
+.nav-session {
+  display: flex;
+  flex: none;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+/* Shrinkable, since a burn's name is as long as somebody wanted it: with the bar on
+   one row, an unshrinkable select would push the corner off a phone. */
 .burn-selector {
+  min-width: 0;
   font-family: ui-sans-serif, system-ui, sans-serif;
   font-size: 0.95rem;
+}
+
+/*
+  The phone's bar, on one row.
+
+  Here the pages are in the bottom bar, so the bar is ☰, the logo, the burn selector
+  and the corner — and wrapping had nothing to drop but the corner, which went under
+  the logo with the whole right half of the row left empty. Nothing may wrap, and the
+  installation's name gives way instead: it is the one thing in the row that is a
+  label rather than a control.
+
+  The tighter gaps are what keeps an ordinary name whole. Measured in Chromium with
+  an admin's three icons and "The Burning Sage": at 390px the wide gaps leave the
+  name 1.8rem over and reading "The Burning Sa…", where these fit it whole with
+  0.2rem to spare. At 360px it is cut either way — by 1.5rem here — and the page
+  still does not scroll sideways.
+
+  The 45rem is `viewport.ts`'s `PHONE` — any change has to move both.
+*/
+@media (max-width: 45rem) {
+  .site-header {
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+  }
+
+  .top-nav,
+  .nav-session {
+    gap: 0.75rem;
+  }
 }
 
 /* Off-screen but read aloud. The circle shows letters; a screen reader needs the name. */
@@ -244,7 +306,7 @@ a:hover {
    `docs/the-app.md` says why that is not a taste question. */
 .menu-wrap {
   display: inline-flex;
-  align-self: center;
+  flex: none;
 }
 
 .menu-button {
