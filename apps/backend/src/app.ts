@@ -129,37 +129,22 @@ const isApiRequest = (pathname: string) => pathname === API_PREFIX || pathname.s
 /**
  * A request for a file rather than a client-side route.
  *
- * The distinction matters because Vite emits content-hashed chunks and
- * Watchtower swaps the image under live clients — so a page on the previous
- * build will ask for a chunk that no longer exists. Answering that with the
- * HTML shell and a 200 produces `Failed to load module script: Expected a
- * JavaScript module script but the server responded with a MIME type of
- * text/html`, which is much worse to debug than a 404.
+ * A page on the previous build asks for a chunk Watchtower has swapped away; answering
+ * that with the shell and a 200 produces a MIME-type error much worse to debug than a
+ * 404.
  *
- * **This is a rule, not a description: any path whose last segment contains a
- * dot is treated as a file and 404s.** So client-side routes must not embed
- * one — no filenames, no email addresses in a path, and in particular invite
- * tokens must be dot-free for `/invite/:token` to resolve.
- *
- * One wrinkle: `path.extname('/.env')` is `''`, so a dotfile-shaped path gets
- * the shell rather than a 404. Harmless — the static glob skips dotfiles, so
- * there is nothing to serve either way — but the rule is "has an extension",
- * not "contains a dot".
+ * **A rule, not a description: any path whose last segment has an extension 404s.** So
+ * client-side routes must not embed one — in particular invite tokens must be dot-free
+ * for `/invite/:token` to resolve.
  */
 const looksLikeAsset = (pathname: string) => path.extname(pathname) !== ''
 
 /**
  * Refuse to start on a web root that cannot serve the app.
  *
- * `@fastify/static` only *warns* on a missing root and returns, and with
- * `wildcard: false` it globs the directory once at registration — so an absent,
- * empty, or wrong root registers zero routes and the app comes up serving
- * nothing. `/api/version` keeps answering, so the container healthcheck stays
- * green while the entire frontend 404s: a typo'd variable, an unmounted volume,
- * or an image where the web build was never copied all look like this.
- *
- * Setting WEB_ROOT is an explicit statement of intent to serve the app, so not
- * being able to is a boot failure, per the same argument config.ts makes.
+ * `@fastify/static` only warns on a missing root, and with `wildcard: false` it globs
+ * once at registration — so a wrong root registers zero routes, `/api/version` keeps
+ * answering, and the healthcheck stays green while the whole frontend 404s.
  */
 const assertServableWebRoot = (root: string): void => {
   const stats = statSync(root, { throwIfNoEntry: false })
@@ -176,15 +161,8 @@ const assertServableWebRoot = (root: string): void => {
 }
 
 /**
- * Logger configuration.
- *
- * Exported so the redaction can be tested against a captured stream rather than
- * against a copy of it — `err.headers` is a real control, its failure mode is
- * silence, and asserting a duplicated list would prove only that a string can
- * be copied.
- *
- * Pretty output would need a dev-only dependency; JSON lines are what a
- * container's log driver wants anyway.
+ * Exported so the redaction is tested against a captured stream rather than a copy of
+ * the list: `err.headers` is a real control whose failure mode is silence.
  */
 export const loggerOptions = (level: string) => ({
   level,
@@ -225,24 +203,13 @@ export const loggerOptions = (level: string) => ({
 /**
  * Security headers, as deviations from `@fastify/helmet`'s defaults.
  *
- * Annotated rather than inferred. The object is built here and handed to
- * `register()` as a call result, not as a fresh literal at the call site, so
- * TypeScript's excess-property check never fires — `xFrameOption` for
- * `xFrameOptions` compiled clean and silently reverted the header to
- * SAMEORIGIN. The annotation is what catches the next misspelling; a test only
- * covers the options something already asserts.
+ * **Annotated, not inferred.** The object is handed to `register()` as a call result,
+ * so the excess-property check never fires — `xFrameOption` for `xFrameOptions`
+ * compiled clean and silently reverted the header to SAMEORIGIN.
  *
- * The defaults are close, but four need narrowing: three are looser than this
- * app needs, and `style-src`'s `'unsafe-inline'` is looser than it should be
- * anywhere. Everything not named here is
- * helmet's default and is wanted: `nosniff`, `Referrer-Policy: no-referrer`
- * (stricter than the `strict-origin-when-cross-origin` #41 asked for, and the
- * right call while an invite token lives in a URL path), HSTS,
- * `Cross-Origin-Opener-Policy` and `Cross-Origin-Resource-Policy` — but not
- * `Cross-Origin-Embedder-Policy`, which helmet stopped defaulting on in v6
- * because `require-corp` breaks every cross-origin subresource — and
- * `X-XSS-Protection: 0`, which disables a legacy auditor that introduced
- * vulnerabilities of its own.
+ * Everything not named here is helmet's default and is wanted, including
+ * `Referrer-Policy: no-referrer`, which is stricter than #41 asked for and the right
+ * call while an invite token lives in a URL path.
  */
 const helmetOptions = (): FastifyHelmetOptions => ({
   contentSecurityPolicy: {
@@ -306,29 +273,18 @@ const sessionDeps = (config: Config) => ({
 const ADMIN_PREFIX = '/api/admin'
 
 /**
- * Everything under `/api/admin` requires the role, whether or not its route
- * asked for it.
+ * Everything under `/api/admin` requires the role, whether or not its route asked.
  *
- * A per-route `preHandler` is one line a new route has to remember, and
- * forgetting it ships that route world-readable: nothing type-checks it,
- * nothing fails, and the tests written beside it pass. The hook makes the
- * guard a property of the path instead of a property of the author.
+ * A per-route `preHandler` is a line a new route has to remember, and forgetting it
+ * ships that route world-readable with nothing failing. The hook makes the guard a
+ * property of the path rather than of the author.
  *
- * The bare prefix is matched as well as the prefixed segment. An admin index at
- * exactly `/api/admin` is the obvious route to add next, and `startsWith` on
- * `/api/admin/` alone would have let it in unauthenticated — the very failure
- * this closes everywhere else.
+ * The bare prefix is matched as well as the prefixed segment, so an admin index at
+ * exactly `/api/admin` cannot slip in unauthenticated. Keyed on the matched route's
+ * pattern rather than the raw URL, so encoding cannot step around it.
  *
- * Keyed on the matched route's own pattern rather than the raw URL, so it cannot
- * be stepped around with encoding. For an unmatched path the hook still runs —
- * the not-found handler inherits this instance's `onRequest` chain — but
- * `routeOptions.url` is `undefined` there, so there is no pattern to match and
- * nothing to guard.
- *
- * A Fastify plugin scope would be the more idiomatic seam and is weaker here: it
- * covers what is registered on it, so a future route declared on the root
- * instance with an `/api/admin` path would slip past. The prefix is what the
- * paths already agree on.
+ * A plugin scope would be more idiomatic and weaker: it covers what is registered on
+ * it, so a future `/api/admin` route declared on the root instance would slip past.
  */
 const registerAdminPrefixGuard = (app: FastifyInstance, deps: GuardDeps) => {
   const { requireAdmin } = createGuards(deps)

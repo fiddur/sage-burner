@@ -67,35 +67,24 @@ import { apiRoutes } from '@sage-burner/shared'
 /**
  * The API client.
  *
- * Always same-origin — the backend serves both halves in production, and Vite
- * proxies to it in development — so there is no base url to configure, nothing to
- * get wrong per environment, and no CORS anywhere.
- *
- * Every path comes from `apiRoutes`, the manifest the route files register from, so
- * the two spellings of an endpoint cannot drift (#152). That is also where the `/api`
- * prefix and the per-segment encoding live: this module used to prepend the one and
- * write out the other at 61 call sites.
+ * Always same-origin, so there is no base url to configure and no CORS anywhere. Every
+ * path comes from `apiRoutes`, the manifest the route files register from, so the two
+ * spellings of an endpoint cannot drift — as do the `/api` prefix and the encoding.
  */
 
 /**
- * Raised for anything that is not a 2xx. Carries enough to render a message.
+ * Raised for anything that is not a 2xx.
  *
- * `code` holds the envelope's `error` slug, or the literal `'unknown'` when the
- * body was not the documented envelope — a proxy's HTML, an empty body, a
- * crash. Typed as `string` rather than the shared `ErrorCode` union on purpose:
- * the API may return a code this build predates, and narrowing would collapse
- * that to `'unknown'`, losing the one string worth putting in a bug report.
+ * `code` is the envelope's slug, or `'unknown'` for a body that was not the envelope.
+ * `string` rather than the shared union: the API may return a code this build
+ * predates, and narrowing would lose the one string worth putting in a bug report.
  */
 export interface ApiError extends Error {
   status: number
   code: string
   /**
-   * The body the failure came with, when there was one (#274).
-   *
-   * A stale write is refused with the resource as it now stands, so the page can
-   * show what the other person wrote rather than only that somebody did. `unknown`
-   * because it is a different shape per route, and the caller is the only one that
-   * knows which.
+   * The body the failure came with (#274) — a stale write is refused with the resource
+   * as it now stands. `unknown`, since only the caller knows the shape.
    */
   payload?: unknown
 }
@@ -110,12 +99,9 @@ export const apiError = (status: number, code: string, message: string, payload?
   Object.assign(new Error(message), { name: 'ApiError', status, code, payload })
 
 /**
- * The body every reorder route takes.
- *
- * One helper and a `satisfies` at each call site, so a client drifting from the
- * schema is a type error rather than a 400 at runtime. The three schemas are
- * separate — one per collection — and identical, which is why this is a shape
- * rather than a shared type.
+ * The body every reorder route takes, so a client drifting from the schema is a type
+ * error rather than a 400. A shape rather than a shared type, because the three
+ * schemas are separate and identical.
  */
 const orderBody = (ids: readonly string[]) => ({ ids: [...ids] })
 
@@ -123,13 +109,8 @@ export const isApiError = (value: unknown): value is ApiError =>
   value instanceof Error && 'status' in value && 'code' in value
 
 /**
- * A message worth showing a member.
- *
- * Unmapped statuses fall back to a generic line rather than surfacing the
- * backend's machine code — a member should never read `validation_failed`.
- * The code is still on `error.code`, where a caller that knows what a
- * particular failure means can map it deliberately; a form handling 422 will
- * want to do exactly that.
+ * A message worth showing a member — never the backend's machine code. The slug stays
+ * on `error.code` for a caller that knows what a particular failure means.
  */
 const messageFor = (status: number) => {
   if (status === 401) return 'You need to sign in.'
@@ -150,15 +131,12 @@ const messageFor = (status: number) => {
 }
 
 /**
- * Pull the error code and the body out of a response without assuming it is JSON.
+ * The error code and the body, without assuming the response is JSON: a proxy or a
+ * crash returns HTML or nothing, and assuming otherwise turns those into a parse error
+ * instead of the status the server sent.
  *
- * A proxy, a crash, or a misrouted request can return HTML or nothing at all,
- * and a client that assumes JSON turns those into an unrelated parse error
- * instead of the status the server actually sent.
- *
- * The body travels with the code because a stale write's refusal carries the
- * resource as it now stands (#274), and reading it twice is not possible — a
- * response body can only be consumed once.
+ * Both together, because a body can only be consumed once and a refused stale write
+ * carries the resource with it (#274).
  */
 const failureFrom = async (response: Response): Promise<{ code: string; payload?: unknown }> => {
   try {
@@ -178,19 +156,11 @@ const failureFrom = async (response: Response): Promise<{ code: string; payload?
 }
 
 /**
- * A `fetch` rejection, as an `ApiError` like every other failure.
+ * A `fetch` rejection, as an `ApiError` like every other failure — offline and DNS
+ * failures reject with a raw `TypeError` whose message is the browser's own.
  *
- * Offline, DNS gone, or the backend not running in dev all reject with a raw
- * `TypeError` whose message is the browser's own — `Failed to fetch` in Chrome,
- * something else again in Firefox. It is the most likely failure a member meets
- * and the one that used to skip this module's mapping entirely.
- *
- * Status 0 because there was no response to have one: nothing reached a server
- * that could answer.
- *
- * A cancellation gets its own code rather than being lumped in. A page that
- * aborts an in-flight request on navigation is tidying up, not failing, and
- * without the distinction it raises an error about its own housekeeping.
+ * Status 0 because nothing reached a server that could answer. A cancellation gets its
+ * own code: a page aborting a request on navigation is tidying up, not failing.
  */
 const failureToReach = (cause: unknown): ApiError =>
   cause instanceof DOMException && cause.name === 'AbortError'
@@ -200,11 +170,8 @@ const failureToReach = (cause: unknown): ApiError =>
 /**
  * The shared things a version tag is kept for (#274).
  *
- * One name per representation the server guards, used at both ends: on the read it
- * says where to keep the `ETag` that came back, and on the write it says which kept
- * one to quote as `If-Match`. Naming it once at each of the two call sites is the
- * whole of the pairing — the server's half is the function the `GET` and the guard
- * share, and the route suites pin that they are the same one.
+ * One name per representation the server guards, used at both ends: where to keep the
+ * `ETag` a read answered with, and which kept one a write quotes as `If-Match`.
  */
 export type Guarded = 'active-event' | 'faq' | 'lead-roles' | 'meals' | 'options' | 'places' | 'sessions'
 
@@ -217,12 +184,10 @@ export interface RequestOptions {
 
 export interface ClientDeps {
   /**
-   * Called for each successful read, with the response that answered it.
+   * Called for each successful read: how old what is on screen is can only be known
+   * where the reads happen, and the worker's stamp is on the response, not the body.
    *
-   * How old what is on screen is can only be known where the reads happen, and the
-   * service worker's stamp is on the response rather than in the body. Reads only:
-   * a write that succeeds proves the server is reachable but refreshes nothing —
-   * this app re-reads after every mutation, so that GET is what says so.
+   * Reads only. A write proves the server is reachable but refreshes nothing.
    */
   onRead?: (response: Response) => void
 }
@@ -237,12 +202,10 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
   /**
    * The newest version tag seen for each guarded representation.
    *
-   * Per client rather than in a module, for the reason `Freshness` is: two suites in
-   * one process would otherwise share one. It is deliberately keyed by what was read
-   * rather than by URL — a write is given an id, not the collection's path, and the
-   * app shows one burn at a time so the last read of a thing is the one on screen.
-   * Quoting another burn's tag cannot succeed, only be refused, which is the safe
-   * direction.
+   * Per client rather than in a module, so two suites in one process do not share one.
+   * Keyed by what was read rather than by URL: a write is given an id, and the app
+   * shows one burn at a time. Quoting another burn's tag can only be refused, which is
+   * the safe direction.
    */
   const versions = new Map<Guarded, string>()
 
@@ -389,14 +352,10 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
     /**
      * The four halves of the two passkey ceremonies (#9).
      *
-     * The option objects are the WebAuthn spec's own shapes rather than anything
-     * declared in `@sage-burner/shared`: both ends already depend on
-     * `@simplewebauthn` for the ceremony itself, so its types are the contract
-     * here, and mirroring them would be a second spelling to keep in step. The
-     * request *bodies* still come from the manifest, since those are what the
-     * backend validates.
-     *
-     * Signed in, any account — a role is not required to manage your own way in.
+     * The option objects are `@simplewebauthn`'s own shapes, which both ends already
+     * depend on; the request bodies still come from the manifest, since those are what
+     * the backend validates. Signed in, any account — a role is not required to manage
+     * your own way in.
      */
     startPasskeyRegistration: () =>
       request<{ options: PublicKeyCredentialCreationOptionsJSON }>(
@@ -864,15 +823,9 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
       }),
 
     /**
-     * Any approved member. Throws ApiError(409, 'conflict') for a lodging option
-     * somebody is sleeping in.
-     *
-     * The two kinds part company here. A **helping** option goes, and takes every
-     * member's ticks with it — `attendance_helping` cascades, which is the
-     * shared-spreadsheet default applied to something other people filled in. A
-     * **lodging** option does not: `attendance.lodging_option_id` has no
-     * `onDelete`, so the foreign key refuses and the route answers 409 rather than
-     * unbooking anyone.
+     * Any approved member. The two kinds part company here: a **helping** option goes
+     * and takes every tick with it, while a **lodging** option somebody is sleeping in
+     * is refused with a 409 rather than unbooking them.
      */
     deleteEventOption: (id: string) =>
       request<undefined>(apiRoutes.deleteEventOption.path(id), {
@@ -941,14 +894,10 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
     /**
      * Public. Creates the account, fills in the person and signs them in.
      *
-     * Throws ApiError(409) for every invite that cannot be spent — unknown,
-     * expired, already used, or one that lost a race — and for an email that
-     * already has an account. One answer because by this point the difference is
-     * not the caller's to act on: the page has already read the status from
-     * `getInviteState`, and all three mean the same thing here.
-     *
-     * Throws ApiError(429) when the server is already spending all the password
-     * hashing it will run at once.
+     * 409 for every invite that cannot be spent and for an email that already has an
+     * account: by this point the difference is not the caller's to act on, since the
+     * page read the status from `getInviteState` already. 429 when the password
+     * hashing gate is full.
      */
     redeemInvite: (token: string, body: BodyOf<'redeemInvite'>) =>
       request<RedeemResponse>(apiRoutes.redeemInvite.path(token), {
@@ -1075,11 +1024,8 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
       request<ApplicationsResponse>(apiRoutes.getApplications.path(), { signal }),
 
     /**
-     * Admin only. Returns the invite token once — it is never stored in the clear.
-     * An admin who loses it calls `reissueInvite`, which replaces the token in
-     * the same row and kills the lost link doing so.
-     *
-     * Throws ApiError(409, 'conflict') when the application has already been
+     * Admin only. Returns the token once — only its digest is stored, and a lost link
+     * is replaced by `reissueInvite`. 409 when the application has already been
      * decided, which is what stops a double click minting two invites.
      */
     approveApplication: (id: string) =>
@@ -1088,12 +1034,9 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
       }),
 
     /**
-     * Admin only. A fresh link for an approved application whose first one was lost,
-     * shown once like the original. The old link stops working the moment this
-     * answers.
-     *
-     * Throws ApiError(409, 'conflict') when the invite has already been used — they
-     * are already in — or when the application is not approved.
+     * Admin only. A fresh link for an approved application whose first was lost; the
+     * old one stops working the moment this answers. 409 with `invite_used` or
+     * `not_approved` — see `errorCodes` for why those are told apart.
      */
     reissueInvite: (id: string) =>
       request<InviteResponse>(apiRoutes.reissueInvite.path(id), {
@@ -1134,13 +1077,9 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
       request<AdminInvitesResponse>(apiRoutes.getInvites.path(), { signal }),
 
     /**
-     * Admin only. Returns the token once, like approval does.
-     *
-     * Also the way back for an applicant who lost theirs: this mints an invite
-     * with no `application_id`, so they get in but their answers stay orphaned
-     * from the account. #91 is re-issuing against the application instead.
-     *
-     * Omit `expires_at` for the default 30 days.
+     * Admin only. Returns the token once, like approval does. Mints an invite with no
+     * `application_id`, so an applicant let back in this way has their answers left
+     * orphaned from the account — #91 is re-issuing against the application instead.
      */
     createInvite: (body: BodyOf<'createInvite'> = {}) =>
       request<InviteResponse>(apiRoutes.createInvite.path(), { method: apiRoutes.createInvite.method, body }),
