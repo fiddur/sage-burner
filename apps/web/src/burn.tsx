@@ -2,6 +2,7 @@ import type { MyBurn } from '@sage-burner/shared'
 import type { ComponentChildren } from 'preact'
 
 import { createContext } from 'preact'
+import { useLocation } from 'preact-iso'
 import { useCallback, useContext, useEffect, useState } from 'preact/hooks'
 
 import type { ApiClient } from './api/client.ts'
@@ -85,6 +86,17 @@ export const BurnProvider = ({
 )
 
 /**
+ * The query parameter a link uses to say which burn it is about (#333).
+ *
+ * Read here rather than by each page, which is what makes one line's link land right
+ * on all of them: every burn-scoped page reads the selector, so the selector following
+ * the URL is the whole of it. The feed is what needed it — it spans burns, so a line
+ * about the autumn burn followed while the selector sat on the summer one opened the
+ * wrong page entirely.
+ */
+export const BURN_PARAM = 'burn'
+
+/**
  * The choice, fetched once and held for the session.
  *
  * Not persisted anywhere. A reload landing on the soonest burn the viewer is part of
@@ -107,6 +119,17 @@ export const FetchedBurnProvider = ({
   const [status, setStatus] = useState<BurnChoice['status']>('loading')
   const [chosen, setChosen] = useState<string | undefined>(undefined)
   const [attempt, setAttempt] = useState(0)
+  // `?.` because `useLocation` outside a `LocationProvider` answers the context's
+  // default — an empty object cast to the hook's type, so `query` is typed as present
+  // and is not. Every page has one; a test rendering this provider bare does not.
+  const asked: string | undefined = useLocation().query?.[BURN_PARAM]
+
+  // A link that names a burn chooses it, and a later one chooses again. Keyed on the
+  // parameter rather than folded into `selected`, so the bar's own selector still wins
+  // afterwards — following a link is a choice, not a lock.
+  useEffect(() => {
+    if (asked !== undefined) setChosen(asked)
+  }, [asked])
 
   useEffect(() => {
     if (!approved) {

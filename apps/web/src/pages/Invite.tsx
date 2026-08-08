@@ -187,7 +187,8 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
         setStay(stayForBurn(upcoming.event.start_date, upcoming.event.end_date))
       }
     },
-    { key: token, fallback: 'Could not load this invitation. Please reload the page.' },
+    // No `fallback`: the page has its own wording for a failed load, below.
+    { key: token },
   )
 
   const { busy: sending, formError: error, setError, run } = useAction()

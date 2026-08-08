@@ -284,14 +284,9 @@ the same way approving does. The link is shown in a paragraph that vanishes on
 reload and the admin has to paste it into Discord before navigating away, so
 losing it is a realistic accident rather than carelessness.
 
-**The two ways it is refused carry different slugs** (#178). Both are `409` —
-`not_approved` for an application nobody has approved or that was rejected, and
-`invite_used` once the link has been redeemed — and they mean opposite things to
-whoever is reading the page: "there is nobody to invite yet" against "they are already
-in". One shared `conflict` had the page wording every refusal as the second, which was
-honest only because `approved` is terminal and the button renders on approved rows
-alone. Two load-bearing facts nothing wrote down, and both stop being true the day an
-un-approve path arrives.
+**The two ways it is refused carry different slugs** (#178) — `not_approved` and
+`invite_used`. The `errorCodes` doc block in `packages/shared/src/schemas/error.ts` has
+the why.
 
 **The row is updated, not replaced**, which is what makes this safe. One invite per
 application stays the invariant `invite_token_application_idx` already enforces, and

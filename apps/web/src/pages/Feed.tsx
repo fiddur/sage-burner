@@ -4,6 +4,7 @@ import { notificationCategoryInfo } from '@sage-burner/shared'
 
 import type { ApiClient } from '../api/client.ts'
 
+import { BURN_PARAM } from '../burn.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
@@ -27,6 +28,12 @@ interface Happening {
  * The lines are the burn-wide notifications, shown to everybody rather than only to
  * whoever switched that category on — and across burns, so each says which it belongs
  * to. Reading it writes nothing: the bell and its unseen count stay `notification`'s.
+ *
+ * **Each link carries the burn it is about** (#333). The links are the notification's
+ * — `/dreams`, `/members`, `/roles` — and those are burn-agnostic, so following one
+ * about the autumn burn while the selector sat on the summer one opened the summer
+ * page. Added here rather than stored on the row, so the lines already written land
+ * right too; `burn.tsx` is what reads it.
  */
 export const Feed = ({ api }: { api: FeedApi }) => {
   const approved = isApproved(useViewer())
@@ -85,7 +92,13 @@ export const Feed = ({ api }: { api: FeedApi }) => {
         <ul class="feed">
           {loaded.data.activity.map((line) => (
             <li key={line.id} class="feed-line">
-              <p class="feed-what">{line.link === null ? line.body : <a href={line.link}>{line.body}</a>}</p>
+              <p class="feed-what">
+                {line.link === null ? (
+                  line.body
+                ) : (
+                  <a href={atItsBurn(line.link, line.event_id)}>{line.body}</a>
+                )}
+              </p>
               <p class="feed-when">
                 {line.burn} · {localDay(line.created_at)}
               </p>
@@ -101,6 +114,19 @@ export const Feed = ({ api }: { api: FeedApi }) => {
       )}
     </GuardedPage>
   )
+}
+
+/**
+ * The same page, about the burn the line belongs to rather than whichever is selected.
+ *
+ * Split on `#` first: no notification link carries a fragment today, and appending to
+ * one would put the query inside it, where it is not a query at all.
+ */
+const atItsBurn = (link: string, eventId: string) => {
+  const [path = '', fragment] = link.split('#')
+  const joined = `${path}${path.includes('?') ? '&' : '?'}${BURN_PARAM}=${encodeURIComponent(eventId)}`
+
+  return fragment === undefined ? joined : `${joined}#${fragment}`
 }
 
 /**

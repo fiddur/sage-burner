@@ -112,9 +112,8 @@ export const Apply = ({ api }: ApplyProps) => {
 
   // Public, so there is no role to wait for — this is the one load in the app that
   // starts on mount whoever is looking.
-  const { loaded } = useLoad(async (signal) => (await api.getQuestions(signal)).questions, {
-    fallback: 'Could not load the form. Please reload the page.',
-  })
+  // No `fallback`: the page has its own wording for a failed load, below.
+  const { loaded } = useLoad(async (signal) => (await api.getQuestions(signal)).questions, {})
   const questions: FormQuestion[] | undefined = loaded.status === 'ready' ? loaded.data : undefined
   const loadFailed = loaded.status === 'failed'
 

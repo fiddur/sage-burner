@@ -26,9 +26,6 @@ const shapeOf = (built: string, fastify: string) => {
 
 describe('the route manifest', () => {
   it('has a path builder whose output routes to its own registration', () => {
-    // The whole point of the manifest. Each endpoint used to exist twice — a literal in
-    // `client.ts` and another in a route file — with nothing tying them together, so a
-    // rename could land on one and not the other and nothing would fail until runtime.
     for (const key of keys) {
       // Widened deliberately: the manifest keeps each builder's own arity, which is
       // what stops `updateEvent.path()` compiling with no id — and which is why a
@@ -50,9 +47,7 @@ describe('the route manifest', () => {
   })
 
   it('encodes every segment it is given', () => {
-    // The chore this removes: `encodeURIComponent` was written out at 61 call sites,
-    // which is 61 chances to leave one off. A slash in an id would otherwise invent a
-    // path segment and route somewhere else entirely.
+    // A slash in an id would otherwise invent a path segment and route somewhere else.
     for (const key of keys) {
       const route: ApiRoute = apiRoutes[key]
       const names = declared(route.fastify)

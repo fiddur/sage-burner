@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -6,7 +7,7 @@ import type { EmailChannel, Told } from './notify.ts'
 import type { PushDeps } from './push.ts'
 
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, attendance, event, notificationSetting } from '../db/schema.ts'
+import { account, attendance, event, notification, notificationSetting } from '../db/schema.ts'
 import { notifyAttendees, recordAndPush } from './notify.ts'
 
 /**
@@ -144,8 +145,8 @@ describe('telling everybody coming to a burn', () => {
   })
 })
 
-describe('a notification whose row cannot be written', () => {
-  it('does not leave the email in flight with nobody holding it', async () => {
+describe('the email leg beside a bell row', () => {
+  it('does not leave the email in flight when the row cannot be written', async () => {
     // Node's default for an unhandled rejection is to exit the process. The email is
     // started before the insert and awaited after it, so anything thrown in between
     // used to leave it floating — and it rejects on a database error, which is the
@@ -178,10 +179,10 @@ describe('a notification whose row cannot be written', () => {
     }
   })
 
-  it('reports a send that failed rather than throwing over it', async () => {
-    // The passing sibling: swallowing the rejection above must not swallow an
-    // ordinary posting. `post` answers a failed send instead of throwing, so a
-    // notification with a mail server that refused still writes its row and returns.
+  it('writes the row and posts, when nothing is broken', async () => {
+    // The passing sibling: the guard above must not swallow an ordinary posting.
+    // `emailChannel` answers a failed send instead of throwing, so a mail server that
+    // refused still leaves the bell row behind.
     const deps = build()
     const accountId = await givenAsking()
     const byEmail = vi.fn<EmailChannel>(() => Promise.resolve({ sent: false, reason: 'refused' }))
@@ -189,5 +190,7 @@ describe('a notification whose row cannot be written', () => {
     await recordAndPush(deps, NOW_AT, () => undefined, byEmail)(accountId, TOLD)
 
     expect(byEmail).toHaveBeenCalledWith(accountId, TOLD)
+    const rows = await db().select().from(notification).where(eq(notification.account_id, accountId))
+    expect(rows.map((row) => row.body)).toEqual([TOLD.body])
   })
 })

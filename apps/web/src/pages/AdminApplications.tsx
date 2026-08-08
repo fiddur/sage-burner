@@ -60,10 +60,8 @@ export const AdminApplications = ({ api }: { api: ApplicationsApi }) => {
         setDeciding(undefined)
         if (!isApiError(failure)) return 'Could not make a new link. Please try again.'
 
-        // Both are 409, and they say opposite things (#178). Told apart by the slug
-        // rather than by the status, so this does not depend on `approved` being
-        // terminal and the button rendering on approved rows alone — two facts that
-        // are true today and are nothing to hang a message on.
+        // By the slug, not the status: both refusals are 409 and mean opposite
+        // things. `errorCodes` says why (#178).
         return (
           {
             invite_used: 'That invite has already been used, so they are already in.',

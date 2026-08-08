@@ -262,9 +262,7 @@ describe('AdminApplications', () => {
   })
 
   it('says something else when the application was never approved', async () => {
-    // The same 409 (#178). Told apart by the slug, so this does not rest on the
-    // button rendering only on approved rows — which is the sort of fact that stops
-    // being true the day an un-approve path arrives, quietly, somewhere else.
+    // The same 409, told apart by the slug — see `errorCodes` (#178).
     withReissue(() => Promise.reject(apiError(409, 'not_approved', 'Request failed (409).')))
 
     ;(await screen.findByRole('button', { name: 'Send a new link' })).click()

@@ -112,12 +112,11 @@ export const recordAndPush =
     // their inbox and nowhere else, and the write must not fail because a mail server
     // did — the rule push already follows here (#30).
     //
-    // Caught where it is started rather than only where it is awaited (#313). The
-    // insert below can throw, and then nothing ever awaits this — which for Node is
-    // an unhandled rejection and, by default, the process exiting. Nothing is lost by
-    // swallowing it: `post` already answers a failed *send* rather than throwing, so
-    // the only way this rejects is a database error, which is the same failure the
-    // insert is about to report.
+    // Caught where it is started rather than only where it is awaited (#313): the
+    // insert below can throw, and then nothing ever awaits this — which for Node is an
+    // unhandled rejection and, by default, the process exiting. A guard rather than
+    // where a reason goes to die, since `emailChannel` reports its own and does not
+    // throw (#357).
     const posting =
       channels.email && byEmail !== undefined ? byEmail(accountId, told).catch(() => undefined) : undefined
 

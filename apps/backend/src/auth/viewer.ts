@@ -1,3 +1,11 @@
+/**
+ * Who is signed in, and the cookie that says so.
+ *
+ * Here rather than in `routes/auth.ts`, where it began. The guards need exactly
+ * this, so a guard was importing from a route file — an inversion that made
+ * `auth/` depend on the thing it exists to protect (#139).
+ */
+
 import type { Viewer } from '@sage-burner/shared'
 import type { FastifyRequest } from 'fastify'
 
@@ -5,6 +13,8 @@ import { eq } from 'drizzle-orm'
 
 import type { Database } from '../db/index.ts'
 import type { Sessions } from './session.ts'
+
+import { account, accountAvatar, accountRole } from '../db/schema.ts'
 
 /**
  * All of a request this needs — the cookie header, and an identity to key on.
@@ -14,16 +24,6 @@ import type { Sessions } from './session.ts'
  * unchanged.
  */
 type Requesting = Pick<FastifyRequest, 'headers'>
-
-import { account, accountAvatar, accountRole } from '../db/schema.ts'
-
-/**
- * Who is signed in, and the cookie that says so.
- *
- * Here rather than in `routes/auth.ts`, where it began. The guards need exactly
- * this, so a guard was importing from a route file — an inversion that made
- * `auth/` depend on the thing it exists to protect (#139).
- */
 
 export const SESSION_COOKIE = 'sage_session'
 
@@ -72,8 +72,8 @@ export const SESSION_COOKIE = 'sage_session'
  * it. Every subsequent request then carries two and is refused. The member is
  * locked out until the planted cookie expires or they clear cookies by hand —
  * and the SPA shows them signed in from the login response, then signed out on
- * the next load, which is the confusing failure the `Secure` note above warns
- * about.
+ * the next load, which is the confusing failure `cookieHeader` in `routes/auth.ts`
+ * warns about.
  *
  * Still the right trade. A durable lockout beats a member typing their
  * allergies and contact details into an attacker's record. But #58's `__Host-`

@@ -30,6 +30,8 @@ const one = (over: Partial<Notification> & Pick<Notification, 'id' | 'body'>): N
   ...over,
 })
 
+const SEEN = '2026-08-06T11:00:00.000Z'
+
 const TWO: Notification[] = [
   one({ id: 'n-1', body: 'You are on helper for Dinner' }),
   one({ id: 'n-2', body: 'Your place is paid for', category: 'payment', link: null }),
@@ -123,26 +125,41 @@ describe('what has happened to you', () => {
     expect(line.closest('li')?.className).toBe('is-new')
   })
 
-  it('marks one that arrives while the page is open as new', async () => {
-    // The set is only ever seeded from the first answer, so a later arrival is judged
-    // on its own `seen_at` rather than being read as old for not having been there.
+  it('marks one that arrives while the page is open as new, and keeps it that way', async () => {
+    // The set grows rather than being seeded once (#352). Seeded once, an arrival
+    // during the visit was bold on the answer that brought it and plain on the next —
+    // the same disappearing act, narrowed to in-session arrivals.
+    const later = one({ id: 'n-9', body: 'Bea is coming.' })
     let asked = 0
     renderPage(
       stub({
         getMyNotifications: () => {
           asked += 1
-          return asked === 1
-            ? Promise.resolve({ notifications: [], unseen: 0 })
-            : Promise.resolve({ notifications: [one({ id: 'n-9', body: 'Bea is coming.' })], unseen: 1 })
+          if (asked === 1) return Promise.resolve({ notifications: [], unseen: 0 })
+
+          // The third answer carries a second line as well, so the assertion below has
+          // something rendered to wait on rather than a counter the fetch bumps before
+          // its answer has been applied.
+          return Promise.resolve({
+            notifications:
+              asked === 2
+                ? [later]
+                : [{ ...later, seen_at: SEEN }, one({ id: 'n-10', body: 'Cai is coming.', seen_at: SEEN })],
+            unseen: asked === 2 ? 1 : 0,
+          })
         },
       }),
     )
     await screen.findByText('Nothing yet.')
 
     fireEvent(window, new Event('focus'))
-
     const line = await screen.findByText('Bea is coming.')
     expect(line.closest('li')?.className).toBe('is-new')
+
+    fireEvent(window, new Event('focus'))
+
+    await screen.findByText('Cai is coming.')
+    expect(screen.getByText('Bea is coming.').closest('li')?.className).toBe('is-new')
   })
 
   it('is open to an account with no role, since it is told things too', async () => {
