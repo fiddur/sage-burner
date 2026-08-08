@@ -95,11 +95,8 @@ export const Home = ({ api }: { api: HomeApi }) => {
   const [editing, setEditing] = useState<string | undefined>(undefined)
   const [opening, setOpening] = useState(false)
 
-  const { loaded: active, reload } = useLoad(
-    async (signal) => (await api.getActiveEvent(signal)).event,
-    // Never rendered: `NoOpenBurn` says "come back later" instead, and says why.
-    { fallback: 'never shown — the page keeps its own wording for a failed load' },
-  )
+  // No `fallback`: `NoOpenBurn` says "come back later" instead, and says why.
+  const { loaded: active, reload } = useLoad(async (signal) => (await api.getActiveEvent(signal)).event, {})
 
   const { busy: saving, formError, setError, failure: refused, run } = useAction(reload)
 

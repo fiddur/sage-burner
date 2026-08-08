@@ -1,7 +1,7 @@
 import type { Attendance, MyBurn, MyBurnsResponse } from '@sage-burner/shared'
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
-import { LocationProvider } from 'preact-iso'
+import { LocationProvider, useLocation } from 'preact-iso'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Viewer } from './viewer.tsx'
@@ -101,13 +101,33 @@ const renderChoiceAt = (at: string, coming: MyBurn[], viewer: Viewer = MEMBER) =
   return getMyBurns
 }
 
+/** The line `Shown` draws: status, every burn, and the one selected. */
+const shown = () => screen.getByText(/^ready:/).textContent
+
+/** `Shown`, plus the one thing only a router test can do: go somewhere else. */
+const Travelling = () => {
+  const { route } = useLocation()
+
+  return (
+    <>
+      <Shown />
+      <button type="button" onClick={() => route('/members')}>
+        Go to Members
+      </button>
+    </>
+  )
+}
+
 describe('a link that names a burn', () => {
   it('chooses it, rather than leaving the selector where it was', async () => {
     // The whole of #333: every burn-scoped page reads the selector, so the selector
     // reading the URL is what makes one line's link land on the right page.
     renderChoiceAt('/dreams?burn=e-2', [aBurn('e-1', 'Summer', true), aBurn('e-2', 'Winter', true)])
 
-    await waitFor(() => expect(screen.getByText(/^ready:/).textContent).toContain(':Winter'))
+    // The whole string, as the rest of this file asserts it. `toContain(':Summer')` is
+    // true of `ready:Summer,Winter:` whatever is selected, so the two siblings below
+    // would pass against no selection at all.
+    await waitFor(() => expect(shown()).toBe('ready:Summer,Winter:Winter'))
   })
 
   it('leaves the default alone when it names one that is not on offer', async () => {
@@ -115,7 +135,37 @@ describe('a link that names a burn', () => {
     // soonest is what every other page already does with no selection at all.
     renderChoiceAt('/dreams?burn=e-9', [aBurn('e-1', 'Summer', true), aBurn('e-2', 'Winter', true)])
 
-    await waitFor(() => expect(screen.getByText(/^ready:/).textContent).toContain(':Summer'))
+    await waitFor(() => expect(shown()).toBe('ready:Summer,Winter:Summer'))
+  })
+
+  it('keeps the burn when the next page names none', async () => {
+    // Following a line lands on `/dreams?burn=e-2`, and everything reached from there
+    // is a page with no parameter at all. Reading the URL must not mean forgetting the
+    // burn the moment somebody moves off the page the link opened.
+    history.replaceState(null, '', '/dreams?burn=e-2')
+    render(
+      <LocationProvider>
+        <ViewerProvider viewer={MEMBER}>
+          <FetchedBurnProvider
+            api={{
+              getMyBurns: () =>
+                Promise.resolve({
+                  coming: [aBurn('e-1', 'Summer', true), aBurn('e-2', 'Winter', true)],
+                  past: [],
+                }),
+            }}
+          >
+            <Travelling />
+          </FetchedBurnProvider>
+        </ViewerProvider>
+      </LocationProvider>,
+    )
+    await waitFor(() => expect(shown()).toBe('ready:Summer,Winter:Winter'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Go to Members' }))
+
+    await waitFor(() => expect(location.pathname).toBe('/members'))
+    expect(shown()).toBe('ready:Summer,Winter:Winter')
   })
 
   it('leaves the default alone when there is no such parameter', async () => {
@@ -123,7 +173,7 @@ describe('a link that names a burn', () => {
     // is every page reached from the bar.
     renderChoiceAt('/dreams', [aBurn('e-1', 'Summer', true), aBurn('e-2', 'Winter', true)])
 
-    await waitFor(() => expect(screen.getByText(/^ready:/).textContent).toContain(':Summer'))
+    await waitFor(() => expect(shown()).toBe('ready:Summer,Winter:Summer'))
   })
 })
 

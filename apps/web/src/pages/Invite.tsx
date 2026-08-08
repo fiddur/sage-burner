@@ -187,8 +187,8 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
         setStay(stayForBurn(upcoming.event.start_date, upcoming.event.end_date))
       }
     },
-    // The fallback is never rendered: the page has its own wording below.
-    { key: token, fallback: 'never shown: the page says it in its own words' },
+    // No `fallback`: the page has its own wording for a failed load, below.
+    { key: token },
   )
 
   const { busy: sending, formError: error, setError, run } = useAction()

@@ -81,6 +81,15 @@ describe('what everyone has been doing', () => {
     expect(link.getAttribute('href')).toBe('/dreams?burn=e-2')
   })
 
+  it('puts the burn before a fragment rather than inside it', async () => {
+    // None carries one today. Appended after a `#` the query is not a query at all,
+    // which is the sort of thing that is cheap now and archaeology later.
+    renderPage(stub({}, [aLine({ id: 'x-1', body: 'Ada offered a dream: Sauna', link: '/schedule#s-1' })]))
+
+    const link = await screen.findByRole('link', { name: 'Ada offered a dream: Sauna' })
+    expect(link.getAttribute('href')).toBe('/schedule?burn=e-1#s-1')
+  })
+
   it('keeps a query the link already had', async () => {
     // None carries one today. The joiner is a `&` rather than a second `?` so that
     // stays true of a link somebody adds rather than of this one.

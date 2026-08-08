@@ -30,6 +30,8 @@ const one = (over: Partial<Notification> & Pick<Notification, 'id' | 'body'>): N
   ...over,
 })
 
+const SEEN = '2026-08-06T11:00:00.000Z'
+
 const TWO: Notification[] = [
   one({ id: 'n-1', body: 'You are on helper for Dinner' }),
   one({ id: 'n-2', body: 'Your place is paid for', category: 'payment', link: null }),
@@ -135,8 +137,14 @@ describe('what has happened to you', () => {
           asked += 1
           if (asked === 1) return Promise.resolve({ notifications: [], unseen: 0 })
 
+          // The third answer carries a second line as well, so the assertion below has
+          // something rendered to wait on rather than a counter the fetch bumps before
+          // its answer has been applied.
           return Promise.resolve({
-            notifications: [asked === 2 ? later : { ...later, seen_at: '2026-08-06T11:00:00.000Z' }],
+            notifications:
+              asked === 2
+                ? [later]
+                : [{ ...later, seen_at: SEEN }, one({ id: 'n-10', body: 'Cai is coming.', seen_at: SEEN })],
             unseen: asked === 2 ? 1 : 0,
           })
         },
@@ -150,8 +158,8 @@ describe('what has happened to you', () => {
 
     fireEvent(window, new Event('focus'))
 
-    await waitFor(() => expect(asked).toBeGreaterThan(2))
-    expect(line.closest('li')?.className).toBe('is-new')
+    await screen.findByText('Cai is coming.')
+    expect(screen.getByText('Bea is coming.').closest('li')?.className).toBe('is-new')
   })
 
   it('is open to an account with no role, since it is told things too', async () => {

@@ -50,12 +50,10 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
   )
 
   // Its own load, and its own failure: the vocabulary is a nicety beside the free
-  // text, so not having it must not cost somebody the page their name is on. The
-  // fallback is never rendered — nothing reads this one's `loaded` — which is why it
-  // says so rather than pretending to be a message.
+  // text, so not having it must not cost somebody the page their name is on. No
+  // `fallback` either — nothing reads this one's message.
   const { loaded: vocabulary } = useLoad(async (signal) => (await api.getAllergyItems(signal)).items, {
     enabled: member,
-    fallback: 'never shown: the list is optional',
   })
   const items: readonly AllergyItem[] = vocabulary.status === 'ready' ? vocabulary.data : []
 

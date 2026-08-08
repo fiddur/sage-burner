@@ -116,9 +116,18 @@ export const Feed = ({ api }: { api: FeedApi }) => {
   )
 }
 
-/** The same page, about the burn the line belongs to rather than whichever is selected. */
-const atItsBurn = (link: string, eventId: string) =>
-  `${link}${link.includes('?') ? '&' : '?'}${BURN_PARAM}=${encodeURIComponent(eventId)}`
+/**
+ * The same page, about the burn the line belongs to rather than whichever is selected.
+ *
+ * Split on `#` first: no notification link carries a fragment today, and appending to
+ * one would put the query inside it, where it is not a query at all.
+ */
+const atItsBurn = (link: string, eventId: string) => {
+  const [path = '', fragment] = link.split('#')
+  const joined = `${path}${path.includes('?') ? '&' : '?'}${BURN_PARAM}=${encodeURIComponent(eventId)}`
+
+  return fragment === undefined ? joined : `${joined}#${fragment}`
+}
 
 /**
  * What kind of thing this is, and the door onto the setting for it.

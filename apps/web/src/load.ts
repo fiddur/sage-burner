@@ -74,16 +74,21 @@ export const errorMessage = (failure: unknown, fallback: string) =>
  * name is spelled out rather than derived because two loads on one page would
  * otherwise collide silently, and the burn's id joins it so switching burns is not
  * shown one burn's grid under the other's name.
+ *
+ * `fallback` is optional because two pages have no use for one: `Home` and `Apply`
+ * write their own sentence for a failed load and never render `loaded.message`. Absent
+ * in the type rather than present as a string saying it is never shown — which is a
+ * string a member would see the day somebody did render it.
  */
 export const useLoad = <T>(
   fetcher: (signal: AbortSignal) => Promise<T>,
   {
     enabled = true,
     key = '',
-    fallback,
+    fallback = 'Could not load that.',
     live = false,
     remember,
-  }: { enabled?: boolean; fallback: string; key?: string; live?: boolean; remember?: string },
+  }: { enabled?: boolean; fallback?: string; key?: string; live?: boolean; remember?: string },
 ): { loaded: Loaded<T>; refreshing: boolean; reload: () => void } => {
   const remembered = useRemembered()
   const at = remember === undefined ? undefined : `${remember}:${key}`
@@ -278,7 +283,7 @@ export const useAction = (onSuccess?: () => void) => {
 export const useLoadInto = <T>(
   fetcher: (signal: AbortSignal) => Promise<T>,
   seed: (data: T) => void,
-  options: { enabled?: boolean; fallback: string; key?: string },
+  options: { enabled?: boolean; fallback?: string; key?: string },
 ): { loaded: Loaded<T>; refreshing: boolean; reload: () => void } => {
   const { loaded, refreshing, reload } = useLoad(fetcher, options)
   const latest = useRef(seed)
