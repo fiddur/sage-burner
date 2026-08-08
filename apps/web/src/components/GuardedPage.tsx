@@ -1,6 +1,16 @@
 import type { ComponentChildren } from 'preact'
 
+import type { Viewer } from '../viewer.tsx'
+
 import { isAdmin, isApproved, isMember, useViewer } from '../viewer.tsx'
+
+/** What a page may ask of whoever is looking, and how each is answered. */
+const holds = {
+  admin: isAdmin,
+  approved: isApproved,
+  member: isMember,
+  'signed-in': (viewer: Viewer) => viewer.account !== undefined,
+} satisfies Record<string, (viewer: Viewer) => boolean>
 
 /**
  * The three states that come before a role-gated page's content: viewer still
@@ -20,13 +30,17 @@ export const GuardedPage = ({
    * `approved` is `member` or `admin`, matching `requireApproved` on the API —
    * somebody organising but not attending holds `admin` alone, and the burn's shared
    * furniture has to stay open to them.
+   *
+   * `signed-in` asks for no role at all, which is what the notifications page needs
+   * (#336): an applicant waiting on a decision is told when it arrives, and telling
+   * them the page announcing it is for members would be the app refusing to show
+   * somebody a message it sent them.
    */
-  require: 'admin' | 'approved' | 'member'
+  require: keyof typeof holds
   children: ComponentChildren
 }) => {
   const viewer = useViewer()
-  const held =
-    require === 'admin' ? isAdmin(viewer) : require === 'member' ? isMember(viewer) : isApproved(viewer)
+  const held = holds[require](viewer)
 
   if (viewer.status === 'loading') {
     return (

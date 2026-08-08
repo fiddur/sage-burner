@@ -69,7 +69,10 @@ a:hover {
   min-height: 100vh;
 }
 
+/* `relative` so the bell's panel can hang off this rather than off the bell — see
+   `.bell-panel`, which is what stopped it opening off the side of the screen. */
 .site-header {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   gap: 1rem;
@@ -1761,17 +1764,21 @@ img.avatar {
 
 /* The bell, and what it drops down. */
 .bell-wrap {
-  position: relative;
   display: inline-flex;
 }
 
+/* A link to `/notifications` rather than a button (#336), so it wears none of a
+   link's clothes: an underline under an emoji reads as a mistake. */
 .bell {
   position: relative;
+  display: inline-flex;
   padding: 0.2rem 0.3rem;
   border: 0;
   background: none;
+  color: inherit;
   font-size: 1.1rem;
   line-height: 1;
+  text-decoration: none;
   cursor: pointer;
   /* Grey until something has happened, which is the whole signal. */
   filter: grayscale(1);
@@ -1798,12 +1805,28 @@ img.avatar {
   text-align: center;
 }
 
+/*
+  Hung off the header, not off the bell (#336).
+
+  `inset-inline-end: 0` inside `.bell-wrap` anchored it to the bell's own right edge,
+  which only worked while the bell was near the right margin. Wrapped onto a second
+  row the bell sits far left, so the panel's other edge went past the viewport — and
+  nothing clipped it, so it could not be reached at all. The header's right edge is
+  the viewport's, wherever the bell has ended up on it.
+
+  Absolute against the header rather than fixed against the viewport, because the
+  header scrolls away with the page: a fixed panel would still be floating over the
+  content long after the bell it belongs to had gone. On a phone it does not exist —
+  the bell is a link to the page instead.
+*/
 .bell-panel {
   position: absolute;
   top: 100%;
-  inset-inline-end: 0;
+  inset-inline-end: clamp(1rem, 5vw, 3rem);
   z-index: 30;
-  width: min(22rem, 80vw);
+  width: min(22rem, calc(100vw - 2rem));
+  max-height: 70vh;
+  overflow-y: auto;
   margin-top: 0.4rem;
   padding: 0.6rem 0.8rem;
   border: 1px solid var(--line);
@@ -1812,15 +1835,24 @@ img.avatar {
   box-shadow: 0 4px 16px rgb(0 0 0 / 18%);
 }
 
-.bell-list {
+/* The panel's list and the page's, which are one component (#336). */
+.notification-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 0.5rem;
+  gap: 0.75rem;
   font-size: 0.9rem;
 }
 
-.bell-list li.is-new {
+.notification-list li.is-new {
   font-weight: 600;
+}
+
+.notification-when {
+  margin: 0.1rem 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  /* The date is never the new part; the line above it is. */
+  font-weight: 400;
 }

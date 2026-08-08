@@ -5,9 +5,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { BellApi } from './NotificationBell.tsx'
 
+import { onADesktop, onAPhone } from '../testing/viewport.ts'
 import { NotificationBell } from './NotificationBell.tsx'
 
 afterEach(cleanup)
+// The viewport belongs to the window, which outlives one test.
+afterEach(onADesktop)
 
 const one = (over: Partial<Notification> = {}): Notification => ({
   id: 'n-1',
@@ -33,13 +36,23 @@ describe('the bell', () => {
       />,
     )
 
-    expect(await screen.findByRole('button', { name: 'Notifications, 1 new' })).toBeTruthy()
+    expect(await screen.findByRole('link', { name: 'Notifications, 1 new' })).toBeTruthy()
   })
 
   it('says nothing about a count when there is none', async () => {
     render(<NotificationBell api={stub()} />)
 
-    expect(await screen.findByRole('button', { name: 'Notifications' })).toBeTruthy()
+    expect(await screen.findByRole('link', { name: 'Notifications' })).toBeTruthy()
+  })
+
+  it('leads to the page whatever the viewport', async () => {
+    // The href is the whole of #336's "one control rather than two": a push tap, a
+    // middle click and an open-in-new-tab all want the page, on any device.
+    render(<NotificationBell api={stub()} />)
+
+    expect((await screen.findByRole('link', { name: 'Notifications' })).getAttribute('href')).toBe(
+      '/notifications',
+    )
   })
 
   it('marks everything seen on opening, and drops the count', async () => {
@@ -54,10 +67,11 @@ describe('the bell', () => {
         })}
       />,
     )
-    ;(await screen.findByRole('button', { name: 'Notifications, 1 new' })).click()
+
+    fireEvent.click(await screen.findByRole('link', { name: 'Notifications, 1 new' }))
 
     await waitFor(() => expect(markNotificationsSeen).toHaveBeenCalled())
-    expect(await screen.findByRole('button', { name: 'Notifications' })).toBeTruthy()
+    expect(await screen.findByRole('link', { name: 'Notifications' })).toBeTruthy()
   })
 
   it('leads to the page the thing happened on', async () => {
@@ -66,7 +80,8 @@ describe('the bell', () => {
         api={stub({ getMyNotifications: () => Promise.resolve({ notifications: [one()], unseen: 1 }) })}
       />,
     )
-    ;(await screen.findByRole('button', { name: 'Notifications, 1 new' })).click()
+
+    fireEvent.click(await screen.findByRole('link', { name: 'Notifications, 1 new' }))
 
     expect((await screen.findByRole('link', { name: /Dinner/ })).getAttribute('href')).toBe('/meals')
   })
@@ -79,10 +94,13 @@ describe('the bell', () => {
         })}
       />,
     )
-    ;(await screen.findByRole('button', { name: 'Notifications, 1 new' })).click()
+
+    fireEvent.click(await screen.findByRole('link', { name: 'Notifications, 1 new' }))
 
     expect(await screen.findByText('You are on helper for Dinner')).toBeTruthy()
-    expect(screen.queryByRole('link')).toBeNull()
+    // The bell itself is a link now, so the absence has to be named rather than
+    // counted: `queryByRole('link')` would find the bell and pass either way.
+    expect(screen.queryByRole('link', { name: /Dinner/ })).toBeNull()
   })
 
   it('keeps the list after it has gone grey', async () => {
@@ -96,7 +114,8 @@ describe('the bell', () => {
         })}
       />,
     )
-    ;(await screen.findByRole('button', { name: 'Notifications' })).click()
+
+    fireEvent.click(await screen.findByRole('link', { name: 'Notifications' }))
 
     expect(await screen.findByText('You are on helper for Dinner')).toBeTruthy()
   })
@@ -123,7 +142,7 @@ describe('the bell', () => {
     // `fireEvent` rather than `.click()`, because it runs inside `act` — which is what
     // flushes the effect that attaches the dismissal listeners. A bare `.click()`
     // renders the panel but leaves them queued until some later frame.
-    fireEvent.click(await screen.findByRole('button', { name: 'Notifications' }))
+    fireEvent.click(await screen.findByRole('link', { name: 'Notifications' }))
 
     return await screen.findByText('You are on helper for Dinner')
   }
@@ -150,7 +169,7 @@ describe('the bell', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
 
     await waitFor(() => expect(screen.queryByText('You are on helper for Dinner')).toBeNull())
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Notifications' }))
+    expect(document.activeElement).toBe(screen.getByRole('link', { name: 'Notifications' }))
   })
 
   it('ignores a key that is not Escape', async () => {
@@ -166,6 +185,56 @@ describe('the bell', () => {
     // where a count goes would be worse than the absence of one.
     render(<NotificationBell api={stub({ getMyNotifications: () => Promise.reject(new Error('nope')) })} />)
 
-    expect(await screen.findByRole('button', { name: 'Notifications' })).toBeTruthy()
+    expect(await screen.findByRole('link', { name: 'Notifications' })).toBeTruthy()
+  })
+
+  describe('a click it does not intercept', () => {
+    const withOne = async () => {
+      render(
+        <NotificationBell
+          api={stub({
+            getMyNotifications: () =>
+              Promise.resolve({
+                notifications: [one({ seen_at: '2026-08-06T11:00:00.000Z' })],
+                unseen: 0,
+              }),
+          })}
+        />,
+      )
+
+      return await screen.findByRole('link', { name: 'Notifications' })
+    }
+
+    it('opens no panel on a phone, because the page is the whole answer there', async () => {
+      // The defect (#336): wrapped onto the header's second row the bell is far left,
+      // so a panel hung off it opened past the edge of the screen and could not be
+      // reached. There is nothing to misplace when there is no panel.
+      onAPhone()
+
+      fireEvent.click(await withOne())
+
+      expect(screen.queryByText('You are on helper for Dinner')).toBeNull()
+    })
+
+    it('leaves a modified click to the browser', async () => {
+      // Open in a new tab: the reader is asking for the page, and a panel in the
+      // document they are leaving is not it.
+      fireEvent.click(await withOne(), { metaKey: true })
+
+      expect(screen.queryByText('You are on helper for Dinner')).toBeNull()
+    })
+
+    it('says it expands only where it does', async () => {
+      // `aria-expanded` on a control that never expands is a promise to a screen
+      // reader that the page cannot keep.
+      onAPhone()
+
+      expect((await withOne()).hasAttribute('aria-expanded')).toBe(false)
+
+      cleanup()
+      onADesktop()
+
+      expect((await withOne()).getAttribute('aria-expanded')).toBe('false')
+    })
   })
 })

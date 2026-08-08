@@ -34,6 +34,7 @@ import { Login } from './pages/Login.tsx'
 import { Meals } from './pages/Meals.tsx'
 import { Members } from './pages/Members.tsx'
 import { NotFound } from './pages/NotFound.tsx'
+import { Notifications } from './pages/Notifications.tsx'
 import { Options } from './pages/Options.tsx'
 import { Places } from './pages/Places.tsx'
 import { ProfilePage } from './pages/Profile.tsx'
@@ -84,6 +85,8 @@ export type RoutesApi = Pick<
   | 'getInviteState'
   | 'redeemInvite'
   | 'getMyProfile'
+  | 'getMyNotifications'
+  | 'markNotificationsSeen'
   | 'getMyNotificationSettings'
   | 'updateMyNotificationSettings'
   | 'getMyPasskeys'
@@ -215,6 +218,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
   const AdminSettingsRoute = useMemo(() => () => <AdminSettings api={api} />, [api])
   const HomeRoute = useMemo(() => () => <Home api={api} />, [api])
   const MembersRoute = useMemo(() => () => <Members api={api} />, [api])
+  const NotificationsRoute = useMemo(() => () => <Notifications api={api} />, [api])
   const DreamsRoute = useMemo(() => () => <Dreams api={api} />, [api])
   const ScheduleRoute = useMemo(() => () => <Schedule api={api} />, [api])
   const RolesRoute = useMemo(() => () => <Roles api={api} />, [api])
@@ -244,6 +248,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
       <Route path="/roles" component={RolesRoute} />
       <Route path="/faq" component={FaqRoute} />
       <Route path="/going-on" component={FeedRoute} />
+      <Route path="/notifications" component={NotificationsRoute} />
       <Route path="/profile" component={ProfileRoute} />
       <Route path="/invite/:token" component={InviteRoute} />
       <Route path="/login" component={LoginRoute} />
