@@ -38,6 +38,18 @@ describe('the stylesheet', () => {
     expect(selectors).toContain('.visually-hidden')
   })
 
+  it("pins the top bar's nav rather than spreading the bar", () => {
+    // The bar's children come and go — ☰ only for a member, the selector only for a
+    // second burn — so `space-between` puts whatever is in the middle *in the middle*:
+    // ☰ landed halfway across the bar the day it became a third child, on the ordinary
+    // one-burn viewer. happy-dom lays nothing out, so this is the only place it shows.
+    const header = rules.find((rule) => rule.selector === '.site-header')
+    const nav = rules.find((rule) => rule.selector === '.site-header nav')
+
+    expect(header?.body).not.toMatch(/justify-content:\s*space-between/)
+    expect(nav?.body).toMatch(/margin-inline-start:\s*auto/)
+  })
+
   it('positions every box that scrolls sideways', () => {
     // Anything establishing a horizontal scroll container has to be a containing
     // block, so an absolutely positioned descendant cannot escape to the document and

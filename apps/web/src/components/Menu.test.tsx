@@ -65,6 +65,21 @@ describe('the menu beside the logo', () => {
     await waitFor(() => expect(screen.queryByRole('link', { name: /Rideshares/ })).toBeNull())
   })
 
+  it('moves focus into the drawer when it opens', async () => {
+    const entry = await opened()
+
+    await waitFor(() => expect(document.activeElement).toBe(entry))
+  })
+
+  it('closes on ✕, which is the way out the drawer does not cover', async () => {
+    // The drawer is drawn over ☰, so pressing ☰ again is not available to a pointer.
+    await opened()
+
+    fireEvent.click(screen.getByRole('button', { name: /Close/ }))
+
+    await waitFor(() => expect(screen.queryByRole('link', { name: /Rideshares/ })).toBeNull())
+  })
+
   it('closes on Escape and hands focus back to ☰', async () => {
     await opened()
 

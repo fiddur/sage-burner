@@ -77,7 +77,7 @@ a:hover {
   flex-wrap: wrap;
   gap: 1rem;
   align-items: baseline;
-  justify-content: space-between;
+  justify-content: flex-start;
   padding: 1rem clamp(1rem, 5vw, 3rem);
   border-bottom: 1px solid var(--line);
 }
@@ -107,8 +107,13 @@ a:hover {
   letter-spacing: 0.01em;
 }
 
+/* `margin-inline-start: auto` rather than `space-between` on the bar: the bar's
+   children come and go — ☰ only for a member, the selector only for a second burn —
+   and `space-between` moves every one of them when another appears. Pinning the nav
+   to the end is the only arrangement that holds for all four combinations. */
 .site-header nav {
   display: flex;
+  margin-inline-start: auto;
   flex-wrap: wrap;
   align-items: center;
   gap: 1.25rem;
@@ -119,7 +124,6 @@ a:hover {
 .burn-selector {
   font-family: ui-sans-serif, system-ui, sans-serif;
   font-size: 0.95rem;
-  margin-inline-end: auto;
 }
 
 /* Off-screen but read aloud. The circle shows letters; a screen reader needs the name. */
@@ -270,6 +274,17 @@ a:hover {
   from {
     transform: translateX(-100%);
   }
+}
+
+.menu-close {
+  margin-top: 0.5rem;
+  padding: 0.6rem 0.2rem;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
 }
 
 .menu-entry {

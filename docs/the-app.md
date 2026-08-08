@@ -125,8 +125,20 @@ which is the viewport this is for, that is no way out at all. Escape still works
 hands focus back to ☰, and following a link closes it too, since a link to the page
 already open changes no route to react to.
 
+The drawer covers ☰ while it is open, so a **✕ inside it** is the pointer way out that
+does not depend on hitting the strip of backdrop beside it. Focus moves to the first
+entry on open and back to ☰ on Escape.
+
 There is no ☰ at all when it would open onto nothing — a signed-out visitor may follow
 none of it.
+
+**The bar pins its nav rather than spreading itself.** `justify-content: space-between`
+put whatever was in the middle _in the middle_, and the bar's children come and go — ☰
+only for a member, the burn selector only for a second burn — so ☰ landed halfway across
+the bar for the ordinary one-burn viewer the day it was added. `margin-inline-start:
+auto` on the nav holds for every combination; a second auto margin would split the free
+space between the two and move the selector instead. Nothing in the suite lays anything
+out, so `styles.test.ts` asserts it against the stylesheet as text.
 
 ### On a phone
 

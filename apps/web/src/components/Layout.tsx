@@ -75,7 +75,8 @@ export const Layout = ({ api, children }: { api: BellApi; children: ComponentChi
 
   // Open to `approved`, so an account holding `admin` alone reaches them from the nav
   // rather than by typing the URL — which is what the pages themselves allow.
-  const pages = isApproved(viewer) ? memberPages : []
+  const approved = isApproved(viewer)
+  const pages = approved ? memberPages : []
   const bottomBar = phone && pages.length > 0
   const hidden = useHidingBar(bottomBar)
 
@@ -91,7 +92,7 @@ export const Layout = ({ api, children }: { api: BellApi; children: ComponentChi
           <span class="brand-name">{title}</span>
         </a>
 
-        <Menu pages={isApproved(viewer) ? menuPages : []} />
+        <Menu pages={approved ? menuPages : []} />
 
         {/* Leftmost, because everything to the right of it is about the burn it
             names. Hidden when there is nothing to choose between: one burn is the
