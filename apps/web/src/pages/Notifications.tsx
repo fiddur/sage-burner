@@ -1,4 +1,4 @@
-import { useEffect } from 'preact/hooks'
+import { useEffect, useRef } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
@@ -20,9 +20,15 @@ export type NotificationsApi = Pick<ApiClient, 'getMyNotifications' | 'markNotif
  * tapped push lands somewhere a reader can scroll, share and come back to.
  *
  * **Reading it marks everything seen**, exactly as opening the panel does, and that is
- * the whole of what seen means here. The list it was read with stays on screen with
- * the new ones still bold: the marking is for the next visit, and taking the emphasis
- * away in front of somebody would undo the thing they came to look at.
+ * the whole of what seen means here. The marking is for the next visit: what arrived
+ * new stays bold for as long as this page is open, because taking the emphasis away in
+ * front of somebody would undo the thing they came to look at.
+ *
+ * That is what `newOnArrival` is for. The page keeps the bell's beat so a tab left open
+ * catches up — and every one of those refetches comes back with `seen_at` set on the
+ * rows this page just marked, so without it the bold would vanish a minute in, or the
+ * moment the tab was focused. The set is only ever added to from the first answer, so a
+ * notification that arrives *while* the page is open is new and says so.
  */
 export const Notifications = ({ api }: { api: NotificationsApi }) => {
   const viewer = useViewer()
@@ -45,6 +51,20 @@ export const Notifications = ({ api }: { api: NotificationsApi }) => {
     api.markNotificationsSeen().catch(() => undefined)
   }, [api, unseen])
 
+  // A ref rather than state: nothing should re-render because of it, and it is written
+  // during the render that first reads the answer it describes.
+  const newOnArrival = useRef<ReadonlySet<string> | undefined>(undefined)
+
+  const items = loaded.status === 'ready' ? loaded.data.notifications : []
+  newOnArrival.current ??=
+    loaded.status === 'ready'
+      ? new Set(items.filter((item) => item.seen_at === null).map((item) => item.id))
+      : undefined
+
+  const asRead = items.map((item) =>
+    newOnArrival.current?.has(item.id) === true ? { ...item, seen_at: null } : item,
+  )
+
   return (
     <GuardedPage title="Notifications" require="signed-in">
       <h1>
@@ -66,7 +86,7 @@ export const Notifications = ({ api }: { api: NotificationsApi }) => {
       {loaded.status === 'loading' && <p class="form-note">One moment…</p>}
       {loaded.status === 'failed' && <ErrorText message={loaded.message} />}
 
-      {loaded.status === 'ready' && <NotificationList items={loaded.data.notifications} />}
+      {loaded.status === 'ready' && <NotificationList items={asRead} />}
     </GuardedPage>
   )
 }

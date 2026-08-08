@@ -22,7 +22,7 @@ export interface DreamDraft {
 }
 
 /**
- * The form for one dream, used by the Dreams list and by the grid's dialog.
+ * The form for one dream, inside the panel both pages open (#342).
  *
  * `creating` changes two things: the button says so, and every field is emitted
  * rather than only the changed ones. The diff exists to protect a concurrent

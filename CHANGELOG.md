@@ -9,6 +9,12 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-08
 
+- **Somebody organising a burn without coming to it can now see its timetable.** They
+  could pick the burn from the selector at the top and were then told the Schedule and
+  the Dreams pages were "for members" — while the places, the lead roles and the
+  lodging lists beside them were already theirs to set up.
+- **What is new on your notifications stays marked new while you read it**, instead of
+  quietly going plain a minute in.
 - **The Leads page no longer drags sideways, and its bottom bar is back.** The page
   slid left and right beside its table, which pushed the row of icons at the bottom off
   the edge of the screen — on that page it was missing entirely until you scrolled to

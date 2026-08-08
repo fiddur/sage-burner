@@ -3,12 +3,13 @@ import { useState } from 'preact/hooks'
 import { IconButton } from './IconButton.tsx'
 
 /**
- * 🗑️ that asks first, on both pages a dream can be withdrawn from (#209).
+ * 🗑️ that asks first (#209).
  *
- * One component rather than a flag each caller keeps: the two copies had already
- * drifted, leaving the list — where hitting the wrong row is easiest — the one that
- * did not ask. Keeping the question here also means a caller that unmounts this drops
- * it, which is what the panel does when it swaps in the edit form (#208).
+ * One component rather than a flag each caller keeps: there were two copies, and they
+ * had already drifted — the Dreams list, where hitting the wrong row is easiest, was
+ * the one that did not ask. Both pages reach this through the panel now (#342), and
+ * keeping the question here still means a caller that unmounts this drops it, which is
+ * what the panel does when it swaps in the edit form (#208).
  */
 export const WithdrawDream = ({
   title,

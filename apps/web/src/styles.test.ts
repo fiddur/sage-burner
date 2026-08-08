@@ -17,7 +17,13 @@ const css = readFileSync(path.resolve(process.cwd(), 'src/styles.css'), 'utf8').
   '',
 )
 
-/** Innermost rules only — an at-rule's body contains braces, so it never matches. */
+/**
+ * Innermost rules only — an at-rule's body contains braces, so it never matches.
+ *
+ * This would fold declarations into the *selector* capture for a rule containing a
+ * nested one, which would drop that rule from every check below. The stylesheet uses
+ * no CSS nesting, and adopting it means rewriting this.
+ */
 const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([, selector, body]) => ({
   selector: (selector ?? '').trim().replaceAll(/\s+/g, ' '),
   body: body ?? '',
@@ -28,21 +34,14 @@ describe('the stylesheet', () => {
     // The parse is a regex, so a change to the file that broke it would otherwise turn
     // every check below into a vacuous pass over an empty list.
     expect(rules.length).toBeGreaterThan(100)
-    expect(rules.some((rule) => rule.selector === '.visually-hidden')).toBe(true)
+    expect(rules.some((rule) => rule.selector.includes('.visually-hidden'))).toBe(true)
   })
 
   it('positions every box that scrolls sideways', () => {
-    /*
-      `.visually-hidden` is `position: absolute`, so without a positioned ancestor its
-      containing block is the *initial* one. Inside a table scrolled sideways it then
-      sits at its static position — past the right edge of the screen — and drags the
-      whole document's scroll width out with it, which is what made the Leads page
-      scroll sideways beside its own table and took the fixed bottom bar with it (#348).
-
-      Anything establishing a horizontal scroll container therefore has to be a
-      containing block, so what is inside it stays inside it. Vertical-only scrollers
-      are exempt: they cannot push the document sideways.
-    */
+    // Anything establishing a horizontal scroll container has to be a containing
+    // block, so an absolutely positioned descendant cannot escape to the document and
+    // drag its scroll width out (#348) — `docs/the-app.md` has the why. Vertical-only
+    // scrollers are exempt: they cannot push the document sideways.
     const sideways = rules.filter((rule) => /overflow(-x)?:\s*(auto|scroll)/.test(rule.body))
 
     expect(sideways.length).toBeGreaterThan(0)
