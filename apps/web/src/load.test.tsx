@@ -63,7 +63,7 @@ const Actor = ({
 }: {
   work: () => Promise<unknown>
   fallback?: string | ((failure: unknown) => string)
-  onSuccess?: () => void
+  onSuccess?: () => void | Promise<void>
 }) => {
   const { busy, error, failure, formError, run } = useAction(onSuccess)
 
@@ -74,6 +74,44 @@ const Actor = ({
       <span data-testid="failure">{isApiError(failure) ? String(failure.status) : 'none'}</span>
       <span data-testid="attempt">{formError.attempt}</span>
       <button type="button" onClick={() => run(work, fallback)}>
+        Go
+      </button>
+    </div>
+  )
+}
+
+/** Two rows, so a click on the second while the first is in flight has somewhere to go. */
+const Rows = ({ work }: { work: () => Promise<unknown> }) => {
+  const { busy, busyWith, run } = useAction()
+
+  return (
+    <div>
+      <span data-testid="busy">{busy ? 'busy' : 'idle'}</span>
+      <span data-testid="busy-with">{busyWith ?? 'nobody'}</span>
+      {['ada', 'bob'].map((who) => (
+        <button key={who} type="button" onClick={() => run(work, 'Could not do it.', who)}>
+          {who}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * A page that re-reads after a write, which is every page with a guarded write.
+ *
+ * The point of the pairing: `busy` has to hold until the re-read has landed, or the
+ * controls come back live against the data the write has already changed.
+ */
+const Page = ({ fetcher, work }: { fetcher: () => Promise<string>; work: () => Promise<unknown> }) => {
+  const { loaded, reload } = useLoad(fetcher, { fallback: 'Could not load it.' })
+  const { busy, run } = useAction(reload)
+
+  return (
+    <div>
+      <span data-testid="state">{describeLoaded(loaded)}</span>
+      <span data-testid="busy">{busy ? 'busy' : 'idle'}</span>
+      <button type="button" onClick={() => run(work, 'Could not do it.')}>
         Go
       </button>
     </div>
@@ -390,6 +428,46 @@ describe('useAction', () => {
 
     fireEvent.click(go)
     expect(work).toHaveBeenCalledTimes(2)
+  })
+
+  it('stays busy until the re-read it started has landed', async () => {
+    // Otherwise the controls come back live against data the write has already
+    // changed — and a second click computes its body from the row on screen, which is
+    // the pre-write one. `Admin`'s role toggle wrote the earlier grant away that way.
+    let answer: (value: string) => void = () => undefined
+    const fetcher = vi.fn(() => new Promise<string>((resolve) => (answer = resolve)))
+    render(<Page fetcher={fetcher} work={() => Promise.resolve()} />)
+
+    answer('before')
+    await waitFor(() => expect(screen.getByTestId('state').textContent).toBe('before'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Go' }))
+
+    await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2))
+    expect(screen.getByTestId('busy').textContent).toBe('busy')
+
+    answer('after')
+
+    await waitFor(() => expect(screen.getByTestId('state').textContent).toBe('after'))
+    await waitFor(() => expect(screen.getByTestId('busy').textContent).toBe('idle'))
+  })
+
+  it('marks the row it actually started, not the one that was refused', async () => {
+    // The refused click used to set the page's own `deciding` on its row, which then
+    // showed as busy until the *first* action cleared it — feedback for something that
+    // was never going to happen.
+    let settle: () => void = () => undefined
+    render(<Rows work={() => new Promise<void>((resolve) => (settle = resolve))} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'ada' }))
+    await waitFor(() => expect(screen.getByTestId('busy-with').textContent).toBe('ada'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'bob' }))
+
+    expect(screen.getByTestId('busy-with').textContent).toBe('ada')
+
+    settle()
+    await waitFor(() => expect(screen.getByTestId('busy-with').textContent).toBe('nobody'))
   })
 
   it('calls onSuccess only when the work succeeded', async () => {

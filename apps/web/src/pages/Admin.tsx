@@ -33,8 +33,6 @@ const withRole = (roles: readonly AccountRole[], role: AccountRole, held: boolea
 export const Admin = ({ api }: { api: AdminApi }) => {
   const viewer = useViewer()
   const admin = isAdmin(viewer)
-  // Which row, not a boolean: only the account being changed should show it.
-  const [saving, setSaving] = useState<string | undefined>(undefined)
 
   // `enabled: admin` rather than a dependency on the viewer: the provider hands out
   // a new object on every render, so depending on it would refetch continuously.
@@ -43,21 +41,15 @@ export const Admin = ({ api }: { api: AdminApi }) => {
     fallback: 'Could not load the roster.',
   })
 
-  const { error, run } = useAction(reload)
+  const { busy, error, run } = useAction(reload)
 
   const toggle = (entry: AdminAccount, role: AccountRole, held: boolean) => {
-    setSaving(entry.id)
     run(
-      async () => {
-        await api.setAccountRoles(entry.id, { roles: withRole(entry.roles, role, held) })
-        setSaving(undefined)
-      },
-      (failure: unknown) => {
-        setSaving(undefined)
-        return isApiError(failure) && failure.status === 409
+      () => api.setAccountRoles(entry.id, { roles: withRole(entry.roles, role, held) }),
+      (failure: unknown) =>
+        isApiError(failure) && failure.status === 409
           ? 'Someone has to keep admin. Give it to another account first.'
-          : errorMessage(failure, 'Could not change that. Please try again.')
-      },
+          : errorMessage(failure, 'Could not change that. Please try again.'),
     )
   }
 
@@ -123,7 +115,7 @@ export const Admin = ({ api }: { api: AdminApi }) => {
                     <input
                       type="checkbox"
                       checked={entry.roles.includes(role)}
-                      disabled={saving !== undefined}
+                      disabled={busy}
                       aria-label={`${role} — ${entry.email}`}
                       onChange={(changeEvent) => {
                         void toggle(entry, role, changeEvent.currentTarget.checked)

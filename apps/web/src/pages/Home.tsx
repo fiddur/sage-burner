@@ -132,7 +132,7 @@ export const Home = ({ api }: { api: HomeApi }) => {
       // drops the page into its no-burn state instead, which is the whole section
       // disappearing and so is its own explanation.
       if (event === null) {
-        reload()
+        void reload()
         return
       }
 

@@ -148,7 +148,11 @@ describe('AdminInvites', () => {
     ;(await screen.findByRole('button', { name: 'Create an invite' })).click()
     ;(await screen.findByRole('button', { name: 'Copy link' })).click()
     await screen.findByRole('button', { name: 'Copied' })
-    screen.getByRole('button', { name: 'Create an invite' }).click()
+    // The button is disabled until the re-read the mint started has landed (#176), and
+    // a click on a disabled button is not a click.
+    const again = screen.getByRole('button', { name: 'Create an invite' })
+    await waitFor(() => expect(again.hasAttribute('disabled')).toBe(false))
+    again.click()
 
     expect(await screen.findByText(/second/)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Copy link' })).toBeTruthy()

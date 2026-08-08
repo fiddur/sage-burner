@@ -31,14 +31,15 @@ export const AdminApplications = ({ api }: { api: ApplicationsApi }) => {
   const [invites, setInvites] = useState<Record<string, { invite: Invite; delivery: InviteDelivery }>>({})
   // Which row, not a boolean: two applications can be decided one after the other,
   // and only the one being decided should show it.
-  const [deciding, setDeciding] = useState<string | undefined>(undefined)
 
   const { loaded, reload } = useLoad((signal) => api.getApplications(signal), {
     enabled: admin,
     fallback: 'Could not load the applications.',
   })
 
-  const { error, run } = useAction(reload)
+  // `busyWith` is the row: only the application being decided should show it, and a
+  // click refused while another is in flight marks nothing.
+  const { busyWith, error, run } = useAction(reload)
 
   /**
    * A fresh link when the first was lost.
@@ -49,15 +50,12 @@ export const AdminApplications = ({ api }: { api: ApplicationsApi }) => {
    * mean hiding the button from the person who needs it.
    */
   const reissue = (id: string) => {
-    setDeciding(id)
     run(
       async () => {
         const { invite, delivery } = await api.reissueInvite(id)
         setInvites((current) => ({ ...current, [id]: { invite, delivery } }))
-        setDeciding(undefined)
       },
       (failure: unknown) => {
-        setDeciding(undefined)
         if (!isApiError(failure)) return 'Could not make a new link. Please try again.'
 
         // By the slug, not the status: both refusals are 409 and mean opposite
@@ -69,11 +67,11 @@ export const AdminApplications = ({ api }: { api: ApplicationsApi }) => {
           }[failure.code] ?? 'Could not make a new link. Please try again.'
         )
       },
+      id,
     )
   }
 
   const decide = (id: string, decision: 'approve' | 'reject') => {
-    setDeciding(id)
     run(
       async () => {
         const response =
@@ -83,16 +81,14 @@ export const AdminApplications = ({ api }: { api: ApplicationsApi }) => {
         // follows returns the application without it.
         const { invite, delivery } = response
         if (invite !== null) setInvites((current) => ({ ...current, [id]: { invite, delivery } }))
-        setDeciding(undefined)
       },
       // A 409 means someone else decided it first, so the list on screen is stale —
       // saying "try again" would send them round the same loop.
-      (failure: unknown) => {
-        setDeciding(undefined)
-        return isApiError(failure) && failure.status === 409
+      (failure: unknown) =>
+        isApiError(failure) && failure.status === 409
           ? 'That application was already decided. Reload to see where it stands.'
-          : 'Could not save that. Please try again.'
-      },
+          : 'Could not save that. Please try again.',
+      id,
     )
   }
 
@@ -131,7 +127,7 @@ export const AdminApplications = ({ api }: { api: ApplicationsApi }) => {
               <p class="row">
                 <button
                   type="button"
-                  disabled={deciding === entry.id}
+                  disabled={busyWith === entry.id}
                   onClick={() => void decide(entry.id, 'approve')}
                 >
                   Approve
@@ -139,7 +135,7 @@ export const AdminApplications = ({ api }: { api: ApplicationsApi }) => {
                 <button
                   type="button"
                   class="link-button"
-                  disabled={deciding === entry.id}
+                  disabled={busyWith === entry.id}
                   onClick={() => void decide(entry.id, 'reject')}
                 >
                   Reject
@@ -152,7 +148,7 @@ export const AdminApplications = ({ api }: { api: ApplicationsApi }) => {
                 <button
                   type="button"
                   class="link-button"
-                  disabled={deciding === entry.id}
+                  disabled={busyWith === entry.id}
                   onClick={() => reissue(entry.id)}
                 >
                   Send a new link

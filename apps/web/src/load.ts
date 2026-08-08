@@ -90,7 +90,7 @@ export const useLoad = <T>(
     live = false,
     remember,
   }: { enabled?: boolean; fallback?: string; key?: string; live?: boolean; remember?: string },
-): { loaded: Loaded<T>; refreshing: boolean; reload: () => void } => {
+): { loaded: Loaded<T>; refreshing: boolean; reload: () => Promise<void> } => {
   const remembered = useRemembered()
   const at = remember === undefined ? undefined : `${remember}:${key}`
 
@@ -117,8 +117,21 @@ export const useLoad = <T>(
   const latest = useRef(fetcher)
   latest.current = fetcher
 
+  // What `reload()` handed back, resolved by whichever run actually finishes — the one
+  // it started, or a later one that superseded it. A caller awaiting this is holding a
+  // button disabled, so it must not be left waiting on a fetch that was aborted.
+  const waiting = useRef<(() => void)[]>([])
+  const settle = () => {
+    const pending = waiting.current
+    waiting.current = []
+    for (const done of pending) done()
+  }
+
   useEffect(() => {
-    if (!enabled) return undefined
+    if (!enabled) {
+      settle()
+      return undefined
+    }
 
     if (seeded.current !== at) {
       seeded.current = at
@@ -151,7 +164,9 @@ export const useLoad = <T>(
         )
       })
       .finally(() => {
-        if (!controller.signal.aborted) setFetching(false)
+        if (controller.signal.aborted) return
+        setFetching(false)
+        settle()
       })
 
     return () => {
@@ -187,7 +202,14 @@ export const useLoad = <T>(
     // Only ever true over data: a first load has "Loading…" to say so, and a spinner
     // beside it would be two ways of saying one thing.
     refreshing: fetching && loaded.status === 'ready',
-    reload: useCallback(() => setAttempt(({ count }) => ({ count: count + 1, quiet: false })), []),
+    reload: useCallback(
+      () =>
+        new Promise<void>((resolve) => {
+          waiting.current.push(resolve)
+          setAttempt(({ count }) => ({ count: count + 1, quiet: false }))
+        }),
+      [],
+    ),
   }
 }
 
@@ -198,6 +220,13 @@ export const useLoad = <T>(
  * copies this replaces and not the others, so a double click on those sent the
  * request twice — made one deliberate choice here rather than four accidental ones.
  *
+ * **Busy holds until `onSuccess` has finished**, which on every page with a guarded
+ * write is the re-read (#176). Dropping it when the write resolved left one GET
+ * round-trip in which the controls were live against pre-write data — and a page that
+ * computes its body from the row on screen sends the row it can still see. `Admin`'s
+ * role toggle did exactly that: a second box ticked in the window wrote the grant just
+ * made back off.
+ *
  * The fallback may be a function, for the pages that map a particular status to
  * particular words: a 409 on "say you are coming" means the burn is full, which is
  * worth saying rather than "that did not work".
@@ -207,28 +236,38 @@ export const useLoad = <T>(
  * beside the message rather than derived from it, so `setError` writing a message of
  * the page's own clears it.
  *
+ * `busyWith` is the third argument to `run`, for a list where only the row being
+ * written should say so. It is set only when `run` actually started: three pages held
+ * their own `deciding`/`saving`/`recording` beside this, set *before* the call, so a
+ * click refused while another action was in flight marked a row nothing was happening
+ * to — and the clears were scattered through both the success path and the error
+ * mapper, a side effect inside a fallback.
+ *
  * `formError` is the same message counted, for a form tall enough that the complaint
  * must be beside the button and focused rather than at the top of the page — see
  * `FormError`, whose whole point is that a *repeated identical* failure is still a new
  * event. Four pages held a `useFormError` beside their own save loop for that, which is
  * two error states on one page and two chances to clear only one of them.
  */
-export const useAction = (onSuccess?: () => void) => {
-  const [busy, setBusy] = useState(false)
+export const useAction = (onSuccess?: () => void | Promise<void>) => {
+  const [active, setActive] = useState<{ tag: string | undefined } | undefined>(undefined)
   const [problem, setProblem] = useState<{ message?: string; failure?: unknown; attempt: number }>({
     attempt: 0,
   })
+  const busy = active !== undefined
 
-  const run = (work: () => Promise<unknown>, fallback: string | ((failure: unknown) => string)) => {
+  const run = (
+    work: () => Promise<unknown>,
+    fallback: string | ((failure: unknown) => string),
+    tag?: string,
+  ) => {
     if (busy) return
 
-    setBusy(true)
+    setActive({ tag })
     setProblem(({ attempt }) => ({ attempt: attempt + 1 }))
 
     void work()
-      .then(() => {
-        onSuccess?.()
-      })
+      .then(() => onSuccess?.())
       .catch((failure: unknown) => {
         setProblem(({ attempt }) => ({
           message: typeof fallback === 'function' ? fallback(failure) : errorMessage(failure, fallback),
@@ -240,15 +279,23 @@ export const useAction = (onSuccess?: () => void) => {
         // refused, so re-read: the message says it has been refreshed, and that has
         // to be true by the time somebody reads it. `onSuccess` is the reload on
         // every page that has one, which is every page with a guarded write.
-        if (isStale(failure)) onSuccess?.()
+        if (isStale(failure)) return onSuccess?.()
+
+        return undefined
       })
       .finally(() => {
-        setBusy(false)
+        setActive(undefined)
       })
   }
 
   return {
     busy,
+    /**
+     * Which row is being written, for a list where only one should say so — the
+     * argument `run` was given, and only when it actually started. A refused click used
+     * to leave the page's own state on a row nothing was happening to.
+     */
+    busyWith: active?.tag,
     error: problem.message,
     failure: problem.failure,
     /** The same message, for `FormError` — which counts attempts rather than storing one. */
@@ -285,7 +332,7 @@ export const useLoadInto = <T>(
   fetcher: (signal: AbortSignal) => Promise<T>,
   seed: (data: T) => void,
   options: { enabled?: boolean; fallback?: string; key?: string },
-): { loaded: Loaded<T>; refreshing: boolean; reload: () => void } => {
+): { loaded: Loaded<T>; refreshing: boolean; reload: () => Promise<void> } => {
   const { loaded, refreshing, reload } = useLoad(fetcher, options)
   const latest = useRef(seed)
   latest.current = seed
