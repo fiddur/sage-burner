@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks'
 
+import type { FormErrorState } from './components/FormError.tsx'
+
 import { isApiError } from './api/client.ts'
 import { useRemembered } from './remembered.tsx'
 import { isStale } from './stale.ts'
@@ -198,26 +200,35 @@ export const useLoad = <T>(
  * — today the longer fields, which show what the other author wrote (#274). Held
  * beside the message rather than derived from it, so `setError` writing a message of
  * the page's own clears it.
+ *
+ * `formError` is the same message counted, for a form tall enough that the complaint
+ * must be beside the button and focused rather than at the top of the page — see
+ * `FormError`, whose whole point is that a *repeated identical* failure is still a new
+ * event. Four pages held a `useFormError` beside their own save loop for that, which is
+ * two error states on one page and two chances to clear only one of them.
  */
 export const useAction = (onSuccess?: () => void) => {
   const [busy, setBusy] = useState(false)
-  const [problem, setProblem] = useState<{ message?: string; failure?: unknown }>({})
+  const [problem, setProblem] = useState<{ message?: string; failure?: unknown; attempt: number }>({
+    attempt: 0,
+  })
 
   const run = (work: () => Promise<unknown>, fallback: string | ((failure: unknown) => string)) => {
     if (busy) return
 
     setBusy(true)
-    setProblem({})
+    setProblem(({ attempt }) => ({ attempt: attempt + 1 }))
 
     void work()
       .then(() => {
         onSuccess?.()
       })
       .catch((failure: unknown) => {
-        setProblem({
+        setProblem(({ attempt }) => ({
           message: typeof fallback === 'function' ? fallback(failure) : errorMessage(failure, fallback),
           failure,
-        })
+          attempt: attempt + 1,
+        }))
 
         // A refused write leaves the page holding exactly the version that was
         // refused, so re-read: the message says it has been refreshed, and that has
@@ -234,9 +245,45 @@ export const useAction = (onSuccess?: () => void) => {
     busy,
     error: problem.message,
     failure: problem.failure,
+    /** The same message, for `FormError` — which counts attempts rather than storing one. */
+    formError: { message: problem.message, attempt: problem.attempt } satisfies FormErrorState,
     setError: (message: string | undefined) => {
-      setProblem({ message })
+      setProblem(({ attempt }) => ({ message, attempt: attempt + 1 }))
     },
     run,
   }
+}
+
+/**
+ * The pages whose "ready" is a form rather than a rendering.
+ *
+ * `Your details` and `Settings` both fetch a record and then copy it into the fields
+ * somebody edits, so the response is a *seed* and the draft is what the page holds
+ * from then on. Written out by hand that is `useLoad`'s effect plus a second one, and
+ * the two pages had already grown different opinions about which state the failure
+ * lived in — which is the drift #144 was filed about, so it is decided once here
+ * rather than twice differently.
+ *
+ * `seed` runs once per answer, not once per render, and is held in a ref so a caller
+ * can write it inline — the same reason `useLoad` holds its fetcher in one. It runs
+ * again after a `reload()`, which is what makes a save show what the server kept.
+ *
+ * **Not for a `live` page.** Re-seeding on a background poll would take away whatever
+ * somebody was halfway through typing, so nothing here passes `live` and this does not
+ * offer it.
+ */
+export const useLoadInto = <T>(
+  fetcher: (signal: AbortSignal) => Promise<T>,
+  seed: (data: T) => void,
+  options: { enabled?: boolean; fallback: string; key?: string; remember?: string },
+): { loaded: Loaded<T>; refreshing: boolean; reload: () => void } => {
+  const { loaded, refreshing, reload } = useLoad(fetcher, options)
+  const latest = useRef(seed)
+  latest.current = seed
+
+  useEffect(() => {
+    if (loaded.status === 'ready') latest.current(loaded.data)
+  }, [loaded])
+
+  return { loaded, refreshing, reload }
 }

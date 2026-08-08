@@ -108,6 +108,15 @@ export const QuestionEditor = ({ api }: { api: QuestionsApi }) => {
     }
   }, [api])
 
+  /*
+    This one keeps its own load-and-run loop rather than `useLoad`/`useAction` (#175),
+    and the reason is `refresh` being **awaitable**: the two branches below tell "saved,
+    but the list could not be reloaded" apart from "the write failed", and they re-read
+    on failure as well as on success — which `useAction` deliberately does not, since
+    for every other page a failed write leaves the screen already correct. `reload()`
+    returns nothing, so bending this onto the hook would cost both messages.
+  */
+
   // Every mutation re-reads rather than patching local state. One extra request
   // per change, and in exchange what is on screen is what the public form will
   // render — including the `order` values the server assigned.

@@ -1,5 +1,5 @@
 import { MAX_TITLE } from '@sage-burner/shared'
-import { useEffect, useState } from 'preact/hooks'
+import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 import type { BannerApi } from '../components/BannerField.tsx'
@@ -7,7 +7,6 @@ import type { IconApi } from '../components/IconField.tsx'
 import type { MailApi } from '../components/MailField.tsx'
 import type { PushApi } from '../components/PushToggle.tsx'
 
-import { isApiError } from '../api/client.ts'
 import { BannerField } from '../components/BannerField.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
@@ -17,6 +16,7 @@ import { MailField } from '../components/MailField.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
 import { PushToggle } from '../components/PushToggle.tsx'
 import { useSetInstallationTitle } from '../installation.tsx'
+import { useAction, useLoadInto } from '../load.ts'
 import { isAdmin, useViewer } from '../viewer.tsx'
 
 export type AdminSettingsApi = BannerApi &
@@ -25,59 +25,37 @@ export type AdminSettingsApi = BannerApi &
   PushApi &
   Pick<ApiClient, 'getInstallation' | 'logout' | 'updateInstallation'>
 
-type Loaded = { status: 'loading' } | { status: 'ready' } | { status: 'failed' }
-
 /** What this installation calls itself. */
 export const AdminSettings = ({ api }: { api: AdminSettingsApi }) => {
   const viewer = useViewer()
   const admin = isAdmin(viewer)
   const setInstallationTitle = useSetInstallationTitle()
-  const [loaded, setLoaded] = useState<Loaded>({ status: 'loading' })
   const [title, setTitle] = useState('')
-  const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
-  const [error, setError] = useState<string | undefined>(undefined)
 
-  useEffect(() => {
-    if (!admin) return undefined
+  const { loaded } = useLoadInto(
+    async (signal) => await api.getInstallation(signal),
+    ({ installation }) => setTitle(installation.title),
+    { enabled: admin, fallback: 'Could not load the settings. Please reload the page.' },
+  )
 
-    const controller = new AbortController()
+  const { busy: saving, error, setError, run } = useAction()
 
-    api
-      .getInstallation(controller.signal)
-      .then((response) => {
-        if (controller.signal.aborted) return
-        setLoaded({ status: 'ready' })
-        setTitle(response.installation.title)
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setLoaded({ status: 'failed' })
-      })
-
-    return () => {
-      controller.abort()
-    }
-  }, [api, admin])
-
-  const save = async () => {
-    setError(undefined)
+  const save = () => {
     setSaved(false)
     if (title.trim() === '') {
       setError('Give it a name — this is the heading on every page.')
       return
     }
 
-    setSaving(true)
-    try {
-      const response = await api.updateInstallation({ title: title.trim() })
-      setTitle(response.installation.title)
-      setInstallationTitle(response.installation.title)
+    run(async () => {
+      const { installation } = await api.updateInstallation({ title: title.trim() })
+      setTitle(installation.title)
+      // The bar reads the title from a context rather than from this page, so the
+      // heading everywhere else follows without a reload.
+      setInstallationTitle(installation.title)
       setSaved(true)
-    } catch (failure) {
-      setError(isApiError(failure) ? failure.message : 'Could not save that. Please try again.')
-    } finally {
-      setSaving(false)
-    }
+    }, 'Could not save that. Please try again.')
   }
 
   return (
@@ -86,16 +64,14 @@ export const AdminSettings = ({ api }: { api: AdminSettingsApi }) => {
 
       {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
 
-      {loaded.status === 'failed' && (
-        <ErrorText message="Could not load the settings. Please reload the page." />
-      )}
+      {loaded.status === 'failed' && <ErrorText message={loaded.message} />}
 
       {loaded.status === 'ready' && (
         <form
           class="form"
           onSubmit={(submitEvent) => {
             submitEvent.preventDefault()
-            void save()
+            save()
           }}
         >
           <ErrorText message={error} />

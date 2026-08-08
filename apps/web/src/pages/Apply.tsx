@@ -8,15 +8,16 @@ import {
   isTickBox,
   looksLikeEmail,
 } from '@sage-burner/shared'
-import { useCallback, useEffect, useMemo, useState } from 'preact/hooks'
+import { useCallback, useMemo, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
 import { ErrorText } from '../components/ErrorText.tsx'
-import { FormError, useFormError } from '../components/FormError.tsx'
+import { FormError } from '../components/FormError.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
 import { useInstallationSendsEmail } from '../installation.tsx'
+import { useAction, useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
 import { rowsFor } from '../textarea.ts'
 
@@ -102,31 +103,22 @@ const hasProblem = (problems: string[], field: string) =>
 
 export const Apply = ({ api }: ApplyProps) => {
   const sendsEmail = useInstallationSendsEmail()
-  const [questions, setQuestions] = useState<FormQuestion[] | undefined>(undefined)
-  const [loadFailed, setLoadFailed] = useState(false)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [answers, setAnswers] = useState<SubmittedAnswers>({})
   const [problems, setProblems] = useState<AnswerProblem[]>([])
   const [identityProblems, setIdentityProblems] = useState<string[]>([])
-  const [sendError, setSendError] = useFormError()
-  const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
 
-  useEffect(() => {
-    const controller = new AbortController()
+  // Public, so there is no role to wait for — this is the one load in the app that
+  // starts on mount whoever is looking.
+  const { loaded } = useLoad(async (signal) => (await api.getQuestions(signal)).questions, {
+    fallback: 'Could not load the form. Please reload the page.',
+  })
+  const questions: FormQuestion[] | undefined = loaded.status === 'ready' ? loaded.data : undefined
+  const loadFailed = loaded.status === 'failed'
 
-    api
-      .getQuestions(controller.signal)
-      .then((response) => {
-        setQuestions(response.questions)
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setLoadFailed(true)
-      })
-
-    return () => controller.abort()
-  }, [api])
+  const { busy: sending, formError: sendError, setError: setSendError, run } = useAction()
 
   // Once per load, not once per keystroke: `answer()` sets `answers`, so this
   // component re-renders on every character typed, and the help text this exists
@@ -150,7 +142,7 @@ export const Apply = ({ api }: ApplyProps) => {
     setAnswers((current) => ({ ...current, [id]: value }))
   }, [])
 
-  const submit = async () => {
+  const submit = () => {
     // Every rule passes vacuously against a list that has not arrived.
     if (questions === undefined) return
 
@@ -166,30 +158,27 @@ export const Apply = ({ api }: ApplyProps) => {
     setSendError(undefined)
     if (found.length > 0 || identity.length > 0) return
 
-    setSending(true)
-    try {
-      await api.submitApplication({
-        applicant_name: name.trim(),
-        applicant_email: email.trim(),
-        answers,
-        // What this page put on screen, which is not necessarily what the server
-        // holds now: a question added while it was open is not one the applicant
-        // was asked, and storing an empty answer for it would say otherwise.
-        asked: questions.map((question) => question.id),
-      })
-      setSent(true)
-    } catch (error) {
-      // A 400 means the questions changed since this page loaded, so retrying
-      // sends an identical body and fails identically. The answers stay on
-      // screen either way.
-      setSendError(
-        isApiError(error) && error.status === 400
+    run(
+      async () => {
+        await api.submitApplication({
+          applicant_name: name.trim(),
+          applicant_email: email.trim(),
+          answers,
+          // What this page put on screen, which is not necessarily what the server
+          // holds now: a question added while it was open is not one the applicant
+          // was asked, and storing an empty answer for it would say otherwise.
+          asked: questions.map((question) => question.id),
+        })
+        setSent(true)
+      },
+      // A 400 means the questions changed since this page loaded, so retrying sends
+      // an identical body and fails identically. The answers stay on screen either
+      // way. A function rather than a string, since the wording turns on the status.
+      (failure) =>
+        isApiError(failure) && failure.status === 400
           ? 'The questions changed while you were filling this in. Please reload the page and send it again.'
           : 'Could not send your application. Please check your connection and try again.',
-      )
-    } finally {
-      setSending(false)
-    }
+    )
   }
 
   if (sent) return <Sent sendsEmail={sendsEmail} />
@@ -202,7 +191,7 @@ export const Apply = ({ api }: ApplyProps) => {
         class="form"
         onSubmit={(event) => {
           event.preventDefault()
-          void submit()
+          submit()
         }}
       >
         {loadFailed && <ErrorText message="Could not load the questions. Please reload the page." />}

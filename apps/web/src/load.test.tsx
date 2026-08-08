@@ -1,13 +1,14 @@
 import type { ComponentChildren } from 'preact'
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
+import { useRef, useState } from 'preact/hooks'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Loaded } from './load.ts'
 import type { Remembered } from './remembered.tsx'
 
 import { apiError, isApiError } from './api/client.ts'
-import { errorMessage, useAction, useLoad } from './load.ts'
+import { errorMessage, useAction, useLoad, useLoadInto } from './load.ts'
 import { createRemembered, RememberedProvider } from './remembered.tsx'
 
 afterEach(cleanup)
@@ -64,13 +65,14 @@ const Actor = ({
   fallback?: string | ((failure: unknown) => string)
   onSuccess?: () => void
 }) => {
-  const { busy, error, failure, run } = useAction(onSuccess)
+  const { busy, error, failure, formError, run } = useAction(onSuccess)
 
   return (
     <div>
       <span data-testid="busy">{busy ? 'busy' : 'idle'}</span>
       <span data-testid="error">{error ?? 'none'}</span>
       <span data-testid="failure">{isApiError(failure) ? String(failure.status) : 'none'}</span>
+      <span data-testid="attempt">{formError.attempt}</span>
       <button type="button" onClick={() => run(work, fallback)}>
         Go
       </button>
@@ -465,6 +467,51 @@ describe('useAction', () => {
   })
 })
 
+describe('an error a form can focus', () => {
+  it('counts every attempt, so a repeated identical failure is still a new one', async () => {
+    // What `FormError` keys its focus on. Two identical failures in a row commit the
+    // same string, so a form watching only the message sits out the second — which is
+    // the original symptom returning: tap, read it, tap again, nothing happens.
+    render(<Actor work={() => Promise.reject(new Error('nope'))} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Go' }))
+    await waitFor(() => expect(screen.getByTestId('error').textContent).toBe('Could not do it.'))
+    const first = screen.getByTestId('attempt').textContent
+
+    fireEvent.click(screen.getByRole('button', { name: 'Go' }))
+
+    await waitFor(() => expect(screen.getByTestId('attempt').textContent).not.toBe(first))
+    expect(screen.getByTestId('error').textContent).toBe('Could not do it.')
+  })
+
+  it('counts a message the page writes itself', async () => {
+    // A page's own complaint — "give it a name" — is the same event to a reader as a
+    // refused write, and it arrives through `setError` rather than through `run`.
+    const Refusing = () => {
+      const { formError, setError } = useAction()
+
+      return (
+        <div>
+          <span data-testid="attempt">{formError.attempt}</span>
+          <span data-testid="error">{formError.message ?? 'none'}</span>
+          <button type="button" onClick={() => setError('not filled in')}>
+            Complain
+          </button>
+        </div>
+      )
+    }
+    render(<Refusing />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Complain' }))
+    await waitFor(() => expect(screen.getByTestId('error').textContent).toBe('not filled in'))
+    const first = screen.getByTestId('attempt').textContent
+
+    fireEvent.click(screen.getByRole('button', { name: 'Complain' }))
+
+    await waitFor(() => expect(screen.getByTestId('attempt').textContent).not.toBe(first))
+  })
+})
+
 describe('a page others are changing under you', () => {
   it('refetches when the tab comes back to the front', async () => {
     let answered = 0
@@ -556,6 +603,88 @@ describe('a page others are changing under you', () => {
     } finally {
       hidden.mockRestore()
     }
+  })
+})
+
+describe('a form seeded from what was loaded', () => {
+  const Form = ({
+    fetcher,
+    enabled,
+  }: {
+    fetcher: (signal: AbortSignal) => Promise<string>
+    enabled?: boolean
+  }) => {
+    const [draft, setDraft] = useState('')
+    const seeded = useRef(0)
+    const { loaded, reload } = useLoadInto(
+      fetcher,
+      (value) => {
+        seeded.current += 1
+        setDraft(value)
+      },
+      { enabled, fallback: 'Could not load it.' },
+    )
+
+    return (
+      <div>
+        <span data-testid="state">{describeLoaded(loaded)}</span>
+        <span data-testid="draft">{draft}</span>
+        <span data-testid="seeds">{seeded.current}</span>
+        <button type="button" onClick={() => setDraft('typed')}>
+          Type
+        </button>
+        <button type="button" onClick={reload}>
+          Reload
+        </button>
+      </div>
+    )
+  }
+
+  it('copies the answer into the draft', async () => {
+    render(<Form fetcher={() => Promise.resolve('from the server')} />)
+
+    await waitFor(() => expect(screen.getByTestId('draft').textContent).toBe('from the server'))
+  })
+
+  it('seeds once per answer, not once per render', async () => {
+    // The reason `seed` lives in a ref: a caller writes it inline, so a new closure
+    // every render would re-seed on every keystroke and take the form away as it was
+    // being filled in.
+    render(<Form fetcher={() => Promise.resolve('from the server')} />)
+    await waitFor(() => expect(screen.getByTestId('draft').textContent).toBe('from the server'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Type' }))
+
+    await waitFor(() => expect(screen.getByTestId('draft').textContent).toBe('typed'))
+    expect(screen.getByTestId('seeds').textContent).toBe('1')
+  })
+
+  it('seeds again after a reload, which is what shows a save landing', async () => {
+    let answered = 0
+    render(<Form fetcher={() => Promise.resolve(`answer ${(answered += 1)}`)} />)
+    await waitFor(() => expect(screen.getByTestId('draft').textContent).toBe('answer 1'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reload' }))
+
+    await waitFor(() => expect(screen.getByTestId('draft').textContent).toBe('answer 2'))
+  })
+
+  it('seeds nothing from a load that failed', async () => {
+    render(<Form fetcher={() => Promise.reject(new Error('nope'))} />)
+
+    await waitFor(() => expect(stateText()).toBe('Could not load it.'))
+    expect(screen.getByTestId('draft').textContent).toBe('')
+    expect(screen.getByTestId('seeds').textContent).toBe('0')
+  })
+
+  it('does not fetch at all when it is not enabled', async () => {
+    const fetcher = vi.fn(() => Promise.resolve('from the server'))
+    render(<Form fetcher={fetcher} enabled={false} />)
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(fetcher).not.toHaveBeenCalled()
+    expect(screen.getByTestId('seeds').textContent).toBe('0')
   })
 })
 

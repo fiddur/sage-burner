@@ -51,6 +51,26 @@ const renderPage = (api: EventsApi) =>
     </ViewerProvider>,
   )
 
+/**
+ * A stub that answers as a server does: the write lands in a list the next read sees.
+ *
+ * Every write on this page re-reads rather than patching what is on screen, so a stub
+ * whose `getEvents` always answers the same thing can only ever show a page that never
+ * caught up. The ordering is the server's too — it returns them start-date first, and
+ * the page used to splice a new one into place by hand.
+ */
+const serverHolding = (...rows: Event[]) => {
+  let held = [...rows]
+
+  return {
+    getEvents: () =>
+      Promise.resolve({ events: [...held].sort((a, b) => a.start_date.localeCompare(b.start_date)) }),
+    keep: (row: Event) => {
+      held = [...held.filter((one) => one.id !== row.id), row]
+    },
+  }
+}
+
 const fill = (label: string, value: string) =>
   fireEvent.input(screen.getByLabelText(label), { target: { value } })
 
@@ -103,10 +123,14 @@ describe('AdminEvents', () => {
     )
   })
 
-  it('creates an event and shows it without a reload', async () => {
+  it('creates an event and shows it without the page being reloaded', async () => {
     const created: Event = { ...summer, id: 'e-2', name: 'Winter Burn', slug: 'winter-2026' }
-    const createEvent = vi.fn(() => Promise.resolve({ event: created }))
-    renderPage(stub({ createEvent }))
+    const server = serverHolding(summer)
+    const createEvent = vi.fn(() => {
+      server.keep(created)
+      return Promise.resolve({ event: created })
+    })
+    renderPage(stub({ createEvent, getEvents: server.getEvents }))
     await screen.findByText('Summer Burn 2026')
 
     fill('Name', 'Winter Burn')
@@ -152,8 +176,9 @@ describe('AdminEvents', () => {
   })
 
   it('keeps a newly created event in start-date order', async () => {
-    // The list comes back ordered by start date; appending would show a winter
-    // event above a summer one until the next reload.
+    // The list comes back ordered by start date, and the page shows the server's
+    // order rather than splicing a new row into place itself — which is where a
+    // winter burn used to appear above a summer one.
     const winter: Event = {
       ...summer,
       id: 'e-0',
@@ -162,7 +187,16 @@ describe('AdminEvents', () => {
       start_date: '2025-12-01',
       end_date: '2025-12-05',
     }
-    renderPage(stub({ createEvent: () => Promise.resolve({ event: winter }) }))
+    const server = serverHolding(summer)
+    renderPage(
+      stub({
+        getEvents: server.getEvents,
+        createEvent: () => {
+          server.keep(winter)
+          return Promise.resolve({ event: winter })
+        },
+      }),
+    )
     await screen.findByText('Summer Burn 2026')
 
     fill('Name', 'Winter Burn')
@@ -263,8 +297,13 @@ describe('AdminEvents', () => {
   it('shows the row the server returned, not the draft that was sent', async () => {
     // The server trims and may adjust; echoing the draft would draw a save that
     // did not happen the way it is shown.
-    const updateEvent = vi.fn(() => Promise.resolve({ event: { ...summer, name: 'Trimmed By Server' } }))
-    renderPage(stub({ updateEvent }))
+    const trimmed = { ...summer, name: 'Trimmed By Server' }
+    const server = serverHolding(summer)
+    const updateEvent = vi.fn(() => {
+      server.keep(trimmed)
+      return Promise.resolve({ event: trimmed })
+    })
+    renderPage(stub({ updateEvent, getEvents: server.getEvents }))
     ;(await screen.findByRole('button', { name: 'Edit event' })).click()
     await screen.findByLabelText('Name of summer-2026')
 
@@ -279,9 +318,13 @@ describe('AdminEvents', () => {
     // response must not land in the form now showing someone else's burn, nor
     // report "Saved." under fields nobody sent.
     let settle: (value: { event: Event }) => void = () => undefined
-    const updateEvent = vi.fn(() => new Promise<{ event: Event }>((resolve) => (settle = resolve)))
     const winterBurn: Event = { ...summer, id: 'e-2', name: 'Winter Burn', slug: 'winter-2026' }
-    renderPage(stub({ updateEvent, getEvents: () => Promise.resolve({ events: [summer, winterBurn] }) }))
+    const server = serverHolding(summer, winterBurn)
+    const updateEvent = vi.fn(() => {
+      server.keep({ ...summer, name: 'Trimmed By Server' })
+      return new Promise<{ event: Event }>((resolve) => (settle = resolve))
+    })
+    renderPage(stub({ updateEvent, getEvents: server.getEvents }))
     await screen.findByText('Summer Burn 2026')
 
     const [editSummer, editWinter] = screen.getAllByRole('button', { name: 'Edit event' })
