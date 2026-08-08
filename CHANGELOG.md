@@ -9,6 +9,9 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-08
 
+- **Changing the banner no longer leaves the old one on your phone forever.** Every
+  upload was kept, about a megabyte each, with nothing to clear them.
+- **The page no longer jumps sideways when a menu or a dream opens** on a desktop.
 - **The menu and a dream's panel now hold the page behind them still.** It used to
   scroll under them, and tabbing from inside walked out to buttons hidden behind the
   backdrop.

@@ -40,7 +40,10 @@ describe('an overlay while it is up', () => {
 
   it('puts back whatever the page was already doing rather than clearing it', () => {
     // Restoring to `''` would be right today and wrong the moment anything else sets
-    // it — which is exactly the kind of thing a second overlay would.
+    // it. Note what this does *not* buy: capture-and-restore only composes while
+    // mount and unmount are strictly LIFO, so two overlaps closing the other way
+    // round would release the lock early. Nothing can overlap today — the dream
+    // modal covers ☰ — and a counter is the shape to reach for when one can.
     document.body.style.overflow = 'clip'
     const { rerender } = render(<Page open={true} />)
 
@@ -69,8 +72,6 @@ describe('an overlay while it is up', () => {
   })
 
   it('sends Shift+Tab from the panel itself to the last, since the panel is not in the order', () => {
-    // The panel holds focus on open with `tabIndex={-1}`, so backwards from there is
-    // the one direction the browser would take straight out into the page.
     render(<Page open={true} />)
     screen.getByTestId('panel').focus()
 
@@ -98,14 +99,27 @@ describe('an overlay while it is up', () => {
     expect(document.activeElement).toBe(behind)
   })
 
-  it('does nothing rather than throwing when there is nothing to focus', () => {
+  it('leaves Tab to the browser when there is nothing to focus', () => {
     // A panel whose every control is disabled mid-write, which is an ordinary moment.
+    // Asserted as `preventDefault` *not* called: `fireEvent.keyDown` never moves focus
+    // in happy-dom, so checking where focus ended up would pass against a hook that
+    // did nothing at all.
     render(<Overlay empty={true} />)
-    const behind = screen.getByRole('button', { name: 'behind' })
-    behind.focus()
+    screen.getByRole('button', { name: 'behind' }).focus()
 
-    fireEvent.keyDown(document, { key: 'Tab' })
+    const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
+    document.dispatchEvent(tab)
 
-    expect(document.activeElement).toBe(behind)
+    expect(tab.defaultPrevented).toBe(false)
+  })
+
+  it('takes Tab over at a boundary, which is the sibling for that', () => {
+    render(<Page open={true} />)
+    screen.getByRole('button', { name: 'last' }).focus()
+
+    const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
+    document.dispatchEvent(tab)
+
+    expect(tab.defaultPrevented).toBe(true)
   })
 })

@@ -147,17 +147,42 @@ export const cachedAt = (response: Pick<Response, 'headers'>): string | undefine
   response.headers.get(CACHED_AT) ?? undefined
 
 /**
- * Drop the oldest hashed assets past the limit. See `ASSET_LIMIT` for why the front.
+ * What the shell cache drops, which is two rules for two kinds of entry.
  *
- * Only `/assets/`. The shell cache also holds the shell itself, the manifest, the
- * icon and the banner, and a count-based trim over the lot could evict the one entry
- * that makes the app open offline at all. Re-puts move an entry to the back, so it
- * took forty asset stores with no navigation in between — unlikely rather than
- * impossible, which is not a distinction worth relying on for that entry (#268).
+ * **The hashed assets are capped by count**, oldest first — `Cache.keys()` is in
+ * insertion order, so the front is the oldest build. See `ASSET_LIMIT` for the number.
+ *
+ * **A picture carrying its version in the query keeps only its newest.** The homepage
+ * quotes the banner as `?v=<updated_at>`, which is a new key on every upload and about
+ * a megabyte kept forever (#311). Only these can accumulate: a URL with no query is a
+ * single key that `put` replaces in place.
+ *
+ * The query is what the rule turns on, and that is load-bearing rather than incidental.
+ * `/api/installation/icon` is asked for **both ways** — bare by the header's mark and
+ * the favicon, versioned by the settings page and the manifest — so those are two live
+ * entries under one path rather than two versions of one, and a rule keyed on pathname
+ * alone would drop whichever was stored first on every put.
+ *
+ * A count-based trim over the lot would be the obvious single rule and is the one thing
+ * this must not do: it could evict the shell, which is what makes the app open offline
+ * at all (#268). Neither rule here can reach it.
  */
 export const trim = async (cache: Pick<Cache, 'delete' | 'keys'>, limit: number): Promise<number> => {
-  const keys = (await cache.keys()).filter((request) => new URL(request.url).pathname.startsWith('/assets/'))
-  const doomed = keys.slice(0, Math.max(0, keys.length - limit))
+  // `pathname` and `search` picked off rather than spread: `URL`'s are prototype
+  // getters, so a spread copies nothing at all.
+  const held = (await cache.keys()).map((request) => {
+    const { pathname, search } = new URL(request.url)
+
+    return { request, pathname, search }
+  })
+  const assets = held.filter((entry) => entry.pathname.startsWith('/assets/'))
+  const versioned = held.filter((entry) => !entry.pathname.startsWith('/assets/') && entry.search !== '')
+
+  const newest = new Map(versioned.map((entry) => [entry.pathname, entry.request.url]))
+  const doomed = [
+    ...versioned.filter((entry) => newest.get(entry.pathname) !== entry.request.url),
+    ...assets.slice(0, Math.max(0, assets.length - limit)),
+  ].map((entry) => entry.request)
 
   for (const request of doomed) await cache.delete(request)
 

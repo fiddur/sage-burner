@@ -45,6 +45,28 @@ describe('the menu beside the logo', () => {
     expect(screen.getByRole('button', { name: 'Menu' }).getAttribute('aria-expanded')).toBe('false')
   })
 
+  it('lets the page go when what it holds falls away under it', async () => {
+    // Roles lost on a background 401 while the drawer is out. The early return stops
+    // rendering it, and a lock that outlived it would leave a page nobody can scroll
+    // and nothing on screen to explain why (#311).
+    const { rerender } = render(<Menu pages={RIDES} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }))
+    await screen.findByRole('link', { name: /Rideshares/ })
+
+    expect(document.body.style.overflow).toBe('hidden')
+
+    rerender(<Menu pages={[]} />)
+
+    expect(document.body.style.overflow).toBe('')
+
+    // And it does not spring open again when they come back: `open` is state, and
+    // nothing between here and there was a press.
+    rerender(<Menu pages={RIDES} />)
+
+    expect(screen.queryByRole('link', { name: /Rideshares/ })).toBeNull()
+    expect(document.body.style.overflow).toBe('')
+  })
+
   it('is not there at all when it would be empty', () => {
     // A signed-out visitor. A control that opens onto nothing is furniture.
     render(<Menu pages={[]} />)

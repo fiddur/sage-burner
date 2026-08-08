@@ -7,7 +7,8 @@ import { useEffect } from 'preact/hooks'
  *
  * Written out rather than derived: there is no way to ask the DOM "what is in the tab
  * order", and `tabbable`-style packages exist because the full answer needs layout.
- * This is the subset these two overlays are built from.
+ * This is the subset the overlays are built from; a caller reaching for something else
+ * has to add it here.
  */
 const REACHABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]),' +
@@ -24,9 +25,10 @@ const REACHABLE =
  * `open` defaults to true, for a caller mounted only while it is showing — the dream
  * panel is. ☰ is in the bar whether or not its drawer is out, so it says which.
  *
- * Tab is moved here rather than left to the browser, so the wrap is this code's: at the
- * last control Tab goes back to the first, and at the first — or on the panel itself,
- * which holds focus on open and is not in the tab order — Shift+Tab goes to the last.
+ * Only the **boundaries** are taken over; Tab in the middle is the browser's, as it
+ * should be. At the last control Tab goes back to the first, and at the first —
+ * or on the panel itself, which holds focus on open and is not in the tab order —
+ * Shift+Tab goes to the last.
  */
 export const useOverlay = (inside: RefObject<HTMLElement | null>, open = true) => {
   useEffect(() => {
@@ -49,8 +51,6 @@ export const useOverlay = (inside: RefObject<HTMLElement | null>, open = true) =
 
       const focused = document.activeElement
       const outside = !(focused instanceof Node) || !overlay.contains(focused)
-      // The panel itself counts as the start: it holds focus on open and is not in the
-      // tab order, so backwards from there is the one direction that leaves.
       const leaving = keyEvent.shiftKey
         ? outside || focused === first || focused === overlay
         : outside || focused === last

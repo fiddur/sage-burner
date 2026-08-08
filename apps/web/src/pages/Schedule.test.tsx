@@ -1116,6 +1116,28 @@ describe('Schedule', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
 
+  it('keeps the offer panel open on Escape and on the backdrop, unlike the details one', async () => {
+    // The most typing anywhere in the grid, and no dream behind it to fall back to —
+    // so a stray press would throw the lot away (#295). Cancel is the way out, and it
+    // is in the form. Deliberate, and asserted here rather than only described.
+    renderPage(stub({}))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Offer a dream' }))
+    const panel = await screen.findByRole('dialog', { name: 'Offer a dream' })
+    fireEvent.input(screen.getByLabelText('Title of the new dream'), { target: { value: 'Check in' } })
+
+    fireEvent.keyDown(panel, { key: 'Escape' })
+
+    expect(screen.getByRole('dialog', { name: 'Offer a dream' })).toBeTruthy()
+
+    const backdrop = document.querySelector('.dream-modal')
+    if (backdrop === null) throw new Error('the panel is open, so there is a backdrop')
+    fireEvent.click(backdrop)
+
+    expect(screen.getByRole('dialog', { name: 'Offer a dream' })).toBeTruthy()
+    expect(screen.getByLabelText('Title of the new dream')).toHaveProperty('value', 'Check in')
+  })
+
   it('stops asking to withdraw once you detour through edit', async () => {
     // #208: `confirming` is local state and nothing reset it, so 🗑️ then ✏️ then
     // Cancel came back to a "Withdraw it?" nobody was still asking — one click from
@@ -1730,15 +1752,30 @@ describe('facilitating a dream, in the panel', () => {
     await waitFor(() => expect(updateSession).toHaveBeenCalledWith('s-1', { facilitator_account_id: null }))
   })
 
-  it('keeps the facilitator out of its own helpers, which is the dream’s one exclusion', async () => {
-    // The passing sibling for the strip above: offering the same person both would
-    // undo the exclusion the helpers list has always had.
+  it('keeps the facilitator out of its own helpers', async () => {
+    // One half of a pair. Offering the same person both would undo the exclusion the
+    // helpers list has always had.
     renderPage(stub({}, [cacao({ facilitator_account_id: 'a-1' })]))
 
     const panel = await open()
 
     expect(within(panel).queryByRole('button', { name: 'Take the spot on Cacao ceremony' })).toBeNull()
     expect(within(panel).getByRole('button', { name: 'Appoint someone to Cacao ceremony' })).toBeTruthy()
+  })
+
+  it('keeps a helper out of the facilitator spot, which is the other half', async () => {
+    // Added with the strip and never covered (#311). Appointing a helper to facilitate
+    // would leave them holding both of a pair the strip below treats as exclusive.
+    renderPage(stub({}, [cacao({ helpers: [{ account_id: 'a-1', name: 'Ada' }] })]))
+
+    const panel = await open()
+
+    expect(
+      within(panel).queryByRole('button', { name: 'Take the spot on Cacao ceremony as facilitator' }),
+    ).toBeNull()
+    expect(
+      within(panel).getByRole('button', { name: 'Appoint someone to Cacao ceremony as facilitator' }),
+    ).toBeTruthy()
   })
 })
 
