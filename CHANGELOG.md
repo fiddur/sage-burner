@@ -9,6 +9,13 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-08
 
+- **A mail server that is not answering no longer holds a page up.** With email
+  configured to a host that had stopped responding, anything told to everybody at a
+  burn — a dream offered, a lead role taken — waited on it once per person, which at a
+  full burn was minutes. Now it posts to everybody at once.
+- **"Send a new link" says which of the two things went wrong.** It told you the person
+  was already in whatever the reason; an application that had not been approved now says
+  so instead.
 - **Somebody organising a burn without coming to it can now see its timetable.** They
   could pick the burn from the selector at the top and were then told the Schedule and
   the Dreams pages were "for members" — while the places, the lead roles and the

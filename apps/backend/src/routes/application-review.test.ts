@@ -428,6 +428,9 @@ describe('a fresh link when the first one was lost', () => {
     const response = await reissue(server, cookie, id)
 
     expect(response.statusCode).toBe(409)
+    // Its own slug, not the shared `conflict` (#178): the page words this one "they
+    // are already in", which is the opposite of what the other 409 here means.
+    expect(response.json().error).toBe('invite_used')
   })
 
   it('refuses an application nobody has approved, and one that was rejected', async () => {
@@ -437,8 +440,15 @@ describe('a fresh link when the first one was lost', () => {
     const rejected = await givenApplication('Rejected')
     await decide(server, cookie, rejected, 'reject')
 
-    expect((await reissue(server, cookie, pending)).statusCode).toBe(409)
-    expect((await reissue(server, cookie, rejected)).statusCode).toBe(409)
+    for (const id of [pending, rejected]) {
+      const response = await reissue(server, cookie, id)
+
+      expect(response.statusCode).toBe(409)
+      // The other slug. Both are 409, and a page that could not tell them apart told
+      // an admin looking at a rejected application that the person was already in.
+      expect(response.json().error).toBe('not_approved')
+    }
+
     expect(await db().select().from(inviteToken)).toEqual([])
   })
 

@@ -6,7 +6,7 @@ import type {
 } from '@sage-burner/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
-import { apiRoutes, looksLikeEmail } from '@sage-burner/shared'
+import { apiRoutes, errorResponse, looksLikeEmail } from '@sage-burner/shared'
 import { and, desc, eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
@@ -261,7 +261,12 @@ export const registerApplicationReviewRoutes = (
     })
 
     if (outcome === 'not_found') return sendError(reply, 404)
-    if (outcome !== 'issued') return sendError(reply, 409)
+    // `errorResponse` rather than `sendError`, which pairs one slug with each status:
+    // both of these are 409 and they mean opposite things to whoever is reading the
+    // page, so the page needs to tell them apart (#178).
+    if (outcome !== 'issued') {
+      return reply.code(409).send(errorResponse(outcome === 'not_approved' ? 'not_approved' : 'invite_used'))
+    }
 
     // Posted here as well as on approval, which is the case this route exists for: a
     // link that was lost. An address that has not changed gets the new one where the
