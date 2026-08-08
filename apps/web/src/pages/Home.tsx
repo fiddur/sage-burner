@@ -7,6 +7,7 @@ import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
 import { FormError, useFormError } from '../components/FormError.tsx'
+import { IconButton } from '../components/IconButton.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
 import { TheirVersion } from '../components/TheirVersion.tsx'
@@ -210,18 +211,13 @@ export const Home = ({ api }: { api: HomeApi }) => {
                 Edited where it is read: whoever spots a typo on the homepage is the
                 one likely to fix it. The burn's dates and cap stay admin-only and
                 are edited under Organise, which is why this is not a link to there.
-
-                A `PendingButton` rather than the `IconButton` the pen would suggest:
-                the editor opens after a read, and the hourglass is what says so.
               */}
               {isApproved(viewer) && (
-                <PendingButton
+                <IconButton
                   busy={opening}
-                  label="✏️"
-                  busyLabel="⌛"
-                  type="button"
-                  class="link-button"
-                  aria-label="Edit this text"
+                  icon="✏️"
+                  busyIcon="⌛"
+                  label="Edit this text"
                   onClick={() => void openEditor(openEvent.welcome_markdown)}
                 />
               )}
