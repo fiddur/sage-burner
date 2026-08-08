@@ -895,6 +895,7 @@ describe('a burn that has ended', () => {
     expect((await edit(server, ada.cookie, id, { title: 'Renamed' })).statusCode).toBe(404)
     expect((await setLead(server, ada.cookie, id, { account_id: ada.id })).statusCode).toBe(404)
     expect((await joinTeam(server, ada.cookie, id, ada.id)).statusCode).toBe(404)
+    expect((await leaveTeam(server, ada.cookie, id, ada.id)).statusCode).toBe(404)
     expect((await remove(server, ada.cookie, id)).statusCode).toBe(404)
   })
 
@@ -908,7 +909,7 @@ describe('a burn that has ended', () => {
     expect(row?.title).not.toBe('Renamed')
   })
 
-  it('takes all four on a burn that has not ended', async () => {
+  it('takes every one of them on a burn that has not ended', async () => {
     // The other half of the sibling rule: a guard that refused everything would pass
     // the refusals above and break the app.
     const server = await build()
@@ -920,6 +921,7 @@ describe('a burn that has ended', () => {
     expect((await edit(server, ada.cookie, id, { title: 'Renamed' })).statusCode).toBe(200)
     expect((await setLead(server, ada.cookie, id, { account_id: ada.id })).statusCode).toBe(200)
     expect((await joinTeam(server, ada.cookie, id, ada.id)).statusCode).toBe(200)
+    expect((await leaveTeam(server, ada.cookie, id, ada.id)).statusCode).toBe(204)
     expect((await remove(server, ada.cookie, id)).statusCode).toBe(204)
   })
 })

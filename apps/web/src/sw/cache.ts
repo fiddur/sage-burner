@@ -147,17 +147,31 @@ export const cachedAt = (response: Pick<Response, 'headers'>): string | undefine
   response.headers.get(CACHED_AT) ?? undefined
 
 /**
- * Drop the oldest hashed assets past the limit. See `ASSET_LIMIT` for why the front.
+ * What the shell cache drops, which is two rules for two kinds of entry.
  *
- * Only `/assets/`. The shell cache also holds the shell itself, the manifest, the
- * icon and the banner, and a count-based trim over the lot could evict the one entry
- * that makes the app open offline at all. Re-puts move an entry to the back, so it
- * took forty asset stores with no navigation in between — unlikely rather than
- * impossible, which is not a distinction worth relying on for that entry (#268).
+ * **The hashed assets are capped by count**, oldest first — `Cache.keys()` is in
+ * insertion order, so the front is the oldest build. See `ASSET_LIMIT` for the number.
+ *
+ * **Everything else keeps one entry per path**, the newest. The shell, the manifest,
+ * the icon, the banner and the changelog are each one resource, so a second entry for
+ * a path is always a superseded copy of the first. That is not hypothetical: the
+ * homepage quotes the banner as `?v=<updated_at>`, which is a new key on every upload
+ * and about a megabyte kept forever (#311).
+ *
+ * A count-based trim over the lot would be the obvious single rule and is the one
+ * thing this must not do: it could evict the shell, which is what makes the app open
+ * offline at all (#268). One-per-path cannot, since the shell only ever has one.
  */
 export const trim = async (cache: Pick<Cache, 'delete' | 'keys'>, limit: number): Promise<number> => {
-  const keys = (await cache.keys()).filter((request) => new URL(request.url).pathname.startsWith('/assets/'))
-  const doomed = keys.slice(0, Math.max(0, keys.length - limit))
+  const keys = await cache.keys()
+  const assets = keys.filter((request) => new URL(request.url).pathname.startsWith('/assets/'))
+  const rest = keys.filter((request) => !new URL(request.url).pathname.startsWith('/assets/'))
+
+  const newest = new Map(rest.map((request) => [new URL(request.url).pathname, request.url]))
+  const doomed = [
+    ...rest.filter((request) => newest.get(new URL(request.url).pathname) !== request.url),
+    ...assets.slice(0, Math.max(0, assets.length - limit)),
+  ]
 
   for (const request of doomed) await cache.delete(request)
 

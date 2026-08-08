@@ -150,7 +150,13 @@ const fakeCache = (urls: string[]) => {
   const keys = urls.map((url) => new Request(`${ORIGIN}${url}`))
 
   return {
-    kept: () => keys.map((request) => new URL(request.url).pathname),
+    // With the query, since that is the whole of what tells two banners apart. Entries
+    // without one read exactly as their pathname.
+    kept: () =>
+      keys.map((request) => {
+        const { pathname, search } = new URL(request.url)
+        return `${pathname}${search}`
+      }),
     keys: () => Promise.resolve([...keys]),
     delete: (request: Request) => {
       const at = keys.findIndex((held) => held.url === request.url)
@@ -188,6 +194,31 @@ describe('keeping the asset cache from growing forever', () => {
       '/api/installation/banner',
       '/assets/new.js',
     ])
+  })
+
+  it('keeps only the newest of a picture that carries its version in the URL', async () => {
+    // The leak #310 left behind: the homepage quotes the banner as `?v=<updated_at>`,
+    // so every upload is a *new* key — and `trim` skipping everything outside
+    // `/assets/` meant nothing ever evicted the old one. About a megabyte per upload,
+    // kept forever. The icon is versioned the same way.
+    const cache = fakeCache([
+      '/api/installation/banner?v=1',
+      '/api/installation/icon?v=1',
+      '/api/installation/banner?v=2',
+      '/api/installation/banner?v=3',
+    ])
+
+    expect(await trim(cache, ASSET_LIMIT)).toBe(2)
+    expect(cache.kept()).toEqual(['/api/installation/icon?v=1', '/api/installation/banner?v=3'])
+  })
+
+  it('leaves the shell alone however many times it has been stored', async () => {
+    // One entry per pathname is what makes the rule above safe: the shell has exactly
+    // one, so no number of re-puts can bring it near an eviction.
+    const cache = fakeCache(['/index.html', '/manifest.webmanifest', '/assets/one.js'])
+
+    expect(await trim(cache, ASSET_LIMIT)).toBe(0)
+    expect(cache.kept()).toEqual(['/index.html', '/manifest.webmanifest', '/assets/one.js'])
   })
 
   it('leaves a cache under the limit alone', async () => {

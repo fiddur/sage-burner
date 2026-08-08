@@ -513,8 +513,14 @@ Two caches, and the split is the whole of what stays on a device:
 - **`sage-burner-shell-v1`** — the HTML shell, the hashed bundles, the manifest,
   the icon, the banner. None of it is anybody's data. Kept across a sign-out, because
   dropping it would mean the next person to open the app offline gets nothing at
-  all. Trimmed to the 40 most recently stored entries, oldest first, so old
-  builds' chunks do not accumulate forever.
+  all. **Trimmed by two rules for two kinds of entry**: the hashed assets are capped
+  at 40, oldest first, so old builds' chunks do not accumulate; everything else keeps
+  one entry per path. A count over the lot would be the obvious single rule and is the
+  one thing it must not do — it could evict the shell, which is what makes the app open
+  offline at all (#268). One-per-path cannot, since the shell only ever has one, and it
+  is what stops the versioned pictures piling up: the homepage quotes the banner as
+  `?v=<updated_at>`, a fresh key on every upload and about a megabyte kept forever
+  until #311.
 - **`sage-burner-api-v1`** — every API read: the roster, the schedule, who you
   are. **This is member data on disk, and signing out deletes the whole cache.**
   Not entries picked from it by URL, which would be a list to keep in step with

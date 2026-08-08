@@ -20,12 +20,17 @@ export const Menu = ({ pages }: { pages: readonly NavPage[] }) => {
     button.current?.focus()
   }
 
-  useOverlay(drawer, open)
+  // `pages` as well as `open`: the early return below is what stops rendering, and an
+  // account whose roles fall away — a background 401 — would otherwise leave the page
+  // locked with no drawer on it (#311).
+  const showing = open && pages.length > 0
+
+  useOverlay(drawer, showing)
 
   useEffect(() => setOpen(false), [path])
 
   useEffect(() => {
-    if (!open) return undefined
+    if (!showing) return undefined
 
     drawer.current?.querySelector('a')?.focus()
 
@@ -36,7 +41,7 @@ export const Menu = ({ pages }: { pages: readonly NavPage[] }) => {
     document.addEventListener('keydown', escape)
 
     return () => document.removeEventListener('keydown', escape)
-  }, [open])
+  }, [showing])
 
   if (pages.length === 0) return null
 
@@ -56,7 +61,7 @@ export const Menu = ({ pages }: { pages: readonly NavPage[] }) => {
 
       {/* Rendered only while open rather than hidden: no `inert` to keep in step with
           the animation, and the links are out of the tab order the rest of the time. */}
-      {open && (
+      {showing && (
         <>
           <div class="menu-backdrop" onPointerDown={close} />
           <nav id="menu-drawer" ref={drawer} class="menu-drawer" aria-label="More">
