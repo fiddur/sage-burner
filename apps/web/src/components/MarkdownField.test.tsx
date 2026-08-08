@@ -115,6 +115,39 @@ describe('MarkdownField', () => {
     )
   })
 
+  it('opens as tall as the text it holds', () => {
+    // The bug (#338): three lines whatever was in it, so editing a page of welcome
+    // text began by scrolling inside a sliver.
+    const twenty = Array.from({ length: 20 }, (_unused, line) => `line ${line}`).join('\n')
+    render(<MarkdownField label="Help text" value={twenty} maxLength={2000} onInput={vi.fn()} />)
+    const tall = screen.getByLabelText('Help text').getAttribute('rows')
+
+    cleanup()
+    render(<MarkdownField label="Help text" value="one line" maxLength={2000} onInput={vi.fn()} />)
+
+    expect(Number(tall)).toBeGreaterThan(Number(screen.getByLabelText('Help text').getAttribute('rows')))
+  })
+
+  it("takes a caller's height as a floor rather than a size", () => {
+    // `rows` is what the burn's payment and transfer texts ask for. It says how tall
+    // an empty box opens, and must not shrink one that already holds more.
+    render(<MarkdownField label="Help text" value="" maxLength={2000} rows={12} onInput={vi.fn()} />)
+    expect(screen.getByLabelText('Help text').getAttribute('rows')).toBe('12')
+
+    cleanup()
+    render(
+      <MarkdownField
+        label="Help text"
+        value={'line\n'.repeat(19)}
+        maxLength={2000}
+        rows={12}
+        onInput={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByLabelText('Help text').getAttribute('rows')).toBe('20')
+  })
+
   it('caps the text at the length the API accepts', () => {
     render(<MarkdownField label="Help text" value="" maxLength={2000} onInput={vi.fn()} />)
 

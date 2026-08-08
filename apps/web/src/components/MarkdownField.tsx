@@ -1,6 +1,7 @@
 import { useId, useState } from 'preact/hooks'
 
 import { renderMarkdown } from '../markdown.ts'
+import { rowsFor } from '../textarea.ts'
 
 /**
  * Every markdown field in the app.
@@ -22,6 +23,10 @@ export const MarkdownField = ({
   label: string
   value: string
   maxLength: number
+  /**
+   * How tall the box opens when there is nothing in it. A floor rather than a size:
+   * a field seeded with a page of text opens as a page whatever this says (#338).
+   */
   rows?: number
   /** For where the visible label is friendlier than it is specific. */
   accessibleName?: string
@@ -81,7 +86,7 @@ export const MarkdownField = ({
             id={fieldId}
             class="md-field-write"
             maxLength={maxLength}
-            rows={rows}
+            rows={rowsFor(value, rows)}
             aria-label={accessibleName}
             placeholder={placeholder}
             value={value}

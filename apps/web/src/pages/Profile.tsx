@@ -18,6 +18,7 @@ import { PasskeysField } from '../components/PasskeysField.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
 import { PushToggle } from '../components/PushToggle.tsx'
 import { YourBurns } from '../components/YourBurns.tsx'
+import { rowsFor } from '../textarea.ts'
 import { isMember, useViewer } from '../viewer.tsx'
 
 export type ProfileApi = Pick<
@@ -175,6 +176,7 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
             <textarea
               name="allergies_notes"
               maxLength={MAX_NOTES}
+              rows={rowsFor(allergies)}
               value={allergies}
               onInput={(inputEvent) => setAllergies(inputEvent.currentTarget.value)}
             />
