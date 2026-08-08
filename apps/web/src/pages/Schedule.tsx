@@ -1,21 +1,20 @@
-import type { EventAttendeesResponse, Meal, MyBurn, Place, Session, SessionUpdate } from '@sage-burner/shared'
+import type { EventAttendeesResponse, Meal, MyBurn, Place, Session } from '@sage-burner/shared'
 import type { ComponentChildren } from 'preact'
 
 import { useRef, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
+import type { Opened } from '../components/OpenedDream.tsx'
 import type { Pinch } from '../pinch.ts'
 import type { LaneCell, MealBlock } from '../schedule.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
 import { Avatar } from '../components/Avatar.tsx'
 import { CalendarFeed } from '../components/CalendarFeed.tsx'
-import { DreamDetails } from '../components/DreamDetails.tsx'
-import { DreamFields } from '../components/DreamFields.tsx'
-import { DreamPanel } from '../components/DreamPanel.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { MealDialog } from '../components/MealDialog.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
+import { dreamActions, OpenedDream } from '../components/OpenedDream.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { dayName, fromLocalInput, toLocalInput } from '../datetime.ts'
 import { useAction, useLoad } from '../load.ts'
@@ -63,16 +62,6 @@ type Timetable = {
   meals: readonly Meal[]
 }
 
-/**
- * What the dialog is showing: an existing dream, or a new one being offered.
- *
- * The existing case holds an id rather than the dream, so a reload after a heart or
- * a helper leaves the panel showing what the server now says.
- */
-type Opened =
-  | { kind: 'dream'; id: string; editing: boolean }
-  | { kind: 'new'; place_id: string | null; time_slot_start: string | null; time_slot_end: string | null }
-
 const label = (row: string) => row.slice(11)
 
 /** `18:00–21:00`, or null for a dream with no slot. */
@@ -89,9 +78,9 @@ const dayOf = (row: string) => row.slice(0, 10)
  *
  * Dragging is the whole point of the page, and it is also the one interaction a
  * unit test cannot really have — `fireEvent.drop` exercises these handlers, not a
- * browser's drag. The Dreams page keeps the precise route: a form with a place
- * and two datetime fields, reachable by keyboard, which is what anyone who cannot
- * drag should use.
+ * browser's drag. The precise route is the panel `OpenedDream` draws, from here or
+ * from the Dreams page: a place and two datetime fields, reachable by keyboard,
+ * which is what anyone who cannot drag should use.
  */
 export const Schedule = ({ api }: { api: ScheduleApi }) => {
   const viewer = useViewer()
@@ -248,13 +237,6 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
     setDragged(undefined)
   }
 
-  const support = (id: string, supporting: boolean) => {
-    run(
-      () => (supporting ? api.supportSession(id) : api.withdrawSupportForSession(id)),
-      'Could not save that.',
-    )
-  }
-
   const resize = (dream: Session, byRows: number) => {
     const end = resizedEnd(dream, byRows)
     if (end === null) return
@@ -293,53 +275,12 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
   const blocks = meals.flatMap((meal) => mealBlocks(meal))
   const shownMeal = meals.find((meal) => meal.id === openedMeal)
 
-  const help = (id: string, helping: boolean, accountId: string) => {
-    run(
-      () =>
-        helping
-          ? api.helpWithSession(id, { account_id: accountId })
-          : api.stopHelpingWithSession(id, accountId),
-      'Could not save that.',
-    )
-  }
-
-  // The panel stays open: taking the spot is not finishing with the dream, and the
-  // reload puts the name into the strip where the click was.
-  const facilitate = (id: string, accountId: string | null) => {
-    run(() => api.updateSession(id, { facilitator_account_id: accountId }), 'Could not save that.')
-  }
-
-  /**
-   * Every write the panel makes closes it **only once the write has landed**.
-   *
-   * Closing on the click threw the member's typing away whenever the server said no,
-   * and that is an ordinary path rather than a corner: filling Starts and leaving
-   * Ends empty is half a slot, which the schema refuses with a 400.
-   *
-   * The fallback title is unreachable — the form disables its own button until there
-   * is one — and if that stopped being true, an empty title is a 400 the panel now
-   * reports with the text still in it.
-   */
-  const offer = ({ title = '', ...fields }: SessionUpdate) => {
-    run(async () => {
-      await api.offerSession(event.id, { ...fields, title })
-      setOpened(undefined)
-    }, 'Could not offer that.')
-  }
-
-  const save = (id: string, changes: SessionUpdate) => {
-    run(async () => {
-      await api.updateSession(id, changes)
-      setOpened({ kind: 'dream', id, editing: false })
-    }, 'Could not save that.')
-  }
-
-  const remove = (id: string) => {
-    run(async () => {
-      await api.withdrawSession(id)
-      setOpened(undefined)
-    }, 'Could not withdraw that.')
-  }
+  const { support, help, facilitate, offer, save, remove } = dreamActions({
+    api,
+    eventId: event.id,
+    run,
+    setOpened,
+  })
 
   return (
     <Framed eventId={event.id} refreshing={refreshing}>
@@ -414,12 +355,11 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
         onClose={() => setOpenedMeal(undefined)}
       />
 
-      <Opened
+      <OpenedDream
         opened={opened}
         dreams={sessions}
         places={places}
         attendees={attendees}
-        people={people}
         viewerId={viewer.account?.id}
         busy={busy}
         error={error}
@@ -434,123 +374,6 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
         onRemove={remove}
       />
     </Framed>
-  )
-}
-
-/**
- * Whichever panel is open over the grid, or nothing.
- *
- * Its own component so the page keeps one branch where it had four — the same
- * reason `NoBurn` is one.
- */
-const Opened = ({
-  opened,
-  dreams,
-  places,
-  attendees,
-  people,
-  viewerId,
-  busy,
-  error,
-  onEdit,
-  onCancelEdit,
-  onClose,
-  onFacilitate,
-  onHelp,
-  onSupport,
-  onSave,
-  onOffer,
-  onRemove,
-}: {
-  opened: Opened | undefined
-  dreams: readonly Session[]
-  places: readonly Place[]
-  attendees: readonly EventAttendeesResponse['attendees'][number][]
-  people: ReadonlyMap<string, Person>
-  viewerId: string | undefined
-  busy: boolean
-  error: string | undefined
-  onEdit: (id: string) => void
-  onCancelEdit: (id: string) => void
-  onClose: () => void
-  onFacilitate: (id: string, accountId: string | null) => void
-  onHelp: (id: string, helping: boolean, accountId: string) => void
-  onSupport: (id: string, supporting: boolean) => void
-  onSave: (id: string, changes: SessionUpdate) => void
-  onOffer: (fields: SessionUpdate) => void
-  onRemove: (id: string) => void
-}) => {
-  if (opened === undefined) return null
-
-  if (opened.kind === 'new') {
-    return (
-      <DreamPanel
-        label="Offer a dream"
-        error={error}
-        onClose={onClose}
-        // Escape and the backdrop take this step instead of closing — and here the
-        // step is nothing. There is no dream behind an offer panel to fall back to,
-        // so a stray press threw away everything typed into the form, which is the
-        // most typing anywhere in the grid. Cancel is the way out, and it is in the
-        // form (#295).
-        onBack={() => undefined}
-      >
-        <h2>Offer a dream</h2>
-        <DreamFields
-          dream={{
-            title: '',
-            description: '',
-            facilitator_account_id: null,
-            repeatable: false,
-            place_id: opened.place_id,
-            time_slot_start: opened.time_slot_start,
-            time_slot_end: opened.time_slot_end,
-          }}
-          subject="the new dream"
-          places={places}
-          attendees={attendees}
-          busy={busy}
-          creating
-          onCancel={onClose}
-          onSave={onOffer}
-        />
-      </DreamPanel>
-    )
-  }
-
-  // Looked up rather than held, so a reload after a heart or a helper leaves the
-  // panel showing what the server now says.
-  const dream = dreams.find((candidate) => candidate.id === opened.id)
-  if (dream === undefined) return null
-
-  return (
-    <DreamDetails
-      dream={dream}
-      places={places}
-      attendees={attendees}
-      facilitator={
-        dream.facilitator_account_id === null
-          ? undefined
-          : // Falling back to the bare id keeps whoever is running it visible — and
-            // removable — if they are no longer among the burn's attendees.
-            (people.get(dream.facilitator_account_id) ?? {
-              account_id: dream.facilitator_account_id,
-              name: null,
-            })
-      }
-      viewerId={viewerId}
-      busy={busy}
-      error={error}
-      editing={opened.editing}
-      onEdit={() => onEdit(dream.id)}
-      onCancelEdit={() => onCancelEdit(dream.id)}
-      onClose={onClose}
-      onFacilitate={(accountId) => onFacilitate(dream.id, accountId)}
-      onHelp={(helping, accountId) => onHelp(dream.id, helping, accountId)}
-      onSupport={(supporting) => onSupport(dream.id, supporting)}
-      onSave={(changes) => onSave(dream.id, changes)}
-      onRemove={() => onRemove(dream.id)}
-    />
   )
 }
 
@@ -1023,7 +846,7 @@ const Timetable = ({
 
 /**
  * The meal panel, or nothing — its own component so the page keeps one branch, the
- * same reason `Opened` is one.
+ * same reason `OpenedDream` is one.
  */
 const OpenedMeal = ({
   meal,

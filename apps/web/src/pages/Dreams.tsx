@@ -4,21 +4,29 @@ import { MAX_TITLE } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
+import type { Opened } from '../components/OpenedDream.tsx'
 
 import { useSelectedBurn } from '../burn.tsx'
-import { DreamFields } from '../components/DreamFields.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
-import { IconButton } from '../components/IconButton.tsx'
+import { dreamActions, OpenedDream } from '../components/OpenedDream.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
-import { WithdrawDream } from '../components/WithdrawDream.tsx'
 import { shortDayOf } from '../datetime.ts'
 import { useAction, useLoad } from '../load.ts'
 import { isMember, useViewer } from '../viewer.tsx'
 
 export type DreamsApi = Pick<
   ApiClient,
-  'getSessions' | 'offerSession' | 'updateSession' | 'withdrawSession' | 'getPlaces' | 'getEventAttendees'
+  | 'getSessions'
+  | 'offerSession'
+  | 'updateSession'
+  | 'withdrawSession'
+  | 'getPlaces'
+  | 'getEventAttendees'
+  | 'helpWithSession'
+  | 'stopHelpingWithSession'
+  | 'supportSession'
+  | 'withdrawSupportForSession'
 >
 
 const placeLabel = (places: readonly Place[], id: string | null) => {
@@ -48,12 +56,19 @@ const when = (dream: Session) => {
  * A dream with no time is *offered but not yet scheduled*, which is where most
  * of them sit right up until the burn. Anyone here can arrange the schedule, not
  * only whoever offered a given dream.
+ *
+ * **A row opens the panel the grid opens** (#342). It used to swap itself for an edit
+ * form, so a dream had two ways to be read and two to be edited, and only the grid's
+ * had the description, the helpers and the supporters on it — the list showed a title
+ * and a time, and nothing said what a dream actually _was_. The row's ✏️ and 🗑️ went
+ * with the second form: on a phone they wrapped onto a third line, under a title they
+ * no longer sat beside.
  */
 export const Dreams = ({ api }: { api: DreamsApi }) => {
   const viewer = useViewer()
   const member = isMember(viewer)
   const [title, setTitle] = useState('')
-  const [editing, setEditing] = useState<string | undefined>(undefined)
+  const [opened, setOpenedPanel] = useState<Opened | undefined>(undefined)
 
   // The burn comes first: since #156 the lanes belong to one. With no burn open
   // there is nothing to offer a dream to either, and `getSessions` says so anyway.
@@ -81,7 +96,22 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
 
   const { busy, error, setError, run } = useAction(reload)
 
-  const offer = () => {
+  // Every way the panel opens or closes, so none of them can forget the error (#206):
+  // `useAction` keeps its message until the next write, and the panel shows whatever
+  // it is holding as its own `role="alert"`.
+  const setOpened = (next: Opened | undefined) => {
+    setError(undefined)
+    setOpenedPanel(next)
+  }
+
+  const { support, help, facilitate, offer, save, remove } = dreamActions({
+    api,
+    eventId: burn?.event.id ?? '',
+    run,
+    setOpened,
+  })
+
+  const offerByTitle = () => {
     if (title.trim() === '') {
       setError('Give your dream a name.')
       return
@@ -109,7 +139,10 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
         later; most dreams have no time until quite close to the burn.
       </p>
 
-      <ErrorText message={error} />
+      {/* Only when no panel is open: the overlay covers this, and the panel shows the
+          same message itself — two would also be announced twice. The grid guards its
+          own the same way. */}
+      {error !== undefined && opened === undefined && <ErrorText message={error} />}
 
       {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
 
@@ -122,48 +155,28 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
       <ol class="dream-list">
         {dreams.map((dream) => (
           <li key={dream.id} class="dream-row">
-            {editing === dream.id ? (
-              <DreamFields
-                dream={dream}
-                subject={dream.title}
-                places={places}
-                attendees={attendees}
-                busy={busy}
-                onCancel={() => setEditing(undefined)}
-                onSave={(changes) =>
-                  run(async () => {
-                    await api.updateSession(dream.id, changes)
-                    setEditing(undefined)
-                  }, 'Could not save that.')
-                }
-              />
-            ) : (
-              <>
-                <span class="dream-title">
-                  {dream.title}
-                  {dream.repeatable && (
-                    <span class="dream-repeats">
-                      <span aria-hidden="true">↻</span>
-                      <span class="visually-hidden">Can be planned more than once</span>
-                    </span>
-                  )}
-                </span>
-                <span class="dream-when">{when(dream) ?? 'not scheduled yet'}</span>
-                <span class="dream-place">{placeLabel(places, dream.place_id) ?? '—'}</span>
-
-                <IconButton
-                  icon="✏️"
-                  label={`Edit ${dream.title}`}
-                  disabled={busy}
-                  onClick={() => setEditing(dream.id)}
-                />
-                <WithdrawDream
-                  title={dream.title}
-                  busy={busy}
-                  onWithdraw={() => run(() => api.withdrawSession(dream.id), 'Could not withdraw that.')}
-                />
-              </>
-            )}
+            {/* Named for what it does rather than by everything inside it, which is
+                also what the grid's chip is called — the two pages open one panel and
+                a screen reader should hear one instruction. */}
+            <button
+              type="button"
+              class="dream-row-open"
+              aria-label={`Open ${dream.title}`}
+              disabled={busy}
+              onClick={() => setOpened({ kind: 'dream', id: dream.id, editing: false })}
+            >
+              <span class="dream-title">
+                {dream.title}
+                {dream.repeatable && (
+                  <span class="dream-repeats">
+                    <span aria-hidden="true">↻</span>
+                    <span class="visually-hidden">Can be planned more than once</span>
+                  </span>
+                )}
+              </span>
+              <span class="dream-when">{when(dream) ?? 'not scheduled yet'}</span>
+              <span class="dream-place">{placeLabel(places, dream.place_id) ?? '—'}</span>
+            </button>
           </li>
         ))}
       </ol>
@@ -172,7 +185,7 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
         class="form"
         onSubmit={(submitEvent) => {
           submitEvent.preventDefault()
-          offer()
+          offerByTitle()
         }}
       >
         <h2>Offer a dream</h2>
@@ -193,6 +206,25 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
           Offer it
         </button>
       </form>
+
+      <OpenedDream
+        opened={opened}
+        dreams={dreams}
+        places={places}
+        attendees={attendees}
+        viewerId={viewer.account?.id}
+        busy={busy}
+        error={error}
+        onEdit={(id) => setOpened({ kind: 'dream', id, editing: true })}
+        onCancelEdit={(id) => setOpened({ kind: 'dream', id, editing: false })}
+        onClose={() => setOpened(undefined)}
+        onFacilitate={facilitate}
+        onHelp={help}
+        onSupport={support}
+        onSave={save}
+        onOffer={offer}
+        onRemove={remove}
+      />
     </GuardedPage>
   )
 }
