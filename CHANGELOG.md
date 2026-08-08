@@ -9,6 +9,10 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-08
 
+- **Somebody organising a burn can put people down to help with a dream without
+  coming to it themselves.** 👉 on a dream's Helping-out strip used to fail for
+  them, which is what the lead-roles register has always allowed. Whoever is named
+  still has to be coming.
 - **A menu beside the name at the top left.** ☰ slides out the pages the bar has no
   room for — 🛻 Rideshares to begin with, and more as they arrive. The logo still takes
   you to the start page.
