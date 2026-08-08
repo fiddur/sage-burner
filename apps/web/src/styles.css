@@ -880,6 +880,7 @@ a:hover {
 */
 .schedule-grid-wrap {
   overflow: auto;
+  position: relative;
   max-height: 70vh;
   /*
     One finger still scrolls; two are ours (#284). Without this the browser answers a
@@ -1181,6 +1182,15 @@ a:hover {
 */
 .lead-table-wrap {
   overflow-x: auto;
+  /*
+    Load-bearing, and not for anything drawn here: `.visually-hidden` is
+    `position: absolute`, so without a positioned ancestor its containing block is the
+    *initial* one. Sitting at its static position inside a table scrolled sideways,
+    a 1px box then reached x=575 on a 360px screen and dragged the whole document's
+    scroll width out with it — so the Leads page scrolled sideways beside its table,
+    and the fixed bottom bar went with the layout viewport (#348).
+  */
+  position: relative;
   margin: 1rem 0;
 }
 
@@ -1425,6 +1435,7 @@ a:hover {
 */
 .table-wrap {
   overflow-x: auto;
+  position: relative;
 }
 
 /* The shared table: the members list, the roster, the accounts list, the invites. */
@@ -1490,6 +1501,7 @@ a:hover {
 */
 .meal-table-wrap {
   overflow: auto;
+  position: relative;
   max-height: 70vh;
 }
 
