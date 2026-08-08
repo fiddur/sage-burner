@@ -186,11 +186,16 @@ interface Refusal {
   error: 'bad_request' | 'not_found'
 }
 
-interface Attending {
+interface Arranging {
   dream: DreamRow
-  attendanceId: string
+  /** The caller's own attendance, which shapes the answer but gates nothing here. */
+  mine: string | undefined
   /** Who is asking, so a write on somebody else's behalf can tell them. */
   callerId: string | undefined
+}
+
+interface Attending extends Arranging {
+  attendanceId: string
 }
 
 /**
@@ -497,7 +502,27 @@ export const registerSessionRoutes = (
   )
 
   /**
-   * The dream and the caller's place at its burn, or the answer to give instead.
+   * The dream on a burn still open, and whatever place the caller has at it — which
+   * may be none: somebody organising a burn they are not coming to is coherent, and
+   * appointing people is part of that job (#350).
+   */
+  const onOpenBurn = async (
+    request: FastifyRequest<{ Params: { id: string } }>,
+  ): Promise<Refusal | Arranging> => {
+    const [dream] = await dreamRows(db, eq(session.id, request.params.id)).limit(1)
+    if (dream === undefined) return { code: 404, error: 'not_found' }
+
+    const open = await openEventNow(db, now, dream.event_id)
+    if (open === undefined) return { code: 404, error: 'not_found' }
+
+    const viewer = await viewerFor(request, { db, sessions })
+
+    return { dream, mine: await mineAt(request, dream.event_id), callerId: viewer?.account_id }
+  }
+
+  /**
+   * The same, for the writes keyed by the caller's own attendance rather than by
+   * somebody they name — which today is the heart.
    *
    * A caller who is not coming to that burn is a **400**, not a 403: they may well
    * be a member in good standing, and what is wrong is the pairing.
@@ -505,18 +530,11 @@ export const registerSessionRoutes = (
   const asAttendee = async (
     request: FastifyRequest<{ Params: { id: string } }>,
   ): Promise<Refusal | Attending> => {
-    const [dream] = await dreamRows(db, eq(session.id, request.params.id)).limit(1)
-    if (dream === undefined) return { code: 404, error: 'not_found' }
+    const found = await onOpenBurn(request)
+    if ('code' in found) return found
+    if (found.mine === undefined) return { code: 400, error: 'bad_request' }
 
-    const open = await openEventNow(db, now, dream.event_id)
-    if (open === undefined) return { code: 404, error: 'not_found' }
-
-    const attendanceId = await mineAt(request, dream.event_id)
-    if (attendanceId === undefined) return { code: 400, error: 'bad_request' }
-
-    const viewer = await viewerFor(request, { db, sessions })
-
-    return { dream, attendanceId, callerId: viewer?.account_id }
+    return { ...found, attendanceId: found.mine }
   }
 
   /**
@@ -528,8 +546,9 @@ export const registerSessionRoutes = (
    * out loud, and the register has worked that way from the start. What keeps it
    * civil is that the person is told, which is what `tell` is for.
    *
-   * The **caller** still has to be coming to the burn, and so does whoever they
-   * name — a dream is run by people who are there.
+   * Whoever is **named** has to be coming to the burn — a dream is run by people who
+   * are there. The caller does not (#350): arranging a burn is a job somebody can hold
+   * without attending it, and the lead-roles register has always worked that way.
    */
   app.post<{ Params: { id: string } }>(
     apiRoutes.helpWithSession.fastify,
@@ -540,7 +559,7 @@ export const registerSessionRoutes = (
       const body = bodyOf(helperSchema, request)
       if (body === undefined) return sendError(reply, 400)
 
-      const found = await asAttendee(request)
+      const found = await onOpenBurn(request)
       if ('code' in found) return reply.code(found.code).send(errorResponse(found.error))
 
       const theirs = await attendanceFor(db, found.dream.event_id, body.account_id)
@@ -558,7 +577,7 @@ export const registerSessionRoutes = (
         await tell(found.callerId, body.account_id, `You are helping with ${found.dream.title}`)
       }
 
-      return { session: await oneDream(db, found.dream, found.attendanceId) } satisfies SessionResponse
+      return { session: await oneDream(db, found.dream, found.mine) } satisfies SessionResponse
     },
   )
 
@@ -568,7 +587,7 @@ export const registerSessionRoutes = (
     async (request, reply) => {
       void noStore(reply)
 
-      const found = await asAttendee(request)
+      const found = await onOpenBurn(request)
       if ('code' in found) return reply.code(found.code).send(errorResponse(found.error))
 
       const theirs = await attendanceFor(db, found.dream.event_id, request.params.accountId)
@@ -589,7 +608,7 @@ export const registerSessionRoutes = (
         )
       }
 
-      return { session: await oneDream(db, found.dream, found.attendanceId) } satisfies SessionResponse
+      return { session: await oneDream(db, found.dream, found.mine) } satisfies SessionResponse
     },
   )
 

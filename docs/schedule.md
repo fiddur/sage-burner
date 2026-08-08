@@ -178,14 +178,22 @@ drift. The number is derived on every read, and `supported_by_me` is the _reader
 answer — one dream reads differently to two people, which is what makes a filled
 heart mean "mine" rather than "somebody's".
 
-Four routes, all `/me`: `POST`/`DELETE` on `/api/sessions/:id/helpers/me` and
-`/api/sessions/:id/support/me`. The caller speaks for themselves; signing somebody
-else up for work is what the lead-roles register is for, and it asks first. Each is
-idempotent, and each answers with the dream as it now stands.
+Four routes. The heart is always your own — `POST`/`DELETE` on
+`/api/sessions/:id/support/me` — and the helpers name a person: `POST
+/api/sessions/:id/helpers` with an `account_id`, `DELETE
+/api/sessions/:id/helpers/:accountId`. That is #247's one control everywhere, and what
+keeps it civil is that the person is told. Each is idempotent, and each answers with
+the dream as it now stands.
 
-A caller who is not coming to that burn gets a **400**, not a 403: they may be a
-member in good standing, and the pairing is what is wrong. A dream at a burn that
-has ended is a 404, like every other member-facing write here.
+**Whoever is named has to be coming to that burn; the caller does not** (#350). Only
+somebody there can carry the cushions, so a named person with no attendance is a
+**400** — not a 403: they may be a member in good standing, and the pairing is what is
+wrong. But arranging a burn is a job somebody can hold without attending it, and the
+lead-roles register has always let any approved account appoint, so the two used to
+disagree: an organiser saw 👉 on this strip and clicking it through to a name always
+failed. The heart still needs the caller's own attendance, because the row is keyed by
+it. A dream at a burn that has ended is a 404, like every other member-facing write
+here.
 
 `helpers` carries account ids, so whether the reader is on the list is derived from
 it; `supported_by_me` exists because the supporters are a count and nothing more. A
