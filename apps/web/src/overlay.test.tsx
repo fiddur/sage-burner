@@ -53,13 +53,15 @@ describe('an overlay while it is up', () => {
     document.body.style.overflow = ''
   })
 
-  it('sends Tab from the last control back to the first', () => {
+  it('sends Tab from the last control back to the first, and takes the key over to do it', () => {
     render(<Page open={true} />)
     screen.getByRole('button', { name: 'last' }).focus()
 
-    fireEvent.keyDown(document, { key: 'Tab' })
+    const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
+    document.dispatchEvent(tab)
 
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'first' }))
+    expect(tab.defaultPrevented).toBe(true)
   })
 
   it('sends Shift+Tab from the first control to the last', () => {
@@ -111,15 +113,5 @@ describe('an overlay while it is up', () => {
     document.dispatchEvent(tab)
 
     expect(tab.defaultPrevented).toBe(false)
-  })
-
-  it('takes Tab over at a boundary, which is the sibling for that', () => {
-    render(<Page open={true} />)
-    screen.getByRole('button', { name: 'last' }).focus()
-
-    const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
-    document.dispatchEvent(tab)
-
-    expect(tab.defaultPrevented).toBe(true)
   })
 })

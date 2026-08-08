@@ -5,6 +5,7 @@ import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
 import { ICON_ACCEPT, preparedIcon } from '../icon.ts'
+import { useInstallationIcon, useSetInstallationIcon } from '../installation.tsx'
 import { ErrorText } from './ErrorText.tsx'
 
 export type IconApi = Pick<ApiClient, 'removeInstallationIcon' | 'setInstallationIcon'>
@@ -40,10 +41,17 @@ export const messageForFailure = (failure: unknown): string => {
  * cannot execute against this app, and only an admin can put one there.
  *
  * The preview is the live route with a version on it, so saving one shows the new
- * one rather than whatever the browser already had under that URL.
+ * one rather than whatever the browser already had under that URL. The version is the
+ * installation's own — the same `?v=` the manifest quotes (#376) — rather than a
+ * literal of this page's, which was a second live URL for one picture and evicted the
+ * first from the offline cache on every store.
  */
 export const IconField = ({ api }: { api: IconApi }) => {
-  const [version, setVersion] = useState('current')
+  const stored = useInstallationIcon()
+  const setStored = useSetInstallationIcon()
+  // `default` is the manifest's word for "nobody has uploaded one", so the two agree
+  // before an upload as well as after.
+  const version = stored ?? 'default'
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | undefined>(undefined)
 
@@ -52,7 +60,7 @@ export const IconField = ({ api }: { api: IconApi }) => {
     setError(undefined)
     try {
       const { icon } = await api.setInstallationIcon(await preparedIcon(file))
-      setVersion(icon)
+      setStored(icon)
     } catch (failure) {
       setError(messageForFailure(failure))
     } finally {
@@ -65,7 +73,7 @@ export const IconField = ({ api }: { api: IconApi }) => {
     setError(undefined)
     try {
       await api.removeInstallationIcon()
-      setVersion(`removed-${version}`)
+      setStored(null)
     } catch (failure) {
       setError(messageForFailure(failure))
     } finally {

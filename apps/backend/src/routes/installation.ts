@@ -11,6 +11,7 @@ import { INSTALLATION_ID, installation } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { mailSettingsFor } from '../mail/mail.ts'
 import { bannerVersion } from './banner.ts'
+import { iconVersion } from './pwa.ts'
 
 /**
  * What this deployment calls itself.
@@ -35,6 +36,7 @@ export const registerInstallationRoutes = (app: FastifyInstance, { db }: { db: D
     return {
       ...row,
       banner_updated_at: (await bannerVersion(db)) ?? null,
+      icon_updated_at: (await iconVersion(db))?.updated_at ?? null,
       sends_email: (await mailSettingsFor(db)) !== undefined,
     }
   }

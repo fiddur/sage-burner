@@ -22,6 +22,16 @@ export const installationSchema = z.object({
    */
   banner_updated_at: dateTimeSchema.nullable(),
   /**
+   * The same, for the app icon — so the one `?v=` the manifest quotes is the one the
+   * settings page quotes too (#376).
+   *
+   * Without it that page opened at a literal `?v=current`, which is a second live URL
+   * for one picture: the offline cache keeps the newest versioned spelling per path,
+   * so the two evicted each other, and the preview could show what somebody else's
+   * upload had replaced.
+   */
+  icon_updated_at: dateTimeSchema.nullable(),
+  /**
    * Whether an SMTP server has been set up, and nothing else about it (#30).
    *
    * Public, because the page it changes is the public one: the application form
@@ -41,11 +51,11 @@ export const installationResponseSchema = z.object({
  *
  * The read-only fields are omitted rather than left to `.strict()` to reject, because
  * the two are not the same statement — omitting says the field is not this route's to
- * write. Both are set elsewhere: the banner by its own image route, and `sends_email`
- * by whether `/api/admin/installation/mail` has been filled in.
+ * write. All are set elsewhere: the banner and the icon by their own image routes, and
+ * `sends_email` by whether `/api/admin/installation/mail` has been filled in.
  */
 export const installationUpdateSchema = installationSchema
-  .omit({ banner_updated_at: true, sends_email: true })
+  .omit({ banner_updated_at: true, icon_updated_at: true, sends_email: true })
   .partial()
   .strict()
 

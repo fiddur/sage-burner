@@ -23,29 +23,40 @@ interface InstallationContextValue {
    */
   banner?: string | null
   /**
+   * The same for the icon, which the settings page quotes as its preview's `?v=` (#376).
+   *
+   * It used to invent a literal `current`, which is a second live URL for one picture —
+   * and two of those under one path evict each other in the offline cache.
+   */
+  icon?: string | null
+  /**
    * Whether an admin has set an SMTP server up (#30). `undefined` until the answer
    * arrives, which the application form reads as "do not promise either way".
    */
   sendsEmail?: boolean
   setTitle: (title: string) => void
   setBanner: (banner: string | null) => void
+  setIcon: (icon: string | null) => void
   setSendsEmail: (sends: boolean) => void
 }
 
 const InstallationContext = createContext<InstallationContextValue>({
   setTitle: () => undefined,
   setBanner: () => undefined,
+  setIcon: () => undefined,
   setSendsEmail: () => undefined,
 })
 
 const Provide = ({
   title,
   banner,
+  icon,
   sendsEmail,
   children,
 }: {
   title?: string
   banner?: string | null
+  icon?: string | null
   sendsEmail?: boolean
   children: ComponentChildren
 }) => {
@@ -57,6 +68,7 @@ const Provide = ({
   // nothing.
   const [override, setOverride] = useState<string | undefined>(undefined)
   const [bannerOverride, setBannerOverride] = useState<string | null | undefined>(undefined)
+  const [iconOverride, setIconOverride] = useState<string | null | undefined>(undefined)
   const [mailOverride, setMailOverride] = useState<boolean | undefined>(undefined)
   const current = override ?? title
 
@@ -69,9 +81,11 @@ const Provide = ({
       value={{
         title: current,
         banner: bannerOverride === undefined ? banner : bannerOverride,
+        icon: iconOverride === undefined ? icon : iconOverride,
         sendsEmail: mailOverride ?? sendsEmail,
         setTitle: setOverride,
         setBanner: setBannerOverride,
+        setIcon: setIconOverride,
         setSendsEmail: setMailOverride,
       }}
     >
@@ -85,14 +99,16 @@ export const InstallationProvider = ({
   children,
   title,
   banner,
+  icon,
   sendsEmail,
 }: {
   children: ComponentChildren
   title?: string
   banner?: string | null
+  icon?: string | null
   sendsEmail?: boolean
 }) => (
-  <Provide title={title} banner={banner} sendsEmail={sendsEmail}>
+  <Provide title={title} banner={banner} icon={icon} sendsEmail={sendsEmail}>
     {children}
   </Provide>
 )
@@ -113,6 +129,7 @@ export const FetchedInstallationProvider = ({
 }) => {
   const [title, setTitle] = useState<string | undefined>(undefined)
   const [banner, setBanner] = useState<string | null | undefined>(undefined)
+  const [icon, setIcon] = useState<string | null | undefined>(undefined)
   const [sendsEmail, setSendsEmail] = useState<boolean | undefined>(undefined)
 
   useEffect(() => {
@@ -124,6 +141,7 @@ export const FetchedInstallationProvider = ({
         if (controller.signal.aborted) return
         setTitle(response.installation.title)
         setBanner(response.installation.banner_updated_at)
+        setIcon(response.installation.icon_updated_at)
         setSendsEmail(response.installation.sends_email)
       })
       .catch(() => {
@@ -138,7 +156,7 @@ export const FetchedInstallationProvider = ({
   }, [api])
 
   return (
-    <Provide title={title} banner={banner} sendsEmail={sendsEmail}>
+    <Provide title={title} banner={banner} icon={icon} sendsEmail={sendsEmail}>
       {children}
     </Provide>
   )
@@ -154,6 +172,12 @@ export const useSetInstallationTitle = () => useContext(InstallationContext).set
 
 /** For the settings page, so the homepage draws the new banner without a reload. */
 export const useSetInstallationBanner = () => useContext(InstallationContext).setBanner
+
+/** The `?v=` of the app icon — the manifest's spelling of it (#376). */
+export const useInstallationIcon = () => useContext(InstallationContext).icon
+
+/** For the settings page, whose preview is the live route. */
+export const useSetInstallationIcon = () => useContext(InstallationContext).setIcon
 
 /**
  * Whether an invite will arrive by email, for the one public page that promises (#30).

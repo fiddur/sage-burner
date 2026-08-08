@@ -4,9 +4,23 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { apiError } from '../api/client.ts'
 import { ICON_ACCEPT, isSvg } from '../icon.ts'
+import { InstallationProvider } from '../installation.tsx'
 import { IconField, messageForFailure } from './IconField.tsx'
 
 afterEach(cleanup)
+
+/**
+ * Inside a provider, since the preview's `?v=` is the installation's own (#376).
+ *
+ * `icon` is what the API has said so far — `null` for "nobody has uploaded one",
+ * which is what the manifest spells `default`.
+ */
+const renderField = (api: Parameters<typeof IconField>[0]['api'], icon: string | null = null) =>
+  render(
+    <InstallationProvider icon={icon}>
+      <IconField api={api} />
+    </InstallationProvider>,
+  )
 
 const svgFile = () =>
   new File(['<svg xmlns="http://www.w3.org/2000/svg"></svg>'], 'logo.svg', { type: 'image/svg+xml' })
@@ -21,7 +35,7 @@ const icon = () => screen.getByAltText("This installation's app icon")
 
 describe('choosing the icon on a home screen', () => {
   it('shows what is there now, through the route that serves it', () => {
-    render(<IconField api={stub()} />)
+    renderField(stub())
 
     expect(icon().getAttribute('src')).toContain(apiRoutes.getInstallationIcon.path())
   })
@@ -30,15 +44,13 @@ describe('choosing the icon on a home screen', () => {
     // The whole reason SVG is allowed: rasterising a logo to 512 pixels throws away
     // what made it worth uploading. A canvas would also be unavailable here.
     let sent: Blob | undefined
-    render(
-      <IconField
-        api={stub({
-          setInstallationIcon: (image: Blob) => {
-            sent = image
-            return Promise.resolve({ icon: 'v2' })
-          },
-        })}
-      />,
+    renderField(
+      stub({
+        setInstallationIcon: (image: Blob) => {
+          sent = image
+          return Promise.resolve({ icon: 'v2' })
+        },
+      }),
     )
 
     fireEvent.change(screen.getByLabelText('The icon on a home screen'), {
@@ -50,8 +62,24 @@ describe('choosing the icon on a home screen', () => {
     })
   })
 
+  it('quotes the version the manifest quotes, so one picture is one URL', async () => {
+    // Two spellings of it would be two entries in the offline cache under one path,
+    // and the newest-wins rule then drops one on every store (#376).
+    renderField(stub(), '2026-08-01T00:00:00.000Z')
+
+    // Unencoded, because that is how `pwa.ts` writes it into the manifest and the two
+    // spellings have to match exactly. An ISO timestamp is legal in a query as it is.
+    expect(icon().getAttribute('src')).toBe('/api/installation/icon?v=2026-08-01T00:00:00.000Z')
+  })
+
+  it('says default before anybody has uploaded one, as the manifest does', () => {
+    renderField(stub())
+
+    expect(icon().getAttribute('src')).toBe(`${apiRoutes.getInstallationIcon.path()}?v=default`)
+  })
+
   it('shows the new one rather than whatever was under that URL', async () => {
-    render(<IconField api={stub()} />)
+    renderField(stub())
     const before = icon().getAttribute('src')
 
     fireEvent.change(screen.getByLabelText('The icon on a home screen'), {
@@ -65,15 +93,13 @@ describe('choosing the icon on a home screen', () => {
 
   it('goes back to the flame', async () => {
     let removed = false
-    render(
-      <IconField
-        api={stub({
-          removeInstallationIcon: () => {
-            removed = true
-            return Promise.resolve(undefined)
-          },
-        })}
-      />,
+    renderField(
+      stub({
+        removeInstallationIcon: () => {
+          removed = true
+          return Promise.resolve(undefined)
+        },
+      }),
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Back to the flame' }))
@@ -84,19 +110,17 @@ describe('choosing the icon on a home screen', () => {
   })
 
   it('offers only the two types the route will store', () => {
-    render(<IconField api={stub()} />)
+    renderField(stub())
 
     expect(screen.getByLabelText('The icon on a home screen').getAttribute('accept')).toBe(ICON_ACCEPT)
     expect(ICON_ACCEPT).toBe('image/png,image/svg+xml')
   })
 
   it('says what went wrong', async () => {
-    render(
-      <IconField
-        api={stub({
-          setInstallationIcon: () => Promise.reject(apiError(413, 'too_large', 'Payload too large')),
-        })}
-      />,
+    renderField(
+      stub({
+        setInstallationIcon: () => Promise.reject(apiError(413, 'too_large', 'Payload too large')),
+      }),
     )
 
     fireEvent.change(screen.getByLabelText('The icon on a home screen'), {

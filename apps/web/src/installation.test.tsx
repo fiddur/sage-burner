@@ -45,7 +45,12 @@ describe('FetchedInstallationProvider', () => {
     renderWith(
       vi.fn<AppApi['getInstallation']>(() =>
         Promise.resolve({
-          installation: { title: 'The Burning Sage', banner_updated_at: null, sends_email: false },
+          installation: {
+            title: 'The Burning Sage',
+            banner_updated_at: null,
+            icon_updated_at: null,
+            sends_email: false,
+          },
         }),
       ),
     )
@@ -57,7 +62,12 @@ describe('FetchedInstallationProvider', () => {
     renderWith(
       vi.fn<AppApi['getInstallation']>(() =>
         Promise.resolve({
-          installation: { title: 'The Burning Sage', banner_updated_at: null, sends_email: false },
+          installation: {
+            title: 'The Burning Sage',
+            banner_updated_at: null,
+            icon_updated_at: null,
+            sends_email: false,
+          },
         }),
       ),
     )

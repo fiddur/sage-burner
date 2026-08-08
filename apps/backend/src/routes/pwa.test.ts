@@ -69,6 +69,9 @@ const PNG = Buffer.from(
 
 const SVG = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8"></svg>', 'utf8')
 
+const getInstallation = (server: FastifyInstance) =>
+  server.inject({ method: 'GET', url: '/api/installation' })
+
 const putIcon = (
   server: FastifyInstance,
   cookie: string | undefined,
@@ -142,6 +145,22 @@ describe('the web manifest', () => {
     const after = (await getManifest(server)).json()
     expect(after.icons[0].src).toBe(`/api/installation/icon?v=${NOW}`)
     expect(after.icons[0]).toMatchObject({ type: 'image/png', sizes: '512x512' })
+  })
+
+  it('says when the icon changed, so one ?v= serves the manifest and the settings page', async () => {
+    // Two spellings of one picture is two entries in the offline cache under one path,
+    // and the newest-versioned-wins rule then evicts one on every store (#376). The
+    // settings page reads this rather than inventing a version of its own.
+    const server = await build()
+    const root = await givenAccount()
+
+    expect((await getInstallation(server)).json().installation.icon_updated_at).toBeNull()
+
+    expect((await putIcon(server, root.cookie, PNG)).statusCode).toBe(200)
+
+    const said = (await getInstallation(server)).json().installation.icon_updated_at
+    expect(said).toBe(NOW)
+    expect((await getManifest(server)).json().icons[0].src).toBe(`/api/installation/icon?v=${said}`)
   })
 
   it('offers an uploaded icon as maskable, so Android does not plate it in white', async () => {
