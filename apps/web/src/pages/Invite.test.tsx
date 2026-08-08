@@ -677,4 +677,13 @@ describe('the welcome for somebody who did not join a burn', () => {
 
     expect(await screen.findByText(/Could not add you to that burn/)).toBeTruthy()
   })
+
+  it('offers no members-only link on a page nobody has an account on yet', async () => {
+    // The same stay fields, drawn before the account exists — so the rideshare board
+    // and the lodging list are both links that cannot be followed from here (#26).
+    renderPage(withBurn())
+    await screen.findByLabelText('Your name')
+
+    expect(screen.queryByRole('link', { name: /Looking for a lift/ })).toBeNull()
+  })
 })

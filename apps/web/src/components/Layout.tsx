@@ -10,9 +10,10 @@ import { useInstallationTitle } from '../installation.tsx'
 import { isAdmin, isApproved, isMember, useViewer } from '../viewer.tsx'
 import { useHidingBar, usePhone } from '../viewport.ts'
 import { Avatar } from './Avatar.tsx'
+import { Menu } from './Menu.tsx'
 import { NotificationBell } from './NotificationBell.tsx'
 
-interface NavPage {
+export interface NavPage {
   href: string
   label: string
   icon: string
@@ -37,6 +38,14 @@ const memberPages: readonly NavPage[] = [
   { href: '/meals', label: 'Meals', icon: '🍽️' },
   { href: '/faq', label: 'FAQ', icon: '❓' },
 ]
+
+/**
+ * What ☰ holds: the pages the bar has no room for.
+ *
+ * The bar is one entry per thing and the bottom bar caps at six, so this is where the
+ * rest go — starting with the one that had no way in at all.
+ */
+const menuPages: readonly NavPage[] = [{ href: '/rides', label: 'Rideshares', icon: '🛻' }]
 
 /**
  * The frame every page sits in.
@@ -83,6 +92,10 @@ export const Layout = ({ api, children }: { api: BellApi; children: ComponentChi
           <img class="brand-mark" src={apiRoutes.getInstallationIcon.path()} alt="" />
           <span class="brand-name">{title}</span>
         </a>
+
+        {/* Beside the logo rather than on it: the logo goes home, which is a convention
+            worth more than the space a second target costs. */}
+        <Menu pages={pages.length > 0 ? menuPages : []} />
 
         {/* Leftmost, because everything to the right of it is about the burn it
             names. Hidden when there is nothing to choose between: one burn is the

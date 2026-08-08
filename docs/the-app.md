@@ -73,7 +73,7 @@ burn-scoped page already reads this.
   an account with no role at all, because an applicant is told things too.
 - **The lodging and helping lists** are reached from that page, from
   _(edit lodging alternatives)_ beside the question they answer.
-- **The rideshare board** is reached from that page too, beside the arrival dates —
+- **The rideshare board** is in ☰, and beside the arrival dates on the details page —
   which is where somebody is standing when they think about getting there (#26).
   `docs/burns.md` has the shape.
 - **⚙️** is admin's alone. It used to be `Organise` and open to any approved member,
@@ -96,6 +96,29 @@ which is not a problem the wide pages have — they use the room.
 Hiding a link is presentation. Every page behind these is guarded again server-side,
 and `Layout.test.tsx` asserts each absence by name — a negated `arrayContaining`
 passes when any _one_ of the named links is missing, which is not the question.
+
+### ☰, beside the logo
+
+The bar carries one entry per thing and the bottom bar caps at six, so everything else
+has been reached from the page it belongs to. That worked until a page belonged to no
+other page: the rideshare board is linked from a form that only renders for a burn you
+have already joined, so somebody who has not joined one could not get there at all.
+
+**☰ is where those live**, starting with 🛻 Rideshares. Beside the logo rather than on
+it: the logo goes home, which is a convention worth more than the space a second target
+costs.
+
+**The drawer slides over the page, and the page does not move.** Pushing the site aside
+would mean a `transform` on a wrapper, and a transform makes `position: fixed` resolve
+against that wrapper instead of the viewport — which is `.bottom-bar` and `.bell-panel`,
+and exactly the class of bug #344 and #348 were. The z-index scale gains a fourth: bar
+20, popdown 30, drawer 35, modal 40.
+
+It is **rendered only while open** rather than hidden with CSS, so its links are out of
+the tab order the rest of the time with no `inert` to keep in step with an animation.
+Dismissal is the bell's: a press outside, or Escape, which hands focus back to ☰. There
+is no ☰ at all when it would open onto nothing — a signed-out visitor may follow none of
+it.
 
 ### On a phone
 

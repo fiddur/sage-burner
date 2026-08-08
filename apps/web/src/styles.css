@@ -226,6 +226,69 @@ a:hover {
   max-width: var(--measure);
 }
 
+/*
+  ☰ and what it slides out — the pages the bar has no room for.
+
+  Over the page rather than pushing it aside: sliding the site would mean a `transform`
+  on a wrapper, and a transform makes `position: fixed` resolve against that wrapper
+  instead of the viewport — which is `.bottom-bar` and `.bell-panel`, and the class of
+  bug #344 and #348 already were.
+*/
+.menu-wrap {
+  display: inline-flex;
+  align-self: center;
+}
+
+.menu-button {
+  padding: 0.2rem 0.4rem;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 34;
+  background: rgb(0 0 0 / 45%);
+}
+
+.menu-drawer {
+  position: fixed;
+  inset-block: 0;
+  inset-inline-start: 0;
+  z-index: 35;
+  width: min(18rem, 80vw);
+  display: flex;
+  flex-direction: column;
+  padding: 1rem 0;
+  border-inline-end: 1px solid var(--line);
+  background: var(--paper);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  overflow-y: auto;
+  animation: menu-in 0.2s ease;
+}
+
+@keyframes menu-in {
+  from {
+    transform: translateX(-100%);
+  }
+}
+
+.menu-entry {
+  padding: 0.75rem 1.25rem;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.menu-entry:hover {
+  background: color-mix(in srgb, var(--sage) 10%, transparent);
+  color: var(--ink);
+}
+
 /* The phone's nav (#337) — `docs/the-app.md` has the shape and the why. */
 .bottom-bar {
   position: fixed;
@@ -1066,9 +1129,9 @@ a:hover {
 
 /*
   Over the timetable rather than beside it — the grid is as wide as the screen — and
-  above the bottom bar, which is the whole of why this is 40 (#344). The scale, so a
-  fourth thing has somewhere to go: bar 20, popdown 30, modal 40.
-  `docs/the-app.md` says what happened at the same 20.
+  above the bottom bar, which is the whole of why this is 40 (#344). The scale:
+  bar 20, popdown 30, ☰'s drawer 35, modal 40. `docs/the-app.md` says what happened
+  when two of them shared a number.
 */
 .dream-modal {
   position: fixed;
@@ -1843,6 +1906,10 @@ img.avatar {
   .bottom-bar,
   .bottom-bar.is-hidden {
     transition: none;
+  }
+
+  .menu-drawer {
+    animation: none;
   }
 }
 
