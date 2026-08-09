@@ -522,7 +522,7 @@ export const createApp = async ({
 
   registerAuthRoutes(app, { db, config, sessions, gate })
   registerPasskeyRoutes(app, { db, config, sessions, now })
-  registerAdminRoutes(app, { db })
+  registerAdminRoutes(app, { db, hash })
   registerInstallationRoutes(app, { db })
   registerEventRoutes(app, { db, sessions, now })
   registerEventOptionRoutes(app, { db, sessions })

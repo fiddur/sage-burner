@@ -61,13 +61,26 @@ burn-scoped page already reads this.
 - **Dreams** is reached from Schedule. Offering a dream and placing one are the
   same activity, and two entries for it is what the restructure undid.
 - **Places** is reached from Schedule too: the lanes are what the grid draws.
-- **Signing out** is on the details page, under the line naming the account it ends,
-  and on ⚙️ → Settings for the admin the details page refuses. Every entry in the
-  bar is a _place_; this is an action, and it was the only one there.
+- **Signing out** is on the details page, under the line naming the account it ends.
+  Every entry in the bar is a _place_; this is an action, and it was the only one there.
+  It was on ⚙️ → Settings as well (#195), for the admin that page refused — a second
+  copy of one control, which is exactly what the push toggle was taken off that page
+  for. #396 made the details page `approved` instead, so the copy could go.
 - **The initials circle** is the details page: who you are, then a section per burn
   still to come — join it, or fill in your stay at it — then past burns behind
   _…show past burns_. It absorbed the page called "Your burn", singular, which was
   from when there was one burn worth showing and it was whichever came next.
+
+  **`approved`, and the guard sits on the sections rather than the page** (#396). Half
+  of it is the account — a picture, ways of being reached, passkeys and providers,
+  notifications, signing out — and half is a stay: the name and contact planning needs,
+  the allergies, and the burns. The first half is any approved account's, including one
+  holding `admin` and not `member`; the second is behind `member`, because
+  `updateMyProfile` and `joinEvent` both are, so offering either would be a control the
+  API refuses. The page was `member` outright, which left an admin who was not attending
+  with nowhere to turn notifications on — and application notifications go precisely to
+  admins.
+
 - **🔔** is a link to `/notifications` that a wide viewport intercepts to open the
   panel instead (#336). `docs/accounts.md` has the why. It is the one entry offered to
   an account with no role at all, because an applicant is told things too.
@@ -79,8 +92,8 @@ burn-scoped page already reads this.
 - **⚙️** is admin's alone. It used to be `Organise` and open to any approved member,
   because it was the only way to reach the two lists above; now those have their own
   way in, and what is left behind ⚙️ — the burn's shape, who gets in, payment, the
-  installation — is admin's. It still links to both lists, since an admin
-  holding `admin` without `member` has no details page to reach the lodging list from.
+  installation — is admin's. It still links to both lists: they are the burn's shared
+  furniture, and ⚙️ is where somebody organising is already standing.
 
 **Pages are full width.** `--measure` is a reading width and only the two pages that
 are actually prose take it — the homepage's welcome text and the 404, through

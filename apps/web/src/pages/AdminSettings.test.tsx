@@ -41,7 +41,6 @@ const stub = (over: Partial<AdminSettingsApi> = {}): AdminSettingsApi => ({
   removeInstallationIcon: () => Promise.reject(new Error('removeInstallationIcon is not stubbed here')),
   setInstallationBanner: () => Promise.reject(new Error('setInstallationBanner is not stubbed here')),
   removeInstallationBanner: () => Promise.reject(new Error('removeInstallationBanner is not stubbed here')),
-  logout: () => Promise.reject(new Error('logout is not stubbed here')),
   ...over,
 })
 
@@ -87,14 +86,15 @@ describe('AdminSettings', () => {
     expect(screen.queryByRole('heading', { name: 'Notifications' })).toBeNull()
   })
 
-  it('offers the way out, for the account the details page refuses', async () => {
-    // The whole justification for a second Log out button (#195): the details page is
-    // `require="member"`, so an account holding `admin` without `member` is turned
-    // away from the only other one. Nothing asserted it, so deleting this button left
-    // the suite green and stranded that account signed in.
+  it('leaves signing out to the page that holds the rest of the account', async () => {
+    // #195 put a second Log out button here because Your details was `require="member"`
+    // and turned an `admin`-without-`member` account away. That page is `approved` now
+    // (#396), so this is one control in two places again — which is what the push toggle
+    // was moved off this page for.
     renderPage(stub())
+    await titleField()
 
-    expect(await screen.findByRole('button', { name: 'Log out' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Log out' })).toBeNull()
   })
 
   it('is where both pictures are chosen — the home screen’s and a shared link’s', async () => {
