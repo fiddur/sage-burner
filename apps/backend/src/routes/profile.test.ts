@@ -1,5 +1,6 @@
 import type { FastifyInstance, LightMyRequestResponse } from 'fastify'
 
+import { MAX_INTRODUCTION } from '@sage-burner/shared'
 import { and, eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -150,6 +151,51 @@ describe('a member reading and editing who they are', () => {
     expect(response.statusCode).toBe(200)
     expect(response.json().profile.allergies_notes).toBe('peanuts')
     expect(response.json().profile.contact).toBe('someone@example.org')
+  })
+
+  it('keeps an introduction, and clears it for an empty one', async () => {
+    // #390. `optionalText` turns empty into null on the way in, so "I wrote nothing" and "I
+    // took it down" are the same stored state — which is what the page reads to decide
+    // whether to invite somebody to write one.
+    const server = await build()
+    const member = await givenMember()
+
+    const written = await patchProfile(server, member.cookie, {
+      introduction: 'I make **fire**, and I have been coming since the first one.',
+    })
+    expect(written.json().profile.introduction).toContain('I make **fire**')
+
+    const cleared = await patchProfile(server, member.cookie, { introduction: '' })
+    expect(cleared.json().profile.introduction).toBeNull()
+  })
+
+  it('goes with the account, as the pictures inside it do', async () => {
+    // #390's erasure note, asserted rather than assumed. The column is on `account`, so it
+    // needs no cascade of its own — but "needs none" is a claim worth a test, and the
+    // pictures written into it hang off `image.uploaded_by`, which does cascade.
+    const server = await build()
+    const member = await givenMember()
+    await patchProfile(server, member.cookie, { introduction: 'I make fire.' })
+
+    await db().delete(account).where(eq(account.id, member.id))
+
+    expect(await db().select().from(account).where(eq(account.id, member.id))).toEqual([])
+  })
+
+  it('refuses one longer than the field takes, rather than storing a truncation', async () => {
+    const server = await build()
+    const member = await givenMember()
+
+    const refused = await patchProfile(server, member.cookie, {
+      introduction: 'a'.repeat(MAX_INTRODUCTION + 1),
+    })
+
+    expect(refused.statusCode).toBe(400)
+    // The passing sibling: exactly the limit is fine, so the bound is not off by one.
+    const accepted = await patchProfile(server, member.cookie, {
+      introduction: 'a'.repeat(MAX_INTRODUCTION),
+    })
+    expect(accepted.statusCode).toBe(200)
   })
 
   it('never touches anyone else, whatever the body says', async () => {

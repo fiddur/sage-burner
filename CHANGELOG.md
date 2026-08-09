@@ -9,6 +9,11 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-09
 
+- **You can say who you are.** Your details now has _A little about you_ — a paragraph, and as
+  many pictures as you like, pasted or dropped in or taken from your phone. It shows on your
+  page, which every member reaches by clicking your name, above the ways of reaching you. Until
+  now a name you had not met told you how to contact somebody and nothing about who they were.
+
 - **There is a privacy page now**, at /privacy, saying what this app keeps about you, who can
   see it, and how to get rid of it. Anybody can read it without signing in — which is what
   Facebook asks for before it will let people sign in with it, and a fair thing to be able to

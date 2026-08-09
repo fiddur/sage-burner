@@ -112,8 +112,11 @@ const marked = new Marked({
     image(token) {
       if (!isSafeImageSource(token.href)) return escapeHtml(token.text)
 
+      // `loading="lazy"` on every one of them, here rather than per surface: an
+      // introduction is a page of prose and half a dozen photographs (#390), a thread is
+      // as many as anybody has posted, and each is the full stored bytes.
       const title = titleAttribute(token.title)
-      return `<img src="${escapeHtml(clean(token.href))}" alt="${escapeHtml(token.text)}"${title}>`
+      return `<img src="${escapeHtml(clean(token.href))}" alt="${escapeHtml(token.text)}" loading="lazy"${title}>`
     },
   },
 })

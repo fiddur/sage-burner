@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 import { paymentStatuses } from '../enums.ts'
-import { MAX_CONTACT, MAX_NOTES, MAX_OPTION_LABEL, MAX_PERSON_NAME } from '../limits.ts'
+import { MAX_CONTACT, MAX_INTRODUCTION, MAX_NOTES, MAX_OPTION_LABEL, MAX_PERSON_NAME } from '../limits.ts'
 import { emailSchema } from './auth.ts'
 import { dateSchema, dateTimeSchema, idSchema, nonEmptyText, optionalText } from './common.ts'
 import { eventFields } from './event.ts'
@@ -47,6 +47,15 @@ export const profileFields = z.object({
    * the same shape `helping_option_ids` has on a stay.
    */
   allergy_item_ids: z.array(idSchema),
+  /**
+   * Who this person is, in their own words and pictures (#390).
+   *
+   * The one field on an account that is neither identity, contact nor a health fact:
+   * everything else here exists so somebody can be reached or fed, and this exists so a
+   * name somebody has not met means something. Markdown, so it takes the pictures every
+   * other markdown field takes (#379) — `docs/accounts.md` has what it is for.
+   */
+  introduction: optionalText(MAX_INTRODUCTION),
 })
 
 /**

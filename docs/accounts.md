@@ -1059,11 +1059,68 @@ private as the attendee list it is reached from, and no more.
 **The projection is an object literal**, in the manner of `asMemberEntry`. That is the
 safety property rather than tidiness: this is the route every member reads about every other
 member, so a column added to `account` reaches it only when somebody names it in
-`personProfileSchema`. It carries `account_id`, `name`, `avatar`, the connections in their
-order, and `contact`. What is absent is absent because something else already decided it —
+`personProfileSchema`. It carries `account_id`, `name`, `avatar`, the introduction, the
+connections in their order, and `contact`. What is absent is absent because something else
+already decided it —
 `email` is the login identity (#159), allergies belong to the roster where whoever cooks
 reads them as a list, `payment_status` says something about the burn rather than the person,
 and `roles` change nothing on the page.
+
+### The introduction
+
+**A profile that lists ways to reach somebody answers "how do I contact this person". It does
+not answer the question anybody actually has about a name they have not met: who is this**
+(#390). That is a paragraph and a couple of pictures — the thing people post in a Discord
+introductions channel and nowhere else, so it scrolls away and the next person to join never
+sees it.
+
+`account.introduction` is a **column**, not a table: one field with one owner, unlike `image`
+and unlike `account_connection`. Markdown of a few thousand characters, so the argument that
+keeps an avatar's bytes off this row does not reach it. `MAX_INTRODUCTION` is its own number
+with its own reason — `MAX_NOTES`' 2000 is less than what is being asked for and
+`MAX_DESCRIPTION`'s 20 000 is a dream's whole plan.
+
+**The first field on an account that is neither identity, contact nor a health fact.**
+Everything else there exists so somebody can be reached or fed; this exists so a name means
+something.
+
+It is edited with `MarkdownField` and rendered with `renderMarkdown`, which is the whole of
+why it takes pictures: #379 taught that field to accept a paste, a drop and a photograph from
+a phone, and this is the first field that exists _because_ of that rather than one that
+gained it. So the Save button is disabled while a placeholder is still in the value, like
+every other markdown field's.
+
+**`requireApproved`, the same guard as the page it sits on and as the pictures inside it.**
+That last part is not a coincidence: #379 chose `requireApproved` for `/api/images/:id`, so an
+introduction full of photographs renders for members and would show broken images to anybody
+else. This is the field where that decision pays off rather than pinches.
+
+**Nothing renders it anywhere else** — not the roster, not a hover card, not the feed's card.
+It is a page you go to, and it is long; a truncated introduction in a table cell is the shape
+of thing nobody reads and everybody has to keep formatting.
+
+**The empty state is worth more than the field.** This only works if people fill it in, so a
+page with none says so — an invitation on your own, the plain fact on somebody else's. Null
+rather than empty is what makes that possible, which is why `optionalText` turning `''` into
+null is load-bearing here rather than tidy.
+
+**Nothing extra for erasure.** The column goes with the account, and the pictures written into
+it cascade from `image.uploaded_by`. Both were already true; `profile.test.ts` asserts the
+first rather than assuming it, since "needs no cascade" is still a claim.
+
+`renderMarkdown` puts `loading="lazy"` on every image it draws, which is here rather than per
+surface: an introduction is a page of prose and half a dozen photographs, and a thread is as
+many as anybody has posted.
+
+**Whether a first introduction is a feed entry is not decided.** #375 gave the burn its own
+thread for lines belonging to no dream, so "Wren introduced themselves" would need no new
+`entity_type`. Against it: an edit is not an event, so it fires once and never again, and
+#259's rule puts something happening _around_ you off unless asked for — so almost nobody
+would see the line. Build the field, decide the entry when there is one to look at.
+
+**Every picture in a row renders as a wall of full-width images.** A row of thumbnails is the
+obvious next thing, and it is a rendering decision — so it belongs to `markdown.ts`, and
+everything else that draws pictures gets it too.
 
 **Every name links to it, and mostly through one component.** `PersonBadge` already drew a
 face and a name together (#301), so making it an anchor linked a dream's helpers, a meal's

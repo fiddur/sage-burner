@@ -30,6 +30,7 @@ const aPerson = (over: Partial<PersonProfile> = {}): PersonProfile => ({
   avatar: null,
   connections: [],
   contact: null,
+  introduction: null,
   facebook: null,
   ...over,
 })
@@ -129,6 +130,58 @@ describe('somebody’s page', () => {
 
     await screen.findByRole('heading', { level: 1, name: /Wren Aldertide/ })
     expect(screen.queryByText(/your own page/)).toBeNull()
+  })
+
+  it('draws what they wrote about themselves, as markdown, above the ways to reach them', async () => {
+    // #390: the answer to "who is this", which is the question a name somebody has not met
+    // raises before "how do I contact them".
+    show(stub(aPerson({ introduction: '## Wren\n\nI make **fire**.' })))
+
+    expect(await screen.findByRole('heading', { level: 3, name: 'Wren' })).toBeTruthy()
+    expect(document.querySelector('.person-introduction strong')?.textContent).toBe('fire')
+  })
+
+  it('escapes markup somebody pasted in rather than rendering it', async () => {
+    // The field most likely to be pasted into from a rich-text editor, and the one place
+    // where every member is an untrusted author of prose other members read. `markdown.ts`
+    // escapes raw HTML rather than filtering it — this pins that it reaches here.
+    show(stub(aPerson({ introduction: '<img src=x onerror="alert(1)"> and <b>bold</b>' })))
+
+    await screen.findByRole('heading', { level: 1, name: /Wren Aldertide/ })
+    const drawn = document.querySelector('.person-introduction')
+    expect(drawn?.querySelector('img')).toBeNull()
+    expect(drawn?.querySelector('b')).toBeNull()
+    expect(drawn?.textContent).toContain('<b>bold</b>')
+  })
+
+  it('draws a picture written into one, lazily', async () => {
+    show(stub(aPerson({ introduction: '![me](/api/images/img-1)' })))
+
+    const drawn = await waitFor(() => {
+      const found = document.querySelector('.person-introduction img')
+      if (found === null) throw new Error('no picture yet')
+      return found
+    })
+
+    expect(drawn.getAttribute('src')).toBe('/api/images/img-1')
+    // A page of somebody's photographs is a lot of bytes; nothing is fetched until it is near.
+    expect(drawn.getAttribute('loading')).toBe('lazy')
+  })
+
+  it('invites the person whose page it is to write one, and says plainly when it is not theirs', async () => {
+    // The prompt matters more than the field: this only works if people fill it in.
+    show(stub(aPerson({ account_id: 'a-1', introduction: null })), 'a-1')
+
+    expect(await screen.findByText(/You have not written anything about yourself yet/)).toBeTruthy()
+    expect(
+      screen.getByRole('link', { name: 'write a paragraph and add a picture or two' }).getAttribute('href'),
+    ).toBe('/profile')
+
+    cleanup()
+    show(stub(aPerson({ introduction: null })))
+    expect(
+      await screen.findByText(/Wren Aldertide has not written anything about themselves yet/),
+    ).toBeTruthy()
   })
 
   it('draws their Facebook page beside the name, not among the ways to reach them', async () => {

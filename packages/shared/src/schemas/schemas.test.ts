@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { MAX_ASKED_QUESTIONS } from '../answers.ts'
 import {
   MAX_CONTACT,
+  MAX_INTRODUCTION,
   MAX_NOTES,
   MAX_PERSON_NAME,
   MAX_QUESTION_LABEL,
@@ -286,6 +287,7 @@ describe('profileSchema', () => {
     contact: 'someone@example.org',
     allergies_notes: 'gluten. Sensitive to red lentils.',
     allergy_item_ids: [],
+    introduction: null,
   }
 
   it('accepts a person with their allergies recorded once', () => {
@@ -639,6 +641,7 @@ describe('the named length limits', () => {
     contact: 'a phone number',
     allergies_notes: null,
     allergy_item_ids: [],
+    introduction: null,
   }
   const aQuestion = {
     id: ID,
@@ -654,6 +657,11 @@ describe('the named length limits', () => {
     ['a person’s name', (v) => profileSchema.safeParse({ ...aProfile, name: v }).success, MAX_PERSON_NAME],
     ['a contact', (v) => profileSchema.safeParse({ ...aProfile, contact: v }).success, MAX_CONTACT],
     ['allergies', (v) => profileSchema.safeParse({ ...aProfile, allergies_notes: v }).success, MAX_NOTES],
+    [
+      'an introduction',
+      (v) => profileSchema.safeParse({ ...aProfile, introduction: v }).success,
+      MAX_INTRODUCTION,
+    ],
     ['an event name', (v) => eventSchema.safeParse({ ...anEvent, name: v }).success, MAX_TITLE],
     [
       'a welcome text',
