@@ -4,6 +4,7 @@ import { BURN_PARAM, dreamPage, entryCategory, notificationCategoryInfo } from '
 import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
+import type { UploadImage } from '../image-upload.ts'
 
 import { DreamThread } from '../components/DreamThread.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
@@ -22,6 +23,7 @@ export type FeedApi = Pick<
   | 'postComment'
   | 'updateComment'
   | 'deleteComment'
+  | 'uploadImage'
 >
 
 interface Happening {
@@ -166,6 +168,7 @@ export const Feed = ({ api }: { api: FeedApi }) => {
                 busy={busy}
                 on={settings?.on}
                 talk={talk}
+                upload={api.uploadImage}
                 onToggle={toggle}
               />
             ),
@@ -208,6 +211,7 @@ const Card = ({
   busy,
   on,
   talk,
+  upload,
   onToggle,
 }: {
   card: Thread
@@ -221,6 +225,7 @@ const Card = ({
     remove: (id: string) => void
     showAll: (id: string) => void
   }
+  upload: UploadImage
   onToggle: (category: NotificationCategory) => void
 }) => {
   const page = pageFor(card)
@@ -243,6 +248,7 @@ const Card = ({
         admin={admin}
         busy={busy}
         more={card.entry_count > card.entries.length}
+        upload={upload}
         onSay={(body) => talk.say(card.id, body)}
         onRewrite={(id, body) => talk.rewrite(id, body)}
         onRemove={(id) => talk.remove(id)}

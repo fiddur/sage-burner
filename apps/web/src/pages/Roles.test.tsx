@@ -64,6 +64,7 @@ const stub = (
   getEventAttendees: () => Promise.resolve({ attendees }),
   getLeadRoleSources: () => Promise.resolve({ sources: [] }),
   addLeadRole: () => Promise.reject(new Error('addLeadRole is not stubbed here')),
+  uploadImage: () => Promise.reject(new Error('uploadImage is not stubbed here')),
   updateLeadRole: () => Promise.reject(new Error('updateLeadRole is not stubbed here')),
   deleteLeadRole: () => Promise.reject(new Error('deleteLeadRole is not stubbed here')),
   setLeadRoleLead: () => Promise.reject(new Error('setLeadRoleLead is not stubbed here')),

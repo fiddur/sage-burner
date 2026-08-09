@@ -10,6 +10,7 @@ import {
   eventOptionKinds,
   formQuestionTypes,
   ICON_TYPES,
+  IMAGE_TYPES,
   mealRoles,
   mealSlotKinds,
   paymentStatuses,
@@ -1431,5 +1432,49 @@ export const threadEntry = sqliteTable(
       'thread_entry_comment_author_check',
       sql`${table.kind} <> 'comment' or ${table.author_account_id} is not null`,
     ),
+  ],
+)
+
+/**
+ * A picture written into markdown (#379).
+ *
+ * One table rather than a fixed slot like `account_avatar`, `installation_icon` and
+ * `installation_banner`: those each have one owner and nobody makes more of them, while
+ * this is as many as a member uploads. The reference lives inside prose, so the row has
+ * no owning entity to hang off — only the person who put it there.
+ *
+ * **Blob here rather than a file under the data volume.** Both are writable, so it is
+ * not about where the process may write: the database is one file to back up, and
+ * deleting a row and its bytes is one statement. A directory beside it is a second thing
+ * that can drift out of step with the rows referring to it. At a few hundred pictures a
+ * burn, capped, that is tens of megabytes a year.
+ *
+ * **Nothing garbage-collects.** A reference from prose has no foreign key, so knowing
+ * when the last one goes would mean either scanning markdown on every save or a sweep
+ * that has to know every markdown column in the schema — both lists that go one column
+ * stale, silently. An orphan is cheaper than the machinery that would find it. The one
+ * deletion that must work is the person's, which is what `uploaded_by` cascades.
+ *
+ * No `byte_size` column: `length(bytes)` answers it, and a number stored beside the
+ * bytes is a number to keep in step with them.
+ */
+export const image = sqliteTable(
+  'image',
+  {
+    id: text('id').notNull(),
+    bytes: blob('bytes', { mode: 'buffer' }).notNull(),
+    content_type: text('content_type').notNull(),
+    uploaded_by: text('uploaded_by')
+      .notNull()
+      .references(() => account.id, { onDelete: 'cascade' }),
+    created_at: text('created_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    // What the upload route accepts. A CHECK as well, because the constraint exists for
+    // writes that do not come through the API.
+    check('image_type_check', oneOf(table.content_type, IMAGE_TYPES)),
+    // The per-account ceiling counts by this, and erasure deletes by it.
+    index('image_uploader_idx').on(table.uploaded_by),
   ],
 )

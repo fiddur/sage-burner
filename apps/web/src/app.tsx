@@ -78,6 +78,7 @@ export type RoutesApi = Pick<
   | 'setAccountPassword'
   | 'setMyAvatar'
   | 'removeMyAvatar'
+  | 'uploadImage'
   | 'setInstallationIcon'
   | 'removeInstallationIcon'
   | 'setInstallationBanner'

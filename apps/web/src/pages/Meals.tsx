@@ -4,6 +4,7 @@ import { MAX_OPTION_LABEL, MAX_WELCOME_LENGTH } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
+import type { UploadImage } from '../image-upload.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
@@ -15,6 +16,7 @@ import { NoBurn } from '../components/NoBurn.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { TheirVersion } from '../components/TheirVersion.tsx'
 import { dayName } from '../datetime.ts'
+import { stillUploading } from '../image-upload.ts'
 import { useAction, useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
 import { useViewer } from '../viewer.tsx'
@@ -28,6 +30,7 @@ export type MealsApi = Pick<
   | 'leaveMealCrew'
   | 'setMealIdea'
   | 'updateMealIntro'
+  | 'uploadImage'
 >
 
 type Person = EventAttendeesResponse['attendees'][number]
@@ -86,6 +89,7 @@ export const Meals = ({ api }: { api: MealsApi }) => {
               intro={plan.intro_markdown}
               busy={busy}
               failure={failure}
+              upload={api.uploadImage}
               onCancel={() => setEditingIntro(false)}
               onSave={(meal_intro_markdown) =>
                 run(async () => {
@@ -161,11 +165,13 @@ const IntroEditor = ({
   intro,
   busy,
   failure,
+  upload,
   onSave,
   onCancel,
 }: {
   intro: string
   busy: boolean
+  upload: UploadImage
   failure?: unknown
   onSave: (intro: string) => void
   onCancel: () => void
@@ -180,11 +186,12 @@ const IntroEditor = ({
         label="What everyone should know"
         value={draft}
         maxLength={MAX_WELCOME_LENGTH}
+        upload={upload}
         onInput={setDraft}
       />
       <TheirVersion failure={failure} at={['intro_markdown']} />
       <p class="row">
-        <button type="button" disabled={busy} onClick={() => onSave(draft)}>
+        <button type="button" disabled={busy || stillUploading(draft)} onClick={() => onSave(draft)}>
           Save
         </button>
         <button type="button" class="link-button" disabled={busy} onClick={onCancel}>

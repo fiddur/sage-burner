@@ -12,10 +12,12 @@ import { GuardedPage } from '../components/GuardedPage.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
 import { MealSlots } from '../components/MealSlots.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
+import { stillUploading } from '../image-upload.ts'
 import { useAction, useLoad } from '../load.ts'
 import { isAdmin, useViewer } from '../viewer.tsx'
 
-export type EventsApi = MealSlotsApi & Pick<ApiClient, 'createEvent' | 'getEvents' | 'updateEvent'>
+export type EventsApi = MealSlotsApi &
+  Pick<ApiClient, 'createEvent' | 'getEvents' | 'updateEvent' | 'uploadImage'>
 
 type Editable = Pick<
   Event,
@@ -361,6 +363,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
                     value={payment}
                     maxLength={MAX_WELCOME_LENGTH}
                     rows={6}
+                    upload={api.uploadImage}
                     onInput={(next) => {
                       setPayment(next)
                       setSaved(false)
@@ -375,6 +378,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
                     value={transfer}
                     maxLength={MAX_WELCOME_LENGTH}
                     rows={6}
+                    upload={api.uploadImage}
                     onInput={(next) => {
                       setTransfer(next)
                       setSaved(false)
@@ -390,6 +394,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
 
                   <PendingButton
                     busy={saving}
+                    disabled={stillUploading(payment) || stillUploading(transfer)}
                     label="Save event"
                     busyLabel="Saving…"
                     type="button"

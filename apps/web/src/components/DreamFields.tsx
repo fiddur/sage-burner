@@ -7,7 +7,10 @@ import {
 } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
+import type { UploadImage } from '../image-upload.ts'
+
 import { fromLocalInput, toLocalInput } from '../datetime.ts'
+import { stillUploading } from '../image-upload.ts'
 import { MarkdownField } from './MarkdownField.tsx'
 
 /** What the form edits. A stored `Session` is one; so is a blank one being offered. */
@@ -36,6 +39,7 @@ export const DreamFields = ({
   attendees,
   busy,
   creating = false,
+  upload,
   onSave,
   onCancel,
 }: {
@@ -46,6 +50,8 @@ export const DreamFields = ({
   attendees: readonly EventAttendeesResponse['attendees'][number][]
   busy: boolean
   creating?: boolean
+  /** How a picture gets into the description (#379). */
+  upload: UploadImage
   onSave: (changes: SessionUpdate) => void
   onCancel: () => void
 }) => {
@@ -106,6 +112,7 @@ export const DreamFields = ({
         accessibleName={`Description of ${subject}`}
         value={description}
         maxLength={MAX_DESCRIPTION}
+        upload={upload}
         onInput={setDescription}
       />
 
@@ -188,7 +195,7 @@ export const DreamFields = ({
 
       <button
         type="button"
-        disabled={busy || (creating && title.trim() === '')}
+        disabled={busy || stillUploading(description) || (creating && title.trim() === '')}
         onClick={() => onSave(creating ? all() : edits())}
       >
         {creating ? 'Offer it' : 'Save'}

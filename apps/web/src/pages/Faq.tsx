@@ -5,6 +5,7 @@ import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 import type { CopySource } from '../components/CopyFrom.tsx'
+import type { UploadImage } from '../image-upload.ts'
 import type { Loaded } from '../load.ts'
 
 import { useBurns, useSelectedBurn } from '../burn.tsx'
@@ -15,6 +16,7 @@ import { IconButton } from '../components/IconButton.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { ReorderableList } from '../components/ReorderableList.tsx'
+import { stillUploading } from '../image-upload.ts'
 import { useAction, useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
 import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
@@ -29,6 +31,7 @@ export type FaqApi = Pick<
   | 'getFaqSources'
   | 'copyFaq'
   | 'getActiveEvent'
+  | 'uploadImage'
 >
 
 interface Shown {
@@ -168,6 +171,7 @@ export const Faq = ({ api }: { api: FaqApi }) => {
             <FaqFields
               entry={row}
               busy={busy}
+              upload={api.uploadImage}
               onCancel={() => setEditing(undefined)}
               onSave={(changes) => {
                 run(async () => {
@@ -333,11 +337,13 @@ const Notice = ({ loaded }: { loaded: Loaded<Questions> }) => {
 const FaqFields = ({
   entry,
   busy,
+  upload,
   onSave,
   onCancel,
 }: {
   entry: FaqEntry
   busy: boolean
+  upload: UploadImage
   onSave: (changes: { question?: string; answer?: string }) => void
   onCancel: () => void
 }) => {
@@ -363,11 +369,16 @@ const FaqFields = ({
         label={`Answer to ${entry.question}`}
         value={answer}
         maxLength={MAX_FAQ_ANSWER}
+        upload={upload}
         onInput={setAnswer}
       />
 
       <p class="row">
-        <button type="button" disabled={busy} onClick={() => onSave({ question: question.trim(), answer })}>
+        <button
+          type="button"
+          disabled={busy || stillUploading(answer)}
+          onClick={() => onSave({ question: question.trim(), answer })}
+        >
           Save
         </button>
         <button type="button" class="link-button" disabled={busy} onClick={onCancel}>

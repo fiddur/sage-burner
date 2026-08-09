@@ -62,6 +62,16 @@ describe('what the worker does with a request', () => {
     expect(asked(apiRoutes.getFeed.path())).toBe('api')
   })
 
+  it('never caches a stored picture, for the same reason and more bytes', () => {
+    // One key per photograph anybody has scrolled past, kept until sign-out, where the
+    // entries this cache is for are kilobytes of JSON replaced in place (#379). The
+    // route answers `immutable`, so the browser's own cache still holds them.
+    expect(asked(apiRoutes.storedImage.path('img-1'))).toBe('skip')
+    expect(asked(apiRoutes.storedImage.path('img-2'))).toBe('skip')
+    // The passing sibling: a face is one key per member and is kept.
+    expect(asked(apiRoutes.accountAvatar.path('a-1'))).toBe('api')
+  })
+
   it('keeps the app itself apart from the data', () => {
     // The shell cache survives a sign-out and the API cache does not, so which one a
     // thing lands in is the whole of what stays on a device afterwards.

@@ -25,6 +25,7 @@ import type {
   FormQuestionOrder,
   FormQuestionResponse,
   FormQuestionsResponse,
+  ImageUploadResponse,
   InstallationResponse,
   InviteResponse,
   InviteState,
@@ -568,6 +569,16 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
 
     removeMyAvatar: () =>
       request<undefined>(apiRoutes.removeMyAvatar.path(), { method: apiRoutes.removeMyAvatar.method }),
+
+    /**
+     * A picture to write into a markdown field (#379). Raw bytes, scaled down here, and
+     * the id comes back for the `![](…)` the field then holds.
+     */
+    uploadImage: (image: Blob) =>
+      request<ImageUploadResponse>(apiRoutes.uploadImage.path(), {
+        method: apiRoutes.uploadImage.method,
+        body: image,
+      }),
 
     /** Admin only. The icon an installed copy of the app wears (#256). */
     setInstallationIcon: (image: Blob) =>

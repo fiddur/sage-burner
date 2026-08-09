@@ -61,6 +61,7 @@ const stub = (
   getPlaces: () => Promise.resolve({ places }),
   getSessions: () => Promise.resolve({ sessions }),
   updateSession: () => Promise.reject(new Error('updateSession is not stubbed here')),
+  uploadImage: () => Promise.reject(new Error('uploadImage is not stubbed here')),
   getThread: () => Promise.reject(new Error('getThread is not stubbed here')),
   postComment: () => Promise.reject(new Error('postComment is not stubbed here')),
   updateComment: () => Promise.reject(new Error('updateComment is not stubbed here')),

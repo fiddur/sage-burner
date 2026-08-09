@@ -1,0 +1,108 @@
+import type { ImageUploadResponse } from '@sage-burner/shared'
+import type { FastifyInstance } from 'fastify'
+
+import { apiRoutes, isImageType, MAX_IMAGE_BYTES, MAX_IMAGES_PER_ACCOUNT } from '@sage-burner/shared'
+import { count, eq } from 'drizzle-orm'
+import { randomUUID } from 'node:crypto'
+
+import type { GuardDeps } from '../auth/guards.ts'
+
+import { createGuards } from '../auth/guards.ts'
+import { viewerFor } from '../auth/viewer.ts'
+import { image } from '../db/schema.ts'
+import { noStore, sendError } from '../http.ts'
+
+export interface ImageDeps extends GuardDeps {
+  now: () => Date
+}
+
+/**
+ * Pictures inside markdown (#379).
+ *
+ * **Nothing here decodes an image**, which is the rule the avatar, the icon and the
+ * banner all state and the one worth keeping hardest here: this is the upload that takes
+ * whatever a camera produced. The browser scales it on a canvas before sending, and the
+ * server stores the bytes as given. So the content type is what the caller claims and
+ * those bytes are served back with it — bounded by a short list of storable types,
+ * `X-Content-Type-Options: nosniff`, and `requireApproved` on both ends.
+ */
+export const registerImageRoutes = (app: FastifyInstance, { db, sessions, now }: ImageDeps) => {
+  const { requireApproved } = createGuards({ db, sessions })
+
+  app.post(
+    apiRoutes.uploadImage.fastify,
+    { bodyLimit: MAX_IMAGE_BYTES, preHandler: requireApproved },
+    async (request, reply) => {
+      void noStore(reply)
+
+      const content_type = request.headers['content-type']
+      if (!isImageType(content_type)) return sendError(reply, 415)
+
+      if (!Buffer.isBuffer(request.body) || request.body.length === 0) {
+        return sendError(reply, 400)
+      }
+
+      const viewer = await viewerFor(request, { db, sessions })
+      if (viewer === undefined) return sendError(reply, 401)
+
+      const [stored] = await db
+        .select({ held: count() })
+        .from(image)
+        .where(eq(image.uploaded_by, viewer.account_id))
+
+      if ((stored?.held ?? 0) >= MAX_IMAGES_PER_ACCOUNT) return sendError(reply, 409)
+
+      // `randomUUID` is CSPRNG, so 122 bits stand between a URL and the next one. That
+      // is defence in depth rather than the guard — `requireApproved` is — but it means
+      // an id leaking out of somebody's prose exposes that picture and no other.
+      const id = randomUUID()
+
+      await db.insert(image).values({
+        id,
+        bytes: request.body,
+        content_type,
+        uploaded_by: viewer.account_id,
+        created_at: now().toISOString(),
+      })
+
+      return reply.code(201).send({ id } satisfies ImageUploadResponse)
+    },
+  )
+
+  /**
+   * The picture itself.
+   *
+   * `requireApproved`, like the avatar: the reference lives inside prose members write
+   * to each other, and a photograph in a comment thread is at least as personal as a
+   * face. The cost is that a picture hand-written into the burn's welcome text — which
+   * is public — is broken for the public, and that is a follow-up rather than a reason
+   * to open the route.
+   *
+   * Cached hard, and safe because an image is immutable: this id will never answer with
+   * different bytes, so no cache here can go stale. `private` keeps it out of shared
+   * ones, since it is member data.
+   */
+  app.get<{ Params: { id: string } }>(
+    apiRoutes.storedImage.fastify,
+    { preHandler: requireApproved },
+    async (request, reply) => {
+      const [row] = await db.select().from(image).where(eq(image.id, request.params.id)).limit(1)
+
+      if (row === undefined) {
+        void noStore(reply)
+        return sendError(reply, 404)
+      }
+
+      return (
+        reply
+          .header('content-type', row.content_type)
+          // The bytes are whatever was uploaded and the type is what the uploader
+          // claimed, so a browser must not be allowed to decide for itself that a PNG
+          // is really something it should run.
+          .header('x-content-type-options', 'nosniff')
+          .header('cache-control', 'private, max-age=31536000, immutable')
+          .send(row.bytes)
+      )
+    },
+  )
+}

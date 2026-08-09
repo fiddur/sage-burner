@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 
-import { BANNER_TYPE, ICON_TYPES } from '@sage-burner/shared'
+import { BANNER_TYPE, ICON_TYPES, IMAGE_TYPES } from '@sage-burner/shared'
 
 import { AVATAR_TYPES } from './avatars.ts'
 
@@ -13,9 +13,12 @@ import { AVATAR_TYPES } from './avatars.ts'
  *
  * The banner's `image/jpeg` is already among the avatar's three, and is named anyway:
  * that overlap is a coincidence, and a day when avatars stop taking JPEG should not be
- * the day banner uploads start answering 415.
+ * the day banner uploads start answering 415. `IMAGE_TYPES` is the same three as the
+ * avatar's today, for the same reason and with the same independence.
  */
-export const IMAGE_BODY_TYPES = [...new Set<string>([...AVATAR_TYPES, ...ICON_TYPES, BANNER_TYPE])]
+export const IMAGE_BODY_TYPES = [
+  ...new Set<string>([...AVATAR_TYPES, ...ICON_TYPES, ...IMAGE_TYPES, BANNER_TYPE]),
+]
 
 /**
  * Raw bytes, for the routes that take an image.

@@ -55,6 +55,7 @@ const stub = (over: Partial<FaqApi> = {}, entries: FaqEntry[] = TWO): FaqApi => 
   deleteFaqEntry: () => Promise.reject(new Error('deleteFaqEntry is not stubbed here')),
   reorderFaq: () => Promise.reject(new Error('reorderFaq is not stubbed here')),
   copyFaq: () => Promise.reject(new Error('copyFaq is not stubbed here')),
+  uploadImage: () => Promise.reject(new Error('uploadImage is not stubbed here')),
   ...over,
 })
 

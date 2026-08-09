@@ -56,6 +56,7 @@ const stub = (over: Partial<DreamsApi> = {}, sessions: Session[] = []): DreamsAp
   getSessions: () => Promise.resolve({ sessions }),
   getPlaces: () => Promise.resolve({ places: [TEMPLE] }),
   offerSession: () => Promise.reject(new Error('offerSession is not stubbed here')),
+  uploadImage: () => Promise.reject(new Error('uploadImage is not stubbed here')),
   updateSession: () => Promise.reject(new Error('updateSession is not stubbed here')),
   getThread: () => Promise.reject(new Error('getThread is not stubbed here')),
   postComment: () => Promise.reject(new Error('postComment is not stubbed here')),
