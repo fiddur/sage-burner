@@ -92,7 +92,7 @@ describe('the privacy policy', () => {
     const held = readPrivacy()
 
     expect(held).toMatch(/calendar/i)
-    expect(held).toMatch(/anybody holding it can read the programme/i)
+    expect(held).toMatch(/anybody\s+holding\s+it\s+can\s+read\s+the\s+programme/i)
   })
 
   it('says the feed address is the calendar’s own, and can be taken back', async () => {

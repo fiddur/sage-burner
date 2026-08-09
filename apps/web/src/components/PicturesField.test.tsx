@@ -55,6 +55,15 @@ describe('the pictures you have stored', () => {
     expect(await screen.findByText(`2 of ${MAX_IMAGES_PER_ACCOUNT}`)).toBeTruthy()
   })
 
+  it('names each ✕ distinctly, since a paste session stores several on one day', async () => {
+    // The date alone collided for every picture added the same day, which is what a screen
+    // reader reads as one control repeated (#409).
+    render(<PicturesField api={stub({}, [anImage({ id: 'img-1' }), anImage({ id: 'img-2' })])} />)
+
+    expect(await screen.findByRole('button', { name: /^Take off picture 1 of 2/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /^Take off picture 2 of 2/ })).toBeTruthy()
+  })
+
   it('takes one off and re-reads rather than guessing what is left', async () => {
     let held = [anImage({ id: 'img-1' })]
     const removeMyImage = vi.fn((id: string) => {
@@ -64,7 +73,7 @@ describe('the pictures you have stored', () => {
     render(
       <PicturesField api={{ getMyImages: () => Promise.resolve({ images: [...held] }), removeMyImage }} />,
     )
-    ;(await screen.findByRole('button', { name: /^Take off the picture/ })).click()
+    ;(await screen.findByRole('button', { name: /^Take off picture 1 of 1/ })).click()
 
     expect(await screen.findByText(/have not added any yet/)).toBeTruthy()
     expect(removeMyImage).toHaveBeenCalledWith('img-1')
@@ -76,7 +85,7 @@ describe('the pictures you have stored', () => {
         api={stub({ removeMyImage: () => Promise.reject(new Error('nope')) }, [anImage({ id: 'img-1' })])}
       />,
     )
-    ;(await screen.findByRole('button', { name: /^Take off the picture/ })).click()
+    ;(await screen.findByRole('button', { name: /^Take off picture 1 of 1/ })).click()
 
     expect((await screen.findByRole('alert')).textContent).toContain('Could not take that picture off')
     expect(document.querySelectorAll('.picture-grid img')).toHaveProperty('length', 1)

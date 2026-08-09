@@ -79,8 +79,9 @@ export interface AppDeps {
    */
   now?: () => Date
   /**
-   * Password hashing, injected only so redemption's equal-cost property can be
-   * asserted as a wait rather than as ~230ms of real scrypt in the suite.
+   * Password hashing, injected so redemption's equal-cost property can be asserted as a
+   * wait rather than as ~230ms of real scrypt, and so the admin password-reset route's
+   * tests can set one cheaply. Both routes that spend it take it from here.
    */
   hash?: (password: string) => Promise<string>
   /**

@@ -27,20 +27,7 @@ afterEach(async () => {
   handle = undefined
 })
 
-/**
- * scrypt at a cost a test can afford, for the seam `AdminDeps.hash` exists for.
- *
- * This file sets two passwords and logs in twice, which was four full-cost derivations on
- * the libuv threadpool — four threads, process-wide, with sixty test files competing for
- * them. On an idle machine the two tests that log in took 555ms and 919ms against
- * vitest's 5s budget; they take 349ms and 293ms with this. Under six times headroom
- * became seventeen, which is the shape of #399's flake — seen once, never reproduced,
- * and never diagnosed, so this is a mitigation rather than a fix.
- *
- * Only the sets are cheap. The logins still pay in full: `needsRehash` is true for a hash
- * made with these, so the login route upgrades it — deliberately, since that path is what
- * `auth.test.ts` pins and nothing here should stop it happening.
- */
+/** scrypt at a cost a test can afford — #399 has the measurement. */
 const cheap = { cost: 2 ** 12, blockSize: 8, parallelism: 1 }
 
 const build = async () => {

@@ -61,8 +61,11 @@ burn-scoped page already reads this.
 - **Dreams** is reached from Schedule. Offering a dream and placing one are the
   same activity, and two entries for it is what the restructure undid.
 - **Places** is reached from Schedule too: the lanes are what the grid draws.
-- **Signing out** is on the details page, under the line naming the account it ends.
-  Every entry in the bar is a _place_; this is an action, and it was the only one there.
+- **Signing out** is on the details page, and nowhere else. Every entry in the bar is a
+  _place_; this is an action, and it was the only one there. It sits under the line naming
+  the account it ends — for a member. That line is the sign-in address, which comes from
+  `getMyProfile` and so is behind `member` like the rest of the stay half, so an
+  `admin`-without-`member` gets the button with nothing above it saying whose session it is.
   It was on ⚙️ → Settings as well (#195), for the admin that page refused — a second
   copy of one control, which is exactly what the push toggle was taken off that page
   for. #396 made the details page `approved` instead, so the copy could go.
@@ -901,6 +904,14 @@ that: `GET /api/me/images` lists the ids and dates (never the bytes — five hun
 those is not a JSON response anybody wants), the grid draws each one through
 `storedImage`, and `DELETE /api/me/images/:id` takes one off with the account in the
 `WHERE`, so somebody else's id is a 404 rather than a write.
+
+**The grid draws the full stored bytes**, at 7rem apiece, and that is a deliberate no.
+A `?w=` variant on `storedImage` would be the obvious fix and would make this the first
+thing in the process to decode an image — the rule every image path here states, and the
+one this feature was built to keep. What stands in for it: `loading="lazy"`, so nothing is
+fetched until it is near, and `private, max-age, immutable`, so a second visit to the page
+fetches none of them again. An account at the ceiling scrolling its own grid once is the
+cost, and that account is the one about to delete something.
 
 **A removal leaves a gap wherever the picture was still shown**, and the page says so
 before anybody presses ✕. Refusing instead would mean knowing every markdown column in

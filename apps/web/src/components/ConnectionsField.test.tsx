@@ -70,13 +70,15 @@ describe('what the form refuses before sending', () => {
 })
 
 describe('why it could not be saved', () => {
-  it('tells the two 409s apart, which the status alone does not', () => {
-    expect(messageForFailure(apiError(409, 'conflict', 'conflict'), false)).toContain('already listed')
-    expect(messageForFailure(apiError(409, 'conflict', 'conflict'), true)).toContain('as many ways')
+  it('tells the two 409s apart by their codes, which the status alone does not', () => {
+    // The page cannot infer it: the add form only renders below the ceiling, so a count
+    // read here says "not full" for exactly the refusal that means it is (#409).
+    expect(messageForFailure(apiError(409, 'conflict', 'conflict'))).toContain('already listed')
+    expect(messageForFailure(apiError(409, 'list_full', 'conflict'))).toContain('as many ways')
   })
 
   it('says a refused value is worth another look rather than repeating the code', () => {
-    expect(messageForFailure(apiError(400, 'bad_request', 'bad_request'), false)).toContain('another look')
+    expect(messageForFailure(apiError(400, 'bad_request', 'bad_request'))).toContain('another look')
   })
 })
 
