@@ -32,6 +32,7 @@ import type {
   InstallationResponse,
   OAuthSettingsResponse,
   PersonProfileResponse,
+  PrivacyResponse,
   InviteResponse,
   InviteState,
   LeadRoleLead,
@@ -574,6 +575,9 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
 
     removeMyAvatar: () =>
       request<undefined>(apiRoutes.removeMyAvatar.path(), { method: apiRoutes.removeMyAvatar.method }),
+
+    /** Public (#402). Facebook's app review opens this as a stranger, and so do applicants. */
+    getPrivacy: (signal?: AbortSignal) => request<PrivacyResponse>(apiRoutes.getPrivacy.path(), { signal }),
 
     /** The ways in on this account (#393). Signed in at all is the whole guard. */
     getMyIdentities: (signal?: AbortSignal) =>

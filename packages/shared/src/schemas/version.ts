@@ -32,3 +32,19 @@ export type VersionResponse = z.infer<typeof versionResponseSchema>
 export const changelogResponseSchema = z.object({ markdown: z.string() })
 
 export type ChangelogResponse = z.infer<typeof changelogResponseSchema>
+
+/**
+ * `GET /api/privacy` — what Facebook's app review asks for a URL to (#402).
+ *
+ * The changelog's shape and the changelog's reasoning: prose that ships with the image,
+ * served rather than bundled, so a page can render it without a build step knowing about it.
+ *
+ * **Public, and that is the whole point.** A reviewer at Meta opens it as a stranger, and so
+ * does anybody deciding whether to apply. A privacy policy behind a login is not one.
+ *
+ * Empty where the image has none — a page saying so, rather than a container that refuses to
+ * start, since nothing here is load-bearing at boot.
+ */
+export const privacyResponseSchema = z.object({ markdown: z.string() })
+
+export type PrivacyResponse = z.infer<typeof privacyResponseSchema>

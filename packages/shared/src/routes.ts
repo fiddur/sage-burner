@@ -411,6 +411,12 @@ export const apiRoutes = {
    * Behind the admin prefix, and never carrying the secret — `oauthSettingsSchema` says why
    * `has_secret` is what comes back instead.
    */
+  /** Public: a reviewer at Meta opens it as a stranger, and so does an applicant (#402). */
+  getPrivacy: {
+    method: 'GET',
+    fastify: '/api/privacy',
+    path: () => '/api/privacy',
+  },
   getOauthSettings: {
     method: 'GET',
     fastify: '/api/admin/installation/oauth/:provider',

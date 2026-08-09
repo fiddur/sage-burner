@@ -78,6 +78,7 @@ COPY LICENSE ./
 # What `GET /api/changelog` answers with (#325). In the image because the app serves it,
 # unlike every other markdown file here — `.dockerignore` un-ignores this one.
 COPY CHANGELOG.md ./
+COPY PRIVACY.md ./
 
 # The volume mount point, and the only thing the app needs to write. /app stays
 # root-owned and world-readable: `node` can read its own code and dependencies

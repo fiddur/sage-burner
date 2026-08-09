@@ -9,6 +9,11 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-09
 
+- **There is a privacy page now**, at /privacy, saying what this app keeps about you, who can
+  see it, and how to get rid of it. Anybody can read it without signing in — which is what
+  Facebook asks for before it will let people sign in with it, and a fair thing to be able to
+  read before you apply.
+
 - **You can sign in with Discord or Facebook**, if whoever runs this has set that up — as well
   as your password and any passkeys, never instead of them. Link one under Your details, and
   it works next time you sign in. You cannot take away the last way you have of getting in.

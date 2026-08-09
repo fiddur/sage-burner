@@ -55,6 +55,7 @@ import { registerOauthRoutes } from './routes/oauth.ts'
 import { registerPasskeyRoutes } from './routes/passkeys.ts'
 import { registerPeopleRoutes } from './routes/people.ts'
 import { registerPlaceRoutes } from './routes/places.ts'
+import { readPrivacy, registerPrivacyRoutes } from './routes/privacy.ts'
 import { registerProfileRoutes } from './routes/profile.ts'
 import { registerPushRoutes } from './routes/push.ts'
 import { registerPwaRoutes } from './routes/pwa.ts'
@@ -129,6 +130,14 @@ export interface AppDeps {
    * repository's own.
    */
   changelog?: string
+  /**
+   * What `GET /api/privacy` answers with (#402).
+   *
+   * Read from `PRIVACY.md` at boot, and injected for the same reason as the changelog. It
+   * exists because Facebook's app review will not take an app without a policy at a URL, and
+   * it has to be readable by somebody who is not signed in.
+   */
+  privacy?: string
 }
 
 /** The API lives here; everything else is the single-page app. */
@@ -388,6 +397,7 @@ export const createApp = async ({
   hash,
   now = () => new Date(),
   changelog = readChangelog(),
+  privacy = readPrivacy(),
 }: AppDeps): Promise<FastifyInstance> => {
   const app = Fastify({
     logger: loggerOptions(config.log_level),
@@ -455,6 +465,7 @@ export const createApp = async ({
   // Read once, at boot: the file is part of the image, and a page nobody is signed in
   // to read is not worth a stat per request.
   registerChangelogRoutes(app, { markdown: changelog })
+  registerPrivacyRoutes(app, { markdown: privacy })
 
   // One `Sessions` for both, so the guards verify what the login route signed.
   const sessions = createSessions(sessionDeps(config))

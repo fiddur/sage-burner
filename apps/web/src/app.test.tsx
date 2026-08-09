@@ -34,6 +34,7 @@ const clientWith = (
   getThread: () => Promise.reject(new Error('getThread is not stubbed in this file')),
   uploadImage: () => Promise.reject(new Error('uploadImage is not stubbed in this file')),
   getAccountProfile: () => Promise.reject(new Error('getAccountProfile is not stubbed in this file')),
+  getPrivacy: () => Promise.resolve({ markdown: '' }),
   getMyIdentities: () => Promise.resolve({ identities: [] }),
   removeMyIdentity: () => Promise.reject(new Error('removeMyIdentity is not stubbed in this file')),
   getOauthSettings: () => Promise.resolve({ settings: null }),
