@@ -418,14 +418,19 @@ them.)
 - The app is served at a **domain root** — there is no sub-path/`BASE_PATH`
   handling, deliberately.
 - No external services are required to run it: no payment gateway, no external
-  database — and nothing to sign up for. Two features reach outward at runtime and
-  both are optional and configured from inside the app, never from the environment.
-  Browser push (#96) goes to the push service the _browser_ chose, so the container
-  needs outbound HTTPS; the VAPID pair is minted into the database the first time an
-  admin turns notifications on, and an installation that never does never acquires
-  one. Email (#30) goes to whatever SMTP the people running the gathering already
-  have, set under ⚙️ → Settings and stored in `mail_setting`; with no row there, no
-  invite is posted, no notification is, and nothing else changes.
+  database — and nothing to sign up for. **Three** features reach outward at runtime
+  and all three are optional and configured from inside the app, never from the
+  environment. Browser push (#96) goes to the push service the _browser_ chose, so the
+  container needs outbound HTTPS; the VAPID pair is minted into the database the first
+  time an admin turns notifications on, and an installation that never does never
+  acquires one. Email (#30) goes to whatever SMTP the people running the gathering
+  already have, set under ⚙️ → Settings and stored in `mail_setting`; with no row
+  there, no invite is posted, no notification is, and nothing else changes. Signing in
+  from Discord or Facebook (#393) goes to that provider, with the client id and secret
+  a row per provider in `oauth_setting`; with no row there the button does not appear
+  and nothing is ever asked of the provider. `mail/smtp.ts`, `push/web-push.ts` and
+  `oauth/client.ts` are the only three modules that open a socket, and each is injected
+  at `createApp` so the suite never leaves the machine.
 - `docker compose up` must be sufficient — with one current exception: the app
   refuses to start without `SESSION_SECRET`, so a bare clone needs it generated
   first (the README's Deploying section is one `sed` line). Failing loudly beats

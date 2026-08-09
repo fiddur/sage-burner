@@ -963,6 +963,82 @@ the rideshare board, and `rides.ts` calls it "the one field on the account that 
 given out". Once there is a list of kinds, `contact` is the sentence that fits no kind, and
 merging it in means touching all three — its own change, with its own migration.
 
+## Signing in from Discord or Facebook
+
+A third way in beside a password and a passkey (#393), and the same rule governs it: **a way
+in is an extra way in, never the only one imposed** (#9). The routes sit outside both
+`/api/admin/` and `requireApproved`, because the guard is being signed in at all — an account
+with no role yet still has to be able to add a way in and get back in with it.
+
+**Nothing about it is in the environment.** A client id and secret are a row an admin fills in
+under ⚙️ → Settings, keyed by provider — `mail_setting`'s argument, and the VAPID pair's:
+`docker compose up` has to stay sufficient, and an installation that never wants this never
+has a row. Zero rows is the ordinary state. The secret is stored as given, because that is
+what an authorization-code exchange sends, and the read answers `has_secret`.
+
+**A provider that is not configured has no button anywhere.** `GET /api/installation` carries
+`social_logins` — provider names, nothing else — for the reason `sends_email` is public: the
+login page draws its buttons before anybody is signed in, so it cannot ask an admin route.
+Absent rather than present and disabled, which is #30's rule about the email column.
+
+### What it will not do
+
+**It never creates an account.** Accounts come from the CLI bootstrap, an approved
+application's invite, or a direct admin invite, and the login page says so out loud. So a link
+is made from Your details by somebody already signed in; signing in matches a stored identity
+or refuses. An OAuth button that created accounts would be a hole straight through the
+membership gate the application form exists to be.
+
+**It never matches on an email address**, and neither provider is asked for one. Matching a
+provider's address to an account is an account-takeover path the moment any provider hands
+over one it did not verify, and it would make the button an oracle for which addresses have
+accounts here — which the usernameless passkey login went out of its way not to be. An
+unmatched sign-in answers `unlinked`, worded to read the same whether or not an account exists.
+
+**It never leaves an account with no way in.** Removing an identity is refused with a 409 when
+no password, passkey or other identity remains — `removePasskey`'s refusal generalised.
+Somebody who set no password and linked one provider has exactly one, and losing it locks them
+out of a burn they have paid for.
+
+### The round trip
+
+`oauth_state` is a row, and the statement that reads it deletes it — `webauthn_challenge`'s
+shape, for the reason stated there: single-use is what a state is for, and a signed cookie
+cannot be spent. It carries the **intent**, because signing in and linking end differently and
+the caller must not be the one saying which, and the **account** that started a link, so a
+callback cannot attach an identity to somebody else by arriving with a different cookie. A
+CHECK enforces that a link has an account.
+
+The redirect URI is built by the backend from `originOf` with `PUBLIC_ORIGIN` winning, and has
+to match what is registered with the provider exactly — which is why the admin page prints it
+rather than asking for it.
+
+`oauth/providers.ts` is pure and `oauth/client.ts` is the only module that opens a socket,
+which is what `mail/smtp.ts` and `push/web-push.ts` are for theirs. Nothing in it throws: a
+provider that is down or answering nonsense costs a sign-in attempt rather than a stack trace.
+
+`FACEBOOK_GRAPH_VERSION` is the one value here that goes stale on somebody else's schedule.
+Meta pins each app to a version and retires them, so it has to match the developer console —
+check it there rather than trusting the constant.
+
+### What linking gives you
+
+Two things, and neither may cost somebody the link that was just made:
+
+- **Your picture, if the account has none.** A provider's is a better start than initials and
+  never better than one somebody chose, so an existing avatar is not even asked about. A
+  silhouette is skipped: replacing initials with a grey placeholder says less, not more.
+  Nothing in this process decodes it — the provider is asked for a 256-pixel picture, the type
+  must be one of the three `account_avatar`'s CHECK allows, and the length is capped at
+  `MAX_AVATAR_BYTES`.
+- **Messenger as a way to be reached**, for Facebook only, on the end of the list because
+  where it belongs in the order is theirs to say. Only when they have none of that kind, so it
+  never argues with a handle somebody typed.
+
+**Linking Facebook also puts their Facebook page on their profile**, drawn from the identity
+rather than typed — the app knows about a Facebook account only because somebody linked one.
+That is a consequence worth stating where the linking happens, and Your details does.
+
 ## Somebody's page
 
 `/members/:accountId` is one person as the rest of the community sees them (#389), and it

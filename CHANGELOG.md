@@ -9,6 +9,18 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-09
 
+- **You can sign in with Discord or Facebook**, if whoever runs this has set that up — as well
+  as your password and any passkeys, never instead of them. Link one under Your details, and
+  it works next time you sign in. You cannot take away the last way you have of getting in.
+
+- **Linking Facebook fills in your picture** if you have not chosen one, offers Messenger as a
+  way to reach you, and puts your Facebook page on your profile for other members. The picture
+  and the Messenger entry are yours to change or remove like anything else.
+
+- **Signing in with something nobody has linked tells you nothing about who is here.** It says
+  the same thing whether or not there is an account — this app does not answer questions about
+  who has one.
+
 - **Every name is a link to the person now.** Click somebody — on the members list, on a
   dream, in a conversation, beside a lift they are offering — and you get their page: their
   face, and how to reach them in the order they chose, so the first one is where they would
