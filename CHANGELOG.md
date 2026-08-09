@@ -9,6 +9,21 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-09
 
+- **Every name is a link to the person now.** Click somebody — on the members list, on a
+  dream, in a conversation, beside a lift they are offering — and you get their page: their
+  face, and how to reach them in the order they chose, so the first one is where they would
+  rather be tried. A handle nothing can link to, like a Discord username, comes with a copy button instead.
+
+- **Your email is in your list of ways to be reached from the start**, since you have one
+  either way. Sort it where you like, change it, or take it off — it is an ordinary entry.
+
+- **Notification settings are in one place.** The switch for notifications on this device
+  was on both Your details and the admin Settings page, which made it look like two
+  different settings. It is on Your details, where the rest of your own settings are.
+
+- **Facebook is in the list, as Messenger.** Paste your Facebook name or the whole link to
+  your profile and it becomes a "message me" link that works from anybody's phone.
+
 - **You can say how people should reach you.** Your details now takes Discord, Instagram,
   TikTok, Mastodon, Signal, WhatsApp, a phone number, an email address or a link of your
   own — as many as you like, dragged into the order you want people to try. Nothing shows

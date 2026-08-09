@@ -62,6 +62,15 @@ describe('what the worker does with a request', () => {
     expect(asked(apiRoutes.getFeed.path())).toBe('api')
   })
 
+  it('does cache somebody’s page, which is one key per member and not per thing', () => {
+    // The growth argument that excludes a thread and a picture does not reach this: there
+    // are as many of these as there are accounts — a few dozen — and each is a few hundred
+    // bytes, so the cache does not grow with use the way a key per dream ever opened does.
+    // Being able to look up how to reach somebody with no signal is most of the point.
+    expect(asked(apiRoutes.accountProfile.path('a-1'))).toBe('api')
+    expect(cacheFor(asked(apiRoutes.accountProfile.path('a-1')))).toBe(API_CACHE)
+  })
+
   it('never caches a stored picture, for the same reason and more bytes', () => {
     // One key per photograph anybody has scrolled past, kept until sign-out, where the
     // entries this cache is for are kilobytes of JSON replaced in place (#379). The

@@ -5,7 +5,6 @@ import type { ApiClient } from '../api/client.ts'
 import type { BannerApi } from '../components/BannerField.tsx'
 import type { IconApi } from '../components/IconField.tsx'
 import type { MailApi } from '../components/MailField.tsx'
-import type { PushApi } from '../components/PushToggle.tsx'
 
 import { BannerField } from '../components/BannerField.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
@@ -14,15 +13,22 @@ import { IconField } from '../components/IconField.tsx'
 import { LogOutButton } from '../components/LogOutButton.tsx'
 import { MailField } from '../components/MailField.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
-import { PushToggle } from '../components/PushToggle.tsx'
 import { useSetInstallationTitle } from '../installation.tsx'
 import { useAction, useLoadInto } from '../load.ts'
 import { isAdmin, useViewer } from '../viewer.tsx'
 
+/**
+ * This page is the installation's settings, and nothing personal.
+ *
+ * The push toggle used to be here as well as on Your details, on the argument that an
+ * admin holding `admin` without `member` is refused from that page. Two switches for one
+ * subscription is the worse problem: which of them is on is a question the page cannot
+ * answer, and it reads as two different settings. It lives where a person's own settings
+ * live, and the gap for an admin who is not a member is #396.
+ */
 export type AdminSettingsApi = BannerApi &
   IconApi &
   MailApi &
-  PushApi &
   Pick<ApiClient, 'getInstallation' | 'logout' | 'updateInstallation'>
 
 /** What this installation calls itself. */
@@ -109,12 +115,6 @@ export const AdminSettings = ({ api }: { api: AdminSettingsApi }) => {
       {loaded.status === 'ready' && <IconField api={api} />}
       {loaded.status === 'ready' && <BannerField api={api} />}
       {loaded.status === 'ready' && <MailField api={api} />}
-
-      {/* Also on the details page, which is where a member finds it. Kept here for
-          the same reason ⚙️ keeps the Places and lodging links: an admin holding
-          `admin` without `member` is refused from that page, and application
-          notifications go precisely to admins. */}
-      <PushToggle api={api} />
 
       <LogOutButton api={api} />
     </GuardedPage>

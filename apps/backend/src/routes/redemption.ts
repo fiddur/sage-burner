@@ -11,8 +11,9 @@ import type { Config } from '../config.ts'
 import type { Database } from '../db/index.ts'
 
 import { hashPassword } from '../auth/password.ts'
+import { loginAddressConnection } from '../connections.ts'
 import { isUniqueViolation } from '../db/errors.ts'
-import { account, accountRole, application, inviteToken } from '../db/schema.ts'
+import { account, accountConnection, accountRole, application, inviteToken } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { digestOf } from '../invites.ts'
 import { joinBurn } from './attendance.ts'
@@ -183,6 +184,10 @@ export const registerRedemptionRoutes = (
           // transaction and outside it, so a failure to join cannot roll back the
           // token spend — see the comment after this transaction.
           tx.insert(accountRole).values({ account_id: accountId, role: 'member' }).run()
+
+          // In the same transaction as the account, so nobody can exist without the one
+          // way of being reached they certainly have (#388).
+          tx.insert(accountConnection).values(loginAddressConnection(accountId, body.email)).run()
 
           return true
         })

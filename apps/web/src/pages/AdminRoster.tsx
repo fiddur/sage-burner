@@ -1,5 +1,6 @@
 import type { RosterEntry } from '@sage-burner/shared'
 
+import { profilePage } from '@sage-burner/shared'
 import { Fragment } from 'preact'
 import { useState } from 'preact/hooks'
 
@@ -133,7 +134,7 @@ export const AdminRoster = ({ api }: { api: RosterApi }) => {
                     {startsTheWaitingList(roster.entries, index) && <WaitingListLine columns={4} />}
                     <tr class={entry.waiting ? 'waiting' : undefined}>
                       <td>
-                        {entry.name ?? entry.email}
+                        <a href={profilePage(entry.account_id)}>{entry.name ?? entry.email}</a>
                         {entry.waiting && <span class="form-note"> · waiting</span>}
                         <br />
                         <span class="form-note">{entry.contact ?? entry.email}</span>

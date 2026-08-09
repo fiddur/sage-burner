@@ -139,13 +139,38 @@ describe('where a way of being reached points', () => {
     expect(connectionHref('link', 'https://wren.example/photos')).toBe('https://wren.example/photos')
   })
 
-  it('has an answer for every kind, so none can render a dead link', () => {
-    // The property that keeps the vocabulary honest: adding a kind means deciding what
-    // its address is, or deciding that it has none.
+  it('builds only addresses a browser should be sent to, for every kind', () => {
+    // What the type cannot give: `satisfies Record<ConnectionKind, ConnectionKindInfo>`
+    // makes a missing `links` a compile error, so asserting it is a function proves
+    // nothing (#395). What is worth asserting is what the functions produce — every href
+    // reachable from this vocabulary carries a scheme the app is willing to emit, whatever
+    // somebody typed into the box.
+    const schemes = new Set<string>()
+
     for (const kind of connectionKinds) {
-      expect(typeof connectionKindInfo[kind].href).toBe('function')
       expect(connectionKindInfo[kind].label).not.toBe('')
+      expect(connectionKindInfo[kind].hint).not.toBe('')
+      expect(connectionKindInfo[kind].icon).not.toBe('')
+
+      for (const nasty of ['javascript:alert(1)', 'wren', '  ', '<script>', 'https://ok.example/x']) {
+        const href = connectionHref(kind, nasty)
+        if (href !== undefined) schemes.add(href.split(':')[0] ?? '')
+      }
     }
+
+    expect([...schemes].sort()).toEqual(['https', 'mailto', 'tel'])
+  })
+
+  it('writes to somebody on Messenger, which is what Facebook is as a contact', () => {
+    // Looking at somebody's Facebook page is a different act and not a way of reaching
+    // them; the profile page draws that from a linked sign-in (#393).
+    expect(connectionHref('messenger', 'wren')).toBe('https://m.me/wren')
+  })
+
+  it('takes the numeric form of a Facebook account, which has no handle', () => {
+    // An account with no vanity name is only ever `profile.php?id=…`, and Messenger takes
+    // the number just the same.
+    expect(connectionHref('messenger', '1234567890')).toBe('https://m.me/1234567890')
   })
 
   it('names only the one kind somebody titles themselves', () => {
@@ -161,6 +186,15 @@ describe('what is stored for a way of being reached', () => {
     expect(connectionValue('instagram', 'https://www.instagram.com/wren/')).toBe('wren')
     expect(connectionValue('instagram', 'https://instagram.com/wren/?hl=en')).toBe('wren')
     expect(connectionValue('tiktok', 'https://www.tiktok.com/@wren')).toBe('wren')
+  })
+
+  it('reduces a pasted Facebook link to what Messenger needs, in both of its shapes', () => {
+    expect(connectionValue('messenger', 'https://www.facebook.com/wren')).toBe('wren')
+    expect(connectionValue('messenger', 'https://facebook.com/wren/')).toBe('wren')
+    // An account with no vanity name has only this shape, and its path segment is
+    // `profile.php` — reduced as a handle it would point at nobody.
+    expect(connectionValue('messenger', 'https://facebook.com/profile.php?id=1234567890')).toBe('1234567890')
+    expect(connectionValue('messenger', 'https://www.facebook.com/profile.php?locale=sv_SE&id=42')).toBe('42')
   })
 
   it('reduces a pasted Mastodon URL to the address its own network uses', () => {

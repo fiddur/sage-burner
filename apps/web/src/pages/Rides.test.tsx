@@ -86,7 +86,17 @@ describe('the rideshare board', () => {
     // spreadsheet had these in a publicly linked document.
     renderPage(stub({}, [aRide({ id: 'r-1', name: 'Ada Lovelace', contact: '070 111 22 33' })]))
 
-    expect(await screen.findByText(/Ada Lovelace · 070 111 22 33/)).toBeTruthy()
+    // The name is a link to their page now (#389), so the two are separate nodes.
+    expect(await screen.findByRole('link', { name: 'Ada Lovelace' })).toBeTruthy()
+    expect(screen.getByText(/070 111 22 33/)).toBeTruthy()
+  })
+
+  it('links the name to the page that says how else to reach them', async () => {
+    renderPage(stub({}, [aRide({ id: 'r-1', account_id: 'a-9', name: 'Ada Lovelace' })]))
+
+    expect((await screen.findByRole('link', { name: 'Ada Lovelace' })).getAttribute('href')).toBe(
+      '/members/a-9',
+    )
   })
 
   it('says so when a half is empty rather than leaving a gap', async () => {

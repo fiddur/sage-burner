@@ -24,3 +24,12 @@ export const DREAM_PARAM = 'dream'
  */
 export const dreamPage = (eventId: string, dreamId: string): string =>
   `/dreams?${BURN_PARAM}=${encodeURIComponent(eventId)}&${DREAM_PARAM}=${encodeURIComponent(dreamId)}`
+
+/**
+ * Somebody's page (#389).
+ *
+ * Here rather than as a literal because more than one side builds it: every name in the
+ * app links to it, and a notification saying somebody handed you a job has an obvious
+ * person to point at.
+ */
+export const profilePage = (accountId: string): string => `/members/${encodeURIComponent(accountId)}`
