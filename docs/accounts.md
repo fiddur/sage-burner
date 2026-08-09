@@ -1023,21 +1023,22 @@ check it there rather than trusting the constant.
 
 ### What linking gives you
 
-Two things, and neither may cost somebody the link that was just made:
+**Your picture, if the account has none**, and that is all. A provider's is a better start than
+initials and never better than one somebody chose, so an existing avatar is not even asked
+about. A silhouette is skipped: replacing initials with a grey placeholder says less, not more.
+Nothing in this process decodes it — the provider is asked for a 256-pixel picture, the type
+must be one of the three `account_avatar`'s CHECK allows, and the length is capped at
+`MAX_AVATAR_BYTES`. A failure costs the picture and never the link.
 
-- **Your picture, if the account has none.** A provider's is a better start than initials and
-  never better than one somebody chose, so an existing avatar is not even asked about. A
-  silhouette is skipped: replacing initials with a grey placeholder says less, not more.
-  Nothing in this process decodes it — the provider is asked for a 256-pixel picture, the type
-  must be one of the three `account_avatar`'s CHECK allows, and the length is capped at
-  `MAX_AVATAR_BYTES`.
-- **Messenger as a way to be reached**, for Facebook only, on the end of the list because
-  where it belongs in the order is theirs to say. Only when they have none of that kind, so it
-  never argues with a handle somebody typed.
+**Not a way to be reached, and not a page on the profile** — both of which linking did write
+at first, from the id the provider hands over. That was wrong for Facebook: `public_profile`
+answers with an **app-scoped** id, which identifies nobody outside this installation's Meta
+app, so `m.me/<that>` and `facebook.com/profile.php?id=<that>` both point at nobody. Somebody
+signing in with Facebook says nothing about wanting their page shown either.
 
-**Linking Facebook also puts their Facebook page on their profile**, drawn from the identity
-rather than typed — the app knows about a Facebook account only because somebody linked one.
-That is a consequence worth stating where the linking happens, and Your details does.
+So both come from the handle somebody **types** under How people can reach you: the `messenger`
+kind builds the `m.me` link in their list, and the profile page builds `facebook.com/…` from
+the same value. Your details says where to type it, next to the linking.
 
 ## Somebody's page
 

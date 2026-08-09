@@ -1606,6 +1606,17 @@ export const oauthState = sqliteTable(
     state: text('state').notNull(),
     provider: text('provider', { enum: oauthProviders }).notNull(),
     intent: text('intent', { enum: oauthIntents }).notNull(),
+    /**
+     * What ties the trip to the browser that started it.
+     *
+     * The state alone is unguessable and single-use, and neither of those says the party
+     * who *finishes* the trip is the party who started it — so a member could run the flow,
+     * stop at their own callback URL and hand somebody else the `?code&state`, whose browser
+     * would then be issued a session for the member's account. A top-level GET, which
+     * `SameSite=Lax` permits by design, so the cookie has to carry a value the row can check
+     * (RFC 6749 §10.12).
+     */
+    nonce: text('nonce').notNull(),
     /** Null for a sign-in, which nobody is signed in for. */
     account_id: text('account_id').references(() => account.id, { onDelete: 'cascade' }),
     created_at: text('created_at').notNull(),

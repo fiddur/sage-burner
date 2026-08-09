@@ -2,12 +2,12 @@ import type { PersonProfile, PersonProfileResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
 import { apiRoutes, facebookProfileUrl } from '@sage-burner/shared'
-import { and, eq } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 
 import type { GuardDeps } from '../auth/guards.ts'
 
 import { createGuards } from '../auth/guards.ts'
-import { account, accountAvatar, accountIdentity } from '../db/schema.ts'
+import { account, accountAvatar } from '../db/schema.ts'
 import { noStore, sendError } from '../http.ts'
 import { connectionsFor } from './connections.ts'
 
@@ -54,22 +54,29 @@ export const registerPeopleRoutes = (app: FastifyInstance, { db, sessions }: Gua
       // reads as one.
       if (row === undefined) return sendError(reply, 404)
 
-      // From the identity rather than typed: the app knows about a Facebook account only
-      // because somebody linked one to sign in (#393). The id itself never leaves — only the
-      // page it points at.
-      const [linked] = await db
-        .select({ subject: accountIdentity.subject })
-        .from(accountIdentity)
-        .where(and(eq(accountIdentity.account_id, accountId), eq(accountIdentity.provider, 'facebook')))
-        .limit(1)
+      const connections = await connectionsFor(db, accountId)
+
+      /**
+       * Their Facebook page, from the handle they typed for Messenger.
+       *
+       * **Not from the linked identity**, which is the obvious source and the wrong one:
+       * Facebook answers `public_profile` with an *app-scoped* id, which identifies nobody
+       * outside this installation's Meta app, so a URL built from it would be a link to
+       * nobody on every member's profile. `schema.ts` says the subject is never sent back
+       * out, and this keeps that true.
+       *
+       * A value somebody typed is their real handle or the number out of their own profile
+       * link, so both this and the `m.me` the list draws point somewhere.
+       */
+      const messenger = connections.find((connection) => connection.kind === 'messenger')
 
       const person: PersonProfile = {
         account_id: row.account_id,
         name: row.name,
         avatar: row.avatar,
-        connections: await connectionsFor(db, accountId),
+        connections,
         contact: row.contact,
-        facebook: linked === undefined ? null : facebookProfileUrl(linked.subject),
+        facebook: messenger === undefined ? null : facebookProfileUrl(messenger.value),
       }
 
       return { person } satisfies PersonProfileResponse

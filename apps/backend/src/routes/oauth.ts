@@ -1,15 +1,8 @@
 import type { IdentitiesResponse, OAuthIntent, OAuthProvider } from '@sage-burner/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
-import {
-  apiRoutes,
-  connectionValue,
-  detailsPage,
-  isOAuthProvider,
-  loginPage,
-  MAX_CONNECTIONS,
-} from '@sage-burner/shared'
-import { and, asc, eq, gt } from 'drizzle-orm'
+import { apiRoutes, detailsPage, isOAuthProvider, loginPage } from '@sage-burner/shared'
+import { and, eq, gt, lt } from 'drizzle-orm'
 import { randomBytes, randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -17,8 +10,7 @@ import type { Config } from '../config.ts'
 import type { OAuthCalls } from '../oauth/client.ts'
 
 import { viewerFor } from '../auth/viewer.ts'
-import { nextOrder } from '../db/ordered.ts'
-import { accountAvatar, accountConnection, accountIdentity, oauthState } from '../db/schema.ts'
+import { accountAvatar, accountIdentity, oauthState } from '../db/schema.ts'
 import { noStore, sendError } from '../http.ts'
 import { hasAnotherWayIn, identitiesFor } from '../oauth/identities.ts'
 import { authorizeUrl } from '../oauth/providers.ts'
@@ -39,6 +31,9 @@ export interface OAuthDeps extends GuardDeps {
  * read a consent screen, short enough that an abandoned one is not lying around.
  */
 export const STATE_TTL_SECONDS = 300
+
+/** What the browser is given to prove it is the one that left. */
+export const OAUTH_NONCE_COOKIE = 'sage_oauth'
 
 /**
  * Signing in from Discord or Facebook, and linking one to an account (#393).
@@ -79,15 +74,68 @@ export const registerOauthRoutes = (
   const providerOf = (value: string): OAuthProvider | undefined =>
     isOAuthProvider(value) ? value : undefined
 
-  /** 32 CSPRNG bytes, like an invite token: a state nobody can guess or replay. */
+  /**
+   * A state and the nonce that ties it to this browser.
+   *
+   * 32 CSPRNG bytes each, like an invite token. The nonce goes back as a short-lived cookie
+   * and its twin stays in the row, so finishing the trip takes both — the state from the
+   * provider's redirect and the cookie from the browser that started it. Without that pairing
+   * the two legs are unrelated, and RFC 6749 §10.12 is about exactly this.
+   */
   const mintState = async (provider: OAuthProvider, intent: OAuthIntent, account_id: string | null) => {
     const state = randomBytes(32).toString('base64url')
+    const nonce = randomBytes(32).toString('base64url')
+    const stamp = now()
+
+    // Swept here rather than on a schedule, which is `mintChallenge`'s argument: leaving for
+    // a provider is the only thing that makes these, so it is also the only thing that can
+    // leave them behind — and an abandoned consent screen is the ordinary case, on a route
+    // anybody can reach.
+    await db
+      .delete(oauthState)
+      .where(lt(oauthState.created_at, new Date(stamp.getTime() - STATE_TTL_SECONDS * 1000).toISOString()))
 
     await db
       .insert(oauthState)
-      .values({ state, provider, intent, account_id, created_at: now().toISOString() })
+      .values({ state, provider, intent, nonce, account_id, created_at: stamp.toISOString() })
 
-    return state
+    return { state, nonce }
+  }
+
+  /**
+   * The nonce cookie: `Lax`, because it has to survive the provider's top-level redirect
+   * back, and `HttpOnly` because nothing on the page has any use for it.
+   *
+   * Scoped to `/api` rather than `/`, so it is not sent with every page load — it is only
+   * ever read by the callback.
+   */
+  const nonceCookie = (value: string, maxAgeSeconds: number) =>
+    [
+      `${OAUTH_NONCE_COOKIE}=${value}`,
+      'HttpOnly',
+      'SameSite=Lax',
+      'Path=/api',
+      `Max-Age=${maxAgeSeconds}`,
+      ...(config.secure_cookies ? ['Secure'] : []),
+    ].join('; ')
+
+  /**
+   * The nonce this browser was given, if it was given exactly one.
+   *
+   * Counted rather than first-wins, which is `readSessionCookie`'s reasoning: a planted
+   * duplicate must not be able to decide which value is read.
+   */
+  const nonceFrom = (header: string | undefined): string | undefined => {
+    const present = (header ?? '')
+      .split(';')
+      .map((part) => part.trim())
+      .filter((part) => part.startsWith(`${OAUTH_NONCE_COOKIE}=`))
+
+    if (present.length !== 1) return undefined
+
+    const value = present[0]?.slice(OAUTH_NONCE_COOKIE.length + 1)
+
+    return value === undefined || value === '' ? undefined : value
   }
 
   /**
@@ -128,7 +176,9 @@ export const registerOauthRoutes = (
       const uri = redirectUri(request, provider)
       if (setting === undefined || uri === undefined) return back(reply, failed)
 
-      const state = await mintState(provider, intent, viewer?.account_id ?? null)
+      const { state, nonce } = await mintState(provider, intent, viewer?.account_id ?? null)
+
+      void reply.header('set-cookie', nonceCookie(nonce, STATE_TTL_SECONDS))
 
       return back(reply, authorizeUrl(provider, { clientId: setting.client_id, redirectUri: uri, state }))
     }
@@ -165,38 +215,68 @@ export const registerOauthRoutes = (
   }
 
   /**
-   * A way to be reached, from the account just linked.
+   * Somebody coming back to sign in.
    *
-   * Only Facebook, and only as **Messenger**: Facebook as a way of being reached is the
-   * `m.me` link, and looking at somebody's page is a different act that the profile draws
-   * from the identity itself. Only when they have none of that kind, so this never argues
-   * with a handle somebody typed — and it goes on the end of their list, because where in the
-   * order it belongs is theirs to say.
+   * Matches the stored identity and nothing else — never an email address, which would be a
+   * takeover path and an oracle both. `unlinked` reads the same whether or not an account
+   * exists for whatever the provider holds.
    */
-  const maybeMessenger = async (accountId: string, provider: OAuthProvider, subject: string) => {
-    if (provider !== 'facebook') return
+  const signIn = async (reply: FastifyReply, provider: OAuthProvider, subject: string) => {
+    const [identity] = await db
+      .select({ account_id: accountIdentity.account_id })
+      .from(accountIdentity)
+      .where(and(eq(accountIdentity.provider, provider), eq(accountIdentity.subject, subject)))
+      .limit(1)
 
-    const held = await db
-      .select({ id: accountConnection.id, kind: accountConnection.kind })
-      .from(accountConnection)
-      .where(eq(accountConnection.account_id, accountId))
-      .orderBy(asc(accountConnection.order))
+    if (identity === undefined) return back(reply, loginPage('unlinked'))
 
-    if (held.length >= MAX_CONNECTIONS || held.some((row) => row.kind === 'messenger')) return
+    void reply.header(
+      'set-cookie',
+      cookieHeader(sessions.issue(identity.account_id), config, config.session_ttl_seconds),
+    )
 
-    db.transaction((tx) => {
-      const order = nextOrder(tx, accountConnection, eq(accountConnection.account_id, accountId))
-      tx.insert(accountConnection)
-        .values({
-          id: randomUUID(),
-          account_id: accountId,
-          kind: 'messenger',
-          value: connectionValue('messenger', subject),
-          label: '',
-          order,
-        })
-        .run()
-    })
+    return back(reply, '/')
+  }
+
+  /**
+   * Somebody coming back to add a way in.
+   *
+   * The account comes from the state rather than the cookie, so a callback cannot attach an
+   * identity to somebody else by arriving as them.
+   */
+  const link = async (
+    reply: FastifyReply,
+    provider: OAuthProvider,
+    accountId: string | null,
+    profile: { subject: string; picture?: string },
+  ) => {
+    if (accountId === null) return back(reply, detailsPage('refused'))
+
+    try {
+      await db.insert(accountIdentity).values({
+        id: randomUUID(),
+        account_id: accountId,
+        provider,
+        subject: profile.subject,
+        created_at: now().toISOString(),
+      })
+    } catch {
+      // Either this provider account is already somebody's, or this account already has one
+      // of this provider. Both are `taken` from where the page stands, and neither is worth
+      // telling somebody which — the second is their own row, and the first is not theirs to
+      // know about.
+      return back(reply, detailsPage('taken'))
+    }
+
+    // Must not cost somebody the link they just made: a CDN having a bad day is not a reason
+    // to undo an identity that is already written.
+    try {
+      await maybeAvatar(accountId, profile.picture)
+    } catch {
+      // Swallowed on purpose. The link is done, and a picture is a convenience.
+    }
+
+    return back(reply, detailsPage('linked'))
   }
 
   app.get<{ Params: { provider: string }; Querystring: { code?: string; state?: string } }>(
@@ -215,9 +295,19 @@ export const registerOauthRoutes = (
       }
 
       const spent = await spendState(state)
-      if (spent === undefined || spent.provider !== provider) return back(reply, loginPage('refused'))
+      if (spent === undefined) return back(reply, loginPage('refused'))
 
       const failed = spent.intent === 'sign-in' ? loginPage('refused') : detailsPage('refused')
+
+      // The cookie is cleared whatever happens next: the state is spent either way, and a
+      // nonce left behind is one a later trip would have to reason about.
+      void reply.header('set-cookie', nonceCookie('', 0))
+
+      // Both halves, and the second is the one that matters: the state proves the provider
+      // sent this, and the nonce proves it came back to the browser that left. Neither alone
+      // says the party finishing the trip is the party who started it.
+      if (spent.provider !== provider) return back(reply, failed)
+      if (nonceFrom(request.headers.cookie) !== spent.nonce) return back(reply, failed)
 
       const setting = await oauthSettingFor(db, provider)
       const uri = redirectUri(request, provider)
@@ -232,53 +322,9 @@ export const registerOauthRoutes = (
       })
       if (profile === undefined) return back(reply, failed)
 
-      if (spent.intent === 'sign-in') {
-        const [identity] = await db
-          .select({ account_id: accountIdentity.account_id })
-          .from(accountIdentity)
-          .where(and(eq(accountIdentity.provider, provider), eq(accountIdentity.subject, profile.subject)))
-          .limit(1)
-
-        // Nobody has linked this. Deliberately the same answer whether or not an account
-        // exists for whatever address the provider holds: nothing here is an oracle.
-        if (identity === undefined) return back(reply, loginPage('unlinked'))
-
-        void reply.header(
-          'set-cookie',
-          cookieHeader(sessions.issue(identity.account_id), config, config.session_ttl_seconds),
-        )
-
-        return back(reply, '/')
-      }
-
-      const account_id = spent.account_id
-      if (account_id === null) return back(reply, detailsPage('refused'))
-
-      try {
-        await db.insert(accountIdentity).values({
-          id: randomUUID(),
-          account_id,
-          provider,
-          subject: profile.subject,
-          created_at: now().toISOString(),
-        })
-      } catch {
-        // Either this provider account is already somebody's, or this account already has one
-        // of this provider. Both are `taken` from where the page stands, and neither is worth
-        // telling somebody which — the second is their own row and the first is not theirs to
-        // know about.
-        return back(reply, detailsPage('taken'))
-      }
-
-      // Neither of these may cost somebody the link they just made.
-      try {
-        await maybeAvatar(account_id, profile.picture)
-        await maybeMessenger(account_id, provider, profile.subject)
-      } catch {
-        // Logged by nothing on purpose: the link is done, and the two extras are conveniences.
-      }
-
-      return back(reply, detailsPage('linked'))
+      return spent.intent === 'sign-in'
+        ? await signIn(reply, provider, profile.subject)
+        : await link(reply, provider, spent.account_id, profile)
     },
   )
 

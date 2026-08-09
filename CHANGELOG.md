@@ -13,9 +13,11 @@ under today's heading, and make a new heading when there is none.
   as your password and any passkeys, never instead of them. Link one under Your details, and
   it works next time you sign in. You cannot take away the last way you have of getting in.
 
-- **Linking Facebook fills in your picture** if you have not chosen one, offers Messenger as a
-  way to reach you, and puts your Facebook page on your profile for other members. The picture
-  and the Messenger entry are yours to change or remove like anything else.
+- **Linking one fills in your picture** if you have not chosen one — from Discord or Facebook,
+  whichever you linked. It is yours to change or remove like any other picture, and one you
+  have already chosen is left alone. If you want people to reach you on Facebook, add your
+  Facebook name under How people can reach you: that is what puts Messenger in your list and
+  your Facebook page on your profile.
 
 - **Signing in with something nobody has linked tells you nothing about who is here.** It says
   the same thing whether or not there is an account — this app does not answer questions about

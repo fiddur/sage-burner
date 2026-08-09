@@ -131,6 +131,23 @@ describe('somebody’s page', () => {
     expect(screen.queryByText(/your own page/)).toBeNull()
   })
 
+  it('draws their Facebook page beside the name, not among the ways to reach them', async () => {
+    // It is not a way of being reached — Messenger is that, and it is a row like any other.
+    show(stub(aPerson({ facebook: 'https://facebook.com/wren' })))
+
+    const link = await screen.findByRole('link', { name: /on Facebook/ })
+
+    expect(link.getAttribute('href')).toBe('https://facebook.com/wren')
+    expect(link.textContent).toContain('Wren Aldertide')
+  })
+
+  it('draws none for somebody with no Facebook handle', async () => {
+    show(stub(aPerson()))
+
+    await screen.findByRole('heading', { level: 1, name: /Wren Aldertide/ })
+    expect(screen.queryByRole('link', { name: /on Facebook/ })).toBeNull()
+  })
+
   it('shows the free-text contact last, where there is one', async () => {
     show(stub(aPerson({ contact: 'ask Anna, we live together' })))
 

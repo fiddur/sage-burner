@@ -40,21 +40,6 @@ const messageForFailure = (failure: unknown): string => {
  * admin resets a password out of band until
  * either exists — saying so here is better than a dead link.
  */
-/**
- * What the page says about a provider round trip that came back here.
- *
- * Exported so it is testable without a URL: the wording is the whole of what `unlinked` is
- * for, and it must not name whether an account exists.
- */
-export const signInOutcome = (outcome: string | null): string | undefined => {
-  if (outcome === 'unlinked') {
-    return 'No account here is linked to that. Sign in another way, then link it under Your details.'
-  }
-  if (outcome === 'refused') return 'That did not work. Try again, or sign in with your password.'
-
-  return undefined
-}
-
 export const Login = ({
   api,
   ceremony,
@@ -259,4 +244,19 @@ export const Login = ({
       </p>
     </section>
   )
+}
+
+/**
+ * What the page says about a provider round trip that came back here.
+ *
+ * Exported so it is testable without a URL: the wording is the whole of what `unlinked` is
+ * for, and it must not name whether an account exists.
+ */
+export const signInOutcome = (outcome: string | null): string | undefined => {
+  if (outcome === 'unlinked') {
+    return 'No account here is linked to that. Sign in another way, then link it under Your details.'
+  }
+  if (outcome === 'refused') return 'That did not work. Try again, or sign in with your password.'
+
+  return undefined
 }

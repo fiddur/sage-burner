@@ -1,6 +1,11 @@
 import type { OAuthProvider, OAuthSettings } from '@sage-burner/shared'
 
-import { MAX_OAUTH_CLIENT_ID, MAX_OAUTH_CLIENT_SECRET, oauthProviderInfo } from '@sage-burner/shared'
+import {
+  apiRoutes,
+  MAX_OAUTH_CLIENT_ID,
+  MAX_OAUTH_CLIENT_SECRET,
+  oauthProviderInfo,
+} from '@sage-burner/shared'
 import { useEffect, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -87,7 +92,7 @@ export const OauthField = ({ api, provider }: { api: OauthApi; provider: OAuthPr
       </p>
 
       <p class="form-note">
-        The redirect URI to register there is <code>/api/auth/oauth/{provider}/callback</code> on this
+        The redirect URI to register there is <code>{apiRoutes.finishOauth.path(provider)}</code> on this
         installation's own address — the app builds it, and it has to match exactly.
       </p>
 

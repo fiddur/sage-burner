@@ -43,10 +43,17 @@ CREATE UNIQUE INDEX `account_identity_account_idx` ON `account_identity` (`provi
 -- It carries what the trip was *for*, because the two intents end differently and the
 -- caller must not be the one saying which — and `account_id`, so a callback cannot attach
 -- an identity to somebody else's account by arriving with a different cookie.
+--
+-- `nonce` is what ties the trip to the browser that started it. Unguessable and single-use
+-- are both properties of the state and neither says the party who finishes is the party who
+-- began: without this a member could run the flow, stop at their own callback URL and hand
+-- the `?code&state` to somebody else, whose browser would be issued a session for the
+-- member's account. RFC 6749 §10.12.
 CREATE TABLE `oauth_state` (
 	`state` text NOT NULL,
 	`provider` text NOT NULL,
 	`intent` text NOT NULL,
+	`nonce` text NOT NULL,
 	`account_id` text,
 	`created_at` text NOT NULL,
 	CONSTRAINT `oauth_state_pk` PRIMARY KEY(`state`),

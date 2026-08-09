@@ -108,19 +108,21 @@ describe('the ways in on your own details page', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('only way')
   })
 
-  it('says what linking Facebook also does, where Facebook is offered', async () => {
-    // Linking to sign in also puts their page on their profile and offers Messenger. That is
-    // worth saying where the linking happens rather than discovering afterwards.
+  it('says linking Facebook signs you in and nothing more', async () => {
+    // It used to write a Messenger row from the id Facebook returns — which is app-scoped and
+    // points at nobody outside this installation's Meta app. Both the row and the profile
+    // link now come from the handle somebody types, so this says where to type it.
     show(stub(), ['facebook'])
 
-    expect(await screen.findByText(/puts your Facebook page on your profile/)).toBeTruthy()
+    expect(await screen.findByText(/signs you in and nothing more/)).toBeTruthy()
+    expect(screen.getByText(/add\s+your Facebook name/)).toBeTruthy()
   })
 
   it('says nothing of the sort for Discord alone', async () => {
     show(stub(), ['discord'])
 
     await screen.findByRole('link', { name: 'Link it' })
-    expect(screen.queryByText(/Facebook page on your profile/)).toBeNull()
+    expect(screen.queryByText(/signs you in and nothing more/)).toBeNull()
   })
 
   it('says it is as well as a password, not instead of one', async () => {

@@ -107,8 +107,25 @@ const startLink = (server: FastifyInstance, provider: string, cookie?: string) =
     headers: cookie === undefined ? {} : { cookie },
   })
 
-const callback = (server: FastifyInstance, provider: string, query: string) =>
-  server.inject({ method: 'GET', url: `/api/auth/oauth/${provider}/callback?${query}` })
+const callback = (server: FastifyInstance, provider: string, query: string, cookie?: string) =>
+  server.inject({
+    method: 'GET',
+    url: `/api/auth/oauth/${provider}/callback?${query}`,
+    headers: cookie === undefined ? {} : { cookie },
+  })
+
+/** Every `set-cookie` on one response, as one string — the callback sets two. */
+const cookiesOn = (response: { headers: Record<string, unknown> }): string =>
+  [response.headers['set-cookie'] ?? []].flat().join('\n')
+
+/** What the browser was told to keep, as it would send it back. */
+const nonceFrom = (response: { headers: Record<string, unknown> }): string => {
+  const header = String(response.headers['set-cookie'] ?? '')
+  const value = /sage_oauth=([^;]*)/u.exec(header)?.[1]
+  if (value === undefined || value === '') throw new Error('no nonce cookie was set')
+
+  return `sage_oauth=${value}`
+}
 
 /** The state the app just minted, which is the only way a test can hold one. */
 const mintedState = async () => {
@@ -118,13 +135,13 @@ const mintedState = async () => {
 }
 
 const signInThrough = async (server: FastifyInstance, provider = 'facebook') => {
-  await start(server, provider)
-  return await callback(server, provider, `code=abc&state=${await mintedState()}`)
+  const leaving = await start(server, provider)
+  return await callback(server, provider, `code=abc&state=${await mintedState()}`, nonceFrom(leaving))
 }
 
 const linkThrough = async (server: FastifyInstance, cookie: string, provider = 'facebook') => {
-  await startLink(server, provider, cookie)
-  return await callback(server, provider, `code=abc&state=${await mintedState()}`)
+  const leaving = await startLink(server, provider, cookie)
+  return await callback(server, provider, `code=abc&state=${await mintedState()}`, nonceFrom(leaving))
 }
 
 describe('leaving for a provider', () => {
@@ -204,7 +221,7 @@ describe('signing in from a provider', () => {
     const back = await signInThrough(server)
 
     expect(back.headers.location).toBe('/')
-    expect(back.headers['set-cookie']).toContain(SESSION_COOKIE)
+    expect(cookiesOn(back)).toContain(`${SESSION_COOKIE}=`)
   })
 
   it('creates no account for a provider nobody has linked, and says nothing either way', async () => {
@@ -216,7 +233,8 @@ describe('signing in from a provider', () => {
     const back = await signInThrough(server)
 
     expect(back.headers.location).toBe('/login?from=unlinked')
-    expect(back.headers['set-cookie']).toBeUndefined()
+    // The nonce is cleared either way; what must not be here is a session.
+    expect(cookiesOn(back)).not.toContain(`${SESSION_COOKIE}=`)
     expect(await db().select().from(account)).toEqual([])
   })
 
@@ -231,40 +249,40 @@ describe('signing in from a provider', () => {
       subject: 'provider-1',
       created_at: NOW.toISOString(),
     })
-    await start(server, 'facebook')
+    const leaving = await start(server, 'facebook')
     const state = await mintedState()
 
-    const first = await callback(server, 'facebook', `code=abc&state=${state}`)
-    const again = await callback(server, 'facebook', `code=abc&state=${state}`)
+    const first = await callback(server, 'facebook', `code=abc&state=${state}`, nonceFrom(leaving))
+    const again = await callback(server, 'facebook', `code=abc&state=${state}`, nonceFrom(leaving))
 
     expect(first.headers.location).toBe('/')
     expect(again.headers.location).toBe('/login?from=refused')
-    expect(again.headers['set-cookie']).toBeUndefined()
+    expect(cookiesOn(again)).not.toContain(`${SESSION_COOKIE}=`)
   })
 
   it('refuses a state that has gone stale', async () => {
     const server = await build()
     await givenProvider()
-    await start(server, 'facebook')
+    const leaving = await start(server, 'facebook')
     const state = await mintedState()
 
     clock = new Date(NOW.getTime() + (STATE_TTL_SECONDS + 1) * 1000)
 
-    expect((await callback(server, 'facebook', `code=abc&state=${state}`)).headers.location).toBe(
-      '/login?from=refused',
-    )
+    expect(
+      (await callback(server, 'facebook', `code=abc&state=${state}`, nonceFrom(leaving))).headers.location,
+    ).toBe('/login?from=refused')
   })
 
   it('refuses a state minted for the other provider', async () => {
     const server = await build()
     await givenProvider('discord')
     await givenProvider('facebook')
-    await start(server, 'discord')
+    const leaving = await start(server, 'discord')
     const state = await mintedState()
 
-    expect((await callback(server, 'facebook', `code=abc&state=${state}`)).headers.location).toBe(
-      '/login?from=refused',
-    )
+    expect(
+      (await callback(server, 'facebook', `code=abc&state=${state}`, nonceFrom(leaving))).headers.location,
+    ).toBe('/login?from=refused')
   })
 
   it('refuses a callback carrying no code, without spending anything', async () => {
@@ -277,6 +295,73 @@ describe('signing in from a provider', () => {
     const back = await callback(server, 'facebook', 'error=access_denied')
 
     expect(back.headers.location).toBe('/login?from=refused')
+    expect(await db().select().from(oauthState)).toHaveLength(1)
+  })
+
+  it('refuses a callback that comes back to a different browser', async () => {
+    // The one the state alone does not cover: unguessable and single-use both say nothing
+    // about *who* finishes the trip. Without the nonce a member could run the flow, stop at
+    // their own callback URL and hand somebody else the `?code&state` — a top-level GET,
+    // which `SameSite=Lax` permits — and that browser would be issued a session for the
+    // member's account. RFC 6749 §10.12.
+    const server = await build()
+    await givenProvider()
+    const wren = await givenAccount()
+    await db().insert(accountIdentity).values({
+      id: randomUUID(),
+      account_id: wren.id,
+      provider: 'facebook',
+      subject: 'provider-1',
+      created_at: NOW.toISOString(),
+    })
+    await start(server, 'facebook')
+    const state = await mintedState()
+
+    // Everything the attacker can hand over, and nothing the browser was given.
+    const back = await callback(server, 'facebook', `code=abc&state=${state}`)
+
+    expect(back.headers.location).toBe('/login?from=refused')
+    expect(cookiesOn(back)).not.toContain(`${SESSION_COOKIE}=`)
+  })
+
+  it('refuses a callback carrying somebody else’s nonce', async () => {
+    const server = await build()
+    await givenProvider()
+    await start(server, 'facebook')
+    const state = await mintedState()
+
+    const back = await callback(server, 'facebook', `code=abc&state=${state}`, 'sage_oauth=not-the-one')
+
+    expect(back.headers.location).toBe('/login?from=refused')
+  })
+
+  it('gives the browser a nonce it cannot read, on a path it is not sent from', async () => {
+    const server = await build()
+    await givenProvider()
+
+    const leaving = await start(server, 'facebook')
+    const header = cookiesOn(leaving)
+
+    expect(header).toContain('HttpOnly')
+    expect(header).toContain('SameSite=Lax')
+    expect(header).toContain('Path=/api')
+  })
+
+  it('sweeps states nobody came back for', async () => {
+    // An abandoned consent screen is the ordinary case, and the route that makes these is
+    // unauthenticated — so nothing else would ever reclaim the row. `mintChallenge`'s
+    // argument: leaving is the only thing that makes them, so it is the only thing that can
+    // clear them.
+    const server = await build()
+    await givenProvider()
+    await start(server, 'facebook')
+    await start(server, 'facebook')
+    expect(await db().select().from(oauthState)).toHaveLength(2)
+
+    clock = new Date(NOW.getTime() + (STATE_TTL_SECONDS + 1) * 1000)
+    await start(server, 'facebook')
+
+    // The two stale ones are gone and only the one just minted is left.
     expect(await db().select().from(oauthState)).toHaveLength(1)
   })
 
@@ -374,46 +459,16 @@ describe('linking a provider to an account', () => {
     expect(await db().select().from(accountIdentity)).toHaveLength(1)
   })
 
-  it('offers Messenger as a way to be reached, from the Facebook account just linked', async () => {
+  it('writes no way of being reached from the id a provider hands over', async () => {
+    // It used to write a `messenger` row from `profile.subject`. Facebook answers
+    // `public_profile` with an **app-scoped** id, which identifies nobody outside this
+    // installation's Meta app — so `m.me/<that>` pointed at nobody. Both the Messenger row
+    // and the profile link now come from a handle somebody typed.
     const server = await build()
     await givenProvider('facebook')
     const wren = await givenAccount()
 
     await linkThrough(server, wren.cookie, 'facebook')
-
-    const [held] = await db()
-      .select()
-      .from(accountConnection)
-      .where(eq(accountConnection.account_id, wren.id))
-    expect(held).toMatchObject({ kind: 'messenger', value: 'provider-1' })
-  })
-
-  it('leaves the handle they typed alone', async () => {
-    const server = await build()
-    await givenProvider('facebook')
-    const wren = await givenAccount()
-    await db().insert(accountConnection).values({
-      id: randomUUID(),
-      account_id: wren.id,
-      kind: 'messenger',
-      value: 'wren.aldertide',
-      label: '',
-      order: 0,
-    })
-
-    await linkThrough(server, wren.cookie, 'facebook')
-
-    const held = await db().select().from(accountConnection).where(eq(accountConnection.account_id, wren.id))
-    expect(held).toHaveLength(1)
-    expect(held[0]?.value).toBe('wren.aldertide')
-  })
-
-  it('offers nothing of the kind for Discord, which is not a way of being reached here', async () => {
-    const server = await build()
-    await givenProvider('discord')
-    const wren = await givenAccount()
-
-    await linkThrough(server, wren.cookie, 'discord')
 
     expect(await db().select().from(accountConnection)).toEqual([])
   })

@@ -89,7 +89,8 @@ describe('somebody, as the rest of the community sees them', () => {
       name: 'Wren Aldertide',
       avatar: null,
       contact: 'wren on discord',
-      facebook: null,
+      // Built from the Messenger handle below, since that is a value they typed.
+      facebook: 'https://facebook.com/wren',
       connections: [expect.objectContaining({ kind: 'messenger', value: 'wren' })],
     })
   })
@@ -143,10 +144,36 @@ describe('somebody, as the rest of the community sees them', () => {
     expect(body.payload).not.toContain('peanuts')
   })
 
-  it('shows the Facebook page of somebody who linked Facebook to sign in', async () => {
-    // Derived from the identity rather than typed: the app knows about a Facebook account
-    // only because somebody linked one. The consequence is that linking shows the page, and
-    // Your details says so where the linking happens.
+  it('shows a Facebook page built from the handle they typed', async () => {
+    // **Not from the linked identity.** Facebook answers `public_profile` with an app-scoped
+    // id, which identifies nobody outside this installation's Meta app — a URL built from it
+    // would be a link to nobody on every member's profile, and "a dangling link is worse than
+    // a thin page" is this route's own rule. A value somebody typed is their real handle, or
+    // the number out of their own profile link.
+    const server = await build()
+    const wren = await givenAccount()
+    const reader = await givenAccount()
+    await givenConnection(wren.id, 'messenger', 'wren.aldertide', 0)
+
+    const got = await fetchProfile(server, reader.cookie, wren.id)
+
+    expect(got.json().person.facebook).toBe('https://facebook.com/wren.aldertide')
+  })
+
+  it('takes the numeric form of a typed handle, which has no name to use', async () => {
+    const server = await build()
+    const wren = await givenAccount()
+    const reader = await givenAccount()
+    await givenConnection(wren.id, 'messenger', '1234567890', 0)
+
+    expect((await fetchProfile(server, reader.cookie, wren.id)).json().person.facebook).toBe(
+      'https://facebook.com/profile.php?id=1234567890',
+    )
+  })
+
+  it('shows none for somebody who linked Facebook but typed nothing', async () => {
+    // The identity is not the source: signing in with Facebook says nothing about whether
+    // somebody wants their page shown, and the id it carries could not build one anyway.
     const server = await build()
     const wren = await givenAccount()
     const reader = await givenAccount()
@@ -160,26 +187,9 @@ describe('somebody, as the rest of the community sees them', () => {
 
     const got = await fetchProfile(server, reader.cookie, wren.id)
 
-    expect(got.json().person.facebook).toBe('https://facebook.com/profile.php?id=1234567890')
-    // The app-scoped id itself never leaves the process — only the page it points at, and
-    // that carries the id by necessity.
-    expect(got.json().person.facebook).not.toBe('1234567890')
-  })
-
-  it('shows none for somebody who linked Discord instead', async () => {
-    // Discord is a way in and not a page anybody is sent to: it has no profile URL at all.
-    const server = await build()
-    const wren = await givenAccount()
-    const reader = await givenAccount()
-    await db().insert(accountIdentity).values({
-      id: randomUUID(),
-      account_id: wren.id,
-      provider: 'discord',
-      subject: 'snowflake-1',
-      created_at: NOW,
-    })
-
-    expect((await fetchProfile(server, reader.cookie, wren.id)).json().person.facebook).toBeNull()
+    expect(got.json().person.facebook).toBeNull()
+    // And the app-scoped id is nowhere in the answer, which is what `schema.ts` promises.
+    expect(got.payload).not.toContain('1234567890')
   })
 
   it('has a page for somebody who has filled in nothing', async () => {
