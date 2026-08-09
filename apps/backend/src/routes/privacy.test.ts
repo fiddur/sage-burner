@@ -34,8 +34,7 @@ const fetchPrivacy = (server: FastifyInstance) => server.inject({ method: 'GET',
 
 describe('the privacy policy', () => {
   it('is readable by somebody who is not signed in', async () => {
-    // The requirement, not a nicety: Facebook's app review opens it as a stranger, and a
-    // policy behind a login is not one. So does anybody deciding whether to apply.
+    // The requirement rather than a nicety — `privacyResponseSchema` carries why.
     const server = await build('# What we keep\n\nNot much.')
 
     const got = await fetchPrivacy(server)
@@ -60,7 +59,7 @@ describe('the privacy policy', () => {
   })
 
   it('reads the repository’s own file by default', async () => {
-    // The one case that covers the default, as `changelog.test.ts` does for its file: a path
+    // The one case that covers the default, as `app.test.ts` does for the changelog: a path
     // resolved four levels up is exactly the kind that breaks between a checkout and the
     // image, and nothing else here would notice.
     const held = readPrivacy()
@@ -69,16 +68,31 @@ describe('the privacy policy', () => {
     expect(held).toContain('members')
   })
 
+  it('falls back to empty for a file that is not there', async () => {
+    // What an image built without `PRIVACY.md` gets. The route's own empty case injects the
+    // string, so this is the only thing exercising the read itself.
+    expect(readPrivacy('/nope')).toBe('')
+  })
+
   it('promises no deletion the app cannot perform', async () => {
-    // It said "deleting an account deletes everything attached to it" and "ask an organiser",
-    // and neither was true: no route removes an account, and `db.integration.test.ts` asserts
-    // that SQLite refuses the delete for anybody who has ever said they were coming. A policy
-    // is the one document where a sentence that reads well and is false is a false statement
+    // The invariant: no route deletes an account, and `db.integration.test.ts` asserts that
+    // SQLite refuses the delete for anybody who has ever said they were coming. A policy is
+    // the one document where a sentence that reads well and is false is a false statement
     // about somebody's data. #35 is the gap.
     const held = readPrivacy()
 
     expect(held).toMatch(/not something this app can do yet/i)
     expect(held).not.toMatch(/deletes everything attached to it/i)
+  })
+
+  it('says the calendar feed is readable without signing in', async () => {
+    // `/events/:eventId/schedule.ics` is unauthenticated, and it carries session titles and
+    // descriptions that members write. "Visible to the other members — not to anybody
+    // outside" read as a promise the feed does not keep.
+    const held = readPrivacy()
+
+    expect(held).toMatch(/calendar/i)
+    expect(held).toMatch(/anybody holding it can read the programme/i)
   })
 
   it('says the things app review is checking the page against', async () => {

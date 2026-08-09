@@ -9,6 +9,11 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-09
 
+- **The privacy page is linked from the footer of every page**, and from the application form
+  above the Send button — which is where somebody hands over contact details before they have
+  an account. It also now says what the calendar subscription gives away: the programme's
+  titles and descriptions are readable by anybody holding that address, without signing in.
+
 - **There is a privacy page now**, at /privacy, saying what this app keeps about you, who can
   see it, and how to get rid of it. Anybody can read it without signing in — which is what
   Facebook asks for before it will let people sign in with it, and a fair thing to be able to

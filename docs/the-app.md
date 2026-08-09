@@ -660,9 +660,9 @@ Two caches, and the split is the whole of what stays on a device:
 - **`sage-burner-api-v1`** — every API read: the roster, the schedule, who you
   are. **This is member data on disk, and signing out deletes the whole cache.**
   Not entries picked from it by URL, which would be a list to keep in step with
-  the routes. The three `/api/` reads that are _not_ somebody's data — the icon, the
-  banner and the changelog — are named into the shell cache instead, on the argument
-  that what a sign-out takes away should be what a sign-out was about.
+  the routes. The four `/api/` reads that are _not_ somebody's data — the icon, the
+  banner, the changelog and the privacy policy — are named into the shell cache instead,
+  on the argument that what a sign-out takes away should be what a sign-out was about.
 
 Reads are network-first with the cache as a floor under being offline; hashed
 assets are cache-first, since their names change with their bytes. `/api/version`

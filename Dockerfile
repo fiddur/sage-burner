@@ -75,8 +75,9 @@ COPY --from=builder /app/apps/web/dist ./apps/web/dist
 # load-bearing rather than decorative — do not tidy it away in a redesign.
 COPY LICENSE ./
 
-# What `GET /api/changelog` answers with (#325). In the image because the app serves it,
-# unlike every other markdown file here — `.dockerignore` un-ignores this one.
+# What `GET /api/changelog` (#325) and `GET /api/privacy` (#402) answer with. In the image
+# because the app serves them, unlike every other markdown file here — `.dockerignore`
+# un-ignores these two.
 COPY CHANGELOG.md ./
 COPY PRIVACY.md ./
 

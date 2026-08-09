@@ -283,6 +283,20 @@ describe('the brand', () => {
   })
 })
 
+describe('the footer', () => {
+  it('carries the policy on every page, signed in or not', () => {
+    // Where a reader looks for it, and the only link to it outside the admin's Facebook
+    // field until this. The source link is AGPL §13 and is asserted beside it so neither
+    // is tidied away alone.
+    renderNav({ status: 'signed-out' })
+
+    const footer = document.querySelector('footer.site-footer')
+    const hrefs = [...(footer?.querySelectorAll('a') ?? [])].map((link) => link.getAttribute('href'))
+    expect(hrefs).toContain('/privacy')
+    expect(hrefs).toContain('https://github.com/fiddur/sage-burner')
+  })
+})
+
 describe('initials', () => {
   it('takes the first and last word, so a middle name does not make five letters', () => {
     expect(initials('Ada Lovelace')).toBe('AL')

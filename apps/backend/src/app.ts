@@ -131,11 +131,9 @@ export interface AppDeps {
    */
   changelog?: string
   /**
-   * What `GET /api/privacy` answers with (#402).
+   * What `GET /api/privacy` answers with (#402). `privacyResponseSchema` carries why it exists.
    *
-   * Read from `PRIVACY.md` at boot, and injected for the same reason as the changelog. It
-   * exists because Facebook's app review will not take an app without a policy at a URL, and
-   * it has to be readable by somebody who is not signed in.
+   * Read from `PRIVACY.md` at boot, and injected for the same reason as the changelog.
    */
   privacy?: string
 }

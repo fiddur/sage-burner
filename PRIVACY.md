@@ -1,6 +1,7 @@
 This app is run by the people organising the gathering you are part of. It holds what it needs
 to plan that gathering and nothing else, and what it holds is visible to the other members of
-it — not to anybody outside.
+it — not to anybody outside, with the one exception described under **The calendar feed**
+below.
 
 **Nothing here is shared, sold, or sent anywhere for advertising or analytics.** There is no
 analytics service, no advertising network and no third-party tracker in this app. Nobody is
@@ -35,6 +36,19 @@ Only if you choose to link one, and only ever as an extra way in beside your pas
 
 We ask those providers for nothing else. We do not ask for your email address, your friends,
 your posts, or anything you have done anywhere else, and we cannot see any of it.
+
+# The calendar feed
+
+The programme can be subscribed to as a calendar, so that what is being offered turns up in
+your phone's own calendar app. A calendar app cannot sign in, so that address works without a
+login: **anybody holding it can read the programme** — the title, description, time and place
+of each thing offered, which are written by members. Nobody's name is put in it, and neither
+are contact details, allergies or anything about payment.
+
+The address has an unguessable identifier in it and is published nowhere, so it reaches only
+whoever it is handed to. Handing it outside the gathering is what would make it public, which
+is worth knowing before writing something in a description you would not want a stranger to
+read.
 
 # Notifications and email
 

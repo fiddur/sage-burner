@@ -388,6 +388,15 @@ describe('Apply', () => {
     expect(screen.getByRole('button', { name: 'Send application' })).toBeTruthy()
   })
 
+  it('links the privacy policy beside the button', async () => {
+    // The one page where somebody hands over contact details before having an account, so
+    // it is where the policy has to be reachable before the click rather than after it.
+    render(<Apply api={stub()} />)
+
+    await ready()
+    expect(screen.getByRole('link', { name: 'privacy policy' }).getAttribute('href')).toBe('/privacy')
+  })
+
   it('refuses a name of only spaces, rather than letting the server say no', async () => {
     const submitApplication = vi.fn(() => Promise.resolve({ application: {} as never }))
     render(<Apply api={stub({ submitApplication })} />)
