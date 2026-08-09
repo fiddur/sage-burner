@@ -400,15 +400,21 @@ export const apiRoutes = {
    * Behind the admin prefix, and never carrying the password — `mailSettingsSchema`
    * says why `has_password` is what comes back instead.
    */
-  getOauthSettings: {
-    method: 'GET',
-    fastify: '/api/admin/installation/oauth/:provider',
-    path: (provider: string) => `/api/admin/installation/oauth/${encodeURIComponent(provider)}`,
-  },
   getMailSettings: {
     method: 'GET',
     fastify: '/api/admin/installation/mail',
     path: () => '/api/admin/installation/mail',
+  },
+  /**
+   * What a provider was set up with, for the admin who set it up (#393).
+   *
+   * Behind the admin prefix, and never carrying the secret — `oauthSettingsSchema` says why
+   * `has_secret` is what comes back instead.
+   */
+  getOauthSettings: {
+    method: 'GET',
+    fastify: '/api/admin/installation/oauth/:provider',
+    path: (provider: string) => `/api/admin/installation/oauth/${encodeURIComponent(provider)}`,
   },
   getMe: {
     method: 'GET',

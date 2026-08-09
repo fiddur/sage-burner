@@ -674,13 +674,17 @@ describe('the state row itself', () => {
     const client = handle?.client
     if (client === undefined) throw new Error('build() first')
 
+    // Every other column supplied, and asserted on the message: omitting `nonce` made this
+    // pass on NOT NULL instead, so the CHECK could have been deleted from the migration with
+    // the test still green — "a mutation that does not apply looks exactly like one that was
+    // caught".
     expect(() =>
       client
         .prepare(
-          'insert into oauth_state (state, provider, intent, account_id, created_at) values (?, ?, ?, ?, ?)',
+          'insert into oauth_state (state, provider, intent, nonce, account_id, created_at) values (?, ?, ?, ?, ?, ?)',
         )
-        .run('s-1', 'facebook', 'link', null, NOW.toISOString()),
-    ).toThrow()
+        .run('s-1', 'facebook', 'link', 'a-nonce', null, NOW.toISOString()),
+    ).toThrow(/oauth_state_link_account_check/u)
   })
 
   it('goes with the account that started it', async () => {

@@ -42,16 +42,17 @@ export const personProfileSchema = z.object({
    */
   contact: z.string().nullable(),
   /**
-   * Where their Facebook page is, when they have linked Facebook to sign in (#393).
+   * Where their Facebook page is, built from the handle they typed for Messenger (#393).
    *
-   * Not a connection row, and deliberately: Facebook as a *way to be reached* is Messenger,
-   * and looking at somebody's page is a different act. The app only knows about a Facebook
-   * account at all because somebody linked one, so this is derived from the identity rather
-   * than typed — which also means **linking Facebook shows your page to members**, and Your
-   * details says so where the linking happens.
+   * Not a connection row of its own, deliberately: Facebook as a *way to be reached* is
+   * Messenger, and looking at somebody's page is a different act — so it sits beside the name
+   * rather than in the list.
    *
-   * Built here rather than sending the id, so the page has no opinion about Facebook's URL
-   * shape and the app-scoped id never leaves the process.
+   * **Not from a linked Facebook sign-in**, which is the obvious source and the wrong one:
+   * `public_profile` answers with an app-scoped id that identifies nobody outside the
+   * installation's own Meta app, so a URL built from it would point at nobody. Linking
+   * therefore shows nothing here; typing a handle does. The URL is built in the backend, so
+   * the page holds no opinion about Facebook's URL shape.
    */
   facebook: z.string().nullable(),
 })
