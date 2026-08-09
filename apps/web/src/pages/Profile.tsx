@@ -84,19 +84,29 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
   }
 
   return (
-    <GuardedPage title="Your details" require="member">
+    <GuardedPage title="Your details" require="approved">
       <h1>Your details</h1>
 
-      <p class="form-note">
-        These follow you from burn to burn. Below them is each burn on its own, for what does not: when you
-        arrive, where you sleep, what you will help with.
-      </p>
+      {member ? (
+        <p class="form-note">
+          These follow you from burn to burn. Below them is each burn on its own, for what does not: when you
+          arrive, where you sleep, what you will help with.
+        </p>
+      ) : (
+        // An account holding `admin` and not `member` (#396). Organising without attending is
+        // coherent, so the half of this page that is about a stay has nothing to say to them —
+        // and the half that is about the account has everything, notifications included.
+        <p class="form-note">
+          Your picture, how people reach you, and how you sign in. Say you are coming to a burn — under
+          Organise → Accounts — and what you bring and where you sleep appear here too.
+        </p>
+      )}
 
-      {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
+      {member && loaded.status === 'loading' && <p class="form-note">Loading…</p>}
 
-      {loaded.status === 'failed' && <ErrorText message={loaded.message} />}
+      {member && loaded.status === 'failed' && <ErrorText message={loaded.message} />}
 
-      {loaded.status === 'ready' && (
+      {member && loaded.status === 'ready' && (
         <form
           class="form"
           onSubmit={(submitEvent) => {
@@ -180,10 +190,12 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
         </form>
       )}
 
-      <p class="form-note">
-        Signed in as {loaded.status === 'ready' ? loaded.data.email : 'you'}. Changing that address is not
-        possible yet — ask someone with admin.
-      </p>
+      {member && (
+        <p class="form-note">
+          Signed in as {loaded.status === 'ready' ? loaded.data.email : 'you'}. Changing that address is not
+          possible yet — ask someone with admin.
+        </p>
+      )}
 
       <AvatarField api={api} />
 
@@ -197,7 +209,9 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
 
       <PushToggle api={api} />
 
-      <YourBurns api={api} />
+      {/* The burn-shaped half: `joinEvent` is `requireMember`, so somebody organising
+          without attending would be offered a button the API refuses. */}
+      {member && <YourBurns api={api} />}
     </GuardedPage>
   )
 }

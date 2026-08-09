@@ -7,7 +7,7 @@ import type { BellApi } from './NotificationBell.tsx'
 
 import { useBurns } from '../burn.tsx'
 import { useInstallationTitle } from '../installation.tsx'
-import { isAdmin, isApproved, isMember, useViewer } from '../viewer.tsx'
+import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
 import { useHidingBar, usePhone } from '../viewport.ts'
 import { Avatar } from './Avatar.tsx'
 import { Menu } from './Menu.tsx'
@@ -169,7 +169,10 @@ const TopNav = ({ api, pages }: { api: BellApi; pages: readonly NavPage[] }) => 
             </a>
           )}
 
-          {isMember(viewer) && (
+          {/* `approved`, matching the page: an account holding `admin` and not `member`
+              has a picture, ways of being reached and a notification switch there, and
+              reaching them by typing the URL is not a way in (#396). */}
+          {isApproved(viewer) && (
             <a class="nav-icon" href="/profile" aria-label="Your details" title="Your details">
               <Avatar
                 accountId={viewer.account.id}

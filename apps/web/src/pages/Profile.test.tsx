@@ -175,6 +175,52 @@ describe('ProfilePage', () => {
   })
 })
 
+describe('the page for an account organising without attending', () => {
+  const ORGANISER: Viewer = {
+    status: 'signed-in',
+    account: { id: 'a-1', name: 'Fredrik', avatar: null, roles: ['admin'] },
+  }
+
+  it('lets an admin who is not a member in, so notifications are reachable at all', async () => {
+    // The bug (#396): the page was `require="member"`, the push toggle had been taken off
+    // the admin page, and application notifications go precisely to admins.
+    renderPage(stub(), ORGANISER)
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Your details' })).toBeTruthy()
+    expect(screen.queryByText(/for members/)).toBeNull()
+  })
+
+  it('offers the half of it that is about the account, not the half about a stay', async () => {
+    renderPage(stub(), ORGANISER)
+
+    await screen.findByRole('heading', { level: 1, name: 'Your details' })
+    // The account's own: a picture, ways of being reached, ways in, and signing out.
+    expect(screen.getByRole('heading', { name: 'How people can reach you' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Log out' })).toBeTruthy()
+    // The stay's: `updateMyProfile` and `joinEvent` are both `requireMember`, so offering
+    // either would be a control the API refuses.
+    expect(screen.queryByLabelText('Your name')).toBeNull()
+    expect(screen.queryByText(/no burn planned/)).toBeNull()
+  })
+
+  it('does not read a profile the API would refuse it', async () => {
+    const getMyProfile = vi.fn(() => Promise.resolve({ profile: aProfile() }))
+    renderPage(stub({ getMyProfile }), ORGANISER)
+
+    await screen.findByRole('heading', { level: 1, name: 'Your details' })
+    expect(getMyProfile).not.toHaveBeenCalled()
+    // And says nothing about a load that never happened.
+    expect(screen.queryByText('Loading…')).toBeNull()
+  })
+
+  it('still shows the whole page to a member, which is the ordinary case', async () => {
+    renderPage(stub())
+
+    expect(await screen.findByLabelText('Your name')).toBeTruthy()
+    expect(screen.getByText(/These follow you from burn to burn/)).toBeTruthy()
+  })
+})
+
 describe('the allergy tick boxes', () => {
   const ITEMS = [
     { id: 'i-1', order: 0, label: 'Vegan' },
