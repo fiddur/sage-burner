@@ -67,7 +67,9 @@ export const Feed = ({ api }: { api: FeedApi }) => {
 
   // Whichever threads somebody has opened out, keyed by id. The card carries its newest
   // few lines; this is what replaces them once the whole conversation has been asked
-  // for. Cleared by nothing: a reload refreshes what is held rather than closing it.
+  // for, and what every write here answers with. Held until the page goes: a reload
+  // refreshes the cards underneath but not these, so one opened out shows what it last
+  // answered rather than closing itself under somebody.
   const [whole, setWhole] = useState<Record<string, Thread>>({})
 
   const settings = loaded.status === 'ready' ? loaded.data.settings : undefined
@@ -185,7 +187,10 @@ export const Feed = ({ api }: { api: FeedApi }) => {
 const feedItems = ({ activity, threads }: Happening): Item[] =>
   [
     ...activity.map((line) => ({ at: line.created_at, id: line.id, line })),
-    ...threads.map((card) => ({ at: card.last_at, id: card.id, card })),
+    // A card on the feed always has entries — it comes from grouping them — so the
+    // fallback is for the one that has had its last comment taken back while the page
+    // was open. It sorts to the bottom, which is where something with no news belongs.
+    ...threads.map((card) => ({ at: card.last_at ?? '', id: card.id, card })),
   ].sort((one, other) =>
     one.at === other.at ? other.id.localeCompare(one.id) : other.at.localeCompare(one.at),
   )
@@ -227,7 +232,8 @@ const Card = ({
         {page === undefined ? <span>{card.title}</span> : <a href={page}>{card.title}</a>}
       </p>
       <p class="feed-when">
-        {card.burn} · {localDay(card.last_at)}
+        {card.burn}
+        {card.last_at !== null && ` · ${localDay(card.last_at)}`}
         {card.gone && ' · withdrawn'}
       </p>
 
@@ -298,7 +304,7 @@ const atItsBurn = (link: string, eventId: string) => {
  *
  * Half the point of the page: this is where somebody discovers the switch exists, in
  * the moment they have just found the thing interesting — which is a better place for
- * it than a table of eleven rows they went looking for.
+ * it than a table of thirteen rows they went looking for.
  *
  * The label is the settings table's own, rather than a second vocabulary to keep in
  * step. A toggle button rather than a link, because it changes something: `aria-pressed`

@@ -334,6 +334,41 @@ describe('a thread', () => {
     expect(await bell(server, dag.cookie)).toEqual([])
   })
 
+  it('does not enrol whoever moved a dream in the grid', async () => {
+    // Laying out the timetable is a dozen drags, each writing a quiet line. Enrolling
+    // their author would make `dream_comment` — on by default — fire for every comment
+    // on every dream they ever touched, which is the channel people learn to ignore.
+    // What counts is having spoken, plus the offer that started it.
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    const cai = await givenAccount('Cai')
+    await givenComing(ada.id)
+    await givenComing(bea.id)
+    await givenComing(cai.id)
+    const { dream, thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+
+    await sendGuarded((headers) =>
+      server.inject({
+        method: 'PATCH',
+        url: `/api/sessions/${dream}`,
+        headers: { cookie: bea.cookie, ...headers },
+        payload: {
+          time_slot_start: '2026-08-01T09:00:00.000Z',
+          time_slot_end: '2026-08-01T10:00:00.000Z',
+        },
+      }),
+    )
+
+    await say(server, cai.cookie, id, 'is one person enough?')
+
+    // Ada offered it, so she is in the conversation.
+    expect((await bell(server, ada.cookie)).map((one) => one.category)).toEqual(['dream_comment'])
+    // Bea only moved it, and has not asked for other people's dreams.
+    expect(await bell(server, bea.cookie)).toEqual([])
+  })
+
   it('counts saying something as asking to hear the answer', async () => {
     const server = await build()
     await givenBurn()
@@ -524,6 +559,26 @@ describe('a thread', () => {
     await db().delete(account).where(eq(account.id, ada.id))
 
     expect((await entriesOf(server, bea.cookie, id)).map((entry) => entry.body)).toEqual(['bring a towel'])
+  })
+
+  it('says nothing has happened yet rather than answering an empty date', async () => {
+    // Every dream offered before #375 has a thread and no entries, which the migration
+    // wrote exactly like this. `last_at: ''` is not a datetime, and the feed drew it as
+    // "Invalid Date" for the card of a thread whose last comment had just been taken back.
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+
+    const id = randomUUID()
+    client()
+      .prepare('insert into thread (id, event_id, entity_type, entity_id, title) values (?, ?, ?, ?, ?)')
+      .run(id, BURN, 'session', randomUUID(), 'A dream from before')
+
+    const answer = (await read(server, id, ada.cookie)).json().thread
+    expect(answer.last_at).toBeNull()
+    expect(answer.entry_count).toBe(0)
+    expect(answer.entries).toEqual([])
   })
 
   it('keeps the conversation when the burn is deleted only until the burn is deleted', async () => {

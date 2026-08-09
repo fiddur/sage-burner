@@ -276,7 +276,11 @@ export const readThreads = async (
         title: row.title,
         gone: row.dream === null,
         entry_count: counts?.get(id) ?? all.length,
-        last_at: last?.created_at ?? '',
+        // Null where nothing has happened on it yet, which is not hypothetical: the
+        // migration backfilled a thread per dream already offered, and each has no
+        // entries until something does. An empty string here is not a datetime, and
+        // `localDay` drew it as "Invalid Date".
+        last_at: last?.created_at ?? null,
         entries: shown,
       } satisfies Thread,
     ]
@@ -287,8 +291,15 @@ export const readThreads = async (
  * Everybody with a stake in one conversation: who has spoken, and who has a job on it.
  *
  * Spoken is generic and is most of it — saying something is how you ask to hear the
- * answer. The rest is not: appointing somebody puts a line on the thread authored by
- * whoever appointed, so a facilitator who was handed the dream has said nothing and
+ * answer. **Only what somebody said, and the offer that started it**: the quiet lines
+ * are not a stake in anything. Whoever lays out the grid drags a dozen dreams into
+ * place, writing a `scheduled` line on each, and enrolling them there would make
+ * `dream_comment` — on by default — fire for every comment on every dream they ever
+ * touched, which is the channel people learn to ignore. The offerer's only trace is the
+ * `offered` line's author, which is why this is a pair rather than comments alone.
+ *
+ * The rest is not spoken at all: appointing somebody puts a line on the thread authored
+ * by whoever appointed, so a facilitator who was handed the dream has said nothing and
  * would otherwise never hear a question about it. That half is the entity's own, which
  * is what `entity_type` gains a branch for when meals or rides become commentable.
  */
@@ -299,7 +310,7 @@ export const participantsOf = async (
   const spoke = await db
     .selectDistinct({ account_id: threadEntry.author_account_id })
     .from(threadEntry)
-    .where(eq(threadEntry.thread_id, found.id))
+    .where(and(eq(threadEntry.thread_id, found.id), inArray(threadEntry.kind, ['comment', 'offered'])))
 
   const people = new Set(spoke.flatMap((row) => (row.account_id === null ? [] : [row.account_id])))
 

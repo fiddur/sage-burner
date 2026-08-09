@@ -47,8 +47,14 @@ export const threadSchema = z.object({
   /** The thing it is about is no longer there. The conversation still is. */
   gone: z.boolean(),
   entry_count: z.int().min(0),
-  /** When the newest entry landed — what the feed sorts on, so a card rises as it is used. */
-  last_at: dateTimeSchema,
+  /**
+   * When the newest entry landed — what the feed sorts on, so a card rises as it is used.
+   *
+   * Null on a thread nothing has happened on. The feed never carries one, since a card
+   * comes from grouping the entries; a dream backfilled by #375's migration does, until
+   * anybody touches it.
+   */
+  last_at: dateTimeSchema.nullable(),
   /** Oldest first, the order a conversation is read in. */
   entries: z.array(threadEntrySchema),
 })

@@ -116,6 +116,21 @@ describe('what everyone has been doing', () => {
     ).toEqual(['Sauna at dawn', 'Bea is coming.', 'Cacao ceremony'])
   })
 
+  it('says nothing about when, on a card nothing has happened on', async () => {
+    // `new Date('')` is an Invalid Date, and the card drew it. Reachable by taking back
+    // the last comment on a thread from before #375, which has no other entry.
+    renderPage(
+      stub(
+        {},
+        [],
+        [aCard({ id: 'c-1', title: 'Sauna at dawn', last_at: null, entry_count: 0, entries: [] })],
+      ),
+    )
+
+    await screen.findByText('Sauna at dawn')
+    expect(document.querySelector('.feed-when')?.textContent).toBe('Summer burn')
+  })
+
   it('heads a card with what the dream is called, and links to it at its burn', async () => {
     renderPage(
       stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn', event_id: 'e-2', entity_id: 's-9' })]),
