@@ -126,7 +126,6 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
         </p>
       )}
 
-      {/* No `member` gate here since #412 — `profile.ts` and `docs/accounts.md` have why. */}
       {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
 
       {loaded.status === 'failed' && <ErrorText message={loaded.message} />}

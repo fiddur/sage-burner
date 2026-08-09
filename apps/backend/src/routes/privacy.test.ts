@@ -86,7 +86,7 @@ describe('the privacy policy', () => {
   })
 
   it('says the calendar feed is readable without signing in', async () => {
-    // `/events/:eventId/schedule.ics` is unauthenticated, and it carries session titles and
+    // `/calendar/:token/schedule.ics` is unauthenticated, and it carries session titles and
     // descriptions that members write. "Visible to the other members — not to anybody
     // outside" read as a promise the feed does not keep.
     const held = readPrivacy()
@@ -95,17 +95,16 @@ describe('the privacy policy', () => {
     expect(held).toMatch(/anybody\s+holding\s+it\s+can\s+read\s+the\s+programme/i)
   })
 
-  it('does not call the active burn’s feed address unpublished, because it is not', async () => {
-    // `GET /api/events/active` is unguarded and answers the whole row, `id` included, and
-    // the public home page fetches it on every anonymous visit — so a stranger can build
-    // that burn's `.ics` URL without being handed anything. #408 is the gap; this is the
-    // policy not claiming otherwise in the meantime.
+  it('says the feed address is the calendar’s own, and can be taken back', async () => {
+    // It was the burn's id, which `/api/events/active` answers unguarded to every anonymous
+    // visit — so "published nowhere" was false for the burn being planned, and the policy
+    // said so plainly until #408 gave the feed a token of its own.
     const held = readPrivacy()
 
     // `\s+` between every word: the file is wrapped prose, so a reflow puts a newline
     // wherever it likes and a literal space fails against a sentence that is still there.
-    expect(held).toMatch(/worked\s+out\s+from\s+the\s+public\s+front\s+page/i)
-    expect(held).toMatch(/readable\s+by\s+anybody\s+at\s+all/i)
+    expect(held).toMatch(/unguessable\s+identifier\s+of\s+its\s+own/i)
+    expect(held).toMatch(/give\s+the\s+calendar\s+a\s+new\s+address/i)
   })
 
   it('says the things app review is checking the page against', async () => {

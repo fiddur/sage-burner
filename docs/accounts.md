@@ -1133,7 +1133,8 @@ That invitation is why `getMyProfile` and `updateMyProfile` are `requireApproved
 `requireMember` (#412). An account holding `admin` and not `member` has a page of its own like
 anybody else, and was being asked there to go and write an introduction on a form it could not
 reach. `requireMember` on the account's own name, picture and prose was also the root of what
-#396 had to work around; only the stay — `updateMyStay`, `joinEvent` — is a member's.
+#396 had to work around. What stays a member's is the stay itself: `updateMyStay`,
+`joinEvent`, `leaveEvent` and `transferMyPlace`.
 
 **Nothing extra for erasure.** The column goes with the account, and the pictures written into
 it cascade from `image.uploaded_by`. Both were already true; `profile.test.ts` writes a real

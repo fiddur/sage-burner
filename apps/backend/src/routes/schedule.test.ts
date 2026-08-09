@@ -42,6 +42,12 @@ const db = () => {
   return found
 }
 
+/**
+ * The burn, and the address its feed answers at (#408).
+ *
+ * A token rather than the id, and written here rather than left to the route, because these
+ * rows skip `createEvent` — which is what mints one in the app.
+ */
 const givenEvent = async (name = 'Summer burn') => {
   const id = randomUUID()
   await db()
@@ -53,6 +59,7 @@ const givenEvent = async (name = 'Summer burn') => {
       start_date: '2026-08-01',
       end_date: '2026-08-05',
       member_cap: 42,
+      feed_token: `token-${id}`,
       created_at: NOW,
     })
   return id
@@ -130,9 +137,29 @@ const givenDream = async (
 }
 
 const feed = (server: FastifyInstance, eventId: string) =>
-  server.inject({ method: 'GET', url: `/events/${eventId}/schedule.ics` })
+  server.inject({ method: 'GET', url: `/calendar/token-${eventId}/schedule.ics` })
 
 describe('the public calendar feed', () => {
+  it('answers nothing at the burn’s id, which the public homepage gives away', async () => {
+    // The bug (#408): keyed by `event.id`, this was readable by any stranger who loaded
+    // `/`, because `/api/events/active` is unguarded and answers the whole row.
+    const server = await build()
+    const eventId = await givenEvent()
+
+    expect(
+      (await server.inject({ method: 'GET', url: `/calendar/${eventId}/schedule.ics` })).statusCode,
+    ).toBe(404)
+  })
+
+  it('answers nothing at a token that names no burn', async () => {
+    const server = await build()
+    await givenEvent()
+
+    expect(
+      (await server.inject({ method: 'GET', url: '/calendar/not-a-token/schedule.ics' })).statusCode,
+    ).toBe(404)
+  })
+
   it('is served as a calendar, without signing in', async () => {
     const server = await build()
     const eventId = await givenEvent()

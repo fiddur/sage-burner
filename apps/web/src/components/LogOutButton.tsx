@@ -13,9 +13,8 @@ import { useSetViewer } from '../viewer.tsx'
  *
  * One call site, which took two goes to get to: #195 put a second button on ⚙️ → Settings
  * because the details page was `require="member"` and turned an `admin`-without-`member`
- * account away, and #396 made that page `approved` instead so the copy could go. Which of two
- * buttons somebody pressed is a question neither page can answer, which is the same argument
- * that moved the push toggle.
+ * account away, and #396 made that page `approved` instead — so the account the copy existed
+ * for can reach the original, and the copy could go.
  */
 export const LogOutButton = ({
   api,

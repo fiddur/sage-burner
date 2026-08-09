@@ -242,3 +242,14 @@ export type EventsResponse = z.infer<typeof eventsResponseSchema>
  */
 export const activeEventResponseSchema = z.object({ event: eventFields.nullable() })
 export type ActiveEventResponse = z.infer<typeof activeEventResponseSchema>
+
+/**
+ * Where one burn's calendar feed lives (#408).
+ *
+ * The token rather than a whole URL, because the client builds every path from `apiRoutes` —
+ * and this app has no notion of its own public address anyway, which is why `CalendarFeed`
+ * reads `window.location.origin`.
+ */
+export const calendarFeedResponseSchema = z.object({ token: z.string() })
+
+export type CalendarFeedResponse = z.infer<typeof calendarFeedResponseSchema>
