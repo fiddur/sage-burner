@@ -447,6 +447,17 @@ export const apiRoutes = {
     fastify: '/api/me/identities',
     path: () => '/api/me/identities',
   },
+  /**
+   * The address of one burn's calendar feed, for the member being offered the link (#408).
+   *
+   * A read of its own rather than a field on the burn: the burn's shape is answered to the
+   * **public** homepage, and putting the token there would undo the whole point.
+   */
+  getCalendarToken: {
+    method: 'GET',
+    fastify: '/api/events/:eventId/calendar',
+    path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/calendar`,
+  },
   getMyBurns: {
     method: 'GET',
     fastify: '/api/events/mine',
@@ -707,15 +718,28 @@ export const apiRoutes = {
     fastify: '/api/admin/questions/order',
     path: () => '/api/admin/questions/order',
   },
+  /** A new address for the feed, when the old one has been handed too far (#408). */
+  rotateCalendarToken: {
+    method: 'POST',
+    fastify: '/api/admin/events/:id/calendar',
+    path: (id: string) => `/api/admin/events/${encodeURIComponent(id)}/calendar`,
+  },
   revokeInvite: {
     method: 'DELETE',
     fastify: '/api/admin/invites/:id',
     path: (id: string) => `/api/admin/invites/${encodeURIComponent(id)}`,
   },
+  /**
+   * The programme as a calendar subscription (#258), keyed by the burn's feed token and
+   * **not** by its id (#408).
+   *
+   * Outside `/api` because a calendar client asks for a file, not an API — the web manifest
+   * is the other one. `event.feed_token` says why the id will not do.
+   */
   scheduleFeed: {
     method: 'GET',
-    fastify: '/events/:eventId/schedule.ics',
-    path: (eventId: string) => `/events/${encodeURIComponent(eventId)}/schedule.ics`,
+    fastify: '/calendar/:token/schedule.ics',
+    path: (token: string) => `/calendar/${encodeURIComponent(token)}/schedule.ics`,
   },
   /**
    * A message to the admin's own address, so a wrong password is found here rather

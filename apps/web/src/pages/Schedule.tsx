@@ -4,6 +4,7 @@ import type { ComponentChildren } from 'preact'
 import { useRef, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
+import type { CalendarFeedApi } from '../components/CalendarFeed.tsx'
 import type { Opened } from '../components/OpenedDream.tsx'
 import type { Pinch } from '../pinch.ts'
 import type { LaneCell, MealBlock } from '../schedule.ts'
@@ -55,7 +56,8 @@ export type ScheduleApi = Pick<
   | 'updateComment'
   | 'deleteComment'
   | 'uploadImage'
->
+> &
+  CalendarFeedApi
 
 type Person = EventAttendeesResponse['attendees'][number]
 
@@ -299,7 +301,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
   }
 
   return (
-    <Framed eventId={event.id} refreshing={refreshing}>
+    <Framed api={api} eventId={event.id} refreshing={refreshing}>
       {error !== undefined &&
         opened === undefined &&
         shownMeal === undefined && (
@@ -397,10 +399,12 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
 }
 
 const Framed = ({
+  api,
   eventId,
   refreshing = false,
   children,
 }: {
+  api?: CalendarFeedApi
   eventId?: string
   refreshing?: boolean
   children: ComponentChildren
@@ -409,7 +413,9 @@ const Framed = ({
     <h1>
       Schedule <Refreshing on={refreshing} />
     </h1>
-    {eventId !== undefined && <CalendarFeed eventId={eventId} />}
+    {/* Both, or neither: there is no burn to fetch a feed for until there is one, and the
+        states above this all render before there is. */}
+    {eventId !== undefined && api !== undefined && <CalendarFeed api={api} eventId={eventId} />}
     {children}
   </section>
 )

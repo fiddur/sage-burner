@@ -45,11 +45,11 @@ login: **anybody holding it can read the programme** — the title, description,
 of each thing offered, which are written by members. Nobody's name is put in it, and neither
 are contact details, allergies or anything about payment.
 
-**For the gathering being planned right now, that address can be worked out from the public
-front page**, so treat what you write in a title or a description as readable by anybody at
-all. For any other gathering the address has an unguessable identifier in it and is published
-nowhere, so it reaches only whoever it is handed to — and handing it on is what would make
-that one public too.
+The address has an unguessable identifier of its own in it, published nowhere and belonging to
+nothing else, so it reaches only whoever it is handed to. Handing it on is what would make it
+public — so it is worth a thought before writing something in a description you would not want
+a stranger to read. If a link does get out, whoever organises the gathering can give the
+calendar a new address, which stops the old one.
 
 # Notifications and email
 

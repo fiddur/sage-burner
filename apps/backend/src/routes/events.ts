@@ -20,6 +20,7 @@ import { patchRow } from '../db/patch.ts'
 import { event } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { refuseIfStale, withVersion } from '../if-match.ts'
+import { newFeedToken } from './calendar.ts'
 
 export interface EventRouteDeps extends GuardDeps {
   now: () => Date
@@ -137,7 +138,9 @@ export const registerEventRoutes = (app: FastifyInstance, { db, sessions, now }:
     const row = { ...body, id: randomUUID(), created_at: now().toISOString() }
 
     try {
-      await db.insert(event).values(row)
+      // The token is written and not answered: `row` is what goes back, and `eventSchema`
+      // is the shape the public homepage reads (#408).
+      await db.insert(event).values({ ...row, feed_token: newFeedToken() })
     } catch (error) {
       // The slug is in URLs, so a collision is a thing the admin can fix by
       // choosing another — worth its own status rather than a generic 400.

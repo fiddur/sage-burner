@@ -270,10 +270,33 @@ export const event = sqliteTable(
     /** What the Meal page says above its table. Markdown, and any member may rewrite it. */
     meal_intro_markdown: text('meal_intro_markdown').notNull().default(''),
     member_cap: integer('member_cap').notNull(),
+    /**
+     * What the calendar feed's URL is keyed by (#408), and deliberately not the id.
+     *
+     * `GET /calendar/:token/schedule.ics` cannot hold a session — a phone re-fetches it on
+     * its own schedule — so the address is the only thing protecting it. Keyed by `id` that
+     * was no protection at all for the burn being planned: `/api/events/active` is
+     * unguarded, carries the whole row, and the public homepage fetches it on every
+     * anonymous visit, so a stranger could read the id and build the URL.
+     *
+     * Separate from the id and therefore **rotatable**, which is the answer to "that link
+     * got out" that an id can never give.
+     *
+     * Nullable because adding it needed no table rebuild; the migration backfills every row
+     * and `createEvent` mints one, so nothing reaches the read without it. Never in
+     * `eventSchema` — that is the shape the public homepage is answered with, which is the
+     * whole problem this exists to fix.
+     */
+    feed_token: text('feed_token'),
     created_at: text('created_at').notNull(),
   },
   (table) => [
     primaryKey({ columns: [table.id] }),
+    // Partial, because NULLs compare distinct in SQLite and the column is nullable —
+    // `account_invite_token_idx` for the same reason.
+    uniqueIndex('event_feed_token_idx')
+      .on(table.feed_token)
+      .where(sql`${table.feed_token} is not null`),
     // Mirrors `withEventDateOrder` in the shared schemas. Dates are fixed-width
     // ISO, so a string comparison is chronological here.
     check('event_start_date_check', isIsoDate(table.start_date)),

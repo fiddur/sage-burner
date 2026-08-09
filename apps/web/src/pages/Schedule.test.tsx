@@ -62,6 +62,8 @@ const stub = (
   getSessions: () => Promise.resolve({ sessions }),
   updateSession: () => Promise.reject(new Error('updateSession is not stubbed here')),
   uploadImage: () => Promise.reject(new Error('uploadImage is not stubbed here')),
+  getCalendarToken: () => Promise.resolve({ token: 'feed-token' }),
+  rotateCalendarToken: () => Promise.reject(new Error('rotateCalendarToken is not stubbed here')),
   getThread: () => Promise.reject(new Error('getThread is not stubbed here')),
   postComment: () => Promise.reject(new Error('postComment is not stubbed here')),
   updateComment: () => Promise.reject(new Error('updateComment is not stubbed here')),
@@ -1880,13 +1882,27 @@ describe('the calendar feed', () => {
     // snapshot, and an origin `preact-iso` will not take over (#298).
     renderPage(stub())
 
-    expect((await feedLink()).getAttribute('href')).toBe('webcal://localhost:3000/events/e-1/schedule.ics')
+    expect((await feedLink()).getAttribute('href')).toBe(
+      'webcal://localhost:3000/calendar/feed-token/schedule.ics',
+    )
   })
 
   it('follows the burn in the selector rather than whichever is active', async () => {
-    renderPage(stub(), MEMBER, { event: { ...BURN, id: 'e-2' }, attendance: null })
+    // The token is fetched per burn, so the id being asked for is what decides the link —
+    // the address itself says nothing about which burn it is, which is the point (#408).
+    const getCalendarToken = vi.fn((eventId: string) => Promise.resolve({ token: `token-for-${eventId}` }))
+    renderPage(stub({ getCalendarToken }), MEMBER, { event: { ...BURN, id: 'e-2' }, attendance: null })
 
-    expect((await feedLink()).getAttribute('href')).toContain('/events/e-2/schedule.ics')
+    expect((await feedLink()).getAttribute('href')).toContain('/calendar/token-for-e-2/schedule.ics')
+  })
+
+  it('is keyed by nothing anybody can read off the public homepage', async () => {
+    // The bug (#408): keyed by `event.id`, and `/api/events/active` answers the whole row
+    // unguarded to every anonymous visit — so a stranger could build the active burn's feed
+    // URL from the front page.
+    renderPage(stub())
+
+    expect((await feedLink()).getAttribute('href')).not.toContain('e-1')
   })
 
   it('copies the https URL, which is what Google Calendar wants pasted', async () => {
@@ -1899,7 +1915,7 @@ describe('the calendar feed', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Copy link' }))
 
     await waitFor(() =>
-      expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/events/e-1/schedule.ics`),
+      expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/calendar/feed-token/schedule.ics`),
     )
   })
 
