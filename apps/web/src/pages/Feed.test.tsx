@@ -1,4 +1,4 @@
-import type { Activity } from '@sage-burner/shared'
+import type { Activity, Thread, ThreadEntry } from '@sage-burner/shared'
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -28,8 +28,34 @@ const aLine = (over: Partial<Activity> & Pick<Activity, 'id' | 'body'>): Activit
 
 const TWO: Activity[] = [
   aLine({ id: 'x-1', body: 'Ada offered a dream: Sauna at dawn' }),
-  aLine({ id: 'x-2', body: 'Bea is coming.', category: 'member_joined', link: '/members' }),
+  aLine({
+    id: 'x-2',
+    body: 'Bea is coming.',
+    category: 'member_joined',
+    link: '/members',
+    created_at: '2026-08-07T17:00:00.000Z',
+  }),
 ]
+
+const anEntry = (over: Partial<ThreadEntry> & Pick<ThreadEntry, 'id' | 'body'>): ThreadEntry => ({
+  kind: 'comment',
+  author: { account_id: 'a-1', name: 'Ada' },
+  created_at: '2026-08-07T18:00:00.000Z',
+  edited_at: null,
+  ...over,
+})
+
+const aCard = (over: Partial<Thread> & Pick<Thread, 'id' | 'title'>): Thread => ({
+  event_id: 'e-1',
+  burn: 'Summer burn',
+  entity_type: 'session',
+  entity_id: 's-1',
+  gone: false,
+  entry_count: 1,
+  last_at: '2026-08-07T18:00:00.000Z',
+  entries: [anEntry({ id: 't-1', body: 'offered this dream', kind: 'offered' })],
+  ...over,
+})
 
 /** What the server sends somebody who has never touched the settings. */
 const DEFAULTS = [
@@ -39,13 +65,18 @@ const DEFAULTS = [
   'payment',
   'waiting_list_near',
   'waiting_list_pushed',
+  'dream_comment',
   'application',
 ] as const
 
-const stub = (over: Partial<FeedApi> = {}, activity: Activity[] = TWO): FeedApi => ({
-  getFeed: () => Promise.resolve({ activity }),
+const stub = (over: Partial<FeedApi> = {}, activity: Activity[] = TWO, threads: Thread[] = []): FeedApi => ({
+  getFeed: () => Promise.resolve({ activity, threads }),
   getMyNotificationSettings: () => Promise.resolve({ on: [...DEFAULTS], email: [] }),
   updateMyNotificationSettings: () => Promise.resolve({ on: [...DEFAULTS], email: [] }),
+  getThread: () => Promise.reject(new Error('getThread is not stubbed here')),
+  postComment: () => Promise.reject(new Error('postComment is not stubbed here')),
+  updateComment: () => Promise.reject(new Error('updateComment is not stubbed here')),
+  deleteComment: () => Promise.reject(new Error('deleteComment is not stubbed here')),
   ...over,
 })
 
@@ -57,12 +88,172 @@ const renderPage = (api: FeedApi, viewer: Viewer = ADA) =>
   )
 
 describe('what everyone has been doing', () => {
-  it('shows a line per thing, newest first as the server sent them', async () => {
+  it('shows a line per thing, newest first', async () => {
     renderPage(stub())
 
     expect(await screen.findByText('Ada offered a dream: Sauna at dawn')).toBeTruthy()
     const lines = [...document.querySelectorAll('.feed-what')].map((one) => one.textContent)
     expect(lines).toEqual(['Ada offered a dream: Sauna at dawn', 'Bea is coming.'])
+  })
+
+  it('interleaves the conversations with the news, by when each last moved', async () => {
+    // Two things on one page: a dream is a card carrying its own history and talk, and
+    // the burn's news stays a line. The order is one order, not two lists.
+    renderPage(
+      stub(
+        {},
+        [aLine({ id: 'x-1', body: 'Bea is coming.', created_at: '2026-08-07T19:00:00.000Z' })],
+        [
+          aCard({ id: 'c-1', title: 'Sauna at dawn', last_at: '2026-08-07T20:00:00.000Z' }),
+          aCard({ id: 'c-2', title: 'Cacao ceremony', last_at: '2026-08-07T18:00:00.000Z' }),
+        ],
+      ),
+    )
+
+    await screen.findByText('Sauna at dawn')
+    expect(
+      [...document.querySelectorAll('.feed-card-head, .feed-what')].map((one) => one.textContent),
+    ).toEqual(['Sauna at dawn', 'Bea is coming.', 'Cacao ceremony'])
+  })
+
+  it('says nothing about when, on a card nothing has happened on', async () => {
+    // `new Date('')` is an Invalid Date, and the card drew it. Reachable by taking back
+    // the last comment on a thread from before #375, which has no other entry.
+    renderPage(
+      stub(
+        {},
+        [],
+        [aCard({ id: 'c-1', title: 'Sauna at dawn', last_at: null, entry_count: 0, entries: [] })],
+      ),
+    )
+
+    await screen.findByText('Sauna at dawn')
+    expect(document.querySelector('.feed-when')?.textContent).toBe('Summer burn')
+  })
+
+  it('heads a card with what the dream is called, and links to it at its burn', async () => {
+    renderPage(
+      stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn', event_id: 'e-2', entity_id: 's-9' })]),
+    )
+
+    const link = await screen.findByRole('link', { name: 'Sauna at dawn' })
+    expect(link.getAttribute('href')).toBe('/dreams?burn=e-2&dream=s-9')
+  })
+
+  it('keeps a withdrawn dream readable, and links nowhere', async () => {
+    // The card is the only place its thread can be read: there is no panel to open.
+    renderPage(stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn', gone: true })]))
+
+    expect(await screen.findByText(/withdrawn/)).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Sauna at dawn' })).toBeNull()
+  })
+
+  it('draws what somebody said differently from what the app did', async () => {
+    renderPage(
+      stub(
+        {},
+        [],
+        [
+          aCard({
+            id: 'c-1',
+            title: 'Sauna at dawn',
+            entry_count: 2,
+            entries: [
+              anEntry({ id: 't-1', body: 'offered this dream', kind: 'offered' }),
+              anEntry({ id: 't-2', body: 'bring a towel', author: { account_id: 'a-2', name: 'Bea' } }),
+            ],
+          }),
+        ],
+      ),
+    )
+
+    await screen.findByText('Ada offered this dream')
+    expect(document.querySelectorAll('.thread-did')).toHaveLength(1)
+    expect(document.querySelectorAll('.thread-said')).toHaveLength(1)
+  })
+
+  it('says something on a card, and shows what came back', async () => {
+    const posted = vi.fn<FeedApi['postComment']>((id) =>
+      Promise.resolve({
+        thread: aCard({
+          id,
+          title: 'Sauna at dawn',
+          entry_count: 2,
+          entries: [
+            anEntry({ id: 't-1', body: 'offered this dream', kind: 'offered' }),
+            anEntry({ id: 't-2', body: 'is one person enough?' }),
+          ],
+        }),
+      }),
+    )
+    renderPage(stub({ postComment: posted }, [], [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
+
+    const box = await screen.findByLabelText('Say something about Sauna at dawn')
+    fireEvent.input(box, { target: { value: 'is one person enough?' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Say it' }))
+
+    await waitFor(() => expect(posted).toHaveBeenCalledWith('c-1', { body: 'is one person enough?' }))
+    expect(await screen.findByText('is one person enough?')).toBeTruthy()
+  })
+
+  it('asks for the rest of a conversation only when there is more of it', async () => {
+    // The card carries the end of it, which is what bounds the page and what the
+    // installed app keeps on disk. The whole thread is a read of its own.
+    const whole = vi.fn<FeedApi['getThread']>((id) =>
+      Promise.resolve({
+        thread: aCard({
+          id,
+          title: 'Sauna at dawn',
+          entry_count: 2,
+          entries: [
+            anEntry({ id: 't-0', body: 'offered this dream', kind: 'offered' }),
+            anEntry({ id: 't-1', body: 'the earliest thing said' }),
+          ],
+        }),
+      }),
+    )
+    renderPage(stub({ getThread: whole }, [], [aCard({ id: 'c-1', title: 'Sauna at dawn', entry_count: 4 })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: /Show the whole thread \(4\)/ }))
+
+    await waitFor(() => expect(whole).toHaveBeenCalledWith('c-1'))
+    expect(await screen.findByText('the earliest thing said')).toBeTruthy()
+  })
+
+  it('offers no way to ask for more when the card already has all of it', async () => {
+    renderPage(stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn', entry_count: 1 })]))
+
+    await screen.findByText('Sauna at dawn')
+    expect(screen.queryByRole('button', { name: /Show the whole thread/ })).toBeNull()
+  })
+
+  it('offers the switch that would tell somebody about a card like this one', async () => {
+    // The chip names the top of the card, and only where a category exists to name: a
+    // dream being moved sends nothing, so a card whose latest news is a move offers no
+    // switch rather than one that would change nothing.
+    renderPage(
+      stub(
+        {},
+        [],
+        [
+          aCard({
+            id: 'c-1',
+            title: 'Sauna at dawn',
+            entries: [anEntry({ id: 't-1', body: 'moved it in the schedule', kind: 'scheduled' })],
+          }),
+          aCard({
+            id: 'c-2',
+            title: 'Cacao ceremony',
+            entity_id: 's-2',
+            last_at: '2026-08-07T17:00:00.000Z',
+            entries: [anEntry({ id: 't-2', body: 'bring a cup' })],
+          }),
+        ],
+      ),
+    )
+
+    expect(await screen.findByRole('button', { name: /Somebody comments on any dream/ })).toBeTruthy()
+    expect(document.querySelectorAll('.feed-chip')).toHaveLength(1)
   })
 
   it('names the burn each line belongs to, because the page spans them', async () => {

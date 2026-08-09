@@ -44,16 +44,16 @@ month's grid with nothing on screen to say why.
 lands on the burn it is about. Read here rather than by each page, because every
 burn-scoped page already reads this.
 
-| Viewer                   | Bar                                                            |
-| ------------------------ | -------------------------------------------------------------- |
-| Signed out               | Apply, Log in                                                  |
-| An account, neither role | 🔔 alone — an applicant, who is still told when it is decided  |
-| `member`                 | Going on, Members, Schedule, Leads, Meals, FAQ, and the circle |
-| `admin` without `member` | Going on, Members, Schedule, Leads, Meals, FAQ, ⚙️             |
+| Viewer                   | Bar                                                           |
+| ------------------------ | ------------------------------------------------------------- |
+| Signed out               | Apply, Log in                                                 |
+| An account, neither role | 🔔 alone — an applicant, who is still told when it is decided |
+| `member`                 | Feed, Members, Schedule, Leads, Meals, FAQ, and the circle    |
+| `admin` without `member` | Feed, Members, Schedule, Leads, Meals, FAQ, ⚙️                |
 
-- **Going on** is the feed (#303) — see below. First of the entries, because it is the
-  page that answers the question somebody has on opening the app between burns: is
-  anything happening?
+- **Feed** is what everyone has been doing and saying (#303, #375) — see below. First of
+  the entries, because it is the page that answers the question somebody has on opening
+  the app between burns: is anything happening?
 - **Members** is the roster a member may now read — see "What a member may change".
 - **FAQ** is the burn's Q&A (#28) — a thing of its own rather than something reached
   from another page, because it is what somebody opens when they have a question and
@@ -158,9 +158,9 @@ links, 🔔, 🙂 and ⚙️ with no responsive rule at all, so it wrapped to tw
 
 Below `45rem` the six pages move to a **fixed bar along the bottom**, one icon each:
 
-| 📜       | 🧑‍🤝‍🧑      | 🗓️       | 🕴️    | 🍽️    | ❓  |
-| -------- | ------- | -------- | ----- | ----- | --- |
-| Going on | Members | Schedule | Leads | Meals | FAQ |
+| 📜   | 🧑‍🤝‍🧑      | 🗓️       | 🕴️    | 🍽️    | ❓  |
+| ---- | ------- | -------- | ----- | ----- | --- |
+| Feed | Members | Schedule | Leads | Meals | FAQ |
 
 The topbar keeps ☰, the brand, the burn selector and the three things that are about
 the session rather than any page — the bell, ⚙️ and the face — and scrolls away with
@@ -249,62 +249,154 @@ Three rules the pages follow, all of them things a phone found first:
   browser ignore `rows`, so the fields that ask for a taller empty box would open at
   the stylesheet's floor in Chrome and at their own everywhere else.
 
-## Going on
+## Feed
 
-A page of what everyone has been doing (#303), because between burns the app was quiet
-and quiet reads as nothing-to-do.
+A page of what everyone has been doing (#303) and what they are talking about (#375),
+because between burns the app was quiet and quiet reads as nothing-to-do.
 
-**The lines are the burn-wide notifications, shown to everybody.** A dream offered,
-somebody saying they are coming, a lead role added, a lead taken. Those categories are
-**off by default** — a burn where every arrival pings forty-two people is a channel
-people learn to ignore (#259) — so until this page the ordinary way to learn somebody
-had offered a dream was to go looking at the schedule.
+**Two things on one page, deliberately.** A dream is one **card** carrying its whole
+history and the talk under it; the burn's own news — somebody joined, a lead role added,
+a lead taken — stays a **line**. Collapsing everything by thread was the first design and
+it does not work: the lines that belong to no dream would end up behind one card per
+burn, which is the page's list disappearing into an accordion. So `activity` keeps what
+has no conversation to hang on, and shrinks as each kind of thing gains one.
+
+The server merges both halves by time and cuts them to fifty **against each other**, so a
+burn full of talk cannot push its news off the page and a quiet one does not leave the
+page half empty.
+
+### The lines
+
+**The burn-wide notifications, shown to everybody.** Somebody saying they are coming, a
+lead role added, a lead taken. Those categories are **off by default** — a burn where
+every arrival pings forty-two people is a channel people learn to ignore (#259) — so
+until this page the ordinary way to learn anything had happened was to go looking.
 
 **An `activity` row, written where `notifyAttendees` fans out.** The alternative was
 deriving the feed from the rows that already exist, and it does not work: those carry
 _current_ state, so a helper who signed up and stood down again leaves nothing to show,
-and several of the join tables have no `created_at` at all. Writing it in the same
-function that sends the notification is what stops the two describing one event two
-ways, and it is written whether or not anybody has that category switched on — which is
-the whole point.
+and several of the join tables have no `created_at` at all.
 
 The wording is the notification's own, third person, and so is the link. Nothing about
 payment, contact details or allergies can reach the feed, because nothing but a
 burn-wide notification writes to it.
 
-**Across burns**, which is the one place a burn-scoped page does not take an event id
-(#184): the gap between burns is exactly what the page fills, and "somebody joined the
-Autumn Burn" is news to people still thinking about the summer one. Each line names its
-own burn instead.
+### The cards
 
-**And each link carries it** (#333). The links are the notification's — `/dreams`,
-`/members`, `/roles` — and those are burn-agnostic, so following a line about the
-autumn burn while the selector sat on the summer one opened the summer page. The line
-appends `?burn=<id>`, and `burn.tsx` is what reads it: every burn-scoped page already
-reads the selector, so **the selector following the URL is the whole of the fix** rather
-than a parameter each page has to learn. Added when the line is drawn rather than stored
-on the row, so the lines already written land right too. It is a choice, not a lock —
-the bar's own selector still wins afterwards.
+**A dream is something you can talk about.** Under it is one column of what the app did
+and what people said, in the order it happened: offered, facilitated, a hand up, a
+question, an answer. The point of hanging it on a dream rather than on a change is that a
+dream is still there next week, so the comment is still worth reading.
 
-**The chip is half of it.** Every line carries the category's own settings-table label
-as a toggle button, so somebody meets the switch in the moment they have just found the
-thing interesting rather than in a table of twelve rows they went looking for. It sends
-the same complete `{ on, email }` the settings table does, so the two cannot mean
-different things by a shorter list.
+**The card is the conversation, not a preview of one** — a comment box included. It is
+also the only place a withdrawn dream's thread can be read, since there is no panel left
+to open. The same component draws it inside the dream's own panel (#342), so the two
+cannot come to show one conversation differently.
+
+**The title is the thread's own, and that is the bug this fixed.** An `activity` line
+freezes the title into a sentence — "Ada offered a dream: Sauna at dawn" — and goes on
+saying it after the dream has been renamed. A card heads with `thread.title`, which the
+rename keeps in step, and an entry's body carries neither the title nor the actor's name:
+the author is a column, so a name is resolved when the line is read.
+
+**A thread outlives the dream.** Withdrawing one leaves a line saying so rather than
+deleting what people said to each other, which is why `thread.entity_id` deliberately
+carries no foreign key, and why `event_id` and `title` sit on the thread rather than
+being joined out of a row that may be gone. Retention is still the burn: a thread
+cascades with the event.
+
+**What leaves a quiet line, and what does not.** Offered, facilitated, handed over, a
+hand up or down, renamed, moved, edited, withdrawn. A ❤️‍🔥 does not — the faces are on
+the dream already, and twenty hearts is twenty lines nobody reads.
+
+**Coalescing happens on the write.** Laying out the grid is a drag every few seconds, so
+a second line of the same kind by the same person with nothing in between rewrites the
+first rather than adding to it. On the write and not the read, so nothing accumulates and
+the card and the whole thread cannot come to collapse it differently. Per aspect — a
+rename followed by a move keeps both lines, and fifteen moves keep one — which is why
+`renamed`, `scheduled` and `edited` are three kinds rather than one.
+
+**A conversation is ordered by `seq`, not by the clock.** One save changing a dream's
+name and its time writes two lines from one reading of `now()`, and two lines sharing a
+millisecond would come back in whatever order the ids compared in. A conversation that
+reorders itself reads as a different conversation.
+
+**No formatted time is ever written into a line.** The server does not know the reader's
+zone, so "moved it to Sat 14:00" stored here would be Saturday in UTC. The line says
+something moved; the dream says when.
+
+### Talking, and being told about it
+
+`GET /api/threads/:id`, `POST /api/threads/:id/comments`, `PATCH|DELETE
+/api/comments/:id`. Keyed by thread id rather than by the dream's, because a withdrawn
+dream has no id left to ask by. A comment is the author's to rewrite and the author's or
+an admin's to take down — an admin may take a comment off but not put words in somebody's
+mouth, since a deletion says who did it and an edit would not. A line the app wrote is
+nobody's to edit.
+
+**A comment is allowed on a burn that has ended**, and it is the one member-facing write
+that is not scoped to an open burn. Talking about a burn is not arranging one, and "that
+was lovely" is a thing somebody posts on the way home. Every other dream write stays on
+`openEvent`.
+
+**Two categories, split the way every other pair here is** (#259). A comment on a thread
+you are part of is `about: 'you'` and **on**; a comment on any dream at a burn you are
+coming to is `about: 'else'` and **off**. The audiences are disjoint so nobody is told
+twice, and never the person who just wrote it (#247). Who is "part of it" is whoever has
+spoken on the thread, plus the facilitator and the helpers — appointing somebody writes a
+line authored by whoever appointed, so a facilitator handed the dream has said nothing
+and would otherwise never hear a question about it.
+
+Neither writes an `activity` row: the entry is the record, and a line beside it would put
+one comment on the page twice. That is what `tellAttendees` is for beside
+`notifyAttendees`.
+
+**The author is an `account`, not an `attendance`** — deliberately unlike
+`session_helper`. Leaving a burn empties your spots and must not delete what you said; a
+thread with the replies missing reads as though nobody answered. It cascades with the
+account, which is where erasure belongs (#35).
+
+**Members author it, so it is markdown and it is sanitized.** `markdown.ts` escapes raw
+HTML rather than filtering it, and untrusted authors are already inside what it defends
+against. A quiet line is drawn as text, so a dream titled with a tag is text too.
+
+### The rest of it
+
+**Each link carries the burn it is about** (#333). The links are burn-agnostic —
+`/dreams`, `/members`, `/roles` — so following a line about the autumn burn while the
+selector sat on the summer one opened the summer page. The line appends `?burn=<id>`, and
+`burn.tsx` is what reads it. A card names the dream as well, `?dream=<id>`, which the
+Dreams page reads to open the panel — the panel is local state, so before #375 no link
+could reach one. Both parameters are spelled once, in `pages.ts` in the shared package,
+because the backend writes them into notifications and the web builds and reads them.
+
+**The chip is half of it.** A line carries its category's own settings-table label as a
+toggle, so somebody meets the switch in the moment they have just found the thing
+interesting rather than in a table of thirteen rows they went looking for. A card carries
+the newest one of its lines that names a category anybody could be told through — a dream
+being moved sends nothing, so a card whose latest news is a move offers no chip rather
+than one that would change nothing.
 
 **Reading it writes nothing.** The bell and its unseen count stay `notification`'s; a
 feed that marked itself read would be a second thing to keep in step with them. And
 `requireApproved`, like the roster: everything on it is already readable by an approved
 member, gathered into one place.
 
-**Retention is the burn.** `activity` cascades with `event`, so a burn's lines go when
-it does, and the route reads the newest fifty. An audit log grows without bound; this is
-bounded by something that already ends.
+**Retention is the burn.** `activity` and `thread` both cascade with `event`, and the
+route reads the newest fifty. An audit log grows without bound; this is bounded by
+something that already ends.
 
-What is _not_ on it yet: taking a meal role, joining a lead role's team, putting a hand
-up on a dream. Those notify the person rather than the burn, so a line for them would
-need a category of its own — and the chip has to name something a reader can actually
-switch on, or it is a promise the page cannot keep.
+**What the installed app keeps on disk.** The feed is one cache key, replaced in place,
+and it is bounded by construction: fifty things, at most three lines a card, and
+`MAX_COMMENT` is 2000. The whole thread is a read of its own and is **never cached** —
+that would be a key per dream ever opened, kept until sign-out, which is the shape of the
+problem #311 fixed for the banner. Offline you get the card's newest lines; the rest of
+the conversation needs the network.
+
+What is _not_ on it yet: an unread mark per thread, a digest instead of one notification
+per comment, reactions on a line, and threads on anything but a dream. `entity_type` is
+what makes a meal, a ride or a plan item a value in the vocabulary and a branch in the
+link builder rather than a migration.
 
 ## What this installation is called
 
@@ -578,6 +670,14 @@ is never cached — a stale answer there is the one reply that makes the redeplo
 check pointless. `/api/changelog` is, and is `no-cache` at the HTTP layer for the same
 family of reasons: it answers what the _server_ is running, and the notification that
 sends somebody to it fires precisely when that has changed. Nothing cross-origin is touched.
+
+**A whole thread is never cached either, for the other reason** (#375). Every other read
+here is one key for a page — the roster, the schedule, the feed — which `put` replaces in
+place, so the cache does not grow with use. `GET /api/threads/:id` is one key per dream
+ever opened, kept until sign-out, which is exactly the shape #311 fixed for the versioned
+banner. The feed's card carries the newest few lines of each conversation, so offline
+still shows what is being talked about. The prefix is taken off the route manifest rather
+than written out, like every other path in `cache.ts`.
 
 **A navigation is only stored if it answered with HTML.** Not every same-origin
 navigation returns the app: the ICS feed is a plain `<a href>` in the page, so

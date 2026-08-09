@@ -192,9 +192,15 @@ export const displayName = async (db: Database, accountId: string): Promise<stri
 /**
  * One line in the feed, for something that happened at a burn (#303).
  *
- * Called from `notifyAttendees` and nowhere else, which is what keeps the feed and the
- * bell describing one event the same way — and it runs whether or not anybody has that
- * category on, which is what the page is for. `docs/the-app.md` has the rest.
+ * Called from `notifyAttendees` and nowhere else, which is what keeps the feed's line
+ * and the bell describing one event the same way — and it runs whether or not anybody
+ * has that category on, which is what the page is for. `docs/the-app.md` has the rest.
+ *
+ * **What has a thread does not come through here** (#375). A dream's news is a
+ * `thread_entry` on the dream, so the feed collapses it into one card carrying the live
+ * title rather than a line frozen at the wording it was offered under — those routes
+ * call `tellAttendees` below, which fans out without recording. `activity` keeps
+ * whatever has no conversation to hang on.
  */
 export const recordActivity = async (db: Database, eventId: string, told: Told, at: Date) => {
   await db.insert(activity).values({
@@ -242,6 +248,24 @@ export const notifyAttendees = async (
   // Outside the fan-out: one row for the burn, not one per person told.
   await recordActivity(db, eventId, told, at)
 
+  return await tellAttendees(db, notify, eventId, told, { except })
+}
+
+/**
+ * The same fan-out, for what the feed hears about another way (#375).
+ *
+ * A dream's news is an entry on its own thread, so recording a line beside it would put
+ * the same thing on the feed twice — once as a card and once as a line under it. The
+ * bell is unchanged either way: what somebody is told does not depend on where the feed
+ * reads it from.
+ */
+export const tellAttendees = async (
+  db: Database,
+  notify: Notifier,
+  eventId: string,
+  told: Told,
+  { except = [] }: { except?: readonly (string | undefined)[] } = {},
+): Promise<number> => {
   const rows = await db
     .select({ account_id: attendance.account_id })
     .from(attendance)

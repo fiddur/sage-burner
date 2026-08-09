@@ -1,0 +1,157 @@
+import type { Thread, ThreadEntry } from '@sage-burner/shared'
+
+import { cleanup, fireEvent, render, screen } from '@testing-library/preact'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+import { DreamThread } from './DreamThread.tsx'
+
+afterEach(cleanup)
+
+const anEntry = (over: Partial<ThreadEntry> & Pick<ThreadEntry, 'id' | 'body'>): ThreadEntry => ({
+  kind: 'comment',
+  author: { account_id: 'a-1', name: 'Ada' },
+  created_at: '2026-08-07T18:00:00.000Z',
+  edited_at: null,
+  ...over,
+})
+
+const aThread = (entries: ThreadEntry[]): Thread => ({
+  id: 'th-1',
+  event_id: 'e-1',
+  burn: 'Summer burn',
+  entity_type: 'session',
+  entity_id: 's-1',
+  title: 'Sauna at dawn',
+  gone: false,
+  entry_count: entries.length,
+  last_at: '2026-08-07T18:00:00.000Z',
+  entries,
+})
+
+const show = (
+  thread: Thread | undefined,
+  over: Partial<Parameters<typeof DreamThread>[0]> = {},
+): { say: ReturnType<typeof vi.fn>; rewrite: ReturnType<typeof vi.fn>; remove: ReturnType<typeof vi.fn> } => {
+  const say = vi.fn()
+  const rewrite = vi.fn()
+  const remove = vi.fn()
+
+  render(
+    <DreamThread
+      thread={thread}
+      viewerId="a-1"
+      admin={false}
+      busy={false}
+      more={false}
+      onSay={say}
+      onRewrite={rewrite}
+      onRemove={remove}
+      {...over}
+    />,
+  )
+
+  return { say, rewrite, remove }
+}
+
+describe('a conversation about a dream', () => {
+  it('draws nothing at all while there is no thread to draw', () => {
+    show(undefined)
+
+    expect(screen.queryByRole('button')).toBeNull()
+  })
+
+  it('says who wrote what, and renders it as markdown', () => {
+    show(aThread([anEntry({ id: 't-1', body: '**bring** a towel' })]))
+
+    expect(screen.getByText('Ada')).toBeTruthy()
+    expect(document.querySelector('.markdown-preview strong')?.textContent).toBe('bring')
+  })
+
+  it('draws a line the app wrote as one quiet sentence', () => {
+    show(aThread([anEntry({ id: 't-1', kind: 'offered', body: 'offered this dream' })]))
+
+    expect(document.querySelector('.thread-did')?.textContent).toContain('Ada offered this dream')
+    // Nobody edits or deletes what happened: only a comment is anybody's.
+    expect(screen.queryByRole('button', { name: /Rewrite/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Take this comment back/ })).toBeNull()
+  })
+
+  it('reads as "Somebody" where the account behind a line has gone', () => {
+    show(aThread([anEntry({ id: 't-1', kind: 'offered', body: 'offered this dream', author: null })]))
+
+    expect(document.querySelector('.thread-did')?.textContent).toContain('Somebody offered this dream')
+  })
+
+  it('offers the pen and the bin on your own words, and neither on somebody else’s', () => {
+    show(
+      aThread([
+        anEntry({ id: 't-1', body: 'mine' }),
+        anEntry({ id: 't-2', body: 'theirs', author: { account_id: 'a-2', name: 'Bea' } }),
+      ]),
+    )
+
+    expect(screen.getAllByRole('button', { name: /Rewrite what you said/ })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: /Take this comment back/ })).toHaveLength(1)
+  })
+
+  it('lets an admin take somebody else’s comment down without rewriting it', () => {
+    // An admin may take a comment off but not put words in somebody's mouth: a deletion
+    // says who did it and an edit would not.
+    show(aThread([anEntry({ id: 't-2', body: 'theirs', author: { account_id: 'a-2', name: 'Bea' } })]), {
+      admin: true,
+    })
+
+    expect(screen.getAllByRole('button', { name: /Take this comment back/ })).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: /Rewrite what you said/ })).toBeNull()
+  })
+
+  it('sends what was typed, and clears the box', () => {
+    const { say } = show(aThread([]))
+
+    const box = screen.getByLabelText('Say something about Sauna at dawn')
+    fireEvent.input(box, { target: { value: '  is one mat enough?  ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Say it' }))
+
+    expect(say).toHaveBeenCalledWith('is one mat enough?')
+    expect((box as HTMLTextAreaElement).value).toBe('')
+  })
+
+  it('will not send an empty comment', () => {
+    const { say } = show(aThread([]))
+
+    const box = screen.getByLabelText('Say something about Sauna at dawn')
+    fireEvent.input(box, { target: { value: '   ' } })
+
+    expect(screen.getByRole('button', { name: 'Say it' }).hasAttribute('disabled')).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Say it' }))
+    expect(say).not.toHaveBeenCalled()
+  })
+
+  it('rewrites what you said, starting from what you said', () => {
+    const { rewrite } = show(aThread([anEntry({ id: 't-1', body: 'bring a towl' })]))
+
+    fireEvent.click(screen.getByRole('button', { name: /Rewrite what you said/ }))
+
+    const box = screen.getByLabelText('Rewrite what you said')
+    expect((box as HTMLTextAreaElement).value).toBe('bring a towl')
+
+    fireEvent.input(box, { target: { value: 'bring a towel' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(rewrite).toHaveBeenCalledWith('t-1', 'bring a towel')
+  })
+
+  it('says a comment was rewritten, so nobody reads an edit as the original', () => {
+    show(aThread([anEntry({ id: 't-1', body: 'bring a towel', edited_at: '2026-08-08T09:00:00.000Z' })]))
+
+    expect(document.querySelector('.thread-who')?.textContent).toContain('edited')
+  })
+
+  it('offers the rest of a conversation only where there is somewhere to ask for it', () => {
+    const showAll = vi.fn()
+    show(aThread([anEntry({ id: 't-1', body: 'a word' })]), { more: true, onShowAll: showAll })
+
+    fireEvent.click(screen.getByRole('button', { name: /Show the whole thread/ }))
+    expect(showAll).toHaveBeenCalled()
+  })
+})

@@ -32,14 +32,29 @@ export interface WindowClients {
 }
 
 /**
- * Whether a window is already showing the page, ignoring any query or fragment.
+ * Whether a window is already showing what the notification is about.
+ *
+ * The path, and the query **where the link carries one**. That asymmetry is the whole
+ * of it: a query is part of what a link means when it has one — `?burn=` chooses a burn
+ * (#333) and `?dream=` opens a panel (#375) — so a window sitting on `/dreams` is not
+ * showing the dream somebody was told about, and has to be routed rather than merely
+ * focused. A link with no query asks for the page and nothing more, so a window already
+ * there is showing it whatever it happens to carry, and routing would move somebody off
+ * what they were reading.
+ *
+ * The fragment is ignored either way: nothing in the app puts meaning in one.
  *
  * A window that will not parse is not showing anything we can match, and a tap must
  * not die on one: the answer is no, and the next window is asked.
  */
 const showing = (client: OpenWindow, path: string, origin: string): boolean => {
   try {
-    return new URL(client.url).pathname === new URL(path, origin).pathname
+    const asked = new URL(path, origin)
+    const at = new URL(client.url)
+
+    if (at.pathname !== asked.pathname) return false
+
+    return asked.search === '' || at.search === asked.search
   } catch {
     return false
   }

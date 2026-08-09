@@ -1,7 +1,10 @@
-import type { EventAttendeesResponse, Place, Session, SessionUpdate } from '@sage-burner/shared'
+import type { EventAttendeesResponse, Place, Session, SessionUpdate, Thread } from '@sage-burner/shared'
+
+import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
+import { useLoad } from '../load.ts'
 import { DreamDetails } from './DreamDetails.tsx'
 import { DreamFields } from './DreamFields.tsx'
 import { DreamPanel } from './DreamPanel.tsx'
@@ -86,6 +89,77 @@ export const dreamActions = ({
   },
 })
 
+export type DreamTalkApi = Pick<ApiClient, 'getThread' | 'postComment' | 'updateComment' | 'deleteComment'>
+
+/** The conversation about whichever dream is open, and every way of adding to it. */
+export interface DreamTalk {
+  thread: Thread | undefined
+  say: (body: string) => void
+  rewrite: (id: string, body: string) => void
+  remove: (id: string) => void
+}
+
+/** Which conversation the open panel is about, or nothing while none is open. */
+export const threadOf = (
+  dreams: readonly Session[],
+  opened: Opened | undefined,
+): string | null | undefined =>
+  opened?.kind === 'dream' ? dreams.find((one) => one.id === opened.id)?.thread_id : undefined
+
+/**
+ * The thread the open dream carries (#375), for both pages that open one.
+ *
+ * Fetched here rather than with the dreams: the grid loads every dream for a burn and
+ * wants none of this, and a conversation is the one read the service worker deliberately
+ * does not keep. Keyed on the thread id, so opening another dream fetches another
+ * conversation and closing the panel stops asking for one at all.
+ *
+ * Every write answers with the whole thread, so this holds what came back rather than
+ * reloading — the page's own reload is about the dreams, and a comment changes none of
+ * them.
+ */
+export const useDreamThread = ({
+  api,
+  threadId,
+  run,
+}: {
+  api: DreamTalkApi
+  threadId: string | null | undefined
+  run: (work: () => Promise<unknown>, fallback: string) => void
+}): DreamTalk => {
+  const [held, setHeld] = useState<Thread | undefined>(undefined)
+
+  const { loaded } = useLoad<Thread | undefined>(
+    async (signal) => (threadId == null ? undefined : (await api.getThread(threadId, signal)).thread),
+    {
+      enabled: threadId != null,
+      key: threadId ?? '',
+      fallback: 'Could not load what has been said about this.',
+    },
+  )
+
+  const fetched = loaded.status === 'ready' ? loaded.data : undefined
+  // What came back from a write wins, but only while it is about the thread being shown
+  // — otherwise closing one dream and opening another would show the first one's talk
+  // until the fetch landed.
+  const thread = held?.id === fetched?.id && held !== undefined ? held : fetched
+
+  const after = (work: () => Promise<{ thread: Thread }>, fallback: string) => {
+    run(async () => setHeld((await work()).thread), fallback)
+  }
+
+  return {
+    thread,
+    say: (body) => {
+      if (threadId == null) return
+
+      after(() => api.postComment(threadId, { body }), 'Could not say that.')
+    },
+    rewrite: (id, body) => after(() => api.updateComment(id, { body }), 'Could not save that.'),
+    remove: (id) => after(() => api.deleteComment(id), 'Could not take that back.'),
+  }
+}
+
 /**
  * Whichever dream panel is open, or nothing.
  *
@@ -98,7 +172,9 @@ export const OpenedDream = ({
   dreams,
   places,
   attendees,
+  talk,
   viewerId,
+  admin,
   busy,
   error,
   onEdit,
@@ -115,7 +191,11 @@ export const OpenedDream = ({
   dreams: readonly Session[]
   places: readonly Place[]
   attendees: readonly EventAttendeesResponse['attendees'][number][]
+  /** What has been said about the open dream, and every way of adding to it (#375). */
+  talk: DreamTalk
   viewerId: string | undefined
+  /** An admin may take a comment off. Nobody may rewrite somebody else's. */
+  admin: boolean
   busy: boolean
   error: string | undefined
   onEdit: (id: string) => void
@@ -192,7 +272,9 @@ export const OpenedDream = ({
             // removable — if they are no longer among the burn's attendees.
             (facilitating ?? { account_id: dream.facilitator_account_id, name: null })
       }
+      talk={talk}
       viewerId={viewerId}
+      admin={admin}
       busy={busy}
       error={error}
       editing={opened.editing}

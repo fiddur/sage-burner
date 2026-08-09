@@ -159,6 +159,28 @@ describe('where a tap lands', () => {
     expect(browser.did).toEqual([{ focused: `${ORIGIN}/schedule?dream=d-1#top` }])
   })
 
+  it('routes a window on the same page when the link names something on it', async () => {
+    // The other direction, and the reason the rule is asymmetric: a comment notification
+    // names the dream it is about, so a window already sitting on the dreams page is not
+    // showing it — focusing that window would land the tap on nothing (#375).
+    const browser = browserWith(`${ORIGIN}/dreams`)
+
+    await landOn(browser.clients, ORIGIN, '/dreams?burn=e-1&dream=s-1')
+
+    expect(browser.did).toEqual([
+      { focused: `${ORIGIN}/dreams` },
+      { told: `${ORIGIN}/dreams`, message: { type: ROUTE_TO, path: '/dreams?burn=e-1&dream=s-1' } },
+    ])
+  })
+
+  it('focuses a window already on the very dream it names', async () => {
+    const browser = browserWith(`${ORIGIN}/dreams?burn=e-1&dream=s-1`)
+
+    await landOn(browser.clients, ORIGIN, '/dreams?burn=e-1&dream=s-1')
+
+    expect(browser.did).toEqual([{ focused: `${ORIGIN}/dreams?burn=e-1&dream=s-1` }])
+  })
+
   it('asks a window showing something else to route in place, after focusing it', async () => {
     const browser = browserWith(`${ORIGIN}/meals`)
 

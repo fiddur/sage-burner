@@ -1,12 +1,14 @@
 import type { EventAttendeesResponse, Place, Session, SessionUpdate } from '@sage-burner/shared'
 
 import type { Person } from './HelperStrip.tsx'
+import type { DreamTalk } from './OpenedDream.tsx'
 
 import { toLocalInput } from '../datetime.ts'
 import { renderMarkdown } from '../markdown.ts'
 import { Avatar } from './Avatar.tsx'
 import { DreamFields } from './DreamFields.tsx'
 import { DreamPanel } from './DreamPanel.tsx'
+import { DreamThread } from './DreamThread.tsx'
 import { HelperStrip } from './HelperStrip.tsx'
 import { IconButton } from './IconButton.tsx'
 import { NAMELESS } from './PersonBadge.tsx'
@@ -22,7 +24,9 @@ export const DreamDetails = ({
   places,
   attendees,
   facilitator,
+  talk,
   viewerId,
+  admin,
   busy,
   error,
   editing,
@@ -40,8 +44,12 @@ export const DreamDetails = ({
   attendees: readonly EventAttendeesResponse['attendees'][number][]
   /** Whoever is running it, resolved to a name by the page. Absent while nobody is. */
   facilitator: Person | undefined
+  /** What has been said about it, and every way of adding to it (#375). */
+  talk: DreamTalk
   /** Who is reading it, so the button can say "I cannot help after all". */
   viewerId: string | undefined
+  /** An admin may take a comment off. Nobody may rewrite somebody else's. */
+  admin: boolean
   busy: boolean
   error: string | undefined
   /**
@@ -178,6 +186,21 @@ export const DreamDetails = ({
               Close
             </button>
           </p>
+
+          {/* Last, and after the buttons rather than before them: a conversation grows
+              and the ways out of the panel should not move down the page as it does. */}
+          <h3>Talk</h3>
+
+          <DreamThread
+            thread={talk.thread}
+            viewerId={viewerId}
+            admin={admin}
+            busy={busy}
+            more={false}
+            onSay={talk.say}
+            onRewrite={talk.rewrite}
+            onRemove={talk.remove}
+          />
         </>
       )}
     </DreamPanel>

@@ -15,7 +15,7 @@ import { ErrorText } from '../components/ErrorText.tsx'
 import { MealDialog } from '../components/MealDialog.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
 import { NotForYou } from '../components/NotForYou.tsx'
-import { dreamActions, OpenedDream } from '../components/OpenedDream.tsx'
+import { dreamActions, OpenedDream, threadOf, useDreamThread } from '../components/OpenedDream.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { dayName, fromLocalInput, toLocalInput } from '../datetime.ts'
 import { useAction, useLoad } from '../load.ts'
@@ -30,7 +30,7 @@ import {
   resizedEnd,
   rowsDragged,
 } from '../schedule.ts'
-import { isApproved, useViewer } from '../viewer.tsx'
+import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
 
 export type ScheduleApi = Pick<
   ApiClient,
@@ -50,6 +50,10 @@ export type ScheduleApi = Pick<
   | 'joinMealCrew'
   | 'leaveMealCrew'
   | 'setMealIdea'
+  | 'getThread'
+  | 'postComment'
+  | 'updateComment'
+  | 'deleteComment'
 >
 
 type Person = EventAttendeesResponse['attendees'][number]
@@ -275,6 +279,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
   const shownMeal = meals.find((meal) => meal.id === openedMeal)
 
   const { support, help, facilitate, save, remove } = dreamActions({ api, run, setOpened })
+  const talk = useDreamThread({ api, threadId: threadOf(sessions, opened), run })
 
   /**
    * The one write that needs a burn to write to, so it stays here where there is one —
@@ -370,7 +375,9 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
         dreams={sessions}
         places={places}
         attendees={attendees}
+        talk={talk}
         viewerId={viewer.account?.id}
+        admin={isAdmin(viewer)}
         busy={busy}
         error={error}
         onEdit={(id) => setOpened({ kind: 'dream', id, editing: true })}

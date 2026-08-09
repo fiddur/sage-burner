@@ -1549,6 +1549,86 @@ a:hover {
   color: var(--ink);
 }
 
+/* A conversation about a dream (#375), which is a card rather than a line: it carries
+   its own history and everything said about it, and it is the only place a withdrawn
+   dream's thread can be read. */
+.feed-card {
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.feed-card-head {
+  margin: 0;
+  font-weight: 600;
+}
+
+/* Loudest thing in the card, because it is why anybody opens one. The quiet lines
+   beside it are what the app did, and they are deliberately at the size of a caption. */
+.thread {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.thread-entries {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.thread-did {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.thread-said {
+  border-left: 2px solid var(--line);
+  padding-left: 0.6rem;
+}
+
+.thread-who {
+  margin: 0;
+}
+
+.thread-when {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: normal;
+}
+
+.thread-mine {
+  margin: 0;
+  display: flex;
+  gap: 0.4rem;
+}
+
+.thread-more {
+  margin: 0;
+}
+
+/* The box and its button on one row on a wide screen, stacked on a phone — a comment
+   box that shrinks to a slit beside a button is the thing this avoids. */
+.thread-say,
+.thread-editing {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: flex-start;
+}
+
+.thread-box {
+  flex: 1 1 12rem;
+  font: inherit;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 0.4rem;
+  background: var(--paper);
+  color: var(--ink);
+}
+
 /* The "seed this burn from a previous one" control, on the places grid and the
    roles register both. One class rather than one per list: it is the same control. */
 .copy-from {

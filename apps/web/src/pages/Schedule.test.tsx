@@ -49,6 +49,7 @@ const aDream = (over: Partial<Session> & Pick<Session, 'id' | 'title'>): Session
   supporters: [],
   support_count: 0,
   supported_by_me: false,
+  thread_id: null,
   ...over,
 })
 
@@ -60,6 +61,10 @@ const stub = (
   getPlaces: () => Promise.resolve({ places }),
   getSessions: () => Promise.resolve({ sessions }),
   updateSession: () => Promise.reject(new Error('updateSession is not stubbed here')),
+  getThread: () => Promise.reject(new Error('getThread is not stubbed here')),
+  postComment: () => Promise.reject(new Error('postComment is not stubbed here')),
+  updateComment: () => Promise.reject(new Error('updateComment is not stubbed here')),
+  deleteComment: () => Promise.reject(new Error('deleteComment is not stubbed here')),
   offerSession: () => Promise.reject(new Error('offerSession is not stubbed here')),
   getEventAttendees: () =>
     Promise.resolve({

@@ -122,6 +122,16 @@ export const sessionSchema = withValidTimeSlot(
     support_count: z.int().min(0),
     /** The reader's own answer, so one dream reads differently to two people. */
     supported_by_me: z.boolean(),
+    /**
+     * The conversation about it (#375), for the panel to read and write.
+     *
+     * Nullable because the read is a left join, not because a dream is expected to lack
+     * one: it is written in the same transaction as the dream and the migration
+     * backfilled the rest. An inner join would make a missing thread hide the dream
+     * itself from the grid, which is a far worse failure than a panel with no comment
+     * box — and the next write to the dream makes one anyway.
+     */
+    thread_id: idSchema.nullable(),
   }),
 )
 

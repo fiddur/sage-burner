@@ -7,6 +7,32 @@ There are no version numbers: every merge to `develop` builds an image and the s
 picks it up within a few minutes, so a date can hold several deploys. Add your line
 under today's heading, and make a new heading when there is none.
 
+# 2026-08-09
+
+- **You can talk about a dream now.** Open one — from Dreams or from the grid — and under
+  it there is a conversation: who offered it, who put a hand up, and whatever anybody has
+  asked or answered. How many people is it for, do you want help, is that before or after
+  dinner. That went to Discord before.
+
+- **Going on is now the Feed, and a dream has one place on it.** A dream is a single card
+  carrying its own history and everything said about it, so a morning of four comments is
+  one card rather than four lines, and a card comes back to the top when somebody says
+  something. Everything else — somebody joining, a lead role taken — still reads as it
+  did.
+
+- **A dream that has been renamed says its new name.** The feed used to go on offering the
+  title it was given when it was first offered, however many times it had been changed
+  since.
+
+- **Withdrawing a dream keeps what was said about it.** The card stays, says it was
+  withdrawn, and can still be replied to — the conversation was often worth more than the
+  plan.
+
+- **You are told when somebody answers you.** A comment on a dream you offered,
+  facilitate, help with or have spoken on reaches your bell, and by email if you have
+  asked for that. Comments on everybody else's dreams are off unless you switch them on,
+  under Your details → what else is going on.
+
 # 2026-08-08
 
 - **The bar across the top fits on one row on a phone.** 🔔, ⚙️ and your face sat on a

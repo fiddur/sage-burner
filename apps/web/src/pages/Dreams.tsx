@@ -1,7 +1,8 @@
 import type { Place, Session } from '@sage-burner/shared'
 
-import { MAX_TITLE } from '@sage-burner/shared'
-import { useState } from 'preact/hooks'
+import { DREAM_PARAM, MAX_TITLE } from '@sage-burner/shared'
+import { useLocation } from 'preact-iso'
+import { useEffect, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 import type { Opened } from '../components/OpenedDream.tsx'
@@ -9,11 +10,11 @@ import type { Opened } from '../components/OpenedDream.tsx'
 import { useSelectedBurn } from '../burn.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
-import { dreamActions, OpenedDream } from '../components/OpenedDream.tsx'
+import { dreamActions, OpenedDream, threadOf, useDreamThread } from '../components/OpenedDream.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { shortDayOf } from '../datetime.ts'
 import { useAction, useLoad } from '../load.ts'
-import { isApproved, useViewer } from '../viewer.tsx'
+import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
 
 export type DreamsApi = Pick<
   ApiClient,
@@ -27,6 +28,10 @@ export type DreamsApi = Pick<
   | 'stopHelpingWithSession'
   | 'supportSession'
   | 'withdrawSupportForSession'
+  | 'getThread'
+  | 'postComment'
+  | 'updateComment'
+  | 'deleteComment'
 >
 
 const placeLabel = (places: readonly Place[], id: string | null) => {
@@ -106,6 +111,16 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
 
   const { support, help, facilitate, save, remove } = dreamActions({ api, run, setOpened })
 
+  // A link that names a dream opens it — the feed's cards and the notifications about
+  // them both do (#375). Keyed on the parameter rather than folded into the panel's own
+  // state, so closing it stays closed: following a link is a choice, not a lock. A dream
+  // the burn does not have simply opens nothing, which is what a withdrawn one does.
+  const asked: string | undefined = useLocation().query?.[DREAM_PARAM]
+
+  useEffect(() => {
+    if (asked !== undefined) setOpenedPanel({ kind: 'dream', id: asked, editing: false })
+  }, [asked])
+
   const offerByTitle = () => {
     if (title.trim() === '') {
       setError('Give your dream a name.')
@@ -122,6 +137,8 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
   const dreams = loaded.status === 'ready' ? loaded.data.sessions : []
   const places = loaded.status === 'ready' ? loaded.data.places : []
   const attendees = loaded.status === 'ready' ? loaded.data.attendees : []
+
+  const talk = useDreamThread({ api, threadId: threadOf(dreams, opened), run })
 
   return (
     <GuardedPage title="Dreams" require="approved">
@@ -207,7 +224,9 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
         dreams={dreams}
         places={places}
         attendees={attendees}
+        talk={talk}
         viewerId={viewer.account?.id}
+        admin={isAdmin(viewer)}
         busy={busy}
         error={error}
         onEdit={(id) => setOpened({ kind: 'dream', id, editing: true })}
