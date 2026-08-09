@@ -95,6 +95,19 @@ describe('the privacy policy', () => {
     expect(held).toMatch(/anybody holding it can read the programme/i)
   })
 
+  it('does not call the active burn’s feed address unpublished, because it is not', async () => {
+    // `GET /api/events/active` is unguarded and answers the whole row, `id` included, and
+    // the public home page fetches it on every anonymous visit — so a stranger can build
+    // that burn's `.ics` URL without being handed anything. #408 is the gap; this is the
+    // policy not claiming otherwise in the meantime.
+    const held = readPrivacy()
+
+    // `\s+` between every word: the file is wrapped prose, so a reflow puts a newline
+    // wherever it likes and a literal space fails against a sentence that is still there.
+    expect(held).toMatch(/worked\s+out\s+from\s+the\s+public\s+front\s+page/i)
+    expect(held).toMatch(/readable\s+by\s+anybody\s+at\s+all/i)
+  })
+
   it('says the things app review is checking the page against', async () => {
     // Not a style assertion. A reviewer looks for what is collected, who sees it, and how to
     // get rid of it; and the provider paragraph is the one they read most closely, since it
