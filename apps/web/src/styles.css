@@ -825,6 +825,30 @@ a:hover {
   align-items: flex-start;
 }
 
+/*
+  A way of being reached (#388). The controls sit at the top for the same reason the
+  FAQ's do: the row grows into a form while it is being changed, and a grip centred
+  against a three-field form reads as belonging to the form rather than to the row.
+
+  The name and the handle take the slack so Change and Remove stay at the right edge —
+  that is `.reorder-name`'s job on every other list, and this row has two pieces of text
+  where the others have one.
+*/
+.connection-row {
+  align-items: flex-start;
+}
+
+.connection-row > span:nth-of-type(2) {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.connection-edit {
+  flex: 1;
+  min-width: 0;
+}
+
 .faq-entry {
   flex: 1;
   min-width: 0;

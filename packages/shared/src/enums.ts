@@ -335,3 +335,155 @@ export const entryCategory = (kind: ThreadEntryKind): NotificationCategory | und
 
   return undefined
 }
+
+/**
+ * The ways somebody may say they can be reached (#388).
+ *
+ * A fixed vocabulary, and fixed for a concrete reason rather than tidiness: rendering
+ * one needs the app to know what it is. A handle has to become a URL, and only the kind
+ * says how — `@wren` on Instagram and `@wren@chaos.social` on Mastodon build different
+ * links, and a Discord username builds none at all. A free-text kind could produce
+ * neither an icon nor a link, which is why the escape hatch is `link` — a label and a
+ * URL somebody types — rather than an open list. Adding Signal properly later is a line
+ * here and no migration.
+ */
+export const connectionKinds = [
+  'email',
+  'phone',
+  'signal',
+  'whatsapp',
+  'discord',
+  'instagram',
+  'tiktok',
+  'mastodon',
+  'link',
+] as const
+
+export type ConnectionKind = (typeof connectionKinds)[number]
+
+export const isConnectionKind = (value: unknown): value is ConnectionKind => isOneOf(connectionKinds, value)
+
+export interface ConnectionKindInfo {
+  /** What the row is called, in the editor and beside the value. */
+  label: string
+  icon: string
+  /** What the box asks for, so nobody has to guess the shape. */
+  hint: string
+  /**
+   * Whether the person names it themselves. Only `link` does — everything else is a
+   * network whose name is the label.
+   */
+  labelled: boolean
+  /**
+   * The address to build, or nothing where the network has no such thing.
+   *
+   * Discord is the one that matters here: a username is a string you paste into
+   * Discord's own search and there is no profile URL to point at, so the page has to
+   * offer something to copy instead of an anchor. A kind added without an answer to
+   * this would otherwise render a dead link.
+   */
+  href: (value: string) => string | undefined
+}
+
+/** Digits, `+` kept, so a number typed with spaces or dashes still dials. */
+const dialled = (value: string): string => `+${value.replaceAll(/\D/gu, '')}`
+
+/**
+ * `@user@instance` split into the address its own server serves.
+ *
+ * The value carries the server, unlike every other handle here, so this is the one that
+ * has to be read rather than dropped into a template.
+ */
+const mastodonHref = (value: string): string | undefined => {
+  const [, user, instance] = /^@?([^@\s]+)@([^@\s]+)$/u.exec(value.trim()) ?? []
+  if (user === undefined || instance === undefined) return undefined
+
+  return `https://${instance}/@${user}`
+}
+
+/**
+ * A URL somebody typed, if it is one worth putting in an `href`.
+ *
+ * `https` alone, and stricter than `markdown.ts`'s link check on purpose: that governs
+ * prose, where a relative path and a `mailto:` are ordinary, while this field exists to
+ * hold somebody's page elsewhere. `javascript:` is the thing being refused.
+ */
+export const isProfileUrl = (value: string): boolean => /^https:\/\/[^\s/$.?#][^\s]*$/iu.test(value.trim())
+
+export const connectionKindInfo = {
+  email: {
+    label: 'Email',
+    icon: '✉️',
+    hint: 'you@example.org',
+    labelled: false,
+    href: (value) => `mailto:${value.trim()}`,
+  },
+  phone: {
+    label: 'Phone',
+    icon: '📞',
+    hint: '+46 70 123 45 67',
+    labelled: false,
+    href: (value) => `tel:${dialled(value)}`,
+  },
+  signal: {
+    label: 'Signal',
+    icon: '🔒',
+    hint: 'The number you are on Signal with',
+    labelled: false,
+    // A number is not enough to build a signal.me link — that carries a key — so this
+    // is one to copy into Signal rather than to follow.
+    href: () => undefined,
+  },
+  whatsapp: {
+    label: 'WhatsApp',
+    icon: '💬',
+    hint: '+46 70 123 45 67',
+    labelled: false,
+    href: (value) => `https://wa.me/${dialled(value).slice(1)}`,
+  },
+  discord: {
+    label: 'Discord',
+    icon: '🎮',
+    hint: 'your username',
+    labelled: false,
+    // Discord has no profile URL at all: a username is a string you search for.
+    href: () => undefined,
+  },
+  instagram: {
+    label: 'Instagram',
+    icon: '📷',
+    hint: '@handle',
+    labelled: false,
+    href: (value) => `https://instagram.com/${value.trim().replace(/^@/u, '')}`,
+  },
+  tiktok: {
+    label: 'TikTok',
+    icon: '🎵',
+    hint: '@handle',
+    labelled: false,
+    href: (value) => `https://tiktok.com/@${value.trim().replace(/^@/u, '')}`,
+  },
+  mastodon: {
+    label: 'Mastodon',
+    icon: '🐘',
+    hint: '@you@instance.social',
+    labelled: false,
+    href: mastodonHref,
+  },
+  link: {
+    label: 'Somewhere else',
+    icon: '🔗',
+    hint: 'https://…',
+    labelled: true,
+    href: (value) => (isProfileUrl(value) ? value.trim() : undefined),
+  },
+} as const satisfies Record<ConnectionKind, ConnectionKindInfo>
+
+/**
+ * Where a stored connection points, or nothing to follow.
+ *
+ * One entry point rather than reaching into the table at each call site, so a kind whose
+ * value cannot be made into a link is handled the same way everywhere.
+ */
+export const connectionHref = (kind: ConnectionKind, value: string): string | undefined =>
+  connectionKindInfo[kind].href(value)

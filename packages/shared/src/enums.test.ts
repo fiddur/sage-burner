@@ -3,6 +3,9 @@ import { describe, expect, it } from 'vitest'
 import {
   accountRoles,
   applicationStatuses,
+  connectionHref,
+  connectionKindInfo,
+  connectionKinds,
   effortLevels,
   eventOptionKinds,
   formQuestionTypes,
@@ -88,5 +91,63 @@ describe('inviteStatusOf', () => {
     expect(inviteStatusOf({ expires_at: '2026-07-01T00:00:00Z', ...used }, at('2026-08-03T00:00:00Z'))).toBe(
       'used',
     )
+  })
+})
+
+describe('where a way of being reached points', () => {
+  it('builds an address for the networks that have one', () => {
+    expect(connectionHref('email', 'wren@example.org')).toBe('mailto:wren@example.org')
+    expect(connectionHref('instagram', 'wren')).toBe('https://instagram.com/wren')
+    expect(connectionHref('tiktok', 'wren')).toBe('https://tiktok.com/@wren')
+  })
+
+  it('takes a handle with or without its @', () => {
+    // People type it both ways, and a doubled @ is a link to nobody.
+    expect(connectionHref('instagram', '@wren')).toBe('https://instagram.com/wren')
+    expect(connectionHref('tiktok', '@wren')).toBe('https://tiktok.com/@wren')
+  })
+
+  it('reads the server out of a Mastodon address, which carries its own', () => {
+    expect(connectionHref('mastodon', '@wren@chaos.social')).toBe('https://chaos.social/@wren')
+    expect(connectionHref('mastodon', 'wren@chaos.social')).toBe('https://chaos.social/@wren')
+  })
+
+  it('has nowhere to send somebody for a Mastodon address with no server', () => {
+    expect(connectionHref('mastodon', '@wren')).toBeUndefined()
+  })
+
+  it('says there is nowhere to go for the ones with no profile page', () => {
+    // Discord is the one that matters: a username is a string you paste into Discord's
+    // own search, so the page has to offer something to copy rather than an anchor.
+    expect(connectionHref('discord', 'wren')).toBeUndefined()
+    expect(connectionHref('signal', '+46701234567')).toBeUndefined()
+  })
+
+  it('dials a number however it was written', () => {
+    expect(connectionHref('phone', '+46 70 123 45 67')).toBe('tel:+46701234567')
+    expect(connectionHref('whatsapp', '+46-70-123 45 67')).toBe('https://wa.me/46701234567')
+  })
+
+  it('refuses to point anywhere a browser should not be sent', () => {
+    for (const value of ['javascript:alert(1)', 'http://insecure.example', 'wren.example', '']) {
+      expect(connectionHref('link', value)).toBeUndefined()
+    }
+  })
+
+  it('follows an https link somebody typed', () => {
+    expect(connectionHref('link', 'https://wren.example/photos')).toBe('https://wren.example/photos')
+  })
+
+  it('has an answer for every kind, so none can render a dead link', () => {
+    // The property that keeps the vocabulary honest: adding a kind means deciding what
+    // its address is, or deciding that it has none.
+    for (const kind of connectionKinds) {
+      expect(typeof connectionKindInfo[kind].href).toBe('function')
+      expect(connectionKindInfo[kind].label).not.toBe('')
+    }
+  })
+
+  it('names only the one kind somebody titles themselves', () => {
+    expect(connectionKinds.filter((kind) => connectionKindInfo[kind].labelled)).toEqual(['link'])
   })
 })

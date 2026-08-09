@@ -862,6 +862,66 @@ coming to a burn. Somebody organising but not attending is coherent, so `admin`
 deliberately does not confer `member` — but the ordinary case is both, which is
 why `admin:create` grants both.
 
+## The ways somebody can be reached
+
+`account.contact` is one free-text box, and #88 said what is wrong with it: "how can we
+reach you?" as a single field produces "fredrik on discord i think" and an organiser
+guessing. `account_connection` is the answer for a member, as `applicant_email` was for an
+applicant (#30) — **rows, ordered, one per way of being reached**.
+
+**Rows rather than a column per network**, and the order is why as much as the count is.
+The first one is the answer to the question somebody actually has — where do I reach this
+person — rather than the start of a list of everything they have ever signed up to. A
+column per network would also be a migration every time one is added; this is a line in
+`enums.ts`.
+
+**The vocabulary is fixed because rendering needs it.** A handle has to become a URL, and
+only the kind says how: `@wren` on Instagram and `@wren@chaos.social` on Mastodon build
+different addresses, and a Discord username builds none at all. `connectionKindInfo` holds
+each kind's label, icon, hint and `href`, and the `href` is allowed to answer nothing —
+Discord and Signal do, because a username you paste into a search is not a link. A kind
+added without an answer would otherwise render a dead anchor, and `enums.test.ts` asserts
+every kind has one.
+
+`link` is the escape hatch: a label and a URL somebody types. A labelled URL rather than a
+free-text _kind_, because a kind nothing knows about could produce neither an icon nor an
+address. It is also the only kind whose value is checked rather than merely bounded —
+`isProfileUrl` allows `https` alone, since the field exists to become an `href` and
+`javascript:` is what that has to refuse. Deliberately stricter than `markdown.ts`'s link
+check, which governs prose where a relative path and a `mailto:` are ordinary.
+
+**What was typed is what is stored**, and the URL is built at render. A handle is what
+somebody knows about themselves; a network changing its domain is then one line in
+`enums.ts` rather than a data migration.
+
+**Every row is published to approved members**, and the editor says so plainly. That is
+what separates the list from `account.email`: the address somebody signs in with is the
+login identity and stays out of what other members read (#159), while these are what the
+person chose to put up — **including an `email` row**, which is an address they typed and
+may not be the one they sign in with at all.
+
+Worth knowing while reading that: `redemption.ts` already defaults `contact` to the address
+somebody redeemed with, and `contact` is on the member roster. So for most accounts the
+login address is already published, by default, today. Nothing here seeds a connection from
+it — publishing by default is the opposite of what this list is for.
+
+**Written only by the person themselves.** `/api/me/connections` takes the account id from
+the session, and the `id` a caller supplies reaches only their own row because the account
+is in the `WHERE` — somebody else's is a 404 rather than a write. No `If-Match`:
+preconditions are for the burn's shared furniture (#274), where two people edit one thing,
+and this is one record with one writer.
+
+`MAX_CONNECTIONS` is a ceiling rather than an absence, since this is a row per click, and
+`unique(account_id, kind, value)` refuses the same handle twice with a 409 — the list is
+what somebody reads to know how to reach this person, so a silent duplicate is worse than a
+refusal. The server assigns `order` through `nextOrder`, and a reorder names every row
+exactly once or is refused, which is `ordered.ts` for the sixth list.
+
+**`contact` is untouched.** It is required by the details page, drawn on the roster and on
+the rideshare board, and `rides.ts` calls it "the one field on the account that exists to be
+given out". Once there is a list of kinds, `contact` is the sentence that fits no kind, and
+merging it in means touching all three — its own change, with its own migration.
+
 ## What a member may change
 
 This replaces a shared spreadsheet where everyone could edit everything except

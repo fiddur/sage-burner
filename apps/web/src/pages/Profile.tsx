@@ -4,11 +4,13 @@ import { MAX_CONTACT, MAX_NOTES, MAX_PERSON_NAME } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
+import type { ConnectionsApi } from '../components/ConnectionsField.tsx'
 import type { PasskeysApi } from '../components/PasskeysField.tsx'
 import type { PushApi } from '../components/PushToggle.tsx'
 import type { YourBurnsApi } from '../components/YourBurns.tsx'
 
 import { AvatarField } from '../components/AvatarField.tsx'
+import { ConnectionsField } from '../components/ConnectionsField.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { FormError } from '../components/FormError.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
@@ -25,6 +27,7 @@ export type ProfileApi = Pick<
   ApiClient,
   'getMyProfile' | 'updateMyProfile' | 'logout' | 'setMyAvatar' | 'removeMyAvatar' | 'getAllergyItems'
 > &
+  ConnectionsApi &
   PasskeysApi &
   PushApi &
   YourBurnsApi
@@ -180,6 +183,8 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
       </p>
 
       <AvatarField api={api} />
+
+      <ConnectionsField api={api} />
 
       <PasskeysField api={api} />
 

@@ -35,6 +35,7 @@ import { registerAuthRoutes } from './routes/auth.ts'
 import { registerAvatarRoutes } from './routes/avatars.ts'
 import { registerBannerRoutes } from './routes/banner.ts'
 import { readChangelog, registerChangelogRoutes } from './routes/changelog.ts'
+import { registerConnectionRoutes } from './routes/connections.ts'
 import { registerEventOptionRoutes } from './routes/event-options.ts'
 import { registerEventRoutes } from './routes/events.ts'
 import { registerFaqRoutes } from './routes/faq.ts'
@@ -504,6 +505,7 @@ export const createApp = async ({
   registerRideRoutes(app, { db, sessions, now })
   registerAvatarRoutes(app, { db, sessions, now })
   registerImageRoutes(app, { db, sessions, now })
+  registerConnectionRoutes(app, { db, sessions })
   registerPwaRoutes(app, { db, sessions, now })
   registerBannerRoutes(app, { db, sessions, now })
   registerMailRoutes(app, { db, sessions, mail, now })

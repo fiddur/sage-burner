@@ -5,6 +5,7 @@ import type { AnySQLiteColumn, SQLiteColumn } from 'drizzle-orm/sqlite-core'
 import {
   accountRoles,
   applicationStatuses,
+  connectionKinds,
   notificationCategories,
   effortLevels,
   eventOptionKinds,
@@ -1476,5 +1477,44 @@ export const image = sqliteTable(
     check('image_type_check', oneOf(table.content_type, IMAGE_TYPES)),
     // The per-account ceiling counts by this, and erasure deletes by it.
     index('image_uploader_idx').on(table.uploaded_by),
+  ],
+)
+
+/**
+ * One way somebody has said they can be reached (#388).
+ *
+ * Rows rather than a column per network, because the list is ordered and the order is
+ * half the point — the first is where somebody is actually reached. Columns would also
+ * be a migration every time a network is added, where this is a line in `enums.ts`.
+ *
+ * Every row here is published to approved members, which is what separates the list from
+ * `account.email`: that is the login identity and stays out of what other members read
+ * (#159), while these are what somebody chose to put up — including an `email` row, which
+ * is an address they typed rather than the one they sign in with.
+ *
+ * `unique(account_id, kind, value)` so one handle is not listed twice, and the composite
+ * index is the read: one account's list, in its order.
+ */
+export const accountConnection = sqliteTable(
+  'account_connection',
+  {
+    id: text('id').notNull(),
+    account_id: text('account_id')
+      .notNull()
+      .references(() => account.id, { onDelete: 'cascade' }),
+    kind: text('kind', { enum: connectionKinds }).notNull(),
+    /** What was typed: a handle, a number, an address. The URL is built at render. */
+    value: text('value').notNull(),
+    /** Only `link` carries one — everything else is a network whose label is its name. */
+    label: text('label').notNull().default(''),
+    order: integer('order').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    check('account_connection_kind_check', oneOf(table.kind, connectionKinds)),
+    // An empty handle is a row that reads as a broken promise on somebody's profile.
+    check('account_connection_value_check', sql`length(trim(${table.value})) > 0`),
+    uniqueIndex('account_connection_unique_idx').on(table.account_id, table.kind, table.value),
+    index('account_connection_account_idx').on(table.account_id, table.order),
   ],
 )
