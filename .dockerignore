@@ -37,11 +37,14 @@ node_modules
 **/*.sqlite-wal
 **/*.sqlite-shm
 
-# Documentation. `CHANGELOG.md` is the exception: the app serves it at `/changelog`,
+# Documentation. Two exceptions, both served by the app rather than read here: `CHANGELOG.md`
+# at `/changelog`, and `PRIVACY.md` at `/privacy`. `CHANGELOG.md` is the exception:
 # which is where the "a new version is out" notification leads, so it is part of the
 # image rather than something a reader of the repository sees (#325).
 **/*.md
 !CHANGELOG.md
+# And the privacy policy, which `/privacy` serves and Facebook's app review reads (#402).
+!PRIVACY.md
 docs
 
 # Environment files (passed in as env vars instead)
