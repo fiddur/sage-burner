@@ -1,6 +1,6 @@
 import type { AllergyItem, Profile } from '@sage-burner/shared'
 
-import { MAX_CONTACT, MAX_NOTES, MAX_PERSON_NAME } from '@sage-burner/shared'
+import { MAX_CONTACT, MAX_INTRODUCTION, MAX_NOTES, MAX_PERSON_NAME } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -17,19 +17,27 @@ import { ErrorText } from '../components/ErrorText.tsx'
 import { FormError } from '../components/FormError.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { LogOutButton } from '../components/LogOutButton.tsx'
+import { MarkdownField } from '../components/MarkdownField.tsx'
 import { PasskeysField } from '../components/PasskeysField.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
 import { PicturesField } from '../components/PicturesField.tsx'
 import { PushToggle } from '../components/PushToggle.tsx'
 import { WaysInField } from '../components/WaysInField.tsx'
 import { YourBurns } from '../components/YourBurns.tsx'
+import { stillUploading } from '../image-upload.ts'
 import { useAction, useLoad, useLoadInto } from '../load.ts'
 import { rowsFor } from '../textarea.ts'
 import { isMember, useViewer } from '../viewer.tsx'
 
 export type ProfileApi = Pick<
   ApiClient,
-  'getMyProfile' | 'updateMyProfile' | 'logout' | 'setMyAvatar' | 'removeMyAvatar' | 'getAllergyItems'
+  | 'getMyProfile'
+  | 'updateMyProfile'
+  | 'logout'
+  | 'setMyAvatar'
+  | 'removeMyAvatar'
+  | 'getAllergyItems'
+  | 'uploadImage'
 > &
   ConnectionsApi &
   PasskeysApi &
@@ -44,6 +52,7 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
   const [name, setName] = useState('')
   const [contact, setContact] = useState('')
   const [allergies, setAllergies] = useState('')
+  const [introduction, setIntroduction] = useState('')
   const [ticked, setTicked] = useState<readonly string[]>([])
   const [saved, setSaved] = useState(false)
 
@@ -53,6 +62,7 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
       setName(profile.name ?? '')
       setContact(profile.contact ?? '')
       setAllergies(profile.allergies_notes ?? '')
+      setIntroduction(profile.introduction ?? '')
       setTicked(profile.allergy_item_ids)
     },
     { enabled: member, fallback: 'Could not load your details. Please reload the page.' },
@@ -86,6 +96,7 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
         contact: contact.trim(),
         allergies_notes: allergies.trim() === '' ? null : allergies.trim(),
         allergy_item_ids: [...ticked],
+        introduction: introduction.trim() === '' ? null : introduction.trim(),
       })
       setSaved(true)
     }, 'Could not save that. Please try again.')
@@ -150,6 +161,25 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
                 />
               </label>
 
+              {/* Above the allergies rather than below them: it is the part of this page
+                  other members read, and the part somebody has actually come here to write.
+                  `uploadImage` is passed, so it takes a paste, a drop and a photograph from
+                  a phone like every other markdown field members read (#379). */}
+              <MarkdownField
+                label="A little about you"
+                placeholder="Who you are, what you are bringing, a picture or two…"
+                value={introduction}
+                maxLength={MAX_INTRODUCTION}
+                rows={5}
+                upload={api.uploadImage}
+                onInput={setIntroduction}
+              />
+
+              <p class="form-note">
+                Shown on your page, which every member reaches by clicking your name. Nobody outside the
+                gathering sees it.
+              </p>
+
               {items.length > 0 && (
                 <fieldset class="field">
                   <legend>Allergies or food you cannot eat</legend>
@@ -198,7 +228,13 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
 
               <FormError error={formError} />
 
-              <PendingButton busy={saving} label="Save" busyLabel="Saving…" type="submit" />
+              <PendingButton
+                busy={saving}
+                label="Save"
+                busyLabel="Saving…"
+                type="submit"
+                disabled={stillUploading(introduction)}
+              />
             </form>
           )}
 

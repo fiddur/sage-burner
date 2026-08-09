@@ -89,6 +89,7 @@ describe('somebody, as the rest of the community sees them', () => {
       name: 'Wren Aldertide',
       avatar: null,
       contact: 'wren on discord',
+      introduction: null,
       // Built from the Messenger handle below, since that is a value they typed.
       facebook: 'https://facebook.com/wren',
       connections: [expect.objectContaining({ kind: 'messenger', value: 'wren' })],
@@ -136,12 +137,39 @@ describe('somebody, as the rest of the community sees them', () => {
       'connections',
       'contact',
       'facebook',
+      'introduction',
       'name',
     ])
     // No address at all here, because this account has no `email` connection: the seeding
     // happens on the paths that create an account, and these rows are inserted directly.
     expect(body.payload).not.toContain('@example.org')
     expect(body.payload).not.toContain('peanuts')
+  })
+
+  it('carries what somebody wrote about themselves, which is what the page is for', async () => {
+    // #390: the answer to "who is this", which is the question a name somebody has not met
+    // actually raises. Markdown, rendered by the page like every other field members write.
+    const server = await build()
+    const wren = await givenAccount()
+    const reader = await givenAccount()
+    await db()
+      .update(account)
+      .set({ introduction: 'I make **fire**.\n\n![](/api/images/img-1)' })
+      .where(eq(account.id, wren.id))
+
+    const body = await fetchProfile(server, reader.cookie, wren.id)
+
+    expect(body.json().person.introduction).toContain('I make **fire**.')
+  })
+
+  it('answers null for somebody who has written none, so the page can say so', async () => {
+    // Distinct from an empty string on purpose: the page has different things to say to
+    // somebody who has not written one and to the person whose page it is.
+    const server = await build()
+    const wren = await givenAccount()
+    const reader = await givenAccount()
+
+    expect((await fetchProfile(server, reader.cookie, wren.id)).json().person.introduction).toBeNull()
   })
 
   it('shows a Facebook page built from the handle they typed', async () => {

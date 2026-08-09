@@ -61,6 +61,17 @@ export const MAX_DESCRIPTION = 20_000
  */
 export const MAX_COMMENT = 2000
 
+/**
+ * Who somebody is, in their own words and pictures (#390).
+ *
+ * Its own number rather than either neighbour's. `MAX_NOTES`' 2000 is a paragraph, which
+ * is less than what is being asked for, and `MAX_DESCRIPTION`'s 20 000 is a dream's whole
+ * plan. 10 000 is a page of prose and half a dozen pictures' worth of `![](…)` lines —
+ * `STORED_MARKDOWN_LENGTH` is 53 characters apiece, so the pictures cost almost nothing
+ * against it and the prose is what the number is really for.
+ */
+export const MAX_INTRODUCTION = 10_000
+
 /** A burn's slug, which lives in URLs. Also `slugSchema`'s bound. */
 export const MAX_SLUG = 64
 

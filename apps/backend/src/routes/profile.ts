@@ -180,6 +180,7 @@ export const registerProfileRoutes = (app: FastifyInstance, { db, sessions, now 
         name: account.name,
         contact: account.contact,
         allergies_notes: account.allergies_notes,
+        introduction: account.introduction,
       })
       .from(account)
       .where(eq(account.id, accountId))
