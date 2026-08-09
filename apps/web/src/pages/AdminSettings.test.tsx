@@ -24,6 +24,7 @@ const stub = (over: Partial<AdminSettingsApi> = {}): AdminSettingsApi => ({
         banner_updated_at: null,
         icon_updated_at: null,
         sends_email: false,
+        social_logins: [],
       },
     }),
   // The mail form mounted here has its own tests; this keeps it from reaching the API
@@ -111,6 +112,7 @@ describe('AdminSettings', () => {
           banner_updated_at: null,
           icon_updated_at: null,
           sends_email: false,
+          social_logins: [],
         },
       }),
     )
@@ -131,6 +133,7 @@ describe('AdminSettings', () => {
           banner_updated_at: null,
           icon_updated_at: null,
           sends_email: false,
+          social_logins: [],
         },
       }),
     )
@@ -147,7 +150,13 @@ describe('AdminSettings', () => {
     // submit before this message can be shown. The page is the only authority.
     const updateInstallation = vi.fn<AdminSettingsApi['updateInstallation']>(() =>
       Promise.resolve({
-        installation: { title: '', banner_updated_at: null, icon_updated_at: null, sends_email: false },
+        installation: {
+          title: '',
+          banner_updated_at: null,
+          icon_updated_at: null,
+          sends_email: false,
+          social_logins: [],
+        },
       }),
     )
     renderPage(stub({ updateInstallation }))
@@ -177,6 +186,7 @@ describe('AdminSettings', () => {
                     banner_updated_at: null,
                     icon_updated_at: null,
                     sends_email: false,
+                    social_logins: [],
                   },
                 }),
             })}
@@ -222,6 +232,7 @@ describe('AdminSettings', () => {
           banner_updated_at: null,
           icon_updated_at: null,
           sends_email: false,
+          social_logins: [],
         },
       }),
     )
@@ -240,6 +251,7 @@ describe('AdminSettings', () => {
           banner_updated_at: null,
           icon_updated_at: null,
           sends_email: false,
+          social_logins: [],
         },
       }),
     )

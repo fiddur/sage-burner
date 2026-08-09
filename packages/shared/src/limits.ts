@@ -125,3 +125,14 @@ export const MAX_CONNECTION_LABEL = 60
  * page stays a list somebody reads rather than scrolls.
  */
 export const MAX_CONNECTIONS = 12
+
+/**
+ * An OAuth client id, as a provider issues it (#393).
+ *
+ * Discord's is a snowflake and Facebook's is a long number; both are far under this, and
+ * a generous bound is right for a field whose format belongs to somebody else.
+ */
+export const MAX_OAUTH_CLIENT_ID = 200
+
+/** An OAuth client secret. Opaque, provider-shaped, and never read back out. */
+export const MAX_OAUTH_CLIENT_SECRET = 500

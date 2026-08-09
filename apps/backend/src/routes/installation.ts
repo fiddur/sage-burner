@@ -10,6 +10,7 @@ import { isEmptyPatch } from '../db/patch.ts'
 import { INSTALLATION_ID, installation } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { mailSettingsFor } from '../mail/mail.ts'
+import { configuredProviders } from '../oauth/settings.ts'
 import { bannerVersion } from './banner.ts'
 import { iconVersion } from './pwa.ts'
 
@@ -38,6 +39,9 @@ export const registerInstallationRoutes = (app: FastifyInstance, { db }: { db: D
       banner_updated_at: (await bannerVersion(db)) ?? null,
       icon_updated_at: (await iconVersion(db))?.updated_at ?? null,
       sends_email: (await mailSettingsFor(db)) !== undefined,
+      // Names only, and only of what is configured: the login page draws the buttons
+      // before anybody is signed in, so it cannot ask an admin route (#393).
+      social_logins: await configuredProviders(db),
     }
   }
 

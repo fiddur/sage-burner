@@ -14,6 +14,8 @@ import {
   IMAGE_TYPES,
   mealRoles,
   mealSlotKinds,
+  oauthIntents,
+  oauthProviders,
   paymentStatuses,
   placeColors,
   rideKinds,
@@ -1519,5 +1521,103 @@ export const accountConnection = sqliteTable(
     check('account_connection_value_check', sql`length(trim(${table.value})) > 0`),
     uniqueIndex('account_connection_unique_idx').on(table.account_id, table.kind, table.value),
     index('account_connection_account_idx').on(table.account_id, table.order),
+  ],
+)
+
+/**
+ * What an admin filled in to let people sign in from somewhere else (#393).
+ *
+ * Keyed by provider rather than a table each, and rather than a singleton like
+ * `mail_setting`: there are two of these and the second is not hypothetical. Zero rows is
+ * the ordinary state, and an installation that never wants either never has one — the
+ * argument `mail_setting` and the VAPID pair both make.
+ *
+ * The secret is stored as given, because that is what an authorization-code exchange
+ * sends, and it never leaves this process: the read answers `has_secret`.
+ */
+export const oauthSetting = sqliteTable(
+  'oauth_setting',
+  {
+    provider: text('provider', { enum: oauthProviders }).notNull(),
+    client_id: text('client_id').notNull(),
+    client_secret: text('client_secret').notNull(),
+    updated_at: text('updated_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.provider] }),
+    check('oauth_setting_provider_check', oneOf(table.provider, oauthProviders)),
+    // An empty id cannot build an authorize URL, and the failure would surface at the
+    // provider rather than here.
+    check('oauth_setting_client_id_check', sql`length(trim(${table.client_id})) > 0`),
+  ],
+)
+
+/**
+ * A way in that somebody has linked to their account (#393).
+ *
+ * **Signing in matches this and nothing else.** Never an email address: a provider's
+ * address is an account-takeover path the moment one hands over an address it did not
+ * verify, and matching on it would make the button an oracle for which addresses have
+ * accounts here — which the usernameless passkey login went out of its way not to be.
+ *
+ * `subject` is the provider's own id, and it is not the same kind of thing on the two:
+ * Facebook's is app-scoped, so it identifies nobody outside this installation's Meta app,
+ * while Discord's is a global snowflake. Both are opaque here and neither is ever sent
+ * back out.
+ *
+ * `unique(provider, subject)` so one provider account signs in as one account here.
+ * `unique(provider, account_id)` so an account has at most one of each — two Discords on
+ * one account is a question with no useful answer.
+ */
+export const accountIdentity = sqliteTable(
+  'account_identity',
+  {
+    id: text('id').notNull(),
+    account_id: text('account_id')
+      .notNull()
+      .references(() => account.id, { onDelete: 'cascade' }),
+    provider: text('provider', { enum: oauthProviders }).notNull(),
+    subject: text('subject').notNull(),
+    created_at: text('created_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    check('account_identity_provider_check', oneOf(table.provider, oauthProviders)),
+    uniqueIndex('account_identity_subject_idx').on(table.provider, table.subject),
+    uniqueIndex('account_identity_account_idx').on(table.provider, table.account_id),
+  ],
+)
+
+/**
+ * One leg of a provider round trip, spent when it comes back (#393).
+ *
+ * A row, and the statement that reads it deletes it — `webauthn_challenge` with its TTL and
+ * its delete-with-returning, for the reason stated there: single-use is what a state is
+ * for, and a signed cookie cannot give it.
+ *
+ * It carries what the trip was **for**, because the two intents end differently and the
+ * caller must not be the one saying which. `account_id` is who was signed in when a link
+ * was started, so a callback cannot attach an identity to somebody else's account by
+ * arriving with a different cookie.
+ */
+export const oauthState = sqliteTable(
+  'oauth_state',
+  {
+    state: text('state').notNull(),
+    provider: text('provider', { enum: oauthProviders }).notNull(),
+    intent: text('intent', { enum: oauthIntents }).notNull(),
+    /** Null for a sign-in, which nobody is signed in for. */
+    account_id: text('account_id').references(() => account.id, { onDelete: 'cascade' }),
+    created_at: text('created_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.state] }),
+    check('oauth_state_provider_check', oneOf(table.provider, oauthProviders)),
+    check('oauth_state_intent_check', oneOf(table.intent, oauthIntents)),
+    // A link with nobody to link to would be a callback deciding whose account it is.
+    check(
+      'oauth_state_link_account_check',
+      sql`${table.intent} <> 'link' or ${table.account_id} is not null`,
+    ),
   ],
 )
