@@ -114,8 +114,13 @@ describe('somebody, as the rest of the community sees them', () => {
 
   it('carries nothing else about them, whatever the account row holds', async () => {
     // The projection is written out field by field, which is what keeps a column added to
-    // `account` from reaching every member's reading of every other member. `email` is the
-    // one that matters: it is the login identity and stays off what members read (#159).
+    // `account` from reaching every member's reading of every other member.
+    //
+    // `account.email` is the column that matters and this asserts the column: no
+    // member-facing read selects it (#159). It is *not* a claim that the address is unseen —
+    // every account is seeded with an `email` connection holding the same string, which this
+    // page shows on purpose. The two are different things, and the second is a row somebody
+    // can delete.
     const server = await build()
     const wren = await givenAccount()
     const reader = await givenAccount()
@@ -130,6 +135,8 @@ describe('somebody, as the rest of the community sees them', () => {
       'contact',
       'name',
     ])
+    // No address at all here, because this account has no `email` connection: the seeding
+    // happens on the paths that create an account, and these rows are inserted directly.
     expect(body.payload).not.toContain('@example.org')
     expect(body.payload).not.toContain('peanuts')
   })

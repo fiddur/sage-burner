@@ -43,9 +43,18 @@ CREATE INDEX `account_connection_account_idx` ON `account_connection` (`account_
 -- is satisfied by any of them, and a second would collide with
 -- `account_connection_unique_idx` only when the addresses matched.
 --
--- This publishes the login address to members, which the list's own note says it does. It
--- is no new exposure: `redemption.ts` has always copied that address into `account.contact`,
--- and `contact` is on the roster every approved member reads.
+-- **This publishes the login address, and for some accounts it is the first time.** Worth
+-- being exact, because the easy version of this sentence is wrong: `redemption.ts` writes
+-- `contact: body.contact ?? body.email`, so the address usually *is* already on the roster
+-- through `contact` — but `contact` is editable afterwards, so anybody who replaced it with a
+-- Discord handle or a phone number has never had their login address shown to members, and
+-- this row shows it. That is #159's decision reversed for those accounts, without them doing
+-- anything.
+--
+-- Kept anyway, as a deliberate choice rather than an oversight: an empty list is a list
+-- nobody fills in, and a list that is present for most people and mysteriously absent for
+-- the rest is worse than either. What is owed in exchange is that the row is removable, and
+-- that the changelog says plainly that it is visible — both of which it is.
 INSERT INTO `account_connection` (`id`, `account_id`, `kind`, `value`, `label`, `order`)
 SELECT
 	lower(

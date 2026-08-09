@@ -8,9 +8,11 @@ import { randomUUID } from 'node:crypto'
  * removable by the person whose it is, because present by default is not the same as
  * imposed.
  *
- * It publishes the login address to members, which the list says it does. No new exposure:
- * `redemption.ts` has always copied that address into `account.contact`, which is on the
- * roster every approved member reads.
+ * It publishes the login address to members. Usually that address is already on the roster
+ * through `account.contact`, which `redemption.ts` defaults to it — but `contact` is editable,
+ * so for anybody who replaced it this is the first time their login address is shown. The
+ * migration that backfilled existing accounts says why that was accepted rather than scoped
+ * around.
  *
  * A row rather than something synthesised on read, because it has to sort among the others
  * and a position has to be stored somewhere. `order: 0` because an account being created

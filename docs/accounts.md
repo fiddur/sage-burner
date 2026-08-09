@@ -907,15 +907,9 @@ identity and stays out of what other members read (#159), while these are what t
 chose to put up — **including an `email` row**, which is an address they typed and may not
 be the one they sign in with at all.
 
-Note the tense. Nothing reads somebody else's list yet: `connectionsFor` is only ever
-called with the viewer's own account, and the page that shows anybody else's is #389. The
-editor says what these are _for_ rather than who can see them today, because people are
-filling them in now and the answer will be everybody.
-
-Worth knowing while reading that: `redemption.ts` already defaults `contact` to the address
-somebody redeemed with, and `contact` is on the member roster. So for most accounts the
-login address is already published, by default, today. Nothing here seeds a connection from
-it — publishing by default is the opposite of what this list is for.
+Somebody's page (#389) is what reads it: `connectionsFor` is called with whoever's page is
+being looked at, and every name in the app links there. The editor's own note says what the
+list is _for_ rather than reciting who can see it, which is the same sentence either way.
 
 **The login address is in the list from the start.** Everybody has one, and a list that
 starts empty is a list nobody fills in — so `loginAddressConnection` seeds an `email` row in
@@ -926,9 +920,20 @@ as imposed. The backfill puts it **last** for an account that already had rows, 
 somebody who put Discord at the top chose that, and it skips an account that already has an
 `email` row whatever address that holds.
 
-That publishes the login address to members, which the list says it does, and it is no new
-exposure: `redemption.ts` has always copied that address into `account.contact`, and
-`contact` is on the roster every approved member reads.
+**That publishes the login address, and for some accounts it is the first time.** The easy
+version of this sentence is wrong, so it is worth being exact: `redemption.ts` writes
+`contact: body.contact ?? body.email`, so the address usually _is_ already on the roster
+through `contact` — but `contact` is editable afterwards, and anybody who replaced it with a
+Discord handle or a phone number had never had their login address shown to members. #159's
+decision stands for the `account.email` column, which no member-facing read selects; what
+changed is that a row holding the same string is now in a list that is read.
+
+Why it was not scoped to the accounts where the address was already public — a one-line
+`WHERE account.contact IS NULL OR lower(account.contact) = account.email` would have done it —
+is that a list present for most people and mysteriously absent for the rest is worse than
+either, and the absence would land on exactly the people who care most about the difference
+with nothing telling them why. What is owed instead is that the row is removable and that the
+changelog says plainly it is visible. Both hold.
 
 **Facebook is Messenger here.** The `messenger` kind takes a Facebook name or the number out
 of a `profile.php?id=` link, and builds `m.me`. Looking at somebody's Facebook page is a

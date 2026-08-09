@@ -14,8 +14,10 @@ under today's heading, and make a new heading when there is none.
   face, and how to reach them in the order they chose, so the first one is where they would
   rather be tried. A handle nothing can link to, like a Discord username, comes with a copy button instead.
 
-- **Your email is in your list of ways to be reached from the start**, since you have one
-  either way. Sort it where you like, change it, or take it off — it is an ordinary entry.
+- **Your email address is now in your list of ways to be reached**, because you have one
+  either way — and like everything else in that list, **other members can see it**. If you
+  would rather they did not, take it off under Your details → How people can reach you; it is
+  an ordinary entry, and you can also sort it or change it to a different address.
 
 - **Notification settings are in one place.** The switch for notifications on this device
   was on both Your details and the admin Settings page, which made it look like two
