@@ -841,6 +841,7 @@ describe('json columns', () => {
 })
 
 const REBUILD = '20260804105125_places_per_burn'
+const THREADS = '20260809090000_threads'
 const FACILITATOR = '20260805040000_facilitator'
 const REPEATABLE = '20260805050000_repeatable_dream'
 
@@ -1239,5 +1240,129 @@ describe('the allergy list', () => {
     expect(() =>
       handle.db.insert(accountAllergy).values({ account_id: ids.account, item_id: LACTOSE }).run(),
     ).toThrow()
+  })
+})
+
+describe('the threads migration', () => {
+  /**
+   * Staged like the rebuilds above, and for the same reason: this one backfills a
+   * thread per dream already offered, and a backfill is only tested by running it over
+   * the old shape with rows in it.
+   */
+  const beforeTheThreads = () => {
+    const fresh = createDb({ url: ':memory:' })
+    const { staged, kept } = stagedThrough(THREADS)
+
+    // Asserted, or a mistyped tag stages the migration too and these prove nothing.
+    expect(kept).not.toContain(THREADS)
+    expect(kept.length).toBeGreaterThan(0)
+
+    runMigrations(fresh, staged)
+    expect(fresh.client.prepare("select name from sqlite_master where name = 'thread'").get()).toBeUndefined()
+
+    return fresh
+  }
+
+  it('gives every dream already offered a thread of its own, named as it is named', () => {
+    const fresh = beforeTheThreads()
+
+    try {
+      anEvent(fresh, 'e-1', 'a-burn', NOW)
+      for (const [id, title] of [
+        ['s-1', 'Sauna at dawn'],
+        ['s-2', 'Cacao ceremony'],
+      ] as [string, string][]) {
+        fresh.client
+          .prepare('insert into session (id, event_id, title) values (?, ?, ?)')
+          .run(id, 'e-1', title)
+      }
+
+      runMigrations(fresh, migrationsFolder)
+
+      const threads = fresh.client
+        .prepare('select entity_type, entity_id, title, event_id from thread order by entity_id')
+        .all()
+
+      expect(threads).toEqual([
+        { entity_type: 'session', entity_id: 's-1', title: 'Sauna at dawn', event_id: 'e-1' },
+        { entity_type: 'session', entity_id: 's-2', title: 'Cacao ceremony', event_id: 'e-1' },
+      ])
+      // No entries are invented: an `activity` row carries a sentence and a `/dreams`
+      // link rather than a session id, so nothing here can say who offered which dream
+      // or when. A thread with no entries draws no card until something happens.
+      expect(fresh.client.prepare('select count(*) as n from thread_entry').get()?.n).toBe(0)
+    } finally {
+      fresh.close()
+    }
+  })
+
+  it('gives each of them a distinct id', () => {
+    // The whole backfill is one INSERT ... SELECT, so a constant expression where the
+    // UUID should be would insert the same id for every row — which the primary key
+    // catches, but only for the second dream. Asserted rather than trusted.
+    const fresh = beforeTheThreads()
+
+    try {
+      anEvent(fresh, 'e-1', 'a-burn', NOW)
+      for (const id of ['s-1', 's-2', 's-3']) {
+        fresh.client.prepare('insert into session (id, event_id, title) values (?, ?, ?)').run(id, 'e-1', id)
+      }
+
+      runMigrations(fresh, migrationsFolder)
+
+      const ids = fresh.client
+        .prepare('select id from thread')
+        .all()
+        .map((row) => String(row.id))
+
+      expect(new Set(ids).size).toBe(3)
+      // And each is a UUID, because `idSchema` is what the wire bounds them by.
+      for (const id of ids)
+        {expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)}
+    } finally {
+      fresh.close()
+    }
+  })
+
+  it('keeps every notification already written while widening what one may be about', () => {
+    // Three tables carry a CHECK listing the categories and SQLite cannot alter one in
+    // place, so all three are rebuilt — and a rebuild that dropped the rows would be a
+    // silent emptying of somebody's bell.
+    const fresh = beforeTheThreads()
+
+    try {
+      anEvent(fresh, 'e-1', 'a-burn', NOW)
+      fresh.client
+        .prepare('insert into account (id, email, created_at) values (?, ?, ?)')
+        .run('a-1', 'a@b.c', NOW)
+      fresh.client
+        .prepare(
+          'insert into notification (id, account_id, category, body, created_at) values (?, ?, ?, ?, ?)',
+        )
+        .run('n-1', 'a-1', 'dream_offered', 'Ada offered a dream: Sauna', NOW)
+      fresh.client
+        .prepare('insert into notification_setting (account_id, category, enabled) values (?, ?, ?)')
+        .run('a-1', 'dream_offered', 1)
+      fresh.client
+        .prepare('insert into activity (id, event_id, category, body, created_at) values (?, ?, ?, ?, ?)')
+        .run('act-1', 'e-1', 'member_joined', 'Bea is coming.', NOW)
+
+      runMigrations(fresh, migrationsFolder)
+
+      expect(fresh.client.prepare('select count(*) as n from notification').get()?.n).toBe(1)
+      expect(fresh.client.prepare('select count(*) as n from notification_setting').get()?.n).toBe(1)
+      expect(fresh.client.prepare('select count(*) as n from activity').get()?.n).toBe(1)
+
+      // And the new categories are storable, which is what the rebuild was for.
+      expect(() =>
+        fresh.client
+          .prepare(
+            'insert into notification (id, account_id, category, body, created_at) values (?, ?, ?, ?, ?)',
+          )
+          .run('n-2', 'a-1', 'dream_comment', 'Bea said something', NOW),
+      ).not.toThrow()
+    } finally {
+      fresh.close()
+    }
   })
 })
