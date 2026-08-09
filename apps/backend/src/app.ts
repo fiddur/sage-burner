@@ -13,6 +13,7 @@ import type { Config } from './config.ts'
 import type { Database } from './db/index.ts'
 import type { Send } from './mail/mail.ts'
 import type { EmailQueue } from './mail/queue.ts'
+import type { OAuthCalls } from './oauth/client.ts'
 import type { Delivery, VapidKeys } from './push/push.ts'
 
 import { createGate, SCRYPT_GATE } from './auth/gate.ts'
@@ -24,6 +25,7 @@ import { sendError } from './http.ts'
 import { emailChannel } from './mail/channel.ts'
 import { createEmailQueue, drainWithin } from './mail/queue.ts'
 import { sendWithSmtp } from './mail/smtp.ts'
+import { httpsOAuth } from './oauth/client.ts'
 import { notifyAdmins, recordAndPush } from './push/notify.ts'
 import { deliverWithWebPush, DEFAULT_PUSH_CONTACT, generateVAPIDKeys } from './push/web-push.ts'
 import { registerAdminRoutes } from './routes/admin.ts'
@@ -48,6 +50,8 @@ import { registerLeadRoleRoutes } from './routes/lead-roles.ts'
 import { registerMailRoutes } from './routes/mail.ts'
 import { registerMealAdminRoutes, registerMealRoutes } from './routes/meals.ts'
 import { registerNotificationRoutes } from './routes/notifications.ts'
+import { registerOauthAdminRoutes } from './routes/oauth-admin.ts'
+import { registerOauthRoutes } from './routes/oauth.ts'
 import { registerPasskeyRoutes } from './routes/passkeys.ts'
 import { registerPeopleRoutes } from './routes/people.ts'
 import { registerPlaceRoutes } from './routes/places.ts'
@@ -95,6 +99,15 @@ export interface AppDeps {
    * configures one has this and sends nothing.
    */
   send?: Send
+  /**
+   * How a provider is talked to (#393).
+   *
+   * Injected for the reason `deliver` and `send` are: the suite must never leave the
+   * machine, and production passes `httpsOAuth`. `oauth/client.ts` is the only module that
+   * opens a socket for this, and nothing in it throws — a provider having a bad day costs a
+   * sign-in attempt rather than a stack trace.
+   */
+  oauth?: OAuthCalls
   /**
    * Where the email leg of a notification goes (#356).
    *
@@ -370,6 +383,7 @@ export const createApp = async ({
   deliver = deliverWithWebPush(DEFAULT_PUSH_CONTACT),
   mintKeys = generateVAPIDKeys,
   send = sendWithSmtp,
+  oauth = httpsOAuth,
   defer,
   hash,
   now = () => new Date(),
@@ -508,6 +522,8 @@ export const createApp = async ({
   registerImageRoutes(app, { db, sessions, now })
   registerConnectionRoutes(app, { db, sessions })
   registerPeopleRoutes(app, { db, sessions })
+  registerOauthRoutes(app, { db, sessions, now, config, oauth })
+  registerOauthAdminRoutes(app, { db, now })
   registerPwaRoutes(app, { db, sessions, now })
   registerBannerRoutes(app, { db, sessions, now })
   registerMailRoutes(app, { db, sessions, mail, now })

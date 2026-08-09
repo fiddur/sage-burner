@@ -51,12 +51,18 @@ export interface ProviderShape {
   read: (body: unknown) => ProviderProfile | undefined
 }
 
-const field = (body: unknown, name: string): unknown =>
-  typeof body === 'object' && body !== null && name in body
-    ? (body as Record<string, unknown>)[name]
-    : undefined
+/**
+ * A provider's JSON is `unknown`, and these two are how it is read rather than asserted.
+ *
+ * One type predicate, so the narrowing lives in a guard instead of a cast at each call
+ * site — which is the difference between "avoid casting" and pretending to.
+ */
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null
 
-const stringField = (body: unknown, name: string): string | undefined => {
+export const field = (body: unknown, name: string): unknown => (isRecord(body) ? body[name] : undefined)
+
+export const stringField = (body: unknown, name: string): string | undefined => {
   const held = field(body, name)
 
   return typeof held === 'string' && held !== '' ? held : undefined

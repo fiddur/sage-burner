@@ -3,7 +3,7 @@ import type { OAuthProvider } from '@sage-burner/shared'
 import type { ProviderProfile } from './providers.ts'
 
 import { AVATAR_TYPES, MAX_AVATAR_BYTES } from '../routes/avatars.ts'
-import { providerShapes } from './providers.ts'
+import { providerShapes, stringField } from './providers.ts'
 
 /**
  * The only module here that opens a socket (#393).
@@ -51,12 +51,8 @@ const jsonFrom = async (response: Response): Promise<unknown> => {
   }
 }
 
-const accessToken = (body: unknown): string | undefined => {
-  if (typeof body !== 'object' || body === null || !('access_token' in body)) return undefined
-  const held = (body as { access_token: unknown }).access_token
-
-  return typeof held === 'string' && held !== '' ? held : undefined
-}
+/** Read rather than asserted: `stringField` is the same guard the profile readers use. */
+const accessToken = (body: unknown): string | undefined => stringField(body, 'access_token')
 
 export const identifyOverHttps: Identify = async ({
   provider,
