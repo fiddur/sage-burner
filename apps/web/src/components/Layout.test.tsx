@@ -102,11 +102,24 @@ describe('the nav', () => {
   it('reaches the shared pages for an admin who holds admin alone', () => {
     // Schedule and Leads are `requireApproved` server-side, so an admin who is
     // not attending may use them — and used to be able to only by typing the URL,
-    // because the nav gated them on `member`. The personal pages stay behind
-    // `member`, since somebody not attending has no stay to fill in.
+    // because the nav gated them on `member`. Your details is `approved` too since
+    // #396: the half of it that is the account — a picture, ways of being reached,
+    // and the notification switch — is theirs, and application notifications go
+    // precisely to admins.
     renderNav(signedInAs('admin'))
 
-    expectLinks(['Feed', 'Members', 'Schedule', 'Leads', 'FAQ', 'Organise'], ['Your burn', 'Your details'])
+    expectLinks(['Feed', 'Members', 'Schedule', 'Leads', 'FAQ', 'Organise', 'Your details'], ['Your burn'])
+  })
+
+  it('offers it to nobody who is not approved at all', () => {
+    // The passing sibling: `approved` is not "signed in". An account with no role yet
+    // would be refused by `requireApproved` on every section of that page.
+    renderNav({
+      status: 'signed-in',
+      account: { id: 'a-1', name: 'Ada Lovelace', avatar: null, roles: [] },
+    })
+
+    expectLinks([], ['Your details', 'Organise'])
   })
 
   it('offers Dreams from the Schedule rather than from the bar', () => {

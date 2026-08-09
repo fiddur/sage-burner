@@ -9,6 +9,12 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-09
 
+- **Somebody organising a burn without coming to it can reach Your details.** Their picture,
+  how people reach them, how they sign in, and — the one that mattered — the switch for
+  notifications, which is where applications are announced. The page turned them away
+  before, and the notification switch had already moved off the admin page. What is about a
+  stay is still a member's: the name and allergies planning needs, and the burns themselves.
+
 - **You can see and delete the pictures you have added**, under **Pictures you have added** on
   Your details. Every picture you paste or drop into something you write is kept, whether or
   not what you wrote still shows it, and until now there was no way to take one back off —

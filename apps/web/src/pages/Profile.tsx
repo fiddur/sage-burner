@@ -68,6 +68,11 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
 
   const { busy: saving, formError, setError, run } = useAction()
 
+  // Read once: the address names the account above the sign-out button and seeds the
+  // one-press fill on the `email` kind, and two ternaries over the same load was what
+  // pushed this component over the complexity ceiling.
+  const email = loaded.status === 'ready' ? loaded.data.email : undefined
+
   const save = () => {
     setSaved(false)
     if (name.trim() === '' || contact.trim() === '') {
@@ -87,110 +92,125 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
   }
 
   return (
-    <GuardedPage title="Your details" require="member">
+    <GuardedPage title="Your details" require="approved">
       <h1>Your details</h1>
 
-      <p class="form-note">
-        These follow you from burn to burn. Below them is each burn on its own, for what does not: when you
-        arrive, where you sleep, what you will help with.
-      </p>
-
-      {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
-
-      {loaded.status === 'failed' && <ErrorText message={loaded.message} />}
-
-      {loaded.status === 'ready' && (
-        <form
-          class="form"
-          onSubmit={(submitEvent) => {
-            submitEvent.preventDefault()
-            save()
-          }}
-        >
-          <label class="field">
-            <span>Your name</span>
-            <input
-              type="text"
-              name="name"
-              maxLength={MAX_PERSON_NAME}
-              aria-required
-              value={name}
-              onInput={(inputEvent) => setName(inputEvent.currentTarget.value)}
-            />
-          </label>
-
-          <label class="field">
-            <span>How can we reach you?</span>
-            <input
-              type="text"
-              name="contact"
-              maxLength={MAX_CONTACT}
-              aria-required
-              value={contact}
-              onInput={(inputEvent) => setContact(inputEvent.currentTarget.value)}
-            />
-          </label>
-
-          {items.length > 0 && (
-            <fieldset class="field">
-              <legend>Allergies or food you cannot eat</legend>
-              {items.map((item) => (
-                <label key={item.id} class="field-inline">
-                  <input
-                    type="checkbox"
-                    checked={ticked.includes(item.id)}
-                    onChange={(changed) =>
-                      setTicked((current) =>
-                        changed.currentTarget.checked
-                          ? [...current, item.id]
-                          : current.filter((id) => id !== item.id),
-                      )
-                    }
-                  />
-                  <span>{item.label}</span>
-                </label>
-              ))}
-            </fieldset>
-          )}
-
-          <label class="field">
-            <span>
-              {items.length > 0 ? 'Anything else you cannot eat' : 'Allergies or food you cannot eat'}
-            </span>
-            <textarea
-              name="allergies_notes"
-              maxLength={MAX_NOTES}
-              rows={rowsFor(allergies)}
-              value={allergies}
-              onInput={(inputEvent) => setAllergies(inputEvent.currentTarget.value)}
-            />
-          </label>
-
-          <p class="form-note">
-            Food is primarily vegetarian, with vegan options. Read by whoever plans the meals, for every burn
-            you come to — so correcting it here corrects it everywhere.
-          </p>
-
-          {saved && (
-            <p class="form-note" role="status">
-              Saved.
-            </p>
-          )}
-
-          <FormError error={formError} />
-
-          <PendingButton busy={saving} label="Save" busyLabel="Saving…" type="submit" />
-        </form>
+      {member ? (
+        <p class="form-note">
+          These follow you from burn to burn. Below them is each burn on its own, for what does not: when you
+          arrive, where you sleep, what you will help with.
+        </p>
+      ) : (
+        // An account holding `admin` and not `member` (#396). Organising without attending is
+        // coherent, so the half of this page that is about a stay has nothing to say to them —
+        // and the half that is about the account has everything, notifications included.
+        <p class="form-note">
+          Your picture, how people reach you, and how you sign in. Say you are coming to a burn — under
+          Organise → Accounts — and what you bring and where you sleep appear here too.
+        </p>
       )}
 
-      <p class="form-note">
-        Signed in as {loaded.status === 'ready' ? loaded.data.email : 'you'}. Changing that address is not
-        possible yet — ask someone with admin.
-      </p>
+      {/* The member half, in one conditional rather than four: what somebody says about
+          themselves and their stay, behind the guard `updateMyProfile` already has. */}
+      {member && (
+        <>
+          {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
+
+          {loaded.status === 'failed' && <ErrorText message={loaded.message} />}
+
+          {loaded.status === 'ready' && (
+            <form
+              class="form"
+              onSubmit={(submitEvent) => {
+                submitEvent.preventDefault()
+                save()
+              }}
+            >
+              <label class="field">
+                <span>Your name</span>
+                <input
+                  type="text"
+                  name="name"
+                  maxLength={MAX_PERSON_NAME}
+                  aria-required
+                  value={name}
+                  onInput={(inputEvent) => setName(inputEvent.currentTarget.value)}
+                />
+              </label>
+
+              <label class="field">
+                <span>How can we reach you?</span>
+                <input
+                  type="text"
+                  name="contact"
+                  maxLength={MAX_CONTACT}
+                  aria-required
+                  value={contact}
+                  onInput={(inputEvent) => setContact(inputEvent.currentTarget.value)}
+                />
+              </label>
+
+              {items.length > 0 && (
+                <fieldset class="field">
+                  <legend>Allergies or food you cannot eat</legend>
+                  {items.map((item) => (
+                    <label key={item.id} class="field-inline">
+                      <input
+                        type="checkbox"
+                        checked={ticked.includes(item.id)}
+                        onChange={(changed) =>
+                          setTicked((current) =>
+                            changed.currentTarget.checked
+                              ? [...current, item.id]
+                              : current.filter((id) => id !== item.id),
+                          )
+                        }
+                      />
+                      <span>{item.label}</span>
+                    </label>
+                  ))}
+                </fieldset>
+              )}
+
+              <label class="field">
+                <span>
+                  {items.length > 0 ? 'Anything else you cannot eat' : 'Allergies or food you cannot eat'}
+                </span>
+                <textarea
+                  name="allergies_notes"
+                  maxLength={MAX_NOTES}
+                  rows={rowsFor(allergies)}
+                  value={allergies}
+                  onInput={(inputEvent) => setAllergies(inputEvent.currentTarget.value)}
+                />
+              </label>
+
+              <p class="form-note">
+                Food is primarily vegetarian, with vegan options. Read by whoever plans the meals, for every
+                burn you come to — so correcting it here corrects it everywhere.
+              </p>
+
+              {saved && (
+                <p class="form-note" role="status">
+                  Saved.
+                </p>
+              )}
+
+              <FormError error={formError} />
+
+              <PendingButton busy={saving} label="Save" busyLabel="Saving…" type="submit" />
+            </form>
+          )}
+
+          <p class="form-note">
+            Signed in as {email ?? 'you'}. Changing that address is not possible yet — ask someone with admin.
+          </p>
+        </>
+      )}
 
       <AvatarField api={api} />
 
-      <ConnectionsField api={api} loginAddress={loaded.status === 'ready' ? loaded.data.email : undefined} />
+      <ConnectionsField api={api} loginAddress={email} />
 
       <PicturesField api={api} />
 
@@ -202,7 +222,9 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
 
       <PushToggle api={api} />
 
-      <YourBurns api={api} />
+      {/* The burn-shaped half: `joinEvent` is `requireMember`, so somebody organising
+          without attending would be offered a button the API refuses. */}
+      {member && <YourBurns api={api} />}
     </GuardedPage>
   )
 }
