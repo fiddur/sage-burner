@@ -21,11 +21,11 @@ import { noStore, sendError } from '../http.ts'
 export const newFeedToken = (): string => randomBytes(32).toString('base64url')
 
 /**
- * What a burn's feed is reachable at, and giving it a new one (#408).
+ * What a burn's feed is reachable at, and giving it a new one (#408). "The calendar feed" in
+ * `docs/burns.md` has why the id would not do.
  *
- * **Not a field on the burn.** `eventSchema` is the shape `/api/events/active` answers the
- * public homepage with, and putting the token there would undo the reason it exists — which
- * is exactly how the id ended up being no protection at all.
+ * **A read of its own, not a field on the burn**, since the burn is what the public homepage
+ * is answered with.
  *
  * Reading it is `requireApproved`: it is the link the Schedule page offers, and the schedule
  * itself is a member's to read. Rotating it is admin's, and lives under `/api/admin/` where
@@ -34,7 +34,10 @@ export const newFeedToken = (): string => randomBytes(32).toString('base64url')
  * A burn that has none — one written before the migration by something that skipped it — is
  * given one on read rather than answered with nothing. The column is nullable only because
  * adding it needed no table rebuild, so a null is a gap to close rather than a state to
- * report.
+ * report. That makes the read a write, which two simultaneous first-reads of one token-less
+ * burn would race: both mint, and the loser is told a token the row no longer holds. Not
+ * worth a lock — the migration backfills every row and `createEvent` is the only insert, so
+ * there is nothing left to reach it — and a reload heals it either way.
  */
 export const registerCalendarRoutes = (app: FastifyInstance, { db, sessions }: GuardDeps) => {
   const { requireApproved } = createGuards({ db, sessions })

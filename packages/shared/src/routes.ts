@@ -447,12 +447,7 @@ export const apiRoutes = {
     fastify: '/api/me/identities',
     path: () => '/api/me/identities',
   },
-  /**
-   * The address of one burn's calendar feed, for the member being offered the link (#408).
-   *
-   * A read of its own rather than a field on the burn: the burn's shape is answered to the
-   * **public** homepage, and putting the token there would undo the whole point.
-   */
+  /** The address of one burn's calendar feed, for the member being offered the link (#408). */
   getCalendarToken: {
     method: 'GET',
     fastify: '/api/events/:eventId/calendar',
@@ -731,10 +726,10 @@ export const apiRoutes = {
   },
   /**
    * The programme as a calendar subscription (#258), keyed by the burn's feed token and
-   * **not** by its id (#408).
+   * **not** by its id (#408) — `docs/burns.md` has why.
    *
    * Outside `/api` because a calendar client asks for a file, not an API — the web manifest
-   * is the other one. `event.feed_token` says why the id will not do.
+   * is the other one.
    */
   scheduleFeed: {
     method: 'GET',

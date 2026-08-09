@@ -51,6 +51,17 @@ export const todayIso = (now: () => Date) => now().toISOString().slice(0, 10)
  * the next event is what fills the gap, and that is the action the admin
  * wants prompting toward anyway.
  */
+export const activeEvent = async (db: Database, today: string): Promise<Event | undefined> => {
+  const [row] = await db
+    .select()
+    .from(event)
+    .where(gte(event.end_date, today))
+    .orderBy(asc(event.end_date), asc(event.start_date), asc(event.slug))
+    .limit(1)
+
+  return row === undefined ? undefined : asEvent(row)
+}
+
 /**
  * A burn as it leaves the building, named field by field.
  *
@@ -84,17 +95,6 @@ export const asEvent = (row: typeof event.$inferSelect): Event => ({
   member_cap: row.member_cap,
   created_at: row.created_at,
 })
-
-export const activeEvent = async (db: Database, today: string): Promise<Event | undefined> => {
-  const [row] = await db
-    .select()
-    .from(event)
-    .where(gte(event.end_date, today))
-    .orderBy(asc(event.end_date), asc(event.start_date), asc(event.slug))
-    .limit(1)
-
-  return row === undefined ? undefined : asEvent(row)
-}
 
 /**
  * A burn by id, if it has not ended.

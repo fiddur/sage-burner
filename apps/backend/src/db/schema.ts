@@ -271,24 +271,16 @@ export const event = sqliteTable(
     meal_intro_markdown: text('meal_intro_markdown').notNull().default(''),
     member_cap: integer('member_cap').notNull(),
     /**
-     * What the calendar feed's URL is keyed by (#408), and deliberately not the id.
+     * What the calendar feed's URL is keyed by, and deliberately not the id (#408) — "The
+     * calendar feed" in `docs/burns.md` has why, and why it is rotatable.
      *
-     * `GET /calendar/:token/schedule.ics` cannot hold a session — a phone re-fetches it on
-     * its own schedule — so the address is the only thing protecting it. Keyed by `id` that
-     * was no protection at all for the burn being planned: `/api/events/active` is
-     * unguarded, carries the whole row, and the public homepage fetches it on every
-     * anonymous visit, so a stranger could read the id and build the URL.
-     *
-     * Separate from the id and therefore **rotatable**, which is the answer to "that link
-     * got out" that an id can never give.
+     * **What keeps it off the public homepage is `asEvent`, not this column's absence from
+     * `eventSchema`.** Leaving it out of the type was the first attempt and closed nothing:
+     * no route declares a Fastify `response` schema and there is no serializer compiler, so
+     * `db.select()` put the token straight into the anonymous body.
      *
      * Nullable because adding it needed no table rebuild; the migration backfills every row
      * and `createEvent` mints one, so nothing reaches the read without it.
-     *
-     * **What keeps it off the homepage is `asEvent`, not `eventSchema`.** Leaving it out of
-     * the type was the first attempt and closed nothing: no route declares a Fastify
-     * `response` schema and there is no serializer compiler, so `db.select()` put the token
-     * straight into the public body. The projection is what does it.
      */
     feed_token: text('feed_token'),
     created_at: text('created_at').notNull(),

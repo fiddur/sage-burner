@@ -1,9 +1,5 @@
--- The calendar feed gets an address of its own (#408).
---
--- Keyed by `event.id`, the feed was not protected at all for the burn being planned:
--- `/api/events/active` is unguarded, answers the whole row, and the public homepage fetches
--- it on every anonymous visit — so a stranger could read the id and build the `.ics` URL.
--- `schema.ts` has the rest, including why this is rotatable and the id is not.
+-- The calendar feed gets an address of its own (#408). Why not the burn's id, and why this
+-- is rotatable: "The calendar feed" in `docs/burns.md`.
 --
 -- Nullable, so no rebuild: SQLite adds a column with a constant default in place, and a
 -- per-row random value is not a constant. Backfilled below instead, and `createEvent` mints
