@@ -411,12 +411,6 @@ export const apiRoutes = {
    * Behind the admin prefix, and never carrying the secret — `oauthSettingsSchema` says why
    * `has_secret` is what comes back instead.
    */
-  /** Public: a reviewer at Meta opens it as a stranger, and so does an applicant (#402). */
-  getPrivacy: {
-    method: 'GET',
-    fastify: '/api/privacy',
-    path: () => '/api/privacy',
-  },
   getOauthSettings: {
     method: 'GET',
     fastify: '/api/admin/installation/oauth/:provider',
@@ -522,6 +516,17 @@ export const apiRoutes = {
     method: 'GET',
     fastify: '/api/changelog',
     path: () => '/api/changelog',
+  },
+  /**
+   * The privacy policy (#402). `privacyResponseSchema` carries the why.
+   *
+   * Beside the changelog because it is the same shape in every respect: prose that ships with
+   * the image, served rather than bundled, and public.
+   */
+  getPrivacy: {
+    method: 'GET',
+    fastify: '/api/privacy',
+    path: () => '/api/privacy',
   },
   getVersion: {
     method: 'GET',

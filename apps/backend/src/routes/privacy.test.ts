@@ -69,6 +69,18 @@ describe('the privacy policy', () => {
     expect(held).toContain('members')
   })
 
+  it('promises no deletion the app cannot perform', async () => {
+    // It said "deleting an account deletes everything attached to it" and "ask an organiser",
+    // and neither was true: no route removes an account, and `db.integration.test.ts` asserts
+    // that SQLite refuses the delete for anybody who has ever said they were coming. A policy
+    // is the one document where a sentence that reads well and is false is a false statement
+    // about somebody's data. #35 is the gap.
+    const held = readPrivacy()
+
+    expect(held).toMatch(/not something this app can do yet/i)
+    expect(held).not.toMatch(/deletes everything attached to it/i)
+  })
+
   it('says the things app review is checking the page against', async () => {
     // Not a style assertion. A reviewer looks for what is collected, who sees it, and how to
     // get rid of it; and the provider paragraph is the one they read most closely, since it

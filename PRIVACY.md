@@ -51,9 +51,15 @@ What you write and what you have said about coming stays as long as the gatherin
 so that the people organising the next one can look back at the last one.
 
 You can remove most of it yourself, at any time, under **Your details** — your picture, the ways
-people can reach you, what you have written. To have your whole account removed, ask an
-organiser. Deleting an account deletes everything attached to it: your details, your pictures,
-your ways of being reached, and any provider you had linked.
+people can reach you, what you have written.
+
+**Removing an account entirely is not something this app can do yet.** There is no button for
+it, and the database deliberately refuses to delete an account that has ever said it was coming
+to a gathering, because doing so would take that gathering's records with it. So if you want
+everything gone, ask an organiser — and know that today that means somebody editing the
+database by hand, and deciding with you what happens to the parts that are shared: what you
+wrote on a thread, and whether you appear in the record of who came. We would rather say that
+than promise a button that does not exist.
 
 # Who to ask
 
