@@ -894,11 +894,16 @@ check, which governs prose where a relative path and a `mailto:` are ordinary.
 somebody knows about themselves; a network changing its domain is then one line in
 `enums.ts` rather than a data migration.
 
-**Every row is published to approved members**, and the editor says so plainly. That is
-what separates the list from `account.email`: the address somebody signs in with is the
-login identity and stays out of what other members read (#159), while these are what the
-person chose to put up — **including an `email` row**, which is an address they typed and
-may not be the one they sign in with at all.
+**Every row is meant to be read by approved members**, and the editor says so. That is what
+separates the list from `account.email`: the address somebody signs in with is the login
+identity and stays out of what other members read (#159), while these are what the person
+chose to put up — **including an `email` row**, which is an address they typed and may not
+be the one they sign in with at all.
+
+Note the tense. Nothing reads somebody else's list yet: `connectionsFor` is only ever
+called with the viewer's own account, and the page that shows anybody else's is #389. The
+editor says what these are _for_ rather than who can see them today, because people are
+filling them in now and the answer will be everybody.
 
 Worth knowing while reading that: `redemption.ts` already defaults `contact` to the address
 somebody redeemed with, and `contact` is on the member roster. So for most accounts the

@@ -6,6 +6,7 @@ import {
   connectionHref,
   connectionKindInfo,
   connectionKinds,
+  connectionValue,
   effortLevels,
   eventOptionKinds,
   formQuestionTypes,
@@ -149,5 +150,52 @@ describe('where a way of being reached points', () => {
 
   it('names only the one kind somebody titles themselves', () => {
     expect(connectionKinds.filter((kind) => connectionKindInfo[kind].labelled)).toEqual(['link'])
+  })
+})
+
+describe('what is stored for a way of being reached', () => {
+  it('reduces a pasted profile URL to the handle', () => {
+    // What autofill and every "copy link" button hand over. Kept whole, it builds
+    // `instagram.com/https://instagram.com/wren` and points at nobody.
+    expect(connectionValue('instagram', 'https://instagram.com/wren')).toBe('wren')
+    expect(connectionValue('instagram', 'https://www.instagram.com/wren/')).toBe('wren')
+    expect(connectionValue('instagram', 'https://instagram.com/wren/?hl=en')).toBe('wren')
+    expect(connectionValue('tiktok', 'https://www.tiktok.com/@wren')).toBe('wren')
+  })
+
+  it('reduces a pasted Mastodon URL to the address its own network uses', () => {
+    expect(connectionValue('mastodon', 'https://chaos.social/@wren')).toBe('@wren@chaos.social')
+    expect(connectionValue('mastodon', 'https://chaos.social/@wren/')).toBe('@wren@chaos.social')
+  })
+
+  it('drops the @ people type in front of a handle', () => {
+    expect(connectionValue('instagram', '@wren')).toBe('wren')
+    expect(connectionValue('tiktok', ' @wren ')).toBe('wren')
+  })
+
+  it('leaves a bare handle and an ordinary address alone', () => {
+    expect(connectionValue('instagram', 'wren')).toBe('wren')
+    expect(connectionValue('mastodon', '@wren@chaos.social')).toBe('@wren@chaos.social')
+    expect(connectionValue('discord', ' wren ')).toBe('wren')
+    expect(connectionValue('link', ' https://wren.example/photos ')).toBe('https://wren.example/photos')
+  })
+
+  it('does not mistake somebody else’s URL for a handle', () => {
+    // A link to an Instagram post is not a profile, and a URL on another host is not
+    // Instagram at all — both stay as typed rather than becoming a wrong handle.
+    expect(connectionValue('instagram', 'https://example.org/wren')).toBe('https://example.org/wren')
+    expect(connectionValue('mastodon', 'https://chaos.social/@wren/statuses/1')).toBe(
+      'https://chaos.social/@wren/statuses/1',
+    )
+  })
+
+  it('makes the link that a pasted URL would otherwise have broken', () => {
+    // The two halves together, which is the whole point of normalising on the way in.
+    expect(connectionHref('instagram', connectionValue('instagram', 'https://instagram.com/wren'))).toBe(
+      'https://instagram.com/wren',
+    )
+    expect(connectionHref('mastodon', connectionValue('mastodon', 'https://chaos.social/@wren'))).toBe(
+      'https://chaos.social/@wren',
+    )
   })
 })

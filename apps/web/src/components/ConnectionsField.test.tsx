@@ -119,6 +119,24 @@ describe('the list on your own details page', () => {
     )
   })
 
+  it('sends what will be stored, so a pasted profile URL goes as the handle', async () => {
+    const addMyConnection = vi.fn(() => Promise.resolve({ connection: aRow({ id: 'c-1' }) }))
+    render(<ConnectionsField api={stub({ addMyConnection })} />)
+
+    await waitFor(() => expect(screen.getByText(/have not added any yet/)).toBeTruthy())
+    fireEvent.change(screen.getByLabelText('Kind of a new way to reach you'), {
+      target: { value: 'instagram' },
+    })
+    fireEvent.input(screen.getByLabelText('Handle for a new way to reach you'), {
+      target: { value: 'https://instagram.com/wren/' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Add it' }))
+
+    await waitFor(() =>
+      expect(addMyConnection).toHaveBeenCalledWith({ kind: 'instagram', value: 'wren', label: '' }),
+    )
+  })
+
   it('refuses a bad link at the keyboard rather than sending it', async () => {
     const addMyConnection = vi.fn(() => Promise.resolve({ connection: aRow({ id: 'c-1' }) }))
     render(<ConnectionsField api={stub({ addMyConnection })} />)
@@ -182,12 +200,14 @@ describe('the list on your own details page', () => {
     expect(screen.queryByRole('button', { name: 'Add it' })).toBeNull()
   })
 
-  it('says these are the ones everybody sees, and the sign-in address is not', async () => {
-    // The one thing on the page that has to be unambiguous: this list is published, and
-    // `account.email` deliberately is not (#159).
+  it('says what the list is for, and that the sign-in address is not in it', async () => {
+    // The one thing on the page that has to be unambiguous: this list is for other members
+    // to reach somebody on, and `account.email` deliberately is not (#159). Written as what
+    // it is for rather than who can see it today — the page that shows anybody else's is
+    // #389, and people are filling this in now.
     render(<ConnectionsField api={stub()} />)
 
-    await waitFor(() => expect(screen.getByText(/Every member can see these/)).toBeTruthy())
-    expect(screen.getByText(/address you sign in with is not shown/)).toBeTruthy()
+    await waitFor(() => expect(screen.getByText(/how other members will reach you/)).toBeTruthy())
+    expect(screen.getByText(/address you sign in with is shown to nobody/)).toBeTruthy()
   })
 })

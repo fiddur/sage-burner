@@ -126,6 +126,30 @@ describe('the ways somebody can be reached', () => {
     expect((await add(server, bea.cookie, DISCORD)).json().connection.order).toBe(0)
   })
 
+  it('stores the handle out of a pasted profile URL, whatever the caller sent', async () => {
+    // Not only the form's job: the value is stored as authored, and a URL kept whole
+    // builds `instagram.com/https://instagram.com/wren`.
+    const server = await build()
+    const ada = await givenAccount()
+
+    const added = await add(server, ada.cookie, { kind: 'instagram', value: 'https://instagram.com/wren/' })
+
+    expect(added.json().connection.value).toBe('wren')
+    expect((await list(server, ada.cookie)).json().connections[0].value).toBe('wren')
+  })
+
+  it('counts a pasted URL and its handle as the same one', async () => {
+    // Which is the other reason to normalise on the way in: `unique(account_id, kind,
+    // value)` would otherwise keep both.
+    const server = await build()
+    const ada = await givenAccount()
+    await add(server, ada.cookie, { kind: 'instagram', value: '@wren' })
+
+    expect(
+      (await add(server, ada.cookie, { kind: 'instagram', value: 'https://instagram.com/wren' })).statusCode,
+    ).toBe(409)
+  })
+
   it('refuses the same handle twice on one account', async () => {
     const server = await build()
     const ada = await givenAccount()

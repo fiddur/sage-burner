@@ -3,6 +3,7 @@ import type { Connection, ConnectionKind } from '@sage-burner/shared'
 import {
   connectionKindInfo,
   connectionKinds,
+  connectionValue,
   isConnectionKind,
   isProfileUrl,
   MAX_CONNECTION_LABEL,
@@ -146,9 +147,13 @@ const Fields = ({
  * anybody actually has — where do I reach this person — rather than the start of a list of
  * everything they have ever signed up to. The profile page (#389) reads it in that order.
  *
- * Every row here is shown to approved members, and the note says so: this is a list
- * somebody chooses to publish, which is what separates it from the address they sign in
- * with. That one stays out of what other members read.
+ * Every row here is meant for other members to read, which is what separates the list from
+ * the address somebody signs in with: that one stays out of what other members read (#159),
+ * and an `email` row is an address the person typed and chose to put up.
+ *
+ * The note says what the list is *for* rather than who can see it today. Nothing reads
+ * somebody else's yet — the page that does is #389 — and people are filling this in now, so
+ * the future tense is both true and the safe direction to be wrong in.
  */
 export const ConnectionsField = ({ api }: { api: ConnectionsApi }) => {
   const [rows, setRows] = useState<Connection[] | undefined>(undefined)
@@ -196,7 +201,13 @@ export const ConnectionsField = ({ api }: { api: ConnectionsApi }) => {
     }
 
     await run(async () => {
-      await api.addMyConnection({ kind: draft.kind, value: draft.value.trim(), label: draft.label.trim() })
+      await api.addMyConnection({
+        kind: draft.kind,
+        // What the server will store, so the row that comes back is what was sent — a
+        // pasted profile URL reduces to the handle either way.
+        value: connectionValue(draft.kind, draft.value),
+        label: draft.label.trim(),
+      })
       return await reload()
     })
     setDraft(BLANK)
@@ -212,7 +223,7 @@ export const ConnectionsField = ({ api }: { api: ConnectionsApi }) => {
     await run(async () => {
       await api.updateMyConnection(id, {
         kind: wanted.kind,
-        value: wanted.value.trim(),
+        value: connectionValue(wanted.kind, wanted.value),
         label: wanted.label.trim(),
       })
       return await reload()
@@ -225,8 +236,8 @@ export const ConnectionsField = ({ api }: { api: ConnectionsApi }) => {
       <h2>How people can reach you</h2>
 
       <p class="form-note">
-        Every member can see these, in the order you put them in — the first is where people will try you. The
-        address you sign in with is not shown to anybody; add it here if you want it to be.
+        These are how other members will reach you, in the order you put them in — the first is where people
+        will try you first. The address you sign in with is shown to nobody; add it here if you want it to be.
       </p>
 
       {rows === undefined && <p class="form-note">Loading…</p>}
@@ -267,7 +278,7 @@ export const ConnectionsField = ({ api }: { api: ConnectionsApi }) => {
             ) : (
               <>
                 <span aria-hidden="true">{connectionKindInfo[row.kind].icon}</span>
-                <span>
+                <span class="connection-what">
                   <strong>{nameOf(row)}</strong> <span class="form-note">{row.value}</span>
                 </span>
                 <button

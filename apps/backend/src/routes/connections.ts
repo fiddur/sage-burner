@@ -6,6 +6,7 @@ import {
   connectionCreateSchema,
   connectionOrderSchema,
   connectionUpdateSchema,
+  connectionValue,
   MAX_CONNECTIONS,
 } from '@sage-burner/shared'
 import { and, asc, eq } from 'drizzle-orm'
@@ -66,6 +67,10 @@ export const registerConnectionRoutes = (app: FastifyInstance, { db, sessions }:
     const held = await connectionsFor(db, viewer.account_id)
     if (held.length >= MAX_CONNECTIONS) return sendError(reply, 409)
 
+    // Normalised here rather than only in the form, so a pasted profile URL is stored as
+    // the handle whatever the caller is — and so `unique(account_id, kind, value)` refuses
+    // `wren` and `@wren` as one handle instead of keeping both.
+    const row = { ...body, value: connectionValue(body.kind, body.value) }
     const id = randomUUID()
 
     try {
@@ -74,14 +79,14 @@ export const registerConnectionRoutes = (app: FastifyInstance, { db, sessions }:
       const order = db.transaction((tx) => {
         const next = nextOrder(tx, accountConnection, eq(accountConnection.account_id, viewer.account_id))
         tx.insert(accountConnection)
-          .values({ ...body, id, account_id: viewer.account_id, order: next })
+          .values({ ...row, id, account_id: viewer.account_id, order: next })
           .run()
 
         return next
       })
 
       return reply.code(201).send({
-        connection: { ...body, id, account_id: viewer.account_id, order },
+        connection: { ...row, id, account_id: viewer.account_id, order },
       } satisfies ConnectionResponse)
     } catch (failure) {
       // The same handle twice on one account. A 409 rather than a silent second row,
@@ -108,7 +113,7 @@ export const registerConnectionRoutes = (app: FastifyInstance, { db, sessions }:
         // a write — the id is the only thing a caller supplies here.
         const [updated] = await db
           .update(accountConnection)
-          .set(body)
+          .set({ ...body, value: connectionValue(body.kind, body.value) })
           .where(
             and(
               eq(accountConnection.id, request.params.id),

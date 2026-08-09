@@ -98,6 +98,20 @@ describe('the stylesheet', () => {
     expect(session?.body).toMatch(/flex:\s*none/)
   })
 
+  it('names the flexible child of a reorderable row rather than counting it', () => {
+    // `ReorderableList` renders its own controls as the row's first child, so a positional
+    // selector counts from something the component owns — and adding a child moves it. It
+    // picked the `aria-hidden` icon rather than the text the day one was written that way,
+    // leaving a 200-character handle to push the actions off the side of a phone. Every
+    // other list here names the element instead: `.reorder-name`, `.faq-entry`.
+    const rows = /\.(reorder|connection|faq|question)-row/
+    const counted = rules.filter(
+      (rule) => rows.test(rule.selector) && /:nth-(of-type|child)/.test(rule.selector),
+    )
+
+    expect(counted.map((rule) => rule.selector)).toEqual([])
+  })
+
   it('positions every box that scrolls sideways', () => {
     // Anything establishing a horizontal scroll container has to be a containing
     // block, so an absolutely positioned descendant cannot escape to the document and

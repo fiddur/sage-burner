@@ -402,6 +402,52 @@ const mastodonHref = (value: string): string | undefined => {
 }
 
 /**
+ * The handle inside a pasted profile URL, or nothing if that is not what this is.
+ *
+ * People paste. Autofill pastes, and every "copy link" button hands over a URL rather
+ * than a handle — so a value kept whole builds `instagram.com/https://instagram.com/wren`
+ * and points at nobody. Only the first path segment is taken, so a link carrying `?hl=en`
+ * or a trailing slash reduces to the same handle.
+ *
+ * A regex rather than `URL`: this package has no platform in its `lib`, deliberately —
+ * everything in it has to typecheck the same for the backend and for the browser.
+ */
+const handleIn = (value: string, host: RegExp): string | undefined => {
+  const [, hostname, path] = /^https?:\/\/([^\s/?#]+)(?:\/([^\s?#]*))?(?:[?#].*)?$/iu.exec(value.trim()) ?? []
+  if (hostname === undefined || !host.test(hostname)) return undefined
+
+  const [first] = (path ?? '').split('/').filter((part) => part !== '')
+
+  return first === undefined ? undefined : first.replace(/^@/u, '')
+}
+
+/**
+ * What is actually stored for a kind, whatever was typed or pasted into the box.
+ *
+ * Normalising on the way in rather than at render, because the value is read as text as
+ * well as followed as a link — the profile page prints it beside the icon — and because
+ * `unique(account_id, kind, value)` should refuse `wren` and `@wren` as one handle rather
+ * than keep both. It does not weaken "store what was typed": the reason for that is a
+ * network changing its domain being one line here instead of a migration, and reducing a
+ * pasted URL to the handle is what makes that true.
+ */
+export const connectionValue = (kind: ConnectionKind, value: string): string => {
+  const trimmed = value.trim()
+
+  if (kind === 'instagram') return handleIn(trimmed, /(^|\.)instagram\.com$/iu) ?? trimmed.replace(/^@/u, '')
+  if (kind === 'tiktok') return handleIn(trimmed, /(^|\.)tiktok\.com$/iu) ?? trimmed.replace(/^@/u, '')
+  if (kind === 'mastodon') {
+    // Any instance, so the host cannot be matched against a list — a Mastodon URL is
+    // recognised by its shape: one path segment, and that segment an `@handle`.
+    const [, instance, user] = /^https?:\/\/([^\s/]+)\/@([^\s/]+)\/?$/u.exec(trimmed) ?? []
+
+    return user === undefined || instance === undefined ? trimmed : `@${user}@${instance}`
+  }
+
+  return trimmed
+}
+
+/**
  * A URL somebody typed, if it is one worth putting in an `href`.
  *
  * `https` alone, and stricter than `markdown.ts`'s link check on purpose: that governs
