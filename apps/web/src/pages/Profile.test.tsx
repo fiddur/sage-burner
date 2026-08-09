@@ -19,6 +19,7 @@ const aProfile = (over: Partial<Profile> = {}): Profile => ({
   contact: 'fredrik on discord',
   allergies_notes: 'peanuts',
   allergy_item_ids: [],
+  introduction: null,
   ...over,
 })
 
@@ -36,6 +37,7 @@ const stub = (over: Partial<ProfileApi> = {}, profile = aProfile()): ProfileApi 
   removeMyConnection: () => Promise.reject(new Error('removeMyConnection is not stubbed here')),
   reorderMyConnections: () => Promise.reject(new Error('reorderMyConnections is not stubbed here')),
   getAllergyItems: () => Promise.resolve({ items: [] }),
+  uploadImage: () => Promise.reject(new Error('uploadImage is not stubbed here')),
   setMyAvatar: () => Promise.reject(new Error('setMyAvatar is not stubbed here')),
   removeMyAvatar: () => Promise.reject(new Error('removeMyAvatar is not stubbed here')),
   updateMyProfile: () => Promise.reject(new Error('updateMyProfile is not stubbed here')),
@@ -83,6 +85,14 @@ const fill = (label: string, value: string) => {
   fireEvent.input(screen.getByLabelText(label, { exact: false }), { target: { value } })
 }
 
+/**
+ * The introduction's box, by its exact label.
+ *
+ * `fill`'s prefix match finds three: `MarkdownField` names its Write and Preview buttons
+ * after the field, so "A little about you" is a substring of all of them.
+ */
+const introduction = () => screen.getByLabelText<HTMLTextAreaElement>('A little about you', { exact: true })
+
 describe('ProfilePage', () => {
   it('shows what is stored', async () => {
     renderPage(stub())
@@ -115,9 +125,48 @@ describe('ProfilePage', () => {
         // Sent every time, because the form shows every box: a delta would need the
         // page to know what it had before in order to say what changed.
         allergy_item_ids: [],
+        introduction: null,
       }),
     )
     expect((await screen.findByRole('status')).textContent).toContain('Saved')
+  })
+
+  it('saves what somebody wrote about themselves', async () => {
+    // #390. `MarkdownField`, so it takes a paste, a drop and a photograph from a phone the
+    // moment it is passed an uploader — nothing here has to know about pictures.
+    const updateMyProfile = vi.fn(() => Promise.resolve({ profile: aProfile() }))
+    renderPage(stub({ updateMyProfile }))
+
+    await screen.findByLabelText('Your name')
+    fireEvent.input(introduction(), { target: { value: '  I make **fire**.  ' } })
+    screen.getByRole('button', { name: 'Save' }).click()
+
+    await waitFor(() =>
+      expect(updateMyProfile).toHaveBeenCalledWith(
+        expect.objectContaining({ introduction: 'I make **fire**.' }),
+      ),
+    )
+  })
+
+  it('sends null for one that was cleared, rather than an empty string', async () => {
+    const updateMyProfile = vi.fn(() => Promise.resolve({ profile: aProfile() }))
+    renderPage(stub({ updateMyProfile }, aProfile({ introduction: 'I make fire.' })))
+
+    await waitFor(() => expect(introduction()).toHaveProperty('value', 'I make fire.'))
+    fireEvent.input(introduction(), { target: { value: '   ' } })
+    screen.getByRole('button', { name: 'Save' }).click()
+
+    await waitFor(() =>
+      expect(updateMyProfile).toHaveBeenCalledWith(expect.objectContaining({ introduction: null })),
+    )
+  })
+
+  it('will not save while a picture is still going up', async () => {
+    // A profile stored mid-upload keeps the placeholder for good, and the picture that
+    // lands a moment later is written into a box that has already been saved (#379).
+    renderPage(stub({}, aProfile({ introduction: 'look ![Uploading sauna.jpg…]()' })))
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toHaveProperty('disabled', true))
   })
 
   it('sends null rather than an empty string for cleared allergies', async () => {

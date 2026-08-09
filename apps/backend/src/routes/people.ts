@@ -42,6 +42,7 @@ export const registerPeopleRoutes = (app: FastifyInstance, { db, sessions }: Gua
           account_id: account.id,
           name: account.name,
           contact: account.contact,
+          introduction: account.introduction,
           avatar: accountAvatar.updated_at,
         })
         .from(account)
@@ -74,6 +75,7 @@ export const registerPeopleRoutes = (app: FastifyInstance, { db, sessions }: Gua
         account_id: row.account_id,
         name: row.name,
         avatar: row.avatar,
+        introduction: row.introduction,
         connections,
         contact: row.contact,
         facebook: messenger === undefined ? null : facebookProfileUrl(messenger.value),

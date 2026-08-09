@@ -42,6 +42,15 @@ export const personProfileSchema = z.object({
    */
   contact: z.string().nullable(),
   /**
+   * Who they are, in their own words and pictures (#390).
+   *
+   * The one thing on this page that is not a way of reaching somebody — it is the answer
+   * to *who is this*, which is the question anybody actually has about a name they have
+   * not met. Markdown, and `requireApproved` like the pictures inside it, so an
+   * introduction full of photographs renders for the people it is written for.
+   */
+  introduction: z.string().nullable(),
+  /**
    * Where their Facebook page is, built from the handle they typed for Messenger (#393).
    *
    * Not a connection row of its own, deliberately: Facebook as a *way to be reached* is

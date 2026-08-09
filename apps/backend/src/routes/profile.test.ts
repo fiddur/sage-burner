@@ -1,5 +1,6 @@
 import type { FastifyInstance, LightMyRequestResponse } from 'fastify'
 
+import { MAX_INTRODUCTION } from '@sage-burner/shared'
 import { and, eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -12,7 +13,15 @@ import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, attendance, attendanceHelping, event, eventOption } from '../db/schema.ts'
+import {
+  account,
+  accountRole,
+  attendance,
+  attendanceHelping,
+  event,
+  eventOption,
+  image,
+} from '../db/schema.ts'
 import { writeAllergyTicks } from './allergy-ticks.ts'
 import { helpingIdsFor, writeHelping } from './helping.ts'
 import { writeStay } from './profile.ts'
@@ -150,6 +159,64 @@ describe('a member reading and editing who they are', () => {
     expect(response.statusCode).toBe(200)
     expect(response.json().profile.allergies_notes).toBe('peanuts')
     expect(response.json().profile.contact).toBe('someone@example.org')
+  })
+
+  it('keeps an introduction, and clears it for an empty one', async () => {
+    // #390. `optionalText` turns empty into null on the way in, so "I wrote nothing" and "I
+    // took it down" are the same stored state — which is what the page reads to decide
+    // whether to invite somebody to write one.
+    const server = await build()
+    const member = await givenMember()
+
+    const written = await patchProfile(server, member.cookie, {
+      introduction: 'I make **fire**, and I have been coming since the first one.',
+    })
+    expect(written.json().profile.introduction).toContain('I make **fire**')
+
+    const cleared = await patchProfile(server, member.cookie, { introduction: '' })
+    expect(cleared.json().profile.introduction).toBeNull()
+  })
+
+  it('goes with the account, and takes the pictures written into it too', async () => {
+    // #390's erasure note, asserted rather than assumed — and the picture is written for
+    // real, or this would only prove that deleting a row deletes it. `image.uploaded_by`
+    // is what carries the cascade; the column needs none of its own.
+    const server = await build()
+    const member = await givenMember()
+    const pictureId = randomUUID()
+    await db()
+      .insert(image)
+      .values({
+        id: pictureId,
+        bytes: Buffer.from([1, 2, 3]),
+        content_type: 'image/png',
+        uploaded_by: member.id,
+        created_at: NOW,
+      })
+    await patchProfile(server, member.cookie, {
+      introduction: `I make fire.\n\n![](/api/images/${pictureId})`,
+    })
+
+    await db().delete(account).where(eq(account.id, member.id))
+
+    expect(await db().select().from(account).where(eq(account.id, member.id))).toEqual([])
+    expect(await db().select().from(image).where(eq(image.id, pictureId))).toEqual([])
+  })
+
+  it('refuses one longer than the field takes, rather than storing a truncation', async () => {
+    const server = await build()
+    const member = await givenMember()
+
+    const refused = await patchProfile(server, member.cookie, {
+      introduction: 'a'.repeat(MAX_INTRODUCTION + 1),
+    })
+
+    expect(refused.statusCode).toBe(400)
+    // The passing sibling: exactly the limit is fine, so the bound is not off by one.
+    const accepted = await patchProfile(server, member.cookie, {
+      introduction: 'a'.repeat(MAX_INTRODUCTION),
+    })
+    expect(accepted.statusCode).toBe(200)
   })
 
   it('never touches anyone else, whatever the body says', async () => {

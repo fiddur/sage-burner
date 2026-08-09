@@ -11,6 +11,7 @@ import { GuardedPage } from '../components/GuardedPage.tsx'
 import { NAMELESS } from '../components/PersonBadge.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { useLoad } from '../load.ts'
+import { renderMarkdown } from '../markdown.ts'
 import { isApproved, useViewer } from '../viewer.tsx'
 
 export type PersonApi = Pick<ApiClient, 'getAccountProfile'>
@@ -58,12 +59,79 @@ const Way = ({ row, whose }: { row: Connection; whose: string }) => {
  * How the page refers to somebody, in the two grammars it needs.
  *
  * `them` goes in prose — "how to reach them" — and cannot take a possessive: with no name
- * filled in, the copy button read "Copy them’s Discord".
+ * filled in, the copy button read "Copy them’s Discord", and the introduction's empty state
+ * read "them has not written anything".
  */
 const namesFor = (name: string | null | undefined) => ({
   them: name ?? 'them',
   whose: name ?? 'this person',
 })
+
+/**
+ * The list itself, in the order they put it in, or the fact that there is none.
+ *
+ * The order is the whole point: the first is where they would rather be tried, which is why
+ * the list is one somebody drags around rather than a set.
+ */
+const Ways = ({ rows, mine, whose }: { rows: readonly Connection[]; mine: boolean; whose: string }) => {
+  if (rows.length === 0) {
+    return (
+      <p class="form-note">
+        {mine
+          ? 'You have not said how people can reach you yet.'
+          : 'Nothing said yet about how to reach them.'}
+      </p>
+    )
+  }
+
+  return (
+    <ul class="ways">
+      {rows.map((row) => (
+        <Way key={row.id} row={row} whose={whose} />
+      ))}
+    </ul>
+  )
+}
+
+/**
+ * What somebody wrote about themselves, or the fact that they have not (#390).
+ *
+ * Above the ways of reaching them, because it answers the question somebody opening this
+ * page has first: who is this. Safe by construction — `renderMarkdown` escapes raw HTML
+ * rather than filtering it, which is what makes every member here inside what it defends
+ * against.
+ *
+ * The empty state is worth more than the field on somebody's own page: this only works if
+ * people fill it in, and the moment they are most likely to is the one where the app says
+ * plainly that nothing is there.
+ */
+const Introduction = ({ written, mine, whose }: { written: string; mine: boolean; whose: string }) => {
+  if (written !== '') {
+    return (
+      <div
+        class="markdown-preview person-introduction"
+        dangerouslySetInnerHTML={{ __html: renderMarkdown(written) }}
+      />
+    )
+  }
+
+  return (
+    <p class="form-note">
+      {mine ? (
+        <>
+          {/* Not a second "Your details" link: the note above already carries one, and two
+              anchors with the same accessible name on one page is what a screen reader
+              reads as one place twice. */}
+          You have not written anything about yourself yet —{' '}
+          <a href="/profile">write a paragraph and add a picture or two</a>. It is what makes your name mean
+          something to somebody who has not met you.
+        </>
+      ) : (
+        `${whose} has not written anything about themselves yet.`
+      )}
+    </p>
+  )
+}
 
 /**
  * Somebody's page (#389).
@@ -126,21 +194,11 @@ export const Person = ({ api, accountId }: { api: PersonApi; accountId: string }
             </p>
           )}
 
+          <Introduction written={(person.introduction ?? '').trim()} mine={mine} whose={whose} />
+
           <h2>How to reach {them}</h2>
 
-          {person.connections.length > 0 ? (
-            <ul class="ways">
-              {person.connections.map((row) => (
-                <Way key={row.id} row={row} whose={whose} />
-              ))}
-            </ul>
-          ) : (
-            <p class="form-note">
-              {mine
-                ? 'You have not said how people can reach you yet.'
-                : 'Nothing said yet about how to reach them.'}
-            </p>
-          )}
+          <Ways rows={person.connections} mine={mine} whose={whose} />
 
           {/* The free-text box from before the list existed, last of all —
               `personProfileSchema` says why it is still here. */}
