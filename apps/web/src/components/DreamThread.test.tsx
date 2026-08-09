@@ -128,6 +128,46 @@ describe('a conversation about a dream', () => {
     expect(say).not.toHaveBeenCalled()
   })
 
+  it('will not send a comment with a picture still on the way', () => {
+    // Sent mid-upload, the stored comment keeps the literal placeholder for good — it
+    // renders as escaped text, since an empty href fails `isSafeImageSource` — and the
+    // picture that lands a moment later is written into a box that has been cleared, so
+    // it is a row nothing references.
+    const { say } = show(aThread([]))
+
+    const box = screen.getByLabelText('Say something about Sauna at dawn')
+    fireEvent.input(box, { target: { value: 'look at this ![Uploading sauna.jpg…]()' } })
+
+    expect(screen.getByRole('button', { name: 'Say it' }).hasAttribute('disabled')).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Say it' }))
+    expect(say).not.toHaveBeenCalled()
+  })
+
+  it('sends it once the picture has landed', () => {
+    // The passing sibling: the finished markdown is not a placeholder, and a gate that
+    // could not tell them apart would leave the box unsendable for good.
+    const { say } = show(aThread([]))
+
+    const box = screen.getByLabelText('Say something about Sauna at dawn')
+    fireEvent.input(box, { target: { value: 'look at this ![](/api/images/img-1)' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Say it' }))
+
+    expect(say).toHaveBeenCalledWith('look at this ![](/api/images/img-1)')
+  })
+
+  it('will not save a rewrite with a picture still on the way', () => {
+    const { rewrite } = show(aThread([anEntry({ id: 't-1', body: 'bring a towel' })]))
+
+    fireEvent.click(screen.getByRole('button', { name: /Rewrite what you said/ }))
+    fireEvent.input(screen.getByLabelText('Rewrite what you said'), {
+      target: { value: 'bring a towel ![Uploading sauna.jpg…]()' },
+    })
+
+    expect(screen.getByRole('button', { name: 'Save' }).hasAttribute('disabled')).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(rewrite).not.toHaveBeenCalled()
+  })
+
   it('rewrites what you said, starting from what you said', () => {
     const { rewrite } = show(aThread([anEntry({ id: 't-1', body: 'bring a towl' })]))
 

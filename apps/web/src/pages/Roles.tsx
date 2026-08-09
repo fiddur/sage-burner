@@ -17,6 +17,7 @@ import { IconButton } from '../components/IconButton.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
+import { stillUploading } from '../image-upload.ts'
 import { useAction, useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
 import { isApproved, useViewer } from '../viewer.tsx'
@@ -531,7 +532,11 @@ const RoleFields = ({
         />
       </label>
 
-      <button type="button" disabled={busy} onClick={() => onSave(edits())}>
+      <button
+        type="button"
+        disabled={busy || stillUploading(purpose) || stillUploading(tasks)}
+        onClick={() => onSave(edits())}
+      >
         Save
       </button>
       <button type="button" class="link-button" disabled={busy} onClick={onCancel}>

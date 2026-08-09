@@ -4,8 +4,31 @@ import { useRef, useState } from 'preact/hooks'
 import { isApiError } from './api/client.ts'
 import { resizedImage } from './image.ts'
 
+/**
+ * What every placeholder starts with, and the whole of how one is recognised later.
+ *
+ * One constant rather than a builder and a matcher that have to agree: `stillUploading`
+ * is what stops a half-finished picture being saved, and a matcher written out
+ * separately is the kind of thing that survives a change to the wording above it.
+ */
+const PLACEHOLDER_PREFIX = '![Uploading '
+
 /** What stands in the text while the bytes are still going up, as GitHub's does. */
-export const uploadPlaceholder = (name: string): string => `![Uploading ${name}…]()`
+export const uploadPlaceholder = (name: string): string => `${PLACEHOLDER_PREFIX}${name}…]()`
+
+/**
+ * Whether this text still has a picture on the way.
+ *
+ * Read off the value rather than off the hook's `busy`, because the value is the one
+ * thing every call site already holds — the save buttons live in six different parents,
+ * and it is what must not be saved that matters rather than which component is busy. A
+ * comment stored mid-upload keeps the placeholder for good and orphans the picture that
+ * lands a moment later.
+ *
+ * Somebody who types the prefix themselves gets a disabled save until they change it,
+ * which is recoverable and not worth a stricter match.
+ */
+export const stillUploading = (value: string): boolean => value.includes(PLACEHOLDER_PREFIX)
 
 /**
  * A placeholder that is not already in the text.
@@ -40,6 +63,15 @@ export const replaceFirst = (value: string, find: string, replacement: string): 
 
 /** What a stored picture looks like in the markdown. */
 export const imageMarkdown = (id: string): string => `![](${apiRoutes.storedImage.path(id)})`
+
+/**
+ * The most room the finished markdown can need.
+ *
+ * Built from `imageMarkdown` rather than counted, so a change to the path in `routes.ts`
+ * moves this with it. The id is a v4 UUID — 36 characters, none of which encoding
+ * lengthens.
+ */
+export const STORED_MARKDOWN_LENGTH = imageMarkdown('0'.repeat(36)).length
 
 /**
  * Why the picture did not go up.
@@ -141,9 +173,15 @@ export const useImageUpload = ({
     for (const file of files) {
       const placeholder = freePlaceholder(latest.current, file.name === '' ? 'picture' : file.name)
 
-      // The markdown the placeholder becomes is shorter than the placeholder itself, so
-      // room for this is room for the result.
-      if (latest.current.length + placeholder.length > maxLength) {
+      // Against whichever of the two is longer, which is the finished markdown for any
+      // ordinary filename: `![](/api/images/<uuid>)` is 53 characters against a
+      // placeholder's 16 plus the name. Checking the placeholder alone would let a
+      // nearly-full field take a picture and then overflow on the swap — and `maxLength`
+      // does not truncate a value set from code, so nothing would stop it until the save
+      // came back refused.
+      const room = Math.max(placeholder.length, STORED_MARKDOWN_LENGTH)
+
+      if (latest.current.length + room > maxLength) {
         setError(TOO_LONG)
         break
       }

@@ -10,6 +10,7 @@ import { useState } from 'preact/hooks'
 import type { UploadImage } from '../image-upload.ts'
 
 import { fromLocalInput, toLocalInput } from '../datetime.ts'
+import { stillUploading } from '../image-upload.ts'
 import { MarkdownField } from './MarkdownField.tsx'
 
 /** What the form edits. A stored `Session` is one; so is a blank one being offered. */
@@ -194,7 +195,7 @@ export const DreamFields = ({
 
       <button
         type="button"
-        disabled={busy || (creating && title.trim() === '')}
+        disabled={busy || stillUploading(description) || (creating && title.trim() === '')}
         onClick={() => onSave(creating ? all() : edits())}
       >
         {creating ? 'Offer it' : 'Save'}

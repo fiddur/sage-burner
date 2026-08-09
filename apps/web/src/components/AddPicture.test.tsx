@@ -128,6 +128,29 @@ describe('putting a picture in a markdown field', () => {
     expect(box().value).toBe('0123456789')
   })
 
+  it('counts the room the finished markdown needs, not the shorter placeholder', async () => {
+    // `![Uploading a.jpg…]()` is 21 characters and `![](/api/images/<uuid>)` is 53, so a
+    // field with room for the first and not the second used to take the picture and
+    // overflow on the swap — and `maxLength` does not truncate a value set from code, so
+    // nothing caught it until the save came back refused.
+    render(<Field upload={() => Promise.resolve({ id: 'x'.repeat(36) })} maxLength={60} start="0123456789" />)
+
+    paste([aPicture('a.jpg')])
+
+    await waitFor(() => expect(screen.getByText(/not room for a picture/)).toBeTruthy())
+    expect(box().value).toBe('0123456789')
+  })
+
+  it('still takes one when the finished markdown does fit', async () => {
+    // The passing sibling: a guard that refused everything would satisfy the test above
+    // while making a picture impossible to add to any bounded field.
+    render(<Field upload={() => Promise.resolve({ id: 'x'.repeat(36) })} maxLength={64} start="0123456789" />)
+
+    paste([aPicture('a.jpg')])
+
+    await waitFor(() => expect(box().value).toBe(`0123456789![](/api/images/${'x'.repeat(36)})`))
+  })
+
   it('lets an ordinary paste of text alone', () => {
     render(<Field upload={() => Promise.resolve({ id: 'img-7' })} />)
 

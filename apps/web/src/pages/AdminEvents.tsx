@@ -12,6 +12,7 @@ import { GuardedPage } from '../components/GuardedPage.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
 import { MealSlots } from '../components/MealSlots.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
+import { stillUploading } from '../image-upload.ts'
 import { useAction, useLoad } from '../load.ts'
 import { isAdmin, useViewer } from '../viewer.tsx'
 
@@ -393,6 +394,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
 
                   <PendingButton
                     busy={saving}
+                    disabled={stillUploading(payment) || stillUploading(transfer)}
                     label="Save event"
                     busyLabel="Saving…"
                     type="button"

@@ -856,6 +856,20 @@ by an offset, because the offset is wrong the moment somebody carries on typing 
 is the case the field must survive, since a refusal takes the placeholder back out and
 must never take the comment with it.
 
+**Saving waits for it.** Every submit beside one of these fields is disabled while a
+placeholder is in the value, because a comment stored mid-upload keeps that placeholder
+for good — it renders as escaped text, since an empty href fails `isSafeImageSource` —
+and the picture that lands a moment later is written into a box that has already been
+cleared, so it is a row nothing references. The condition is `stillUploading(value)`
+rather than the hook's `busy` flag: the value is the one thing all six parents already
+hold, and what must not be saved is the point rather than which component is busy.
+
+**How much room a picture needs is the finished markdown, not the placeholder.**
+`![](/api/images/<uuid>)` is 53 characters and `![Uploading a.jpg…]()` is 21, so a field
+checked against the shorter one would take a picture it has no room for and overflow on
+the swap — and `maxLength` does not truncate a value set from code, so nothing would
+catch it until the save came back refused.
+
 **A stored picture is not put in the offline cache.** It is one key per photograph
 anybody has scrolled past, kept until sign-out, where every other entry there is a page's
 JSON replaced in place — the shape `getThread` is excluded for, with a hundred times the

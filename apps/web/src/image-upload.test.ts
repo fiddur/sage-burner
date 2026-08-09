@@ -7,6 +7,8 @@ import {
   insertAt,
   messageForFailure,
   replaceFirst,
+  stillUploading,
+  STORED_MARKDOWN_LENGTH,
   uploadPlaceholder,
 } from './image-upload.ts'
 
@@ -32,6 +34,32 @@ describe('what stands in while the bytes go up', () => {
     const held = `${uploadPlaceholder('sauna.jpg')} ${uploadPlaceholder('sauna.jpg (2)')}`
 
     expect(freePlaceholder(held, 'sauna.jpg')).toBe('![Uploading sauna.jpg (3)…]()')
+  })
+})
+
+describe('knowing a picture is still on the way', () => {
+  it('recognises the placeholder it builds', () => {
+    // The two share a constant rather than agreeing by hand; this is what pins that.
+    expect(stillUploading(uploadPlaceholder('sauna.jpg'))).toBe(true)
+    expect(stillUploading(`said something ${uploadPlaceholder('sauna.jpg')} and more`)).toBe(true)
+  })
+
+  it('says no for ordinary text, including a finished picture', () => {
+    expect(stillUploading('')).toBe(false)
+    expect(stillUploading('the fire is lit')).toBe(false)
+    expect(stillUploading(imageMarkdown('img-1'))).toBe(false)
+  })
+})
+
+describe('how much room a picture needs', () => {
+  it('is the finished markdown, which is longer than the placeholder it replaces', () => {
+    // The guard checks the larger of the two. Checking the placeholder alone let a
+    // nearly-full field take a picture and overflow on the swap.
+    expect(STORED_MARKDOWN_LENGTH).toBeGreaterThan(uploadPlaceholder('sauna.jpg').length)
+  })
+
+  it('is measured from the path, so it moves if the route does', () => {
+    expect(STORED_MARKDOWN_LENGTH).toBe(imageMarkdown('0123456789abcdef0123456789abcdef0123').length)
   })
 })
 

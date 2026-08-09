@@ -16,6 +16,7 @@ import { NoBurn } from '../components/NoBurn.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { TheirVersion } from '../components/TheirVersion.tsx'
 import { dayName } from '../datetime.ts'
+import { stillUploading } from '../image-upload.ts'
 import { useAction, useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
 import { useViewer } from '../viewer.tsx'
@@ -190,7 +191,7 @@ const IntroEditor = ({
       />
       <TheirVersion failure={failure} at={['intro_markdown']} />
       <p class="row">
-        <button type="button" disabled={busy} onClick={() => onSave(draft)}>
+        <button type="button" disabled={busy || stillUploading(draft)} onClick={() => onSave(draft)}>
           Save
         </button>
         <button type="button" class="link-button" disabled={busy} onClick={onCancel}>

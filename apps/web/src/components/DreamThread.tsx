@@ -6,7 +6,7 @@ import { useState } from 'preact/hooks'
 import type { UploadImage } from '../image-upload.ts'
 
 import { localDay } from '../datetime.ts'
-import { useImageUpload } from '../image-upload.ts'
+import { stillUploading, useImageUpload } from '../image-upload.ts'
 import { renderMarkdown } from '../markdown.ts'
 import { rowsFor } from '../textarea.ts'
 import { AddPicture } from './AddPicture.tsx'
@@ -136,7 +136,7 @@ export const DreamThread = ({
                   <AddPicture pictures={editingPictures} label="what you said" />
                   <button
                     type="button"
-                    disabled={busy || editing.body.trim() === ''}
+                    disabled={busy || stillUploading(editing.body) || editing.body.trim() === ''}
                     onClick={() => {
                       onRewrite(entry.id, editing.body.trim())
                       setEditing(undefined)
@@ -198,7 +198,7 @@ export const DreamThread = ({
           onInput={(event) => setSaying(event.currentTarget.value)}
           {...sayingPictures.handlers}
         />
-        <button type="button" disabled={busy || saying.trim() === ''} onClick={say}>
+        <button type="button" disabled={busy || stillUploading(saying) || saying.trim() === ''} onClick={say}>
           Say it
         </button>
       </p>

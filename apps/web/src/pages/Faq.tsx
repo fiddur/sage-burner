@@ -16,6 +16,7 @@ import { IconButton } from '../components/IconButton.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { ReorderableList } from '../components/ReorderableList.tsx'
+import { stillUploading } from '../image-upload.ts'
 import { useAction, useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
 import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
@@ -373,7 +374,11 @@ const FaqFields = ({
       />
 
       <p class="row">
-        <button type="button" disabled={busy} onClick={() => onSave({ question: question.trim(), answer })}>
+        <button
+          type="button"
+          disabled={busy || stillUploading(answer)}
+          onClick={() => onSave({ question: question.trim(), answer })}
+        >
           Save
         </button>
         <button type="button" class="link-button" disabled={busy} onClick={onCancel}>
