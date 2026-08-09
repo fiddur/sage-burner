@@ -1101,7 +1101,9 @@ say different things to somebody who has not written one and to the person whose
 
 This paragraph is the home for all of that: the migration, `schema.ts`, `membership.ts` and
 `person.ts` point here rather than arguing it again. Six copies is what the first version of
-this feature shipped, and the migration header is the one that can never be edited again.
+this feature shipped, and the migration header is the copy nobody should have to go back to —
+drizzle keys on the folder timestamp rather than the SQL, so editing one is safe, but a
+migration is a record of what ran and re-arguing a decision inside one invites exactly that.
 `limits.ts` keeps its own reasoning, because the number is what that file is for and its rule
 is that each one is named and argued where it is declared.
 

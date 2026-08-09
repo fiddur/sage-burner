@@ -9,9 +9,10 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-10
 
-- **Somebody organising a burn without coming to it has the whole of Your details now** — a
-  name, a picture, an introduction — not only the parts about signing in. Their own page had
-  been inviting them to write an introduction on a form that turned them away.
+- **Somebody organising a burn without coming to it can fill in Your details** — a name, a
+  picture, an introduction — not only the parts about signing in. Their own page had been
+  inviting them to write an introduction on a form that turned them away. The burns below are
+  still for whoever is coming to one.
 
 - **The ✕ on each of your stored pictures says which picture it is**, rather than only the day
   it was added — which was the same words for everything from one sitting.

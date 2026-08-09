@@ -49,9 +49,11 @@ export type ProfileApi = Pick<
 export const ProfilePage = ({ api }: { api: ProfileApi }) => {
   const viewer = useViewer()
   const member = isMember(viewer)
-  // What the two loads wait for: `getMyProfile` and `getAllergyItems` are `requireApproved`,
-  // so fetching before the viewer resolves — or for somebody who will be shown the refusal —
-  // is a request for a 403.
+  // `getMyProfile` is `requireApproved`, so asking before the viewer resolves — or for
+  // somebody who will be shown the refusal instead — is a request for a 403.
+  // `getAllergyItems` is public and rides along on the same flag: the only thing that reads
+  // it is the form above, so fetching a vocabulary for a form nobody will see is waste
+  // rather than a refusal.
   const approved = isApproved(viewer)
   const [name, setName] = useState('')
   const [contact, setContact] = useState('')

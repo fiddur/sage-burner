@@ -282,7 +282,9 @@ describe('the page for an account organising without attending', () => {
     renderPage(stub())
 
     expect(await screen.findByLabelText('Your name')).toBeTruthy()
-    expect(screen.getByText(/These follow you from burn to burn/)).toBeTruthy()
+    // The discriminating half: both viewers now open "These follow you from burn to burn",
+    // and only a member has a burn section below for it to be pointing at.
+    expect(screen.getByText(/Below them is each burn on its own/)).toBeTruthy()
   })
 })
 
