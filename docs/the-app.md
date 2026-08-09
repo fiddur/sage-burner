@@ -880,6 +880,20 @@ answers with different bytes, so the browser's own cache still holds them betwee
 unbounded write any member can make, and rate limiting (#57) is still unbuilt.
 `MAX_IMAGES_PER_ACCOUNT` in `media.ts` says what it is and why.
 
+**A ceiling has to be one you can get back under** (#392), and at first it was not. The
+cap counts every row ever written, and deleting the comment that referenced a picture
+deliberately leaves the row — so an account that reached 500 could never upload again by
+any action the app offered. **Pictures you have added** on Your details is what closes
+that: `GET /api/me/images` lists the ids and dates (never the bytes — five hundred of
+those is not a JSON response anybody wants), the grid draws each one through
+`storedImage`, and `DELETE /api/me/images/:id` takes one off with the account in the
+`WHERE`, so somebody else's id is a 404 rather than a write.
+
+**A removal leaves a gap wherever the picture was still shown**, and the page says so
+before anybody presses ✕. Refusing instead would mean knowing every markdown column in
+the schema, which is exactly the list this design does not keep — so the honest version
+is to tell the person what it costs and let them decide.
+
 ## Markdown is escaped, not filtered
 
 `welcome_markdown` is written by **any approved member** and rendered to every

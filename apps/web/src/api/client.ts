@@ -45,6 +45,7 @@ import type {
   MemberRosterResponse,
   MeResponse,
   MyBurnsResponse,
+  MyImagesResponse,
   NotificationSettings,
   NotificationsResponse,
   OAuthSettingsResponse,
@@ -646,6 +647,13 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
         method: apiRoutes.uploadImage.method,
         body: image,
       }),
+
+    /** Your own stored pictures, so the ceiling is something you can get back under (#392). */
+    getMyImages: (signal?: AbortSignal) =>
+      request<MyImagesResponse>(apiRoutes.getMyImages.path(), { signal }),
+
+    removeMyImage: (id: string) =>
+      request<undefined>(apiRoutes.removeMyImage.path(id), { method: apiRoutes.removeMyImage.method }),
 
     /** Admin only. The icon an installed copy of the app wears (#256). */
     setInstallationIcon: (image: Blob) =>

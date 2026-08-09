@@ -6,6 +6,7 @@ import { useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 import type { ConnectionsApi } from '../components/ConnectionsField.tsx'
 import type { PasskeysApi } from '../components/PasskeysField.tsx'
+import type { PicturesApi } from '../components/PicturesField.tsx'
 import type { PushApi } from '../components/PushToggle.tsx'
 import type { WaysInApi } from '../components/WaysInField.tsx'
 import type { YourBurnsApi } from '../components/YourBurns.tsx'
@@ -18,6 +19,7 @@ import { GuardedPage } from '../components/GuardedPage.tsx'
 import { LogOutButton } from '../components/LogOutButton.tsx'
 import { PasskeysField } from '../components/PasskeysField.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
+import { PicturesField } from '../components/PicturesField.tsx'
 import { PushToggle } from '../components/PushToggle.tsx'
 import { WaysInField } from '../components/WaysInField.tsx'
 import { YourBurns } from '../components/YourBurns.tsx'
@@ -31,6 +33,7 @@ export type ProfileApi = Pick<
 > &
   ConnectionsApi &
   PasskeysApi &
+  PicturesApi &
   WaysInApi &
   PushApi &
   YourBurnsApi
@@ -188,6 +191,8 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
       <AvatarField api={api} />
 
       <ConnectionsField api={api} loginAddress={loaded.status === 'ready' ? loaded.data.email : undefined} />
+
+      <PicturesField api={api} />
 
       <PasskeysField api={api} />
 

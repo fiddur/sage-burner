@@ -452,6 +452,18 @@ export const apiRoutes = {
     fastify: '/api/events/mine',
     path: () => '/api/events/mine',
   },
+  /**
+   * Every picture this account has stored (#392).
+   *
+   * `myImagesResponseSchema` carries why it exists. The ids and the dates, never the
+   * bytes — the list draws each one through `storedImage`, which is the route that
+   * already serves them.
+   */
+  getMyImages: {
+    method: 'GET',
+    fastify: '/api/me/images',
+    path: () => '/api/me/images',
+  },
   getMyNotifications: {
     method: 'GET',
     fastify: '/api/me/notifications',
@@ -652,6 +664,12 @@ export const apiRoutes = {
     method: 'DELETE',
     fastify: '/api/me/avatar',
     path: () => '/api/me/avatar',
+  },
+  /** Taking one of your own pictures back off, which is what makes the ceiling recoverable. */
+  removeMyImage: {
+    method: 'DELETE',
+    fastify: '/api/me/images/:id',
+    path: (id: string) => `/api/me/images/${encodeURIComponent(id)}`,
   },
   removePasskey: {
     method: 'DELETE',

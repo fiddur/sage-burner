@@ -9,6 +9,20 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-09
 
+- **You can see and delete the pictures you have added**, under **Pictures you have added** on
+  Your details. Every picture you paste or drop into something you write is kept, whether or
+  not what you wrote still shows it, and until now there was no way to take one back off —
+  so somebody who filled up their allowance could never add another. Taking one off frees a
+  place, and leaves a gap wherever it was still being shown.
+
+- **Pasting an SVG into a comment now says why it will not do**, instead of failing with
+  "could not read that picture".
+
+- **A refused save no longer empties the form** when you add a way of being reached, and a
+  list that could not load says so instead of looking empty.
+
+- **Your sign-in address fills in with one press** when you add it as a way of being reached.
+
 - **The privacy page is linked from the footer of every page**, and from the application form
   above the Send button — which is where somebody hands over contact details before they have
   an account. It also now says what the calendar subscription gives away: the programme's

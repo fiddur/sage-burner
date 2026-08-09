@@ -74,6 +74,40 @@ describe('putting a picture in a markdown field', () => {
     await waitFor(() => expect(box().value).toBe('already said![](/api/images/img-3)'))
   })
 
+  it('says why an SVG will not do, rather than failing at the decode', async () => {
+    // The server refuses the type outright. Left to `resizedImage` it fails at
+    // `createImageBitmap` and reads as "could not read that picture", which sends
+    // somebody with a perfectly good logo off to re-export it (#392).
+    const upload = vi.fn(() => Promise.resolve({ id: 'img-1' }))
+    render(<Field upload={upload} />)
+
+    paste([new File(['<svg/>'], 'logo.svg', { type: 'image/svg+xml' })])
+
+    expect((await screen.findByRole('alert')).textContent).toContain('An SVG cannot be used')
+    expect(upload).not.toHaveBeenCalled()
+    expect(box().value).toBe('')
+  })
+
+  it('still takes the raster pictures pasted alongside one', async () => {
+    // The passing sibling: refusing the whole paste would satisfy the test above while
+    // losing the photograph somebody meant to send.
+    render(<Field upload={() => Promise.resolve({ id: 'img-1' })} />)
+
+    paste([new File(['<svg/>'], 'logo.svg', { type: 'image/svg+xml' }), aPicture()])
+
+    await waitFor(() => expect(box().value).toBe('![](/api/images/img-1)'))
+  })
+
+  it('keeps the picture controls out of the paragraph they sit beside', async () => {
+    // `ErrorText` renders a `<p>` of its own and `DreamThread` mounts this inside a row
+    // wrapper, so a `<p>` here nests block elements. Preact builds the DOM directly, so
+    // nothing shows it — a browser parsing the same HTML would close the outer one early.
+    render(<Field upload={() => Promise.resolve({ id: 'img-1' })} />)
+
+    const control = screen.getByLabelText('Add a picture to Say something').closest('.row')
+    expect(control?.tagName).toBe('DIV')
+  })
+
   it('stands something in the text while the bytes are going up', async () => {
     let finish = (_: { id: string }) => undefined as void
     render(<Field upload={() => new Promise<{ id: string }>((resolve) => (finish = resolve))} />)

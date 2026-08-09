@@ -2019,6 +2019,37 @@ img.avatar {
 }
 
 /*
+  Your own stored pictures, so a full ceiling is one you can get back under (#392).
+
+  Thumbnails rather than a list of dates, because the date is not what tells one
+  picture from another. `auto-fill` down to 7rem so a phone gets three across and a
+  desktop as many as fit; the images are the full stored bytes, which is what
+  `loading="lazy"` is on the `img` for.
+*/
+.picture-grid {
+  list-style: none;
+  margin: 0.5rem 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
+  gap: 0.75rem;
+}
+
+.picture-grid li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.picture-grid img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 0.4rem;
+}
+
+/*
   Whoever is on something, and what is still wanted. One control in three places.
 
   A list rather than wrapping chips: in a table cell the chips wrapped
