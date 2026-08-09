@@ -1,11 +1,9 @@
 import type {
+  AccountRolesUpdate,
+  AdminPasswordReset,
   AllergyItemCreate,
   AllergyItemOrder,
   AllergyItemUpdate,
-  LoginRequest,
-  InviteCreate,
-  AccountRolesUpdate,
-  AdminPasswordReset,
   ApplicationCreate,
   AttendanceCreate,
   AttendanceUpdate,
@@ -22,32 +20,34 @@ import type {
   EventWelcomeUpdate,
   FaqCreateInput,
   FaqUpdate,
-  IdOrder,
   FormQuestionCreateInput,
   FormQuestionOrder,
   FormQuestionUpdate,
+  Helper,
+  IdOrder,
   InstallationUpdate,
+  InviteCreate,
   LeadRoleCreateInput,
   LeadRoleLead,
   LeadRoleTeam,
   LeadRoleUpdate,
+  LoginRequest,
+  MailSettingsUpdate,
   MealCreateInput,
   MealIdeaUpdate,
   MealIntroUpdate,
   MealLead,
   MealSlotCreateInput,
-  Helper,
   MealSlotUpdate,
   MealUpdate,
-  MailSettingsUpdate,
-  OAuthSettingsUpdate,
   NotificationSettings,
+  OAuthSettingsUpdate,
   PasskeyLogin,
   PasskeyRegistration,
   PaymentUpdate,
   PlaceCreate,
-  PlaceTransfer,
   PlaceOrder,
+  PlaceTransfer,
   PlaceUpdate,
   ProfileUpdate,
   PushSubscriptionCreate,
@@ -778,12 +778,9 @@ export const apiRoutes = {
     path: () => '/api/auth/passkey/challenge',
   },
   /**
-   * A picture somebody wrote into a markdown field (#379).
-   *
-   * `requireApproved`, like the avatar and the name beside it: the reference lives
-   * inside prose the members write to each other, and a photograph in a comment thread
-   * is at least as personal as a face. The id is unguessable, which is what keeps the
-   * URL from being a list of everything anybody has uploaded.
+   * A picture somebody wrote into a markdown field (#379). `requireApproved`, for the
+   * reasons in `docs/the-app.md`; the id is unguessable, which is what keeps the URL
+   * from being a list of everything anybody has uploaded.
    */
   storedImage: {
     method: 'GET',
@@ -825,12 +822,6 @@ export const apiRoutes = {
     method: 'DELETE',
     fastify: '/api/push/subscriptions',
     path: () => '/api/push/subscriptions',
-  },
-  /** Raw bytes in, an id out, which the field writes into the markdown at the cursor. */
-  uploadImage: {
-    method: 'POST',
-    fastify: '/api/images',
-    path: () => '/api/images',
   },
   /** Rewriting what you said. The author's own; nobody edits somebody else's words. */
   updateComment: {
@@ -937,6 +928,12 @@ export const apiRoutes = {
     method: 'PATCH',
     fastify: '/api/events/:id/welcome',
     path: (id: string) => `/api/events/${encodeURIComponent(id)}/welcome`,
+  },
+  /** Raw bytes in, an id out, which the field writes into the markdown at the cursor. */
+  uploadImage: {
+    method: 'POST',
+    fastify: '/api/images',
+    path: () => '/api/images',
   },
   withdrawSession: {
     method: 'DELETE',

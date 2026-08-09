@@ -3,10 +3,10 @@ import { describe, expect, it } from 'vitest'
 import { MAX_ASKED_QUESTIONS } from '../answers.ts'
 import {
   MAX_CONTACT,
+  MAX_LOCATION,
   MAX_NOTES,
   MAX_PERSON_NAME,
   MAX_QUESTION_LABEL,
-  MAX_LOCATION,
   MAX_SLUG,
   MAX_TITLE,
   MAX_WELCOME_LENGTH,

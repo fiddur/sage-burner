@@ -1,12 +1,12 @@
 import type { AnswerProblem, FormQuestion, SubmittedAnswers } from '@sage-burner/shared'
 
 import {
-  MAX_ANSWER_LENGTH,
-  MAX_APPLICANT_EMAIL_LENGTH,
-  MAX_APPLICANT_NAME_LENGTH,
   answerProblems,
   isTickBox,
   looksLikeEmail,
+  MAX_ANSWER_LENGTH,
+  MAX_APPLICANT_EMAIL_LENGTH,
+  MAX_APPLICANT_NAME_LENGTH,
 } from '@sage-burner/shared'
 import { useCallback, useMemo, useState } from 'preact/hooks'
 

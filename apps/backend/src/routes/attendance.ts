@@ -2,7 +2,7 @@ import type { EventAttendeesResponse, MyBurn, MyBurnsResponse } from '@sage-burn
 import type { FastifyInstance } from 'fastify'
 
 import { apiRoutes, attendanceCreateSchema, placeTransferSchema } from '@sage-burner/shared'
-import { TransactionRollbackError, and, asc, eq, gte, isNotNull, ne, or } from 'drizzle-orm'
+import { and, asc, eq, gte, isNotNull, ne, or, TransactionRollbackError } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'

@@ -105,7 +105,7 @@ export const isImageType = (value: unknown): value is ImageType =>
  * list stays because bytes stored before this, or by a client that skipped the resize,
  * still have to be served back with the type they came in as.
  */
-export const IMAGE_TYPE = 'image/webp'
+export const IMAGE_UPLOAD_TYPE = 'image/webp'
 
 /**
  * The longest edge a picture is scaled down to before it is sent.

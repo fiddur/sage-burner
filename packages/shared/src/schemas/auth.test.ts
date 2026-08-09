@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { emailSchema, loginRequestSchema, loginPasswordSchema, viewerSchema } from './auth.ts'
+import { emailSchema, loginPasswordSchema, loginRequestSchema, viewerSchema } from './auth.ts'
 
 /**
  * The bounds here are security controls rather than tidiness, and neither was

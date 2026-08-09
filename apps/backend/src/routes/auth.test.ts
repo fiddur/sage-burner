@@ -8,7 +8,7 @@ import type { DbHandle } from '../db/index.ts'
 
 import { createApp } from '../app.ts'
 import { defaultScryptParams, hashPassword, needsRehash, verifyPassword } from '../auth/password.ts'
-import { SESSION_COOKIE, readSessionCookie } from '../auth/viewer.ts'
+import { readSessionCookie, SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, accountRole } from '../db/schema.ts'

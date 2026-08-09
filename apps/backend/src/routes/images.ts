@@ -72,11 +72,8 @@ export const registerImageRoutes = (app: FastifyInstance, { db, sessions, now }:
   /**
    * The picture itself.
    *
-   * `requireApproved`, like the avatar: the reference lives inside prose members write
-   * to each other, and a photograph in a comment thread is at least as personal as a
-   * face. The cost is that a picture hand-written into the burn's welcome text — which
-   * is public — is broken for the public, and that is a follow-up rather than a reason
-   * to open the route.
+   * `requireApproved`, like the avatar, and what that costs the public-facing fields is
+   * in `docs/the-app.md`.
    *
    * Cached hard, and safe because an image is immutable: this id will never answer with
    * different bytes, so no cache here can go stale. `private` keeps it out of shared
@@ -93,16 +90,11 @@ export const registerImageRoutes = (app: FastifyInstance, { db, sessions, now }:
         return sendError(reply, 404)
       }
 
-      return (
-        reply
-          .header('content-type', row.content_type)
-          // The bytes are whatever was uploaded and the type is what the uploader
-          // claimed, so a browser must not be allowed to decide for itself that a PNG
-          // is really something it should run.
-          .header('x-content-type-options', 'nosniff')
-          .header('cache-control', 'private, max-age=31536000, immutable')
-          .send(row.bytes)
-      )
+      return reply
+        .header('content-type', row.content_type)
+        .header('x-content-type-options', 'nosniff')
+        .header('cache-control', 'private, max-age=31536000, immutable')
+        .send(row.bytes)
     },
   )
 }

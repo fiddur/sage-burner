@@ -163,7 +163,8 @@ describe('putting a picture in a markdown field', () => {
 
   it('offers nothing where the field is one the public reads', () => {
     // `/api/images/:id` is `requireApproved`, so a picture in the welcome text would be
-    // broken for exactly the people that text is written for.
+    // broken for exactly the people that text is written for. `docs/the-app.md` has why
+    // that is the trade rather than the bug.
     render(<Field />)
 
     expect(screen.queryByLabelText('Add a picture to Say something')).toBeNull()

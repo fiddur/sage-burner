@@ -19,7 +19,7 @@ import type { Database } from '../db/index.ts'
 import { viewerFor, viewerOf } from '../auth/viewer.ts'
 import { knownTransports, relyingParty } from '../auth/webauthn.ts'
 import { isUniqueViolation } from '../db/errors.ts'
-import { account, INSTALLATION_ID, installation, passkey, webauthnChallenge } from '../db/schema.ts'
+import { account, installation, INSTALLATION_ID, passkey, webauthnChallenge } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { cookieHeader } from './auth.ts'
 

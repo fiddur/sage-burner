@@ -892,9 +892,11 @@ the path of every read.
 only the kind says how: `@wren` on Instagram and `@wren@chaos.social` on Mastodon build
 different addresses, and a Discord username builds none at all. `connectionKindInfo` holds
 each kind's label, icon, hint and `href`, and the `href` is allowed to answer nothing —
-Discord and Signal do, because a username you paste into a search is not a link. A kind
-added without an answer would otherwise render a dead anchor, and `enums.test.ts` asserts
-every kind has one.
+Discord and Signal do, because a username you paste into a search is not a link. That every
+kind has one at all is the type's doing — `satisfies Record<ConnectionKind, ConnectionKindInfo>`
+makes omitting it a compile error — so what `enums.test.ts` is for is the part the type cannot
+say: that every href any kind builds, from anything anybody types, carries a scheme worth
+sending a browser to.
 
 `link` is the escape hatch: a label and a URL somebody types. A labelled URL rather than a
 free-text _kind_, because a kind nothing knows about could produce neither an icon nor an

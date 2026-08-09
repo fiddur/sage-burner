@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { AppApi } from './app.tsx'
 
-import { FetchedViewerProvider, ViewerProvider, isAdmin, isMember, useViewer } from './viewer.tsx'
+import { FetchedViewerProvider, isAdmin, isMember, useViewer, ViewerProvider } from './viewer.tsx'
 
 /**
  * The provider the real app uses, against an injected client.

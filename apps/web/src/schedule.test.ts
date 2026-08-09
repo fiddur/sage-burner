@@ -7,8 +7,8 @@ import {
   mealBlocks,
   mealMovedTo,
   resizedEnd,
-  rowSpanOf,
   rowsDragged,
+  rowSpanOf,
 } from './schedule.ts'
 
 describe('the timetable rows', () => {

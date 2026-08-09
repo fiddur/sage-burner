@@ -13,7 +13,7 @@ import type { DbHandle } from './db/index.ts'
 import { createApp } from './app.ts'
 import { createConfig } from './config.ts'
 import { createDb, runMigrations } from './db/index.ts'
-import { INSTALLATION_ID, event, installationBanner } from './db/schema.ts'
+import { event, INSTALLATION_ID, installationBanner } from './db/schema.ts'
 
 /**
  * Builds the real app in-process against an in-memory database and drives it

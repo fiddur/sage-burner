@@ -95,6 +95,18 @@ export const messageForFailure = (failure: unknown): string => {
 
 const TOO_LONG = 'There is not room for a picture in this field.'
 
+/**
+ * The one `image/*` the server refuses outright, refused here too.
+ *
+ * Left to `resizedImage` it fails at `createImageBitmap` and reads as "could not read
+ * that picture" — true, and no use to somebody who picked a perfectly good logo. Named
+ * rather than narrowed to `IMAGE_TYPES`, because a phone's HEIC is not on that list and
+ * the canvas turns it into one of them.
+ */
+const REFUSED_TYPE = 'image/svg+xml'
+
+const NOT_A_PICTURE = 'An SVG cannot be used as a picture here. A JPEG, PNG or WebP works.'
+
 /** `api.uploadImage`, named so the components that take it do not each spell it out. */
 export type UploadImage = (image: Blob) => Promise<{ id: string }>
 
@@ -135,11 +147,7 @@ export const useImageUpload = ({
   value: string
   maxLength: number
   onInput: (value: string) => void
-  /**
-   * Absent where the field is one the public reads. `/api/images/:id` is
-   * `requireApproved`, so a picture in the burn's welcome text or beside an application
-   * question would be broken for exactly the people that text is written for.
-   */
+  /** Absent where the field is one the public reads — `docs/the-app.md` has why. */
   upload?: UploadImage
 }): ImageUpload => {
   const [busy, setBusy] = useState(false)
@@ -167,18 +175,18 @@ export const useImageUpload = ({
 
     setError(undefined)
 
+    const usable = files.filter((file) => file.type !== REFUSED_TYPE)
+    if (usable.length < files.length) setError(NOT_A_PICTURE)
+    if (usable.length === 0) return
+
     let cursor = at ?? latest.current.length
     const started: { file: File; placeholder: string }[] = []
 
-    for (const file of files) {
+    for (const file of usable) {
       const placeholder = freePlaceholder(latest.current, file.name === '' ? 'picture' : file.name)
 
-      // Against whichever of the two is longer, which is the finished markdown for any
-      // ordinary filename: `![](/api/images/<uuid>)` is 53 characters against a
-      // placeholder's 16 plus the name. Checking the placeholder alone would let a
-      // nearly-full field take a picture and then overflow on the swap — and `maxLength`
-      // does not truncate a value set from code, so nothing would stop it until the save
-      // came back refused.
+      // Against whichever of the two is longer, because the placeholder is swapped for
+      // the finished markdown in a field nothing truncates. `docs/the-app.md` has why.
       const room = Math.max(placeholder.length, STORED_MARKDOWN_LENGTH)
 
       if (latest.current.length + room > maxLength) {

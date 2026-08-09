@@ -1,13 +1,5 @@
--- Pictures written into markdown (#379).
---
--- One table, unlike the three fixed slots — `account_avatar`, `installation_icon`,
--- `installation_banner` — because these have no owning entity: the reference lives
--- inside prose, and the only thing that owns one is the person who uploaded it. That is
--- also why the cascade is on `uploaded_by` and there is nothing else to cascade from.
---
--- Nothing sweeps orphans. A reference from markdown has no foreign key, so finding the
--- last one would mean knowing every markdown column in the schema — a list that goes one
--- column stale in silence. `schema.ts` has the rest of the reasoning.
+-- Pictures written into markdown (#379). Why one table, why a blob, why nothing sweeps
+-- orphans: "Pictures in what people write" in `docs/the-app.md`.
 CREATE TABLE `image` (
 	`id` text NOT NULL,
 	`bytes` blob NOT NULL,

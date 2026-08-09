@@ -1,6 +1,6 @@
 import type { Identity, OAuthProvider } from '@sage-burner/shared'
 
-import { apiRoutes, oauthProviderInfo, oauthProviders, OAUTH_OUTCOME_PARAM } from '@sage-burner/shared'
+import { apiRoutes, OAUTH_OUTCOME_PARAM, oauthProviderInfo, oauthProviders } from '@sage-burner/shared'
 import { useEffect, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'

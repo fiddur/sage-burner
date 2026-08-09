@@ -139,7 +139,7 @@ export const DreamThread = ({
               </p>
 
               {editing?.id === entry.id ? (
-                <p class="thread-editing">
+                <div class="thread-editing">
                   <textarea
                     class="thread-box"
                     aria-label="Rewrite what you said"
@@ -163,7 +163,7 @@ export const DreamThread = ({
                   <button type="button" class="link-button" onClick={() => setEditing(undefined)}>
                     Cancel
                   </button>
-                </p>
+                </div>
               ) : (
                 <>
                   {/* Safe by construction: `renderMarkdown` escapes raw HTML rather than

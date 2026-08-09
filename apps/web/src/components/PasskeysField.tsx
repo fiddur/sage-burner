@@ -1,13 +1,13 @@
-import type { Passkey } from '@sage-burner/shared'
-
 import { MAX_PASSKEY_LABEL } from '@sage-burner/shared'
-import { useEffect, useState } from 'preact/hooks'
+import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 import type { Ceremony, PasskeyApi } from '../passkey.ts'
 
 import { isApiError } from '../api/client.ts'
+import { useLoad } from '../load.ts'
 import { addPasskey, messageForCeremony, passkeysWork } from '../passkey.ts'
+import { ErrorText } from './ErrorText.tsx'
 import { FormError, useFormError } from './FormError.tsx'
 import { PendingButton } from './PendingButton.tsx'
 
@@ -50,32 +50,25 @@ export const PasskeysField = ({
   ceremony?: Ceremony
   supported?: boolean
 }) => {
-  const [passkeys, setPasskeys] = useState<Passkey[] | undefined>(undefined)
   const [label, setLabel] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useFormError()
 
-  useEffect(() => {
-    const controller = new AbortController()
-
-    api
-      .getMyPasskeys(controller.signal)
-      .then(({ passkeys: mine }) => {
-        if (!controller.signal.aborted) setPasskeys(mine)
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setPasskeys([])
-      })
-
-    return () => controller.abort()
-  }, [api])
+  // `useLoad` rather than a fetch-and-catch of its own, so a failure is a sentence
+  // instead of an empty list — which reads as "you have none" and invites a second
+  // registration of a device that is already here.
+  const { loaded, reload } = useLoad(async (signal) => (await api.getMyPasskeys(signal)).passkeys, {
+    enabled: supported,
+    fallback: 'Could not load your passkeys. Please reload the page.',
+  })
+  const passkeys = loaded.status === 'ready' ? loaded.data : undefined
 
   const add = async () => {
     setError(undefined)
     setBusy(true)
     try {
-      const { passkeys: mine } = await addPasskey(api, label.trim(), ceremony)
-      setPasskeys(mine)
+      await addPasskey(api, label.trim(), ceremony)
+      await reload()
       setLabel('')
     } catch (failure) {
       // Undefined for a cancelled dialog: closing it is an ordinary thing to do,
@@ -91,8 +84,8 @@ export const PasskeysField = ({
     setError(undefined)
     setBusy(true)
     try {
-      const { passkeys: mine } = await api.removePasskey(id)
-      setPasskeys(mine)
+      await api.removePasskey(id)
+      await reload()
     } catch (failure) {
       setError(messageForRemoval(failure))
     } finally {
@@ -116,7 +109,9 @@ export const PasskeysField = ({
             keeps working either way.
           </p>
 
-          {passkeys === undefined && <p class="form-note">Loading…</p>}
+          {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
+
+          {loaded.status === 'failed' && <ErrorText message={loaded.message} />}
 
           {passkeys?.length === 0 && <p class="form-note">You have no passkeys yet.</p>}
 

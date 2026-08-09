@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm'
 import type { Database } from '../db/index.ts'
 import type { Notifier } from './notify.ts'
 
-import { INSTALLATION_ID, installation } from '../db/schema.ts'
+import { installation, INSTALLATION_ID } from '../db/schema.ts'
 import { notifyEveryone } from './notify.ts'
 
 /**

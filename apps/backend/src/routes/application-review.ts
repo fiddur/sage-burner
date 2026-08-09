@@ -16,7 +16,7 @@ import type { MailDeps } from '../mail/mail.ts'
 
 import { viewerFor } from '../auth/viewer.ts'
 import { whyNothingWritten } from '../db/refusals.ts'
-import { application, INSTALLATION_ID, installation, inviteToken } from '../db/schema.ts'
+import { application, installation, INSTALLATION_ID, inviteToken } from '../db/schema.ts'
 import { noStore, sendError } from '../http.ts'
 import { defaultExpiry, mintToken } from '../invites.ts'
 import { NO_ORIGIN, post } from '../mail/mail.ts'

@@ -4,7 +4,7 @@ import type { IdOrder } from './common.ts'
 
 import { formQuestionTypes, tickBoxRequired } from '../enums.ts'
 import { MAX_NOTES, MAX_OPTION_LABEL, MAX_QUESTION_LABEL } from '../limits.ts'
-import { idOrderSchema, idSchema, optionalText, nonEmptyText } from './common.ts'
+import { idOrderSchema, idSchema, nonEmptyText, optionalText } from './common.ts'
 
 /**
  * One question on the application form.

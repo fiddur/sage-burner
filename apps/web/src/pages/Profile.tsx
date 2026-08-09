@@ -1,4 +1,4 @@
-import type { Profile, AllergyItem } from '@sage-burner/shared'
+import type { AllergyItem, Profile } from '@sage-burner/shared'
 
 import { MAX_CONTACT, MAX_NOTES, MAX_PERSON_NAME } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
@@ -187,7 +187,7 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
 
       <AvatarField api={api} />
 
-      <ConnectionsField api={api} />
+      <ConnectionsField api={api} loginAddress={loaded.status === 'ready' ? loaded.data.email : undefined} />
 
       <PasskeysField api={api} />
 

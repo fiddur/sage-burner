@@ -3,7 +3,7 @@ import { createConfig } from './config.ts'
 import { createDb, runMigrations } from './db/index.ts'
 import { announceDeploy } from './push/deploy.ts'
 import { recordAndPush } from './push/notify.ts'
-import { deliverWithWebPush, DEFAULT_PUSH_CONTACT, generateVAPIDKeys } from './push/web-push.ts'
+import { DEFAULT_PUSH_CONTACT, deliverWithWebPush, generateVAPIDKeys } from './push/web-push.ts'
 
 /**
  * Entry point. Everything it does is sequencing — the pieces themselves are

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { createFreshness, freshnessAt, FRESH_FOR_MS } from './freshness.ts'
+import { createFreshness, FRESH_FOR_MS, freshnessAt } from './freshness.ts'
 import { CACHED_AT } from './sw/cache.ts'
 
 const NOW = Date.parse('2026-08-06T12:00:00.000Z')

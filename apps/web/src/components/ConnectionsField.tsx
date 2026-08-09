@@ -10,12 +10,14 @@ import {
   MAX_CONNECTION_VALUE,
   MAX_CONNECTIONS,
 } from '@sage-burner/shared'
-import { useEffect, useState } from 'preact/hooks'
+import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
-import { FormError, useFormError } from './FormError.tsx'
+import { useAction, useLoad } from '../load.ts'
+import { ErrorText } from './ErrorText.tsx'
+import { FormError } from './FormError.tsx'
 import { ReorderableList } from './ReorderableList.tsx'
 
 export type ConnectionsApi = Pick<
@@ -37,11 +39,14 @@ export const nameOf = (row: Pick<Connection, 'kind' | 'label'>): string =>
  * Why a way of being reached could not be saved.
  *
  * The 409 covers two refusals the server tells apart by nothing else, and both are worth
- * their own sentence: the same handle twice, or a list already as long as it may be.
+ * their own sentence: the same handle twice, or a list already as long as it may be. Which
+ * one it was comes from the caller, because only the add ever answers with the ceiling —
+ * inferred from the count instead, editing a row while the list happens to be full would
+ * tell somebody to take one off.
  */
-export const messageForFailure = (failure: unknown, held: number): string => {
+export const messageForFailure = (failure: unknown, atCeiling: boolean): string => {
   if (isApiError(failure) && failure.status === 409) {
-    return held >= MAX_CONNECTIONS
+    return atCeiling
       ? `That is as many ways as one account may list. Take one off to add another.`
       : 'You have already listed that one.'
   }
@@ -80,12 +85,21 @@ const Fields = ({
   draft,
   busy,
   subject,
+  loginAddress,
   onChange,
 }: {
   draft: Draft
   busy: boolean
   /** What the labels say this form is, since a page can hold two of them at once. */
   subject: string
+  /**
+   * The address this account signs in with, for the one-press fill (#388).
+   *
+   * Passed down rather than fetched: it comes from `getMyProfile`, which the page around
+   * this already loads, and `/api/auth/me` deliberately does not carry it. Absent while
+   * that load is in flight or failed, which is why the button is conditional.
+   */
+  loginAddress?: string
   onChange: (draft: Draft) => void
 }) => (
   <>
@@ -123,6 +137,17 @@ const Fields = ({
       />
     </label>
 
+    {draft.kind === 'email' && loginAddress !== undefined && draft.value !== loginAddress && (
+      <button
+        type="button"
+        class="link-button"
+        disabled={busy}
+        onClick={() => onChange({ ...draft, value: loginAddress })}
+      >
+        Use my sign-in address
+      </button>
+    )}
+
     {connectionKindInfo[draft.kind].labelled && (
       <label class="field">
         <span>Called</span>
@@ -155,80 +180,60 @@ const Fields = ({
  * somebody else's yet — the page that does is #389 — and people are filling this in now, so
  * the future tense is both true and the safe direction to be wrong in.
  */
-export const ConnectionsField = ({ api }: { api: ConnectionsApi }) => {
-  const [rows, setRows] = useState<Connection[] | undefined>(undefined)
+export const ConnectionsField = ({ api, loginAddress }: { api: ConnectionsApi; loginAddress?: string }) => {
   const [draft, setDraft] = useState<Draft>(BLANK)
   const [editing, setEditing] = useState<{ id: string; draft: Draft } | undefined>(undefined)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useFormError()
 
-  useEffect(() => {
-    const controller = new AbortController()
-
-    api
-      .getMyConnections(controller.signal)
-      .then(({ connections }) => {
-        if (!controller.signal.aborted) setRows(connections)
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setRows([])
-      })
-
-    return () => controller.abort()
-  }, [api])
-
+  const { loaded, reload } = useLoad(async (signal) => (await api.getMyConnections(signal)).connections, {
+    fallback: 'Could not load your ways of being reached. Please reload the page.',
+  })
+  const rows = loaded.status === 'ready' ? loaded.data : undefined
   const held = rows?.length ?? 0
 
-  const run = async (work: () => Promise<Connection[]>) => {
-    setError(undefined)
-    setBusy(true)
-    try {
-      setRows(await work())
-    } catch (failure) {
-      setError(messageForFailure(failure, held))
-    } finally {
-      setBusy(false)
-    }
-  }
+  const { busy, formError, setError, run } = useAction(reload)
 
-  const reload = async () => (await api.getMyConnections()).connections
-
-  const add = async () => {
+  const add = () => {
     const problem = problemWith(draft)
     if (problem !== undefined) {
       setError(problem)
       return
     }
 
-    await run(async () => {
-      await api.addMyConnection({
-        kind: draft.kind,
-        // What the server will store, so the row that comes back is what was sent — a
-        // pasted profile URL reduces to the handle either way.
-        value: connectionValue(draft.kind, draft.value),
-        label: draft.label.trim(),
-      })
-      return await reload()
-    })
-    setDraft(BLANK)
+    run(
+      async () => {
+        await api.addMyConnection({
+          kind: draft.kind,
+          // What the server will store, so the row that comes back is what was sent — a
+          // pasted profile URL reduces to the handle either way.
+          value: connectionValue(draft.kind, draft.value),
+          label: draft.label.trim(),
+        })
+        // Inside the work, so a refusal leaves what was typed where it is (#205).
+        setDraft(BLANK)
+      },
+      (failure) => messageForFailure(failure, held >= MAX_CONNECTIONS),
+    )
   }
 
-  const save = async (id: string, wanted: Draft) => {
+  const save = (id: string, wanted: Draft) => {
     const problem = problemWith(wanted)
     if (problem !== undefined) {
       setError(problem)
       return
     }
 
-    await run(async () => {
-      await api.updateMyConnection(id, {
-        kind: wanted.kind,
-        value: connectionValue(wanted.kind, wanted.value),
-        label: wanted.label.trim(),
-      })
-      return await reload()
-    })
-    setEditing(undefined)
+    run(
+      async () => {
+        await api.updateMyConnection(id, {
+          kind: wanted.kind,
+          value: connectionValue(wanted.kind, wanted.value),
+          label: wanted.label.trim(),
+        })
+        setEditing(undefined)
+      },
+      // Never the ceiling: an update's 409 is always a duplicate.
+      (failure) => messageForFailure(failure, false),
+    )
   }
 
   return (
@@ -240,7 +245,12 @@ export const ConnectionsField = ({ api }: { api: ConnectionsApi }) => {
         will try you first. The address you sign in with is shown to nobody; add it here if you want it to be.
       </p>
 
-      {rows === undefined && <p class="form-note">Loading…</p>}
+      {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
+
+      {/* Said rather than shown as an empty list: a failed load and "you have added none"
+          are different facts, and the wrong one invites an Add that then 409s against rows
+          nobody can see. */}
+      {loaded.status === 'failed' && <ErrorText message={loaded.message} />}
 
       {rows?.length === 0 && <p class="form-note">You have not added any yet.</p>}
 
@@ -250,7 +260,11 @@ export const ConnectionsField = ({ api }: { api: ConnectionsApi }) => {
           busy={busy}
           rowClass="connection-row"
           labelFor={(row) => nameOf(row)}
-          onReorder={(ids) => void run(async () => (await api.reorderMyConnections(ids)).connections)}
+          onReorder={(ids) => {
+            run(async () => {
+              await api.reorderMyConnections(ids)
+            }, 'Could not save that order. Please try again.')
+          }}
         >
           {(row) =>
             editing?.id === row.id ? (
@@ -259,10 +273,11 @@ export const ConnectionsField = ({ api }: { api: ConnectionsApi }) => {
                   draft={editing.draft}
                   busy={busy}
                   subject={nameOf(row)}
+                  loginAddress={loginAddress}
                   onChange={(next) => setEditing({ id: row.id, draft: next })}
                 />
                 <p class="row">
-                  <button type="button" disabled={busy} onClick={() => void save(row.id, editing.draft)}>
+                  <button type="button" disabled={busy} onClick={() => save(row.id, editing.draft)}>
                     Save
                   </button>
                   <button
@@ -297,12 +312,11 @@ export const ConnectionsField = ({ api }: { api: ConnectionsApi }) => {
                   class="link-button"
                   disabled={busy}
                   aria-label={`Remove ${nameOf(row)}`}
-                  onClick={() =>
-                    void run(async () => {
+                  onClick={() => {
+                    run(async () => {
                       await api.removeMyConnection(row.id)
-                      return await reload()
-                    })
-                  }
+                    }, 'Could not remove that. Please try again.')
+                  }}
                 >
                   Remove
                 </button>
@@ -312,17 +326,23 @@ export const ConnectionsField = ({ api }: { api: ConnectionsApi }) => {
         </ReorderableList>
       )}
 
-      <FormError error={error} />
+      <FormError error={formError} />
 
       {held < MAX_CONNECTIONS && (
         <form
           class="form"
           onSubmit={(submitEvent) => {
             submitEvent.preventDefault()
-            void add()
+            add()
           }}
         >
-          <Fields draft={draft} busy={busy} subject="a new way to reach you" onChange={setDraft} />
+          <Fields
+            draft={draft}
+            busy={busy}
+            subject="a new way to reach you"
+            loginAddress={loginAddress}
+            onChange={setDraft}
+          />
           <button type="submit" disabled={busy}>
             Add it
           </button>
