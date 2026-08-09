@@ -36,6 +36,7 @@ import { registerAttendanceRoutes } from './routes/attendance.ts'
 import { registerAuthRoutes } from './routes/auth.ts'
 import { registerAvatarRoutes } from './routes/avatars.ts'
 import { registerBannerRoutes } from './routes/banner.ts'
+import { registerCalendarRoutes } from './routes/calendar.ts'
 import { readChangelog, registerChangelogRoutes } from './routes/changelog.ts'
 import { registerConnectionRoutes } from './routes/connections.ts'
 import { registerEventOptionRoutes } from './routes/event-options.ts'
@@ -573,6 +574,7 @@ export const createApp = async ({
   registerSessionRoutes(app, { db, sessions, now, notify: tellAccount })
   registerThreadRoutes(app, { db, sessions, now, notify: tellAccount })
   registerScheduleRoutes(app, { db, now })
+  registerCalendarRoutes(app, { db, sessions })
 
   const webRoot = config.web_root
   const servesWebApp = webRoot !== undefined

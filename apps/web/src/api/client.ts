@@ -10,6 +10,7 @@ import type {
   ApplicationsResponse,
   Attendance,
   BodyOf,
+  CalendarFeedResponse,
   ChangelogResponse,
   ConnectionResponse,
   ConnectionsResponse,
@@ -576,6 +577,16 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
 
     removeMyAvatar: () =>
       request<undefined>(apiRoutes.removeMyAvatar.path(), { method: apiRoutes.removeMyAvatar.method }),
+
+    /** Where this burn's calendar feed lives (#408). Not on the burn: the homepage reads that. */
+    getCalendarToken: (eventId: string, signal?: AbortSignal) =>
+      request<CalendarFeedResponse>(apiRoutes.getCalendarToken.path(eventId), { signal }),
+
+    /** Admin only. A new address for the feed, which stops every calendar already on the old one. */
+    rotateCalendarToken: (eventId: string) =>
+      request<CalendarFeedResponse>(apiRoutes.rotateCalendarToken.path(eventId), {
+        method: apiRoutes.rotateCalendarToken.method,
+      }),
 
     /** Public (#402). `privacyResponseSchema` carries why. */
     getPrivacy: (signal?: AbortSignal) => request<PrivacyResponse>(apiRoutes.getPrivacy.path(), { signal }),

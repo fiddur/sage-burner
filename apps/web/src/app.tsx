@@ -82,6 +82,8 @@ export type RoutesApi = Pick<
   | 'setMyAvatar'
   | 'removeMyAvatar'
   | 'uploadImage'
+  | 'getCalendarToken'
+  | 'rotateCalendarToken'
   | 'getMyImages'
   | 'removeMyImage'
   | 'getAccountProfile'

@@ -307,8 +307,9 @@ One row holds a paragraph somebody else wrote and nobody has another copy of.
 
 ## The calendar feed
 
-`GET /events/:eventId/schedule.ics` is the programme as a calendar subscription,
-so people can put it in their phone rather than reloading a page.
+`GET /calendar/:token/schedule.ics` is the programme as a calendar subscription,
+so people can put it in their phone rather than reloading a page. The token is
+`event.feed_token` and deliberately not the burn's id — see below.
 
 The **Schedule page carries the link**, for the burn selected in the bar, with a
 copy button beside it (#258). Until then nothing in `apps/web` referenced the feed at
@@ -329,9 +330,25 @@ URL has origin `"null"`, so the router's `link.origin != location.origin` check 
 the click alone.
 
 **Unauthenticated**, because a calendar client cannot hold a session — subscribing
-is a URL a phone re-fetches on its own. The event id is a UUID, so the URL is
-unguessable, but it is not a secret beyond that: **do not post it anywhere outside
-the gathering.** That is the trade that lets descriptions go out in full.
+is a URL a phone re-fetches on its own. So the address is the only thing protecting
+it, and it is **`event.feed_token`, not the burn's id** (#408).
+
+Keyed by the id, it was not protected at all for the burn being planned:
+`GET /api/events/active` has no guard, answers the whole row with `id` in it, and the
+public homepage fetches it on every anonymous visit — so a stranger could read the id
+off the front page and build the `.ics` URL. `CalendarFeed` had been saying "the UUID
+is the only thing protecting the feed" the whole time, which was true and, for the
+active burn, worth nothing.
+
+The token is 32 CSPRNG bytes, in no response the public reads, and **rotatable** —
+which is the part an id could never give. `GET /api/events/:eventId/calendar` answers
+it to an approved member, `POST /api/admin/events/:id/calendar` gives a new one, and
+every calendar already subscribed to the old address then stops updating with nothing
+to tell it. That is what rotating is for, and the button says so.
+
+Still: **do not post it anywhere outside the gathering.** That is the trade that lets
+descriptions go out in full — the difference is that now there is something to do
+about it when somebody does.
 
 What leaves the building is the title, the description, the times, and the place's
 name, emoji and colour. No facilitator, no contact details, no allergies, no payment

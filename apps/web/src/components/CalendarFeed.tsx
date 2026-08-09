@@ -1,13 +1,17 @@
 import { apiRoutes } from '@sage-burner/shared'
 
+import type { ApiClient } from '../api/client.ts'
+
+import { useAction, useLoad } from '../load.ts'
+import { isAdmin, useViewer } from '../viewer.tsx'
 import { CopyButton } from './CopyButton.tsx'
+import { ErrorText } from './ErrorText.tsx'
+import { FormError } from './FormError.tsx'
+
+export type CalendarFeedApi = Pick<ApiClient, 'getCalendarToken' | 'rotateCalendarToken'>
 
 /**
- * The subscribe link for one burn's schedule (#258, #298).
- *
- * The feed has existed since the ICS work and nothing pointed at it, so it was only
- * reachable by typing a URL with a UUID in it. Built from `window.location.origin`,
- * like the invite link, because the API has no notion of its own public URL.
+ * The subscribe link for one burn's schedule (#258, #298, #408).
  *
  * **`webcal://`, not `https://`.** The point is a subscription that keeps itself up
  * to date; following the `https` URL downloads a snapshot that never changes, which
@@ -23,22 +27,57 @@ import { CopyButton } from './CopyButton.tsx'
  * reached the backend. A `webcal:` URL has origin `"null"`, so the router's
  * `link.origin != location.origin` check leaves it alone.
  *
- * The UUID is the only thing protecting the feed, which is why the warning is here
- * rather than assumed — kept to the tooltip so the heading stays a heading.
+ * **The address is fetched rather than built from the burn's id.** It is
+ * `event.feed_token`, which the public homepage is never told — keyed by the id, this
+ * link was readable by any stranger who loaded the front page. The URL is still the only
+ * thing protecting the feed, which is why the warning is here rather than assumed; what
+ * changed is that it can now be taken back, and an admin is offered that.
+ *
+ * Built from `window.location.origin`, like the invite link, because the API has no
+ * notion of its own public URL.
  */
-export const CalendarFeed = ({ eventId }: { eventId: string }) => {
-  const url = `${window.location.origin}${apiRoutes.scheduleFeed.path(eventId)}`
+export const CalendarFeed = ({ api, eventId }: { api: CalendarFeedApi; eventId: string }) => {
+  const viewer = useViewer()
+  const { loaded, reload } = useLoad(async (signal) => (await api.getCalendarToken(eventId, signal)).token, {
+    key: eventId,
+    fallback: 'Could not load the calendar link. Please reload the page.',
+  })
+  const { busy, formError, run } = useAction(reload)
+
+  if (loaded.status === 'failed') return <ErrorText message={loaded.message} />
+  if (loaded.status !== 'ready') return <p class="form-note">One moment…</p>
+
+  const url = `${window.location.origin}${apiRoutes.scheduleFeed.path(loaded.data)}`
   const subscribe = url.replace(/^https?:/, 'webcal:')
 
   return (
-    <p class="calendar-feed form-note">
-      <a
-        href={subscribe}
-        title="Opens in your calendar app and subscribes — it keeps itself up to date. Anyone holding the link can read the schedule, so keep it inside the gathering."
-      >
-        📅 Add to calendar
-      </a>{' '}
-      <CopyButton value={url} label="Copy link" />
-    </p>
+    <>
+      <p class="calendar-feed form-note">
+        <a
+          href={subscribe}
+          title="Opens in your calendar app and subscribes — it keeps itself up to date. Anyone holding the link can read the schedule, so keep it inside the gathering."
+        >
+          📅 Add to calendar
+        </a>{' '}
+        <CopyButton value={url} label="Copy link" />
+        {isAdmin(viewer) && (
+          <button
+            type="button"
+            class="link-button"
+            disabled={busy}
+            title="Gives the feed a new address. Every calendar already subscribed to the old one stops updating, with nothing to tell them."
+            onClick={() => {
+              run(async () => {
+                await api.rotateCalendarToken(eventId)
+              }, 'Could not change the address. Please try again.')
+            }}
+          >
+            New link
+          </button>
+        )}
+      </p>
+
+      <FormError error={formError} />
+    </>
   )
 }

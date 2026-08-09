@@ -4,6 +4,7 @@ import type { ComponentChildren } from 'preact'
 import { useRef, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
+import type { CalendarFeedApi } from '../components/CalendarFeed.tsx'
 import type { Opened } from '../components/OpenedDream.tsx'
 import type { Pinch } from '../pinch.ts'
 import type { LaneCell, MealBlock } from '../schedule.ts'
@@ -55,7 +56,8 @@ export type ScheduleApi = Pick<
   | 'updateComment'
   | 'deleteComment'
   | 'uploadImage'
->
+> &
+  CalendarFeedApi
 
 type Person = EventAttendeesResponse['attendees'][number]
 
@@ -153,21 +155,21 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
     run(() => api.updateSession(id, changes), 'Could not move that dream.')
   }
 
-  if (viewer.status === 'loading') return <Framed>{<p class="form-note">One moment…</p>}</Framed>
+  if (viewer.status === 'loading') return <Framed api={api}>{<p class="form-note">One moment…</p>}</Framed>
 
   if (!approved) {
     return (
-      <Framed>
+      <Framed api={api}>
         <NotForYou signedOut={viewer.status === 'signed-out'} who="members" />
       </Framed>
     )
   }
 
-  if (loaded.status === 'loading') return <Framed>{<p class="form-note">Loading…</p>}</Framed>
+  if (loaded.status === 'loading') return <Framed api={api}>{<p class="form-note">Loading…</p>}</Framed>
 
   if (loaded.status === 'failed') {
     return (
-      <Framed>
+      <Framed api={api}>
         <ErrorText message={loaded.message} />
       </Framed>
     )
@@ -179,7 +181,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
 
   if (event === null) {
     return (
-      <Framed>
+      <Framed api={api}>
         <NoBurn absent="there is no timetable to draw" />
       </Framed>
     )
@@ -187,7 +189,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
 
   if (places.length === 0 && meals.length === 0) {
     return (
-      <Framed>
+      <Framed api={api}>
         <p class="notice">
           No places yet, so there are no lanes to put anything in. They are added under{' '}
           <a href="/places">Places</a>.
@@ -299,7 +301,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
   }
 
   return (
-    <Framed eventId={event.id} refreshing={refreshing}>
+    <Framed api={api} eventId={event.id} refreshing={refreshing}>
       {error !== undefined &&
         opened === undefined &&
         shownMeal === undefined && (
@@ -397,10 +399,13 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
 }
 
 const Framed = ({
+  api,
   eventId,
   refreshing = false,
   children,
 }: {
+  api: CalendarFeedApi
+  /** Absent until a burn is selected, which every state above the grid renders before. */
   eventId?: string
   refreshing?: boolean
   children: ComponentChildren
@@ -409,7 +414,7 @@ const Framed = ({
     <h1>
       Schedule <Refreshing on={refreshing} />
     </h1>
-    {eventId !== undefined && <CalendarFeed eventId={eventId} />}
+    {eventId !== undefined && <CalendarFeed api={api} eventId={eventId} />}
     {children}
   </section>
 )

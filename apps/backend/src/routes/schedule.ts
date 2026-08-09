@@ -18,10 +18,12 @@ export interface ScheduleDeps {
 /**
  * The programme as a calendar subscription.
  *
- * Unauthenticated, because a calendar client cannot hold a session — subscribing
- * is a URL a phone re-fetches on its own schedule. The event id is a UUID, so the
- * URL is unguessable; it is not a secret beyond that, and `docs/burns.md` says plainly
- * that it should not be handed outside the gathering.
+ * Unauthenticated, because a calendar client cannot hold a session — subscribing is a URL a
+ * phone re-fetches on its own schedule. **Keyed by `event.feed_token`, not by the id** (#408):
+ * the id is answered to the public homepage by `/api/events/active`, so keying on it left the
+ * active burn's feed readable by any stranger who loaded the front page. The token is
+ * unguessable, published nowhere, and rotatable; `docs/burns.md` still says not to hand it
+ * outside the gathering, which is now advice rather than the only defence.
  *
  * The columns selected here are the whole of what leaves the building. No host,
  * no contact details, no allergies, no payment state — `schedule.test.ts` asserts
@@ -29,7 +31,7 @@ export interface ScheduleDeps {
  * rather than about this query, so a future join cannot quietly widen it.
  */
 export const registerScheduleRoutes = (app: FastifyInstance, { db, now }: ScheduleDeps) => {
-  app.get<{ Params: { eventId: string } }>(apiRoutes.scheduleFeed.fastify, async (request, reply) => {
+  app.get<{ Params: { token: string } }>(apiRoutes.scheduleFeed.fastify, async (request, reply) => {
     // Public and re-fetched on a client's own schedule, so it may be cached —
     // but an edit has to show up, and there is no ETag here to revalidate
     // against. Same reasoning as `/api/events/active`.
@@ -38,7 +40,7 @@ export const registerScheduleRoutes = (app: FastifyInstance, { db, now }: Schedu
     const [found] = await db
       .select({ id: event.id, name: event.name })
       .from(event)
-      .where(eq(event.id, request.params.eventId))
+      .where(eq(event.feed_token, request.params.token))
       .limit(1)
 
     if (found === undefined) return sendError(reply, 404)

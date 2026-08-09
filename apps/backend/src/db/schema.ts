@@ -270,10 +270,28 @@ export const event = sqliteTable(
     /** What the Meal page says above its table. Markdown, and any member may rewrite it. */
     meal_intro_markdown: text('meal_intro_markdown').notNull().default(''),
     member_cap: integer('member_cap').notNull(),
+    /**
+     * What the calendar feed's URL is keyed by, and deliberately not the id (#408) — "The
+     * calendar feed" in `docs/burns.md` has why, and why it is rotatable.
+     *
+     * **What keeps it off the public homepage is `asEvent`, not this column's absence from
+     * `eventSchema`.** Leaving it out of the type was the first attempt and closed nothing:
+     * no route declares a Fastify `response` schema and there is no serializer compiler, so
+     * `db.select()` put the token straight into the anonymous body.
+     *
+     * Nullable because adding it needed no table rebuild; the migration backfills every row
+     * and `createEvent` mints one, so nothing reaches the read without it.
+     */
+    feed_token: text('feed_token'),
     created_at: text('created_at').notNull(),
   },
   (table) => [
     primaryKey({ columns: [table.id] }),
+    // Partial, because NULLs compare distinct in SQLite and the column is nullable —
+    // `account_invite_token_idx` for the same reason.
+    uniqueIndex('event_feed_token_idx')
+      .on(table.feed_token)
+      .where(sql`${table.feed_token} is not null`),
     // Mirrors `withEventDateOrder` in the shared schemas. Dates are fixed-width
     // ISO, so a string comparison is chronological here.
     check('event_start_date_check', isIsoDate(table.start_date)),
