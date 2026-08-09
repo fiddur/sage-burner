@@ -604,12 +604,11 @@ somebody with a laptop and a phone turns it on in both. The toggle is on the det
 page behind the initials circle, and **only** there.
 
 It was on ⚙️ → Settings as well, because an account holding `admin` without `member`
-is refused from the details page and application notifications go precisely to
+was refused from the details page and application notifications go precisely to
 admins. Two switches for one subscription turned out to be the worse problem —
 which of them is on is a question neither page can answer, and it reads as two
-different settings — so it lives where a person's own settings live. **That leaves
-the account that paragraph existed for with no way to subscribe**, which is a live
-gap rather than a solved one: #396 has it, with the three ways out.
+different settings — so it lives where a person's own settings live, and #396 made
+that page `approved` so the account the second switch existed for can reach it.
 
 A notification is a **record**, and a push is a copy of it (#248). The bell in the
 header carries what happened while you were away and whether you have looked; a push
@@ -1096,6 +1095,18 @@ keeps an avatar's bytes off this row does not reach it. `MAX_INTRODUCTION` is it
 with its own reason — `MAX_NOTES`' 2000 is less than what is being asked for and
 `MAX_DESCRIPTION`'s 20 000 is a dream's whole plan.
 
+**Null rather than empty** for an account that has written none, which is what lets the page
+say different things to somebody who has not written one and to the person whose page it is.
+`optionalText` turning `''` into null is load-bearing here rather than tidy.
+
+This paragraph is the home for all of that: the migration, `schema.ts`, `membership.ts` and
+`person.ts` point here rather than arguing it again. Six copies is what the first version of
+this feature shipped, and the migration header is the copy nobody should have to go back to —
+drizzle keys on the folder timestamp rather than the SQL, so editing one is safe, but a
+migration is a record of what ran and re-arguing a decision inside one invites exactly that.
+`limits.ts` keeps its own reasoning, because the number is what that file is for and its rule
+is that each one is named and argued where it is declared.
+
 **The first field on an account that is neither identity, contact nor a health fact.**
 Everything else there exists so somebody can be reached or fed; this exists so a name means
 something.
@@ -1116,9 +1127,14 @@ It is a page you go to, and it is long; a truncated introduction in a table cell
 of thing nobody reads and everybody has to keep formatting.
 
 **The empty state is worth more than the field.** This only works if people fill it in, so a
-page with none says so — an invitation on your own, the plain fact on somebody else's. Null
-rather than empty is what makes that possible, which is why `optionalText` turning `''` into
-null is load-bearing here rather than tidy.
+page with none says so — an invitation on your own, the plain fact on somebody else's.
+
+That invitation is why `getMyProfile` and `updateMyProfile` are `requireApproved` rather than
+`requireMember` (#412). An account holding `admin` and not `member` has a page of its own like
+anybody else, and was being asked there to go and write an introduction on a form it could not
+reach. `requireMember` on the account's own name, picture and prose was also the root of what
+#396 had to work around. What stays a member's is the stay itself: `updateMyStay`,
+`joinEvent`, `leaveEvent` and `transferMyPlace`.
 
 **Nothing extra for erasure.** The column goes with the account, and the pictures written into
 it cascade from `image.uploaded_by`. Both were already true; `profile.test.ts` writes a real

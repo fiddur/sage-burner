@@ -612,8 +612,8 @@ doing depends on the year.
 `/options` — **Lodging and helping**, for the burn the selector is pointing at.
 Setting them up before that burn is the next one works because the selector offers
 every burn still to come. Reached from **(edit lodging alternatives)** on the details page,
-beside the question the list answers, and from ⚙️ as well — an account holding
-`admin` without `member` has no details page to reach it from.
+beside the question the list answers, and from ⚙️ as well, since that is where
+somebody setting a burn up is already standing.
 
 A lodging entry can carry a number of spaces — "Temple mattress: 9" — or leave it
 blank for the ones that do not run out, like a tent of one's own. Helping entries

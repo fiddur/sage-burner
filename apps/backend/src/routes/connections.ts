@@ -79,9 +79,7 @@ export const registerConnectionRoutes = (app: FastifyInstance, { db, sessions }:
     if (viewer === undefined) return sendError(reply, 401)
 
     const held = await connectionsFor(db, viewer.account_id)
-    // Its own code, not the bare `conflict` the duplicate raises: they mean opposite things
-    // to whoever is reading, and the page cannot tell them apart from its own count —
-    // `errorCodes` has the argument, which `not_approved`/`invite_used` already made once.
+    // Its own code, not the bare `conflict` the duplicate raises — `errorCodes` has why.
     if (held.length >= MAX_CONNECTIONS) return reply.code(409).send(errorResponse('list_full'))
 
     // Normalised here rather than only in the form, so a pasted profile URL is stored as

@@ -38,10 +38,8 @@ export const nameOf = (row: Pick<Connection, 'kind' | 'label'>): string =>
 /**
  * Why a way of being reached could not be saved.
  *
- * The two 409s carry different codes, which is the point of `list_full` existing (#409):
- * inferred from the page's own count, the ceiling wording was unreachable — the add form
- * only renders below the ceiling — and a real ceiling refusal, from a list that grew in
- * another tab, read as "you have already listed that one".
+ * The two 409s carry different codes, which is what `list_full` is for — `errorCodes` has
+ * why this page cannot work it out for itself.
  */
 export const messageForFailure = (failure: unknown): string => {
   if (isApiError(failure) && failure.code === 'list_full') {

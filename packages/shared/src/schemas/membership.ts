@@ -48,12 +48,9 @@ export const profileFields = z.object({
    */
   allergy_item_ids: z.array(idSchema),
   /**
-   * Who this person is, in their own words and pictures (#390).
-   *
-   * The one field on an account that is neither identity, contact nor a health fact:
-   * everything else here exists so somebody can be reached or fed, and this exists so a
-   * name somebody has not met means something. Markdown, so it takes the pictures every
-   * other markdown field takes (#379) — `docs/accounts.md` has what it is for.
+   * Who this person is, in their own words and pictures (#390). Markdown, so it takes the
+   * pictures every other markdown field takes (#379); "The introduction" in
+   * `docs/accounts.md` has what it is for.
    */
   introduction: optionalText(MAX_INTRODUCTION),
 })
