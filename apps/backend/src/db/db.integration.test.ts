@@ -1310,15 +1310,16 @@ describe('the threads migration', () => {
 
       runMigrations(fresh, migrationsFolder)
 
-      const ids = fresh.client
+      const minted = fresh.client
         .prepare('select id from thread')
         .all()
         .map((row) => String(row.id))
 
-      expect(new Set(ids).size).toBe(3)
+      expect(new Set(minted).size).toBe(3)
       // And each is a UUID, because `idSchema` is what the wire bounds them by.
-      for (const id of ids)
-        {expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)}
+      for (const id of minted) {
+        expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+      }
     } finally {
       fresh.close()
     }
