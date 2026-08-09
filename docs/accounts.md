@@ -1096,6 +1096,15 @@ keeps an avatar's bytes off this row does not reach it. `MAX_INTRODUCTION` is it
 with its own reason — `MAX_NOTES`' 2000 is less than what is being asked for and
 `MAX_DESCRIPTION`'s 20 000 is a dream's whole plan.
 
+**Null rather than empty** for an account that has written none, which is what lets the page
+say different things to somebody who has not written one and to the person whose page it is.
+`optionalText` turning `''` into null is load-bearing here rather than tidy.
+
+This paragraph is the home for all of that: the migration, `schema.ts`, `membership.ts`,
+`person.ts` and `limits.ts` point here rather than arguing it again. Six copies is what the
+first version of this feature shipped, and the migration header is the one that can never be
+edited again.
+
 **The first field on an account that is neither identity, contact nor a health fact.**
 Everything else there exists so somebody can be reached or fed; this exists so a name means
 something.
@@ -1116,9 +1125,13 @@ It is a page you go to, and it is long; a truncated introduction in a table cell
 of thing nobody reads and everybody has to keep formatting.
 
 **The empty state is worth more than the field.** This only works if people fill it in, so a
-page with none says so — an invitation on your own, the plain fact on somebody else's. Null
-rather than empty is what makes that possible, which is why `optionalText` turning `''` into
-null is load-bearing here rather than tidy.
+page with none says so — an invitation on your own, the plain fact on somebody else's.
+
+That invitation is why `getMyProfile` and `updateMyProfile` are `requireApproved` rather than
+`requireMember` (#412). An account holding `admin` and not `member` has a page of its own like
+anybody else, and was being asked there to go and write an introduction on a form it could not
+reach. `requireMember` on the account's own name, picture and prose was also the root of what
+#396 had to work around; only the stay — `updateMyStay`, `joinEvent` — is a member's.
 
 **Nothing extra for erasure.** The column goes with the account, and the pictures written into
 it cascade from `image.uploaded_by`. Both were already true; `profile.test.ts` writes a real

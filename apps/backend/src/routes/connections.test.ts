@@ -253,8 +253,7 @@ describe('the ways somebody can be reached', () => {
     const refused = await add(server, ada.cookie, DISCORD)
 
     expect(refused.statusCode).toBe(409)
-    // Its own code, not the duplicate's: the page cannot tell them apart from its own
-    // count, because the add form only renders below the ceiling (#409).
+    // Its own code, not the duplicate's — `errorCodes` has why (#409).
     expect(refused.json().error).toBe('list_full')
   })
 

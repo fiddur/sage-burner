@@ -575,15 +575,8 @@ export const account = sqliteTable(
      */
     allergies_notes: text('allergies_notes'),
     /**
-     * Who this person is, in their own words and pictures (#390).
-     *
-     * A column rather than a table: one field with one owner, unlike `image` and unlike
-     * `account_connection`. Markdown of a few thousand characters, so the argument that
-     * keeps an avatar's bytes out of this row does not reach it — but it is not selected
-     * by anything that does not name it, which every read here does anyway.
-     *
-     * The first field on an account that is neither identity, contact nor a health fact.
-     * `docs/accounts.md` has what it is for.
+     * Who this person is, in their own words and pictures (#390). Why a column rather than a
+     * table: "The introduction" in `docs/accounts.md`.
      */
     introduction: text('introduction'),
     /**

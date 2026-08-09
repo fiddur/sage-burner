@@ -162,15 +162,22 @@ export const writeStay = (
   })
 
 /**
- * A member maintaining their own record.
+ * Somebody maintaining their own record.
  *
  * Two halves, because they have two lifetimes: who you are lives on the account
  * and outlives every burn, while when you arrive and where you sleep belong to
  * one stay. Both routes derive whose row it is from the session, so there is no
  * id in either body to get wrong or to tamper with.
+ *
+ * **The account half is `requireApproved`, the stay is `requireMember`** (#412). An account
+ * holding `admin` and not `member` has a name, a picture, ways of being reached and an
+ * introduction like anybody else — its own page renders them to every member, and #390's
+ * empty state actively invites it to write one. `requireMember` here made that invitation a
+ * dead end, and was the root of what #396 had to work around on the page. Nothing in this
+ * half is burn-scoped: it reads and writes the caller's own `account` row.
  */
 export const registerProfileRoutes = (app: FastifyInstance, { db, sessions, now }: ProfileDeps) => {
-  const { requireMember } = createGuards({ db, sessions })
+  const { requireApproved, requireMember } = createGuards({ db, sessions })
 
   const profileFor = async (accountId: string) => {
     const [row] = await db
@@ -193,7 +200,7 @@ export const registerProfileRoutes = (app: FastifyInstance, { db, sessions, now 
       : { ...row, allergy_item_ids: await allergyTickIdsFor(db, accountId) }
   }
 
-  app.get(apiRoutes.getMyProfile.fastify, { preHandler: requireMember }, async (request, reply) => {
+  app.get(apiRoutes.getMyProfile.fastify, { preHandler: requireApproved }, async (request, reply) => {
     void noStore(reply)
 
     const viewer = await viewerFor(request, { db, sessions })
@@ -205,7 +212,7 @@ export const registerProfileRoutes = (app: FastifyInstance, { db, sessions, now 
     return { profile } satisfies ProfileResponse
   })
 
-  app.patch(apiRoutes.updateMyProfile.fastify, { preHandler: requireMember }, async (request, reply) => {
+  app.patch(apiRoutes.updateMyProfile.fastify, { preHandler: requireApproved }, async (request, reply) => {
     void noStore(reply)
 
     const body = bodyOf(profileUpdateSchema, request)

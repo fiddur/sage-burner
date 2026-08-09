@@ -27,7 +27,7 @@ import { YourBurns } from '../components/YourBurns.tsx'
 import { stillUploading } from '../image-upload.ts'
 import { useAction, useLoad, useLoadInto } from '../load.ts'
 import { rowsFor } from '../textarea.ts'
-import { isMember, useViewer } from '../viewer.tsx'
+import { isApproved, isMember, useViewer } from '../viewer.tsx'
 
 export type ProfileApi = Pick<
   ApiClient,
@@ -49,6 +49,10 @@ export type ProfileApi = Pick<
 export const ProfilePage = ({ api }: { api: ProfileApi }) => {
   const viewer = useViewer()
   const member = isMember(viewer)
+  // What the two loads wait for: `getMyProfile` and `getAllergyItems` are `requireApproved`,
+  // so fetching before the viewer resolves — or for somebody who will be shown the refusal —
+  // is a request for a 403.
+  const approved = isApproved(viewer)
   const [name, setName] = useState('')
   const [contact, setContact] = useState('')
   const [allergies, setAllergies] = useState('')
@@ -65,14 +69,14 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
       setIntroduction(profile.introduction ?? '')
       setTicked(profile.allergy_item_ids)
     },
-    { enabled: member, fallback: 'Could not load your details. Please reload the page.' },
+    { enabled: approved, fallback: 'Could not load your details. Please reload the page.' },
   )
 
   // Its own load, and its own failure: the vocabulary is a nicety beside the free
   // text, so not having it must not cost somebody the page their name is on. No
   // `fallback` either — nothing reads this one's message.
   const { loaded: vocabulary } = useLoad(async (signal) => (await api.getAllergyItems(signal)).items, {
-    enabled: member,
+    enabled: approved,
   })
   const items: readonly AllergyItem[] = vocabulary.status === 'ready' ? vocabulary.data : []
 
@@ -106,143 +110,131 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
     <GuardedPage title="Your details" require="approved">
       <h1>Your details</h1>
 
-      {member ? (
-        <p class="form-note">
-          These follow you from burn to burn. Below them is each burn on its own, for what does not: when you
-          arrive, where you sleep, what you will help with.
-        </p>
-      ) : (
-        // An account holding `admin` and not `member` (#396). Organising without attending is
-        // coherent, so the half of this page that is about a stay has nothing to say to them —
-        // and the half that is about the account has everything, notifications included.
-        <p class="form-note">
-          Your picture, how people reach you, and how you sign in. Say you are coming to a burn — under
-          Organise → Accounts — and what you bring and where you sleep appear here too.
-        </p>
-      )}
+      <p class="form-note">
+        These follow you from burn to burn. Below them is each burn on its own, for what does not: when you
+        arrive, where you sleep, what you will help with.
+      </p>
 
-      {/* The member half, in one conditional rather than four: what somebody says about
-          themselves and their stay, behind the guard `updateMyProfile` already has. */}
-      {member && (
-        <>
-          {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
+      {/* No `member` gate on the account half since #412: `getMyProfile` and
+          `updateMyProfile` are `requireApproved`, because a name, a picture and an
+          introduction belong to the account rather than to a stay — and the introduction's
+          empty state actively asks for one. Only the burns below are a member's. */}
+      {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
 
-          {loaded.status === 'failed' && <ErrorText message={loaded.message} />}
+      {loaded.status === 'failed' && <ErrorText message={loaded.message} />}
 
-          {loaded.status === 'ready' && (
-            <form
-              class="form"
-              onSubmit={(submitEvent) => {
-                submitEvent.preventDefault()
-                save()
-              }}
-            >
-              <label class="field">
-                <span>Your name</span>
-                <input
-                  type="text"
-                  name="name"
-                  maxLength={MAX_PERSON_NAME}
-                  aria-required
-                  value={name}
-                  onInput={(inputEvent) => setName(inputEvent.currentTarget.value)}
-                />
-              </label>
+      {loaded.status === 'ready' && (
+        <form
+          class="form"
+          onSubmit={(submitEvent) => {
+            submitEvent.preventDefault()
+            save()
+          }}
+        >
+          <label class="field">
+            <span>Your name</span>
+            <input
+              type="text"
+              name="name"
+              maxLength={MAX_PERSON_NAME}
+              aria-required
+              value={name}
+              onInput={(inputEvent) => setName(inputEvent.currentTarget.value)}
+            />
+          </label>
 
-              <label class="field">
-                <span>How can we reach you?</span>
-                <input
-                  type="text"
-                  name="contact"
-                  maxLength={MAX_CONTACT}
-                  aria-required
-                  value={contact}
-                  onInput={(inputEvent) => setContact(inputEvent.currentTarget.value)}
-                />
-              </label>
+          <label class="field">
+            <span>How can we reach you?</span>
+            <input
+              type="text"
+              name="contact"
+              maxLength={MAX_CONTACT}
+              aria-required
+              value={contact}
+              onInput={(inputEvent) => setContact(inputEvent.currentTarget.value)}
+            />
+          </label>
 
-              {/* Above the allergies rather than below them: it is the part of this page
-                  other members read, and the part somebody has actually come here to write.
-                  `uploadImage` is passed, so it takes a paste, a drop and a photograph from
-                  a phone like every other markdown field members read (#379). */}
-              <MarkdownField
-                label="A little about you"
-                placeholder="Who you are, what you are bringing, a picture or two…"
-                value={introduction}
-                maxLength={MAX_INTRODUCTION}
-                rows={5}
-                upload={api.uploadImage}
-                onInput={setIntroduction}
-              />
-
-              <p class="form-note">
-                Shown on your page, which every member reaches by clicking your name. Nobody outside the
-                gathering sees it.
-              </p>
-
-              {items.length > 0 && (
-                <fieldset class="field">
-                  <legend>Allergies or food you cannot eat</legend>
-                  {items.map((item) => (
-                    <label key={item.id} class="field-inline">
-                      <input
-                        type="checkbox"
-                        checked={ticked.includes(item.id)}
-                        onChange={(changed) =>
-                          setTicked((current) =>
-                            changed.currentTarget.checked
-                              ? [...current, item.id]
-                              : current.filter((id) => id !== item.id),
-                          )
-                        }
-                      />
-                      <span>{item.label}</span>
-                    </label>
-                  ))}
-                </fieldset>
-              )}
-
-              <label class="field">
-                <span>
-                  {items.length > 0 ? 'Anything else you cannot eat' : 'Allergies or food you cannot eat'}
-                </span>
-                <textarea
-                  name="allergies_notes"
-                  maxLength={MAX_NOTES}
-                  rows={rowsFor(allergies)}
-                  value={allergies}
-                  onInput={(inputEvent) => setAllergies(inputEvent.currentTarget.value)}
-                />
-              </label>
-
-              <p class="form-note">
-                Food is primarily vegetarian, with vegan options. Read by whoever plans the meals, for every
-                burn you come to — so correcting it here corrects it everywhere.
-              </p>
-
-              {saved && (
-                <p class="form-note" role="status">
-                  Saved.
-                </p>
-              )}
-
-              <FormError error={formError} />
-
-              <PendingButton
-                busy={saving}
-                label="Save"
-                busyLabel="Saving…"
-                type="submit"
-                disabled={stillUploading(introduction)}
-              />
-            </form>
-          )}
+          {/* Above the allergies rather than below them: it is the part of this page
+                other members read, and the part somebody has actually come here to write.
+                `uploadImage` is passed, so it takes a paste, a drop and a photograph from
+                a phone like every other markdown field members read (#379). */}
+          <MarkdownField
+            label="A little about you"
+            placeholder="Who you are, what you are bringing, a picture or two…"
+            value={introduction}
+            maxLength={MAX_INTRODUCTION}
+            rows={5}
+            upload={api.uploadImage}
+            onInput={setIntroduction}
+          />
 
           <p class="form-note">
-            Signed in as {email ?? 'you'}. Changing that address is not possible yet — ask someone with admin.
+            Shown on your page, which every member reaches by clicking your name. Nobody outside the gathering
+            sees it.
           </p>
-        </>
+
+          {items.length > 0 && (
+            <fieldset class="field">
+              <legend>Allergies or food you cannot eat</legend>
+              {items.map((item) => (
+                <label key={item.id} class="field-inline">
+                  <input
+                    type="checkbox"
+                    checked={ticked.includes(item.id)}
+                    onChange={(changed) =>
+                      setTicked((current) =>
+                        changed.currentTarget.checked
+                          ? [...current, item.id]
+                          : current.filter((id) => id !== item.id),
+                      )
+                    }
+                  />
+                  <span>{item.label}</span>
+                </label>
+              ))}
+            </fieldset>
+          )}
+
+          <label class="field">
+            <span>
+              {items.length > 0 ? 'Anything else you cannot eat' : 'Allergies or food you cannot eat'}
+            </span>
+            <textarea
+              name="allergies_notes"
+              maxLength={MAX_NOTES}
+              rows={rowsFor(allergies)}
+              value={allergies}
+              onInput={(inputEvent) => setAllergies(inputEvent.currentTarget.value)}
+            />
+          </label>
+
+          <p class="form-note">
+            Food is primarily vegetarian, with vegan options. Read by whoever plans the meals, for every burn
+            you come to — so correcting it here corrects it everywhere.
+          </p>
+
+          {saved && (
+            <p class="form-note" role="status">
+              Saved.
+            </p>
+          )}
+
+          <FormError error={formError} />
+
+          <PendingButton
+            busy={saving}
+            label="Save"
+            busyLabel="Saving…"
+            type="submit"
+            disabled={stillUploading(introduction)}
+          />
+        </form>
       )}
+
+      <p class="form-note">
+        Signed in as {email ?? 'you'}. Changing that address is not possible yet — ask someone with admin.
+      </p>
 
       <AvatarField api={api} />
 

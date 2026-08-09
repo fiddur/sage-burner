@@ -273,11 +273,25 @@ describe('a member reading and editing who they are', () => {
     ).toBe(401)
   })
 
-  it('refuses an account that is not a member', async () => {
+  it('answers an organiser who is not attending, whose record this also is', async () => {
+    // `requireApproved` since #412. A name, a picture and an introduction belong to the
+    // account rather than to a stay — and their own page invites them to write one, which
+    // `requireMember` here made a dead end.
     const server = await build()
-    const admin = await givenMember({ roles: ['admin'] })
+    const boss = await givenMember({ roles: ['admin'] })
 
-    expect((await getProfile(server, admin.cookie)).statusCode).toBe(403)
+    expect((await getProfile(server, boss.cookie)).statusCode).toBe(200)
+    expect((await patchProfile(server, boss.cookie, { introduction: 'I organise.' })).statusCode).toBe(200)
+  })
+
+  it('refuses an account with no role at all', async () => {
+    // The passing sibling for the guard: `approved` is not "signed in", and an applicant
+    // waiting on a decision has no record here to keep.
+    const server = await build()
+    const nobody = await givenMember({ roles: [] })
+
+    expect((await getProfile(server, nobody.cookie)).statusCode).toBe(403)
+    expect((await patchProfile(server, nobody.cookie, { name: 'Nope' })).statusCode).toBe(403)
   })
 })
 

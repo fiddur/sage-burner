@@ -71,8 +71,7 @@ describe('what the form refuses before sending', () => {
 
 describe('why it could not be saved', () => {
   it('tells the two 409s apart by their codes, which the status alone does not', () => {
-    // The page cannot infer it: the add form only renders below the ceiling, so a count
-    // read here says "not full" for exactly the refusal that means it is (#409).
+    // `errorCodes` has why the page cannot infer it (#409).
     expect(messageForFailure(apiError(409, 'conflict', 'conflict'))).toContain('already listed')
     expect(messageForFailure(apiError(409, 'list_full', 'conflict'))).toContain('as many ways')
   })

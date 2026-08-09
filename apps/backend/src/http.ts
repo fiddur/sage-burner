@@ -45,12 +45,12 @@ export type ClientStatus = 400 | 401 | 403 | 404 | 409 | 415 | 429
  * errorResponse('conflict'))` compiles perfectly well and answers exactly that.
  *
  * **Not every refusal goes through here**, and the exceptions are the point rather
- * than leftovers. Both logins — password and passkey — answer 401 with
- * `invalid_credentials`, which is deliberately distinguishable from a missing
- * session and is a fact about the route rather than about the status.
- * `sessions.ts` and `profile.ts` carry a status and slug together out of a
- * discriminated union. Those keep `errorResponse` explicitly, which reads as "this
- * one is different" precisely because everything else no longer does.
+ * than leftovers: a route reaches for `errorResponse` when the status alone does not
+ * say which refusal this is. A login's 401 is `invalid_credentials` rather than the
+ * missing-session one; a 409 is `conflict`, `not_approved`, `invite_used` or
+ * `list_full` depending on what could not be done. Naming the rule rather than the
+ * call sites, because a list of those is what goes one route stale — `errorCodes`
+ * carries the argument for each.
  */
 export const sendError = (reply: FastifyReply, status: ClientStatus) =>
   reply.code(status).send(errorResponse(codeFor(status)))

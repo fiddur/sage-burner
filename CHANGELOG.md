@@ -7,6 +7,15 @@ There are no version numbers: every merge to `develop` builds an image and the s
 picks it up within a few minutes, so a date can hold several deploys. Add your line
 under today's heading, and make a new heading when there is none.
 
+# 2026-08-10
+
+- **Somebody organising a burn without coming to it has the whole of Your details now** — a
+  name, a picture, an introduction — not only the parts about signing in. Their own page had
+  been inviting them to write an introduction on a form that turned them away.
+
+- **The ✕ on each of your stored pictures says which picture it is**, rather than only the day
+  it was added — which was the same words for everything from one sitting.
+
 # 2026-08-09
 
 - **You can say who you are.** Your details now has _A little about you_ — a paragraph, and as

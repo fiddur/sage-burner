@@ -80,8 +80,7 @@ const rolesOf = async (accountId: string) =>
 describe('an admin editing who holds which role', () => {
   it('grants a role an account did not have', async () => {
     // An account holding `admin` alone — granted here rather than bootstrapped,
-    // since `admin:create` gives both — cannot reach its own profile or say it is
-    // coming until `member` is added.
+    // since `admin:create` gives both — cannot say it is coming until `member` is added.
     const server = await build()
     const admin = await givenAccount(['admin'])
 
@@ -93,18 +92,25 @@ describe('an admin editing who holds which role', () => {
   })
 
   it('opens the member routes to them, which is the point of doing it', async () => {
-    // Hiding the nav link was never what stopped them: `/api/me/profile` is
-    // behind `requireMember` and answered 403 to an admin without the role.
+    // Hiding the nav link was never what stopped them. Saying you are coming is the member
+    // half of the app — `/api/me/profile` is the account half and `requireApproved` since
+    // #412, so it no longer tells the two roles apart.
     const server = await build()
     const admin = await givenAccount(['admin'])
-    const profile = () =>
-      server.inject({ method: 'GET', url: '/api/me/profile', headers: { cookie: admin.cookie } })
+    const join = () =>
+      server.inject({
+        method: 'POST',
+        url: `/api/events/${randomUUID()}/attendance/me`,
+        headers: { cookie: admin.cookie },
+      })
 
-    expect((await profile()).statusCode).toBe(403)
+    expect((await join()).statusCode).toBe(403)
 
     await setRoles(server, admin.cookie, admin.id, { roles: ['admin', 'member'] })
 
-    expect((await profile()).statusCode).toBe(200)
+    // 404 rather than 201: no such burn. The guard has been passed, which is what is
+    // being asserted — a 403 here would mean the role change bought nothing.
+    expect((await join()).statusCode).toBe(404)
   })
 
   it('takes a role away', async () => {

@@ -241,27 +241,32 @@ describe('the page for an account organising without attending', () => {
     expect(screen.queryByText(/for members/)).toBeNull()
   })
 
-  it('offers the half of it that is about the account, not the half about a stay', async () => {
+  it('offers the whole account half, including what #390 invites them to write', async () => {
+    // `getMyProfile` and `updateMyProfile` are `requireApproved` since #412: a name, a
+    // picture and an introduction belong to the account rather than to a stay, and the
+    // introduction's empty state on their own page actively asks for one.
     renderPage(stub(), ORGANISER)
 
-    await screen.findByRole('heading', { level: 1, name: 'Your details' })
-    // The account's own: a picture, ways of being reached, ways in, and signing out.
+    expect(await screen.findByLabelText('Your name')).toBeTruthy()
+    expect(screen.getByLabelText('A little about you', { exact: true })).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'How people can reach you' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Log out' })).toBeTruthy()
-    // The stay's: `updateMyProfile` and `joinEvent` are both `requireMember`, so offering
-    // either would be a control the API refuses.
-    expect(screen.queryByLabelText('Your name')).toBeNull()
+  })
+
+  it('offers no burn to join, which is the half that is a stay', async () => {
+    // `joinEvent` is `requireMember`, so the button would be one the API refuses.
+    renderPage(stub(), ORGANISER)
+
+    await screen.findByLabelText('Your name')
     expect(screen.queryByText(/no burn planned/)).toBeNull()
   })
 
-  it('does not read a profile the API would refuse it', async () => {
+  it('reads the profile, which the API now answers it', async () => {
     const getMyProfile = vi.fn(() => Promise.resolve({ profile: aProfile() }))
     renderPage(stub({ getMyProfile }), ORGANISER)
 
-    await screen.findByRole('heading', { level: 1, name: 'Your details' })
-    expect(getMyProfile).not.toHaveBeenCalled()
-    // And says nothing about a load that never happened.
-    expect(screen.queryByText('Loading…')).toBeNull()
+    await screen.findByLabelText('Your name')
+    expect(getMyProfile).toHaveBeenCalled()
   })
 
   it('still shows the whole page to a member, which is the ordinary case', async () => {

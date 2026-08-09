@@ -100,11 +100,11 @@ branches on. The message a member reads is the frontend's to choose, because
 only the frontend knows what the member was trying to do. The real error goes to
 the server log, where a SQL fragment or a file path is useful rather than public.
 
-The vocabulary today is `bad_request`, `not_found`, `internal_error`,
-`invalid_credentials`, `unauthenticated`, `forbidden`, `conflict` and
-`rate_limited`, defined in
-[`packages/shared`](../packages/shared/src/schemas/error.ts). It grows with the
-routes that emit it, rather than being listed in advance and left unreachable.
+The vocabulary is `errorCodes` in
+[`packages/shared`](../packages/shared/src/schemas/error.ts), and that is where it is read
+rather than copied — this paragraph listed eight of them and went four stale, which is what a
+list in prose does. Each entry carries why it is not just `conflict` or `bad_request`. It grows
+with the routes that emit it, rather than being listed in advance and left unreachable.
 
 `unauthenticated` and `forbidden` are separate because 401 and 403 are the one
 distinction a client cannot safely collapse — signing in fixes the first and

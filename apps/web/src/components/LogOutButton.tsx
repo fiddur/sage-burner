@@ -11,10 +11,11 @@ import { useSetViewer } from '../viewer.tsx'
  * somewhere — and where its neighbours are all places, not actions. It belongs
  * beside the sentence naming the account it ends.
  *
- * Rendered on **two** pages, for the reason ⚙️ keeps the Places and lodging links:
- * the details page is `require="member"`, and an account holding `admin` without
- * `member` is refused from it. Leaving them no way to sign out is worse than a
- * second button most people never see.
+ * One call site, which took two goes to get to: #195 put a second button on ⚙️ → Settings
+ * because the details page was `require="member"` and turned an `admin`-without-`member`
+ * account away, and #396 made that page `approved` instead so the copy could go. Which of two
+ * buttons somebody pressed is a question neither page can answer, which is the same argument
+ * that moved the push toggle.
  */
 export const LogOutButton = ({
   api,
