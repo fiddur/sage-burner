@@ -282,10 +282,11 @@ export const registerPasskeyRoutes = (app: FastifyInstance, { db, config, sessio
      * the count is taken by the same statement that deletes, so the second one
      * matches nothing.
      *
-     * This is the one place in the app that engineers for a race, against the rule
-     * the rest of it follows. It is not that the window is realistic — it needs one
-     * person removing their own two passkeys in the same second — but that the
-     * consequence is permanent and there is no way back through the app.
+     * This and `anotherWayInSurvives`, which does the same for an OAuth identity, are
+     * the only two places in the app that engineer for a race, against the rule the rest
+     * of it follows. It is not that the window is realistic — it needs one person
+     * removing their own two passkeys in the same second — but that the consequence is
+     * permanent and there is no way back through the app.
      *
      * Untestable through `inject`, which serialises requests. What the suite pins is
      * the refusal itself, and that an account with a password or a spare key is not

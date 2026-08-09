@@ -590,6 +590,23 @@ describe('the ways in on an account', () => {
     expect((await forget(server, 'facebook', wren.cookie)).statusCode).toBe(204)
   })
 
+  it('counts the other provider as another way in, which nothing else asserted', async () => {
+    // The third `exists` in `anotherWayInSurvives`, and the passing sibling the refusal
+    // tests do not give: a break that is too *permissive* is caught by "refuses to take
+    // away the only way in", but a too-restrictive one would silently stop an account with
+    // two providers and no password from unlinking either, and nothing would fail.
+    const server = await build()
+    await givenProvider('discord')
+    await givenProvider('facebook')
+    const wren = await givenAccount({ password: null })
+    await linkThrough(server, wren.cookie, 'discord')
+    await linkThrough(server, wren.cookie, 'facebook')
+
+    expect((await forget(server, 'facebook', wren.cookie)).statusCode).toBe(204)
+    // And now it is the only one left, so it cannot go — the same guard, from the other side.
+    expect((await forget(server, 'discord', wren.cookie)).statusCode).toBe(409)
+  })
+
   it('answers 404 for a provider that was never linked', async () => {
     const server = await build()
     const wren = await givenAccount()

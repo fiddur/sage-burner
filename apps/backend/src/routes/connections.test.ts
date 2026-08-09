@@ -176,7 +176,11 @@ describe('the ways somebody can be reached', () => {
     const ada = await givenAccount()
     await add(server, ada.cookie, DISCORD)
 
-    expect((await add(server, ada.cookie, DISCORD)).statusCode).toBe(409)
+    const refused = await add(server, ada.cookie, DISCORD)
+
+    expect(refused.statusCode).toBe(409)
+    // The plain `conflict`, which is the other of the two 409s here — see the ceiling test.
+    expect(refused.json().error).toBe('conflict')
   })
 
   it('lets two people list the same handle', async () => {
@@ -246,7 +250,12 @@ describe('the ways somebody can be reached', () => {
       await add(server, ada.cookie, { kind: 'link', value: `https://n${index}.example`, label: `n${index}` })
     }
 
-    expect((await add(server, ada.cookie, DISCORD)).statusCode).toBe(409)
+    const refused = await add(server, ada.cookie, DISCORD)
+
+    expect(refused.statusCode).toBe(409)
+    // Its own code, not the duplicate's: the page cannot tell them apart from its own
+    // count, because the add form only renders below the ceiling (#409).
+    expect(refused.json().error).toBe('list_full')
   })
 
   it('still takes the last one below the ceiling', async () => {
