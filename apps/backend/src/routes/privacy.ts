@@ -14,11 +14,11 @@ import path from 'node:path'
 export const privacyFile = path.join(import.meta.dirname, '..', '..', '..', '..', 'PRIVACY.md')
 
 /**
- * The policy as text, or empty where the image has none.
+ * The policy as text, or empty where the image has none — `privacyResponseSchema` carries why
+ * empty rather than a throw.
  *
  * Read once, at boot, like the changelog: the file is part of the image and cannot change
- * under a running process. Empty rather than a throw — a missing policy is a page that says
- * so, not a container that refuses to start.
+ * under a running process.
  */
 export const readPrivacy = (file: string = privacyFile): string => {
   try {
@@ -29,10 +29,7 @@ export const readPrivacy = (file: string = privacyFile): string => {
 }
 
 /**
- * `GET /api/privacy` — the URL Facebook's app review requires (#402).
- *
- * Public, which is the whole point: a reviewer opens it as a stranger, and so does anybody
- * deciding whether to apply. A privacy policy behind a login is not one.
+ * `GET /api/privacy` (#402). `privacyResponseSchema` carries why it is public.
  *
  * The text is passed in rather than read here, so a test can hand it a policy without
  * writing a file.

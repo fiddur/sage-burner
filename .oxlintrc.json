@@ -42,6 +42,11 @@
     "unicorn/error-message": 2,
     "no-console": [2, { "allow": ["warn", "error", "info"] }],
     "typescript/no-explicit-any": 2,
+    // Three consecutive reviews each caught one import inserted out of order, which is a
+    // reviewer doing a linter's job. Only the members inside a declaration — the order of
+    // the declarations themselves is `import type` first, then value imports, which this
+    // rule does not know about.
+    "sort-imports": [2, { "ignoreDeclarationSort": true, "ignoreCase": true }],
     // Type-aware rule: only evaluated under `oxlint --type-aware`, which needs
     // the `oxlint-tsgolint` package. The per-package `check` scripts pass that
     // flag — without it this rule silently never runs.

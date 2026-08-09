@@ -8,9 +8,10 @@ import { IconButton } from './IconButton.tsx'
 /**
  * A list somebody can put in order (#146).
  *
- * Five pages let you rearrange one — the schedule's lanes, a burn's lodging and
- * helping options, the allergy vocabulary, the FAQ and the application questions —
- * and each had written out its own: the drop target, the `⠿` handle with its
+ * Six lists let you rearrange one — the schedule's lanes, a burn's lodging and
+ * helping options, the allergy vocabulary, the FAQ, the application questions and the
+ * ways somebody can be reached — and the first five had each written out their own:
+ * the drop target, the `⠿` handle with its
  * `dataTransfer` workaround, the drag state, the arrow-key fallback. Thirty-odd
  * lines, and the affordances are exactly what goes missing when they are re-derived:
  * the allergy list and `QuestionEditor` grew ↑/↓ buttons and no drag, while the other

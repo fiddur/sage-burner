@@ -1,9 +1,9 @@
 import {
   type EventAttendeesResponse,
-  type SessionUpdate,
   MAX_DESCRIPTION,
   MAX_TITLE,
   type Place,
+  type SessionUpdate,
 } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 

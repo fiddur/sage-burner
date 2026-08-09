@@ -673,9 +673,9 @@ Two caches, and the split is the whole of what stays on a device:
 - **`sage-burner-api-v1`** — every API read: the roster, the schedule, who you
   are. **This is member data on disk, and signing out deletes the whole cache.**
   Not entries picked from it by URL, which would be a list to keep in step with
-  the routes. The three `/api/` reads that are _not_ somebody's data — the icon, the
-  banner and the changelog — are named into the shell cache instead, on the argument
-  that what a sign-out takes away should be what a sign-out was about.
+  the routes. The four `/api/` reads that are _not_ somebody's data — the icon, the
+  banner, the changelog and the privacy policy — are named into the shell cache instead,
+  on the argument that what a sign-out takes away should be what a sign-out was about.
 
 Reads are network-first with the cache as a floor under being offline; hashed
 assets are cache-first, since their names change with their bytes. `/api/version`
@@ -892,6 +892,20 @@ answers with different bytes, so the browser's own cache still holds them betwee
 **How many one account may hold is a number**, not an absence: this is the first
 unbounded write any member can make, and rate limiting (#57) is still unbuilt.
 `MAX_IMAGES_PER_ACCOUNT` in `media.ts` says what it is and why.
+
+**A ceiling has to be one you can get back under** (#392), and at first it was not. The
+cap counts every row ever written, and deleting the comment that referenced a picture
+deliberately leaves the row — so an account that reached 500 could never upload again by
+any action the app offered. **Pictures you have added** on Your details is what closes
+that: `GET /api/me/images` lists the ids and dates (never the bytes — five hundred of
+those is not a JSON response anybody wants), the grid draws each one through
+`storedImage`, and `DELETE /api/me/images/:id` takes one off with the account in the
+`WHERE`, so somebody else's id is a 404 rather than a write.
+
+**A removal leaves a gap wherever the picture was still shown**, and the page says so
+before anybody presses ✕. Refusing instead would mean knowing every markdown column in
+the schema, which is exactly the list this design does not keep — so the honest version
+is to tell the person what it costs and let them decide.
 
 ## Markdown is escaped, not filtered
 

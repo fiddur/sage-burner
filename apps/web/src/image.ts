@@ -1,4 +1,4 @@
-import { IMAGE_PIXELS, IMAGE_TYPE } from '@sage-burner/shared'
+import { IMAGE_PIXELS, IMAGE_UPLOAD_TYPE } from '@sage-burner/shared'
 
 /**
  * The size a picture is drawn at, with its shape kept.
@@ -55,7 +55,7 @@ export const resizedImage = async (file: Blob): Promise<Blob> => {
     context.drawImage(bitmap, 0, 0, width, height)
 
     const blob = await new Promise<Blob | null>((resolve) => {
-      canvas.toBlob(resolve, IMAGE_TYPE, 0.85)
+      canvas.toBlob(resolve, IMAGE_UPLOAD_TYPE, 0.85)
     })
 
     if (blob === null) throw new Error('could not read that picture')

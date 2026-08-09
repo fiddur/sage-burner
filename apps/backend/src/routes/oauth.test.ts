@@ -187,11 +187,31 @@ describe('leaving for a provider', () => {
     expect((await callback(server, 'myspace', 'code=a&state=b')).statusCode).toBe(404)
   })
 
-  it('will not start a link for somebody who is not signed in', async () => {
+  it('sends somebody whose session has gone to the login page, not a JSON 401', async () => {
+    // Reached by a plain `<a href>`, so an error envelope would land on the screen as one.
     const server = await build()
     await givenProvider()
 
-    expect((await startLink(server, 'facebook')).statusCode).toBe(401)
+    const refused = await startLink(server, 'facebook')
+
+    expect(refused.statusCode).toBe(302)
+    expect(refused.headers.location).toBe('/login')
+  })
+
+  it('will not leave for a provider whose secret is empty', async () => {
+    // The row exists, so `oauthSettingFor` answers it — but a trip made with no secret can
+    // only end at `/login?from=refused` after a full journey out and back (#401).
+    const server = await build()
+    await db().insert(oauthSetting).values({
+      provider: 'discord',
+      client_id: 'client-1',
+      client_secret: '',
+      updated_at: NOW.toISOString(),
+    })
+
+    const leaving = await start(server, 'discord')
+
+    expect(leaving.headers.location).toBe('/login?from=refused')
   })
 
   it('starts a link for somebody with no role at all', async () => {
@@ -383,6 +403,27 @@ describe('linking a provider to an account', () => {
 
     expect(back.headers.location).toBe('/profile?from=linked')
     expect(await db().select().from(accountIdentity)).toHaveLength(1)
+  })
+
+  it('attaches the identity to whoever started the trip, not whoever finished it', async () => {
+    // The reason `oauth_state.account_id` exists: the account comes from the row, so a
+    // callback arriving with somebody else's session cannot hand them the identity (#401).
+    const server = await build()
+    await givenProvider()
+    const wren = await givenAccount()
+    const anna = await givenAccount()
+
+    const leaving = await startLink(server, 'facebook', wren.cookie)
+    const back = await callback(
+      server,
+      'facebook',
+      `code=abc&state=${await mintedState()}`,
+      `${nonceFrom(leaving)}; ${anna.cookie}`,
+    )
+
+    expect(back.headers.location).toBe('/profile?from=linked')
+    const [written] = await db().select().from(accountIdentity)
+    expect(written?.account_id).toBe(wren.id)
   })
 
   it('refuses a provider account that is already somebody else’s', async () => {
@@ -649,6 +690,31 @@ describe('setting a provider up', () => {
 
     expect(installation.json().installation.social_logins).toEqual(['discord'])
     expect(installation.payload).not.toContain('client-1')
+  })
+
+  it('draws no button for a client id saved with no secret', async () => {
+    // A row exists, so selecting on existence listed it — and "Continue with Discord" then
+    // led to `/login?from=refused` after a full trip out and back (#401).
+    const server = await build()
+    const boss = await givenAccount({ roles: ['admin'] })
+    await save(server, 'discord', boss.cookie, { client_id: 'client-1' })
+
+    const installation = await server.inject({ method: 'GET', url: '/api/installation' })
+
+    expect(installation.json().installation.social_logins).toEqual([])
+  })
+
+  it('takes the button away again when the secret is cleared', async () => {
+    // The other direction, and the one that matters more: a provider that worked yesterday
+    // and whose secret was emptied today must stop offering a trip.
+    const server = await build()
+    const boss = await givenAccount({ roles: ['admin'] })
+    await save(server, 'discord', boss.cookie, { client_id: 'client-1', client_secret: 'hunter2' })
+
+    await save(server, 'discord', boss.cookie, { client_id: 'client-1', client_secret: '' })
+
+    const installation = await server.inject({ method: 'GET', url: '/api/installation' })
+    expect(installation.json().installation.social_logins).toEqual([])
   })
 
   it('is admin’s alone, through the prefix hook', async () => {

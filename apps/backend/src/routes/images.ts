@@ -1,8 +1,8 @@
-import type { ImageUploadResponse } from '@sage-burner/shared'
+import type { ImageUploadResponse, MyImagesResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
 import { apiRoutes, isImageType, MAX_IMAGE_BYTES, MAX_IMAGES_PER_ACCOUNT } from '@sage-burner/shared'
-import { count, eq } from 'drizzle-orm'
+import { and, count, desc, eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -72,11 +72,8 @@ export const registerImageRoutes = (app: FastifyInstance, { db, sessions, now }:
   /**
    * The picture itself.
    *
-   * `requireApproved`, like the avatar: the reference lives inside prose members write
-   * to each other, and a photograph in a comment thread is at least as personal as a
-   * face. The cost is that a picture hand-written into the burn's welcome text — which
-   * is public — is broken for the public, and that is a follow-up rather than a reason
-   * to open the route.
+   * `requireApproved`, like the avatar, and what that costs the public-facing fields is
+   * in `docs/the-app.md`.
    *
    * Cached hard, and safe because an image is immutable: this id will never answer with
    * different bytes, so no cache here can go stale. `private` keeps it out of shared
@@ -93,16 +90,64 @@ export const registerImageRoutes = (app: FastifyInstance, { db, sessions, now }:
         return sendError(reply, 404)
       }
 
-      return (
-        reply
-          .header('content-type', row.content_type)
-          // The bytes are whatever was uploaded and the type is what the uploader
-          // claimed, so a browser must not be allowed to decide for itself that a PNG
-          // is really something it should run.
-          .header('x-content-type-options', 'nosniff')
-          .header('cache-control', 'private, max-age=31536000, immutable')
-          .send(row.bytes)
-      )
+      return reply
+        .header('content-type', row.content_type)
+        .header('x-content-type-options', 'nosniff')
+        .header('cache-control', 'private, max-age=31536000, immutable')
+        .send(row.bytes)
+    },
+  )
+
+  /**
+   * What this account has stored, newest first (#392).
+   *
+   * Named columns rather than the row: `bytes` is up to two megabytes apiece and a list
+   * of five hundred of them is not a JSON response anybody wants. The page draws each
+   * one through `storedImage`.
+   */
+  app.get(apiRoutes.getMyImages.fastify, { preHandler: requireApproved }, async (request, reply) => {
+    void noStore(reply)
+
+    const viewer = await viewerFor(request, { db, sessions })
+    if (viewer === undefined) return sendError(reply, 401)
+
+    const rows = await db
+      .select({ id: image.id, created_at: image.created_at })
+      .from(image)
+      .where(eq(image.uploaded_by, viewer.account_id))
+      .orderBy(desc(image.created_at), desc(image.id))
+
+    return { images: rows } satisfies MyImagesResponse
+  })
+
+  /**
+   * Taking one back off (#392), which is what makes `MAX_IMAGES_PER_ACCOUNT` recoverable.
+   *
+   * The account is in the `WHERE`, so somebody else's id is a 404 rather than a write —
+   * the same shape as a connection, and for the same reason.
+   *
+   * **A picture still referenced from prose is deleted anyway**, leaving that markdown
+   * pointing at nothing. Refusing instead would mean knowing every markdown column in the
+   * schema, which is the list `docs/the-app.md` explains why this app does not keep; the
+   * page says plainly what a removal costs before anybody presses it.
+   */
+  app.delete<{ Params: { id: string } }>(
+    apiRoutes.removeMyImage.fastify,
+    { preHandler: requireApproved },
+    async (request, reply) => {
+      void noStore(reply)
+
+      const viewer = await viewerFor(request, { db, sessions })
+      if (viewer === undefined) return sendError(reply, 401)
+
+      const removed = await db
+        .delete(image)
+        .where(and(eq(image.id, request.params.id), eq(image.uploaded_by, viewer.account_id)))
+        .returning({ id: image.id })
+
+      if (removed.length === 0) return sendError(reply, 404)
+
+      return reply.code(204).send()
     },
   )
 }

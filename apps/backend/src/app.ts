@@ -27,7 +27,7 @@ import { createEmailQueue, drainWithin } from './mail/queue.ts'
 import { sendWithSmtp } from './mail/smtp.ts'
 import { httpsOAuth } from './oauth/client.ts'
 import { notifyAdmins, recordAndPush } from './push/notify.ts'
-import { deliverWithWebPush, DEFAULT_PUSH_CONTACT, generateVAPIDKeys } from './push/web-push.ts'
+import { DEFAULT_PUSH_CONTACT, deliverWithWebPush, generateVAPIDKeys } from './push/web-push.ts'
 import { registerAdminRoutes } from './routes/admin.ts'
 import { registerAllergyRoutes } from './routes/allergies.ts'
 import { registerApplicationReviewRoutes } from './routes/application-review.ts'
@@ -131,11 +131,9 @@ export interface AppDeps {
    */
   changelog?: string
   /**
-   * What `GET /api/privacy` answers with (#402).
+   * What `GET /api/privacy` answers with (#402). `privacyResponseSchema` carries why it exists.
    *
-   * Read from `PRIVACY.md` at boot, and injected for the same reason as the changelog. It
-   * exists because Facebook's app review will not take an app without a policy at a URL, and
-   * it has to be readable by somebody who is not signed in.
+   * Read from `PRIVACY.md` at boot, and injected for the same reason as the changelog.
    */
   privacy?: string
 }

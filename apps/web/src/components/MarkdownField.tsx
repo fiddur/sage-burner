@@ -38,9 +38,7 @@ export const MarkdownField = ({
   placeholder?: string
   /**
    * How a picture gets stored, where this field takes them (#379). Passed only by the
-   * fields members read: `/api/images/:id` is `requireApproved`, so a picture in the
-   * welcome text or beside an application question would be broken for the public that
-   * text is written for.
+   * fields members read, for the reason in `docs/the-app.md`.
    */
   upload?: UploadImage
   onInput: (value: string) => void

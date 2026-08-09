@@ -1,4 +1,4 @@
-import type { PublicSession, PlaceColor } from '@sage-burner/shared'
+import type { PlaceColor, PublicSession } from '@sage-burner/shared'
 
 /**
  * iCalendar rendering, by hand.

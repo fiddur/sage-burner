@@ -17,7 +17,6 @@ import { providerShapes, stringField } from './providers.ts'
  * The routes turn `undefined` into a refusal they can word.
  */
 
-/** How long to wait on a provider before giving up. */
 const TIMEOUT_MS = 10_000
 
 export interface IdentifyInput {
@@ -108,6 +107,11 @@ export const identifyOverHttps: Identify = async ({
  */
 export const fetchPictureOverHttps: FetchPicture = async (url) => {
   try {
+    // The URL is whatever the provider's profile response named, so the scheme is pinned
+    // rather than trusted. Only reachable if the provider itself answers hostilely, and a
+    // cheap narrowing given nothing in this process decodes the bytes.
+    if (!url.toLowerCase().startsWith('https://')) return undefined
+
     const response = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) })
     if (!response.ok) return undefined
 

@@ -6,7 +6,7 @@ import type { DbHandle } from '../db/index.ts'
 import type { Told } from './notify.ts'
 
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, INSTALLATION_ID, installation, notificationSetting } from '../db/schema.ts'
+import { account, installation, INSTALLATION_ID, notificationSetting } from '../db/schema.ts'
 import { announceDeploy } from './deploy.ts'
 
 const NOW = '2026-07-02T00:00:00.000Z'

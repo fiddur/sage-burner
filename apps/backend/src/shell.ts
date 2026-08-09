@@ -14,7 +14,7 @@ import type { Config } from './config.ts'
 import type { Database } from './db/index.ts'
 import type { ShareImage, ShareSubject } from './share.ts'
 
-import { INSTALLATION_ID, installation } from './db/schema.ts'
+import { installation, INSTALLATION_ID } from './db/schema.ts'
 import { bannerVersion } from './routes/banner.ts'
 import { activeEventNow } from './routes/events.ts'
 import { FALLBACK_NAME, iconVersion } from './routes/pwa.ts'

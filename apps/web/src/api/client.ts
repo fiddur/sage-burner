@@ -1,15 +1,18 @@
 import type {
-  BodyOf,
   ActiveEventResponse,
   AdminAccountResponse,
   AdminAccountsResponse,
   AdminInvitesResponse,
+  AllergyItem,
+  AllergyItemsResponse,
   ApplicationDecisionResponse,
   ApplicationResponse,
   ApplicationsResponse,
-  AllergyItem,
-  AllergyItemsResponse,
   Attendance,
+  BodyOf,
+  ChangelogResponse,
+  ConnectionResponse,
+  ConnectionsResponse,
   CopyFrom,
   CopySourcesResponse,
   EventAttendeesResponse,
@@ -20,49 +23,47 @@ import type {
   EventResponse,
   EventsResponse,
   FaqListResponse,
-  FeedResponse,
   FaqResponse,
+  FeedResponse,
   FormQuestionOrder,
   FormQuestionResponse,
-  ConnectionResponse,
-  ConnectionsResponse,
   FormQuestionsResponse,
-  ImageUploadResponse,
   IdentitiesResponse,
+  ImageUploadResponse,
   InstallationResponse,
-  OAuthSettingsResponse,
-  PersonProfileResponse,
-  PrivacyResponse,
   InviteResponse,
   InviteState,
   LeadRoleLead,
   LeadRoleResponse,
-  LeadRoleTeam,
   LeadRolesResponse,
+  LeadRoleTeam,
   MailSettingsResponse,
   MailTestResponse,
   MealResponse,
   MealSlotsResponse,
   MealsResponse,
-  MeResponse,
   MemberRosterResponse,
+  MeResponse,
   MyBurnsResponse,
+  MyImagesResponse,
   NotificationSettings,
   NotificationsResponse,
+  OAuthSettingsResponse,
   PasskeysResponse,
+  PersonProfileResponse,
   Place,
   PlaceOrder,
   PlacesResponse,
-  Ride,
-  RidesResponse,
+  PrivacyResponse,
   ProfileResponse,
   PushKeyResponse,
   RedeemResponse,
+  Ride,
+  RidesResponse,
   RosterResponse,
   SessionResponse,
   SessionsResponse,
   ThreadResponse,
-  ChangelogResponse,
   VersionResponse,
 } from '@sage-burner/shared'
 import type {
@@ -576,7 +577,7 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
     removeMyAvatar: () =>
       request<undefined>(apiRoutes.removeMyAvatar.path(), { method: apiRoutes.removeMyAvatar.method }),
 
-    /** Public (#402). Facebook's app review opens this as a stranger, and so do applicants. */
+    /** Public (#402). `privacyResponseSchema` carries why. */
     getPrivacy: (signal?: AbortSignal) => request<PrivacyResponse>(apiRoutes.getPrivacy.path(), { signal }),
 
     /** The ways in on this account (#393). Signed in at all is the whole guard. */
@@ -646,6 +647,13 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
         method: apiRoutes.uploadImage.method,
         body: image,
       }),
+
+    /** Your own stored pictures, so the ceiling is something you can get back under (#392). */
+    getMyImages: (signal?: AbortSignal) =>
+      request<MyImagesResponse>(apiRoutes.getMyImages.path(), { signal }),
+
+    removeMyImage: (id: string) =>
+      request<undefined>(apiRoutes.removeMyImage.path(id), { method: apiRoutes.removeMyImage.method }),
 
     /** Admin only. The icon an installed copy of the app wears (#256). */
     setInstallationIcon: (image: Blob) =>

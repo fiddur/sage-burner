@@ -7,7 +7,7 @@ import type { Viewer } from '../viewer.tsx'
 import type { InviteApi } from './Invite.tsx'
 
 import { apiError } from '../api/client.ts'
-import { ViewerProvider, useViewer } from '../viewer.tsx'
+import { useViewer, ViewerProvider } from '../viewer.tsx'
 import { Invite } from './Invite.tsx'
 
 afterEach(cleanup)

@@ -6,7 +6,6 @@ import {
   accountRoles,
   applicationStatuses,
   connectionKinds,
-  notificationCategories,
   effortLevels,
   eventOptionKinds,
   formQuestionTypes,
@@ -14,6 +13,7 @@ import {
   IMAGE_TYPES,
   mealRoles,
   mealSlotKinds,
+  notificationCategories,
   oauthIntents,
   oauthProviders,
   paymentStatuses,
@@ -1439,24 +1439,8 @@ export const threadEntry = sqliteTable(
 )
 
 /**
- * A picture written into markdown (#379).
- *
- * One table rather than a fixed slot like `account_avatar`, `installation_icon` and
- * `installation_banner`: those each have one owner and nobody makes more of them, while
- * this is as many as a member uploads. The reference lives inside prose, so the row has
- * no owning entity to hang off — only the person who put it there.
- *
- * **Blob here rather than a file under the data volume.** Both are writable, so it is
- * not about where the process may write: the database is one file to back up, and
- * deleting a row and its bytes is one statement. A directory beside it is a second thing
- * that can drift out of step with the rows referring to it. At a few hundred pictures a
- * burn, capped, that is tens of megabytes a year.
- *
- * **Nothing garbage-collects.** A reference from prose has no foreign key, so knowing
- * when the last one goes would mean either scanning markdown on every save or a sweep
- * that has to know every markdown column in the schema — both lists that go one column
- * stale, silently. An orphan is cheaper than the machinery that would find it. The one
- * deletion that must work is the person's, which is what `uploaded_by` cascades.
+ * A picture written into markdown (#379). Why one table, why a blob and why nothing
+ * garbage-collects: "Pictures in what people write" in `docs/the-app.md`.
  *
  * No `byte_size` column: `length(bytes)` answers it, and a number stored beside the
  * bytes is a number to keep in step with them.
@@ -1483,19 +1467,14 @@ export const image = sqliteTable(
 )
 
 /**
- * One way somebody has said they can be reached (#388).
+ * One way somebody has said they can be reached (#388). Why rows rather than a column per
+ * network, and why every one of them is published to approved members while
+ * `account.email` is not: "The ways somebody can be reached" in `docs/accounts.md`.
  *
- * Rows rather than a column per network, because the list is ordered and the order is
- * half the point — the first is where somebody is actually reached. Adding a network is a
- * line in `enums.ts` **and** a table-rebuild migration, since `kind` carries a CHECK listing
- * the vocabulary and SQLite cannot alter one in place — `20260806180000_general_notifications`
- * is the precedent. Still less than a column per network, which would be a migration *and* a
- * wider row on the path of every read.
- *
- * Every row here is published to approved members, which is what separates the list from
- * `account.email`: that is the login identity and stays out of what other members read
- * (#159), while these are what somebody chose to put up — including an `email` row, which
- * is an address they typed rather than the one they sign in with.
+ * Adding a kind is a line in `enums.ts` **and** a table-rebuild migration: `kind` carries a
+ * CHECK listing the vocabulary and SQLite cannot alter one in place —
+ * `20260806180000_general_notifications` is the precedent, and nothing here fails until a
+ * write hits the old CHECK.
  *
  * `unique(account_id, kind, value)` so one handle is not listed twice, and the composite
  * index is the read: one account's list, in its order.

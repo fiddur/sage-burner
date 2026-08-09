@@ -7,7 +7,7 @@ import { eq } from 'drizzle-orm'
 import type { Database } from '../db/index.ts'
 
 import { isEmptyPatch } from '../db/patch.ts'
-import { INSTALLATION_ID, installation } from '../db/schema.ts'
+import { installation, INSTALLATION_ID } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { mailSettingsFor } from '../mail/mail.ts'
 import { configuredProviders } from '../oauth/settings.ts'

@@ -6,7 +6,7 @@ import { eq } from 'drizzle-orm'
 import type { GuardDeps } from '../auth/guards.ts'
 import type { Database } from '../db/index.ts'
 
-import { INSTALLATION_ID, installation, installationIcon } from '../db/schema.ts'
+import { installation, INSTALLATION_ID, installationIcon } from '../db/schema.ts'
 import { noStore, sendError } from '../http.ts'
 
 export interface PwaDeps extends GuardDeps {

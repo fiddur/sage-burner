@@ -1,6 +1,6 @@
 import type { MeResponse } from '@sage-burner/shared'
 
-import { apiRoutes, oauthProviderInfo, oauthProviders, OAUTH_OUTCOME_PARAM } from '@sage-burner/shared'
+import { apiRoutes, oauthProviderInfo, oauthProviders } from '@sage-burner/shared'
 import { useRef, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -10,6 +10,7 @@ import { isApiError } from '../api/client.ts'
 import { FormError, useFormError } from '../components/FormError.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
 import { useSocialLogins } from '../installation.tsx'
+import { useOauthOutcome } from '../outcome.ts'
 import { messageForCeremony, passkeysWork, signInWithPasskey } from '../passkey.ts'
 import { useSetViewer, useViewer } from '../viewer.tsx'
 
@@ -66,7 +67,7 @@ export const Login = ({
    * `unlinked` is the one that matters: it must read the same whether or not an account
    * exists for whatever address the provider holds, because this page is not an oracle.
    */
-  const outcome = signInOutcome(new URLSearchParams(window.location.search).get(OAUTH_OUTCOME_PARAM))
+  const outcome = signInOutcome(useOauthOutcome())
 
   // A ref rather than the `submitting` state, because state updates are
   // asynchronous: two clicks in the same tick both read `submitting === false`

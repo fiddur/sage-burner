@@ -22,10 +22,23 @@ import { nextOrder, reorder } from '../db/ordered.ts'
 import { accountConnection } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 
-/** One account's list, in the order they put it in. */
+/**
+ * One account's list, in the order they put it in.
+ *
+ * Named columns rather than the row, and for the reason `asMemberEntry` is an object
+ * literal: somebody else's page reads this, so a column added to `account_connection`
+ * reaches every member only when somebody names it here.
+ */
 export const connectionsFor = async (db: Database, accountId: string): Promise<Connection[]> =>
   await db
-    .select()
+    .select({
+      id: accountConnection.id,
+      account_id: accountConnection.account_id,
+      kind: accountConnection.kind,
+      value: accountConnection.value,
+      label: accountConnection.label,
+      order: accountConnection.order,
+    })
     .from(accountConnection)
     .where(eq(accountConnection.account_id, accountId))
     .orderBy(asc(accountConnection.order), asc(accountConnection.id))

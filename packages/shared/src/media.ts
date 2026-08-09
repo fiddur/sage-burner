@@ -105,7 +105,7 @@ export const isImageType = (value: unknown): value is ImageType =>
  * list stays because bytes stored before this, or by a client that skipped the resize,
  * still have to be served back with the type they came in as.
  */
-export const IMAGE_TYPE = 'image/webp'
+export const IMAGE_UPLOAD_TYPE = 'image/webp'
 
 /**
  * The longest edge a picture is scaled down to before it is sent.
@@ -134,6 +134,15 @@ export const MAX_IMAGE_BYTES = 2 * 1024 * 1024
  * one request and not a thousand of them, and #57's rate limiting is still unbuilt, so
  * the ceiling is deliberate rather than absent. At 2 MB apiece it is a gigabyte at worst
  * from one account, and a burn's whole photography is nowhere near it.
+ *
+ * **Recoverable, which it was not at first** (#392). It counts every row ever written,
+ * and deleting the comment that referenced a picture deliberately leaves the row — so
+ * without `/api/me/images` an account that reached this could not upload again by any
+ * action the app offered.
+ *
+ * Not exact: the route reads the count and then inserts, so two uploads racing one place
+ * below the ceiling can both pass. A soft cap at this size, so that is worth knowing
+ * rather than worth machinery.
  */
 export const MAX_IMAGES_PER_ACCOUNT = 500
 

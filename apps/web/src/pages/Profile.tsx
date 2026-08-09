@@ -1,4 +1,4 @@
-import type { Profile, AllergyItem } from '@sage-burner/shared'
+import type { AllergyItem, Profile } from '@sage-burner/shared'
 
 import { MAX_CONTACT, MAX_NOTES, MAX_PERSON_NAME } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
@@ -6,6 +6,7 @@ import { useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 import type { ConnectionsApi } from '../components/ConnectionsField.tsx'
 import type { PasskeysApi } from '../components/PasskeysField.tsx'
+import type { PicturesApi } from '../components/PicturesField.tsx'
 import type { PushApi } from '../components/PushToggle.tsx'
 import type { WaysInApi } from '../components/WaysInField.tsx'
 import type { YourBurnsApi } from '../components/YourBurns.tsx'
@@ -18,6 +19,7 @@ import { GuardedPage } from '../components/GuardedPage.tsx'
 import { LogOutButton } from '../components/LogOutButton.tsx'
 import { PasskeysField } from '../components/PasskeysField.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
+import { PicturesField } from '../components/PicturesField.tsx'
 import { PushToggle } from '../components/PushToggle.tsx'
 import { WaysInField } from '../components/WaysInField.tsx'
 import { YourBurns } from '../components/YourBurns.tsx'
@@ -31,6 +33,7 @@ export type ProfileApi = Pick<
 > &
   ConnectionsApi &
   PasskeysApi &
+  PicturesApi &
   WaysInApi &
   PushApi &
   YourBurnsApi
@@ -64,6 +67,11 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
   const items: readonly AllergyItem[] = vocabulary.status === 'ready' ? vocabulary.data : []
 
   const { busy: saving, formError, setError, run } = useAction()
+
+  // Read once: the address names the account above the sign-out button and seeds the
+  // one-press fill on the `email` kind, and two ternaries over the same load was what
+  // pushed this component over the complexity ceiling.
+  const email = loaded.status === 'ready' ? loaded.data.email : undefined
 
   const save = () => {
     setSaved(false)
@@ -102,104 +110,109 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
         </p>
       )}
 
-      {member && loaded.status === 'loading' && <p class="form-note">Loading…</p>}
+      {/* The member half, in one conditional rather than four: what somebody says about
+          themselves and their stay, behind the guard `updateMyProfile` already has. */}
+      {member && (
+        <>
+          {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
 
-      {member && loaded.status === 'failed' && <ErrorText message={loaded.message} />}
+          {loaded.status === 'failed' && <ErrorText message={loaded.message} />}
 
-      {member && loaded.status === 'ready' && (
-        <form
-          class="form"
-          onSubmit={(submitEvent) => {
-            submitEvent.preventDefault()
-            save()
-          }}
-        >
-          <label class="field">
-            <span>Your name</span>
-            <input
-              type="text"
-              name="name"
-              maxLength={MAX_PERSON_NAME}
-              aria-required
-              value={name}
-              onInput={(inputEvent) => setName(inputEvent.currentTarget.value)}
-            />
-          </label>
+          {loaded.status === 'ready' && (
+            <form
+              class="form"
+              onSubmit={(submitEvent) => {
+                submitEvent.preventDefault()
+                save()
+              }}
+            >
+              <label class="field">
+                <span>Your name</span>
+                <input
+                  type="text"
+                  name="name"
+                  maxLength={MAX_PERSON_NAME}
+                  aria-required
+                  value={name}
+                  onInput={(inputEvent) => setName(inputEvent.currentTarget.value)}
+                />
+              </label>
 
-          <label class="field">
-            <span>How can we reach you?</span>
-            <input
-              type="text"
-              name="contact"
-              maxLength={MAX_CONTACT}
-              aria-required
-              value={contact}
-              onInput={(inputEvent) => setContact(inputEvent.currentTarget.value)}
-            />
-          </label>
+              <label class="field">
+                <span>How can we reach you?</span>
+                <input
+                  type="text"
+                  name="contact"
+                  maxLength={MAX_CONTACT}
+                  aria-required
+                  value={contact}
+                  onInput={(inputEvent) => setContact(inputEvent.currentTarget.value)}
+                />
+              </label>
 
-          {items.length > 0 && (
-            <fieldset class="field">
-              <legend>Allergies or food you cannot eat</legend>
-              {items.map((item) => (
-                <label key={item.id} class="field-inline">
-                  <input
-                    type="checkbox"
-                    checked={ticked.includes(item.id)}
-                    onChange={(changed) =>
-                      setTicked((current) =>
-                        changed.currentTarget.checked
-                          ? [...current, item.id]
-                          : current.filter((id) => id !== item.id),
-                      )
-                    }
-                  />
-                  <span>{item.label}</span>
-                </label>
-              ))}
-            </fieldset>
+              {items.length > 0 && (
+                <fieldset class="field">
+                  <legend>Allergies or food you cannot eat</legend>
+                  {items.map((item) => (
+                    <label key={item.id} class="field-inline">
+                      <input
+                        type="checkbox"
+                        checked={ticked.includes(item.id)}
+                        onChange={(changed) =>
+                          setTicked((current) =>
+                            changed.currentTarget.checked
+                              ? [...current, item.id]
+                              : current.filter((id) => id !== item.id),
+                          )
+                        }
+                      />
+                      <span>{item.label}</span>
+                    </label>
+                  ))}
+                </fieldset>
+              )}
+
+              <label class="field">
+                <span>
+                  {items.length > 0 ? 'Anything else you cannot eat' : 'Allergies or food you cannot eat'}
+                </span>
+                <textarea
+                  name="allergies_notes"
+                  maxLength={MAX_NOTES}
+                  rows={rowsFor(allergies)}
+                  value={allergies}
+                  onInput={(inputEvent) => setAllergies(inputEvent.currentTarget.value)}
+                />
+              </label>
+
+              <p class="form-note">
+                Food is primarily vegetarian, with vegan options. Read by whoever plans the meals, for every
+                burn you come to — so correcting it here corrects it everywhere.
+              </p>
+
+              {saved && (
+                <p class="form-note" role="status">
+                  Saved.
+                </p>
+              )}
+
+              <FormError error={formError} />
+
+              <PendingButton busy={saving} label="Save" busyLabel="Saving…" type="submit" />
+            </form>
           )}
-
-          <label class="field">
-            <span>
-              {items.length > 0 ? 'Anything else you cannot eat' : 'Allergies or food you cannot eat'}
-            </span>
-            <textarea
-              name="allergies_notes"
-              maxLength={MAX_NOTES}
-              rows={rowsFor(allergies)}
-              value={allergies}
-              onInput={(inputEvent) => setAllergies(inputEvent.currentTarget.value)}
-            />
-          </label>
 
           <p class="form-note">
-            Food is primarily vegetarian, with vegan options. Read by whoever plans the meals, for every burn
-            you come to — so correcting it here corrects it everywhere.
+            Signed in as {email ?? 'you'}. Changing that address is not possible yet — ask someone with admin.
           </p>
-
-          {saved && (
-            <p class="form-note" role="status">
-              Saved.
-            </p>
-          )}
-
-          <FormError error={formError} />
-
-          <PendingButton busy={saving} label="Save" busyLabel="Saving…" type="submit" />
-        </form>
-      )}
-
-      {member && (
-        <p class="form-note">
-          Signed in as {loaded.status === 'ready' ? loaded.data.email : 'you'}. Changing that address is not
-          possible yet — ask someone with admin.
-        </p>
+        </>
       )}
 
       <AvatarField api={api} />
 
-      <ConnectionsField api={api} />
+      <ConnectionsField api={api} loginAddress={email} />
+
+      <PicturesField api={api} />
 
       <PasskeysField api={api} />
 

@@ -71,14 +71,12 @@ describe('what the form refuses before sending', () => {
 
 describe('why it could not be saved', () => {
   it('tells the two 409s apart, which the status alone does not', () => {
-    expect(messageForFailure(apiError(409, 'conflict', 'conflict'), 1)).toContain('already listed')
-    expect(messageForFailure(apiError(409, 'conflict', 'conflict'), MAX_CONNECTIONS)).toContain(
-      'as many ways',
-    )
+    expect(messageForFailure(apiError(409, 'conflict', 'conflict'), false)).toContain('already listed')
+    expect(messageForFailure(apiError(409, 'conflict', 'conflict'), true)).toContain('as many ways')
   })
 
   it('says a refused value is worth another look rather than repeating the code', () => {
-    expect(messageForFailure(apiError(400, 'bad_request', 'bad_request'), 0)).toContain('another look')
+    expect(messageForFailure(apiError(400, 'bad_request', 'bad_request'), false)).toContain('another look')
   })
 })
 
@@ -87,6 +85,49 @@ describe('the list on your own details page', () => {
     render(<ConnectionsField api={stub()} />)
 
     await waitFor(() => expect(screen.getByText(/have not added any yet/)).toBeTruthy())
+  })
+
+  it('says a failed load failed, rather than showing an empty list', async () => {
+    // "You have not added any yet" for a request that never answered invites an Add that
+    // then 409s against a row nobody can see (#395).
+    render(<ConnectionsField api={stub({ getMyConnections: () => Promise.reject(new Error('offline')) })} />)
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Could not load your ways')
+    expect(screen.queryByText(/have not added any yet/)).toBeNull()
+  })
+
+  it('keeps what was typed when the save is refused', async () => {
+    // #205: a refusal must not take the form away with it. The 409 here is the duplicate
+    // one, which is exactly the case somebody fixes by editing what is still on screen.
+    render(
+      <ConnectionsField
+        api={stub({ addMyConnection: () => Promise.reject(apiError(409, 'conflict', 'Conflict.')) })}
+      />,
+    )
+
+    await waitFor(() => expect(screen.getByText(/have not added any yet/)).toBeTruthy())
+    fireEvent.input(screen.getByLabelText('Handle for a new way to reach you'), { target: { value: 'wren' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add it' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('already listed')
+    expect(screen.getByLabelText('Handle for a new way to reach you')).toHaveProperty('value', 'wren')
+  })
+
+  it('fills in the sign-in address in one press, for the one kind it is', async () => {
+    // #388 asked for this and it did not land in #394. The address comes from the page
+    // around the field, since `/api/auth/me` deliberately does not carry it.
+    render(<ConnectionsField api={stub()} loginAddress="wren@example.org" />)
+
+    await waitFor(() => expect(screen.getByText(/have not added any yet/)).toBeTruthy())
+    const handle = screen.getByLabelText('Handle for a new way to reach you')
+    expect(screen.queryByRole('button', { name: 'Use my sign-in address' })).toBeNull()
+
+    fireEvent.change(screen.getByLabelText('Kind of a new way to reach you'), { target: { value: 'email' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Use my sign-in address' }))
+
+    expect(handle).toHaveProperty('value', 'wren@example.org')
+    // Gone once it has been used: a button that would do nothing is furniture.
+    expect(screen.queryByRole('button', { name: 'Use my sign-in address' })).toBeNull()
   })
 
   it('draws what is stored, in the order it came back', async () => {

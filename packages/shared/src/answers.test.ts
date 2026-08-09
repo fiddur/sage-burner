@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { FormQuestion } from './schemas/form-question.ts'
 
-import { MAX_ANSWER_LENGTH, answerProblems, looksLikeEmail } from './answers.ts'
+import { answerProblems, looksLikeEmail, MAX_ANSWER_LENGTH } from './answers.ts'
 
 const question = (over: Partial<FormQuestion> & Pick<FormQuestion, 'id' | 'type'>): FormQuestion => ({
   order: 0,

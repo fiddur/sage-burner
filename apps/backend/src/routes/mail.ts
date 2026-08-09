@@ -8,7 +8,7 @@ import type { GuardDeps } from '../auth/guards.ts'
 import type { MailDeps } from '../mail/mail.ts'
 
 import { viewerFor } from '../auth/viewer.ts'
-import { account, INSTALLATION_ID, installation, mailSetting } from '../db/schema.ts'
+import { account, installation, INSTALLATION_ID, mailSetting } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { NOT_CONFIGURED, post } from '../mail/mail.ts'
 import { testMessage } from '../mail/messages.ts'

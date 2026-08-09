@@ -11,7 +11,7 @@ import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { INSTALLATION_ID, account, accountRole } from '../db/schema.ts'
+import { account, accountRole, INSTALLATION_ID } from '../db/schema.ts'
 
 const SECRET = 'b'.repeat(40)
 const NOW = '2026-08-07T10:00:00.000Z'
