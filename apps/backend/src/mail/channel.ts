@@ -4,7 +4,7 @@ import type { Database } from '../db/index.ts'
 import type { EmailChannel } from '../push/notify.ts'
 import type { MailDeps, Posted } from './mail.ts'
 
-import { account, INSTALLATION_ID, installation } from '../db/schema.ts'
+import { account, installation, INSTALLATION_ID } from '../db/schema.ts'
 import { mailSettingsFor, post, reasonFor } from './mail.ts'
 import { absolute, notificationMessage } from './messages.ts'
 

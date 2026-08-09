@@ -18,22 +18,21 @@ import { useSetInstallationTitle } from '../installation.tsx'
 import { useAction, useLoadInto } from '../load.ts'
 import { isAdmin, useViewer } from '../viewer.tsx'
 
-/**
- * This page is the installation's settings, and nothing personal.
- *
- * The push toggle used to be here as well as on Your details, on the argument that an
- * admin holding `admin` without `member` is refused from that page. Two switches for one
- * subscription is the worse problem: which of them is on is a question the page cannot
- * answer, and it reads as two different settings. It lives where a person's own settings
- * live, and the gap for an admin who is not a member is #396.
- */
 export type AdminSettingsApi = BannerApi &
   IconApi &
   MailApi &
   OauthApi &
   Pick<ApiClient, 'getInstallation' | 'updateInstallation'>
 
-/** What this installation calls itself. */
+/**
+ * The installation's settings, and nothing personal.
+ *
+ * The push toggle used to be here as well as on Your details, and signing out with it, both
+ * because an admin holding `admin` without `member` was refused from that page. Two controls
+ * for one thing is the worse problem: which switch is on is a question neither page can
+ * answer, and it reads as two different settings. Your details is `approved` since #396, so
+ * that account reaches its own settings where everybody else's are.
+ */
 export const AdminSettings = ({ api }: { api: AdminSettingsApi }) => {
   const viewer = useViewer()
   const admin = isAdmin(viewer)

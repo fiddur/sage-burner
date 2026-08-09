@@ -1,4 +1,4 @@
-import type { NotificationsResponse, NotificationSettings } from '@sage-burner/shared'
+import type { NotificationSettings, NotificationsResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
 import { apiRoutes, notificationCategories, notificationSettingsSchema } from '@sage-burner/shared'

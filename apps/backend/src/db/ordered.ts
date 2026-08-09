@@ -1,9 +1,10 @@
 /**
  * Lists a person put in an order, and the two writes that keep them in one.
  *
- * Five lists carry an `order` somebody drags around: the schedule's places, the
+ * Six lists carry an `order` somebody drags around: the schedule's places, the
  * application's questions, a burn's lodging and helping options, the allergy
- * vocabulary and the FAQ. Both invariants live here rather than once per list — **the
+ * vocabulary, the FAQ, and the ways somebody can be reached. Both invariants live here
+ * rather than once per list — **the
  * server assigns the position**, and **a reorder names every row exactly once or is
  * refused**.
  */

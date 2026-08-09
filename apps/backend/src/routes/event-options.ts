@@ -1,4 +1,4 @@
-import type { EventOption, EventOptionTaken, EventOptionsResponse } from '@sage-burner/shared'
+import type { EventOption, EventOptionsResponse, EventOptionTaken } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
 import {

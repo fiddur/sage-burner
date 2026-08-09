@@ -15,7 +15,10 @@ export const AddPicture = ({ pictures, label }: { pictures: ImageUpload; label: 
 
   return (
     <>
-      <p class="row md-field-pictures">
+      {/* A `div`, not a `p`: `ErrorText` renders a paragraph of its own, and one of the
+          places this is mounted is itself a row wrapper. A paragraph inside a paragraph
+          is invalid markup that Preact builds anyway, so nothing here would show it. */}
+      <div class="row">
         <label class="link-button">
           Add a picture
           <input
@@ -36,7 +39,7 @@ export const AddPicture = ({ pictures, label }: { pictures: ImageUpload; label: 
         </label>
 
         {pictures.busy && <span class="form-note">Sending…</span>}
-      </p>
+      </div>
 
       <ErrorText message={pictures.error} />
     </>

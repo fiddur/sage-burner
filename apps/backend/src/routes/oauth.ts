@@ -12,9 +12,9 @@ import type { OAuthCalls } from '../oauth/client.ts'
 import { viewerFor } from '../auth/viewer.ts'
 import { accountAvatar, accountIdentity, oauthState } from '../db/schema.ts'
 import { noStore, sendError } from '../http.ts'
-import { hasAnotherWayIn, identitiesFor } from '../oauth/identities.ts'
+import { anotherWayInSurvives, identitiesFor } from '../oauth/identities.ts'
 import { authorizeUrl } from '../oauth/providers.ts'
-import { oauthSettingFor } from '../oauth/settings.ts'
+import { usableOauthSetting } from '../oauth/settings.ts'
 import { originOf } from '../shell.ts'
 import { cookieHeader } from './auth.ts'
 
@@ -170,9 +170,11 @@ export const registerOauthRoutes = (
       // No role is required: an account with no role yet still has to be able to add a way in
       // and get back in with it, which is #9's rule for passkeys.
       const viewer = intent === 'link' ? await viewerFor(request, { db, sessions }) : undefined
-      if (intent === 'link' && viewer === undefined) return sendError(reply, 401)
+      // A redirect rather than a JSON 401: this is reached by a plain `<a href>`, so an
+      // expired session would otherwise put an error envelope on the screen.
+      if (intent === 'link' && viewer === undefined) return back(reply, loginPage())
 
-      const setting = await oauthSettingFor(db, provider)
+      const setting = await usableOauthSetting(db, provider)
       const uri = redirectUri(request, provider)
       if (setting === undefined || uri === undefined) return back(reply, failed)
 
@@ -273,7 +275,7 @@ export const registerOauthRoutes = (
     try {
       await maybeAvatar(accountId, profile.picture)
     } catch {
-      // Swallowed on purpose. The link is done, and a picture is a convenience.
+      /* empty */
     }
 
     return back(reply, detailsPage('linked'))
@@ -309,7 +311,7 @@ export const registerOauthRoutes = (
       if (spent.provider !== provider) return back(reply, failed)
       if (nonceFrom(request.headers.cookie) !== spent.nonce) return back(reply, failed)
 
-      const setting = await oauthSettingFor(db, provider)
+      const setting = await usableOauthSetting(db, provider)
       const uri = redirectUri(request, provider)
       if (setting === undefined || uri === undefined) return back(reply, failed)
 
@@ -346,16 +348,25 @@ export const registerOauthRoutes = (
     const viewer = await viewerFor(request, { db, sessions })
     if (viewer === undefined) return sendError(reply, 401)
 
-    // The last way in cannot go. `removePasskey` refuses the same thing for the same
-    // reason: an account nobody can sign into is not a tidier account.
-    if (!(await hasAnotherWayIn(db, viewer.account_id, provider))) return sendError(reply, 409)
-
-    const [gone] = await db
-      .delete(accountIdentity)
+    const [mine] = await db
+      .select({ id: accountIdentity.id })
+      .from(accountIdentity)
       .where(and(eq(accountIdentity.account_id, viewer.account_id), eq(accountIdentity.provider, provider)))
+      .limit(1)
+
+    if (mine === undefined) return sendError(reply, 404)
+
+    // The last way in cannot go. `removePasskey` refuses the same thing for the same
+    // reason: an account nobody can sign into is not a tidier account. The guard is inside
+    // the statement — `anotherWayInSurvives` says why.
+    const gone = await db
+      .delete(accountIdentity)
+      .where(and(eq(accountIdentity.id, mine.id), anotherWayInSurvives(viewer.account_id, provider)))
       .returning({ id: accountIdentity.id })
 
-    if (gone === undefined) return sendError(reply, 404)
+    // The row was there a moment ago and this is the owner's own request, so the only thing
+    // that matches nothing is the guard.
+    if (gone.length === 0) return sendError(reply, 409)
 
     return reply.code(204).send()
   })

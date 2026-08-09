@@ -84,6 +84,23 @@ describe('somebody’s page', () => {
     expect(screen.getByRole('button', { name: /Copy Wren Aldertide’s Discord/ })).toBeTruthy()
   })
 
+  it('names a link with the text it shows, so voice control can address it', async () => {
+    // WCAG 2.5.3: an accessible name that drops the visible text cannot be spoken. The
+    // name still says whose it is, because a page of "wren" links needs telling apart.
+    show(stub(aPerson({ connections: [aWay({ id: 'c-1', kind: 'messenger', value: 'wren' })] })))
+
+    const link = await screen.findByRole('link', { name: /Messenger/ })
+
+    expect(link.getAttribute('aria-label')).toBe('wren, Wren Aldertide’s Messenger')
+  })
+
+  it('says "this person" rather than "them" where a name would go possessive', async () => {
+    // `them` reads well in prose and not at all in "Copy them’s Discord".
+    show(stub(aPerson({ name: null, connections: [aWay({ id: 'c-1', kind: 'discord', value: 'wren' })] })))
+
+    expect(await screen.findByRole('button', { name: 'Copy this person’s Discord' })).toBeTruthy()
+  })
+
   it('writes an email as a mailto, which is what the list is for', async () => {
     // Not `account.email`: this is the address they typed and chose to publish (#159).
     show(stub(aPerson({ connections: [aWay({ id: 'c-1', kind: 'email', value: 'wren@example.org' })] })))

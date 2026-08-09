@@ -892,9 +892,11 @@ the path of every read.
 only the kind says how: `@wren` on Instagram and `@wren@chaos.social` on Mastodon build
 different addresses, and a Discord username builds none at all. `connectionKindInfo` holds
 each kind's label, icon, hint and `href`, and the `href` is allowed to answer nothing —
-Discord and Signal do, because a username you paste into a search is not a link. A kind
-added without an answer would otherwise render a dead anchor, and `enums.test.ts` asserts
-every kind has one.
+Discord and Signal do, because a username you paste into a search is not a link. That every
+kind has one at all is the type's doing — `satisfies Record<ConnectionKind, ConnectionKindInfo>`
+makes omitting it a compile error — so what `enums.test.ts` is for is the part the type cannot
+say: that every href any kind builds, from anything anybody types, carries a scheme worth
+sending a browser to.
 
 `link` is the escape hatch: a label and a URL somebody types. A labelled URL rather than a
 free-text _kind_, because a kind nothing knows about could produce neither an icon nor an
@@ -981,6 +983,13 @@ what an authorization-code exchange sends, and the read answers `has_secret`.
 login page draws its buttons before anybody is signed in, so it cannot ask an admin route.
 Absent rather than present and disabled, which is #30's rule about the email column.
 
+**"Configured" means both halves filled in**, not a row existing (#401). The secret is
+optional on the update, so a first save that leaves it blank — or one clearing it — keeps a row
+with `client_secret = ''`; selected on existence, that drew "Continue with Discord" for a trip
+that could only end at `/login?from=refused`. `configuredProviders` selects on both columns
+being non-empty and `usableOauthSetting` is the same rule for the routes that start and finish
+a trip, so the button and the journey cannot disagree.
+
 ### What it will not do
 
 **It never creates an account.** Accounts come from the CLI bootstrap, an approved
@@ -999,6 +1008,13 @@ unmatched sign-in answers `unlinked`, worded to read the same whether or not an 
 no password, passkey or other identity remains — `removePasskey`'s refusal generalised.
 Somebody who set no password and linked one provider has exactly one, and losing it locks them
 out of a burn they have paid for.
+
+The check is **inside the DELETE's own `WHERE`**, as `removePasskey`'s is (#239). Read in a
+statement of its own, two removals from two tabs — a Discord identity and a Facebook one, on
+an account with no password — could each see the other as the survivor, both pass, and
+together leave the account with nothing. These two are the only places in the app that
+engineer for a race; not because either window is realistic, but because the consequence is
+permanent and the password reset that would undo it is an admin's.
 
 ### The round trip
 
@@ -1105,8 +1121,10 @@ rather than empty is what makes that possible, which is why `optionalText` turni
 null is load-bearing here rather than tidy.
 
 **Nothing extra for erasure.** The column goes with the account, and the pictures written into
-it cascade from `image.uploaded_by`. Both were already true; `profile.test.ts` asserts the
-first rather than assuming it, since "needs no cascade" is still a claim.
+it cascade from `image.uploaded_by`. Both were already true; `profile.test.ts` writes a real
+`image` row into an introduction and asserts both go, since "needs no cascade" is still a
+claim — and a test that stored no picture would have proved only that deleting a row deletes
+it.
 
 `renderMarkdown` puts `loading="lazy"` on every image it draws, which is here rather than per
 surface: an introduction is a page of prose and half a dozen photographs, and a thread is as

@@ -1,12 +1,15 @@
-import type { Identity, OAuthProvider } from '@sage-burner/shared'
+import type { OAuthProvider } from '@sage-burner/shared'
 
-import { apiRoutes, oauthProviderInfo, oauthProviders, OAUTH_OUTCOME_PARAM } from '@sage-burner/shared'
-import { useEffect, useState } from 'preact/hooks'
+import { apiRoutes, oauthProviderInfo, oauthProviders } from '@sage-burner/shared'
+import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
 import { useSocialLogins } from '../installation.tsx'
+import { useLoad } from '../load.ts'
+import { useOauthOutcome } from '../outcome.ts'
+import { ErrorText } from './ErrorText.tsx'
 import { FormError, useFormError } from './FormError.tsx'
 
 export type WaysInApi = Pick<ApiClient, 'getMyIdentities' | 'removeMyIdentity'>
@@ -52,24 +55,16 @@ const added = (iso: string) => new Date(iso).toLocaleDateString()
  */
 export const WaysInField = ({ api }: { api: WaysInApi }) => {
   const configured = useSocialLogins()
-  const [identities, setIdentities] = useState<Identity[] | undefined>(undefined)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useFormError()
+  const outcome = outcomeMessage(useOauthOutcome())
 
-  useEffect(() => {
-    const controller = new AbortController()
-
-    api
-      .getMyIdentities(controller.signal)
-      .then(({ identities: mine }) => {
-        if (!controller.signal.aborted) setIdentities(mine)
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setIdentities([])
-      })
-
-    return () => controller.abort()
-  }, [api])
+  // `useLoad` rather than a fetch caught into `[]`, so a failure is a sentence instead of a
+  // list that says nothing is linked and offers to link it again (#395's finding, here too).
+  const { loaded, reload } = useLoad(async (signal) => (await api.getMyIdentities(signal)).identities, {
+    fallback: 'Could not load your ways in. Please reload the page.',
+  })
+  const identities = loaded.status === 'ready' ? loaded.data : undefined
 
   const offered = oauthProviders.filter((provider) => configured.includes(provider))
   if (offered.length === 0) return null
@@ -81,15 +76,13 @@ export const WaysInField = ({ api }: { api: WaysInApi }) => {
     setBusy(true)
     try {
       await api.removeMyIdentity(provider)
-      setIdentities((mine) => mine?.filter((row) => row.provider !== provider))
+      await reload()
     } catch (failure) {
       setError(messageForRemoval(failure))
     } finally {
       setBusy(false)
     }
   }
-
-  const outcome = outcomeMessage(new URLSearchParams(window.location.search).get(OAUTH_OUTCOME_PARAM))
 
   return (
     <section>
@@ -102,7 +95,9 @@ export const WaysInField = ({ api }: { api: WaysInApi }) => {
 
       {outcome !== undefined && <p class="form-note">{outcome}</p>}
 
-      {identities === undefined && <p class="form-note">Loading…</p>}
+      {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
+
+      {loaded.status === 'failed' && <ErrorText message={loaded.message} />}
 
       {identities !== undefined && (
         <ul class="ways-in">

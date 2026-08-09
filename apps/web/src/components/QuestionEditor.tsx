@@ -1,10 +1,10 @@
 import type { FormQuestion, FormQuestionType } from '@sage-burner/shared'
 
 import {
-  MAX_NOTES,
-  MAX_QUESTION_LABEL,
   formQuestionTypes,
   isFormQuestionType,
+  MAX_NOTES,
+  MAX_QUESTION_LABEL,
   tickBoxRequired,
 } from '@sage-burner/shared'
 import { useEffect, useState } from 'preact/hooks'

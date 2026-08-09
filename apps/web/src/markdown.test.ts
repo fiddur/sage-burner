@@ -137,6 +137,15 @@ describe('renderMarkdown', () => {
     )
   })
 
+  it('leaves every image lazy, wherever markdown is drawn', () => {
+    // One rule for every surface (#390): an introduction is a page of prose and half a
+    // dozen photographs, and a thread is as many as anybody has posted — each the full
+    // stored bytes. Asserted beside the renderer it constrains rather than only through a
+    // page test, so an edit to the `img` string fails here.
+    expect(renderMarkdown('![a photo](https://example.org/burn.jpg)')).toContain('loading="lazy"')
+    expect(renderMarkdown('![](/api/images/img-1)')).toContain('loading="lazy"')
+  })
+
   it('rejects an image with an unsafe source', () => {
     const html = renderMarkdown('![alt](javascript:alert(1))')
 

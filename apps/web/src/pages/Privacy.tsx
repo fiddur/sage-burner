@@ -7,11 +7,8 @@ import { renderMarkdown } from '../markdown.ts'
 export type PrivacyApi = Pick<ApiClient, 'getPrivacy'>
 
 /**
- * What this app holds about somebody, and who can see it (#402).
- *
- * Public, and that is the requirement rather than a nicety: Facebook's app review will not
- * take an app without a policy at a URL, and a reviewer opens it as a stranger. So does
- * anybody deciding whether to apply, which is the better reason for it to exist.
+ * What this app holds about somebody, and who can see it (#402). `privacyResponseSchema`
+ * carries why the page is public.
  *
  * `Changelog`'s shape throughout — the page owns the `<h1>` so the file needs none, and
  * `renderMarkdown` shifts a `#` down a level under it.

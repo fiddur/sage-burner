@@ -10,6 +10,8 @@ import {
   effortLevels,
   eventOptionKinds,
   formQuestionTypes,
+  inviteStatuses,
+  inviteStatusOf,
   isAccountRole,
   isApplicationStatus,
   isEffortLevel,
@@ -18,8 +20,6 @@ import {
   isInviteStatus,
   isPaymentStatus,
   isPlaceColor,
-  inviteStatusOf,
-  inviteStatuses,
   paymentStatuses,
   placeColors,
 } from './enums.ts'
@@ -195,6 +195,36 @@ describe('what is stored for a way of being reached', () => {
     // `profile.php` — reduced as a handle it would point at nobody.
     expect(connectionValue('messenger', 'https://facebook.com/profile.php?id=1234567890')).toBe('1234567890')
     expect(connectionValue('messenger', 'https://www.facebook.com/profile.php?locale=sv_SE&id=42')).toBe('42')
+  })
+
+  it('keeps a Facebook link whole when its first segment is not a handle', () => {
+    // `handleIn` takes the first path segment, so these reduced to the literal
+    // `profile.php` or `people` and rendered `m.me/profile.php` — a wrong handle stored
+    // silently. Kept whole they are visibly wrong, which is the better failure (#398).
+    expect(connectionValue('messenger', 'https://facebook.com/profile.php?id=abc')).toBe(
+      'https://facebook.com/profile.php?id=abc',
+    )
+    expect(connectionValue('messenger', 'https://facebook.com/profile.php?myid=42')).toBe(
+      'https://facebook.com/profile.php?myid=42',
+    )
+    expect(connectionValue('messenger', 'https://www.facebook.com/people/Wren/123456/')).toBe(
+      'https://www.facebook.com/people/Wren/123456/',
+    )
+  })
+
+  it('agrees with itself about what Facebook is, on both branches', () => {
+    // The numeric branch matched `[^\s/]*facebook\.com`, which takes `notfacebook.com` and
+    // eats a whole authority — so a query string naming Facebook was read as one (#398).
+    expect(connectionValue('messenger', 'https://notfacebook.com/profile.php?id=123')).toBe(
+      'https://notfacebook.com/profile.php?id=123',
+    )
+    expect(connectionValue('messenger', 'https://evil.example?x=facebook.com/profile.php?id=123')).toBe(
+      'https://evil.example?x=facebook.com/profile.php?id=123',
+    )
+    // The passing sibling, so anchoring has not simply refused everything: a subdomain is
+    // still Facebook, on both branches.
+    expect(connectionValue('messenger', 'https://m.facebook.com/profile.php?id=123')).toBe('123')
+    expect(connectionValue('messenger', 'https://m.facebook.com/wren')).toBe('wren')
   })
 
   it('reduces a pasted Mastodon URL to the address its own network uses', () => {

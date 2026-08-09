@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 import { MAX_LOCATION, MAX_TITLE, MAX_WELCOME_LENGTH } from '../limits.ts'
-import { dateSchema, dateTimeSchema, idSchema, slugSchema, nonEmptyText, timeSchema } from './common.ts'
+import { dateSchema, dateTimeSchema, idSchema, nonEmptyText, slugSchema, timeSchema } from './common.ts'
 
 /** Tolerates missing keys so `.partial()` and `.omit()` derivations still typecheck. */
 type DateRange = { start_date?: string; end_date?: string; start_time?: string; end_time?: string }

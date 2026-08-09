@@ -69,9 +69,24 @@ describe('PasskeysField', () => {
     expect(await screen.findByText('You have no passkeys yet.')).toBeTruthy()
   })
 
+  it('says a failed load failed, rather than showing an empty list', async () => {
+    // "You have no passkeys yet" for a request that never answered invites somebody to
+    // register a device that is already here (#395).
+    renderField(stub({ getMyPasskeys: () => Promise.reject(new Error('offline')) }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Could not load your passkeys')
+    expect(screen.queryByText('You have no passkeys yet.')).toBeNull()
+  })
+
   it('registers one and shows what came back', async () => {
-    const add = vi.fn(() => Promise.resolve({ passkeys: [aPasskey({ label: 'Work laptop' })] }))
-    renderField(stub({ addPasskey: add }))
+    // The stub keeps a list, because the field re-reads after a write rather than
+    // trusting the response — the pattern every page here follows.
+    const held: Passkey[] = []
+    const add = vi.fn(() => {
+      held.push(aPasskey({ label: 'Work laptop' }))
+      return Promise.resolve({ passkeys: [...held] })
+    })
+    renderField(stub({ addPasskey: add, getMyPasskeys: () => Promise.resolve({ passkeys: [...held] }) }))
 
     await screen.findByText('You have no passkeys yet.')
     fireEvent.input(screen.getByLabelText('Name this device'), { target: { value: 'Work laptop' } })
@@ -117,10 +132,14 @@ describe('PasskeysField', () => {
   })
 
   it('removes one', async () => {
-    const remove = vi.fn(() => Promise.resolve({ passkeys: [] }))
+    let held = [aPasskey()]
+    const remove = vi.fn((id: string) => {
+      held = held.filter((key) => key.id !== id)
+      return Promise.resolve({ passkeys: [...held] })
+    })
     renderField(
       stub({
-        getMyPasskeys: () => Promise.resolve({ passkeys: [aPasskey()] }),
+        getMyPasskeys: () => Promise.resolve({ passkeys: [...held] }),
         removePasskey: remove,
       }),
     )

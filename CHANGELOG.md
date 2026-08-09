@@ -20,6 +20,37 @@ under today's heading, and make a new heading when there is none.
   before, and the notification switch had already moved off the admin page. What is about a
   stay is still a member's: the name and allergies planning needs, and the burns themselves.
 
+- **You can see and delete the pictures you have added**, under **Pictures you have added** on
+  Your details. Every picture you paste or drop into something you write is kept, whether or
+  not what you wrote still shows it, and until now there was no way to take one back off —
+  so somebody who filled up their allowance could never add another. Taking one off frees a
+  place, and leaves a gap wherever it was still being shown.
+
+- **Pasting an SVG into a comment now says why it will not do**, instead of failing with
+  "could not read that picture".
+
+- **A Facebook link the app cannot read a handle out of is kept as you pasted it**, rather
+  than being quietly stored as something that led nowhere.
+
+- **The links on somebody's page are named by what they say**, so a screen reader or voice
+  control can address them; and a page for somebody with no name yet no longer offers to
+  copy "them's Discord".
+
+- **"Continue with Discord" only appears where it can actually work.** A provider saved with
+  a client id and no secret used to draw a button that could only end in "that did not work".
+
+- **"That is linked now" is said once**, rather than again on every reload of the page.
+
+- **A refused save no longer empties the form** when you add a way of being reached, and a
+  list that could not load says so instead of looking empty.
+
+- **Your sign-in address fills in with one press** when you add it as a way of being reached.
+
+- **The privacy page is linked from the footer of every page**, and from the application form
+  above the Send button — which is where somebody hands over contact details before they have
+  an account. It also now says what the calendar subscription gives away: the programme's
+  titles and descriptions are readable by anybody holding that address, without signing in.
+
 - **There is a privacy page now**, at /privacy, saying what this app keeps about you, who can
   see it, and how to get rid of it. Anybody can read it without signing in — which is what
   Facebook asks for before it will let people sign in with it, and a fair thing to be able to

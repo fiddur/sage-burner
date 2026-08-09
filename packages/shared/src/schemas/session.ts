@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 import { placeColors } from '../enums.ts'
 import { MAX_DESCRIPTION, MAX_OPTION_LABEL, MAX_TITLE } from '../limits.ts'
-import { dateTimeSchema, idSchema, optionalText, nonEmptyText } from './common.ts'
+import { dateTimeSchema, idSchema, nonEmptyText, optionalText } from './common.ts'
 
 /** Tolerates missing keys so `.partial()` and `.omit()` derivations still typecheck. */
 type TimeSlot = { time_slot_start?: string | null; time_slot_end?: string | null }

@@ -28,6 +28,8 @@ const aProfile = (over: Partial<Profile> = {}): Profile => ({
 const stub = (over: Partial<ProfileApi> = {}, profile = aProfile()): ProfileApi => ({
   getMyProfile: () => Promise.resolve({ profile }),
   getMyConnections: () => Promise.resolve({ connections: [] }),
+  getMyImages: () => Promise.resolve({ images: [] }),
+  removeMyImage: () => Promise.reject(new Error('removeMyImage is not stubbed here')),
   getMyIdentities: () => Promise.resolve({ identities: [] }),
   removeMyIdentity: () => Promise.reject(new Error('removeMyIdentity is not stubbed here')),
   addMyConnection: () => Promise.reject(new Error('addMyConnection is not stubbed here')),

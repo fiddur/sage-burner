@@ -11,8 +11,8 @@ const stub = (markdown: string): PrivacyApi => ({ getPrivacy: () => Promise.reso
 
 describe('the privacy page', () => {
   it('renders the policy for anybody, signed in or not', async () => {
-    // No `ViewerProvider` here on purpose: this page must render for a stranger, which is
-    // what Facebook's app review is, and the absence of a guard is the thing being asserted.
+    // No `ViewerProvider` here on purpose: the absence of a guard is the thing being
+    // asserted, and `privacyResponseSchema` carries why there is none.
     render(<Privacy api={stub('# What we keep\n\nYour name, and not much else.')} />)
 
     expect(await screen.findByRole('heading', { level: 2, name: 'What we keep' })).toBeTruthy()

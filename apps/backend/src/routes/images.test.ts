@@ -244,6 +244,91 @@ describe('a picture written into markdown', () => {
     expect(client().prepare('select count(*) as n from image').get()?.n).toBe(0)
   })
 
+  it('lists what one account has stored, newest first, and nobody else’s', async () => {
+    const server = await build()
+    const ada = await givenAccount()
+    const bea = await givenAccount()
+    const older = await upload(server, ada.cookie)
+    await db()
+      .update(image)
+      .set({ created_at: '2026-07-01T00:00:00.000Z' })
+      .where(eq(image.id, older.json().id))
+    const newer = await upload(server, ada.cookie)
+    await upload(server, bea.cookie)
+
+    const listed = await server.inject({
+      method: 'GET',
+      url: '/api/me/images',
+      headers: { cookie: ada.cookie },
+    })
+
+    expect(listed.statusCode).toBe(200)
+    expect(listed.json().images.map((row: { id: string }) => row.id)).toEqual([
+      newer.json().id,
+      older.json().id,
+    ])
+  })
+
+  it('carries no bytes in the list, which would be megabytes apiece', async () => {
+    const server = await build()
+    const ada = await givenAccount()
+    await upload(server, ada.cookie)
+
+    const listed = await server.inject({
+      method: 'GET',
+      url: '/api/me/images',
+      headers: { cookie: ada.cookie },
+    })
+
+    expect(Object.keys(listed.json().images[0]).sort()).toEqual(['created_at', 'id'])
+  })
+
+  it('frees a slot when one is taken off, so the ceiling is recoverable', async () => {
+    // The dead end this route exists for: the cap counts every row ever written, so an
+    // account at the ceiling could not upload again by any action the app offered.
+    const server = await build()
+    const ada = await givenAccount()
+    await givenStoredImages(ada.id, MAX_IMAGES_PER_ACCOUNT - 1)
+    const last = await upload(server, ada.cookie)
+    expect((await upload(server, ada.cookie)).statusCode).toBe(409)
+
+    const removed = await server.inject({
+      method: 'DELETE',
+      url: `/api/me/images/${last.json().id}`,
+      headers: { cookie: ada.cookie },
+    })
+
+    expect(removed.statusCode).toBe(204)
+    expect((await upload(server, ada.cookie)).statusCode).toBe(201)
+  })
+
+  it('refuses to take off somebody else’s, and leaves it where it is', async () => {
+    const server = await build()
+    const ada = await givenAccount()
+    const bea = await givenAccount()
+    const hers = await upload(server, ada.cookie)
+
+    const attempt = await server.inject({
+      method: 'DELETE',
+      url: `/api/me/images/${hers.json().id}`,
+      headers: { cookie: bea.cookie },
+    })
+
+    expect(attempt.statusCode).toBe(404)
+    expect((await fetchImage(server, ada.cookie, hers.json().id)).statusCode).toBe(200)
+  })
+
+  it('is nobody’s to list or take off while signed out', async () => {
+    const server = await build()
+    const ada = await givenAccount()
+    const hers = await upload(server, ada.cookie)
+
+    expect((await server.inject({ method: 'GET', url: '/api/me/images' })).statusCode).toBe(401)
+    expect(
+      (await server.inject({ method: 'DELETE', url: `/api/me/images/${hers.json().id}` })).statusCode,
+    ).toBe(401)
+  })
+
   it('will not hold a type the route would refuse, even written straight to the table', async () => {
     // The CHECK, which only a write skipping the API can exercise.
     await build()
