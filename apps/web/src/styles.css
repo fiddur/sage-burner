@@ -825,6 +825,35 @@ a:hover {
   align-items: flex-start;
 }
 
+/*
+  A way of being reached (#388). The controls sit at the top for the same reason the
+  FAQ's do: the row grows into a form while it is being changed, and a grip centred
+  against a three-field form reads as belonging to the form rather than to the row.
+*/
+.connection-row {
+  align-items: flex-start;
+}
+
+/*
+  The name and the handle take the slack, so Change and Remove stay at the right edge —
+  `.reorder-name`'s job on every other list. Named rather than counted: `ReorderableList`
+  renders its own controls as the row's first child, so a positional selector picks the
+  icon, and adding a child would move it again.
+
+  `overflow-wrap` because the handle may be two hundred characters of unbroken URL, which
+  otherwise pushes the actions off the side of a phone.
+*/
+.connection-what {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.connection-edit {
+  flex: 1;
+  min-width: 0;
+}
+
 .faq-entry {
   flex: 1;
   min-width: 0;

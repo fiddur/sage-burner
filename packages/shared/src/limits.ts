@@ -105,3 +105,23 @@ export const MAX_FROM_NAME = 200
  * notes beside them.
  */
 export const MAX_RIDE_PLACE = 120
+
+/**
+ * A handle, a number or an address on one of the ways to reach somebody (#388).
+ *
+ * Long enough for a Mastodon address on a long instance and for a profile URL with a
+ * path, short of anything that is really a sentence.
+ */
+export const MAX_CONNECTION_VALUE = 200
+
+/** What somebody calls a link of their own: "my band", "photos". Not a sentence. */
+export const MAX_CONNECTION_LABEL = 60
+
+/**
+ * How many ways to be reached one account may list.
+ *
+ * A ceiling rather than an absence, since this is a row per click. Well past what
+ * anybody has — the vocabulary itself is nine kinds — and low enough that the profile
+ * page stays a list somebody reads rather than scrolls.
+ */
+export const MAX_CONNECTIONS = 12

@@ -9,6 +9,12 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-09
 
+- **You can say how people should reach you.** Your details now takes Discord, Instagram,
+  TikTok, Mastodon, Signal, WhatsApp, a phone number, an email address or a link of your
+  own — as many as you like, dragged into the order you want people to try. Nothing shows
+  them to anybody else yet; that arrives with the page behind your name. The address you
+  sign in with is shown to nobody either way: add it to the list if you want it to be.
+
 - **You can put a picture in what you write.** Paste one into a comment, drag one onto a
   dream's description, or tap "Add a picture" and pick one from your phone — it appears
   where you were typing and everyone reading sees it. Photographs are shrunk in your own

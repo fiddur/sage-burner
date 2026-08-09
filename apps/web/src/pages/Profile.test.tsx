@@ -26,6 +26,11 @@ const aProfile = (over: Partial<Profile> = {}): Profile => ({
 // details form is what these tests are looking at.
 const stub = (over: Partial<ProfileApi> = {}, profile = aProfile()): ProfileApi => ({
   getMyProfile: () => Promise.resolve({ profile }),
+  getMyConnections: () => Promise.resolve({ connections: [] }),
+  addMyConnection: () => Promise.reject(new Error('addMyConnection is not stubbed here')),
+  updateMyConnection: () => Promise.reject(new Error('updateMyConnection is not stubbed here')),
+  removeMyConnection: () => Promise.reject(new Error('removeMyConnection is not stubbed here')),
+  reorderMyConnections: () => Promise.reject(new Error('reorderMyConnections is not stubbed here')),
   getAllergyItems: () => Promise.resolve({ items: [] }),
   setMyAvatar: () => Promise.reject(new Error('setMyAvatar is not stubbed here')),
   removeMyAvatar: () => Promise.reject(new Error('removeMyAvatar is not stubbed here')),

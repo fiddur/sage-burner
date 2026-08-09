@@ -24,6 +24,8 @@ import type {
   FaqResponse,
   FormQuestionOrder,
   FormQuestionResponse,
+  ConnectionResponse,
+  ConnectionsResponse,
   FormQuestionsResponse,
   ImageUploadResponse,
   InstallationResponse,
@@ -569,6 +571,36 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
 
     removeMyAvatar: () =>
       request<undefined>(apiRoutes.removeMyAvatar.path(), { method: apiRoutes.removeMyAvatar.method }),
+
+    /**
+     * The ways somebody can be reached, which are their own to write (#388). No
+     * `If-Match`: one person's own record has one writer.
+     */
+    getMyConnections: (signal?: AbortSignal) =>
+      request<ConnectionsResponse>(apiRoutes.getMyConnections.path(), { signal }),
+
+    addMyConnection: (body: BodyOf<'addMyConnection'>) =>
+      request<ConnectionResponse>(apiRoutes.addMyConnection.path(), {
+        method: apiRoutes.addMyConnection.method,
+        body,
+      }),
+
+    updateMyConnection: (id: string, body: BodyOf<'updateMyConnection'>) =>
+      request<ConnectionResponse>(apiRoutes.updateMyConnection.path(id), {
+        method: apiRoutes.updateMyConnection.method,
+        body,
+      }),
+
+    removeMyConnection: (id: string) =>
+      request<undefined>(apiRoutes.removeMyConnection.path(id), {
+        method: apiRoutes.removeMyConnection.method,
+      }),
+
+    reorderMyConnections: (ids: string[]) =>
+      request<ConnectionsResponse>(apiRoutes.reorderMyConnections.path(), {
+        method: apiRoutes.reorderMyConnections.method,
+        body: { ids },
+      }),
 
     /**
      * A picture to write into a markdown field (#379). Raw bytes, scaled down here, and

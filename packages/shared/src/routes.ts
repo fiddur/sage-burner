@@ -10,6 +10,9 @@ import type {
   AttendanceCreate,
   AttendanceUpdate,
   CommentInput,
+  ConnectionCreate,
+  ConnectionOrder,
+  ConnectionUpdate,
   CopyFrom,
   EventCreateInput,
   EventOptionCreateInput,
@@ -101,6 +104,18 @@ export const apiRoutes = {
     method: 'POST',
     fastify: '/api/events/:eventId/roles',
     path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/roles`,
+  },
+  /**
+   * The ways somebody can be reached, which are their own to write (#388).
+   *
+   * Beside `/api/me/profile` and outside `/api/admin/`: nobody edits anybody else's,
+   * and the account id comes from the session so there is no id in a body to tamper
+   * with. Reading somebody else's belongs to their profile page, not here.
+   */
+  addMyConnection: {
+    method: 'POST',
+    fastify: '/api/me/connections',
+    path: () => '/api/me/connections',
   },
   addMeal: {
     method: 'POST',
@@ -384,6 +399,11 @@ export const apiRoutes = {
     fastify: '/api/events/:eventId/members',
     path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/members`,
   },
+  getMyConnections: {
+    method: 'GET',
+    fastify: '/api/me/connections',
+    path: () => '/api/me/connections',
+  },
   getMyBurns: {
     method: 'GET',
     fastify: '/api/events/mine',
@@ -559,6 +579,11 @@ export const apiRoutes = {
     fastify: '/api/admin/installation/mail',
     path: () => '/api/admin/installation/mail',
   },
+  removeMyConnection: {
+    method: 'DELETE',
+    fastify: '/api/me/connections/:id',
+    path: (id: string) => `/api/me/connections/${encodeURIComponent(id)}`,
+  },
   removeMyAvatar: {
     method: 'DELETE',
     fastify: '/api/me/avatar',
@@ -568,6 +593,11 @@ export const apiRoutes = {
     method: 'DELETE',
     fastify: '/api/me/passkeys/:id',
     path: (id: string) => `/api/me/passkeys/${encodeURIComponent(id)}`,
+  },
+  reorderMyConnections: {
+    method: 'PUT',
+    fastify: '/api/me/connections/order',
+    path: () => '/api/me/connections/order',
   },
   reorderFaq: {
     method: 'PUT',
@@ -771,6 +801,11 @@ export const apiRoutes = {
     fastify: '/api/admin/meal-slots/:id',
     path: (id: string) => `/api/admin/meal-slots/${encodeURIComponent(id)}`,
   },
+  updateMyConnection: {
+    method: 'PATCH',
+    fastify: '/api/me/connections/:id',
+    path: (id: string) => `/api/me/connections/${encodeURIComponent(id)}`,
+  },
   updateMyNotificationSettings: {
     method: 'PUT',
     fastify: '/api/me/notification-settings',
@@ -877,6 +912,9 @@ export const bannerSrc = (version: string): string =>
  * the schema the route parses.
  */
 export interface RouteBodies {
+  addMyConnection: ConnectionCreate
+  updateMyConnection: ConnectionUpdate
+  reorderMyConnections: ConnectionOrder
   addEventOption: EventOptionCreateInput
   addFaqEntry: FaqCreateInput
   addLeadRole: LeadRoleCreateInput
