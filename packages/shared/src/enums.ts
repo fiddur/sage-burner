@@ -426,6 +426,36 @@ const handleIn = (value: string, host: RegExp): string | undefined => {
   return first === undefined ? undefined : first.replace(/^@/u, '')
 }
 
+const FACEBOOK_HOST = /(^|\.)facebook\.com$/iu
+
+/**
+ * Path segments a Facebook URL can start with that are not somebody's handle.
+ *
+ * `handleIn` takes the first segment, which for `profile.php?id=…` and for
+ * `/people/Name/123456/` is the segment itself — stored, that renders `m.me/profile.php`
+ * and points at nobody.
+ */
+const NOT_A_HANDLE = new Set(['profile.php', 'people'])
+
+/**
+ * The numeric id out of a `profile.php?id=` link, or nothing.
+ *
+ * Its own function so the host is anchored the way `handleIn` anchors it. Written inline
+ * the two branches of `connectionValue` disagreed about what Facebook is: `[^\s/]*` before
+ * `facebook.com` accepts `notfacebook.com`, and eats a whole authority, so
+ * `https://evil.example?x=facebook.com/profile.php?id=123` matched as well.
+ */
+const facebookNumericId = (value: string): string | undefined => {
+  const [, hostname, path = '', query = ''] =
+    /^https?:\/\/([^\s/?#]+)(?:\/([^\s?#]*))?(?:\?([^\s#]*))?(?:#.*)?$/iu.exec(value.trim()) ?? []
+  if (hostname === undefined || !FACEBOOK_HOST.test(hostname)) return undefined
+  if (path.toLowerCase() !== 'profile.php') return undefined
+
+  const [, id] = /(?:^|&)id=(\d+)(?:&|$)/u.exec(query) ?? []
+
+  return id
+}
+
 /**
  * What is actually stored for a kind, whatever was typed or pasted into the box.
  *
@@ -440,13 +470,17 @@ export const connectionValue = (kind: ConnectionKind, value: string): string => 
   const trimmed = value.trim()
 
   if (kind === 'messenger') {
-    // The numeric form first: its path segment is `profile.php`, so `handleIn` would
-    // reduce the link to that and point at nobody.
-    const [, numeric] =
-      /^https?:\/\/[^\s/]*facebook\.com\/profile\.php\?(?:[^\s]*&)?id=(\d+)/iu.exec(trimmed) ?? []
+    const numeric = facebookNumericId(trimmed)
     if (numeric !== undefined) return numeric
 
-    return handleIn(trimmed, /(^|\.)facebook\.com$/iu) ?? trimmed.replace(/^@/u, '')
+    const handle = handleIn(trimmed, FACEBOOK_HOST)
+    if (handle !== undefined && !NOT_A_HANDLE.has(handle.toLowerCase())) return handle
+    // A Facebook URL whose first segment is not a handle — `?id=abc`, `?myid=42`, a
+    // `/people/Name/123/` link — is kept whole rather than reduced to that segment. It is
+    // visibly wrong, which beats storing `profile.php` as somebody's Messenger name.
+    if (handle !== undefined) return trimmed
+
+    return trimmed.replace(/^@/u, '')
   }
   if (kind === 'instagram') return handleIn(trimmed, /(^|\.)instagram\.com$/iu) ?? trimmed.replace(/^@/u, '')
   if (kind === 'tiktok') return handleIn(trimmed, /(^|\.)tiktok\.com$/iu) ?? trimmed.replace(/^@/u, '')
@@ -462,11 +496,12 @@ export const connectionValue = (kind: ConnectionKind, value: string): string => 
 }
 
 /**
- * Somebody's Facebook page, from the id Facebook gave them (#393).
+ * Somebody's Facebook page, from the handle they typed for Messenger (#393).
  *
  * Two shapes, and both have to be kept: an account with a vanity name is
- * `facebook.com/wren`, and one without is only ever `facebook.com/profile.php?id=<digits>`.
- * A subject from the sign-in is always the numeric form; a `messenger` value may be either.
+ * `facebook.com/wren`, and one without is only ever `facebook.com/profile.php?id=<digits>`,
+ * which is what `connectionValue` stores the digits of. Never from a linked sign-in —
+ * `docs/accounts.md` says why an app-scoped id points at nobody.
  */
 export const facebookProfileUrl = (value: string): string =>
   /^\d+$/u.test(value.trim())

@@ -18,6 +18,13 @@ under today's heading, and make a new heading when there is none.
 - **Pasting an SVG into a comment now says why it will not do**, instead of failing with
   "could not read that picture".
 
+- **A Facebook link the app cannot read a handle out of is kept as you pasted it**, rather
+  than being quietly stored as something that led nowhere.
+
+- **The links on somebody's page are named by what they say**, so a screen reader or voice
+  control can address them; and a page for somebody with no name yet no longer offers to
+  copy "them's Discord".
+
 - **A refused save no longer empties the form** when you add a way of being reached, and a
   list that could not load says so instead of looking empty.
 

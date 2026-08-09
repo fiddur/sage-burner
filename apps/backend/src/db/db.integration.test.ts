@@ -1367,7 +1367,9 @@ describe('the threads migration', () => {
       fresh.close()
     }
   })
+})
 
+describe('the login-address backfill', () => {
   it('gives every account already here its login address as a way to be reached', () => {
     // The backfill (#388's follow-up): everybody has an address, and a list that starts
     // empty is a list nobody fills in. Last rather than first, so somebody who already

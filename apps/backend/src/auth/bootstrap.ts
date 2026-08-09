@@ -88,8 +88,8 @@ export const ensureAdmin = async ({
     created_at: now().toISOString(),
   })
   await db.insert(accountRole).values(BOOTSTRAP_ROLES.map((role) => ({ account_id: id, role })))
-  // Only on this branch: an account that already existed has whatever list its owner made,
-  // and re-running the bootstrap must not put a row back that they took off.
+  // Only where the account is created: an account that already existed has whatever list
+  // its owner made, and re-running the bootstrap must not put a row back that they took off.
   await db.insert(accountConnection).values(loginAddressConnection(id, parsedEmail.data))
 
   return { account_id: id, created: true }

@@ -19,8 +19,14 @@ import { useSetInstallationTitle } from '../installation.tsx'
 import { useAction, useLoadInto } from '../load.ts'
 import { isAdmin, useViewer } from '../viewer.tsx'
 
+export type AdminSettingsApi = BannerApi &
+  IconApi &
+  MailApi &
+  OauthApi &
+  Pick<ApiClient, 'getInstallation' | 'logout' | 'updateInstallation'>
+
 /**
- * This page is the installation's settings, and nothing personal.
+ * The installation's settings, and nothing personal.
  *
  * The push toggle used to be here as well as on Your details, on the argument that an
  * admin holding `admin` without `member` is refused from that page. Two switches for one
@@ -28,13 +34,6 @@ import { isAdmin, useViewer } from '../viewer.tsx'
  * answer, and it reads as two different settings. It lives where a person's own settings
  * live, and the gap for an admin who is not a member is #396.
  */
-export type AdminSettingsApi = BannerApi &
-  IconApi &
-  MailApi &
-  OauthApi &
-  Pick<ApiClient, 'getInstallation' | 'logout' | 'updateInstallation'>
-
-/** What this installation calls itself. */
 export const AdminSettings = ({ api }: { api: AdminSettingsApi }) => {
   const viewer = useViewer()
   const admin = isAdmin(viewer)

@@ -42,8 +42,9 @@ const Way = ({ row, whose }: { row: Connection; whose: string }) => {
           <span class="form-note">{row.value}</span>
         ) : (
           // Named for a screen reader, which would otherwise read a page of "wren" links
-          // with nothing to tell them apart.
-          <a href={href} aria-label={`${label}: ${whose}`}>
+          // with nothing to tell them apart — and the visible text comes first, because a
+          // name that does not contain it cannot be addressed by voice (WCAG 2.5.3).
+          <a href={href} aria-label={`${row.value}, ${whose}’s ${label}`}>
             {row.value}
           </a>
         )}
@@ -52,6 +53,17 @@ const Way = ({ row, whose }: { row: Connection; whose: string }) => {
     </li>
   )
 }
+
+/**
+ * How the page refers to somebody, in the two grammars it needs.
+ *
+ * `them` goes in prose — "how to reach them" — and cannot take a possessive: with no name
+ * filled in, the copy button read "Copy them’s Discord".
+ */
+const namesFor = (name: string | null | undefined) => ({
+  them: name ?? 'them',
+  whose: name ?? 'this person',
+})
 
 /**
  * Somebody's page (#389).
@@ -77,7 +89,7 @@ export const Person = ({ api, accountId }: { api: PersonApi; accountId: string }
 
   const mine = viewer.account?.id === accountId
   const person = loaded.status === 'ready' ? loaded.data : undefined
-  const them = person?.name ?? 'them'
+  const { them, whose } = namesFor(person?.name)
 
   return (
     <GuardedPage title="Somebody" require="approved">
@@ -105,9 +117,8 @@ export const Person = ({ api, accountId }: { api: PersonApi; accountId: string }
 
           {person.facebook !== null && (
             // Beside the name rather than in the list below, because it is not a way of
-            // being reached: Messenger is that, and it is a row like any other. This is
-            // their page, which the app knows about only because they linked Facebook to
-            // sign in (#393).
+            // being reached: Messenger is that, and it is a row like any other. Built from
+            // the Messenger handle, never from a linked sign-in (#393).
             <p class="person-elsewhere">
               <a href={person.facebook}>
                 <span aria-hidden="true">📘</span> {them} on Facebook
@@ -120,7 +131,7 @@ export const Person = ({ api, accountId }: { api: PersonApi; accountId: string }
           {person.connections.length > 0 ? (
             <ul class="ways">
               {person.connections.map((row) => (
-                <Way key={row.id} row={row} whose={them} />
+                <Way key={row.id} row={row} whose={whose} />
               ))}
             </ul>
           ) : (
@@ -131,9 +142,8 @@ export const Person = ({ api, accountId }: { api: PersonApi; accountId: string }
             </p>
           )}
 
-          {/* The free-text box from before the list existed, last of all: still required,
-              still filled in for every account, and still where a sentence that fits no
-              kind goes. */}
+          {/* The free-text box from before the list existed, last of all —
+              `personProfileSchema` says why it is still here. */}
           {person.contact !== null && person.contact.trim() !== '' && (
             <p class="form-note">Also said: {person.contact}</p>
           )}

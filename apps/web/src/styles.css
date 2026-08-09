@@ -852,10 +852,6 @@ a:hover {
 /*
   Somebody's page (#389): the face at the size of a heading, and their ways of being
   reached under it.
-
-  `.person-face` sits below `.avatar` for the reason every other size modifier does —
-  each is a single class, so specificity ties and source order decides. Above the base
-  rule it would set nothing at all and the face would draw at the bar's 2rem.
 */
 .person-head {
   display: flex;
@@ -2225,9 +2221,15 @@ img.avatar {
   align-items: center;
 }
 
+/* An anchor, so it gets `a.person-badge`'s treatment for the same reason: a face is not
+   body copy, and an underline through one looks like a mistake. Only a visually-hidden
+   span is inside it today, so nothing underlines — which is why this was the one link
+   that escaped. */
 .dream-supporter {
   display: inline-flex;
   margin-inline-start: -0.35rem;
+  color: inherit;
+  text-decoration: none;
 }
 
 .dream-supporter:first-child {
