@@ -1,3 +1,4 @@
+import type { OAuthProvider } from '@sage-burner/shared'
 import type { ComponentChildren } from 'preact'
 
 import { createContext } from 'preact'
@@ -34,10 +35,19 @@ interface InstallationContextValue {
    * arrives, which the application form reads as "do not promise either way".
    */
   sendsEmail?: boolean
+  /**
+   * Which providers somebody may sign in from (#393).
+   *
+   * Here rather than fetched per page because both the login page and Your details need it,
+   * and the login page needs it before anybody is signed in — which is why the installation
+   * read carries it at all.
+   */
+  socialLogins?: readonly OAuthProvider[]
   setTitle: (title: string) => void
   setBanner: (banner: string | null) => void
   setIcon: (icon: string | null) => void
   setSendsEmail: (sends: boolean) => void
+  setSocialLogins: (providers: readonly OAuthProvider[]) => void
 }
 
 const InstallationContext = createContext<InstallationContextValue>({
@@ -45,6 +55,7 @@ const InstallationContext = createContext<InstallationContextValue>({
   setBanner: () => undefined,
   setIcon: () => undefined,
   setSendsEmail: () => undefined,
+  setSocialLogins: () => undefined,
 })
 
 const Provide = ({
@@ -52,12 +63,14 @@ const Provide = ({
   banner,
   icon,
   sendsEmail,
+  socialLogins,
   children,
 }: {
   title?: string
   banner?: string | null
   icon?: string | null
   sendsEmail?: boolean
+  socialLogins?: readonly OAuthProvider[]
   children: ComponentChildren
 }) => {
   // A rename on the settings page has to reach the header, which is a sibling
@@ -70,6 +83,7 @@ const Provide = ({
   const [bannerOverride, setBannerOverride] = useState<string | null | undefined>(undefined)
   const [iconOverride, setIconOverride] = useState<string | null | undefined>(undefined)
   const [mailOverride, setMailOverride] = useState<boolean | undefined>(undefined)
+  const [loginsOverride, setLoginsOverride] = useState<readonly OAuthProvider[] | undefined>(undefined)
   const current = override ?? title
 
   useEffect(() => {
@@ -83,10 +97,12 @@ const Provide = ({
         banner: bannerOverride === undefined ? banner : bannerOverride,
         icon: iconOverride === undefined ? icon : iconOverride,
         sendsEmail: mailOverride ?? sendsEmail,
+        socialLogins: loginsOverride ?? socialLogins,
         setTitle: setOverride,
         setBanner: setBannerOverride,
         setIcon: setIconOverride,
         setSendsEmail: setMailOverride,
+        setSocialLogins: setLoginsOverride,
       }}
     >
       {children}
@@ -101,14 +117,16 @@ export const InstallationProvider = ({
   banner,
   icon,
   sendsEmail,
+  socialLogins,
 }: {
   children: ComponentChildren
   title?: string
   banner?: string | null
   icon?: string | null
   sendsEmail?: boolean
+  socialLogins?: readonly OAuthProvider[]
 }) => (
-  <Provide title={title} banner={banner} icon={icon} sendsEmail={sendsEmail}>
+  <Provide title={title} banner={banner} icon={icon} sendsEmail={sendsEmail} socialLogins={socialLogins}>
     {children}
   </Provide>
 )
@@ -131,6 +149,7 @@ export const FetchedInstallationProvider = ({
   const [banner, setBanner] = useState<string | null | undefined>(undefined)
   const [icon, setIcon] = useState<string | null | undefined>(undefined)
   const [sendsEmail, setSendsEmail] = useState<boolean | undefined>(undefined)
+  const [socialLogins, setSocialLogins] = useState<readonly OAuthProvider[] | undefined>(undefined)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -143,6 +162,7 @@ export const FetchedInstallationProvider = ({
         setBanner(response.installation.banner_updated_at)
         setIcon(response.installation.icon_updated_at)
         setSendsEmail(response.installation.sends_email)
+        setSocialLogins(response.installation.social_logins)
       })
       .catch(() => {
         // Nothing to report and nowhere to report it: this renders in the
@@ -156,7 +176,7 @@ export const FetchedInstallationProvider = ({
   }, [api])
 
   return (
-    <Provide title={title} banner={banner} icon={icon} sendsEmail={sendsEmail}>
+    <Provide title={title} banner={banner} icon={icon} sendsEmail={sendsEmail} socialLogins={socialLogins}>
       {children}
     </Provide>
   )
@@ -186,6 +206,10 @@ export const useSetInstallationIcon = () => useContext(InstallationContext).setI
  * that is true either way rather than a promise it may have to take back.
  */
 export const useInstallationSendsEmail = () => useContext(InstallationContext).sendsEmail
+
+/** Empty until the read lands, and empty for an installation that configured none. */
+export const useSocialLogins = (): readonly OAuthProvider[] =>
+  useContext(InstallationContext).socialLogins ?? []
 
 /** For the settings page, which has just turned mail on or off. */
 export const useSetInstallationSendsEmail = () => useContext(InstallationContext).setSendsEmail

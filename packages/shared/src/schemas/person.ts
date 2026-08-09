@@ -41,6 +41,20 @@ export const personProfileSchema = z.object({
    * roster, its CSV and the rideshare board, and is its own change.
    */
   contact: z.string().nullable(),
+  /**
+   * Where their Facebook page is, built from the handle they typed for Messenger (#393).
+   *
+   * Not a connection row of its own, deliberately: Facebook as a *way to be reached* is
+   * Messenger, and looking at somebody's page is a different act — so it sits beside the name
+   * rather than in the list.
+   *
+   * **Not from a linked Facebook sign-in**, which is the obvious source and the wrong one:
+   * `public_profile` answers with an app-scoped id that identifies nobody outside the
+   * installation's own Meta app, so a URL built from it would point at nobody. Linking
+   * therefore shows nothing here; typing a handle does. The URL is built in the backend, so
+   * the page holds no opinion about Facebook's URL shape.
+   */
+  facebook: z.string().nullable(),
 })
 
 export type PersonProfile = z.infer<typeof personProfileSchema>

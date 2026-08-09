@@ -24,11 +24,15 @@ const stub = (over: Partial<AdminSettingsApi> = {}): AdminSettingsApi => ({
         banner_updated_at: null,
         icon_updated_at: null,
         sends_email: false,
+        social_logins: [],
       },
     }),
   // The mail form mounted here has its own tests; this keeps it from reaching the API
   // when the page under test is about the title.
   getMailSettings: () => Promise.resolve({ mail: null }),
+  getOauthSettings: () => Promise.resolve({ settings: null }),
+  updateOauthSettings: () => Promise.reject(new Error('updateOauthSettings is not stubbed here')),
+  removeOauthSettings: () => Promise.reject(new Error('removeOauthSettings is not stubbed here')),
   updateMailSettings: () => Promise.reject(new Error('updateMailSettings is not stubbed here')),
   removeMailSettings: () => Promise.reject(new Error('removeMailSettings is not stubbed here')),
   sendTestEmail: () => Promise.reject(new Error('sendTestEmail is not stubbed here')),
@@ -111,6 +115,7 @@ describe('AdminSettings', () => {
           banner_updated_at: null,
           icon_updated_at: null,
           sends_email: false,
+          social_logins: [],
         },
       }),
     )
@@ -131,6 +136,7 @@ describe('AdminSettings', () => {
           banner_updated_at: null,
           icon_updated_at: null,
           sends_email: false,
+          social_logins: [],
         },
       }),
     )
@@ -147,7 +153,13 @@ describe('AdminSettings', () => {
     // submit before this message can be shown. The page is the only authority.
     const updateInstallation = vi.fn<AdminSettingsApi['updateInstallation']>(() =>
       Promise.resolve({
-        installation: { title: '', banner_updated_at: null, icon_updated_at: null, sends_email: false },
+        installation: {
+          title: '',
+          banner_updated_at: null,
+          icon_updated_at: null,
+          sends_email: false,
+          social_logins: [],
+        },
       }),
     )
     renderPage(stub({ updateInstallation }))
@@ -177,6 +189,7 @@ describe('AdminSettings', () => {
                     banner_updated_at: null,
                     icon_updated_at: null,
                     sends_email: false,
+                    social_logins: [],
                   },
                 }),
             })}
@@ -222,6 +235,7 @@ describe('AdminSettings', () => {
           banner_updated_at: null,
           icon_updated_at: null,
           sends_email: false,
+          social_logins: [],
         },
       }),
     )
@@ -240,6 +254,7 @@ describe('AdminSettings', () => {
           banner_updated_at: null,
           icon_updated_at: null,
           sends_email: false,
+          social_logins: [],
         },
       }),
     )

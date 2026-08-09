@@ -462,6 +462,18 @@ export const connectionValue = (kind: ConnectionKind, value: string): string => 
 }
 
 /**
+ * Somebody's Facebook page, from the id Facebook gave them (#393).
+ *
+ * Two shapes, and both have to be kept: an account with a vanity name is
+ * `facebook.com/wren`, and one without is only ever `facebook.com/profile.php?id=<digits>`.
+ * A subject from the sign-in is always the numeric form; a `messenger` value may be either.
+ */
+export const facebookProfileUrl = (value: string): string =>
+  /^\d+$/u.test(value.trim())
+    ? `https://facebook.com/profile.php?id=${value.trim()}`
+    : `https://facebook.com/${value.trim()}`
+
+/**
  * A URL somebody typed, if it is one worth putting in an `href`.
  *
  * `https` alone, and stricter than `markdown.ts`'s link check on purpose: that governs
@@ -506,9 +518,10 @@ export const connectionKindInfo = {
     icon: '🗨️',
     hint: 'your Facebook name, or the number in your profile link',
     labelled: false,
-    // Facebook as a *way to be reached* is Messenger. Looking at somebody's Facebook page
-    // is a different act and is not a contact detail — the profile page draws that from a
-    // linked Facebook sign-in (#393), which is the only place the app knows about one.
+    // Facebook as a *way to be reached* is Messenger. Looking at somebody's Facebook page is a
+    // different act and not a contact detail — the profile page builds that from this same
+    // typed value, because a linked sign-in answers with an app-scoped id that points at
+    // nobody outside the installation's own Meta app (#393).
     href: (value) => `https://m.me/${value.trim()}`,
   },
   discord: {
@@ -557,3 +570,44 @@ export const connectionKindInfo = {
  */
 export const connectionHref = (kind: ConnectionKind, value: string): string | undefined =>
   connectionKindInfo[kind].href(value)
+
+/**
+ * The places somebody can sign in from, besides a password and a passkey (#393).
+ *
+ * Two rather than one, and that is what settles the shape: a `provider` column is not
+ * speculation when there are two rows in it on the day it lands. Discord first because
+ * the community being replaced already lives there, so everybody has an account and
+ * recognises the button — and its OAuth2 costs nothing but an app in the developer
+ * portal, where Facebook's wants app review.
+ *
+ * Adding one is a line here **and** a migration, for the reason `connectionKinds` gives:
+ * `provider` carries a CHECK listing the vocabulary and SQLite cannot alter one in place.
+ */
+export const oauthProviders = ['discord', 'facebook'] as const
+
+export type OAuthProvider = (typeof oauthProviders)[number]
+
+export const isOAuthProvider = (value: unknown): value is OAuthProvider => isOneOf(oauthProviders, value)
+
+export interface OAuthProviderInfo {
+  /** What the button says after "Continue with". */
+  label: string
+  icon: string
+}
+
+export const oauthProviderInfo = {
+  discord: { label: 'Discord', icon: '🎮' },
+  facebook: { label: 'Facebook', icon: '📘' },
+} as const satisfies Record<OAuthProvider, OAuthProviderInfo>
+
+/**
+ * What a callback is for, which the state row carries rather than the URL.
+ *
+ * The same provider round trip does both jobs and they end differently: `sign-in` looks
+ * for an identity and refuses when there is none, `link` writes one for the account
+ * already signed in. Put in the URL it would be a caller's claim about which; in the row
+ * it is what the app decided when it minted the state.
+ */
+export const oauthIntents = ['sign-in', 'link'] as const
+
+export type OAuthIntent = (typeof oauthIntents)[number]

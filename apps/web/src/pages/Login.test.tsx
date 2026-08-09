@@ -11,7 +11,7 @@ import type { Ceremony, PasskeyApi } from '../passkey.ts'
 
 import { apiError } from '../api/client.ts'
 import { ViewerProvider } from '../viewer.tsx'
-import { Login } from './Login.tsx'
+import { Login, signInOutcome } from './Login.tsx'
 
 /**
  * The login form against an injected client, so the assertions are about what a
@@ -46,6 +46,22 @@ const fillIn = (email: string, password: string) => {
 }
 
 const submit = () => screen.getByRole('button', { name: 'Log in' }).click()
+
+describe('what a provider round trip says when it comes back here', () => {
+  it('says nothing about whether an account exists for that provider', () => {
+    // The whole point of `unlinked`: signing in from a provider nobody has linked and from
+    // one that is not somebody's have to read identically, or the page is an oracle.
+    const message = signInOutcome('unlinked')
+
+    expect(message).toContain('No account here is linked to that')
+    expect(message).not.toMatch(/exists|found|unknown|no such/i)
+  })
+
+  it('has a sentence for a refusal, and none for an ordinary visit', () => {
+    expect(signInOutcome('refused')).toContain('did not work')
+    expect(signInOutcome(null)).toBeUndefined()
+  })
+})
 
 describe('Login', () => {
   it('sends what was typed', async () => {

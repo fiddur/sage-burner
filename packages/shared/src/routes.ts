@@ -40,6 +40,7 @@ import type {
   MealSlotUpdate,
   MealUpdate,
   MailSettingsUpdate,
+  OAuthSettingsUpdate,
   NotificationSettings,
   PasskeyLogin,
   PasskeyRegistration,
@@ -265,6 +266,18 @@ export const apiRoutes = {
     fastify: '/api/admin/questions/:id',
     path: (id: string) => `/api/admin/questions/${encodeURIComponent(id)}`,
   },
+  /**
+   * Where a provider sends somebody back (#393).
+   *
+   * One route per provider by the path parameter, which is what gets registered with the
+   * provider as the redirect URI. What the round trip was *for* is not here: the state row
+   * carries it, so a caller cannot claim to be linking when they are signing in.
+   */
+  finishOauth: {
+    method: 'GET',
+    fastify: '/api/auth/oauth/:provider/callback',
+    path: (provider: string) => `/api/auth/oauth/${encodeURIComponent(provider)}/callback`,
+  },
   finishPasskeyLogin: {
     method: 'POST',
     fastify: '/api/auth/passkey/login',
@@ -392,6 +405,17 @@ export const apiRoutes = {
     fastify: '/api/admin/installation/mail',
     path: () => '/api/admin/installation/mail',
   },
+  /**
+   * What a provider was set up with, for the admin who set it up (#393).
+   *
+   * Behind the admin prefix, and never carrying the secret — `oauthSettingsSchema` says why
+   * `has_secret` is what comes back instead.
+   */
+  getOauthSettings: {
+    method: 'GET',
+    fastify: '/api/admin/installation/oauth/:provider',
+    path: (provider: string) => `/api/admin/installation/oauth/${encodeURIComponent(provider)}`,
+  },
   getMe: {
     method: 'GET',
     fastify: '/api/auth/me',
@@ -416,6 +440,12 @@ export const apiRoutes = {
     method: 'GET',
     fastify: '/api/me/connections',
     path: () => '/api/me/connections',
+  },
+  /** The ways in somebody has linked, for their own details page. */
+  getMyIdentities: {
+    method: 'GET',
+    fastify: '/api/me/identities',
+    path: () => '/api/me/identities',
   },
   getMyBurns: {
     method: 'GET',
@@ -587,6 +617,16 @@ export const apiRoutes = {
     fastify: '/api/admin/installation/icon',
     path: () => '/api/admin/installation/icon',
   },
+  removeMyIdentity: {
+    method: 'DELETE',
+    fastify: '/api/me/identities/:provider',
+    path: (provider: string) => `/api/me/identities/${encodeURIComponent(provider)}`,
+  },
+  removeOauthSettings: {
+    method: 'DELETE',
+    fastify: '/api/admin/installation/oauth/:provider',
+    path: (provider: string) => `/api/admin/installation/oauth/${encodeURIComponent(provider)}`,
+  },
   removeMailSettings: {
     method: 'DELETE',
     fastify: '/api/admin/installation/mail',
@@ -703,6 +743,24 @@ export const apiRoutes = {
     path: (eventId: string, accountId: string) =>
       `/api/admin/events/${encodeURIComponent(eventId)}/attendance/${encodeURIComponent(accountId)}/payment`,
   },
+  /**
+   * Leaving for a provider to sign in (#393). Answers a redirect, not JSON.
+   *
+   * Unauthenticated by necessity: this is how somebody who is not signed in gets in. It
+   * mints a single-use state row and sends them on; nothing about who they are is known
+   * yet, and nothing here says whether an account exists.
+   */
+  startOauthSignIn: {
+    method: 'GET',
+    fastify: '/api/auth/oauth/:provider',
+    path: (provider: string) => `/api/auth/oauth/${encodeURIComponent(provider)}`,
+  },
+  /** The same trip, made by somebody already signed in, to add a way in. */
+  startOauthLink: {
+    method: 'GET',
+    fastify: '/api/me/oauth/:provider',
+    path: (provider: string) => `/api/me/oauth/${encodeURIComponent(provider)}`,
+  },
   startPasskeyLogin: {
     method: 'POST',
     fastify: '/api/auth/passkey/challenge',
@@ -793,6 +851,11 @@ export const apiRoutes = {
     method: 'PATCH',
     fastify: '/api/roles/:id',
     path: (id: string) => `/api/roles/${encodeURIComponent(id)}`,
+  },
+  updateOauthSettings: {
+    method: 'PUT',
+    fastify: '/api/admin/installation/oauth/:provider',
+    path: (provider: string) => `/api/admin/installation/oauth/${encodeURIComponent(provider)}`,
   },
   updateMailSettings: {
     method: 'PUT',
@@ -925,6 +988,7 @@ export const bannerSrc = (version: string): string =>
  * the schema the route parses.
  */
 export interface RouteBodies {
+  updateOauthSettings: OAuthSettingsUpdate
   addMyConnection: ConnectionCreate
   updateMyConnection: ConnectionUpdate
   reorderMyConnections: ConnectionOrder

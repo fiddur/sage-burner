@@ -33,3 +33,29 @@ export const dreamPage = (eventId: string, dreamId: string): string =>
  * person to point at.
  */
 export const profilePage = (accountId: string): string => `/members/${encodeURIComponent(accountId)}`
+
+/**
+ * How a provider round trip tells the page how it went (#393).
+ *
+ * The callback is a top-level navigation, so the only channel back into the app is the URL
+ * it lands on — and both sides need the spelling: the backend writes it and the page reads
+ * it, which is what this file is for.
+ *
+ * A reason rather than a sentence, because the wording belongs to the page and the reason
+ * belongs to the route. `unlinked` in particular has to say nothing about whether an
+ * account exists: signing in from a provider nobody has linked and signing in from one that
+ * is not somebody's are the same answer.
+ */
+export const OAUTH_OUTCOME_PARAM = 'from'
+
+export const oauthOutcomes = ['unlinked', 'refused', 'linked', 'taken'] as const
+
+export type OAuthOutcome = (typeof oauthOutcomes)[number]
+
+/** Where somebody lands after signing in from a provider, or failing to. */
+export const loginPage = (outcome?: OAuthOutcome): string =>
+  outcome === undefined ? '/login' : `/login?${OAUTH_OUTCOME_PARAM}=${outcome}`
+
+/** Where somebody lands after adding a way in, or failing to. */
+export const detailsPage = (outcome?: OAuthOutcome): string =>
+  outcome === undefined ? '/profile' : `/profile?${OAUTH_OUTCOME_PARAM}=${outcome}`

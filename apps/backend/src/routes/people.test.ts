@@ -11,7 +11,7 @@ import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountConnection, accountRole } from '../db/schema.ts'
+import { account, accountConnection, accountIdentity, accountRole } from '../db/schema.ts'
 
 const SECRET = 's'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
@@ -89,6 +89,8 @@ describe('somebody, as the rest of the community sees them', () => {
       name: 'Wren Aldertide',
       avatar: null,
       contact: 'wren on discord',
+      // Built from the Messenger handle below, since that is a value they typed.
+      facebook: 'https://facebook.com/wren',
       connections: [expect.objectContaining({ kind: 'messenger', value: 'wren' })],
     })
   })
@@ -133,12 +135,61 @@ describe('somebody, as the rest of the community sees them', () => {
       'avatar',
       'connections',
       'contact',
+      'facebook',
       'name',
     ])
     // No address at all here, because this account has no `email` connection: the seeding
     // happens on the paths that create an account, and these rows are inserted directly.
     expect(body.payload).not.toContain('@example.org')
     expect(body.payload).not.toContain('peanuts')
+  })
+
+  it('shows a Facebook page built from the handle they typed', async () => {
+    // **Not from the linked identity.** Facebook answers `public_profile` with an app-scoped
+    // id, which identifies nobody outside this installation's Meta app — a URL built from it
+    // would be a link to nobody on every member's profile, and "a dangling link is worse than
+    // a thin page" is this route's own rule. A value somebody typed is their real handle, or
+    // the number out of their own profile link.
+    const server = await build()
+    const wren = await givenAccount()
+    const reader = await givenAccount()
+    await givenConnection(wren.id, 'messenger', 'wren.aldertide', 0)
+
+    const got = await fetchProfile(server, reader.cookie, wren.id)
+
+    expect(got.json().person.facebook).toBe('https://facebook.com/wren.aldertide')
+  })
+
+  it('takes the numeric form of a typed handle, which has no name to use', async () => {
+    const server = await build()
+    const wren = await givenAccount()
+    const reader = await givenAccount()
+    await givenConnection(wren.id, 'messenger', '1234567890', 0)
+
+    expect((await fetchProfile(server, reader.cookie, wren.id)).json().person.facebook).toBe(
+      'https://facebook.com/profile.php?id=1234567890',
+    )
+  })
+
+  it('shows none for somebody who linked Facebook but typed nothing', async () => {
+    // The identity is not the source: signing in with Facebook says nothing about whether
+    // somebody wants their page shown, and the id it carries could not build one anyway.
+    const server = await build()
+    const wren = await givenAccount()
+    const reader = await givenAccount()
+    await db().insert(accountIdentity).values({
+      id: randomUUID(),
+      account_id: wren.id,
+      provider: 'facebook',
+      subject: '1234567890',
+      created_at: NOW,
+    })
+
+    const got = await fetchProfile(server, reader.cookie, wren.id)
+
+    expect(got.json().person.facebook).toBeNull()
+    // And the app-scoped id is nowhere in the answer, which is what `schema.ts` promises.
+    expect(got.payload).not.toContain('1234567890')
   })
 
   it('has a page for somebody who has filled in nothing', async () => {

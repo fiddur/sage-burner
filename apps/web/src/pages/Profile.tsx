@@ -7,6 +7,7 @@ import type { ApiClient } from '../api/client.ts'
 import type { ConnectionsApi } from '../components/ConnectionsField.tsx'
 import type { PasskeysApi } from '../components/PasskeysField.tsx'
 import type { PushApi } from '../components/PushToggle.tsx'
+import type { WaysInApi } from '../components/WaysInField.tsx'
 import type { YourBurnsApi } from '../components/YourBurns.tsx'
 
 import { AvatarField } from '../components/AvatarField.tsx'
@@ -18,6 +19,7 @@ import { LogOutButton } from '../components/LogOutButton.tsx'
 import { PasskeysField } from '../components/PasskeysField.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
 import { PushToggle } from '../components/PushToggle.tsx'
+import { WaysInField } from '../components/WaysInField.tsx'
 import { YourBurns } from '../components/YourBurns.tsx'
 import { useAction, useLoad, useLoadInto } from '../load.ts'
 import { rowsFor } from '../textarea.ts'
@@ -29,6 +31,7 @@ export type ProfileApi = Pick<
 > &
   ConnectionsApi &
   PasskeysApi &
+  WaysInApi &
   PushApi &
   YourBurnsApi
 
@@ -187,6 +190,8 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
       <ConnectionsField api={api} />
 
       <PasskeysField api={api} />
+
+      <WaysInField api={api} />
 
       <LogOutButton api={api} />
 

@@ -1,5 +1,6 @@
 import type { MeResponse } from '@sage-burner/shared'
 
+import { apiRoutes, oauthProviderInfo, oauthProviders, OAUTH_OUTCOME_PARAM } from '@sage-burner/shared'
 import { useRef, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -8,6 +9,7 @@ import type { Ceremony, PasskeyApi } from '../passkey.ts'
 import { isApiError } from '../api/client.ts'
 import { FormError, useFormError } from '../components/FormError.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
+import { useSocialLogins } from '../installation.tsx'
 import { messageForCeremony, passkeysWork, signInWithPasskey } from '../passkey.ts'
 import { useSetViewer, useViewer } from '../viewer.tsx'
 
@@ -55,6 +57,16 @@ export const Login = ({
   const [password, setPassword] = useState('')
   const [error, setError] = useFormError()
   const [submitting, setSubmitting] = useState(false)
+  const configured = useSocialLogins()
+  const offered = oauthProviders.filter((provider) => configured.includes(provider))
+
+  /**
+   * What a provider round trip that came back here has to say.
+   *
+   * `unlinked` is the one that matters: it must read the same whether or not an account
+   * exists for whatever address the provider holds, because this page is not an oracle.
+   */
+  const outcome = signInOutcome(new URLSearchParams(window.location.search).get(OAUTH_OUTCOME_PARAM))
 
   // A ref rather than the `submitting` state, because state updates are
   // asynchronous: two clicks in the same tick both read `submitting === false`
@@ -207,10 +219,44 @@ export const Login = ({
         </p>
       )}
 
+      {offered.length > 0 && (
+        <p class="row">
+          {offered.map((provider) => (
+            // A link, not a fetch: the point is to leave for somebody else's consent screen,
+            // which `fetch` cannot follow. Absent entirely where the installation has not set
+            // a provider up — a button that cannot work reads as a promise.
+            <a key={provider} class="link-button" href={apiRoutes.startOauthSignIn.path(provider)}>
+              Continue with {oauthProviderInfo[provider].label}
+            </a>
+          ))}
+        </p>
+      )}
+
+      {outcome !== undefined && (
+        <p class="form-note" role="alert">
+          {outcome}
+        </p>
+      )}
+
       <p class="form-note">
         Accounts are created by invitation, so there is nothing to sign up for here. If you have lost your
         password, ask someone with admin — this app cannot send you a reset link.
       </p>
     </section>
   )
+}
+
+/**
+ * What the page says about a provider round trip that came back here.
+ *
+ * Exported so it is testable without a URL: the wording is the whole of what `unlinked` is
+ * for, and it must not name whether an account exists.
+ */
+export const signInOutcome = (outcome: string | null): string | undefined => {
+  if (outcome === 'unlinked') {
+    return 'No account here is linked to that. Sign in another way, then link it under Your details.'
+  }
+  if (outcome === 'refused') return 'That did not work. Try again, or sign in with your password.'
+
+  return undefined
 }

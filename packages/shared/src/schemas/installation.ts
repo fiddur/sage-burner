@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { oauthProviders } from '../enums.ts'
 import { MAX_TITLE } from '../limits.ts'
 import { dateTimeSchema, nonEmptyText } from './common.ts'
 
@@ -32,6 +33,20 @@ export const installationSchema = z.object({
    * a reason — the host, the port and the address are the admin's business.
    */
   sends_email: z.boolean(),
+  /**
+   * Which providers somebody may sign in from, and nothing else about them (#393).
+   *
+   * Public for the same reason `sends_email` is: it changes an unauthenticated page. The
+   * login page has to draw the buttons before anybody is signed in, so it cannot ask an
+   * admin route — and a provider that is not configured is **absent** rather than present
+   * and disabled, which is #30's rule about the email column. A button that cannot work
+   * reads as a promise.
+   *
+   * The client id is not here. It is not a secret — it travels in the authorize URL the
+   * backend builds — but nothing on the page needs it, and the backend building that URL
+   * is what keeps the redirect and the id from being a caller's claim.
+   */
+  social_logins: z.array(z.enum(oauthProviders)),
 })
 
 export const installationResponseSchema = z.object({
@@ -44,10 +59,11 @@ export const installationResponseSchema = z.object({
  * The read-only fields are omitted rather than left to `.strict()` to reject, because
  * the two are not the same statement — omitting says the field is not this route's to
  * write. All are set elsewhere: the banner and the icon by their own image routes, and
- * `sends_email` by whether `/api/admin/installation/mail` has been filled in.
+ * `sends_email` by whether `/api/admin/installation/mail` has been filled in, and
+ * `social_logins` by which `/api/admin/installation/oauth/:provider` have been.
  */
 export const installationUpdateSchema = installationSchema
-  .omit({ banner_updated_at: true, icon_updated_at: true, sends_email: true })
+  .omit({ banner_updated_at: true, icon_updated_at: true, sends_email: true, social_logins: true })
   .partial()
   .strict()
 
