@@ -156,7 +156,9 @@ describe('where a burn’s calendar feed lives', () => {
 
     expect(made.statusCode).toBe(201)
     expect(made.payload).not.toContain('feed_token')
-    expect(await tokenOf(made.json().event.id)).not.toBeNull()
+    // `expect.any(String)` rather than `not.toBeNull()`, which also passes for the
+    // `undefined` a missing row returns.
+    expect(await tokenOf(made.json().event.id)).toEqual(expect.any(String))
   })
 
   it('answers 404 for a burn that is not there', async () => {

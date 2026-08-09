@@ -83,6 +83,9 @@ const givenEvent = async (fields: { slug: string; start_date: string; end_date: 
       welcome_markdown: '',
       payment_info_markdown: '',
       member_cap: 42,
+      // Written here, or the leak these tests exist to catch is a `null` under test and a
+      // live secret in production (#408).
+      feed_token: `token-${id}`,
       created_at: '2026-01-01T00:00:00.000Z',
     })
   return id
@@ -224,6 +227,51 @@ describe('PATCH /api/events/:id/welcome', () => {
 })
 
 describe('GET /api/events/active', () => {
+  it('carries no calendar feed token, which is the whole of what #408 fixed', async () => {
+    // The route is unguarded and the public homepage fetches it on every anonymous visit,
+    // so anything in this body is public. `db.select()` put `feed_token` here — trading one
+    // readable-off-the-front-page key for another.
+    //
+    // Asserted on the payload rather than on the parsed keys: a serializer, a spread or a
+    // future `.returning()` would each put it back, and only the bytes catch all three.
+    const server = await build()
+    await givenEvent({ slug: 'summer', start_date: '2026-08-01', end_date: '2026-08-05' })
+
+    const response = await active(server)
+
+    expect(response.payload).not.toContain('feed_token')
+    expect(response.payload).not.toContain('token-')
+    // The passing sibling: the burn itself is answered, so this is not passing on an
+    // empty body.
+    expect(response.json().event.slug).toBe('summer')
+  })
+
+  it('answers only what `Event` describes, so a new column cannot ride along', async () => {
+    // `asEvent` is an object literal against the type, in the manner of `asMemberEntry`.
+    // A response schema would be the other way and there is none: nothing validates or
+    // serializes against `eventSchema`, so a type here is documentation, not a filter.
+    const server = await build()
+    await givenEvent({ slug: 'summer', start_date: '2026-08-01', end_date: '2026-08-05' })
+
+    const keys = Object.keys((await active(server)).json().event).toSorted()
+
+    expect(keys).toEqual([
+      'created_at',
+      'end_date',
+      'end_time',
+      'id',
+      'location',
+      'member_cap',
+      'name',
+      'payment_info_markdown',
+      'slug',
+      'start_date',
+      'start_time',
+      'transfer_info_markdown',
+      'welcome_markdown',
+    ])
+  })
+
   it('is null before any event exists', async () => {
     // A fresh deployment. Not a 404 — the homepage renders an explanation.
     const server = await build()

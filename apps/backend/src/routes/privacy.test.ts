@@ -86,7 +86,7 @@ describe('the privacy policy', () => {
   })
 
   it('says the calendar feed is readable without signing in', async () => {
-    // `/events/:eventId/schedule.ics` is unauthenticated, and it carries session titles and
+    // `/calendar/:token/schedule.ics` is unauthenticated, and it carries session titles and
     // descriptions that members write. "Visible to the other members — not to anybody
     // outside" read as a promise the feed does not keep.
     const held = readPrivacy()

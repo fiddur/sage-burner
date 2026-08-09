@@ -283,9 +283,12 @@ export const event = sqliteTable(
      * got out" that an id can never give.
      *
      * Nullable because adding it needed no table rebuild; the migration backfills every row
-     * and `createEvent` mints one, so nothing reaches the read without it. Never in
-     * `eventSchema` — that is the shape the public homepage is answered with, which is the
-     * whole problem this exists to fix.
+     * and `createEvent` mints one, so nothing reaches the read without it.
+     *
+     * **What keeps it off the homepage is `asEvent`, not `eventSchema`.** Leaving it out of
+     * the type was the first attempt and closed nothing: no route declares a Fastify
+     * `response` schema and there is no serializer compiler, so `db.select()` put the token
+     * straight into the public body. The projection is what does it.
      */
     feed_token: text('feed_token'),
     created_at: text('created_at').notNull(),

@@ -51,6 +51,40 @@ export const todayIso = (now: () => Date) => now().toISOString().slice(0, 10)
  * the next event is what fills the gap, and that is the action the admin
  * wants prompting toward anyway.
  */
+/**
+ * A burn as it leaves the building, named field by field.
+ *
+ * `asMemberEntry`'s property and `asMemberEntry`'s reason: a column added to `event` reaches
+ * a response only when somebody names it here. `db.select()` put `feed_token` straight into
+ * `GET /api/events/active` — unguarded, and fetched by the public homepage on every anonymous
+ * visit — so the stranger who used to read the id off the front page read the token off it
+ * instead (#408).
+ *
+ * `eventSchema` describes that shape and does not enforce it: no route here declares a
+ * Fastify `response` schema and there is no serializer compiler, so a response is whatever
+ * `JSON.stringify` makes of the row. A type is not a filter, which is the whole lesson.
+ *
+ * The `Event` return type is what makes it complete: dropping a field is a compile error, and
+ * a column added to the table without being added to `Event` never reaches this at all —
+ * `meal_intro_markdown` is one such, and `db.select()` had been answering it to the public
+ * homepage as well, harmlessly and unnoticed.
+ */
+export const asEvent = (row: typeof event.$inferSelect): Event => ({
+  id: row.id,
+  name: row.name,
+  slug: row.slug,
+  start_date: row.start_date,
+  end_date: row.end_date,
+  start_time: row.start_time,
+  end_time: row.end_time,
+  location: row.location,
+  welcome_markdown: row.welcome_markdown,
+  payment_info_markdown: row.payment_info_markdown,
+  transfer_info_markdown: row.transfer_info_markdown,
+  member_cap: row.member_cap,
+  created_at: row.created_at,
+})
+
 export const activeEvent = async (db: Database, today: string): Promise<Event | undefined> => {
   const [row] = await db
     .select()
@@ -59,7 +93,7 @@ export const activeEvent = async (db: Database, today: string): Promise<Event | 
     .orderBy(asc(event.end_date), asc(event.start_date), asc(event.slug))
     .limit(1)
 
-  return row
+  return row === undefined ? undefined : asEvent(row)
 }
 
 /**
@@ -77,7 +111,7 @@ export const openEvent = async (db: Database, today: string, eventId: string): P
     .where(and(eq(event.id, eventId), gte(event.end_date, today)))
     .limit(1)
 
-  return row
+  return row === undefined ? undefined : asEvent(row)
 }
 
 /**
@@ -124,9 +158,9 @@ export const registerEventRoutes = (app: FastifyInstance, { db, sessions, now }:
   app.get(apiRoutes.getEvents.fastify, async (_request, reply) => {
     void noStore(reply)
 
-    const events = await db.select().from(event).orderBy(asc(event.start_date))
+    const rows = await db.select().from(event).orderBy(asc(event.start_date))
 
-    return { events } satisfies EventsResponse
+    return { events: rows.map(asEvent) } satisfies EventsResponse
   })
 
   app.post(apiRoutes.createEvent.fastify, async (request, reply) => {
@@ -138,8 +172,6 @@ export const registerEventRoutes = (app: FastifyInstance, { db, sessions, now }:
     const row = { ...body, id: randomUUID(), created_at: now().toISOString() }
 
     try {
-      // The token is written and not answered: `row` is what goes back, and `eventSchema`
-      // is the shape the public homepage reads (#408).
       await db.insert(event).values({ ...row, feed_token: newFeedToken() })
     } catch (error) {
       // The slug is in URLs, so a collision is a thing the admin can fix by
@@ -186,7 +218,9 @@ export const registerEventRoutes = (app: FastifyInstance, { db, sessions, now }:
 
       const [updated] = await db.update(event).set(body).where(eq(event.id, request.params.id)).returning()
 
-      return updated === undefined ? sendError(reply, 404) : ({ event: updated } satisfies EventResponse)
+      return updated === undefined
+        ? sendError(reply, 404)
+        : ({ event: asEvent(updated) } satisfies EventResponse)
     },
   )
 
@@ -235,6 +269,6 @@ export const registerEventRoutes = (app: FastifyInstance, { db, sessions, now }:
     // serialises requests too tightly to reach, and 404 is what happened.
     if (patched.kind !== 'ok') return sendError(reply, 404)
 
-    return { event: patched.row } satisfies EventResponse
+    return { event: asEvent(patched.row) } satisfies EventResponse
   })
 }

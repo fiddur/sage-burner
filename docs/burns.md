@@ -307,8 +307,9 @@ One row holds a paragraph somebody else wrote and nobody has another copy of.
 
 ## The calendar feed
 
-`GET /events/:eventId/schedule.ics` is the programme as a calendar subscription,
-so people can put it in their phone rather than reloading a page.
+`GET /calendar/:token/schedule.ics` is the programme as a calendar subscription,
+so people can put it in their phone rather than reloading a page. The token is
+`event.feed_token` and deliberately not the burn's id — see below.
 
 The **Schedule page carries the link**, for the burn selected in the bar, with a
 copy button beside it (#258). Until then nothing in `apps/web` referenced the feed at
