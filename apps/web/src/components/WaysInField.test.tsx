@@ -75,6 +75,13 @@ describe('the ways in on your own details page', () => {
     expect(link.getAttribute('href')).toBe('/api/me/oauth/discord')
   })
 
+  it('says a failed load failed, rather than offering to link what is already linked', async () => {
+    show(stub({ getMyIdentities: () => Promise.reject(new Error('offline')) }), ['discord'])
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Could not load your ways in')
+    expect(screen.queryByRole('link', { name: 'Link it' })).toBeNull()
+  })
+
   it('says which are linked and offers to take those off', async () => {
     show(stub({}, [{ provider: 'discord', created_at: '2026-08-01T00:00:00.000Z' }]), ['discord', 'facebook'])
 
@@ -84,10 +91,14 @@ describe('the ways in on your own details page', () => {
   })
 
   it('takes one off', async () => {
-    const removeMyIdentity = vi.fn(() => Promise.resolve(undefined))
-    show(stub({ removeMyIdentity }, [{ provider: 'discord', created_at: '2026-08-01T00:00:00.000Z' }]), [
-      'discord',
-    ])
+    // The stub keeps a list, because the field re-reads after a write rather than trusting
+    // its own idea of what is left.
+    let held: Identity[] = [{ provider: 'discord', created_at: '2026-08-01T00:00:00.000Z' }]
+    const removeMyIdentity = vi.fn((provider: string) => {
+      held = held.filter((row) => row.provider !== provider)
+      return Promise.resolve(undefined)
+    })
+    show({ getMyIdentities: () => Promise.resolve({ identities: [...held] }), removeMyIdentity }, ['discord'])
 
     fireEvent.click(await screen.findByRole('button', { name: /Take Discord off/ }))
 

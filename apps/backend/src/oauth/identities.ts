@@ -1,6 +1,7 @@
 import type { Identity, OAuthProvider } from '@sage-burner/shared'
+import type { SQL } from 'drizzle-orm'
 
-import { and, asc, eq, ne } from 'drizzle-orm'
+import { asc, eq, sql } from 'drizzle-orm'
 
 import type { Database } from '../db/index.ts'
 
@@ -21,7 +22,8 @@ export const identitiesFor = async (db: Database, accountId: string): Promise<Id
     .orderBy(asc(accountIdentity.created_at))
 
 /**
- * Whether taking one way in away would leave another.
+ * Whether taking one way in away would leave another, as a condition for the DELETE's own
+ * `WHERE`.
  *
  * A password, a passkey, or an identity from a different provider — any one is enough. This
  * is `removePasskey`'s 409 generalised: **a way in is an extra way in, never the only one
@@ -29,35 +31,24 @@ export const identitiesFor = async (db: Database, accountId: string): Promise<Id
  * none. Somebody who signed up with Discord and set no password has exactly one, and losing
  * it locks them out of a burn they have paid for.
  *
- * Three reads rather than one clever query: they are indexed lookups on a 42-row table, and
- * the version that reads plainly is the one somebody can check against the sentence above.
+ * **A condition rather than a read before the write** (#239's shape, and `removePasskey`'s).
+ * Checked in its own statement, two removals in two tabs — a Discord identity and a Facebook
+ * one, on an account with no password — could each see the other as the survivor, both pass,
+ * and together leave the account with no way in at all. Evaluated inside the DELETE, the
+ * second one matches nothing.
+ *
+ * This and `removePasskey` are the only two places in the app that engineer for a race. Not
+ * because either window is realistic, but because the consequence is permanent and nothing
+ * in the app lets somebody back in — the password reset is an admin's.
  */
-export const hasAnotherWayIn = async (
-  db: Database,
-  accountId: string,
-  losing: OAuthProvider,
-): Promise<boolean> => {
-  const [row] = await db
-    .select({ password_hash: account.password_hash })
-    .from(account)
-    .where(eq(account.id, accountId))
-    .limit(1)
-
-  if (row?.password_hash !== null && row?.password_hash !== undefined) return true
-
-  const keys = await db
-    .select({ id: passkey.id })
-    .from(passkey)
-    .where(eq(passkey.account_id, accountId))
-    .limit(1)
-
-  if (keys.length > 0) return true
-
-  const others = await db
-    .select({ id: accountIdentity.id })
-    .from(accountIdentity)
-    .where(and(eq(accountIdentity.account_id, accountId), ne(accountIdentity.provider, losing)))
-    .limit(1)
-
-  return others.length > 0
-}
+export const anotherWayInSurvives = (accountId: string, losing: OAuthProvider): SQL => sql`(
+  exists (
+    select 1 from ${account}
+    where ${account.id} = ${accountId} and ${account.password_hash} is not null
+  )
+  or exists (select 1 from ${passkey} where ${passkey.account_id} = ${accountId})
+  or exists (
+    select 1 from ${accountIdentity}
+    where ${accountIdentity.account_id} = ${accountId} and ${accountIdentity.provider} <> ${losing}
+  )
+)`

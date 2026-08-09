@@ -983,6 +983,13 @@ what an authorization-code exchange sends, and the read answers `has_secret`.
 login page draws its buttons before anybody is signed in, so it cannot ask an admin route.
 Absent rather than present and disabled, which is #30's rule about the email column.
 
+**"Configured" means both halves filled in**, not a row existing (#401). The secret is
+optional on the update, so a first save that leaves it blank — or one clearing it — keeps a row
+with `client_secret = ''`; selected on existence, that drew "Continue with Discord" for a trip
+that could only end at `/login?from=refused`. `configuredProviders` selects on both columns
+being non-empty and `usableOauthSetting` is the same rule for the routes that start and finish
+a trip, so the button and the journey cannot disagree.
+
 ### What it will not do
 
 **It never creates an account.** Accounts come from the CLI bootstrap, an approved
@@ -1001,6 +1008,13 @@ unmatched sign-in answers `unlinked`, worded to read the same whether or not an 
 no password, passkey or other identity remains — `removePasskey`'s refusal generalised.
 Somebody who set no password and linked one provider has exactly one, and losing it locks them
 out of a burn they have paid for.
+
+The check is **inside the DELETE's own `WHERE`**, as `removePasskey`'s is (#239). Read in a
+statement of its own, two removals from two tabs — a Discord identity and a Facebook one, on
+an account with no password — could each see the other as the survivor, both pass, and
+together leave the account with nothing. These two are the only places in the app that
+engineer for a race; not because either window is realistic, but because the consequence is
+permanent and the password reset that would undo it is an admin's.
 
 ### The round trip
 

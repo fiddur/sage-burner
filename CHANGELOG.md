@@ -25,6 +25,11 @@ under today's heading, and make a new heading when there is none.
   control can address them; and a page for somebody with no name yet no longer offers to
   copy "them's Discord".
 
+- **"Continue with Discord" only appears where it can actually work.** A provider saved with
+  a client id and no secret used to draw a button that could only end in "that did not work".
+
+- **"That is linked now" is said once**, rather than again on every reload of the page.
+
 - **A refused save no longer empties the form** when you add a way of being reached, and a
   list that could not load says so instead of looking empty.
 
