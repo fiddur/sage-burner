@@ -45,6 +45,15 @@ describe('setting a provider up', () => {
     expect(await screen.findByText('/api/auth/oauth/facebook/callback')).toBeTruthy()
   })
 
+  it('prints the privacy-policy URL app review asks for', async () => {
+    // The other string an admin pastes into the Meta console, and the one #400 named three
+    // times without ever producing a page for.
+    show(stub())
+
+    expect(await screen.findByText('/privacy')).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'this page' }).getAttribute('href')).toBe('/privacy')
+  })
+
   it('seeds the id from what is stored, and never the secret', async () => {
     show(stub({ getOauthSettings: () => Promise.resolve({ settings: SAVED }) }))
 

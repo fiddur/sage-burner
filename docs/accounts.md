@@ -1017,6 +1017,14 @@ rather than asking for it.
 which is what `mail/smtp.ts` and `push/web-push.ts` are for theirs. Nothing in it throws: a
 provider that is down or answering nonsense costs a sign-in attempt rather than a stack trace.
 
+**The privacy policy is a route, not a promise.** Facebook's app review will not take an app
+without a policy at a URL, so `PRIVACY.md` ships with the image and `/privacy` renders it —
+public, because a reviewer opens it as a stranger and a policy behind a login is not one. It
+follows `CHANGELOG.md` in every respect, and the admin's Facebook field prints the URL to paste
+beside the redirect URI. Deliberately not admin-editable: a textarea for legal text is a promise
+the app cannot keep, nothing would validate it, and an installation that emptied it would fail
+app review with no explanation.
+
 `FACEBOOK_GRAPH_VERSION` is the one value here that goes stale on somebody else's schedule.
 Meta pins each app to a version and retires them, so it has to match the developer console —
 check it there rather than trusting the constant.

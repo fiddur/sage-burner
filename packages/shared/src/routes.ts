@@ -517,6 +517,17 @@ export const apiRoutes = {
     fastify: '/api/changelog',
     path: () => '/api/changelog',
   },
+  /**
+   * The privacy policy (#402). `privacyResponseSchema` carries the why.
+   *
+   * Beside the changelog because it is the same shape in every respect: prose that ships with
+   * the image, served rather than bundled, and public.
+   */
+  getPrivacy: {
+    method: 'GET',
+    fastify: '/api/privacy',
+    path: () => '/api/privacy',
+  },
   getVersion: {
     method: 'GET',
     fastify: '/api/version',

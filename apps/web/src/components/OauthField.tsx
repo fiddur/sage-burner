@@ -96,6 +96,13 @@ export const OauthField = ({ api, provider }: { api: OauthApi; provider: OAuthPr
         installation's own address — the app builds it, and it has to match exactly.
       </p>
 
+      {provider === 'facebook' && (
+        <p class="form-note">
+          The privacy-policy URL app review asks for is <code>/privacy</code> on this installation's own
+          address — <a href="/privacy">this page</a>, which anybody can read without signing in.
+        </p>
+      )}
+
       {stored === undefined ? (
         <p class="form-note">Loading…</p>
       ) : (
