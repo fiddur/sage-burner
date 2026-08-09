@@ -49,6 +49,12 @@ export type ErrorResponse = z.infer<typeof errorResponseSchema>
  * so the first was unreachable through the UI; two load-bearing facts nothing wrote
  * down, and both would go the day an un-approve path arrives.
  *
+ * `list_full` is the other 409 on the ways-to-be-reached list, beside the duplicate one
+ * `unique(account_id, kind, value)` raises (#409). The same argument as the pair above, and
+ * the same trap: the page inferred which it was from its own count of the rows, and the add
+ * form only renders below the ceiling — so the ceiling wording was unreachable, and a real
+ * ceiling 409 (the list grew in another tab) read as "you have already listed that one".
+ *
  * `errorResponseSchema` deliberately accepts codes outside this list, so an
  * older client can still parse a newer API's response rather than failing to
  * read the error explaining what went wrong.
@@ -66,6 +72,7 @@ export const errorCodes = [
   'precondition_required',
   'not_approved',
   'invite_used',
+  'list_full',
 ] as const
 export type ErrorCode = (typeof errorCodes)[number]
 

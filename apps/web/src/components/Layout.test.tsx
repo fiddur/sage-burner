@@ -112,8 +112,9 @@ describe('the nav', () => {
   })
 
   it('offers it to nobody who is not approved at all', () => {
-    // The passing sibling: `approved` is not "signed in". An account with no role yet
-    // would be refused by `requireApproved` on every section of that page.
+    // `approved` is not "signed in": an account with no role yet would be refused by
+    // `requireApproved` on every section of that page. The passing sibling is the
+    // `admin`-alone case above, which is where a too-tight guard would show.
     renderNav({
       status: 'signed-in',
       account: { id: 'a-1', name: 'Ada Lovelace', avatar: null, roles: [] },

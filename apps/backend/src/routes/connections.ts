@@ -7,6 +7,7 @@ import {
   connectionOrderSchema,
   connectionUpdateSchema,
   connectionValue,
+  errorResponse,
   MAX_CONNECTIONS,
 } from '@sage-burner/shared'
 import { and, asc, eq } from 'drizzle-orm'
@@ -78,7 +79,10 @@ export const registerConnectionRoutes = (app: FastifyInstance, { db, sessions }:
     if (viewer === undefined) return sendError(reply, 401)
 
     const held = await connectionsFor(db, viewer.account_id)
-    if (held.length >= MAX_CONNECTIONS) return sendError(reply, 409)
+    // Its own code, not the bare `conflict` the duplicate raises: they mean opposite things
+    // to whoever is reading, and the page cannot tell them apart from its own count —
+    // `errorCodes` has the argument, which `not_approved`/`invite_used` already made once.
+    if (held.length >= MAX_CONNECTIONS) return reply.code(409).send(errorResponse('list_full'))
 
     // Normalised here rather than only in the form, so a pasted profile URL is stored as
     // the handle whatever the caller is — and so `unique(account_id, kind, value)` refuses

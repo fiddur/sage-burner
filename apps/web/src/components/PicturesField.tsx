@@ -55,7 +55,7 @@ export const PicturesField = ({ api }: { api: PicturesApi }) => {
           </p>
 
           <ul class="picture-grid">
-            {images.map((picture) => (
+            {images.map((picture, at) => (
               <li key={picture.id}>
                 {/* No alt text to give: what a picture is of lives in the prose that
                     references it, which nothing here can find. Decorative, and the date
@@ -64,7 +64,10 @@ export const PicturesField = ({ api }: { api: PicturesApi }) => {
                 <span class="form-note">{stored(picture.created_at)}</span>
                 <IconButton
                   icon="✕"
-                  label={`Take off the picture added ${stored(picture.created_at)}`}
+                  // Its position, not its date: a paste session stores several on one day,
+                  // and every ✕ then has the same name — which is what a screen reader
+                  // reads as one control repeated.
+                  label={`Take off picture ${at + 1} of ${images.length}, added ${stored(picture.created_at)}`}
                   disabled={busy}
                   busy={busyWith === picture.id}
                   onClick={() => {

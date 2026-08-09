@@ -38,18 +38,16 @@ export const nameOf = (row: Pick<Connection, 'kind' | 'label'>): string =>
 /**
  * Why a way of being reached could not be saved.
  *
- * The 409 covers two refusals the server tells apart by nothing else, and both are worth
- * their own sentence: the same handle twice, or a list already as long as it may be. Which
- * one it was comes from the caller, because only the add ever answers with the ceiling —
- * inferred from the count instead, editing a row while the list happens to be full would
- * tell somebody to take one off.
+ * The two 409s carry different codes, which is the point of `list_full` existing (#409):
+ * inferred from the page's own count, the ceiling wording was unreachable — the add form
+ * only renders below the ceiling — and a real ceiling refusal, from a list that grew in
+ * another tab, read as "you have already listed that one".
  */
-export const messageForFailure = (failure: unknown, atCeiling: boolean): string => {
-  if (isApiError(failure) && failure.status === 409) {
-    return atCeiling
-      ? `That is as many ways as one account may list. Take one off to add another.`
-      : 'You have already listed that one.'
+export const messageForFailure = (failure: unknown): string => {
+  if (isApiError(failure) && failure.code === 'list_full') {
+    return 'That is as many ways as one account may list. Take one off to add another.'
   }
+  if (isApiError(failure) && failure.status === 409) return 'You have already listed that one.'
   if (isApiError(failure) && failure.status === 400) {
     return 'That does not look like something anybody could reach you on. Have another look at it.'
   }
@@ -199,20 +197,17 @@ export const ConnectionsField = ({ api, loginAddress }: { api: ConnectionsApi; l
       return
     }
 
-    run(
-      async () => {
-        await api.addMyConnection({
-          kind: draft.kind,
-          // What the server will store, so the row that comes back is what was sent — a
-          // pasted profile URL reduces to the handle either way.
-          value: connectionValue(draft.kind, draft.value),
-          label: draft.label.trim(),
-        })
-        // Inside the work, so a refusal leaves what was typed where it is (#205).
-        setDraft(BLANK)
-      },
-      (failure) => messageForFailure(failure, held >= MAX_CONNECTIONS),
-    )
+    run(async () => {
+      await api.addMyConnection({
+        kind: draft.kind,
+        // What the server will store, so the row that comes back is what was sent — a
+        // pasted profile URL reduces to the handle either way.
+        value: connectionValue(draft.kind, draft.value),
+        label: draft.label.trim(),
+      })
+      // Inside the work, so a refusal leaves what was typed where it is (#205).
+      setDraft(BLANK)
+    }, messageForFailure)
   }
 
   const save = (id: string, wanted: Draft) => {
@@ -222,18 +217,14 @@ export const ConnectionsField = ({ api, loginAddress }: { api: ConnectionsApi; l
       return
     }
 
-    run(
-      async () => {
-        await api.updateMyConnection(id, {
-          kind: wanted.kind,
-          value: connectionValue(wanted.kind, wanted.value),
-          label: wanted.label.trim(),
-        })
-        setEditing(undefined)
-      },
-      // Never the ceiling: an update's 409 is always a duplicate.
-      (failure) => messageForFailure(failure, false),
-    )
+    run(async () => {
+      await api.updateMyConnection(id, {
+        kind: wanted.kind,
+        value: connectionValue(wanted.kind, wanted.value),
+        label: wanted.label.trim(),
+      })
+      setEditing(undefined)
+    }, messageForFailure)
   }
 
   return (
