@@ -601,9 +601,15 @@ worth testing.
 Any approved member can be told when something happens to them, per **browser**
 rather than per person: a subscription belongs to the browser it was made in, so
 somebody with a laptop and a phone turns it on in both. The toggle is on the details
-page behind the initials circle, **and on ⚙️ → Settings** — an account holding
-`admin` without `member` is refused from the details page, and application
-notifications go precisely to admins.
+page behind the initials circle, and **only** there.
+
+It was on ⚙️ → Settings as well, because an account holding `admin` without `member`
+is refused from the details page and application notifications go precisely to
+admins. Two switches for one subscription turned out to be the worse problem —
+which of them is on is a question neither page can answer, and it reads as two
+different settings — so it lives where a person's own settings live. **That leaves
+the account that paragraph existed for with no way to subscribe**, which is a live
+gap rather than a solved one: #396 has it, with the three ways out.
 
 A notification is a **record**, and a push is a copy of it (#248). The bell in the
 header carries what happened while you were away and whether you have looked; a push
