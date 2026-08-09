@@ -28,7 +28,9 @@ import type {
   ConnectionsResponse,
   FormQuestionsResponse,
   ImageUploadResponse,
+  IdentitiesResponse,
   InstallationResponse,
+  OAuthSettingsResponse,
   PersonProfileResponse,
   InviteResponse,
   InviteState,
@@ -572,6 +574,30 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
 
     removeMyAvatar: () =>
       request<undefined>(apiRoutes.removeMyAvatar.path(), { method: apiRoutes.removeMyAvatar.method }),
+
+    /** The ways in on this account (#393). Signed in at all is the whole guard. */
+    getMyIdentities: (signal?: AbortSignal) =>
+      request<IdentitiesResponse>(apiRoutes.getMyIdentities.path(), { signal }),
+
+    removeMyIdentity: (provider: string) =>
+      request<undefined>(apiRoutes.removeMyIdentity.path(provider), {
+        method: apiRoutes.removeMyIdentity.method,
+      }),
+
+    /** Admin only. What a provider was set up with — never the secret. */
+    getOauthSettings: (provider: string, signal?: AbortSignal) =>
+      request<OAuthSettingsResponse>(apiRoutes.getOauthSettings.path(provider), { signal }),
+
+    updateOauthSettings: (provider: string, body: BodyOf<'updateOauthSettings'>) =>
+      request<OAuthSettingsResponse>(apiRoutes.updateOauthSettings.path(provider), {
+        method: apiRoutes.updateOauthSettings.method,
+        body,
+      }),
+
+    removeOauthSettings: (provider: string) =>
+      request<OAuthSettingsResponse>(apiRoutes.removeOauthSettings.path(provider), {
+        method: apiRoutes.removeOauthSettings.method,
+      }),
 
     /** Somebody, as the rest of the community sees them (#389). Approved members only. */
     getAccountProfile: (accountId: string, signal?: AbortSignal) =>

@@ -30,6 +30,7 @@ const aPerson = (over: Partial<PersonProfile> = {}): PersonProfile => ({
   avatar: null,
   connections: [],
   contact: null,
+  facebook: null,
   ...over,
 })
 

@@ -103,6 +103,18 @@ export const Person = ({ api, accountId }: { api: PersonApi; accountId: string }
             </p>
           )}
 
+          {person.facebook !== null && (
+            // Beside the name rather than in the list below, because it is not a way of
+            // being reached: Messenger is that, and it is a row like any other. This is
+            // their page, which the app knows about only because they linked Facebook to
+            // sign in (#393).
+            <p class="person-elsewhere">
+              <a href={person.facebook}>
+                <span aria-hidden="true">📘</span> {them} on Facebook
+              </a>
+            </p>
+          )}
+
           <h2>How to reach {them}</h2>
 
           {person.connections.length > 0 ? (

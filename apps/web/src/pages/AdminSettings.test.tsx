@@ -30,6 +30,9 @@ const stub = (over: Partial<AdminSettingsApi> = {}): AdminSettingsApi => ({
   // The mail form mounted here has its own tests; this keeps it from reaching the API
   // when the page under test is about the title.
   getMailSettings: () => Promise.resolve({ mail: null }),
+  getOauthSettings: () => Promise.resolve({ settings: null }),
+  updateOauthSettings: () => Promise.reject(new Error('updateOauthSettings is not stubbed here')),
+  removeOauthSettings: () => Promise.reject(new Error('removeOauthSettings is not stubbed here')),
   updateMailSettings: () => Promise.reject(new Error('updateMailSettings is not stubbed here')),
   removeMailSettings: () => Promise.reject(new Error('removeMailSettings is not stubbed here')),
   sendTestEmail: () => Promise.reject(new Error('sendTestEmail is not stubbed here')),

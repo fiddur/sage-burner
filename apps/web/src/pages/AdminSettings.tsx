@@ -1,10 +1,11 @@
-import { MAX_TITLE } from '@sage-burner/shared'
+import { MAX_TITLE, oauthProviders } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 import type { BannerApi } from '../components/BannerField.tsx'
 import type { IconApi } from '../components/IconField.tsx'
 import type { MailApi } from '../components/MailField.tsx'
+import type { OauthApi } from '../components/OauthField.tsx'
 
 import { BannerField } from '../components/BannerField.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
@@ -12,6 +13,7 @@ import { GuardedPage } from '../components/GuardedPage.tsx'
 import { IconField } from '../components/IconField.tsx'
 import { LogOutButton } from '../components/LogOutButton.tsx'
 import { MailField } from '../components/MailField.tsx'
+import { OauthField } from '../components/OauthField.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
 import { useSetInstallationTitle } from '../installation.tsx'
 import { useAction, useLoadInto } from '../load.ts'
@@ -29,6 +31,7 @@ import { isAdmin, useViewer } from '../viewer.tsx'
 export type AdminSettingsApi = BannerApi &
   IconApi &
   MailApi &
+  OauthApi &
   Pick<ApiClient, 'getInstallation' | 'logout' | 'updateInstallation'>
 
 /** What this installation calls itself. */
@@ -115,6 +118,10 @@ export const AdminSettings = ({ api }: { api: AdminSettingsApi }) => {
       {loaded.status === 'ready' && <IconField api={api} />}
       {loaded.status === 'ready' && <BannerField api={api} />}
       {loaded.status === 'ready' && <MailField api={api} />}
+      {/* One per provider, from the vocabulary, so adding a third is a line in `enums.ts`
+          and a migration rather than a fourth copy of this block. */}
+      {loaded.status === 'ready' &&
+        oauthProviders.map((provider) => <OauthField key={provider} api={api} provider={provider} />)}
 
       <LogOutButton api={api} />
     </GuardedPage>

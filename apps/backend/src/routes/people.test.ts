@@ -11,7 +11,7 @@ import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountConnection, accountRole } from '../db/schema.ts'
+import { account, accountConnection, accountIdentity, accountRole } from '../db/schema.ts'
 
 const SECRET = 's'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
@@ -89,6 +89,7 @@ describe('somebody, as the rest of the community sees them', () => {
       name: 'Wren Aldertide',
       avatar: null,
       contact: 'wren on discord',
+      facebook: null,
       connections: [expect.objectContaining({ kind: 'messenger', value: 'wren' })],
     })
   })
@@ -133,12 +134,52 @@ describe('somebody, as the rest of the community sees them', () => {
       'avatar',
       'connections',
       'contact',
+      'facebook',
       'name',
     ])
     // No address at all here, because this account has no `email` connection: the seeding
     // happens on the paths that create an account, and these rows are inserted directly.
     expect(body.payload).not.toContain('@example.org')
     expect(body.payload).not.toContain('peanuts')
+  })
+
+  it('shows the Facebook page of somebody who linked Facebook to sign in', async () => {
+    // Derived from the identity rather than typed: the app knows about a Facebook account
+    // only because somebody linked one. The consequence is that linking shows the page, and
+    // Your details says so where the linking happens.
+    const server = await build()
+    const wren = await givenAccount()
+    const reader = await givenAccount()
+    await db().insert(accountIdentity).values({
+      id: randomUUID(),
+      account_id: wren.id,
+      provider: 'facebook',
+      subject: '1234567890',
+      created_at: NOW,
+    })
+
+    const got = await fetchProfile(server, reader.cookie, wren.id)
+
+    expect(got.json().person.facebook).toBe('https://facebook.com/profile.php?id=1234567890')
+    // The app-scoped id itself never leaves the process — only the page it points at, and
+    // that carries the id by necessity.
+    expect(got.json().person.facebook).not.toBe('1234567890')
+  })
+
+  it('shows none for somebody who linked Discord instead', async () => {
+    // Discord is a way in and not a page anybody is sent to: it has no profile URL at all.
+    const server = await build()
+    const wren = await givenAccount()
+    const reader = await givenAccount()
+    await db().insert(accountIdentity).values({
+      id: randomUUID(),
+      account_id: wren.id,
+      provider: 'discord',
+      subject: 'snowflake-1',
+      created_at: NOW,
+    })
+
+    expect((await fetchProfile(server, reader.cookie, wren.id)).json().person.facebook).toBeNull()
   })
 
   it('has a page for somebody who has filled in nothing', async () => {

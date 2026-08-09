@@ -1,13 +1,13 @@
 import type { PersonProfile, PersonProfileResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { apiRoutes } from '@sage-burner/shared'
-import { eq } from 'drizzle-orm'
+import { apiRoutes, facebookProfileUrl } from '@sage-burner/shared'
+import { and, eq } from 'drizzle-orm'
 
 import type { GuardDeps } from '../auth/guards.ts'
 
 import { createGuards } from '../auth/guards.ts'
-import { account, accountAvatar } from '../db/schema.ts'
+import { account, accountAvatar, accountIdentity } from '../db/schema.ts'
 import { noStore, sendError } from '../http.ts'
 import { connectionsFor } from './connections.ts'
 
@@ -54,12 +54,22 @@ export const registerPeopleRoutes = (app: FastifyInstance, { db, sessions }: Gua
       // reads as one.
       if (row === undefined) return sendError(reply, 404)
 
+      // From the identity rather than typed: the app knows about a Facebook account only
+      // because somebody linked one to sign in (#393). The id itself never leaves — only the
+      // page it points at.
+      const [linked] = await db
+        .select({ subject: accountIdentity.subject })
+        .from(accountIdentity)
+        .where(and(eq(accountIdentity.account_id, accountId), eq(accountIdentity.provider, 'facebook')))
+        .limit(1)
+
       const person: PersonProfile = {
         account_id: row.account_id,
         name: row.name,
         avatar: row.avatar,
         connections: await connectionsFor(db, accountId),
         contact: row.contact,
+        facebook: linked === undefined ? null : facebookProfileUrl(linked.subject),
       }
 
       return { person } satisfies PersonProfileResponse

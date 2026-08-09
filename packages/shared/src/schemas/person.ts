@@ -41,6 +41,19 @@ export const personProfileSchema = z.object({
    * roster, its CSV and the rideshare board, and is its own change.
    */
   contact: z.string().nullable(),
+  /**
+   * Where their Facebook page is, when they have linked Facebook to sign in (#393).
+   *
+   * Not a connection row, and deliberately: Facebook as a *way to be reached* is Messenger,
+   * and looking at somebody's page is a different act. The app only knows about a Facebook
+   * account at all because somebody linked one, so this is derived from the identity rather
+   * than typed — which also means **linking Facebook shows your page to members**, and Your
+   * details says so where the linking happens.
+   *
+   * Built here rather than sending the id, so the page has no opinion about Facebook's URL
+   * shape and the app-scoped id never leaves the process.
+   */
+  facebook: z.string().nullable(),
 })
 
 export type PersonProfile = z.infer<typeof personProfileSchema>

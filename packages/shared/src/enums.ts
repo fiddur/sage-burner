@@ -462,6 +462,18 @@ export const connectionValue = (kind: ConnectionKind, value: string): string => 
 }
 
 /**
+ * Somebody's Facebook page, from the id Facebook gave them (#393).
+ *
+ * Two shapes, and both have to be kept: an account with a vanity name is
+ * `facebook.com/wren`, and one without is only ever `facebook.com/profile.php?id=<digits>`.
+ * A subject from the sign-in is always the numeric form; a `messenger` value may be either.
+ */
+export const facebookProfileUrl = (value: string): string =>
+  /^\d+$/u.test(value.trim())
+    ? `https://facebook.com/profile.php?id=${value.trim()}`
+    : `https://facebook.com/${value.trim()}`
+
+/**
  * A URL somebody typed, if it is one worth putting in an `href`.
  *
  * `https` alone, and stricter than `markdown.ts`'s link check on purpose: that governs
