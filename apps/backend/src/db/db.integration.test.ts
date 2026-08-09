@@ -842,6 +842,7 @@ describe('json columns', () => {
 
 const REBUILD = '20260804105125_places_per_burn'
 const THREADS = '20260809090000_threads'
+const LOGIN_ADDRESS = '20260809180000_connection_messenger_email'
 const FACILITATOR = '20260805040000_facilitator'
 const REPEATABLE = '20260805050000_repeatable_dream'
 
@@ -1362,6 +1363,59 @@ describe('the threads migration', () => {
           )
           .run('n-2', 'a-1', 'dream_comment', 'Bea said something', NOW),
       ).not.toThrow()
+    } finally {
+      fresh.close()
+    }
+  })
+
+  it('gives every account already here its login address as a way to be reached', () => {
+    // The backfill (#388's follow-up): everybody has an address, and a list that starts
+    // empty is a list nobody fills in. Last rather than first, so somebody who already
+    // put Discord at the top keeps it there — which is the whole point of the order.
+    const fresh = createDb({ url: ':memory:' })
+    const { staged, kept } = stagedThrough(LOGIN_ADDRESS)
+
+    try {
+      expect(kept).not.toContain(LOGIN_ADDRESS)
+      runMigrations(fresh, staged)
+
+      const insertAccount = fresh.client.prepare(
+        'insert into account (id, email, name, created_at) values (?, ?, ?, ?)',
+      )
+      insertAccount.run('a-1', 'ada@example.org', 'Ada', NOW)
+      insertAccount.run('a-2', 'bea@example.org', 'Bea', NOW)
+      insertAccount.run('a-3', 'cai@example.org', 'Cai', NOW)
+
+      // Ada has a list already; Bea has an address of her own in it; Cai has nothing.
+      fresh.client
+        .prepare(
+          'insert into account_connection (id, account_id, kind, value, label, "order") values (?, ?, ?, ?, ?, ?)',
+        )
+        .run('c-1', 'a-1', 'discord', 'ada', '', 0)
+      fresh.client
+        .prepare(
+          'insert into account_connection (id, account_id, kind, value, label, "order") values (?, ?, ?, ?, ?, ?)',
+        )
+        .run('c-2', 'a-2', 'email', 'ada.at.work@example.org', '', 0)
+
+      runMigrations(fresh, migrationsFolder)
+
+      const listFor = (accountId: string) =>
+        fresh.client
+          .prepare(
+            'select kind, value, "order" from account_connection where account_id = ? order by "order"',
+          )
+          .all(accountId)
+          .map((row) => `${String(row.kind)}:${String(row.value)}@${String(row.order)}`)
+
+      // The position is asserted, not just the sequence: seeding at 0 alongside Ada's
+      // existing 0 leaves the order to SQLite's rowid tie-break, which happens to read the
+      // same — so a test comparing only the sequence passes against the bug it exists for.
+      expect(listFor('a-1')).toEqual(['discord:ada@0', 'email:ada@example.org@1'])
+      // Bea already had an email row, so nothing is added — "already present" is satisfied
+      // by any of them, whatever the address.
+      expect(listFor('a-2')).toEqual(['email:ada.at.work@example.org@0'])
+      expect(listFor('a-3')).toEqual(['email:cai@example.org@0'])
     } finally {
       fresh.close()
     }

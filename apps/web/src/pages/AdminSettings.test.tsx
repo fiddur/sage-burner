@@ -33,14 +33,6 @@ const stub = (over: Partial<AdminSettingsApi> = {}): AdminSettingsApi => ({
   removeMailSettings: () => Promise.reject(new Error('removeMailSettings is not stubbed here')),
   sendTestEmail: () => Promise.reject(new Error('sendTestEmail is not stubbed here')),
   updateInstallation: () => Promise.reject(new Error('updateInstallation is not stubbed here')),
-  // The toggle mounted here has its own tests; these keep it from reaching the API
-  // when the page under test is about the title.
-  getMyNotificationSettings: () => Promise.resolve({ on: [], email: [] }),
-  updateMyNotificationSettings: () =>
-    Promise.reject(new Error('updateMyNotificationSettings is not stubbed here')),
-  getPushKey: () => Promise.resolve({ public_key: null }),
-  subscribeToPush: () => Promise.reject(new Error('subscribeToPush is not stubbed here')),
-  unsubscribeFromPush: () => Promise.reject(new Error('unsubscribeFromPush is not stubbed here')),
   setInstallationIcon: () => Promise.reject(new Error('setInstallationIcon is not stubbed here')),
   removeInstallationIcon: () => Promise.reject(new Error('removeInstallationIcon is not stubbed here')),
   setInstallationBanner: () => Promise.reject(new Error('setInstallationBanner is not stubbed here')),
@@ -78,6 +70,17 @@ describe('AdminSettings', () => {
     renderPage(stub())
 
     expect(await titleField()).toHaveProperty('value', 'Sage Burner')
+  })
+
+  it('carries nothing personal: this page is the installation’s settings', async () => {
+    // The push toggle was here as well as on Your details. Two switches for one
+    // subscription is the worse problem — which of them is on is a question neither page
+    // can answer, and it reads as two different settings. This is what keeps the copy from
+    // coming back unnoticed, since the page composes its sections from imports.
+    renderPage(stub())
+    await titleField()
+
+    expect(screen.queryByRole('heading', { name: 'Notifications' })).toBeNull()
   })
 
   it('offers the way out, for the account the details page refuses', async () => {

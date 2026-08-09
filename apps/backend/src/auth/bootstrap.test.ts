@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { DbHandle } from '../db/index.ts'
 
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole } from '../db/schema.ts'
+import { account, accountConnection, accountRole } from '../db/schema.ts'
 import { ensureAdmin } from './bootstrap.ts'
 import { verifyPassword } from './password.ts'
 
@@ -67,6 +67,39 @@ describe('ensureAdmin', () => {
     expect(second).toEqual({ account_id: first.account_id, created: false })
     expect(await rolesOf(db, first.account_id)).toEqual(['admin', 'member'])
     expect(await db.select().from(account)).toHaveLength(1)
+  })
+
+  it('gives the account it creates its login address as a way to be reached', async () => {
+    const db = database()
+
+    const { account_id } = await ensureAdmin({
+      db,
+      email: 'ada@example.org',
+      password: 'a good long passphrase',
+      params: cheap,
+    })
+
+    const held = await db.select().from(accountConnection).where(eq(accountConnection.account_id, account_id))
+
+    expect(held).toHaveLength(1)
+    expect(held[0]).toMatchObject({ kind: 'email', value: 'ada@example.org', order: 0 })
+  })
+
+  it('adds nothing to an account that already exists, whatever it took off', async () => {
+    // Re-running the bootstrap grants roles and stops. Putting the address back would undo
+    // a deletion the person meant, and this command is run again whenever an operator is
+    // unsure whether the admin exists.
+    const db = database()
+    await db.insert(account).values({
+      id: 'existing',
+      email: 'ada@example.org',
+      password_hash: null,
+      created_at: '2026-01-01T00:00:00.000Z',
+    })
+
+    await ensureAdmin({ db, email: 'ada@example.org', password: 'a good long passphrase', params: cheap })
+
+    expect(await db.select().from(accountConnection)).toEqual([])
   })
 
   it('grants the roles to an account that already exists', async () => {

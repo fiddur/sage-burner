@@ -1,6 +1,6 @@
 import type { RideEntry, RideKind } from '@sage-burner/shared'
 
-import { MAX_NOTES, MAX_RIDE_PLACE, rideKinds } from '@sage-burner/shared'
+import { MAX_NOTES, MAX_RIDE_PLACE, profilePage, rideKinds } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -251,7 +251,8 @@ const Half = ({
               {row.kind === 'offers' && row.seats > 0 && ` · ${row.seats} seats`}
             </p>
             <p class="form-note">
-              {row.name ?? 'Name not filled in yet'} · {row.contact ?? 'no contact given'}
+              <a href={profilePage(row.account_id)}>{row.name ?? 'Name not filled in yet'}</a> ·{' '}
+              {row.contact ?? 'no contact given'}
             </p>
             {row.notes !== '' && <p class="ride-notes">{row.notes}</p>}
 

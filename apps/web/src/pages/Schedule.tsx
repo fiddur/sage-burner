@@ -570,6 +570,12 @@ const Support = ({
  * The name is on `title` rather than beside the letters: a chip is an hour tall at
  * best, and two of them in a lane get half that. Nothing when nobody has been handed
  * it — an empty circle would read as somebody whose name is missing.
+ *
+ * **Deliberately not a link to their page** (#389), where every other face in the app is
+ * one: this face sits inside a grid chip whose whole job is to open the dream, and an
+ * anchor there would take the click that does it — a nested interactive element inside a
+ * clickable cell. The name is a link in the panel the chip opens, which is where somebody
+ * reading about a dream can follow it without losing the dream.
  */
 const Facilitator = ({ dream, people }: { dream: Session; people: ReadonlyMap<string, Person> }) => {
   const who = dream.facilitator_account_id

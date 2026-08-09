@@ -1,6 +1,6 @@
 import type { Thread, ThreadEntry, ThreadEntryKind } from '@sage-burner/shared'
 
-import { MAX_COMMENT } from '@sage-burner/shared'
+import { MAX_COMMENT, profilePage } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
 import type { UploadImage } from '../image-upload.ts'
@@ -32,6 +32,22 @@ const marks = {
 } as const satisfies Record<ThreadEntryKind, string>
 
 const nameOf = (entry: ThreadEntry) => entry.author?.name ?? (entry.author === null ? 'Somebody' : NAMELESS)
+
+/**
+ * Who said it, linked to their page (#389).
+ *
+ * The name a reader most wants to click: somebody has just said something and you do not
+ * know who they are. A deleted author is "Somebody" and stays plain text — there is no page
+ * left to point at, and a link to nowhere is worse than none.
+ */
+const Who = ({ entry }: { entry: ThreadEntry }) =>
+  entry.author === null ? (
+    <strong>{nameOf(entry)}</strong>
+  ) : (
+    <a href={profilePage(entry.author.account_id)}>
+      <strong>{nameOf(entry)}</strong>
+    </a>
+  )
 
 /**
  * The conversation about a dream (#375), wherever it is being read.
@@ -115,7 +131,7 @@ export const DreamThread = ({
           entry.kind === 'comment' ? (
             <li key={entry.id} class="thread-said">
               <p class="thread-who">
-                <strong>{nameOf(entry)}</strong>{' '}
+                <Who entry={entry} />{' '}
                 <span class="thread-when">
                   {localDay(entry.created_at)}
                   {entry.edited_at !== null && ' · edited'}

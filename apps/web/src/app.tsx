@@ -36,6 +36,7 @@ import { Members } from './pages/Members.tsx'
 import { NotFound } from './pages/NotFound.tsx'
 import { Notifications } from './pages/Notifications.tsx'
 import { Options } from './pages/Options.tsx'
+import { Person } from './pages/Person.tsx'
 import { Places } from './pages/Places.tsx'
 import { ProfilePage } from './pages/Profile.tsx'
 import { Rides } from './pages/Rides.tsx'
@@ -79,6 +80,7 @@ export type RoutesApi = Pick<
   | 'setMyAvatar'
   | 'removeMyAvatar'
   | 'uploadImage'
+  | 'getAccountProfile'
   | 'getMyConnections'
   | 'addMyConnection'
   | 'updateMyConnection'
@@ -244,8 +246,13 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
   const ProfileRoute = useMemo(() => () => <ProfilePage api={api} />, [api])
   const ApplyRoute = useMemo(() => () => <Apply api={api} />, [api])
   const ChangelogRoute = useMemo(() => () => <Changelog api={api} />, [api])
-  // The token arrives as a prop from the route pattern, so this one takes props
-  // rather than closing over nothing like the others.
+  // Both of these take a prop from the route pattern, rather than closing over nothing
+  // like the others.
+  const PersonRoute = useMemo(
+    () =>
+      ({ accountId }: { accountId?: string }) => <Person api={api} accountId={accountId ?? ''} />,
+    [api],
+  )
   const InviteRoute = useMemo(
     () =>
       ({ token }: { token?: string }) => <Invite api={api} token={token ?? ''} />,
@@ -258,6 +265,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
       <Route path="/apply" component={ApplyRoute} />
       <Route path="/changelog" component={ChangelogRoute} />
       <Route path="/members" component={MembersRoute} />
+      <Route path="/members/:accountId" component={PersonRoute} />
       <Route path="/meals" component={MealsRoute} />
       <Route path="/dreams" component={DreamsRoute} />
       <Route path="/schedule" component={ScheduleRoute} />

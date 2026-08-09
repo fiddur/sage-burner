@@ -90,6 +90,19 @@ export const apiRoutes = {
     fastify: '/api/accounts/:accountId/avatar',
     path: (accountId: string) => `/api/accounts/${encodeURIComponent(accountId)}/avatar`,
   },
+  /**
+   * Somebody, as the rest of the community sees them (#389).
+   *
+   * `requireApproved`, the same guard as the face beside the name and as the attendee
+   * list. A separate route rather than a relaxed roster, for the reason
+   * `/api/events/:eventId/attendees` gives: a route selecting the columns it names cannot
+   * leak one it does not.
+   */
+  accountProfile: {
+    method: 'GET',
+    fastify: '/api/accounts/:accountId/profile',
+    path: (accountId: string) => `/api/accounts/${encodeURIComponent(accountId)}/profile`,
+  },
   addEventOption: {
     method: 'POST',
     fastify: '/api/events/:eventId/options',

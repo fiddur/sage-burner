@@ -29,6 +29,7 @@ import type {
   FormQuestionsResponse,
   ImageUploadResponse,
   InstallationResponse,
+  PersonProfileResponse,
   InviteResponse,
   InviteState,
   LeadRoleLead,
@@ -571,6 +572,10 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
 
     removeMyAvatar: () =>
       request<undefined>(apiRoutes.removeMyAvatar.path(), { method: apiRoutes.removeMyAvatar.method }),
+
+    /** Somebody, as the rest of the community sees them (#389). Approved members only. */
+    getAccountProfile: (accountId: string, signal?: AbortSignal) =>
+      request<PersonProfileResponse>(apiRoutes.accountProfile.path(accountId), { signal }),
 
     /**
      * The ways somebody can be reached, which are their own to write (#388). No

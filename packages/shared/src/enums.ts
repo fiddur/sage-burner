@@ -344,14 +344,19 @@ export const entryCategory = (kind: ThreadEntryKind): NotificationCategory | und
  * says how — `@wren` on Instagram and `@wren@chaos.social` on Mastodon build different
  * links, and a Discord username builds none at all. A free-text kind could produce
  * neither an icon nor a link, which is why the escape hatch is `link` — a label and a
- * URL somebody types — rather than an open list. Adding Signal properly later is a line
- * here and no migration.
+ * URL somebody types — rather than an open list.
+ *
+ * Adding one is a line here **and** a migration: `kind` carries a CHECK listing the
+ * vocabulary and SQLite cannot alter a CHECK in place, so the table is rebuilt. Nothing
+ * checks that the two agree, so a kind added here alone passes Zod and the type checker
+ * and then fails the CHECK against a database that ran the old migration.
  */
 export const connectionKinds = [
   'email',
   'phone',
   'signal',
   'whatsapp',
+  'messenger',
   'discord',
   'instagram',
   'tiktok',
@@ -377,10 +382,10 @@ export interface ConnectionKindInfo {
   /**
    * The address to build, or nothing where the network has no such thing.
    *
-   * Discord is the one that matters here: a username is a string you paste into
-   * Discord's own search and there is no profile URL to point at, so the page has to
-   * offer something to copy instead of an anchor. A kind added without an answer to
-   * this would otherwise render a dead link.
+   * Discord is the one that matters here: a username is a string you paste into Discord's
+   * own search and there is no profile URL to point at, so the page has to offer something
+   * to copy instead of an anchor. A kind added without an answer to this would otherwise
+   * render a dead link.
    */
   href: (value: string) => string | undefined
 }
@@ -434,6 +439,15 @@ const handleIn = (value: string, host: RegExp): string | undefined => {
 export const connectionValue = (kind: ConnectionKind, value: string): string => {
   const trimmed = value.trim()
 
+  if (kind === 'messenger') {
+    // The numeric form first: its path segment is `profile.php`, so `handleIn` would
+    // reduce the link to that and point at nobody.
+    const [, numeric] =
+      /^https?:\/\/[^\s/]*facebook\.com\/profile\.php\?(?:[^\s]*&)?id=(\d+)/iu.exec(trimmed) ?? []
+    if (numeric !== undefined) return numeric
+
+    return handleIn(trimmed, /(^|\.)facebook\.com$/iu) ?? trimmed.replace(/^@/u, '')
+  }
   if (kind === 'instagram') return handleIn(trimmed, /(^|\.)instagram\.com$/iu) ?? trimmed.replace(/^@/u, '')
   if (kind === 'tiktok') return handleIn(trimmed, /(^|\.)tiktok\.com$/iu) ?? trimmed.replace(/^@/u, '')
   if (kind === 'mastodon') {
@@ -486,6 +500,16 @@ export const connectionKindInfo = {
     hint: '+46 70 123 45 67',
     labelled: false,
     href: (value) => `https://wa.me/${dialled(value).slice(1)}`,
+  },
+  messenger: {
+    label: 'Messenger',
+    icon: '🗨️',
+    hint: 'your Facebook name, or the number in your profile link',
+    labelled: false,
+    // Facebook as a *way to be reached* is Messenger. Looking at somebody's Facebook page
+    // is a different act and is not a contact detail — the profile page draws that from a
+    // linked Facebook sign-in (#393), which is the only place the app knows about one.
+    href: (value) => `https://m.me/${value.trim()}`,
   },
   discord: {
     label: 'Discord',

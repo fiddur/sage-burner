@@ -13,7 +13,7 @@ import { verifyPassword } from '../auth/password.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, application, attendance, event, inviteToken } from '../db/schema.ts'
+import { account, accountConnection, application, attendance, event, inviteToken } from '../db/schema.ts'
 
 /**
  * Redeeming an invite: the single funnel both membership paths converge on.
@@ -212,6 +212,24 @@ describe('redeeming', () => {
     expect(row?.contact).toBe('fredrik on discord')
     expect(row?.allergies_notes).toBe('peanuts')
     expect(row?.password_hash).toBeTruthy()
+  })
+
+  it('gives the new account its login address as a way to be reached', async () => {
+    // Everybody has one, and a list that starts empty is a list nobody fills in (#388).
+    // Written in the account's own transaction, so nobody exists without it.
+    const server = await build()
+    const token = await givenInvite()
+
+    await redeem(server, token)
+
+    const [row] = await db().select().from(account).where(eq(account.email, 'fredrik@example.org'))
+    const held = await db()
+      .select()
+      .from(accountConnection)
+      .where(eq(accountConnection.account_id, row?.id ?? ''))
+
+    expect(held).toHaveLength(1)
+    expect(held[0]).toMatchObject({ kind: 'email', value: 'fredrik@example.org', order: 0 })
   })
 
   it('falls back to the email when the body carries no contact', async () => {

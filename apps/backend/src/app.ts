@@ -49,6 +49,7 @@ import { registerMailRoutes } from './routes/mail.ts'
 import { registerMealAdminRoutes, registerMealRoutes } from './routes/meals.ts'
 import { registerNotificationRoutes } from './routes/notifications.ts'
 import { registerPasskeyRoutes } from './routes/passkeys.ts'
+import { registerPeopleRoutes } from './routes/people.ts'
 import { registerPlaceRoutes } from './routes/places.ts'
 import { registerProfileRoutes } from './routes/profile.ts'
 import { registerPushRoutes } from './routes/push.ts'
@@ -506,6 +507,7 @@ export const createApp = async ({
   registerAvatarRoutes(app, { db, sessions, now })
   registerImageRoutes(app, { db, sessions, now })
   registerConnectionRoutes(app, { db, sessions })
+  registerPeopleRoutes(app, { db, sessions })
   registerPwaRoutes(app, { db, sessions, now })
   registerBannerRoutes(app, { db, sessions, now })
   registerMailRoutes(app, { db, sessions, mail, now })

@@ -601,9 +601,15 @@ worth testing.
 Any approved member can be told when something happens to them, per **browser**
 rather than per person: a subscription belongs to the browser it was made in, so
 somebody with a laptop and a phone turns it on in both. The toggle is on the details
-page behind the initials circle, **and on ⚙️ → Settings** — an account holding
-`admin` without `member` is refused from the details page, and application
-notifications go precisely to admins.
+page behind the initials circle, and **only** there.
+
+It was on ⚙️ → Settings as well, because an account holding `admin` without `member`
+is refused from the details page and application notifications go precisely to
+admins. Two switches for one subscription turned out to be the worse problem —
+which of them is on is a question neither page can answer, and it reads as two
+different settings — so it lives where a person's own settings live. **That leaves
+the account that paragraph existed for with no way to subscribe**, which is a live
+gap rather than a solved one: #396 has it, with the three ways out.
 
 A notification is a **record**, and a push is a copy of it (#248). The bell in the
 header carries what happened while you were away and whether you have looked; a push
@@ -907,15 +913,38 @@ identity and stays out of what other members read (#159), while these are what t
 chose to put up — **including an `email` row**, which is an address they typed and may not
 be the one they sign in with at all.
 
-Note the tense. Nothing reads somebody else's list yet: `connectionsFor` is only ever
-called with the viewer's own account, and the page that shows anybody else's is #389. The
-editor says what these are _for_ rather than who can see them today, because people are
-filling them in now and the answer will be everybody.
+Somebody's page (#389) is what reads it: `connectionsFor` is called with whoever's page is
+being looked at, and every name in the app links there. The editor's own note says what the
+list is _for_ rather than reciting who can see it, which is the same sentence either way.
 
-Worth knowing while reading that: `redemption.ts` already defaults `contact` to the address
-somebody redeemed with, and `contact` is on the member roster. So for most accounts the
-login address is already published, by default, today. Nothing here seeds a connection from
-it — publishing by default is the opposite of what this list is for.
+**The login address is in the list from the start.** Everybody has one, and a list that
+starts empty is a list nobody fills in — so `loginAddressConnection` seeds an `email` row in
+the same transaction as the account, on both paths that create one, and a migration
+backfilled every account that already existed. It is an ordinary row from there: sortable,
+editable, and removable by the person whose it is, because present by default is not the same
+as imposed. The backfill puts it **last** for an account that already had rows, since
+somebody who put Discord at the top chose that, and it skips an account that already has an
+`email` row whatever address that holds.
+
+**That publishes the login address, and for some accounts it is the first time.** The easy
+version of this sentence is wrong, so it is worth being exact: `redemption.ts` writes
+`contact: body.contact ?? body.email`, so the address usually _is_ already on the roster
+through `contact` — but `contact` is editable afterwards, and anybody who replaced it with a
+Discord handle or a phone number had never had their login address shown to members. #159's
+decision stands for the `account.email` column, which no member-facing read selects; what
+changed is that a row holding the same string is now in a list that is read.
+
+Why it was not scoped to the accounts where the address was already public — a one-line
+`WHERE account.contact IS NULL OR lower(account.contact) = account.email` would have done it —
+is that a list present for most people and mysteriously absent for the rest is worse than
+either, and the absence would land on exactly the people who care most about the difference
+with nothing telling them why. What is owed instead is that the row is removable and that the
+changelog says plainly it is visible. Both hold.
+
+**Facebook is Messenger here.** The `messenger` kind takes a Facebook name or the number out
+of a `profile.php?id=` link, and builds `m.me`. Looking at somebody's Facebook page is a
+different act and not a way of reaching them, so it is not a row in this list — the page
+draws that from a linked Facebook sign-in, which is the only place the app knows about one.
 
 **Written only by the person themselves.** `/api/me/connections` takes the account id from
 the session, and the `id` a caller supplies reaches only their own row because the account
@@ -933,6 +962,47 @@ exactly once or is refused, which is `ordered.ts` for the sixth list.
 the rideshare board, and `rides.ts` calls it "the one field on the account that exists to be
 given out". Once there is a list of kinds, `contact` is the sentence that fits no kind, and
 merging it in means touching all three — its own change, with its own migration.
+
+## Somebody's page
+
+`/members/:accountId` is one person as the rest of the community sees them (#389), and it
+exists because every name in the app used to be a dead end. `GET /api/accounts/:accountId/profile`
+serves it, beside `accountAvatar`'s `/api/accounts/:accountId/avatar` and behind the same
+`requireApproved` — a page answering "how do I get hold of this person" is exactly as
+private as the attendee list it is reached from, and no more.
+
+**The projection is an object literal**, in the manner of `asMemberEntry`. That is the
+safety property rather than tidiness: this is the route every member reads about every other
+member, so a column added to `account` reaches it only when somebody names it in
+`personProfileSchema`. It carries `account_id`, `name`, `avatar`, the connections in their
+order, and `contact`. What is absent is absent because something else already decided it —
+`email` is the login identity (#159), allergies belong to the roster where whoever cooks
+reads them as a list, `payment_status` says something about the burn rather than the person,
+and `roles` change nothing on the page.
+
+**Every name links to it, and mostly through one component.** `PersonBadge` already drew a
+face and a name together (#301), so making it an anchor linked a dream's helpers, a meal's
+crew and a lead role's team at once — and anything built with it later is linked without
+anybody remembering to. The rest were done by hand: the two roster tables, a comment's
+author, a name on the rideshare board, and the faces on an open dream.
+
+Two deliberate exceptions:
+
+- **The circle in the corner of the bar** goes to `/profile`, not here. It is reliably you,
+  and what somebody wants from their own face is the page where they change it.
+- **The facilitator on a schedule chip** is not a link. That face sits inside a grid cell
+  whose whole job is to open the dream, and an anchor there would take the click that does
+  it. The name is a link in the panel the chip opens, which is where somebody can follow it
+  without losing the dream.
+
+A deleted author stays plain text — "Somebody", with no page left to point at — because a
+link to nowhere is worse than none.
+
+**The page is in the offline cache**, unlike a thread (#375) or a stored picture (#379). The
+growth argument that excludes those does not reach it: there are as many of these as there
+are accounts, a few dozen, each a few hundred bytes — so the cache does not grow with use
+the way a key per dream ever opened does. Looking up how to reach somebody with no signal is
+most of what the page is for.
 
 ## What a member may change
 

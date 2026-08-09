@@ -1,5 +1,7 @@
 import type { EventAttendeesResponse, Place, Session, SessionUpdate } from '@sage-burner/shared'
 
+import { profilePage } from '@sage-burner/shared'
+
 import type { UploadImage } from '../image-upload.ts'
 import type { Person } from './HelperStrip.tsx'
 import type { DreamTalk } from './OpenedDream.tsx'
@@ -130,9 +132,16 @@ export const DreamDetails = ({
                   const who = person.name ?? NAMELESS
 
                   return (
-                    // Wrapped for the name: `Avatar` draws `alt=""` because a name is
-                    // normally beside it, and in a stack of faces there is none.
-                    <span key={person.account_id} class="dream-supporter" title={who}>
+                    // An anchor for the name as much as for the link: `Avatar` draws
+                    // `alt=""` because a name is normally beside it, and in a stack of
+                    // faces there is none — so the hidden span is what a screen reader
+                    // reads, and what gives the link something to be called.
+                    <a
+                      key={person.account_id}
+                      class="dream-supporter"
+                      title={who}
+                      href={profilePage(person.account_id)}
+                    >
                       <Avatar
                         accountId={person.account_id}
                         name={person.name}
@@ -140,7 +149,7 @@ export const DreamDetails = ({
                         size="dream-facilitator"
                       />
                       <span class="visually-hidden">{who}</span>
-                    </span>
+                    </a>
                   )
                 })}
               </span>

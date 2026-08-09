@@ -33,6 +33,7 @@ const clientWith = (
   getMe: () => Promise.reject(new Error('getMe is not stubbed in this file')),
   getThread: () => Promise.reject(new Error('getThread is not stubbed in this file')),
   uploadImage: () => Promise.reject(new Error('uploadImage is not stubbed in this file')),
+  getAccountProfile: () => Promise.reject(new Error('getAccountProfile is not stubbed in this file')),
   getMyConnections: () => Promise.resolve({ connections: [] }),
   addMyConnection: () => Promise.reject(new Error('addMyConnection is not stubbed in this file')),
   updateMyConnection: () => Promise.reject(new Error('updateMyConnection is not stubbed in this file')),

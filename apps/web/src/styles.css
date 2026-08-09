@@ -849,6 +849,61 @@ a:hover {
   overflow-wrap: anywhere;
 }
 
+/*
+  Somebody's page (#389): the face at the size of a heading, and their ways of being
+  reached under it.
+
+  `.person-face` sits below `.avatar` for the reason every other size modifier does —
+  each is a single class, so specificity ties and source order decides. Above the base
+  rule it would set nothing at all and the face would draw at the bar's 2rem.
+*/
+.person-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.ways {
+  list-style: none;
+  margin: 0 0 1.5rem;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+  max-width: 34rem;
+}
+
+.way {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+/* Takes the slack, so a copy button stays at the right edge. Named rather than counted,
+   for the reason `.connection-what` is. */
+.way-what {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.way-name {
+  font-weight: 600;
+}
+
+/*
+  The badge is an anchor now, and it must not read as body-copy link: it is a face and a
+  name, and an underline through both looks like a mistake.
+*/
+a.person-badge {
+  color: inherit;
+  text-decoration: none;
+}
+
+a.person-badge:hover span:last-child,
+a.person-badge:focus-visible span:last-child {
+  text-decoration: underline;
+}
+
 .connection-edit {
   flex: 1;
   min-width: 0;
@@ -1907,6 +1962,14 @@ a:hover {
 .nav-icon {
   display: inline-flex;
   text-decoration: none;
+}
+
+/* Below `.avatar`, like every other size modifier: single classes tie on specificity
+   and source order decides — above it this sets nothing and the face draws at 2rem. */
+.person-face {
+  width: 4rem;
+  height: 4rem;
+  font-size: 1.5rem;
 }
 
 img.avatar {

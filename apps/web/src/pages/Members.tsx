@@ -1,5 +1,6 @@
 import type { MemberRosterEntry, MemberRosterResponse } from '@sage-burner/shared'
 
+import { profilePage } from '@sage-burner/shared'
 import { Fragment } from 'preact'
 
 import type { ApiClient } from '../api/client.ts'
@@ -142,7 +143,7 @@ const RosterTable = ({ entries }: { entries: readonly MemberRosterEntry[] }) => 
             <td>
               {/* No fallback to the email address the way the admin's
                       list has, because the response does not carry one. */}
-              {entry.name ?? 'Name not filled in yet'}
+              <a href={profilePage(entry.account_id)}>{entry.name ?? 'Name not filled in yet'}</a>
               {entry.waiting && <span class="form-note"> · waiting</span>}
               <br />
               <span class="form-note">{entry.contact ?? 'no contact given'}</span>
