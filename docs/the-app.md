@@ -805,6 +805,67 @@ keeps the face far more often than one squashed to fit. The resize itself is not
 unit-tested and cannot usefully be — happy-dom has no canvas that draws, so a test
 would assert against a stub of the thing under test.
 
+## Pictures in what people write
+
+Paste one into a comment, drag one onto a dream's description, or pick one from a phone
+(#379). The markdown for it is written at the cursor and the picture is stored; nothing
+about the renderer changed, because `renderMarkdown` already drew `![](…)` and `app.ts`
+already allowed `img-src 'self'`.
+
+**One table, `image`, unlike the three fixed slots.** `account_avatar`,
+`installation_icon` and `installation_banner` each have one owner and nobody makes more
+of them. A picture in prose has no owning entity at all — the reference is inside
+somebody's markdown, which no foreign key can see — so the only thing it belongs to is
+the person who uploaded it, and `uploaded_by` cascades with the account.
+
+**Nothing sweeps orphans, deliberately.** Knowing when the last reference to a picture
+went would mean scanning markdown on every save, or a sweep that has to know every
+markdown column in the schema. Both are lists that go one column stale in silence, and
+the rule here is to prefer deleting the thing that needs syncing over syncing it. At a
+few hundred pictures a burn, capped, an orphan is cheaper than the machinery that would
+find it. The one deletion that must work is the person's, and that is the cascade.
+
+**`requireApproved` on both ends**, like the avatar and the name beside it: a photograph
+in a comment thread is at least as personal as a face. The consequence is worth stating
+rather than discovering — a picture hand-written into the burn's **welcome text**, which
+is public, is broken for the public. That is why `MarkdownField` takes its uploader as an
+optional prop and the public-facing fields do not pass one: the welcome text and the
+application form's question text offer no picture button, and a paste into them is left
+as an ordinary paste.
+
+The id is a v4 UUID, so 122 CSPRNG bits stand between one URL and the next. That is
+defence in depth rather than the guard.
+
+**Nothing on the server decodes an image**, which is the rule the other three state and
+the one that matters most here, because this is the upload that takes whatever a camera
+produced. The browser scales the longest edge to 1600 px and encodes WebP before sending.
+Two details the avatar and the banner do not have to care about:
+
+- **Orientation.** A phone records the rotation in EXIF, and a canvas round-trip drops
+  the tag and keeps the pixels. `createImageBitmap(file, { imageOrientation: 'from-image' })`
+  is what stops a photograph going up sideways, and `image.test.ts` asserts it is asked
+  for.
+- **What re-encoding costs.** It strips EXIF, which is a privacy win worth having on
+  purpose — a phone photograph carries where it was taken, and this one is going into a
+  thread. It also flattens an animated GIF to one frame, which is why GIF is not in the
+  accepted list.
+
+**A placeholder holds the spot while the bytes go up**, GitHub's `![Uploading …]()`, and
+the real markdown replaces it when the id comes back. It is matched by text rather than
+by an offset, because the offset is wrong the moment somebody carries on typing — which
+is the case the field must survive, since a refusal takes the placeholder back out and
+must never take the comment with it.
+
+**A stored picture is not put in the offline cache.** It is one key per photograph
+anybody has scrolled past, kept until sign-out, where every other entry there is a page's
+JSON replaced in place — the shape `getThread` is excluded for, with a hundred times the
+bytes. The route answers `private, max-age, immutable`, which is safe because an id never
+answers with different bytes, so the browser's own cache still holds them between visits.
+
+**How many one account may hold is a number**, not an absence: this is the first
+unbounded write any member can make, and rate limiting (#57) is still unbuilt.
+`MAX_IMAGES_PER_ACCOUNT` in `media.ts` says what it is and why.
+
 ## Markdown is escaped, not filtered
 
 `welcome_markdown` is written by **any approved member** and rendered to every

@@ -3,9 +3,13 @@ import type { Thread, ThreadEntry, ThreadEntryKind } from '@sage-burner/shared'
 import { MAX_COMMENT } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
+import type { UploadImage } from '../image-upload.ts'
+
 import { localDay } from '../datetime.ts'
+import { useImageUpload } from '../image-upload.ts'
 import { renderMarkdown } from '../markdown.ts'
 import { rowsFor } from '../textarea.ts'
+import { AddPicture } from './AddPicture.tsx'
 import { IconButton } from './IconButton.tsx'
 import { NAMELESS } from './PersonBadge.tsx'
 
@@ -46,6 +50,7 @@ export const DreamThread = ({
   admin,
   busy,
   more,
+  upload,
   onSay,
   onRewrite,
   onRemove,
@@ -58,6 +63,12 @@ export const DreamThread = ({
   busy: boolean
   /** Whether there is more of it than is being shown — the feed's card carries a few. */
   more: boolean
+  /**
+   * How a photograph gets into what somebody says (#379). Required rather than optional:
+   * a thread is the place pictures were wanted most, and a call site that forgot it would
+   * silently be the one field that does not take them.
+   */
+  upload: UploadImage
   onSay: (body: string) => void
   onRewrite: (id: string, body: string) => void
   onRemove: (id: string) => void
@@ -65,6 +76,20 @@ export const DreamThread = ({
 }) => {
   const [saying, setSaying] = useState('')
   const [editing, setEditing] = useState<{ id: string; body: string } | undefined>(undefined)
+
+  const sayingPictures = useImageUpload({
+    value: saying,
+    maxLength: MAX_COMMENT,
+    onInput: setSaying,
+    upload,
+  })
+
+  const editingPictures = useImageUpload({
+    value: editing?.body ?? '',
+    maxLength: MAX_COMMENT,
+    onInput: (body) => setEditing((current) => (current === undefined ? current : { ...current, body })),
+    upload,
+  })
 
   if (thread === undefined) return null
 
@@ -106,7 +131,9 @@ export const DreamThread = ({
                     rows={rowsFor(editing.body, 2)}
                     value={editing.body}
                     onInput={(event) => setEditing({ id: entry.id, body: event.currentTarget.value })}
+                    {...editingPictures.handlers}
                   />
+                  <AddPicture pictures={editingPictures} label="what you said" />
                   <button
                     type="button"
                     disabled={busy || editing.body.trim() === ''}
@@ -169,11 +196,14 @@ export const DreamThread = ({
           rows={rowsFor(saying, 2)}
           value={saying}
           onInput={(event) => setSaying(event.currentTarget.value)}
+          {...sayingPictures.handlers}
         />
         <button type="button" disabled={busy || saying.trim() === ''} onClick={say}>
           Say it
         </button>
       </p>
+
+      <AddPicture pictures={sayingPictures} label={`what you say about ${thread.title}`} />
     </div>
   )
 }

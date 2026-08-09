@@ -5,6 +5,7 @@ import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 import type { CopySource } from '../components/CopyFrom.tsx'
+import type { UploadImage } from '../image-upload.ts'
 import type { Loaded } from '../load.ts'
 
 import { useBurns, useSelectedBurn } from '../burn.tsx'
@@ -29,6 +30,7 @@ export type FaqApi = Pick<
   | 'getFaqSources'
   | 'copyFaq'
   | 'getActiveEvent'
+  | 'uploadImage'
 >
 
 interface Shown {
@@ -168,6 +170,7 @@ export const Faq = ({ api }: { api: FaqApi }) => {
             <FaqFields
               entry={row}
               busy={busy}
+              upload={api.uploadImage}
               onCancel={() => setEditing(undefined)}
               onSave={(changes) => {
                 run(async () => {
@@ -333,11 +336,13 @@ const Notice = ({ loaded }: { loaded: Loaded<Questions> }) => {
 const FaqFields = ({
   entry,
   busy,
+  upload,
   onSave,
   onCancel,
 }: {
   entry: FaqEntry
   busy: boolean
+  upload: UploadImage
   onSave: (changes: { question?: string; answer?: string }) => void
   onCancel: () => void
 }) => {
@@ -363,6 +368,7 @@ const FaqFields = ({
         label={`Answer to ${entry.question}`}
         value={answer}
         maxLength={MAX_FAQ_ANSWER}
+        upload={upload}
         onInput={setAnswer}
       />
 

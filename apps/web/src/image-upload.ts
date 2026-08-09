@@ -1,0 +1,198 @@
+import { apiRoutes } from '@sage-burner/shared'
+import { useRef, useState } from 'preact/hooks'
+
+import { isApiError } from './api/client.ts'
+import { resizedImage } from './image.ts'
+
+/** What stands in the text while the bytes are still going up, as GitHub's does. */
+export const uploadPlaceholder = (name: string): string => `![Uploading ${name}…]()`
+
+/**
+ * A placeholder that is not already in the text.
+ *
+ * Two pictures dropped at once are often two versions of one name, and the finished
+ * upload replaces its placeholder by matching the text rather than by remembering an
+ * offset — because the offset is wrong the moment somebody types while it is in flight.
+ * Identical placeholders would make the first upload to land replace the wrong one.
+ */
+export const freePlaceholder = (value: string, name: string): string => {
+  let candidate = uploadPlaceholder(name)
+
+  for (let attempt = 2; value.includes(candidate); attempt += 1) {
+    candidate = uploadPlaceholder(`${name} (${attempt})`)
+  }
+
+  return candidate
+}
+
+export const insertAt = (value: string, at: number, text: string): string => {
+  const cursor = Math.max(0, Math.min(at, value.length))
+
+  return `${value.slice(0, cursor)}${text}${value.slice(cursor)}`
+}
+
+export const replaceFirst = (value: string, find: string, replacement: string): string => {
+  const at = value.indexOf(find)
+  if (at === -1) return value
+
+  return `${value.slice(0, at)}${replacement}${value.slice(at + find.length)}`
+}
+
+/** What a stored picture looks like in the markdown. */
+export const imageMarkdown = (id: string): string => `![](${apiRoutes.storedImage.path(id)})`
+
+/**
+ * Why the picture did not go up.
+ *
+ * The format advice is only right for a failure that is actually about the file, and it
+ * is expensive to get wrong: it sends somebody with a perfectly good photograph off to
+ * re-export it, and the second attempt fails the same way. Anything that is not an
+ * `ApiError` never reached the network — `resizedImage` throws when the browser cannot
+ * decode what was chosen, which is the one case that advice fits.
+ */
+export const messageForFailure = (failure: unknown): string => {
+  if (!isApiError(failure)) return 'Could not read that picture. A JPEG, PNG or WebP works best.'
+  if (failure.status === 415) return 'That is not a picture we can use. A JPEG, PNG or WebP works best.'
+  if (failure.status === 413) return 'That picture is too large to send.'
+  if (failure.status === 409) return 'You have stored as many pictures as one account may hold.'
+  if (failure.status === 401) return 'You have been signed out. Sign in again and have another go.'
+  if (failure.code === 'network') return failure.message
+
+  return 'Could not send that picture. Please try again.'
+}
+
+const TOO_LONG = 'There is not room for a picture in this field.'
+
+/** `api.uploadImage`, named so the components that take it do not each spell it out. */
+export type UploadImage = (image: Blob) => Promise<{ id: string }>
+
+export interface ImageUpload {
+  /** Whether this field takes pictures at all — false where the public reads it. */
+  enabled: boolean
+  /** Handed to a `textarea`, so a paste and a drop both land in the field. */
+  handlers: {
+    onPaste: (event: ClipboardEvent) => void
+    onDrop: (event: DragEvent) => void
+    onDragOver: (event: DragEvent) => void
+  }
+  /** For the picker, which has no cursor to insert at and so writes at the end. */
+  take: (files: readonly File[]) => void
+  busy: boolean
+  error: string | undefined
+}
+
+const imagesIn = (files: FileList | null | undefined): File[] =>
+  [...(files ?? [])].filter((file) => file.type.startsWith('image/'))
+
+/**
+ * Pasting, dropping or choosing a picture in any field that takes markdown (#379).
+ *
+ * A placeholder goes in at the cursor and the real `![](…)` replaces it when the id comes
+ * back, so the field never blocks and what somebody typed meanwhile is kept. A refusal
+ * takes the placeholder out again and says why — it must never eat the comment.
+ *
+ * The value is held in a ref as well as read from the props, because two pictures dropped
+ * together both write before the parent has re-rendered either of them.
+ */
+export const useImageUpload = ({
+  value,
+  maxLength,
+  onInput,
+  upload,
+}: {
+  value: string
+  maxLength: number
+  onInput: (value: string) => void
+  /**
+   * Absent where the field is one the public reads. `/api/images/:id` is
+   * `requireApproved`, so a picture in the burn's welcome text or beside an application
+   * question would be broken for exactly the people that text is written for.
+   */
+  upload?: UploadImage
+}): ImageUpload => {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | undefined>(undefined)
+  const latest = useRef(value)
+  latest.current = value
+
+  const write = (next: string) => {
+    latest.current = next
+    onInput(next)
+  }
+
+  const send = async (file: File, placeholder: string, post: NonNullable<typeof upload>) => {
+    try {
+      const { id } = await post(await resizedImage(file))
+      write(replaceFirst(latest.current, placeholder, imageMarkdown(id)))
+    } catch (failure) {
+      write(replaceFirst(latest.current, placeholder, ''))
+      setError(messageForFailure(failure))
+    }
+  }
+
+  const take = (files: readonly File[], at?: number) => {
+    if (upload === undefined || files.length === 0) return
+
+    setError(undefined)
+
+    let cursor = at ?? latest.current.length
+    const started: { file: File; placeholder: string }[] = []
+
+    for (const file of files) {
+      const placeholder = freePlaceholder(latest.current, file.name === '' ? 'picture' : file.name)
+
+      // The markdown the placeholder becomes is shorter than the placeholder itself, so
+      // room for this is room for the result.
+      if (latest.current.length + placeholder.length > maxLength) {
+        setError(TOO_LONG)
+        break
+      }
+
+      write(insertAt(latest.current, cursor, placeholder))
+      cursor += placeholder.length
+      started.push({ file, placeholder })
+    }
+
+    if (started.length === 0) return
+
+    setBusy(true)
+    void Promise.all(started.map(({ file, placeholder }) => send(file, placeholder, upload))).finally(() => {
+      setBusy(false)
+    })
+  }
+
+  const at = (target: EventTarget | null) =>
+    target instanceof HTMLTextAreaElement ? target.selectionStart : undefined
+
+  return {
+    enabled: upload !== undefined,
+    handlers: {
+      onPaste: (event) => {
+        const pictures = upload === undefined ? [] : imagesIn(event.clipboardData?.files)
+        if (pictures.length === 0) return
+
+        // Only once there is something to take: a paste of ordinary text must still be
+        // a paste of ordinary text.
+        event.preventDefault()
+        take(pictures, at(event.currentTarget))
+      },
+      onDrop: (event) => {
+        const pictures = upload === undefined ? [] : imagesIn(event.dataTransfer?.files)
+        if (pictures.length === 0) return
+
+        event.preventDefault()
+        take(pictures, at(event.currentTarget))
+      },
+      // Without this the browser navigates to the file instead, and no drop event ever
+      // fires. `types` rather than `files`, which is empty until the drop itself — a
+      // dragover that looked at the files would preventDefault on nothing, every time.
+      onDragOver: (event) => {
+        if (upload === undefined) return
+        if (event.dataTransfer?.types.includes('Files') === true) event.preventDefault()
+      },
+    },
+    take,
+    busy,
+    error,
+  }
+}

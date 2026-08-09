@@ -1,5 +1,6 @@
 import type { EventAttendeesResponse, Place, Session, SessionUpdate } from '@sage-burner/shared'
 
+import type { UploadImage } from '../image-upload.ts'
 import type { Person } from './HelperStrip.tsx'
 import type { DreamTalk } from './OpenedDream.tsx'
 
@@ -30,6 +31,7 @@ export const DreamDetails = ({
   busy,
   error,
   editing,
+  upload,
   onEdit,
   onCancelEdit,
   onClose,
@@ -58,6 +60,8 @@ export const DreamDetails = ({
    * threw away everything the member had typed.
    */
   editing: boolean
+  /** How a picture gets into the description and into what people say about it (#379). */
+  upload: UploadImage
   onEdit: () => void
   onCancelEdit: () => void
   onClose: () => void
@@ -87,6 +91,7 @@ export const DreamDetails = ({
           places={places}
           attendees={attendees}
           busy={busy}
+          upload={upload}
           onCancel={onCancelEdit}
           onSave={onSave}
         />
@@ -197,6 +202,7 @@ export const DreamDetails = ({
             admin={admin}
             busy={busy}
             more={false}
+            upload={upload}
             onSay={talk.say}
             onRewrite={talk.rewrite}
             onRemove={talk.remove}

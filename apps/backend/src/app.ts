@@ -40,6 +40,7 @@ import { registerEventRoutes } from './routes/events.ts'
 import { registerFaqRoutes } from './routes/faq.ts'
 import { registerFeedRoutes } from './routes/feed.ts'
 import { registerImageBodyParser } from './routes/image-body.ts'
+import { registerImageRoutes } from './routes/images.ts'
 import { registerInstallationRoutes } from './routes/installation.ts'
 import { registerInviteRoutes } from './routes/invites.ts'
 import { registerLeadRoleRoutes } from './routes/lead-roles.ts'
@@ -502,6 +503,7 @@ export const createApp = async ({
   registerPlaceRoutes(app, { db, sessions, now })
   registerRideRoutes(app, { db, sessions, now })
   registerAvatarRoutes(app, { db, sessions, now })
+  registerImageRoutes(app, { db, sessions, now })
   registerPwaRoutes(app, { db, sessions, now })
   registerBannerRoutes(app, { db, sessions, now })
   registerMailRoutes(app, { db, sessions, mail, now })

@@ -74,6 +74,7 @@ const stub = (over: Partial<FeedApi> = {}, activity: Activity[] = TWO, threads: 
   getMyNotificationSettings: () => Promise.resolve({ on: [...DEFAULTS], email: [] }),
   updateMyNotificationSettings: () => Promise.resolve({ on: [...DEFAULTS], email: [] }),
   getThread: () => Promise.reject(new Error('getThread is not stubbed here')),
+  uploadImage: () => Promise.reject(new Error('uploadImage is not stubbed here')),
   postComment: () => Promise.reject(new Error('postComment is not stubbed here')),
   updateComment: () => Promise.reject(new Error('updateComment is not stubbed here')),
   deleteComment: () => Promise.reject(new Error('deleteComment is not stubbed here')),

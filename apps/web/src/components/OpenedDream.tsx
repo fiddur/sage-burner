@@ -3,6 +3,7 @@ import type { EventAttendeesResponse, Place, Session, SessionUpdate, Thread } fr
 import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
+import type { UploadImage } from '../image-upload.ts'
 
 import { useLoad } from '../load.ts'
 import { DreamDetails } from './DreamDetails.tsx'
@@ -177,6 +178,7 @@ export const OpenedDream = ({
   admin,
   busy,
   error,
+  upload,
   onEdit,
   onCancelEdit,
   onClose,
@@ -198,6 +200,8 @@ export const OpenedDream = ({
   admin: boolean
   busy: boolean
   error: string | undefined
+  /** How a picture gets into a dream and into what people say about it (#379). */
+  upload: UploadImage
   onEdit: (id: string) => void
   onCancelEdit: (id: string) => void
   onClose: () => void
@@ -246,6 +250,7 @@ export const OpenedDream = ({
           attendees={attendees}
           busy={busy}
           creating
+          upload={upload}
           onCancel={onClose}
           onSave={onOffer}
         />
@@ -278,6 +283,7 @@ export const OpenedDream = ({
       busy={busy}
       error={error}
       editing={opened.editing}
+      upload={upload}
       onEdit={() => onEdit(dream.id)}
       onCancelEdit={() => onCancelEdit(dream.id)}
       onClose={onClose}

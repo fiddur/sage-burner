@@ -32,6 +32,7 @@ const clientWith = (
   logout,
   getMe: () => Promise.reject(new Error('getMe is not stubbed in this file')),
   getThread: () => Promise.reject(new Error('getThread is not stubbed in this file')),
+  uploadImage: () => Promise.reject(new Error('uploadImage is not stubbed in this file')),
   postComment: () => Promise.reject(new Error('postComment is not stubbed in this file')),
   updateComment: () => Promise.reject(new Error('updateComment is not stubbed in this file')),
   deleteComment: () => Promise.reject(new Error('deleteComment is not stubbed in this file')),

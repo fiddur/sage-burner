@@ -54,6 +54,7 @@ export type ScheduleApi = Pick<
   | 'postComment'
   | 'updateComment'
   | 'deleteComment'
+  | 'uploadImage'
 >
 
 type Person = EventAttendeesResponse['attendees'][number]
@@ -378,6 +379,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
         talk={talk}
         viewerId={viewer.account?.id}
         admin={isAdmin(viewer)}
+        upload={api.uploadImage}
         busy={busy}
         error={error}
         onEdit={(id) => setOpened({ kind: 'dream', id, editing: true })}

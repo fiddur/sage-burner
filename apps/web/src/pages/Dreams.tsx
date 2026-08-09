@@ -32,6 +32,7 @@ export type DreamsApi = Pick<
   | 'postComment'
   | 'updateComment'
   | 'deleteComment'
+  | 'uploadImage'
 >
 
 const placeLabel = (places: readonly Place[], id: string | null) => {
@@ -227,6 +228,7 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
         talk={talk}
         viewerId={viewer.account?.id}
         admin={isAdmin(viewer)}
+        upload={api.uploadImage}
         busy={busy}
         error={error}
         onEdit={(id) => setOpened({ kind: 'dream', id, editing: true })}

@@ -35,6 +35,7 @@ const summer: Event = {
 const stub = (over: Partial<EventsApi> = {}): EventsApi => ({
   getEvents: () => Promise.resolve({ events: [summer] }),
   createEvent: () => Promise.reject(new Error('createEvent is not stubbed here')),
+  uploadImage: () => Promise.reject(new Error('uploadImage is not stubbed here')),
   updateEvent: () => Promise.reject(new Error('updateEvent is not stubbed here')),
   getMealSlots: () => Promise.resolve({ slots: [] }),
   addMealSlot: () => Promise.reject(new Error('addMealSlot is not stubbed here')),

@@ -72,8 +72,18 @@ const prefixOf = (fastify: string): string => `${fastify.split('/:')[0] ?? fasti
  * #311 fixed for the banner. The card on the feed carries the newest few lines, so
  * offline still shows what is being talked about; the rest of the conversation needs the
  * network.
+ *
+ * A stored picture is the same shape and a hundred times the bytes (#379): one key per
+ * photograph anybody has ever scrolled past, kept until sign-out, where the entries this
+ * cache is for are a few kilobytes of JSON replaced in place. The browser's own HTTP
+ * cache still holds them between visits — the route answers `immutable`, and an id never
+ * answers with different bytes — so what this gives up is a photograph in a thread read
+ * with no connection at all.
  */
-const NEVER_CACHED_PREFIXES: readonly string[] = [prefixOf(apiRoutes.getThread.fastify)]
+const NEVER_CACHED_PREFIXES: readonly string[] = [
+  prefixOf(apiRoutes.getThread.fastify),
+  prefixOf(apiRoutes.storedImage.fastify),
+]
 
 /**
  * What to do with one request.

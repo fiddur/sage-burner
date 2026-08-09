@@ -1,0 +1,159 @@
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
+import { useState } from 'preact/hooks'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+import { MarkdownField } from './MarkdownField.tsx'
+
+// The resize is a canvas round-trip and happy-dom has no canvas that draws, so it is
+// stubbed here and tested for what it can be tested for in `image.test.ts`. What is under
+// test is everything after it: the placeholder, the swap, and what a refusal leaves behind.
+vi.mock('../image.ts', () => ({ resizedImage: (file: Blob) => Promise.resolve(file) }))
+
+afterEach(cleanup)
+
+const aPicture = (name = 'sauna.jpg') => new File([new Uint8Array([1, 2, 3])], name, { type: 'image/jpeg' })
+
+/** The field is controlled, so the test has to hold the value the way a page would. */
+const Field = ({
+  upload,
+  maxLength = 2000,
+  start = '',
+}: {
+  upload?: (image: Blob) => Promise<{ id: string }>
+  maxLength?: number
+  start?: string
+}) => {
+  const [value, setValue] = useState(start)
+
+  return (
+    <MarkdownField
+      label="Say something"
+      value={value}
+      maxLength={maxLength}
+      upload={upload}
+      onInput={setValue}
+    />
+  )
+}
+
+const paste = (files: File[]) => {
+  const event = new Event('paste', { bubbles: true, cancelable: true })
+  Object.defineProperty(event, 'clipboardData', { value: { files } })
+  fireEvent(screen.getByLabelText('Say something'), event)
+}
+
+const drop = (files: File[]) =>
+  fireEvent.drop(screen.getByLabelText('Say something'), { dataTransfer: { files, types: ['Files'] } })
+
+const box = () => screen.getByLabelText<HTMLTextAreaElement>('Say something')
+
+describe('putting a picture in a markdown field', () => {
+  it('writes the markdown for what was pasted', async () => {
+    render(<Field upload={() => Promise.resolve({ id: 'img-1' })} />)
+
+    paste([aPicture()])
+
+    await waitFor(() => expect(box().value).toBe('![](/api/images/img-1)'))
+  })
+
+  it('takes one dropped on the box too', async () => {
+    render(<Field upload={() => Promise.resolve({ id: 'img-2' })} />)
+
+    drop([aPicture()])
+
+    await waitFor(() => expect(box().value).toBe('![](/api/images/img-2)'))
+  })
+
+  it('takes one chosen from a phone, at the end of what is there', async () => {
+    render(<Field upload={() => Promise.resolve({ id: 'img-3' })} start="already said" />)
+
+    fireEvent.change(screen.getByLabelText('Add a picture to Say something'), {
+      target: { files: [aPicture()] },
+    })
+
+    await waitFor(() => expect(box().value).toBe('already said![](/api/images/img-3)'))
+  })
+
+  it('stands something in the text while the bytes are going up', async () => {
+    let finish = (_: { id: string }) => undefined as void
+    render(<Field upload={() => new Promise<{ id: string }>((resolve) => (finish = resolve))} />)
+
+    paste([aPicture()])
+
+    await waitFor(() => expect(box().value).toBe('![Uploading sauna.jpg…]()'))
+
+    finish({ id: 'img-4' })
+    await waitFor(() => expect(box().value).toBe('![](/api/images/img-4)'))
+  })
+
+  it('keeps what was typed while the picture was in flight', async () => {
+    // #205's rule, and this is the field every comment box shares: a picture arriving
+    // must not throw away the sentence somebody wrote while waiting for it.
+    let finish = (_: { id: string }) => undefined as void
+    render(<Field upload={() => new Promise<{ id: string }>((resolve) => (finish = resolve))} />)
+
+    paste([aPicture()])
+    await waitFor(() => expect(box().value).toBe('![Uploading sauna.jpg…]()'))
+
+    fireEvent.input(box(), { target: { value: '![Uploading sauna.jpg…]() and here it is' } })
+    finish({ id: 'img-5' })
+
+    await waitFor(() => expect(box().value).toBe('![](/api/images/img-5) and here it is'))
+  })
+
+  it('takes the placeholder back out when the upload is refused, and says why', async () => {
+    render(<Field upload={() => Promise.reject(new Error('nope'))} start="what I said" />)
+
+    paste([aPicture()])
+
+    await waitFor(() => expect(screen.getByText(/Could not read that picture/)).toBeTruthy())
+    expect(box().value).toBe('what I said')
+  })
+
+  it('gives two pictures at once two placeholders, in the order they were dropped', async () => {
+    const ids = ['img-a', 'img-b']
+    render(<Field upload={() => Promise.resolve({ id: ids.shift() ?? 'none' })} />)
+
+    drop([aPicture('one.jpg'), aPicture('two.jpg')])
+
+    await waitFor(() => expect(box().value).toBe('![](/api/images/img-a)![](/api/images/img-b)'))
+  })
+
+  it('refuses when there is no room left in the field', async () => {
+    render(<Field upload={() => Promise.resolve({ id: 'img-6' })} maxLength={10} start="0123456789" />)
+
+    paste([aPicture()])
+
+    await waitFor(() => expect(screen.getByText(/not room for a picture/)).toBeTruthy())
+    expect(box().value).toBe('0123456789')
+  })
+
+  it('lets an ordinary paste of text alone', () => {
+    render(<Field upload={() => Promise.resolve({ id: 'img-7' })} />)
+
+    const event = new Event('paste', { bubbles: true, cancelable: true })
+    Object.defineProperty(event, 'clipboardData', { value: { files: [] } })
+    fireEvent(box(), event)
+
+    expect(event.defaultPrevented).toBe(false)
+  })
+
+  it('offers nothing where the field is one the public reads', () => {
+    // `/api/images/:id` is `requireApproved`, so a picture in the welcome text would be
+    // broken for exactly the people that text is written for.
+    render(<Field />)
+
+    expect(screen.queryByLabelText('Add a picture to Say something')).toBeNull()
+  })
+
+  it('ignores a picture pasted into a field that does not take them', () => {
+    render(<Field />)
+
+    const event = new Event('paste', { bubbles: true, cancelable: true })
+    Object.defineProperty(event, 'clipboardData', { value: { files: [aPicture()] } })
+    fireEvent(box(), event)
+
+    expect(event.defaultPrevented).toBe(false)
+    expect(box().value).toBe('')
+  })
+})

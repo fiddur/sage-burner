@@ -61,6 +61,7 @@ const stub = (over: Partial<MealsApi> = {}, meals: Meal[] = [aMeal()]): MealsApi
       ],
     }),
   setMealLead: () => Promise.reject(new Error('setMealLead is not stubbed here')),
+  uploadImage: () => Promise.reject(new Error('uploadImage is not stubbed here')),
   joinMealCrew: () => Promise.reject(new Error('joinMealCrew is not stubbed here')),
   leaveMealCrew: () => Promise.reject(new Error('leaveMealCrew is not stubbed here')),
   setMealIdea: () => Promise.reject(new Error('setMealIdea is not stubbed here')),

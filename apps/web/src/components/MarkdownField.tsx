@@ -1,7 +1,11 @@
 import { useId, useState } from 'preact/hooks'
 
+import type { UploadImage } from '../image-upload.ts'
+
+import { useImageUpload } from '../image-upload.ts'
 import { renderMarkdown } from '../markdown.ts'
 import { rowsFor } from '../textarea.ts'
+import { AddPicture } from './AddPicture.tsx'
 
 /**
  * Every markdown field in the app.
@@ -18,6 +22,7 @@ export const MarkdownField = ({
   rows,
   accessibleName,
   placeholder,
+  upload,
   onInput,
 }: {
   label: string
@@ -31,10 +36,18 @@ export const MarkdownField = ({
   /** For where the visible label is friendlier than it is specific. */
   accessibleName?: string
   placeholder?: string
+  /**
+   * How a picture gets stored, where this field takes them (#379). Passed only by the
+   * fields members read: `/api/images/:id` is `requireApproved`, so a picture in the
+   * welcome text or beside an application question would be broken for the public that
+   * text is written for.
+   */
+  upload?: UploadImage
   onInput: (value: string) => void
 }) => {
   const [previewing, setPreviewing] = useState(false)
   const fieldId = useId()
+  const pictures = useImageUpload({ value, maxLength, onInput, upload })
 
   return (
     <div class="field">
@@ -91,9 +104,12 @@ export const MarkdownField = ({
             placeholder={placeholder}
             value={value}
             onInput={(inputEvent) => onInput(inputEvent.currentTarget.value)}
+            {...pictures.handlers}
           />
         )}
       </div>
+
+      {!previewing && <AddPicture pictures={pictures} label={label} />}
     </div>
   )
 }

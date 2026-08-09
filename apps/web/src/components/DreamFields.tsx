@@ -7,6 +7,8 @@ import {
 } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
+import type { UploadImage } from '../image-upload.ts'
+
 import { fromLocalInput, toLocalInput } from '../datetime.ts'
 import { MarkdownField } from './MarkdownField.tsx'
 
@@ -36,6 +38,7 @@ export const DreamFields = ({
   attendees,
   busy,
   creating = false,
+  upload,
   onSave,
   onCancel,
 }: {
@@ -46,6 +49,8 @@ export const DreamFields = ({
   attendees: readonly EventAttendeesResponse['attendees'][number][]
   busy: boolean
   creating?: boolean
+  /** How a picture gets into the description (#379). */
+  upload: UploadImage
   onSave: (changes: SessionUpdate) => void
   onCancel: () => void
 }) => {
@@ -106,6 +111,7 @@ export const DreamFields = ({
         accessibleName={`Description of ${subject}`}
         value={description}
         maxLength={MAX_DESCRIPTION}
+        upload={upload}
         onInput={setDescription}
       />
 

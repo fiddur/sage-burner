@@ -665,6 +665,19 @@ export const apiRoutes = {
     fastify: '/api/auth/passkey/challenge',
     path: () => '/api/auth/passkey/challenge',
   },
+  /**
+   * A picture somebody wrote into a markdown field (#379).
+   *
+   * `requireApproved`, like the avatar and the name beside it: the reference lives
+   * inside prose the members write to each other, and a photograph in a comment thread
+   * is at least as personal as a face. The id is unguessable, which is what keeps the
+   * URL from being a list of everything anybody has uploaded.
+   */
+  storedImage: {
+    method: 'GET',
+    fastify: '/api/images/:id',
+    path: (id: string) => `/api/images/${encodeURIComponent(id)}`,
+  },
   startPasskeyRegistration: {
     method: 'POST',
     fastify: '/api/me/passkeys/challenge',
@@ -700,6 +713,12 @@ export const apiRoutes = {
     method: 'DELETE',
     fastify: '/api/push/subscriptions',
     path: () => '/api/push/subscriptions',
+  },
+  /** Raw bytes in, an id out, which the field writes into the markdown at the cursor. */
+  uploadImage: {
+    method: 'POST',
+    fastify: '/api/images',
+    path: () => '/api/images',
   },
   /** Rewriting what you said. The author's own; nobody edits somebody else's words. */
   updateComment: {

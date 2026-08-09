@@ -5,6 +5,7 @@ import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 import type { CopySource } from '../components/CopyFrom.tsx'
+import type { UploadImage } from '../image-upload.ts'
 import type { Loaded } from '../load.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
@@ -32,6 +33,7 @@ export type RolesApi = Pick<
   | 'joinLeadRoleTeam'
   | 'leaveLeadRoleTeam'
   | 'copyLeadRoles'
+  | 'uploadImage'
 >
 
 type Person = EventAttendeesResponse['attendees'][number]
@@ -218,6 +220,7 @@ export const Roles = ({ api }: { api: RolesApi }) => {
                         <RoleFields
                           role={role}
                           busy={busy}
+                          upload={api.uploadImage}
                           onCancel={() => setEditing(undefined)}
                           onSave={(changes) =>
                             run(async () => {
@@ -447,11 +450,13 @@ const RoleRow = ({
 const RoleFields = ({
   role,
   busy,
+  upload,
   onSave,
   onCancel,
 }: {
   role: LeadRole
   busy: boolean
+  upload: UploadImage
   onSave: (changes: LeadRoleUpdate) => void
   onCancel: () => void
 }) => {
@@ -498,6 +503,7 @@ const RoleFields = ({
         label={`Purpose of ${role.title}`}
         value={purpose}
         maxLength={MAX_NOTES}
+        upload={upload}
         onInput={setPurpose}
       />
 
@@ -505,6 +511,7 @@ const RoleFields = ({
         label={`Tasks of ${role.title}`}
         value={tasks}
         maxLength={MAX_NOTES}
+        upload={upload}
         onInput={setTasks}
       />
 

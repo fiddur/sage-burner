@@ -9,6 +9,13 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-09
 
+- **You can put a picture in what you write.** Paste one into a comment, drag one onto a
+  dream's description, or tap "Add a picture" and pick one from your phone — it appears
+  where you were typing and everyone reading sees it. Photographs are shrunk in your own
+  browser before they are sent, turned the right way up if your phone recorded that, and
+  stripped of where they were taken. The burn's welcome text and the application form do
+  not take them: those pages are public, and a picture there would only show as broken.
+
 - **You can talk about a dream now.** Open one — from Dreams or from the grid — and under
   it there is a conversation: who offered it, who put a hand up, and whatever anybody has
   asked or answered. How many people is it for, do you want help, is that before or after

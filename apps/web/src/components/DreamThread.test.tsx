@@ -43,6 +43,7 @@ const show = (
       admin={false}
       busy={false}
       more={false}
+      upload={() => Promise.reject(new Error('uploadImage is not stubbed here'))}
       onSay={say}
       onRewrite={rewrite}
       onRemove={remove}
