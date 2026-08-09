@@ -3,8 +3,10 @@
 -- think" and an organiser guessing (#88).
 --
 -- Rows rather than a column per network: the list is ordered and the order is half the
--- point, since the first one is where somebody is actually reached. A column per network
--- would also be a migration every time one is added, where this is a line in `enums.ts`.
+-- point, since the first one is where somebody is actually reached. Adding a network still
+-- costs a migration — `kind` carries a CHECK listing the vocabulary and SQLite cannot alter
+-- one in place, so it is a rebuild, as `20260806180000_general_notifications` was — but a
+-- column per network would be that *and* a wider row on the path of every read.
 --
 -- `contact` stays exactly as it is. It is required by the details page, drawn on the
 -- roster and on the rideshare board, and merging it into this list touches all three —

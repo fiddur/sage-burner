@@ -871,9 +871,16 @@ applicant (#30) — **rows, ordered, one per way of being reached**.
 
 **Rows rather than a column per network**, and the order is why as much as the count is.
 The first one is the answer to the question somebody actually has — where do I reach this
-person — rather than the start of a list of everything they have ever signed up to. A
-column per network would also be a migration every time one is added; this is a line in
-`enums.ts`.
+person — rather than the start of a list of everything they have ever signed up to.
+
+**Adding a network is not free**, and it is worth being exact about, because the trap is
+quiet. It is a line in `enums.ts` **and** a migration: `kind` carries a CHECK listing the
+vocabulary, SQLite cannot alter a CHECK in place, so the table is rebuilt — which is what
+`20260806180000_general_notifications` did when the notification categories grew. Nothing
+checks that `schema.ts` and the migrations agree, so a kind added to the vocabulary alone
+passes Zod and the type checker and then fails the CHECK against a database that ran the
+old migration. A column per network would be that migration _and_ a wider `account` row on
+the path of every read.
 
 **The vocabulary is fixed because rendering needs it.** A handle has to become a URL, and
 only the kind says how: `@wren` on Instagram and `@wren@chaos.social` on Mastodon build

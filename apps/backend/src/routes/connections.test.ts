@@ -150,6 +150,27 @@ describe('the ways somebody can be reached', () => {
     ).toBe(409)
   })
 
+  it('refuses a handle that is nothing once it is normalised', async () => {
+    // `@` passes the schema — one character, trimmed, non-empty — and is nothing at all
+    // once the leading `@` comes off. Left to the insert that is a CHECK violation and a
+    // 500 where a refusal belongs. Not reachable from the web app, which normalises before
+    // sending; reachable from anything else.
+    const server = await build()
+    const ada = await givenAccount()
+
+    expect((await add(server, ada.cookie, { kind: 'instagram', value: '@' })).statusCode).toBe(400)
+    expect((await add(server, ada.cookie, { kind: 'tiktok', value: ' @ ' })).statusCode).toBe(400)
+  })
+
+  it('refuses the same emptying on a change, not only on an add', async () => {
+    const server = await build()
+    const ada = await givenAccount()
+    const { id } = (await add(server, ada.cookie, { kind: 'instagram', value: 'wren' })).json().connection
+
+    expect((await change(server, ada.cookie, id, { kind: 'instagram', value: '@' })).statusCode).toBe(400)
+    expect((await list(server, ada.cookie)).json().connections[0].value).toBe('wren')
+  })
+
   it('refuses the same handle twice on one account', async () => {
     const server = await build()
     const ada = await givenAccount()

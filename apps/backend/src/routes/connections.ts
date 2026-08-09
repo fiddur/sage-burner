@@ -71,6 +71,13 @@ export const registerConnectionRoutes = (app: FastifyInstance, { db, sessions }:
     // the handle whatever the caller is — and so `unique(account_id, kind, value)` refuses
     // `wren` and `@wren` as one handle instead of keeping both.
     const row = { ...body, value: connectionValue(body.kind, body.value) }
+
+    // Checked again because normalising happens *after* the schema, and can empty a value
+    // it accepted: `@` is a legal one-character handle to Zod and nothing at all once the
+    // leading `@` comes off. Left to the insert, that is a CHECK violation and a 500 where
+    // a refusal belongs.
+    if (row.value === '') return sendError(reply, 400)
+
     const id = randomUUID()
 
     try {
@@ -108,12 +115,15 @@ export const registerConnectionRoutes = (app: FastifyInstance, { db, sessions }:
       const viewer = await viewerFor(request, { db, sessions })
       if (viewer === undefined) return sendError(reply, 401)
 
+      const value = connectionValue(body.kind, body.value)
+      if (value === '') return sendError(reply, 400)
+
       try {
         // The account id is in the `WHERE`, so somebody else's row is a 404 rather than
         // a write — the id is the only thing a caller supplies here.
         const [updated] = await db
           .update(accountConnection)
-          .set({ ...body, value: connectionValue(body.kind, body.value) })
+          .set({ ...body, value })
           .where(
             and(
               eq(accountConnection.id, request.params.id),

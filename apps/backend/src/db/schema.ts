@@ -1484,8 +1484,11 @@ export const image = sqliteTable(
  * One way somebody has said they can be reached (#388).
  *
  * Rows rather than a column per network, because the list is ordered and the order is
- * half the point — the first is where somebody is actually reached. Columns would also
- * be a migration every time a network is added, where this is a line in `enums.ts`.
+ * half the point — the first is where somebody is actually reached. Adding a network is a
+ * line in `enums.ts` **and** a table-rebuild migration, since `kind` carries a CHECK listing
+ * the vocabulary and SQLite cannot alter one in place — `20260806180000_general_notifications`
+ * is the precedent. Still less than a column per network, which would be a migration *and* a
+ * wider row on the path of every read.
  *
  * Every row here is published to approved members, which is what separates the list from
  * `account.email`: that is the login identity and stays out of what other members read
