@@ -518,9 +518,10 @@ export const connectionKindInfo = {
     icon: '🗨️',
     hint: 'your Facebook name, or the number in your profile link',
     labelled: false,
-    // Facebook as a *way to be reached* is Messenger. Looking at somebody's Facebook page
-    // is a different act and is not a contact detail — the profile page draws that from a
-    // linked Facebook sign-in (#393), which is the only place the app knows about one.
+    // Facebook as a *way to be reached* is Messenger. Looking at somebody's Facebook page is a
+    // different act and not a contact detail — the profile page builds that from this same
+    // typed value, because a linked sign-in answers with an app-scoped id that points at
+    // nobody outside the installation's own Meta app (#393).
     href: (value) => `https://m.me/${value.trim()}`,
   },
   discord: {
