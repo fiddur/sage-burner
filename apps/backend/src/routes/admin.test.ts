@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { DbHandle } from '../db/index.ts'
 
 import { createApp } from '../app.ts'
+import { hashPassword } from '../auth/password.ts'
 import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
@@ -26,6 +27,22 @@ afterEach(async () => {
   handle = undefined
 })
 
+/**
+ * scrypt at a cost a test can afford, for the seam `AdminDeps.hash` exists for.
+ *
+ * This file sets two passwords and logs in twice, which was four full-cost derivations on
+ * the libuv threadpool — four threads, process-wide, with sixty test files competing for
+ * them. On an idle machine the two tests that log in took 555ms and 919ms against
+ * vitest's 5s budget; they take 349ms and 293ms with this. Under six times headroom
+ * became seventeen, which is the shape of #399's flake — seen once, never reproduced,
+ * and never diagnosed, so this is a mitigation rather than a fix.
+ *
+ * Only the sets are cheap. The logins still pay in full: `needsRehash` is true for a hash
+ * made with these, so the login route upgrades it — deliberately, since that path is what
+ * `auth.test.ts` pins and nothing here should stop it happening.
+ */
+const cheap = { cost: 2 ** 12, blockSize: 8, parallelism: 1 }
+
 const build = async () => {
   handle = createDb({ url: ':memory:' })
   runMigrations(handle)
@@ -33,6 +50,7 @@ const build = async () => {
     db: handle.db,
     config: createConfig({ LOG_LEVEL: 'silent', SESSION_SECRET: SECRET }),
     now: () => new Date(NOW),
+    hash: (password) => hashPassword(password, cheap),
   })
   return app
 }

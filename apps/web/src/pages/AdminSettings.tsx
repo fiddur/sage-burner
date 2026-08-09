@@ -11,7 +11,6 @@ import { BannerField } from '../components/BannerField.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { IconField } from '../components/IconField.tsx'
-import { LogOutButton } from '../components/LogOutButton.tsx'
 import { MailField } from '../components/MailField.tsx'
 import { OauthField } from '../components/OauthField.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
@@ -32,7 +31,7 @@ export type AdminSettingsApi = BannerApi &
   IconApi &
   MailApi &
   OauthApi &
-  Pick<ApiClient, 'getInstallation' | 'logout' | 'updateInstallation'>
+  Pick<ApiClient, 'getInstallation' | 'updateInstallation'>
 
 /** What this installation calls itself. */
 export const AdminSettings = ({ api }: { api: AdminSettingsApi }) => {
@@ -122,8 +121,6 @@ export const AdminSettings = ({ api }: { api: AdminSettingsApi }) => {
           and a migration rather than a fourth copy of this block. */}
       {loaded.status === 'ready' &&
         oauthProviders.map((provider) => <OauthField key={provider} api={api} provider={provider} />)}
-
-      <LogOutButton api={api} />
     </GuardedPage>
   )
 }

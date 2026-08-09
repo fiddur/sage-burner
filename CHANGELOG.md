@@ -14,6 +14,12 @@ under today's heading, and make a new heading when there is none.
   page, which every member reaches by clicking your name, above the ways of reaching you. Until
   now a name you had not met told you how to contact somebody and nothing about who they were.
 
+- **Somebody organising a burn without coming to it can reach Your details.** Their picture,
+  how people reach them, how they sign in, and — the one that mattered — the switch for
+  notifications, which is where applications are announced. The page turned them away
+  before, and the notification switch had already moved off the admin page. What is about a
+  stay is still a member's: the name and allergies planning needs, and the burns themselves.
+
 - **There is a privacy page now**, at /privacy, saying what this app keeps about you, who can
   see it, and how to get rid of it. Anybody can read it without signing in — which is what
   Facebook asks for before it will let people sign in with it, and a fair thing to be able to
