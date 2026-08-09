@@ -110,15 +110,21 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
     <GuardedPage title="Your details" require="approved">
       <h1>Your details</h1>
 
-      <p class="form-note">
-        These follow you from burn to burn. Below them is each burn on its own, for what does not: when you
-        arrive, where you sleep, what you will help with.
-      </p>
+      {member ? (
+        <p class="form-note">
+          These follow you from burn to burn. Below them is each burn on its own, for what does not: when you
+          arrive, where you sleep, what you will help with.
+        </p>
+      ) : (
+        // An account organising without attending: everything above is theirs, and there is
+        // no burn section below to point at (#412).
+        <p class="form-note">
+          These follow you from burn to burn. Say you are coming to one — under Organise → Accounts — and what
+          you bring and where you sleep appear here too.
+        </p>
+      )}
 
-      {/* No `member` gate on the account half since #412: `getMyProfile` and
-          `updateMyProfile` are `requireApproved`, because a name, a picture and an
-          introduction belong to the account rather than to a stay — and the introduction's
-          empty state actively asks for one. Only the burns below are a member's. */}
+      {/* No `member` gate here since #412 — `profile.ts` and `docs/accounts.md` have why. */}
       {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
 
       {loaded.status === 'failed' && <ErrorText message={loaded.message} />}

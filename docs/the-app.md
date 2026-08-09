@@ -61,28 +61,25 @@ burn-scoped page already reads this.
 - **Dreams** is reached from Schedule. Offering a dream and placing one are the
   same activity, and two entries for it is what the restructure undid.
 - **Places** is reached from Schedule too: the lanes are what the grid draws.
-- **Signing out** is on the details page, and nowhere else. Every entry in the bar is a
-  _place_; this is an action, and it was the only one there. It sits under the line naming
-  the account it ends — for a member. That line is the sign-in address, which comes from
-  `getMyProfile` and so is behind `member` like the rest of the stay half, so an
-  `admin`-without-`member` gets the button with nothing above it saying whose session it is.
-  It was on ⚙️ → Settings as well (#195), for the admin that page refused — a second
-  copy of one control, which is exactly what the push toggle was taken off that page
-  for. #396 made the details page `approved` instead, so the copy could go.
+- **Signing out** is on the details page, and nowhere else, under the line naming the
+  account it ends. Every entry in the bar is a _place_; this is an action, and it was the
+  only one there. It was on ⚙️ → Settings as well (#195), for the admin that page refused —
+  a second copy of one control, which is exactly what the push toggle was taken off that
+  page for. #396 made the details page `approved` instead, so the copy could go.
 - **The initials circle** is the details page: who you are, then a section per burn
   still to come — join it, or fill in your stay at it — then past burns behind
   _…show past burns_. It absorbed the page called "Your burn", singular, which was
   from when there was one burn worth showing and it was whichever came next.
 
-  **`approved`, and the guard sits on the sections rather than the page** (#396). Half
-  of it is the account — a picture, ways of being reached, passkeys and providers,
-  notifications, signing out — and half is a stay: the name and contact planning needs,
-  the allergies, and the burns. The first half is any approved account's, including one
-  holding `admin` and not `member`; the second is behind `member`, because
-  `updateMyProfile` and `joinEvent` both are, so offering either would be a control the
-  API refuses. The page was `member` outright, which left an admin who was not attending
-  with nowhere to turn notifications on — and application notifications go precisely to
-  admins.
+  **`approved`, and only the burns are a member's** (#396, #412). The page was `member`
+  outright, which left an admin who was not attending with nowhere to turn notifications
+  on — and application notifications go precisely to admins. #396 opened the page and kept
+  the name, contact and allergies behind `member`; #412 found that split was the same
+  mistake one level down, since #390's introduction invites the person whose page it is to
+  write one and that account could not. So everything that describes the **person** — name,
+  contact, allergies, introduction, picture, ways of being reached, passkeys and providers,
+  notifications, signing out — is any approved account's, and what is left behind `member`
+  is the **stay**: `YourBurns`, because `joinEvent` is. `docs/accounts.md` has the argument.
 
 - **🔔** is a link to `/notifications` that a wide viewport intercepts to open the
   panel instead (#336). `docs/accounts.md` has the why. It is the one entry offered to

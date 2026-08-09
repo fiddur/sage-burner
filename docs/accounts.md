@@ -604,12 +604,11 @@ somebody with a laptop and a phone turns it on in both. The toggle is on the det
 page behind the initials circle, and **only** there.
 
 It was on ⚙️ → Settings as well, because an account holding `admin` without `member`
-is refused from the details page and application notifications go precisely to
+was refused from the details page and application notifications go precisely to
 admins. Two switches for one subscription turned out to be the worse problem —
 which of them is on is a question neither page can answer, and it reads as two
-different settings — so it lives where a person's own settings live. **That leaves
-the account that paragraph existed for with no way to subscribe**, which is a live
-gap rather than a solved one: #396 has it, with the three ways out.
+different settings — so it lives where a person's own settings live, and #396 made
+that page `approved` so the account the second switch existed for can reach it.
 
 A notification is a **record**, and a push is a copy of it (#248). The bell in the
 header carries what happened while you were away and whether you have looked; a push
@@ -1100,10 +1099,11 @@ with its own reason — `MAX_NOTES`' 2000 is less than what is being asked for a
 say different things to somebody who has not written one and to the person whose page it is.
 `optionalText` turning `''` into null is load-bearing here rather than tidy.
 
-This paragraph is the home for all of that: the migration, `schema.ts`, `membership.ts`,
-`person.ts` and `limits.ts` point here rather than arguing it again. Six copies is what the
-first version of this feature shipped, and the migration header is the one that can never be
-edited again.
+This paragraph is the home for all of that: the migration, `schema.ts`, `membership.ts` and
+`person.ts` point here rather than arguing it again. Six copies is what the first version of
+this feature shipped, and the migration header is the one that can never be edited again.
+`limits.ts` keeps its own reasoning, because the number is what that file is for and its rule
+is that each one is named and argued where it is declared.
 
 **The first field on an account that is neither identity, contact nor a health fact.**
 Everything else there exists so somebody can be reached or fed; this exists so a name means

@@ -253,6 +253,15 @@ describe('the page for an account organising without attending', () => {
     expect(screen.getByRole('button', { name: 'Log out' })).toBeTruthy()
   })
 
+  it('points them at where they would say they are coming, rather than at a section below', async () => {
+    // The member's line promises "each burn on its own, below" — there is none for this
+    // account, so it would be describing a page they are not looking at.
+    renderPage(stub(), ORGANISER)
+
+    expect(await screen.findByText(/Organise → Accounts/)).toBeTruthy()
+    expect(screen.queryByText(/Below them is each burn on its own/)).toBeNull()
+  })
+
   it('offers no burn to join, which is the half that is a stay', async () => {
     // `joinEvent` is `requireMember`, so the button would be one the API refuses.
     renderPage(stub(), ORGANISER)
