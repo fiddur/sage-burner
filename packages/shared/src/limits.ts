@@ -51,6 +51,16 @@ export const MAX_EMOJI = 16
 /** What a dream is about. The longest thing a member writes, short of the welcome. */
 export const MAX_DESCRIPTION = 20_000
 
+/**
+ * One thing somebody says on a thread (#375).
+ *
+ * `MAX_NOTES`'s number and `MAX_NOTES`'s reasoning: a paragraph or two, not an essay.
+ * It is also what bounds the feed — a card carries its newest few entries, so the whole
+ * page is at most fifty cards' worth of these, and that is a ceiling the installed app
+ * keeps on disk. Somebody with a page to write has a dream description for it.
+ */
+export const MAX_COMMENT = 2000
+
 /** A burn's slug, which lives in URLs. Also `slugSchema`'s bound. */
 export const MAX_SLUG = 64
 

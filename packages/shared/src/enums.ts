@@ -182,6 +182,8 @@ export const notificationCategories = [
   'waiting_list_near',
   'waiting_list_pushed',
   'dream_offered',
+  'dream_comment',
+  'dream_comment_any',
   'member_joined',
   'lead_role_added',
   'lead_role_filled',
@@ -233,6 +235,12 @@ export const notificationCategoryInfo = {
     about: 'you',
   },
   dream_offered: { label: 'Somebody offers a dream', on: false, about: 'else' },
+  // The pair splits by whether the conversation is one you are in (#375). Being
+  // answered is what makes somebody come back to a thread, so the first is on;
+  // hearing every word said about every dream is the digest's problem, so the
+  // second is off until asked for.
+  dream_comment: { label: 'Somebody comments on a dream you are part of', on: true, about: 'you' },
+  dream_comment_any: { label: 'Somebody comments on any dream', on: false, about: 'else' },
   member_joined: { label: 'Somebody says they are coming', on: false, about: 'else' },
   lead_role_added: { label: 'A lead role is added', on: false, about: 'else' },
   lead_role_filled: { label: 'Somebody takes the lead of a role', on: false, about: 'else' },
@@ -260,3 +268,70 @@ export const notificationSections = [
 
 export const categoriesAbout = (about: NotificationCategoryInfo['about']): NotificationCategory[] =>
   notificationCategories.filter((category) => notificationCategoryInfo[category].about === about)
+
+/**
+ * What a thread can be about (#375).
+ *
+ * One value today. This is what makes a meal or a ride a value here and a link builder
+ * in the web app rather than a migration: `thread.entity_id` holds whichever id it is,
+ * and deliberately holds no foreign key, because a thread outlives the dream it was
+ * about — withdrawing one says so on the thread instead of deleting the conversation.
+ */
+export const threadEntityTypes = ['session'] as const
+export type ThreadEntityType = (typeof threadEntityTypes)[number]
+export const isThreadEntityType = (value: unknown): value is ThreadEntityType =>
+  isOneOf(threadEntityTypes, value)
+
+/**
+ * What one line on a thread is (#375).
+ *
+ * `comment` is what a member wrote; the rest are what the app did, and they render as
+ * quiet single lines beside it. The kind decides three things at once — the icon, the
+ * weight, and whether a second one of the same kind rewrites the first — which is why
+ * an entry carries this rather than a notification category. The category is derived
+ * from it below, because a stored copy of something derivable is a copy that drifts.
+ */
+export const threadEntryKinds = [
+  'comment',
+  'offered',
+  'facilitator',
+  'helper',
+  'renamed',
+  'scheduled',
+  'edited',
+  'withdrawn',
+] as const
+export type ThreadEntryKind = (typeof threadEntryKinds)[number]
+export const isThreadEntryKind = (value: unknown): value is ThreadEntryKind =>
+  isOneOf(threadEntryKinds, value)
+
+/**
+ * Whether a second of these rewrites the first rather than adding to it.
+ *
+ * Laying out the grid is a drag every few seconds, and one line per drag is a thread
+ * nobody reads. Coalescing happens on the **write** — the newest entry's body and time
+ * are rewritten — rather than on the read, so nothing accumulates and the card and the
+ * whole thread cannot come to collapse it differently.
+ *
+ * Only where the same aspect changed again, which is why these are three kinds rather
+ * than one `edited`: a rename followed by a move keeps both lines, and fifteen moves
+ * keep one.
+ */
+export const coalesces = (kind: ThreadEntryKind): boolean =>
+  kind === 'renamed' || kind === 'scheduled' || kind === 'edited'
+
+/**
+ * Which switch the feed offers beside a card, or none.
+ *
+ * The chip names what the top of the card is, so it has to be a category somebody can
+ * switch on and thereby hear about *other people's* dreams. The quiet kinds have none —
+ * nothing is ever sent about a dream being moved — and `dream_role` is deliberately not
+ * offered either: it is about being put on a dream yourself, so switching it on would
+ * change nothing about the card it sat under.
+ */
+export const entryCategory = (kind: ThreadEntryKind): NotificationCategory | undefined => {
+  if (kind === 'comment') return 'dream_comment_any'
+  if (kind === 'offered') return 'dream_offered'
+
+  return undefined
+}

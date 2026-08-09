@@ -1,3 +1,4 @@
+import type { Thread } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
 import { eq } from 'drizzle-orm'
@@ -11,15 +12,20 @@ import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, activity, attendance, event } from '../db/schema.ts'
-import { FEED_LIMIT } from './feed.ts'
+import { account, accountRole, activity, attendance, event, thread, threadEntry } from '../db/schema.ts'
+import { sendGuarded } from '../if-match.testing.ts'
+import { CARD_ENTRIES, FEED_LIMIT } from './feed.ts'
 
 /**
- * What everyone has been doing (#303).
+ * What everyone has been doing (#303), and what they are talking about (#375).
  *
- * The point of the page is that these lines are there whether or not anybody switched
- * the matching notification on — so no test here turns one on, and the burn-wide writes
+ * The point of the page is that these are there whether or not anybody switched the
+ * matching notification on — so no test here turns one on, and the burn-wide writes
  * still fill the feed.
+ *
+ * **Joining a burn is what stages a line now**, where offering a dream used to: a dream
+ * has a thread, so its news is a card and no `activity` row is written for it at all.
+ * The two halves are asserted separately, which is what the response's two arrays are.
  */
 
 const SECRET = 'v'.repeat(40)
@@ -29,12 +35,15 @@ const OTHER_BURN = 'e0000000-0000-4000-8000-000000000002'
 
 let handle: DbHandle | undefined
 let app: FastifyInstance | undefined
+/** The app's clock, so the few tests about order can move it between writes. */
+let stamp = NOW
 
 afterEach(async () => {
   await app?.close()
   handle?.close()
   app = undefined
   handle = undefined
+  stamp = NOW
 })
 
 const db = () => {
@@ -55,7 +64,7 @@ const build = async () => {
   app = await createApp({
     db: handle.db,
     config: createConfig({ LOG_LEVEL: 'silent', SESSION_SECRET: SECRET }),
-    now: () => new Date(NOW),
+    now: () => new Date(stamp),
   })
   return app
 }
@@ -102,31 +111,76 @@ const givenLine = async (body: string, created_at: string, eventId = BURN, id = 
     .values({ id, event_id: eventId, category: 'dream_offered', body, link: null, created_at })
 }
 
-const offerDream = (server: FastifyInstance, cookie: string, title: string, eventId = BURN) =>
-  server.inject({
+const offerDream = async (server: FastifyInstance, cookie: string, title: string, eventId = BURN) => {
+  const response = await server.inject({
     method: 'POST',
     url: `/api/events/${eventId}/sessions`,
     headers: { cookie },
     payload: { title },
   })
 
+  return response.json().session.id as string
+}
+
+/** Saying you are coming, which is a line rather than a card: nobody talks to a joining. */
+const joinBurn = (server: FastifyInstance, cookie: string, eventId = BURN) =>
+  server.inject({ method: 'POST', url: `/api/events/${eventId}/attendance/me`, headers: { cookie } })
+
+const cards = async (server: FastifyInstance, cookie: string): Promise<Thread[]> =>
+  (await feed(server, cookie)).json().threads
+
+const say = (server: FastifyInstance, cookie: string, threadId: string, body: string) =>
+  server.inject({
+    method: 'POST',
+    url: `/api/threads/${threadId}/comments`,
+    headers: { cookie },
+    payload: { body },
+  })
+
+const editDream = (
+  server: FastifyInstance,
+  cookie: string,
+  dream: string,
+  payload: Record<string, unknown>,
+) =>
+  sendGuarded((headers) =>
+    server.inject({
+      method: 'PATCH',
+      url: `/api/sessions/${dream}`,
+      headers: { cookie, ...headers },
+      payload,
+    }),
+  )
+
+const moveTo = (server: FastifyInstance, cookie: string, dream: string, hour: string) =>
+  editDream(server, cookie, dream, {
+    time_slot_start: `2026-08-01T${hour}:00:00.000Z`,
+    time_slot_end: `2026-08-01T${hour}:30:00.000Z`,
+  })
+
 describe('the feed', () => {
-  it('carries a line for a dream nobody asked to hear about', async () => {
-    // The whole reason the page exists: `dream_offered` is off by default, so today the
-    // ordinary way to learn somebody offered one was to go looking at the schedule.
+  it('carries a card for a dream nobody asked to hear about', async () => {
+    // The whole reason the page exists: `dream_offered` is off by default, so before it
+    // the ordinary way to learn somebody offered one was to go looking at the schedule.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
     await givenComing(ada.id)
 
-    expect((await offerDream(server, ada.cookie, 'Sauna at dawn')).statusCode).toBe(201)
+    await offerDream(server, ada.cookie, 'Sauna at dawn')
 
-    expect(await lines(server, ada.cookie)).toEqual(['Ada offered a dream: Sauna at dawn'])
+    const [card] = await cards(server, ada.cookie)
+    expect(card?.title).toBe('Sauna at dawn')
+    expect(card?.entries.map((entry) => [entry.author?.name, entry.kind, entry.body])).toEqual([
+      ['Ada', 'offered', 'offered this dream'],
+    ])
+    // And no line beside it: one offer is one thing on the page, not two.
+    expect(await lines(server, ada.cookie)).toEqual([])
   })
 
   it('shows it to the person who did it, unlike the notification', async () => {
     // Never notifying somebody about their own click is #247's rule about the bell. The
-    // feed is a page somebody chose to open, so leaving their own line out would make
+    // feed is a page somebody chose to open, so leaving their own card out would make
     // it read as though nothing happened.
     const server = await build()
     await givenBurn()
@@ -135,8 +189,48 @@ describe('the feed', () => {
 
     await offerDream(server, ada.cookie, 'Sauna at dawn')
 
-    const response = await feed(server, ada.cookie)
-    expect(response.json().activity).toHaveLength(1)
+    expect(await cards(server, ada.cookie)).toHaveLength(1)
+  })
+
+  it('heads a card with what the dream is called now, not what it was called then', async () => {
+    // The bug this fixes. An `activity` line freezes the title into a sentence, so the
+    // feed went on offering "Sauna at dawn" after it had been renamed; a card carries the
+    // thread's own title and the rename keeps it in step.
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const dream = await offerDream(server, ada.cookie, 'Sauna at dawn')
+
+    await editDream(server, ada.cookie, dream, { title: 'Sauna at dusk' })
+
+    const [card] = await cards(server, ada.cookie)
+    expect(card?.title).toBe('Sauna at dusk')
+    expect(card?.entries.map((entry) => entry.body)).toEqual([
+      'offered this dream',
+      'renamed it to “Sauna at dusk”',
+    ])
+  })
+
+  it('keeps the conversation when the dream is withdrawn, and says so', async () => {
+    // Withdrawing states it on the card rather than deleting it: what people said to
+    // each other stays worth reading, which is why `thread.entity_id` carries no key.
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const dream = await offerDream(server, ada.cookie, 'Sauna at dawn')
+
+    await server.inject({
+      method: 'DELETE',
+      url: `/api/sessions/${dream}`,
+      headers: { cookie: ada.cookie },
+    })
+
+    const [card] = await cards(server, ada.cookie)
+    expect(card?.gone).toBe(true)
+    expect(card?.title).toBe('Sauna at dawn')
+    expect(card?.entries.map((entry) => entry.kind)).toEqual(['offered', 'withdrawn'])
   })
 
   it('names the burn, and spans them', async () => {
@@ -147,27 +241,24 @@ describe('the feed', () => {
     await givenBurn(OTHER_BURN, 'Autumn burn', 'autumn')
     const ada = await givenAccount('Ada')
     const bea = await givenAccount('Bea')
-    await givenComing(ada.id)
-    await givenComing(bea.id, OTHER_BURN)
 
-    await offerDream(server, ada.cookie, 'Sauna at dawn')
-    await offerDream(server, bea.cookie, 'Cacao ceremony', OTHER_BURN)
+    await joinBurn(server, ada.cookie)
+    await joinBurn(server, bea.cookie, OTHER_BURN)
 
     const rows = (await feed(server, ada.cookie)).json().activity
-    expect(rows.map((one: { burn: string }) => one.burn).sort()).toEqual(['Autumn burn', 'Summer burn'])
+    expect(rows.map((one: { burn: string }) => one.burn).toSorted()).toEqual(['Autumn burn', 'Summer burn'])
   })
 
   it('carries the category, so the chip can offer to switch it on', async () => {
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
-    await givenComing(ada.id)
 
-    await offerDream(server, ada.cookie, 'Sauna at dawn')
+    await joinBurn(server, ada.cookie)
 
     const [row] = (await feed(server, ada.cookie)).json().activity
-    expect(row.category).toBe('dream_offered')
-    expect(row.link).toBe('/dreams')
+    expect(row.category).toBe('member_joined')
+    expect(row.link).toBe('/members')
   })
 
   it('has a line for somebody saying they are coming, and for a lead role', async () => {
@@ -274,14 +365,20 @@ describe('the feed', () => {
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
-    await givenComing(ada.id)
+    await joinBurn(server, ada.cookie)
     await offerDream(server, ada.cookie, 'Sauna at dawn')
     expect(await db().select().from(activity)).toHaveLength(1)
+    expect(await db().select().from(thread)).toHaveLength(1)
 
     await db().delete(event).where(eq(event.id, BURN))
 
     expect(await db().select().from(activity)).toEqual([])
+    // The thread goes with it too, and the entries with the thread — a conversation
+    // outlives its dream, not the burn it was at.
+    expect(await db().select().from(thread)).toEqual([])
+    expect(await db().select().from(threadEntry)).toEqual([])
     expect(await lines(server, ada.cookie)).toEqual([])
+    expect(await cards(server, ada.cookie)).toEqual([])
   })
 
   it('refuses a category the vocabulary has never heard of', async () => {
@@ -304,11 +401,10 @@ describe('the feed', () => {
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
-    await givenComing(ada.id)
-    await offerDream(server, ada.cookie, 'Sauna at dawn')
+    await joinBurn(server, ada.cookie)
 
     const [row] = (await feed(server, ada.cookie)).json().activity
-    expect(Object.keys(row).sort()).toEqual([
+    expect(Object.keys(row).toSorted()).toEqual([
       'body',
       'burn',
       'category',
@@ -319,17 +415,121 @@ describe('the feed', () => {
     ])
   })
 
-  it('writes nothing when it is read', async () => {
+  it('folds an afternoon of dragging into one line', async () => {
+    // Coalescing on the write: same kind, same person, nothing in between. Without it a
+    // grid session writes a line per drag and the thread is unreadable — and the card
+    // would show four moves and none of the talk.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
     await givenComing(ada.id)
+    const dream = await offerDream(server, ada.cookie, 'Sauna at dawn')
+
+    await moveTo(server, ada.cookie, dream, '09')
+    await moveTo(server, ada.cookie, dream, '10')
+    await moveTo(server, ada.cookie, dream, '11')
+
+    const [card] = await cards(server, ada.cookie)
+    expect(card?.entries.map((entry) => entry.kind)).toEqual(['offered', 'scheduled'])
+    expect(card?.entry_count).toBe(2)
+  })
+
+  it('keeps a rename and a move apart', async () => {
+    // Why these are three kinds rather than one `edited`: coalescing is per aspect, so a
+    // later move must not overwrite the rename that came before it.
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const dream = await offerDream(server, ada.cookie, 'Sauna at dawn')
+
+    await editDream(server, ada.cookie, dream, { title: 'Sauna at dusk' })
+    await moveTo(server, ada.cookie, dream, '09')
+
+    const [card] = await cards(server, ada.cookie)
+    expect(card?.entries.map((entry) => entry.kind)).toEqual(['offered', 'renamed', 'scheduled'])
+  })
+
+  it('shows the end of the conversation, and says how much more there is', async () => {
+    // What bounds the page, and with it what the installed app keeps on disk: a card
+    // carries a few lines whatever the thread holds.
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    await offerDream(server, ada.cookie, 'Sauna at dawn')
+    const [opened] = await cards(server, ada.cookie)
+    if (opened === undefined) throw new Error('no card')
+
+    for (const word of ['one', 'two', 'three', 'four']) await say(server, ada.cookie, opened.id, word)
+
+    const [card] = await cards(server, ada.cookie)
+    expect(card?.entries).toHaveLength(CARD_ENTRIES)
+    expect(card?.entries.map((entry) => entry.body)).toEqual(['two', 'three', 'four'])
+    expect(card?.entry_count).toBe(5)
+  })
+
+  it('rises when somebody says something', async () => {
+    // What the page is for: a dream offered a week ago that is being talked about this
+    // morning belongs at the top, and the sort key is the newest entry rather than the
+    // thread's own age.
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+
+    await offerDream(server, ada.cookie, 'Sauna at dawn')
+    stamp = '2026-07-02T01:00:00.000Z'
+    await offerDream(server, ada.cookie, 'Cacao ceremony')
+
+    expect((await cards(server, ada.cookie)).map((card) => card.title)).toEqual([
+      'Cacao ceremony',
+      'Sauna at dawn',
+    ])
+
+    const older = (await cards(server, ada.cookie)).find((card) => card.title === 'Sauna at dawn')
+    if (older === undefined) throw new Error('no card')
+    stamp = '2026-07-02T02:00:00.000Z'
+    await say(server, ada.cookie, older.id, 'is this before or after dinner?')
+
+    expect((await cards(server, ada.cookie)).map((card) => card.title)).toEqual([
+      'Sauna at dawn',
+      'Cacao ceremony',
+    ])
+  })
+
+  it('cuts the page against both halves, not each on its own', async () => {
+    // Fifty things, not fifty of each: a burn full of talk must not push the news off
+    // the page, and a quiet one must not leave it half empty.
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    for (let index = 0; index < FEED_LIMIT; index += 1) {
+      await givenLine(`Line ${index}`, `2026-07-01T10:${String(index).padStart(2, '0')}:00.000Z`)
+    }
+
+    // Newer than every one of them, so it takes the last place and one line loses it.
+    stamp = '2026-07-03T00:00:00.000Z'
+    await offerDream(server, ada.cookie, 'Sauna at dawn')
+
+    const response = (await feed(server, ada.cookie)).json()
+    expect(response.threads).toHaveLength(1)
+    expect(response.activity).toHaveLength(FEED_LIMIT - 1)
+  })
+
+  it('writes nothing when it is read', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await joinBurn(server, ada.cookie)
     await offerDream(server, ada.cookie, 'Sauna at dawn')
 
     await feed(server, ada.cookie)
     await feed(server, ada.cookie)
 
     expect(await db().select().from(activity)).toHaveLength(1)
+    expect(await db().select().from(threadEntry)).toHaveLength(1)
     // And no bell row for the reader: the two surfaces are separate, and reading one
     // must not fill the other.
     const bell = await server.inject({

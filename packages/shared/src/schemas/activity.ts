@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { notificationCategories } from '../enums.ts'
 import { MAX_TITLE } from '../limits.ts'
 import { dateTimeSchema, idSchema } from './common.ts'
+import { threadSchema } from './thread.ts'
 
 /**
  * One thing that happened at a burn, as the feed shows it (#303).
@@ -24,6 +25,21 @@ export const activitySchema = z.object({
 })
 export type Activity = z.infer<typeof activitySchema>
 
-/** Newest first, bounded by the route. */
-export const feedResponseSchema = z.object({ activity: z.array(activitySchema) })
+/**
+ * The feed: the burn's news, and the conversations (#375).
+ *
+ * Two arrays rather than one list of a union, because they are two things — a line is
+ * something that happened and a card is somewhere people are talking. Both are newest
+ * first, and the route has already merged them by time and cut the pair to its limit,
+ * so a reader interleaves by timestamp and shows what it is given.
+ *
+ * Additive on purpose. Collapsing everything by thread would put the burn's own news —
+ * somebody joined, a lead role taken — behind one card per burn, which is the feed's
+ * list disappearing into an accordion. `activity` keeps what has no conversation, and
+ * shrinks as each kind of thing gains one.
+ */
+export const feedResponseSchema = z.object({
+  activity: z.array(activitySchema),
+  threads: z.array(threadSchema),
+})
 export type FeedResponse = z.infer<typeof feedResponseSchema>

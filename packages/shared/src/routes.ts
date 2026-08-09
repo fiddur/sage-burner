@@ -9,6 +9,7 @@ import type {
   ApplicationCreate,
   AttendanceCreate,
   AttendanceUpdate,
+  CommentInput,
   CopyFrom,
   EventCreateInput,
   EventOptionCreateInput,
@@ -187,6 +188,15 @@ export const apiRoutes = {
     fastify: '/api/event-options/:id',
     path: (id: string) => `/api/event-options/${encodeURIComponent(id)}`,
   },
+  /**
+   * Taking back what you said, or an admin taking it off. Comments only: a line
+   * describing what the app did is not anybody's to rewrite.
+   */
+  deleteComment: {
+    method: 'DELETE',
+    fastify: '/api/comments/:id',
+    path: (id: string) => `/api/comments/${encodeURIComponent(id)}`,
+  },
   deleteFaqEntry: {
     method: 'DELETE',
     fastify: '/api/faq/:id',
@@ -309,6 +319,19 @@ export const apiRoutes = {
     method: 'GET',
     fastify: '/api/feed',
     path: () => '/api/feed',
+  },
+  /**
+   * One conversation, whole (#375).
+   *
+   * By thread id rather than by the dream's, because a withdrawn dream has no id left
+   * to ask by and its thread is still worth reading. It is also the one read the
+   * service worker keeps out of the offline cache — a key per dream ever opened, kept
+   * until sign-out, is the shape of the problem #311 fixed for the banner.
+   */
+  getThread: {
+    method: 'GET',
+    fastify: '/api/threads/:id',
+    path: (id: string) => `/api/threads/${encodeURIComponent(id)}`,
   },
   getFaq: {
     method: 'GET',
@@ -494,6 +517,18 @@ export const apiRoutes = {
     fastify: '/api/events/:eventId/sessions',
     path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/sessions`,
   },
+  /**
+   * Saying something on a thread.
+   *
+   * Not scoped to a burn still open, unlike every other write here: talking about a
+   * burn is not arranging one, and "that was lovely" is a thing somebody wants to post
+   * on the way home (#375).
+   */
+  postComment: {
+    method: 'POST',
+    fastify: '/api/threads/:id/comments',
+    path: (id: string) => `/api/threads/${encodeURIComponent(id)}/comments`,
+  },
   redeemInvite: {
     method: 'POST',
     fastify: '/api/invites/:token/redeem',
@@ -665,6 +700,12 @@ export const apiRoutes = {
     method: 'DELETE',
     fastify: '/api/push/subscriptions',
     path: () => '/api/push/subscriptions',
+  },
+  /** Rewriting what you said. The author's own; nobody edits somebody else's words. */
+  updateComment: {
+    method: 'PATCH',
+    fastify: '/api/comments/:id',
+    path: (id: string) => `/api/comments/${encodeURIComponent(id)}`,
   },
   updateEvent: {
     method: 'PATCH',
@@ -839,6 +880,7 @@ export interface RouteBodies {
   joinMealCrew: Helper
   login: LoginRequest
   offerSession: SessionCreateInput
+  postComment: CommentInput
   redeemInvite: RedeemRequestInput
   reorderEventOptions: EventOptionOrder
   reorderAllergyItems: AllergyItemOrder
@@ -855,6 +897,7 @@ export interface RouteBodies {
   subscribeToPush: PushSubscriptionCreate
   transferMyPlace: PlaceTransfer
   unsubscribeFromPush: Pick<PushSubscriptionCreate, 'endpoint'>
+  updateComment: CommentInput
   updateEvent: EventUpdate
   updateEventOption: EventOptionUpdate
   updateInstallation: InstallationUpdate

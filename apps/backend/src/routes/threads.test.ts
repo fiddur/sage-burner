@@ -1,0 +1,544 @@
+import type { Thread } from '@sage-burner/shared'
+import type { FastifyInstance } from 'fastify'
+
+import { MAX_COMMENT } from '@sage-burner/shared'
+import { eq } from 'drizzle-orm'
+import { randomUUID } from 'node:crypto'
+import { afterEach, describe, expect, it } from 'vitest'
+
+import type { DbHandle } from '../db/index.ts'
+
+import { createApp } from '../app.ts'
+import { createSessions } from '../auth/session.ts'
+import { SESSION_COOKIE } from '../auth/viewer.ts'
+import { createConfig } from '../config.ts'
+import { createDb, runMigrations } from '../db/index.ts'
+import { account, accountRole, attendance, event, thread, threadEntry } from '../db/schema.ts'
+import { sendGuarded } from '../if-match.testing.ts'
+
+/**
+ * Talking about a dream (#375).
+ *
+ * The thread is the dream's, and it outlives the dream — so these are keyed by thread id
+ * throughout, which is the whole reason the routes are and not `/api/sessions/:id/…`.
+ */
+
+const SECRET = 't'.repeat(40)
+const NOW = '2026-07-02T00:00:00.000Z'
+const AFTER_THE_BURN = '2026-09-01T00:00:00.000Z'
+const BURN = 'e0000000-0000-4000-8000-000000000001'
+
+let handle: DbHandle | undefined
+let app: FastifyInstance | undefined
+let stamp = NOW
+
+afterEach(async () => {
+  await app?.close()
+  handle?.close()
+  app = undefined
+  handle = undefined
+  stamp = NOW
+})
+
+const db = () => {
+  const found = handle?.db
+  if (found === undefined) throw new Error('build() first')
+  return found
+}
+
+const client = () => {
+  const found = handle?.client
+  if (found === undefined) throw new Error('build() first')
+  return found
+}
+
+const build = async () => {
+  handle = createDb({ url: ':memory:' })
+  runMigrations(handle)
+  app = await createApp({
+    db: handle.db,
+    config: createConfig({ LOG_LEVEL: 'silent', SESSION_SECRET: SECRET }),
+    now: () => new Date(stamp),
+  })
+  return app
+}
+
+const givenAccount = async (name: string, roles: ('admin' | 'member')[] = ['member']) => {
+  const id = randomUUID()
+  await db()
+    .insert(account)
+    .values({ id, email: `${id}@example.org`, name, password_hash: null, created_at: NOW })
+  for (const role of roles) await db().insert(accountRole).values({ account_id: id, role })
+
+  const sessions = createSessions({ secret: SECRET, now: () => new Date(), ttlSeconds: 3600 })
+  return { id, name, cookie: `${SESSION_COOKIE}=${sessions.issue(id)}` }
+}
+
+const givenBurn = async () => {
+  await db().insert(event).values({
+    id: BURN,
+    name: 'Summer burn',
+    slug: 'summer',
+    start_date: '2026-08-01',
+    end_date: '2026-08-03',
+    member_cap: 20,
+    created_at: NOW,
+  })
+}
+
+const givenComing = async (accountId: string) => {
+  await db()
+    .insert(attendance)
+    .values({ id: randomUUID(), event_id: BURN, account_id: accountId, joined_at: NOW })
+}
+
+const offerDream = async (server: FastifyInstance, cookie: string, title: string) => {
+  const response = await server.inject({
+    method: 'POST',
+    url: `/api/events/${BURN}/sessions`,
+    headers: { cookie },
+    payload: { title },
+  })
+
+  const dream = response.json().session.id as string
+  const [row] = await db().select({ id: thread.id }).from(thread).where(eq(thread.entity_id, dream)).limit(1)
+
+  if (row === undefined) throw new Error('a dream was offered without a thread')
+
+  return { dream, thread: row.id }
+}
+
+const read = (server: FastifyInstance, id: string, cookie?: string) =>
+  server.inject({
+    method: 'GET',
+    url: `/api/threads/${id}`,
+    ...(cookie === undefined ? {} : { headers: { cookie } }),
+  })
+
+const say = (server: FastifyInstance, cookie: string, id: string, body: string) =>
+  server.inject({
+    method: 'POST',
+    url: `/api/threads/${id}/comments`,
+    headers: { cookie },
+    payload: { body },
+  })
+
+const rewrite = (server: FastifyInstance, cookie: string, id: string, body: string) =>
+  server.inject({ method: 'PATCH', url: `/api/comments/${id}`, headers: { cookie }, payload: { body } })
+
+const remove = (server: FastifyInstance, cookie: string, id: string) =>
+  server.inject({ method: 'DELETE', url: `/api/comments/${id}`, headers: { cookie } })
+
+const entriesOf = async (server: FastifyInstance, cookie: string, id: string): Promise<Thread['entries']> =>
+  (await read(server, id, cookie)).json().thread.entries
+
+const bell = async (server: FastifyInstance, cookie: string): Promise<{ category: string; body: string }[]> =>
+  (await server.inject({ method: 'GET', url: '/api/me/notifications', headers: { cookie } })).json()
+    .notifications
+
+describe('a thread', () => {
+  it('reads whole, oldest first', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const { thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+
+    await say(server, ada.cookie, id, 'bring a towel')
+
+    const answer = (await read(server, id, ada.cookie)).json().thread
+    expect(answer.title).toBe('Sauna at dawn')
+    expect(answer.entry_count).toBe(2)
+    expect(answer.entries.map((entry: { body: string }) => entry.body)).toEqual([
+      'offered this dream',
+      'bring a towel',
+    ])
+  })
+
+  it('names whoever wrote each line, from the account rather than the words', async () => {
+    // Why the author is a column and not baked into `body`: renaming yourself must not
+    // leave a thread attributing your own words to a name you no longer use.
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const { thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+    await say(server, ada.cookie, id, 'bring a towel')
+
+    await server.inject({
+      method: 'PATCH',
+      url: '/api/me/profile',
+      headers: { cookie: ada.cookie },
+      payload: { name: 'Ada Lovelace' },
+    })
+
+    const entries = await entriesOf(server, ada.cookie, id)
+    expect(entries.map((entry) => entry.author?.name)).toEqual(['Ada Lovelace', 'Ada Lovelace'])
+  })
+
+  it('refuses a reader without a role, and anybody signed out', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const { thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+    const nobody = await givenAccount('Nemo', [])
+
+    expect((await read(server, id)).statusCode).toBe(401)
+    expect((await read(server, id, nobody.cookie)).statusCode).toBe(403)
+    expect((await say(server, nobody.cookie, id, 'hello')).statusCode).toBe(403)
+  })
+
+  it('is a 404 for an id nothing is about', async () => {
+    const server = await build()
+    const ada = await givenAccount('Ada')
+
+    expect((await read(server, randomUUID(), ada.cookie)).statusCode).toBe(404)
+    expect((await say(server, ada.cookie, randomUUID(), 'hello')).statusCode).toBe(404)
+  })
+
+  it('refuses a comment that says nothing, and one longer than the limit', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const { thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+
+    expect((await say(server, ada.cookie, id, '   ')).statusCode).toBe(400)
+    expect((await say(server, ada.cookie, id, 'x'.repeat(MAX_COMMENT + 1))).statusCode).toBe(400)
+    // The passing sibling: the same route takes one of exactly the limit.
+    expect((await say(server, ada.cookie, id, 'x'.repeat(MAX_COMMENT))).statusCode).toBe(200)
+  })
+
+  it('takes a comment on a burn that has ended, where every other write is refused', async () => {
+    // The one place a member-facing write is not scoped to an open burn. Talking about a
+    // burn is not arranging one, and "that was lovely" is posted on the way home.
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const { dream, thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+
+    stamp = AFTER_THE_BURN
+
+    const moved = await sendGuarded((headers) =>
+      server.inject({
+        method: 'PATCH',
+        url: `/api/sessions/${dream}`,
+        headers: { cookie: ada.cookie, ...headers },
+        payload: { title: 'Sauna at dusk' },
+      }),
+    )
+    expect(moved.statusCode).toBe(404)
+
+    expect((await say(server, ada.cookie, id, 'that was lovely')).statusCode).toBe(200)
+  })
+
+  it('lets the author rewrite what they said, and says it was rewritten', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const { thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+    await say(server, ada.cookie, id, 'bring a towl')
+
+    const [comment] = (await entriesOf(server, ada.cookie, id)).filter((entry) => entry.kind === 'comment')
+    if (comment === undefined) throw new Error('no comment')
+    expect(comment.edited_at).toBeNull()
+
+    expect((await rewrite(server, ada.cookie, comment.id, 'bring a towel')).statusCode).toBe(200)
+
+    const [after] = (await entriesOf(server, ada.cookie, id)).filter((entry) => entry.kind === 'comment')
+    expect(after?.body).toBe('bring a towel')
+    expect(after?.edited_at).toBe(NOW)
+  })
+
+  it('refuses to let anybody rewrite what somebody else said, admin included', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const cai = await givenAccount('Cai', ['admin'])
+    const bea = await givenAccount('Bea')
+    await givenComing(ada.id)
+    const { thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+    await say(server, ada.cookie, id, 'bring a towel')
+
+    const [comment] = (await entriesOf(server, ada.cookie, id)).filter((entry) => entry.kind === 'comment')
+    if (comment === undefined) throw new Error('no comment')
+
+    expect((await rewrite(server, bea.cookie, comment.id, 'bring nothing')).statusCode).toBe(404)
+    // An admin may take a comment off but not put words in somebody's mouth: a deletion
+    // says who did it and an edit would not.
+    expect((await rewrite(server, cai.cookie, comment.id, 'bring nothing')).statusCode).toBe(404)
+  })
+
+  it('refuses to rewrite or remove a line the app wrote', async () => {
+    // Only a comment is anybody's. A history that could be edited is not a history.
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const cai = await givenAccount('Cai', ['admin'])
+    await givenComing(ada.id)
+    const { thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+
+    const [offered] = await entriesOf(server, ada.cookie, id)
+    if (offered === undefined) throw new Error('no entry')
+
+    expect((await rewrite(server, ada.cookie, offered.id, 'never happened')).statusCode).toBe(404)
+    expect((await remove(server, cai.cookie, offered.id)).statusCode).toBe(404)
+  })
+
+  it('lets the author take a comment back, and an admin take anyone down', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    const cai = await givenAccount('Cai', ['admin'])
+    await givenComing(ada.id)
+    await givenComing(bea.id)
+    const { thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+    await say(server, ada.cookie, id, 'mine')
+    await say(server, bea.cookie, id, 'theirs')
+
+    const comments = (await entriesOf(server, ada.cookie, id)).filter((entry) => entry.kind === 'comment')
+    const [mine, theirs] = comments
+    if (mine === undefined || theirs === undefined) throw new Error('no comments')
+
+    expect((await remove(server, bea.cookie, mine.id)).statusCode).toBe(404)
+    expect((await remove(server, ada.cookie, mine.id)).statusCode).toBe(200)
+    expect((await remove(server, cai.cookie, theirs.id)).statusCode).toBe(200)
+
+    expect((await entriesOf(server, ada.cookie, id)).map((entry) => entry.kind)).toEqual(['offered'])
+  })
+
+  it('tells the people in the conversation, and nobody else', async () => {
+    // The split every pair here has: whoever is part of it is told by default, everybody
+    // else at the burn only if they asked. And never the person who just wrote it.
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    const dag = await givenAccount('Dag')
+    await givenComing(ada.id)
+    await givenComing(bea.id)
+    await givenComing(dag.id)
+    const { thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+
+    await say(server, bea.cookie, id, 'is one person enough to hold space?')
+
+    // Ada offered it, so she is in the conversation.
+    expect((await bell(server, ada.cookie)).map((one) => one.category)).toEqual(['dream_comment'])
+    // Bea wrote it.
+    expect(await bell(server, bea.cookie)).toEqual([])
+    // Dag is coming to the burn and has not asked about other people's dreams.
+    expect(await bell(server, dag.cookie)).toEqual([])
+  })
+
+  it('counts saying something as asking to hear the answer', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    await givenComing(ada.id)
+    await givenComing(bea.id)
+    const { thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+
+    await say(server, bea.cookie, id, 'is one person enough?')
+    await say(server, ada.cookie, id, 'one is plenty')
+
+    expect((await bell(server, bea.cookie)).map((one) => one.body)).toEqual([
+      'Ada said something about Sauna at dawn',
+    ])
+  })
+
+  it('tells somebody who was handed the dream without ever saying anything', async () => {
+    // The half `participantsOf` cannot get from the entries: appointing somebody writes a
+    // line authored by whoever appointed, so the facilitator has said nothing.
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    await givenComing(ada.id)
+    await givenComing(bea.id)
+    const { dream, thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+
+    await sendGuarded((headers) =>
+      server.inject({
+        method: 'PATCH',
+        url: `/api/sessions/${dream}`,
+        headers: { cookie: ada.cookie, ...headers },
+        payload: { facilitator_account_id: bea.id },
+      }),
+    )
+    await say(server, ada.cookie, id, 'what do you need?')
+
+    expect((await bell(server, bea.cookie)).map((one) => one.category)).toEqual([
+      'dream_comment',
+      'dream_role',
+    ])
+  })
+
+  it('writes a line for a hand up, saying whose it was', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    await givenComing(ada.id)
+    await givenComing(bea.id)
+    const { dream, thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+
+    await server.inject({
+      method: 'POST',
+      url: `/api/sessions/${dream}/helpers`,
+      headers: { cookie: bea.cookie },
+      payload: { account_id: bea.id },
+    })
+    await server.inject({
+      method: 'POST',
+      url: `/api/sessions/${dream}/helpers`,
+      headers: { cookie: ada.cookie },
+      payload: { account_id: ada.id },
+    })
+
+    expect(
+      (await entriesOf(server, ada.cookie, id)).map((entry) => [entry.author?.name, entry.body]),
+    ).toEqual([
+      ['Ada', 'offered this dream'],
+      ['Bea', 'put a hand up to help'],
+      ['Ada', 'put a hand up to help'],
+    ])
+  })
+
+  it('says who was asked, when somebody is put down by another', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    await givenComing(ada.id)
+    await givenComing(bea.id)
+    const { dream, thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+
+    await server.inject({
+      method: 'POST',
+      url: `/api/sessions/${dream}/helpers`,
+      headers: { cookie: ada.cookie },
+      payload: { account_id: bea.id },
+    })
+    await server.inject({
+      method: 'DELETE',
+      url: `/api/sessions/${dream}/helpers/${bea.id}`,
+      headers: { cookie: ada.cookie },
+    })
+
+    expect((await entriesOf(server, ada.cookie, id)).map((entry) => entry.body)).toEqual([
+      'offered this dream',
+      'asked Bea to help',
+      'took Bea off helping',
+    ])
+  })
+
+  it('says which way the facilitating went', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    await givenComing(ada.id)
+    await givenComing(bea.id)
+    const { dream, thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+
+    const facilitate = (cookie: string, accountId: string | null) =>
+      sendGuarded((headers) =>
+        server.inject({
+          method: 'PATCH',
+          url: `/api/sessions/${dream}`,
+          headers: { cookie, ...headers },
+          payload: { facilitator_account_id: accountId },
+        }),
+      )
+
+    await facilitate(ada.cookie, ada.id)
+    await facilitate(ada.cookie, bea.id)
+    await facilitate(bea.cookie, null)
+
+    expect(
+      (await entriesOf(server, ada.cookie, id)).map((entry) => [entry.author?.name, entry.body]),
+    ).toEqual([
+      ['Ada', 'offered this dream'],
+      ['Ada', 'is facilitating it'],
+      ['Ada', 'asked Bea to facilitate'],
+      ['Bea', 'stepped back from facilitating'],
+    ])
+  })
+
+  it('refuses a kind the vocabulary has never heard of, and a comment nobody wrote', async () => {
+    // The CHECKs, proved by writes that skip the API — the migration's, since the test
+    // database is built from the SQL rather than from `schema.ts`.
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const { thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+
+    const insert = (kind: string, author: string | null) =>
+      client()
+        .prepare(
+          'insert into thread_entry (id, thread_id, kind, seq, author_account_id, body, created_at) values (?, ?, ?, ?, ?, ?, ?)',
+        )
+        .run(randomUUID(), id, kind, 99, author, 'something', NOW)
+
+    expect(() => insert('gossip', ada.id)).toThrow()
+    expect(() => insert('comment', null)).toThrow()
+    // The passing sibling, so the two above are rejecting the value rather than the row.
+    expect(() => insert('comment', ada.id)).not.toThrow()
+  })
+
+  it('keeps one conversation per thing', async () => {
+    // The unique index is what makes the dream's own panel and the feed's card the same
+    // thread rather than two.
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const { dream } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+
+    expect(() =>
+      client()
+        .prepare('insert into thread (id, event_id, entity_type, entity_id, title) values (?, ?, ?, ?, ?)')
+        .run(randomUUID(), BURN, 'session', dream, 'Sauna at dawn'),
+    ).toThrow()
+  })
+
+  it('takes the words of an erased account with it', async () => {
+    // Erasure is where the cascade belongs (#35), and it takes the lines the person is
+    // behind — including a dream's opening one. Ada is not coming to the burn, because
+    // `attendance.account_id` is NO ACTION and nothing can delete an account that is:
+    // this pins the cascade #35 will lean on rather than claiming erasure works today.
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    await givenComing(bea.id)
+    const { thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+    await say(server, bea.cookie, id, 'bring a towel')
+
+    await db().delete(account).where(eq(account.id, ada.id))
+
+    expect((await entriesOf(server, bea.cookie, id)).map((entry) => entry.body)).toEqual(['bring a towel'])
+  })
+
+  it('keeps the conversation when the burn is deleted only until the burn is deleted', async () => {
+    // Retention is the burn, as it is for `activity`: the thread cascades with the event
+    // and the entries with the thread.
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const { thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+
+    await db().delete(event).where(eq(event.id, BURN))
+
+    expect(await db().select().from(thread)).toEqual([])
+    expect(await db().select().from(threadEntry)).toEqual([])
+    expect((await read(server, id, ada.cookie)).statusCode).toBe(404)
+  })
+})

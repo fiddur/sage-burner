@@ -1,4 +1,10 @@
-import type { Session, SessionResponse, SessionsResponse } from '@sage-burner/shared'
+import type {
+  Session,
+  SessionResponse,
+  SessionsResponse,
+  SessionUpdate,
+  ThreadEntryKind,
+} from '@sage-burner/shared'
 import type { SQL } from 'drizzle-orm'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 
@@ -31,9 +37,10 @@ import {
 } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { refuseIfStale, withCollectionVersion, withVersion } from '../if-match.ts'
-import { displayName, notifyAttendees } from '../push/notify.ts'
+import { displayName, tellAttendees } from '../push/notify.ts'
 import { attendanceFor } from './attendance.ts'
 import { openEventNow } from './events.ts'
+import { addEntry, renameThread, threadForSession, threadIdFor } from './threads.ts'
 
 export interface SessionDeps extends GuardDeps {
   now: () => Date
@@ -163,6 +170,20 @@ const asDream = (row: DreamRow, { helpers, support }: People): Session => ({
   supported_by_me: support.get(row.id)?.mine ?? false,
 })
 
+/**
+ * What a scheduling change says, with no clock in it.
+ *
+ * The server does not know the reader's timezone, so a formatted time written into a
+ * stored line would be Saturday in UTC and Sunday morning for somebody east of it. The
+ * dream itself says when; this says that somebody moved it.
+ */
+const scheduleLine = (before: DreamRow, after: DreamRow): string => {
+  if (before.time_slot_start === null && after.time_slot_start !== null) return 'put it in the schedule'
+  if (before.time_slot_start !== null && after.time_slot_start === null) return 'took it off the schedule'
+
+  return 'moved it in the schedule'
+}
+
 const sessionsFor = async (db: Database, eventId: string, mine: string | undefined): Promise<Session[]> => {
   const rows = await dreamRows(db, eq(session.event_id, eventId))
     // Unscheduled dreams last, then by when they happen. `asc` puts nulls first
@@ -291,17 +312,43 @@ export const registerSessionRoutes = (
    * typo in the title must not announce anything.
    */
   const facilitatorMoved = async (
-    request: FastifyRequest,
-    before: { title: string; facilitator_account_id: string | null },
+    by: string | undefined,
+    before: DreamRow,
     after: string | null | undefined,
   ) => {
     if (after === undefined || after === before.facilitator_account_id) return
 
-    const viewer = await viewerFor(request, { db, sessions })
     const was = before.facilitator_account_id
 
-    if (was !== null) await tell(viewer?.account_id, was, `You are no longer facilitating ${before.title}`)
-    if (after !== null) await tell(viewer?.account_id, after, `You are facilitating ${before.title}`)
+    if (was !== null) await tell(by, was, `You are no longer facilitating ${before.title}`)
+    if (after !== null) await tell(by, after, `You are facilitating ${before.title}`)
+
+    const line = await facilitatorLine(by, was, after)
+    if (line !== undefined) await noteOnDream(before, 'facilitator', by, line)
+  }
+
+  /**
+   * The same change, in the third person, for the thread.
+   *
+   * A second wording rather than the notification's: that one is addressed to whoever it
+   * happened to — "You are facilitating" — and a thread is read by everybody else. The
+   * subject's name is written into it where there is one, which is the one name here
+   * that does not come from the account when the line is read. A line about a past
+   * appointment naming somebody's old name is history; the card's title is not, which is
+   * why that one is resolved live.
+   */
+  const facilitatorLine = async (by: string | undefined, was: string | null, after: string | null) => {
+    if (after === null) {
+      if (was === null) return undefined
+
+      return was === by
+        ? 'stepped back from facilitating'
+        : `took ${await displayName(db, was)} off facilitating`
+    }
+
+    if (after === by) return was === null ? 'is facilitating it' : 'took over as facilitator'
+
+    return `asked ${await displayName(db, after)} to facilitate`
   }
 
   /** Tell somebody, unless they did it themselves. Same rule as the register. */
@@ -309,6 +356,53 @@ export const registerSessionRoutes = (
     if (accountId === by) return
 
     await notify(accountId, { category: 'dream_role', body: message, link: '/dreams' })
+  }
+
+  /** A line on the dream's own thread (#375), by whoever is doing it. */
+  const noteOnDream = async (
+    dream: { id: string; event_id: string; title: string },
+    kind: ThreadEntryKind,
+    by: string | undefined,
+    body: string,
+  ) => {
+    await addEntry(
+      db,
+      { thread_id: await threadForSession(db, dream), kind, author_account_id: by ?? null, body },
+      now(),
+    )
+  }
+
+  /**
+   * What a save changed, as quiet lines beside the talk.
+   *
+   * One per aspect that actually moved rather than one line trying to say everything: a
+   * rename followed by a move keeps both, while `coalesces` folds an afternoon of drags
+   * into a single scheduling line. A field sent unchanged says nothing — the grid sends
+   * the whole dream on every save.
+   */
+  const dreamEdited = async (
+    before: DreamRow,
+    body: SessionUpdate,
+    after: DreamRow,
+    by: string | undefined,
+  ) => {
+    if (body.title !== undefined && body.title !== before.title) {
+      await noteOnDream(before, 'renamed', by, `renamed it to “${after.title}”`)
+      await renameThread(db, await threadForSession(db, before), after.title)
+    }
+
+    const moved =
+      (body.time_slot_start !== undefined && body.time_slot_start !== before.time_slot_start) ||
+      (body.time_slot_end !== undefined && body.time_slot_end !== before.time_slot_end) ||
+      (body.place_id !== undefined && body.place_id !== before.place_id)
+
+    if (moved) await noteOnDream(before, 'scheduled', by, scheduleLine(before, after))
+
+    const detailed =
+      (body.description !== undefined && body.description !== before.description) ||
+      (body.repeatable !== undefined && body.repeatable !== before.repeatable)
+
+    if (detailed) await noteOnDream(before, 'edited', by, 'edited the details')
   }
 
   app.get<{ Params: { eventId: string } }>(
@@ -360,30 +454,55 @@ export const registerSessionRoutes = (
       // decides the pairing, which the key cannot see. That check cannot go stale in
       // the direction that matters — no route moves a place between burns, since
       // `placeUpdateSchema` omits `event_id`.
+      //
+      // The thread goes in with it (#375), so nothing later has to decide whether a
+      // dream has one. Both or neither: a dream whose conversation failed to be created
+      // would be a card the feed cannot draw.
+      let threadId: string
       try {
-        await db.insert(session).values({
-          ...fields,
-          id: row.id,
-          event_id: open.id,
-          facilitator_attendance_id: spot.attendanceId ?? null,
+        threadId = db.transaction((tx) => {
+          tx.insert(session)
+            .values({
+              ...fields,
+              id: row.id,
+              event_id: open.id,
+              facilitator_attendance_id: spot.attendanceId ?? null,
+            })
+            .run()
+
+          return threadIdFor(tx, { type: 'session', id: row.id, event_id: open.id, title: row.title })
         })
       } catch (failure) {
         if (isForeignKeyViolation(failure)) return sendError(reply, 400)
         throw failure
       }
 
+      await addEntry(
+        db,
+        {
+          thread_id: threadId,
+          kind: 'offered',
+          author_account_id: viewer.account_id,
+          body: 'offered this dream',
+        },
+        now(),
+      )
+
       // After the write, and never to the person who just offered it (#259). Off
       // unless somebody asked for it, so on most installations this reaches nobody.
-      await notifyAttendees(
+      //
+      // `tellAttendees` rather than `notifyAttendees`: the entry above is what the feed
+      // reads, and a line beside it would put one offer on the page twice.
+      await tellAttendees(
         db,
         notify,
         open.id,
         {
           category: 'dream_offered',
           body: `${await displayName(db, viewer.account_id)} offered a dream: ${row.title}`,
-          link: '/dreams',
+          link: `/dreams?burn=${encodeURIComponent(open.id)}&dream=${encodeURIComponent(row.id)}`,
         },
-        { except: [viewer.account_id], at: now() },
+        { except: [viewer.account_id] },
       )
 
       // Built from what was written rather than read back: a new dream has nobody
@@ -466,7 +585,10 @@ export const registerSessionRoutes = (
       // the UPDATE would otherwise announce a change to a dream that no longer exists.
       if (row === undefined) return sendError(reply, 404)
 
-      await facilitatorMoved(request, existing, body.facilitator_account_id)
+      const by = (await viewerFor(request, { db, sessions }))?.account_id
+
+      await dreamEdited(existing, body, row, by)
+      await facilitatorMoved(by, existing, body.facilitator_account_id)
 
       return await withCollectionVersion(
         reply,
@@ -483,12 +605,14 @@ export const registerSessionRoutes = (
       void noStore(reply)
 
       const [existing] = await db
-        .select({ event_id: session.event_id })
+        .select({ event_id: session.event_id, title: session.title })
         .from(session)
         .where(eq(session.id, request.params.id))
         .limit(1)
 
-      const open = existing === undefined ? undefined : await openEventNow(db, now, existing.event_id)
+      if (existing === undefined) return sendError(reply, 404)
+
+      const open = await openEventNow(db, now, existing.event_id)
       if (open === undefined) return sendError(reply, 404)
 
       const deleted = await db
@@ -497,6 +621,17 @@ export const registerSessionRoutes = (
         .returning({ id: session.id })
 
       if (deleted.length === 0) return sendError(reply, 404)
+
+      // The thread stays: it holds no foreign key to the dream precisely so that
+      // withdrawing one says so rather than deleting what people said about it (#375).
+      const viewer = await viewerFor(request, { db, sessions })
+
+      await noteOnDream(
+        { id: request.params.id, event_id: open.id, title: existing.title },
+        'withdrawn',
+        viewer?.account_id,
+        'withdrew this dream',
+      )
 
       return reply.code(204).send()
     },
@@ -579,6 +714,14 @@ export const registerSessionRoutes = (
       // repeated 👉, would otherwise push the same person the same line twice.
       if (added.length > 0) {
         await tell(found.callerId, body.account_id, `You are helping with ${found.dream.title}`)
+        await noteOnDream(
+          found.dream,
+          'helper',
+          found.callerId,
+          body.account_id === found.callerId
+            ? 'put a hand up to help'
+            : `asked ${await displayName(db, body.account_id)} to help`,
+        )
       }
 
       return { session: await oneDream(db, found.dream, found.mine) } satisfies SessionResponse
@@ -609,6 +752,14 @@ export const registerSessionRoutes = (
           found.callerId,
           request.params.accountId,
           `You are no longer helping with ${found.dream.title}`,
+        )
+        await noteOnDream(
+          found.dream,
+          'helper',
+          found.callerId,
+          request.params.accountId === found.callerId
+            ? 'cannot help after all'
+            : `took ${await displayName(db, request.params.accountId)} off helping`,
         )
       }
 

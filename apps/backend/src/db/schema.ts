@@ -15,6 +15,8 @@ import {
   paymentStatuses,
   placeColors,
   rideKinds,
+  threadEntityTypes,
+  threadEntryKinds,
   tickBoxRequired,
 } from '@sage-burner/shared'
 import { sql } from 'drizzle-orm'
@@ -1335,5 +1337,99 @@ export const activity = sqliteTable(
     // it scans the table once per row of the burn being deleted (#333).
     index('activity_event_idx').on(table.event_id),
     check('activity_category_check', oneOf(table.category, notificationCategories)),
+  ],
+)
+
+/**
+ * A conversation about one thing (#375). `docs/the-app.md` has the why.
+ *
+ * **`entity_id` carries no foreign key, and that is the design rather than an
+ * omission.** A thread outlives what it is about: withdrawing a dream says so on the
+ * thread instead of deleting it, because what people said to each other stays worth
+ * reading afterwards. A key here would cascade the conversation away with the row.
+ *
+ * Which is also why `event_id` and `title` sit here rather than being joined for. Once
+ * `entity_id` points at nothing there is no dream left to take a burn or a name from,
+ * and the feed still has to draw the card. `title` is kept in step by the handler that
+ * renames a dream — the same one already writing a line about exactly that — so the
+ * feed never reads a name from anywhere else and the staleness `activity` has cannot
+ * happen here.
+ *
+ * **Retention is the burn**, as everywhere: it cascades with `event`.
+ */
+export const thread = sqliteTable(
+  'thread',
+  {
+    id: text('id').notNull(),
+    event_id: text('event_id')
+      .notNull()
+      .references(() => event.id, { onDelete: 'cascade' }),
+    entity_type: text('entity_type', { enum: threadEntityTypes }).notNull(),
+    entity_id: text('entity_id').notNull(),
+    /** What to call it, including after whatever it was about has gone. */
+    title: text('title').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    // One conversation per thing, which is what makes the dream's own panel and the
+    // feed's card the same thread rather than two.
+    uniqueIndex('thread_entity_idx').on(table.entity_type, table.entity_id),
+    // For the cascade, which without it scans the table once per row of the burn
+    // being deleted — the lesson `activity_event_idx` records (#333).
+    index('thread_event_idx').on(table.event_id),
+    check('thread_entity_type_check', oneOf(table.entity_type, threadEntityTypes)),
+  ],
+)
+
+/**
+ * One line on a thread: what somebody said, or what the app did (#375).
+ *
+ * **The author is an `account`, not an `attendance`** — deliberately unlike
+ * `session_helper` and `session_support`. Leaving a burn empties your spots and must
+ * not delete what you said; a thread with the replies missing reads as though nobody
+ * answered. It cascades with the account, which is where erasure belongs (#35) — so
+ * erasing somebody takes their lines, including a dream's opening one.
+ *
+ * It is the actor on a system line too, not only the writer of a comment. That is what
+ * lets the name be resolved when the line is read rather than baked into `body`, and it
+ * is also the audience query: who has spoken here is who hears the next thing said.
+ *
+ * `body` carries neither name nor title for the same reason — see `threadEntrySchema`.
+ */
+export const threadEntry = sqliteTable(
+  'thread_entry',
+  {
+    id: text('id').notNull(),
+    thread_id: text('thread_id')
+      .notNull()
+      .references(() => thread.id, { onDelete: 'cascade' }),
+    kind: text('kind', { enum: threadEntryKinds }).notNull(),
+    /**
+     * Where this sits in the conversation, counted per thread.
+     *
+     * The order cannot come from `created_at`: one save changing a dream's name and its
+     * time writes two lines from one `now()`, and two lines sharing a millisecond would
+     * then come back in whatever order the id comparison gave. A conversation that
+     * reorders itself reads as a different conversation.
+     */
+    seq: integer('seq').notNull(),
+    author_account_id: text('author_account_id').references(() => account.id, { onDelete: 'cascade' }),
+    body: text('body').notNull(),
+    created_at: text('created_at').notNull(),
+    /** Set when a comment is rewritten, and when a quiet line coalesces into itself. */
+    edited_at: text('edited_at'),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    // Both reads: a thread's own entries in order, and the newest per thread that the
+    // feed groups by.
+    index('thread_entry_recent_idx').on(table.thread_id, table.created_at),
+    check('thread_entry_kind_check', oneOf(table.kind, threadEntryKinds)),
+    // Nobody is behind a system line, but a comment is somebody's words by definition
+    // — and it is what the two comment notifications decide their audience from.
+    check(
+      'thread_entry_comment_author_check',
+      sql`${table.kind} <> 'comment' or ${table.author_account_id} is not null`,
+    ),
   ],
 )

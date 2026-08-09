@@ -57,6 +57,7 @@ import { registerRideRoutes } from './routes/rides.ts'
 import { registerRosterRoutes } from './routes/roster.ts'
 import { registerScheduleRoutes } from './routes/schedule.ts'
 import { registerSessionRoutes } from './routes/sessions.ts'
+import { registerThreadRoutes } from './routes/threads.ts'
 import { registerVersionRoutes } from './routes/version.ts'
 import { createShellHandler, prepareShell } from './shell.ts'
 
@@ -538,6 +539,7 @@ export const createApp = async ({
   registerFaqRoutes(app, { db, sessions, now })
   registerFeedRoutes(app, { db, sessions })
   registerSessionRoutes(app, { db, sessions, now, notify: tellAccount })
+  registerThreadRoutes(app, { db, sessions, now, notify: tellAccount })
   registerScheduleRoutes(app, { db, now })
 
   const webRoot = config.web_root
