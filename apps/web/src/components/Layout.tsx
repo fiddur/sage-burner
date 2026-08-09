@@ -26,10 +26,10 @@ export interface NavPage {
  * One list, drawn twice, so the two cannot come to offer different pages. **Six is the
  * ceiling**: six by ~3.5rem fits a 360px phone and nothing wider fits beside it, so a
  * seventh page has to hang off one of these rather than take a seat.
- * `docs/the-app.md` has the rest, including why Going on is first.
+ * `docs/the-app.md` has the rest, including why the Feed is first.
  */
 const memberPages: readonly NavPage[] = [
-  { href: '/going-on', label: 'Going on', icon: '📜' },
+  { href: '/feed', label: 'Feed', icon: '📜' },
   { href: '/members', label: 'Members', icon: '🧑‍🤝‍🧑' },
   { href: '/schedule', label: 'Schedule', icon: '🗓️' },
   // The path stays `/roles`: it is what any link already shared points at, and it is

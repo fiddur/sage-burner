@@ -56,6 +56,26 @@ export type CachePlan = 'api' | 'app' | 'asset' | 'navigate' | 'skip'
 const NEVER_CACHED: readonly string[] = [apiRoutes.getVersion.path()]
 
 /**
+ * What every path built from a route starts with: the part before its first parameter.
+ *
+ * Taken off the manifest rather than spelled out here, which is the rule for every other
+ * path in this file — `/api/threads/` written out would be a second spelling of a route.
+ */
+const prefixOf = (fastify: string): string => `${fastify.split('/:')[0] ?? fastify}/`
+
+/**
+ * Never cached for the other reason: one key per thing ever opened (#375).
+ *
+ * Every other API read the app makes is one key for a page — the roster, the schedule,
+ * the feed — which `put` replaces in place, so the cache does not grow with use. A whole
+ * thread is a read per dream, kept until sign-out, which is the shape of the problem
+ * #311 fixed for the banner. The card on the feed carries the newest few lines, so
+ * offline still shows what is being talked about; the rest of the conversation needs the
+ * network.
+ */
+const NEVER_CACHED_PREFIXES: readonly string[] = [prefixOf(apiRoutes.getThread.fastify)]
+
+/**
  * What to do with one request.
  *
  * `origin` is passed rather than read off `location` so this is a function of its
@@ -86,6 +106,7 @@ export const planFor = (
   // so there is nothing in it a sign-out should take away.
   if (pathname === apiRoutes.getChangelog.path()) return 'app'
   if (NEVER_CACHED.includes(pathname)) return 'skip'
+  if (NEVER_CACHED_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return 'skip'
   if (pathname.startsWith('/api/')) return 'api'
 
   return 'skip'

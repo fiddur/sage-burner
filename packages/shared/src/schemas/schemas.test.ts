@@ -420,6 +420,7 @@ describe('sessionSchema', () => {
     supporters: [{ account_id: ID, name: 'Ada', avatar: null }],
     support_count: 3,
     supported_by_me: true,
+    thread_id: OTHER_ID,
   }
 
   it('lets a partial edit carry one end of the slot, which only the row can judge', () => {

@@ -64,7 +64,7 @@ describe('the nav', () => {
 
     expectLinks(
       ['Apply', 'Log in'],
-      ['Going on', 'Members', 'Schedule', 'Leads', 'FAQ', 'Your details', 'Organise'],
+      ['Feed', 'Members', 'Schedule', 'Leads', 'FAQ', 'Your details', 'Organise'],
     )
   })
 
@@ -74,7 +74,7 @@ describe('the nav', () => {
     // "Your burn" is not among them: the burns are sections of the details page
     // now, since more than one is planned at a time and the singular was from when
     // there was only ever the next one (#184).
-    expectLinks(['Going on', 'Members', 'Schedule', 'Leads', 'FAQ', 'Your details'], ['Your burn'])
+    expectLinks(['Feed', 'Members', 'Schedule', 'Leads', 'FAQ', 'Your details'], ['Your burn'])
   })
 
   it("gives the corner's icons one class, since neither of them is a word", () => {
@@ -106,10 +106,7 @@ describe('the nav', () => {
     // `member`, since somebody not attending has no stay to fill in.
     renderNav(signedInAs('admin'))
 
-    expectLinks(
-      ['Going on', 'Members', 'Schedule', 'Leads', 'FAQ', 'Organise'],
-      ['Your burn', 'Your details'],
-    )
+    expectLinks(['Feed', 'Members', 'Schedule', 'Leads', 'FAQ', 'Organise'], ['Your burn', 'Your details'])
   })
 
   it('offers Dreams from the Schedule rather than from the bar', () => {
@@ -139,7 +136,7 @@ describe('the nav', () => {
 
     expectLinks(
       [],
-      ['Your burn', 'Going on', 'Members', 'Dreams', 'Schedule', 'Leads', 'FAQ', 'Your details', 'Organise'],
+      ['Your burn', 'Feed', 'Members', 'Dreams', 'Schedule', 'Leads', 'FAQ', 'Your details', 'Organise'],
     )
   })
 })
@@ -202,7 +199,7 @@ describe('the nav on a phone', () => {
    * The bar draws them as emoji, so `aria-label` is the only name there — which is
    * the point of naming them: an icon bar nobody can read is six identical buttons.
    */
-  const pages = ['Going on', 'Members', 'Schedule', 'Leads', 'Meals', 'FAQ']
+  const pages = ['Feed', 'Members', 'Schedule', 'Leads', 'Meals', 'FAQ']
 
   const inTheBottomBar = () =>
     [...screen.getByRole('navigation', { name: 'Pages' }).querySelectorAll('a')].map((link) =>

@@ -61,6 +61,10 @@ export type RoutesApi = Pick<
   | 'deleteQuestion'
   | 'getActiveEvent'
   | 'getFeed'
+  | 'getThread'
+  | 'postComment'
+  | 'updateComment'
+  | 'deleteComment'
   | 'getAllergyItems'
   | 'getChangelog'
   | 'addAllergyItem'
@@ -254,7 +258,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
       <Route path="/roles" component={RolesRoute} />
       <Route path="/rides" component={RidesRoute} />
       <Route path="/faq" component={FaqRoute} />
-      <Route path="/going-on" component={FeedRoute} />
+      <Route path="/feed" component={FeedRoute} />
       <Route path="/notifications" component={NotificationsRoute} />
       <Route path="/profile" component={ProfileRoute} />
       <Route path="/invite/:token" component={InviteRoute} />

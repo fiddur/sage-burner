@@ -1,6 +1,7 @@
 import type { MyBurn } from '@sage-burner/shared'
 import type { ComponentChildren } from 'preact'
 
+import { BURN_PARAM } from '@sage-burner/shared'
 import { createContext } from 'preact'
 import { useLocation } from 'preact-iso'
 import { useCallback, useContext, useEffect, useState } from 'preact/hooks'
@@ -94,7 +95,12 @@ export const BurnProvider = ({
  * about the autumn burn followed while the selector sat on the summer one opened the
  * wrong page entirely.
  */
-export const BURN_PARAM = 'burn'
+/**
+ * Re-exported rather than declared: the backend writes links carrying it and the feed
+ * builds its own, so the spelling lives in `@sage-burner/shared` where all three read it
+ * from. Kept exported here because this is where every reader of it already looks.
+ */
+export { BURN_PARAM }
 
 /**
  * The choice, fetched once and held for the session.

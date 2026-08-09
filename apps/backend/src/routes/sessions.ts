@@ -10,6 +10,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify'
 
 import {
   apiRoutes,
+  dreamPage,
   errorResponse,
   helperSchema,
   hasValidTimeSlot,
@@ -34,6 +35,7 @@ import {
   session,
   sessionHelper,
   sessionSupport,
+  thread,
 } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { refuseIfStale, withCollectionVersion, withVersion } from '../if-match.ts'
@@ -64,6 +66,7 @@ export interface SessionDeps extends GuardDeps {
  */
 type DreamRow = Omit<typeof session.$inferSelect, 'facilitator_attendance_id'> & {
   facilitator_account_id: string | null
+  thread_id: string | null
 }
 
 const dreamColumns = {
@@ -76,14 +79,16 @@ const dreamColumns = {
   time_slot_start: session.time_slot_start,
   time_slot_end: session.time_slot_end,
   place_id: session.place_id,
+  thread_id: thread.id,
 }
 
-/** Left, so a dream nobody runs is still a dream. */
+/** Left, so a dream nobody runs is still a dream — and so is one with no thread yet. */
 const dreamRows = (db: Database, where: SQL) =>
   db
     .select(dreamColumns)
     .from(session)
     .leftJoin(attendance, eq(attendance.id, session.facilitator_attendance_id))
+    .leftJoin(thread, and(eq(thread.entity_type, 'session'), eq(thread.entity_id, session.id)))
     .where(where)
 
 interface People {
@@ -162,6 +167,7 @@ const asDream = (row: DreamRow, { helpers, support }: People): Session => ({
   time_slot_start: row.time_slot_start,
   time_slot_end: row.time_slot_end,
   place_id: row.place_id,
+  thread_id: row.thread_id,
   helpers: helpers.get(row.id) ?? [],
   supporters: support.get(row.id)?.people ?? [],
   // Kept beside the list rather than derived by every reader: the grid's chip shows
@@ -447,6 +453,7 @@ export const registerSessionRoutes = (
         id: randomUUID(),
         event_id: open.id,
         facilitator_account_id: wanted ?? null,
+        thread_id: null,
       }
 
       // Split deliberately. The foreign key is the authority on the place *existing*,
@@ -500,7 +507,7 @@ export const registerSessionRoutes = (
         {
           category: 'dream_offered',
           body: `${await displayName(db, viewer.account_id)} offered a dream: ${row.title}`,
-          link: `/dreams?burn=${encodeURIComponent(open.id)}&dream=${encodeURIComponent(row.id)}`,
+          link: dreamPage(open.id, row.id),
         },
         { except: [viewer.account_id] },
       )
@@ -509,6 +516,7 @@ export const registerSessionRoutes = (
       // helping and no hearts by definition.
       const dream: Session = {
         ...row,
+        thread_id: threadId,
         helpers: [],
         supporters: [],
         support_count: 0,

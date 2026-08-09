@@ -1,6 +1,7 @@
 import type { MyBurn, Place, Session } from '@sage-burner/shared'
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
+import { LocationProvider } from 'preact-iso'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Viewer } from '../viewer.tsx'
@@ -47,6 +48,7 @@ const aDream = (over: Partial<Session> & Pick<Session, 'id' | 'title'>): Session
   supporters: [],
   support_count: 0,
   supported_by_me: false,
+  thread_id: null,
   ...over,
 })
 
@@ -55,6 +57,10 @@ const stub = (over: Partial<DreamsApi> = {}, sessions: Session[] = []): DreamsAp
   getPlaces: () => Promise.resolve({ places: [TEMPLE] }),
   offerSession: () => Promise.reject(new Error('offerSession is not stubbed here')),
   updateSession: () => Promise.reject(new Error('updateSession is not stubbed here')),
+  getThread: () => Promise.reject(new Error('getThread is not stubbed here')),
+  postComment: () => Promise.reject(new Error('postComment is not stubbed here')),
+  updateComment: () => Promise.reject(new Error('updateComment is not stubbed here')),
+  deleteComment: () => Promise.reject(new Error('deleteComment is not stubbed here')),
   withdrawSession: () => Promise.reject(new Error('withdrawSession is not stubbed here')),
   getEventAttendees: () =>
     Promise.resolve({
@@ -85,6 +91,25 @@ const renderPage = (api: DreamsApi, viewer: Viewer = MEMBER, burn: MyBurn | null
       </BurnProvider>
     </ViewerProvider>,
   )
+
+/**
+ * The same, under the router — which is where a link naming a dream is read from.
+ *
+ * `LocationProvider` reads `location` on mount, so the address is set first.
+ */
+const renderPageAt = (at: string, api: DreamsApi) => {
+  history.replaceState(null, '', at)
+
+  return render(
+    <LocationProvider>
+      <ViewerProvider viewer={MEMBER}>
+        <BurnProvider value={{ status: 'ready', burns: [CHOSEN], selected: CHOSEN }}>
+          <Dreams api={api} />
+        </BurnProvider>
+      </ViewerProvider>
+    </LocationProvider>,
+  )
+}
 
 /**
  * The row, which opens the panel — the same one the grid opens (#342).
@@ -536,5 +561,52 @@ describe('Dreams', () => {
     renderPage(stub({}, [aDream({ id: 's-1', title: 'Opening circle' })]), organiser)
 
     expect(await screen.findByRole('button', { name: 'Open Opening circle' })).toBeTruthy()
+  })
+
+  it('opens the dream a link names, and shows what has been said about it', async () => {
+    // A card on the feed and a notification about a comment both lead here, and the
+    // panel is local state — so without this a link could only ever open the list.
+    const thread = vi.fn<DreamsApi['getThread']>(() =>
+      Promise.resolve({
+        thread: {
+          id: 'th-1',
+          event_id: 'e-1',
+          burn: 'Summer burn',
+          entity_type: 'session',
+          entity_id: 's-1',
+          title: 'Sunrise yoga',
+          gone: false,
+          entry_count: 1,
+          last_at: '2026-08-07T18:00:00.000Z',
+          entries: [
+            {
+              id: 't-1',
+              kind: 'comment',
+              author: { account_id: 'a-2', name: 'Bea' },
+              body: 'is one mat enough?',
+              created_at: '2026-08-07T18:00:00.000Z',
+              edited_at: null,
+            },
+          ],
+        },
+      }),
+    )
+
+    renderPageAt(
+      '/dreams?dream=s-1',
+      stub({ getThread: thread }, [aDream({ id: 's-1', title: 'Sunrise yoga', thread_id: 'th-1' })]),
+    )
+
+    expect(await screen.findByRole('dialog', { name: 'Sunrise yoga' })).toBeTruthy()
+    await waitFor(() => expect(thread).toHaveBeenCalledWith('th-1', expect.anything()))
+    expect(await screen.findByText('is one mat enough?')).toBeTruthy()
+  })
+
+  it('opens nothing for a dream this burn does not have', async () => {
+    // A withdrawn one, or a link from another burn. The panel simply stays shut.
+    renderPageAt('/dreams?dream=gone', stub({}, [aDream({ id: 's-1', title: 'Sunrise yoga' })]))
+
+    await screen.findByText('Sunrise yoga')
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 })

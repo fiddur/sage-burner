@@ -52,6 +52,16 @@ describe('what the worker does with a request', () => {
     expect(asked(apiRoutes.getVersion.path())).toBe('skip')
   })
 
+  it('never caches a whole conversation, which would be a key per dream', () => {
+    // Every other read here is one key for a page, replaced in place. A thread is one
+    // per dream ever opened, kept until sign-out — what #311 fixed for the banner. The
+    // feed's card carries the newest few lines, so offline is not left with nothing.
+    expect(asked(apiRoutes.getThread.path('thread-1'))).toBe('skip')
+    expect(asked(apiRoutes.getThread.path('thread-2'))).toBe('skip')
+    // The passing sibling: the feed itself is a page, so it is kept.
+    expect(asked(apiRoutes.getFeed.path())).toBe('api')
+  })
+
   it('keeps the app itself apart from the data', () => {
     // The shell cache survives a sign-out and the API cache does not, so which one a
     // thing lands in is the whole of what stays on a device afterwards.

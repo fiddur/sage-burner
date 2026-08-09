@@ -54,6 +54,7 @@ import type {
   RosterResponse,
   SessionResponse,
   SessionsResponse,
+  ThreadResponse,
   ChangelogResponse,
   VersionResponse,
 } from '@sage-burner/shared'
@@ -697,6 +698,33 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
     stopHelpingWithSession: (id: string, accountId: string) =>
       request<SessionResponse>(apiRoutes.stopHelpingWithSession.path(id, accountId), {
         method: apiRoutes.stopHelpingWithSession.method,
+      }),
+
+    /**
+     * One conversation, whole (#375).
+     *
+     * By thread id, not by the dream's: a withdrawn dream keeps its thread, and the
+     * card on the feed is the only place left to read it.
+     */
+    getThread: (id: string, signal?: AbortSignal) =>
+      request<ThreadResponse>(apiRoutes.getThread.path(id), { signal }),
+
+    postComment: (id: string, body: BodyOf<'postComment'>) =>
+      request<ThreadResponse>(apiRoutes.postComment.path(id), {
+        method: apiRoutes.postComment.method,
+        body,
+      }),
+
+    /** The author's own. An admin may take a comment off, but never rewrite one. */
+    updateComment: (id: string, body: BodyOf<'updateComment'>) =>
+      request<ThreadResponse>(apiRoutes.updateComment.path(id), {
+        method: apiRoutes.updateComment.method,
+        body,
+      }),
+
+    deleteComment: (id: string) =>
+      request<ThreadResponse>(apiRoutes.deleteComment.path(id), {
+        method: apiRoutes.deleteComment.method,
       }),
 
     /** A ❤️‍🔥, and taking it back. */

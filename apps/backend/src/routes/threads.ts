@@ -7,7 +7,7 @@ import type {
 } from '@sage-burner/shared'
 import type { FastifyInstance, FastifyReply } from 'fastify'
 
-import { apiRoutes, coalesces, commentSchema } from '@sage-burner/shared'
+import { apiRoutes, coalesces, commentSchema, dreamPage } from '@sage-burner/shared'
 import { and, asc, count, desc, eq, inArray, max, ne, sql } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
@@ -492,7 +492,7 @@ export const registerThreadRoutes = (
     found: { id: string; event_id: string; entity_type: ThreadEntityType; entity_id: string; title: string },
     author: string,
   ) => {
-    const link = `/dreams?burn=${encodeURIComponent(found.event_id)}&dream=${encodeURIComponent(found.entity_id)}`
+    const link = dreamPage(found.event_id, found.entity_id)
     const said = `${await displayName(db, author)} said something about ${found.title}`
 
     const people = await participantsOf(db, found)
