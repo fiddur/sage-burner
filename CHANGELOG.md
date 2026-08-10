@@ -9,6 +9,11 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-10
 
+- **The privacy page now explains why the Discord or Facebook screen asks for more than we keep.**
+  Their screens name your username and banner, because a profile is the smallest thing either
+  lets an app ask for — and what arrives beyond an identifier and a picture is dropped rather
+  than stored. The settings page tells whoever set it up the same thing, so they can answer it.
+
 - **Signing in with Facebook or Discord works from the button again.** Clicking it landed on a
   "Nothing here" page instead of going to the provider — both on the login page and on Your
   details. Nothing was wrong with where the button pointed; the app was catching the click

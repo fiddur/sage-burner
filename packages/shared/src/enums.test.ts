@@ -258,6 +258,19 @@ describe('what is stored for a way of being reached', () => {
     )
   })
 
+  it('reads a path the way a browser segments it', () => {
+    // `\` separates segments too, not just the authority: a browser reads `/a\b/c` as `/a/b/c`,
+    // so `a\b` would have been a handle nobody has.
+    expect(connectionValue('instagram', 'https://instagram.com/a\\b/c')).toBe('a')
+  })
+
+  it('keeps a Mastodon URL whole when the segment is not just a handle', () => {
+    // The same divergence on the branch that recognises a Mastodon URL by its shape. One
+    // segment, and that segment an `@handle` — `@wren\x` is two to a browser, so it stays as
+    // typed rather than becoming `@wren@chaos.social`.
+    expect(connectionValue('mastodon', 'https://chaos.social/@wren\\x')).toBe('https://chaos.social/@wren\\x')
+  })
+
   it('does not mistake somebody else’s URL for a handle', () => {
     // A link to an Instagram post is not a profile, and a URL on another host is not
     // Instagram at all — both stay as typed rather than becoming a wrong handle.
@@ -289,13 +302,20 @@ describe('what is stored for a way of being reached', () => {
     })
 
     it('refuses a host a browser would read differently', () => {
-      // A backslash is the hole: WHATWG treats `\\` as `/` for a special scheme, so a browser
-      // reads `https://evil.example\\.facebook.com/wren` as host `evil.example` and path
+      // The hole this closed, and the only input that distinguished it: WHATWG treats `\\` as
+      // `/` for a special scheme, so a browser reads this as host `evil.example` and path
       // `/.facebook.com/wren`, while an authority captured up to the first `/?#` ends
-      // `.facebook.com` and passes a host check. This value lands in an `href` other members
+      // `.facebook.com` and passed the host check. The value lands in an `href` other members
       // click, so the two readings have to agree.
       expect(facebookProfileLink('https://evil.example\\.facebook.com/wren')).toBeUndefined()
+    })
+
+    it('refuses a userinfo form, as it always did', () => {
+      // Its own case because it proves nothing about the backslash fix — the old code refused
+      // this too, since the captured authority ended `@facebook.com` and the host pattern is
+      // anchored on a preceding dot. Kept as the belt to the braces, not as evidence.
       expect(facebookProfileLink('https://evil.example\\@facebook.com/wren')).toBeUndefined()
+      expect(facebookProfileLink('https://evil.example@facebook.com/wren')).toBeUndefined()
     })
 
     it('refuses a host that only looks like Facebook', () => {

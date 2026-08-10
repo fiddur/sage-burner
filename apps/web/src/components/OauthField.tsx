@@ -20,12 +20,14 @@ const consoles = {
   discord: {
     where: 'discord.com/developers/applications',
     cost: 'An application and a redirect URI. No review.',
+    consent: '“your username, avatar and banner” — the least Discord lets any app ask for',
   },
   facebook: {
     where: 'developers.facebook.com',
     cost: 'An app, the URLs listed below, and app review for public_profile before anybody outside your own account can use it.',
+    consent: 'your public profile — the eight fields public_profile covers, of which this app reads three',
   },
-} as const satisfies Record<OAuthProvider, { where: string; cost: string }>
+} as const satisfies Record<OAuthProvider, { where: string; cost: string; consent: string }>
 
 /**
  * Setting one provider up (#393).
@@ -97,6 +99,14 @@ export const OauthField = ({ api, provider }: { api: OauthApi; provider: OAuthPr
       <p class="form-note">
         The redirect URI to register there is <code>{apiRoutes.finishOauth.path(provider)}</code> on this
         installation's own address — the app builds it, and it has to match exactly.
+      </p>
+
+      <p class="form-note">
+        {/* An admin who has not seen the consent screen cannot answer a member who has, and it
+            names more than this app keeps — `PRIVACY.md` is where that is explained (#429). */}
+        Your members will be asked to allow {consoles[provider].consent}. What this app keeps of it is an
+        identifier and, if they have no picture here, a copy of theirs — <a href="/privacy">/privacy</a> says
+        so, and it is the page they can check.
       </p>
 
       {provider === 'facebook' && (

@@ -38,7 +38,14 @@ Only if you choose to link one, and only ever as an extra way in beside your pas
   for somebody already logged in and already a friend of yours, so it is less of a way to be
   found than the Facebook name you can type in yourself.
 
-We ask those providers for nothing else. We do not ask for your email address, your friends,
+**The provider's own screen will name more than that, and it is right to.** Discord says
+"your username, avatar and banner", because the smallest thing it lets anyone ask for is your
+profile — there is no way to ask only for an identifier. Facebook's is the same shape. What
+arrives beyond what is listed above, your username and your banner among it, is dropped rather
+than kept: it is read out of the answer for the two things named and the rest is never stored,
+never shown to anybody, and gone when the request finishes.
+
+We ask for nothing beyond that profile. We do not ask for your email address, your friends,
 your posts, or anything you have done anywhere else, and we cannot see any of it.
 
 **Getting rid of it takes one button.** Under **Your details**, beside the provider under

@@ -72,8 +72,8 @@ export const registerPeopleRoutes = (app: FastifyInstance, { db, sessions }: Gua
        */
       const messenger = connections.find((connection) => connection.kind === 'messenger')
 
-      // Only when it would be used. A typed handle wins, so on the common path this row is a
-      // query whose result is thrown away.
+      // Read only where it would be used: a typed handle wins, so the common path asks for
+      // nothing here.
       const linked =
         messenger !== undefined
           ? undefined
