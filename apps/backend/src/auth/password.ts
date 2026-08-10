@@ -26,6 +26,9 @@ export const defaultScryptParams: ScryptParams = { cost: 2 ** 16, blockSize: 8, 
 const KEY_LENGTH = 64
 const SALT_LENGTH = 16
 
+// 256, not the quoted `128 * N * r`: OpenSSL wants 4 KiB more than that at cost 2^16, and the
+// 32 MiB floor hides it from every test, which hashes at `fast`. Halving it throws
+// ERR_CRYPTO_INVALID_SCRYPT_PARAMS on every production login while CI stays green.
 const maxmemFor = ({ cost, blockSize }: ScryptParams) => Math.max(32 * 1024 * 1024, 256 * cost * blockSize)
 
 const derive = async (password: string, salt: Buffer, params: ScryptParams): Promise<Buffer> => {

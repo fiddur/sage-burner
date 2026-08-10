@@ -9,6 +9,8 @@ export const IMAGE_BODY_TYPES = [
 ]
 
 export const registerImageBodyParser = (app: FastifyInstance) => {
+  // No `bodyLimit`: a parser's limit beats the route's, so one number here would cap all four
+  // image routes and make each one's own limit unreachable. No test would catch it.
   app.addContentTypeParser(IMAGE_BODY_TYPES, { parseAs: 'buffer' }, (_request, body, done) => {
     done(null, body)
   })
