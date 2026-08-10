@@ -85,13 +85,19 @@ const givenAccount = async (over: { roles?: ('admin' | 'member')[]; password?: s
   return { id, cookie: `${SESSION_COOKIE}=${sessions.issue(id)}` }
 }
 
-const givenProvider = async (provider: 'discord' | 'facebook' = 'facebook') =>
-  await db().insert(oauthSetting).values({
-    provider,
-    client_id: 'client-1',
-    client_secret: 'secret-1',
-    updated_at: NOW.toISOString(),
-  })
+const givenProvider = async (
+  provider: 'discord' | 'facebook' = 'facebook',
+  over: { ask_profile_link?: boolean } = {},
+) =>
+  await db()
+    .insert(oauthSetting)
+    .values({
+      provider,
+      client_id: 'client-1',
+      client_secret: 'secret-1',
+      ask_profile_link: over.ask_profile_link ?? false,
+      updated_at: NOW.toISOString(),
+    })
 
 const start = (server: FastifyInstance, provider: string, cookie?: string) =>
   server.inject({
@@ -171,6 +177,25 @@ describe('leaving for a provider', () => {
     expect(to.searchParams.get('scope')).toBe('public_profile')
   })
 
+  it('asks for the profile link only where the app has been approved for it', async () => {
+    // The pair, and the second half is the one that matters: an app that has not been through
+    // review for `user_link` must not be sent a scope naming it, because the authorize redirect
+    // has already left the browser by the time this process could recover (#405).
+    const server = await build()
+    await givenProvider('facebook', { ask_profile_link: true })
+
+    const asking = new URL((await start(server, 'facebook')).headers.location?.toString() ?? '')
+
+    expect(asking.searchParams.get('scope')).toBe('public_profile,user_link')
+
+    await db().delete(oauthSetting)
+    await givenProvider('facebook', { ask_profile_link: false })
+
+    const not = new URL((await start(server, 'facebook')).headers.location?.toString() ?? '')
+
+    expect(not.searchParams.get('scope')).toBe('public_profile')
+  })
+
   it('refuses a provider nobody has set up, rather than sending somebody nowhere', async () => {
     const server = await build()
 
@@ -242,6 +267,54 @@ describe('signing in from a provider', () => {
 
     expect(back.headers.location).toBe('/')
     expect(cookiesOn(back)).toContain(`${SESSION_COOKIE}=`)
+  })
+
+  it('fills in a profile URL for somebody who linked before it was asked for', async () => {
+    // What makes this reach an existing member at all: their identity was written when nothing
+    // asked for `user_link`, so a link only ever stored at link time would leave them having to
+    // unlink and link again. A vanity name that changes lands here too.
+    const server = await build(
+      fakeOAuth({
+        identify: () =>
+          Promise.resolve({ subject: 'provider-1', profile_url: 'https://www.facebook.com/wren' }),
+      }),
+    )
+    await givenProvider('facebook', { ask_profile_link: true })
+    const wren = await givenAccount()
+    await db().insert(accountIdentity).values({
+      id: randomUUID(),
+      account_id: wren.id,
+      provider: 'facebook',
+      subject: 'provider-1',
+      created_at: NOW.toISOString(),
+    })
+
+    const back = await signInThrough(server)
+
+    expect(back.headers.location).toBe('/')
+    const [held] = await db().select().from(accountIdentity)
+    expect(held?.profile_url).toBe('https://www.facebook.com/wren')
+  })
+
+  it('leaves the stored one alone when the provider answers none', async () => {
+    // The passing sibling, and the case an installation that turns the setting back off is in:
+    // nothing is asked for, so nothing overwrites what is there with null.
+    const server = await build()
+    await givenProvider('facebook')
+    const wren = await givenAccount()
+    await db().insert(accountIdentity).values({
+      id: randomUUID(),
+      account_id: wren.id,
+      provider: 'facebook',
+      subject: 'provider-1',
+      profile_url: 'https://www.facebook.com/wren',
+      created_at: NOW.toISOString(),
+    })
+
+    await signInThrough(server)
+
+    const [held] = await db().select().from(accountIdentity)
+    expect(held?.profile_url).toBe('https://www.facebook.com/wren')
   })
 
   it('creates no account for a provider nobody has linked, and says nothing either way', async () => {
@@ -503,8 +576,9 @@ describe('linking a provider to an account', () => {
   it('writes no way of being reached from the id a provider hands over', async () => {
     // It used to write a `messenger` row from `profile.subject`. Facebook answers
     // `public_profile` with an **app-scoped** id, which identifies nobody outside this
-    // installation's Meta app — so `m.me/<that>` pointed at nobody. Both the Messenger row
-    // and the profile link now come from a handle somebody typed.
+    // installation's Meta app — so `m.me/<that>` pointed at nobody. A Messenger row still only
+    // ever comes from a handle somebody typed; the profile link may come from `user_link`
+    // (#405), and that is a URL Facebook answered rather than an id.
     const server = await build()
     await givenProvider('facebook')
     const wren = await givenAccount()
@@ -512,6 +586,35 @@ describe('linking a provider to an account', () => {
     await linkThrough(server, wren.cookie, 'facebook')
 
     expect(await db().select().from(accountConnection)).toEqual([])
+  })
+
+  it('keeps the profile URL the provider answered', async () => {
+    const server = await build(
+      fakeOAuth({
+        identify: () =>
+          Promise.resolve({ subject: 'provider-1', profile_url: 'https://www.facebook.com/wren' }),
+      }),
+    )
+    await givenProvider('facebook', { ask_profile_link: true })
+    const wren = await givenAccount()
+
+    await linkThrough(server, wren.cookie, 'facebook')
+
+    const [written] = await db().select().from(accountIdentity)
+    expect(written?.profile_url).toBe('https://www.facebook.com/wren')
+  })
+
+  it('keeps none where the provider was never asked for one', async () => {
+    // The ordinary case, and the one that has to keep working: an installation whose admin never
+    // went to app review for `user_link` gets exactly the link it had before.
+    const server = await build()
+    await givenProvider('facebook')
+    const wren = await givenAccount()
+
+    await linkThrough(server, wren.cookie, 'facebook')
+
+    const [written] = await db().select().from(accountIdentity)
+    expect(written?.profile_url).toBeNull()
   })
 })
 

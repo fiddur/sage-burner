@@ -20,6 +20,17 @@ import { dateTimeSchema } from './common.ts'
  */
 export const oauthSettingsFields = z.object({
   client_id: z.string().trim().min(1).max(MAX_OAUTH_CLIENT_ID),
+  /**
+   * Whether the app may ask for the extra scope that answers a profile URL — Facebook's
+   * `user_link` (#405).
+   *
+   * A setting rather than always-on because the scope is named in the authorize redirect,
+   * which leaves the browser before this process sees anything: an app not approved for it
+   * cannot be recovered from server-side, so an installation that never asked keeps the
+   * sign-in it has. Meaningless for Discord, which has no profile URL to answer with, and
+   * only Facebook's form offers it.
+   */
+  ask_profile_link: z.boolean(),
 })
 
 /**
@@ -44,7 +55,16 @@ export type OAuthSettings = z.infer<typeof oauthSettingsSchema>
  * to correct a typo in the id would keep the secret in a text input on every visit.
  */
 export const oauthSettingsUpdateSchema = oauthSettingsFields
-  .extend({ client_secret: z.string().max(MAX_OAUTH_CLIENT_SECRET).optional() })
+  .extend({
+    client_secret: z.string().max(MAX_OAUTH_CLIENT_SECRET).optional(),
+    /**
+     * Absent keeps what is stored, which is `client_secret`'s rule and not a checkbox's
+     * ordinary one — a box that is off has to send `false` rather than omit the field. The
+     * form does. What this buys is that nothing else which PUTs a client id has to know the
+     * setting exists in order to avoid turning it off.
+     */
+    ask_profile_link: z.boolean().optional(),
+  })
   .strict()
 export type OAuthSettingsUpdate = z.infer<typeof oauthSettingsUpdateSchema>
 

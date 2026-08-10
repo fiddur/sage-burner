@@ -1057,15 +1057,41 @@ and then revoked the app from Facebook's side is either locked out of a burn the
 answered with a refusal to justify on a status page. Signed in on their own Your details page none
 of that arises, so the policy names the button and `messageForRemoval`'s 409 explains itself.
 
+**The profile link is a setting, not a constant** (#405). `link` is not in `public_profile` —
+that grants eight fields and `link` is not among them — so it takes `user_link`, which is the
+admin's own trip to app review. Whether Graph omits a field the token lacks permission for or
+refuses the whole read is not answerable without an unapproved app to try, and a sign-in is the
+wrong place to find out: the scope is named in the authorize redirect, which leaves the browser
+before this process sees anything, so an app not approved for it cannot be recovered from
+server-side. Hence `oauth_setting.ask_profile_link`, off by default — an installation whose admin
+never went to the console keeps exactly the sign-in it has, and `asksFor` reads the one row both
+legs read so the scope and the field list cannot disagree.
+
+`account_identity.profile_url` rather than a column on `account`, and that placement is the whole
+of how deletion works: taking the way in off deletes the row, and the row is the only place the
+link is. It is refreshed on sign-in as well as written at link time, which is what makes the
+feature reach somebody who linked before the installation asked for the scope — otherwise their
+only route to one would be to unlink and link again.
+
+On a member's page the **typed Messenger handle wins** over it. That is not arbitrary: a handle
+builds `facebook.com/wren`, which resolves for anybody, while Facebook's own `link` resolves only
+for a viewer who is logged in _and_ already a friend. So the linked URL is a fallback for
+somebody who never typed a handle, not an upgrade over one. `facebookProfileLink` checks the host
+before it is stored, because it becomes an `href` on a page other members read.
+
+Messenger is still not among what linking gives, and cannot be: `m.me` needs the same vanity
+username the profile link would carry, and nothing in `public_profile` or `user_link` answers one
+for an account that has not set it.
+
 `FACEBOOK_GRAPH_VERSION` is the one value here that goes stale on somebody else's schedule.
 Meta pins each app to a version and retires them, so it has to match the developer console —
 check it there rather than trusting the constant.
 
 ### What linking gives you
 
-**Your picture, if the account has none**, and that is all. A provider's is a better start than
-initials and never better than one somebody chose, so an existing avatar is not even asked
-about. A silhouette is skipped: replacing initials with a grey placeholder says less, not more.
+**Your picture, if the account has none**, and — where the installation asked for it — a link to
+your page there. A provider's picture is a better start than initials and never better than one
+somebody chose, so an existing avatar is not even asked about. A silhouette is skipped: replacing initials with a grey placeholder says less, not more.
 Nothing in this process decodes it — the provider is asked for a 256-pixel picture, the type
 must be one of the three `account_avatar`'s CHECK allows, and the length is capped at
 `MAX_AVATAR_BYTES`. A failure costs the picture and never the link.

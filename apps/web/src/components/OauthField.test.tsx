@@ -11,6 +11,7 @@ const SAVED = {
   provider: 'facebook' as const,
   client_id: 'client-1',
   has_secret: true,
+  ask_profile_link: false,
   updated_at: '2026-08-01T00:00:00.000Z',
 }
 
@@ -83,7 +84,10 @@ describe('setting a provider up', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() =>
-      expect(updateOauthSettings).toHaveBeenCalledWith('facebook', { client_id: 'client-2' }),
+      expect(updateOauthSettings).toHaveBeenCalledWith('facebook', {
+        client_id: 'client-2',
+        ask_profile_link: false,
+      }),
     )
   })
 
@@ -98,8 +102,40 @@ describe('setting a provider up', () => {
     await waitFor(() =>
       expect(updateOauthSettings).toHaveBeenCalledWith('facebook', {
         client_id: 'client-1',
+        ask_profile_link: false,
         client_secret: 'hunter2',
       }),
+    )
+  })
+
+  it('sends the profile-link permission once an admin says it is approved', async () => {
+    const updateOauthSettings = vi.fn(() => Promise.resolve({ settings: SAVED }))
+    show(stub({ updateOauthSettings }))
+
+    fireEvent.input(await screen.findByLabelText('Facebook client ID'), { target: { value: 'client-1' } })
+    fireEvent.click(screen.getByRole('checkbox', { name: /user_link/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() =>
+      expect(updateOauthSettings).toHaveBeenCalledWith('facebook', {
+        client_id: 'client-1',
+        ask_profile_link: true,
+      }),
+    )
+  })
+
+  it('seeds the box from what is stored, so a save does not turn it back off', async () => {
+    // The failure this prevents: correcting a typo in the client id, with the box redrawn
+    // unticked, would send `false` and stop asking for the permission on every later sign-in.
+    show(
+      stub({
+        getOauthSettings: () => Promise.resolve({ settings: { ...SAVED, ask_profile_link: true } }),
+      }),
+    )
+
+    expect(await screen.findByRole<HTMLInputElement>('checkbox', { name: /user_link/ })).toHaveProperty(
+      'checked',
+      true,
     )
   })
 

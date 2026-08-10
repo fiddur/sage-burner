@@ -9,6 +9,11 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-10
 
+- **Linking Facebook can now fill in your profile page**, if whoever runs this gathering set
+  their Facebook app up to ask for it — there is a tick box under ⚙️ → Settings for that, and it
+  needs Facebook's approval first. Typing your Facebook name under How people can reach you is
+  still the better of the two: Facebook only opens its own link for people already logged in and
+  already friends with you. Taking the sign-in off takes the link with it.
 - **There are terms now, at `/terms`, linked in the footer beside the privacy policy.** Mostly
   they say the thing that is easy to assume wrong: using this is an agreement with the people
   who invited you, not with a company, because there is not one.

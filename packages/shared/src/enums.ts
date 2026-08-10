@@ -509,6 +509,26 @@ export const facebookProfileUrl = (value: string): string =>
     : `https://facebook.com/${value.trim()}`
 
 /**
+ * A URL Facebook itself answered, if it is one worth putting in an `href` (#405).
+ *
+ * `link` arrives from `user_link` rather than from anything somebody typed, and it is still
+ * checked here — it ends up as a link on a page other members read, so the one thing it must
+ * not be able to become is a link somewhere else. The host is anchored the way
+ * `facebookNumericId` anchors its own, against the same mistake: matching `facebook.com`
+ * loosely accepts `notfacebook.com` and `https://evil.example?x=facebook.com/wren` alike.
+ *
+ * `https` only, for `isProfileUrl`'s reason — `javascript:` is what is being refused.
+ */
+export const facebookProfileLink = (value: string | undefined): string | undefined => {
+  if (value === undefined) return undefined
+
+  const trimmed = value.trim()
+  const [, hostname] = /^https:\/\/([^\s/?#]+)(?:[/?#]|$)/iu.exec(trimmed) ?? []
+
+  return hostname !== undefined && FACEBOOK_HOST.test(hostname) ? trimmed : undefined
+}
+
+/**
  * A URL somebody typed, if it is one worth putting in an `href`.
  *
  * `https` alone, and stricter than `markdown.ts`'s link check on purpose: that governs

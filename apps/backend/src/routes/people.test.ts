@@ -199,9 +199,10 @@ describe('somebody, as the rest of the community sees them', () => {
     )
   })
 
-  it('shows none for somebody who linked Facebook but typed nothing', async () => {
-    // The identity is not the source: signing in with Facebook says nothing about whether
-    // somebody wants their page shown, and the id it carries could not build one anyway.
+  it('shows none for a linked identity that carries no profile URL', async () => {
+    // Which is every identity on an installation that never asked for `user_link`. The id it
+    // carries is app-scoped and could not build a link anyway — the URL, when there is one,
+    // is a URL Facebook answered rather than anything derived from the id.
     const server = await build()
     const wren = await givenAccount()
     const reader = await givenAccount()
@@ -218,6 +219,47 @@ describe('somebody, as the rest of the community sees them', () => {
     expect(got.json().person.facebook).toBeNull()
     // And the app-scoped id is nowhere in the answer, which is what `schema.ts` promises.
     expect(got.payload).not.toContain('1234567890')
+  })
+
+  it('falls back to the URL Facebook answered, for somebody who typed nothing', async () => {
+    const server = await build()
+    const wren = await givenAccount()
+    const reader = await givenAccount()
+    await db().insert(accountIdentity).values({
+      id: randomUUID(),
+      account_id: wren.id,
+      provider: 'facebook',
+      subject: 'app-scoped-1',
+      profile_url: 'https://www.facebook.com/wren.from.facebook',
+      created_at: NOW,
+    })
+
+    const got = await fetchProfile(server, reader.cookie, wren.id)
+
+    expect(got.json().person.facebook).toBe('https://www.facebook.com/wren.from.facebook')
+    expect(got.payload).not.toContain('app-scoped-1')
+  })
+
+  it('prefers the typed handle over the one Facebook answered', async () => {
+    // Not arbitrary, and the reason is which link works: a handle builds `facebook.com/wren`,
+    // which resolves for anybody, while Facebook's own `link` opens only for a viewer already
+    // logged in *and* already a friend. So the answered URL is a fallback, never an upgrade.
+    const server = await build()
+    const wren = await givenAccount()
+    const reader = await givenAccount()
+    await givenConnection(wren.id, 'messenger', 'wren', 0)
+    await db().insert(accountIdentity).values({
+      id: randomUUID(),
+      account_id: wren.id,
+      provider: 'facebook',
+      subject: 'app-scoped-1',
+      profile_url: 'https://www.facebook.com/wren.from.facebook',
+      created_at: NOW,
+    })
+
+    expect((await fetchProfile(server, reader.cookie, wren.id)).json().person.facebook).toBe(
+      'https://facebook.com/wren',
+    )
   })
 
   it('has a page for somebody who has filled in nothing', async () => {

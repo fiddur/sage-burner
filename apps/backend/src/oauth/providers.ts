@@ -1,5 +1,7 @@
 import type { OAuthProvider } from '@sage-burner/shared'
 
+import { facebookProfileLink } from '@sage-burner/shared'
+
 /**
  * What each provider's endpoints are, and how to read what it answers (#393).
  *
@@ -19,7 +21,18 @@ import type { OAuthProvider } from '@sage-burner/shared'
  */
 export const FACEBOOK_GRAPH_VERSION = 'v21.0'
 
-/** What comes back about somebody, reduced to the two things this app has any use for. */
+/**
+ * What this installation's app is allowed to ask a provider for.
+ *
+ * One flag today, and it is a flag rather than a constant because the scope is named in the
+ * authorize redirect: an app that has not been approved for `user_link` cannot be recovered
+ * from once somebody is standing at the consent screen (#405).
+ */
+export interface ProviderAsks {
+  profileLink: boolean
+}
+
+/** What comes back about somebody, reduced to the few things this app has any use for. */
 export interface ProviderProfile {
   /** The provider's own id, which is the whole of what a sign-in matches. */
   subject: string
@@ -30,6 +43,13 @@ export interface ProviderProfile {
    * placeholder as an avatar would replace initials that at least say who somebody is.
    */
   picture?: string
+  /**
+   * Where their own page at the provider is, when it was asked and answered with one.
+   *
+   * Absent for Discord, which has no profile URL — a username is a string you search for —
+   * and absent for a Facebook app whose admin never asked for `user_link`.
+   */
+  profile_url?: string
 }
 
 export interface ProviderShape {
@@ -37,8 +57,8 @@ export interface ProviderShape {
   authorize: string
   /** Where the code is exchanged for a token. */
   token: string
-  /** Where the token reads a profile. */
-  profile: string
+  /** Where the token reads a profile, given what this installation may ask for. */
+  profile: (asks: ProviderAsks) => string
   /**
    * The least it can ask for.
    *
@@ -46,7 +66,7 @@ export interface ProviderShape {
    * here matches on an address, so asking for one would collect what it must not use — and
    * Facebook's `email` needs review of its own.
    */
-  scope: string
+  scope: (asks: ProviderAsks) => string
   /** What the profile endpoint answered, if it is something this can use. */
   read: (body: unknown) => ProviderProfile | undefined
 }
@@ -81,8 +101,9 @@ export const providerShapes = {
   discord: {
     authorize: 'https://discord.com/oauth2/authorize',
     token: 'https://discord.com/api/oauth2/token',
-    profile: 'https://discord.com/api/users/@me',
-    scope: 'identify',
+    profile: () => 'https://discord.com/api/users/@me',
+    // Nothing to add: Discord has no profile URL to ask for.
+    scope: () => 'identify',
     read: (body) => {
       const subject = stringField(body, 'id')
       if (subject === undefined) return undefined
@@ -93,10 +114,22 @@ export const providerShapes = {
   facebook: {
     authorize: `https://www.facebook.com/${FACEBOOK_GRAPH_VERSION}/dialog/oauth`,
     token: `https://graph.facebook.com/${FACEBOOK_GRAPH_VERSION}/oauth/access_token`,
-    // The picture is asked for in the same call rather than a second one, and at the size
-    // the avatar route stores: `AVATAR_PIXELS`.
-    profile: `https://graph.facebook.com/${FACEBOOK_GRAPH_VERSION}/me?fields=id,picture.width(256).height(256)`,
-    scope: 'public_profile',
+    // Everything in one call rather than one per field, and the picture at the size the
+    // avatar route stores: `AVATAR_PIXELS`.
+    //
+    // `link` is named only when the scope was. Whether Graph omits a field the token has no
+    // permission for or refuses the whole read is not something this can find out without an
+    // unapproved app to try it against, and a sign-in is the wrong place to guess: asked for
+    // only when it can be granted, the question never arises.
+    profile: ({ profileLink }) =>
+      `https://graph.facebook.com/${FACEBOOK_GRAPH_VERSION}/me?fields=${[
+        'id',
+        'picture.width(256).height(256)',
+        ...(profileLink ? ['link'] : []),
+      ].join(',')}`,
+    // `public_profile` is granted to every app. `user_link` is not: it is the admin's own
+    // trip to app review, which is why it is a setting and off until they have made it.
+    scope: ({ profileLink }) => (profileLink ? 'public_profile,user_link' : 'public_profile'),
     read: (body) => {
       const subject = stringField(body, 'id')
       if (subject === undefined) return undefined
@@ -105,7 +138,12 @@ export const providerShapes = {
       // `is_silhouette` is Facebook saying "this is our placeholder, not them".
       const own = field(data, 'is_silhouette') !== true
 
-      return { subject, picture: own ? stringField(data, 'url') : undefined }
+      return {
+        subject,
+        picture: own ? stringField(data, 'url') : undefined,
+        // Checked rather than trusted, since it becomes a link on a page other members read.
+        profile_url: facebookProfileLink(stringField(body, 'link')),
+      }
     },
   },
 } as const satisfies Record<OAuthProvider, ProviderShape>
@@ -118,14 +156,19 @@ export const providerShapes = {
  */
 export const authorizeUrl = (
   provider: OAuthProvider,
-  { clientId, redirectUri, state }: { clientId: string; redirectUri: string; state: string },
+  {
+    clientId,
+    redirectUri,
+    state,
+    asks,
+  }: { clientId: string; redirectUri: string; state: string; asks: ProviderAsks },
 ): string => {
   const shape = providerShapes[provider]
   const query = new URLSearchParams({
     client_id: clientId,
     redirect_uri: redirectUri,
     response_type: 'code',
-    scope: shape.scope,
+    scope: shape.scope(asks),
     state,
   })
 

@@ -139,9 +139,10 @@ export const WaysInField = ({ api }: { api: WaysInApi }) => {
 
       {offered.includes('facebook') && (
         <p class="form-note">
-          Linking Facebook signs you in and nothing more. If you want people to reach you there, add your
-          Facebook name under How people can reach you — that puts Messenger in your list and your Facebook
-          page on your profile.
+          If you want people to reach you on Facebook, add your Facebook name under How people can reach you —
+          that puts Messenger in your list, and the page it links to works for anybody. Linking a sign-in here
+          may fill your profile page in too, depending on what this installation's app was set up to ask for,
+          but that link only opens for people already logged in to Facebook.
         </p>
       )}
 

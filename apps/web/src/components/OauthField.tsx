@@ -43,6 +43,7 @@ export const OauthField = ({ api, provider }: { api: OauthApi; provider: OAuthPr
   const [stored, setStored] = useState<OAuthSettings | null | undefined>(undefined)
   const [clientId, setClientId] = useState('')
   const [secret, setSecret] = useState('')
+  const [askProfileLink, setAskProfileLink] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | undefined>(undefined)
 
@@ -57,6 +58,7 @@ export const OauthField = ({ api, provider }: { api: OauthApi; provider: OAuthPr
         if (controller.signal.aborted) return
         setStored(settings)
         setClientId(settings?.client_id ?? '')
+        setAskProfileLink(settings?.ask_profile_link ?? false)
       })
       .catch(() => {
         if (!controller.signal.aborted) setStored(null)
@@ -72,6 +74,7 @@ export const OauthField = ({ api, provider }: { api: OauthApi; provider: OAuthPr
       const { settings } = await work()
       setStored(settings)
       setClientId(settings?.client_id ?? '')
+      setAskProfileLink(settings?.ask_profile_link ?? false)
       setSecret('')
     } catch {
       setError('Could not save that. Please try again.')
@@ -132,6 +135,7 @@ export const OauthField = ({ api, provider }: { api: OauthApi; provider: OAuthPr
               async () =>
                 await api.updateOauthSettings(provider, {
                   client_id: clientId.trim(),
+                  ask_profile_link: askProfileLink,
                   // Omitted rather than sent empty: empty is a secret being cleared, and typing
                   // nothing into a box that was already blank is not that.
                   ...(secret === '' ? {} : { client_secret: secret }),
@@ -164,6 +168,28 @@ export const OauthField = ({ api, provider }: { api: OauthApi; provider: OAuthPr
               onInput={(inputEvent) => setSecret(inputEvent.currentTarget.value)}
             />
           </label>
+
+          {provider === 'facebook' && (
+            <>
+              <label class="row">
+                <input
+                  type="checkbox"
+                  name="ask_profile_link"
+                  checked={askProfileLink}
+                  disabled={busy}
+                  onChange={(changeEvent) => setAskProfileLink(changeEvent.currentTarget.checked)}
+                />
+                <span>This app has been approved for user_link</span>
+              </label>
+
+              <p class="form-note">
+                Only tick that once <code>user_link</code> shows as approved in the console. It puts
+                somebody's Facebook page on their profile here when they link a sign-in, and asking for a
+                permission the app does not have would send people to a consent screen that refuses them.
+                Untick it and the next sign-in asks for nothing extra.
+              </p>
+            </>
+          )}
 
           <p class="row">
             <PendingButton busy={busy} label="Save" busyLabel="Saving…" type="submit" />

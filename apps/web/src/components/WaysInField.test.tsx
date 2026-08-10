@@ -119,21 +119,22 @@ describe('the ways in on your own details page', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('only way')
   })
 
-  it('says linking Facebook signs you in and nothing more', async () => {
-    // It used to write a Messenger row from the id Facebook returns — which is app-scoped and
-    // points at nobody outside this installation's Meta app. Both the row and the profile
-    // link now come from the handle somebody types, so this says where to type it.
+  it('sends somebody to the handle box, which is the link that works for anybody', async () => {
+    // A Messenger row is still only ever built from a typed handle: Facebook's id is app-scoped
+    // and points at nobody outside this installation's Meta app. Linking may fill the profile
+    // page in (#405), and that link opens only for a viewer already logged in and already a
+    // friend — so the box is still where to go, and this says so rather than the reverse.
     show(stub(), ['facebook'])
 
-    expect(await screen.findByText(/signs you in and nothing more/)).toBeTruthy()
-    expect(screen.getByText(/add\s+your Facebook name/)).toBeTruthy()
+    expect(await screen.findByText(/add\s+your Facebook name/)).toBeTruthy()
+    expect(screen.getByText(/only\s+opens\s+for\s+people\s+already\s+logged\s+in/)).toBeTruthy()
   })
 
   it('says nothing of the sort for Discord alone', async () => {
     show(stub(), ['discord'])
 
     await screen.findByRole('link', { name: 'Link it' })
-    expect(screen.queryByText(/signs you in and nothing more/)).toBeNull()
+    expect(screen.queryByText(/add\s+your Facebook name/)).toBeNull()
   })
 
   it('says it is as well as a password, not instead of one', async () => {

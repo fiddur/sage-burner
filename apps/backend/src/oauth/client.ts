@@ -1,6 +1,6 @@
 import type { OAuthProvider } from '@sage-burner/shared'
 
-import type { ProviderProfile } from './providers.ts'
+import type { ProviderAsks, ProviderProfile } from './providers.ts'
 
 import { AVATAR_TYPES, MAX_AVATAR_BYTES } from '../routes/avatars.ts'
 import { providerShapes, stringField } from './providers.ts'
@@ -25,6 +25,13 @@ export interface IdentifyInput {
   clientSecret: string
   redirectUri: string
   code: string
+  /**
+   * What was asked for at the authorize step, so the profile read asks for the same.
+   *
+   * The two have to agree: naming a field the token was never scoped for is the one case
+   * `providerShapes` deliberately never puts a sign-in in.
+   */
+  asks: ProviderAsks
 }
 
 /** The code exchanged for a token, and the token spent on a profile. */
@@ -59,6 +66,7 @@ export const identifyOverHttps: Identify = async ({
   clientSecret,
   redirectUri,
   code,
+  asks,
 }) => {
   const shape = providerShapes[provider]
 
@@ -81,7 +89,7 @@ export const identifyOverHttps: Identify = async ({
     const token = accessToken(await jsonFrom(exchanged))
     if (token === undefined) return undefined
 
-    const identified = await fetch(shape.profile, {
+    const identified = await fetch(shape.profile(asks), {
       headers: { authorization: `Bearer ${token}`, accept: 'application/json' },
       signal: AbortSignal.timeout(TIMEOUT_MS),
     })
