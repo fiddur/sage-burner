@@ -11,15 +11,26 @@ import { facebookProfileLink } from '@sage-burner/shared'
  */
 
 /**
- * Facebook's API version, which is the one value in this file that goes stale on somebody
- * else's schedule.
+ * Facebook's API version — the one value in this file that goes stale on somebody else's
+ * schedule, and the one that cannot be written from memory.
  *
- * Meta pins each app to a version and retires old ones about every two years, so this has
- * to match what the app in the developer console is set to — check it there rather than
- * trusting this constant, which is only as current as whoever last edited it. Discord needs
- * no equivalent: its endpoints are unversioned in the path.
+ * **v26.0, released 2026-07-29.** The date is here so its age is readable: Meta ships roughly
+ * two versions a year and retires each about two years on, so a constant with no date beside
+ * it says nothing about whether it is current. This one first went in as `v21.0` — five
+ * versions behind on the day it was written, because it was recalled rather than looked up.
+ *
+ * **It has to be at or below the app's own version**, which is the *Upgrade API Version* card
+ * under Settings → Advanced in the developer console. A path version overrides that setting
+ * for a single call, but only downwards: older versions stay callable, and Meta does not
+ * document calling one newer than the app is on. So bumping this is half the job — the console
+ * is the other half, and it is the half no code here can read.
+ *
+ * Not omitted from the path, which would be the other way to spell "latest": an unversioned
+ * call resolves to whatever that same console card says, which makes every request depend on a
+ * setting invisible from here. Pinned and stale is a bug somebody can see; unpinned and
+ * drifting is not. Discord needs no equivalent — its endpoints carry no version at all.
  */
-export const FACEBOOK_GRAPH_VERSION = 'v21.0'
+export const FACEBOOK_GRAPH_VERSION = 'v26.0'
 
 /**
  * What this installation's app is allowed to ask a provider for.

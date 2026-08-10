@@ -94,6 +94,7 @@ describe('what the worker does with a request', () => {
     // (#325, #402), so neither is a sign-out's to take away.
     expect(cacheFor(asked(apiRoutes.getChangelog.path()))).toBe(SHELL_CACHE)
     expect(cacheFor(asked(apiRoutes.getPrivacy.path()))).toBe(SHELL_CACHE)
+    expect(cacheFor(asked(apiRoutes.getTerms.path()))).toBe(SHELL_CACHE)
     expect(cacheFor(asked(apiRoutes.getMyProfile.path()))).toBe(API_CACHE)
   })
 

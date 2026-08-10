@@ -63,8 +63,6 @@ export const registerOauthAdminRoutes = (app: FastifyInstance, { db, now }: OAut
       // inferred, because "keep" and "clear" being the same value is the mistake this
       // shape exists to prevent.
       client_secret: body.client_secret ?? held?.client_secret ?? '',
-      // Absent keeps what is stored, exactly as the secret above — `oauthSettingsUpdateSchema`
-      // says why a checkbox follows a secret's rule here.
       ask_profile_link: body.ask_profile_link ?? held?.ask_profile_link ?? false,
       updated_at: now().toISOString(),
     }
