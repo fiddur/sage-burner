@@ -1,4 +1,4 @@
-import type { StoredAnswers } from '@sage-burner/shared'
+import type { SongLink, StoredAnswers } from '@sage-burner/shared'
 import type { SQL } from 'drizzle-orm'
 import type { AnySQLiteColumn, SQLiteColumn } from 'drizzle-orm/sqlite-core'
 
@@ -715,13 +715,13 @@ export const activity = sqliteTable(
   ],
 )
 
+// `event_id` is nullable for the songbook, whose threads belong to no burn and so outlive
+// every one of them — `docs/the-app.md` has why the book is global.
 export const thread = sqliteTable(
   'thread',
   {
     id: text('id').notNull(),
-    event_id: text('event_id')
-      .notNull()
-      .references(() => event.id, { onDelete: 'cascade' }),
+    event_id: text('event_id').references(() => event.id, { onDelete: 'cascade' }),
     entity_type: text('entity_type', { enum: threadEntityTypes }).notNull(),
     entity_id: text('entity_id').notNull(),
     title: text('title').notNull(),
@@ -816,6 +816,58 @@ export const post = sqliteTable(
     primaryKey({ columns: [table.id] }),
     index('post_event_idx').on(table.event_id, table.created_at),
     check('post_title_check', sql`length(trim(${table.title})) > 0`),
+  ],
+)
+
+// No `event_id`: a song outlives any one burn, so the book is global.
+export const song = sqliteTable(
+  'song',
+  {
+    id: text('id').notNull(),
+    title: text('title').notNull(),
+    body: text('body').notNull().default(''),
+    capo: integer('capo'),
+    links: text('links', { mode: 'json' }).$type<SongLink[]>().notNull().default([]),
+    author_account_id: text('author_account_id').references(() => account.id, { onDelete: 'set null' }),
+    deleted_at: text('deleted_at'),
+    created_at: text('created_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    index('song_title_idx').on(table.title),
+    check('song_title_check', sql`length(trim(${table.title})) > 0`),
+    check('song_capo_check', sql`${table.capo} is null or (${table.capo} >= 0 and ${table.capo} <= 11)`),
+  ],
+)
+
+export const songCategory = sqliteTable(
+  'song_category',
+  {
+    id: text('id').notNull(),
+    order: integer('order').notNull(),
+    label: text('label').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    index('song_category_order_idx').on(table.order),
+    check('song_category_order_check', sql`${table.order} >= 0`),
+    check('song_category_label_check', sql`length(trim(${table.label})) > 0`),
+  ],
+)
+
+export const songInCategory = sqliteTable(
+  'song_in_category',
+  {
+    song_id: text('song_id')
+      .notNull()
+      .references(() => song.id, { onDelete: 'cascade' }),
+    category_id: text('category_id')
+      .notNull()
+      .references(() => songCategory.id, { onDelete: 'cascade' }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.song_id, table.category_id] }),
+    index('song_in_category_category_idx').on(table.category_id),
   ],
 )
 

@@ -32,6 +32,7 @@ export type FeedApi = Pick<
   | 'updatePost'
   | 'deletePost'
   | 'getEventAttendees'
+  | 'getApprovedAccounts'
 >
 
 interface Happening {
@@ -122,6 +123,20 @@ export const Feed = ({ api }: { api: FeedApi }) => {
   )
   const people = coming.status === 'ready' ? coming.data : []
 
+  const { loaded: everybody } = useLoad(async (signal) => (await api.getApprovedAccounts(signal)).accounts, {
+    enabled: approved,
+    fallback: 'Could not load who is here.',
+  })
+  const members = everybody.status === 'ready' ? everybody.data : []
+
+  // Whom a comment can name depends on the card: the burn's attendance for a burn's card, and
+  // every approved account for one that belongs to no burn — `namedBy` drops the rest silently.
+  const mentionable = (card: Thread): readonly Mentionable[] => {
+    if (card.entity_type === 'song') return members
+
+    return card.event_id === eventId ? people : []
+  }
+
   return (
     <GuardedPage title="Feed" require="approved" width="column">
       <h1>
@@ -190,7 +205,7 @@ export const Feed = ({ api }: { api: FeedApi }) => {
                 on={settings?.on}
                 talk={talk}
                 upload={api.uploadImage}
-                people={item.card.event_id === eventId ? people : []}
+                people={mentionable(item.card)}
                 onToggle={toggle}
               />
             ),
@@ -412,8 +427,9 @@ const Card = ({
         {card.link === null ? <span>{card.title}</span> : <a href={card.link}>{card.title}</a>}
       </p>
       <p class="feed-when">
-        {card.burn}
-        {card.last_at !== null && ` · ${localDay(card.last_at)}`}
+        {[whereItBelongs(card), card.last_at === null ? undefined : localDay(card.last_at)]
+          .filter((part) => part !== undefined)
+          .join(' · ')}
         {card.gone && goneLabel[card.entity_type]}
       </p>
 
@@ -424,7 +440,7 @@ const Card = ({
         />
       )}
 
-      {(card.own || (admin && card.entity_type === 'post')) && !card.gone && (
+      {card.entity_type === 'post' && (card.own || admin) && !card.gone && (
         <Mine
           card={card}
           mine={card.own}
@@ -466,7 +482,12 @@ const goneLabel = {
   session: ' · withdrawn',
   attendance: ' · no longer coming',
   post: ' · taken back',
+  song: ' · out of the book',
 } as const satisfies Record<Thread['entity_type'], string>
+
+// The songbook belongs to no burn, so its card says the book rather than nothing at all.
+const whereItBelongs = (card: Thread): string | undefined =>
+  card.burn ?? (card.entity_type === 'song' ? 'Songbook' : undefined)
 
 const chipFor = (card: Thread): NotificationCategory | undefined =>
   card.entries.reduceRight<NotificationCategory | undefined>(

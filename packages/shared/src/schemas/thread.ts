@@ -16,8 +16,8 @@ export type ThreadEntry = z.infer<typeof threadEntrySchema>
 
 export const threadSchema = z.object({
   id: idSchema,
-  event_id: idSchema,
-  burn: z.string().max(MAX_TITLE),
+  event_id: idSchema.nullable(),
+  burn: z.string().max(MAX_TITLE).nullable(),
   entity_type: z.enum(threadEntityTypes),
   entity_id: idSchema,
   title: z.string().max(MAX_TITLE),

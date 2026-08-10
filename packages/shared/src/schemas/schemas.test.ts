@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { MAX_ASKED_QUESTIONS } from '../answers.ts'
 import {
+  MAX_CAPO,
   MAX_CONTACT,
   MAX_INTRODUCTION,
   MAX_LOCATION,
@@ -9,6 +10,9 @@ import {
   MAX_PERSON_NAME,
   MAX_QUESTION_LABEL,
   MAX_SLUG,
+  MAX_SONG_BODY,
+  MAX_SONG_CATEGORIES,
+  MAX_SONG_LINKS,
   MAX_TITLE,
   MAX_WELCOME_LENGTH,
 } from '../limits.ts'
@@ -38,6 +42,7 @@ import {
   sessionUpdateSchema,
   withValidTimeSlot,
 } from './session.ts'
+import { songCreateSchema, songUpdateSchema } from './song.ts'
 
 const ID = '0b8a1d4e-3f2c-4a6b-9c1d-5e7f8a9b0c1d'
 const OTHER_ID = '1c9b2e5f-4a3d-4b7c-8d2e-6f8a9b0c1d2e'
@@ -742,5 +747,79 @@ describe('the summaries derived from `eventFields`', () => {
     expect(withCap(42)).toBe(true)
     expect(withCap(0)).toBe(false)
     expect(withCap(-1)).toBe(false)
+  })
+})
+
+describe('a song', () => {
+  const aSong = (over: Record<string, unknown> = {}) => ({
+    title: 'Fire in the sky',
+    ...over,
+  })
+
+  it('needs a title and nothing else, filling the rest in', () => {
+    const parsed = songCreateSchema.safeParse(aSong())
+
+    expect(parsed.success).toBe(true)
+    expect(parsed.data).toEqual({
+      title: 'Fire in the sky',
+      body: '',
+      capo: null,
+      links: [],
+      category_ids: [],
+    })
+  })
+
+  it('refuses a title of nothing but whitespace', () => {
+    expect(songCreateSchema.safeParse(aSong({ title: '   ' })).success).toBe(false)
+  })
+
+  it('holds a body as long as a welcome page is short', () => {
+    expect(songCreateSchema.safeParse(aSong({ body: 'a'.repeat(MAX_SONG_BODY) })).success).toBe(true)
+    expect(songCreateSchema.safeParse(aSong({ body: 'a'.repeat(MAX_SONG_BODY + 1) })).success).toBe(false)
+  })
+
+  it('takes a capo on the neck and refuses one off it', () => {
+    expect(songCreateSchema.safeParse(aSong({ capo: 0 })).success).toBe(true)
+    expect(songCreateSchema.safeParse(aSong({ capo: MAX_CAPO })).success).toBe(true)
+    expect(songCreateSchema.safeParse(aSong({ capo: MAX_CAPO + 1 })).success).toBe(false)
+    expect(songCreateSchema.safeParse(aSong({ capo: -1 })).success).toBe(false)
+    expect(songCreateSchema.safeParse(aSong({ capo: 1.5 })).success).toBe(false)
+  })
+
+  it('takes only an https link, so a rendered one cannot carry a script', () => {
+    const withLink = (url: string) =>
+      songCreateSchema.safeParse(aSong({ links: [{ url, label: '' }] })).success
+
+    expect(withLink('https://open.spotify.com/track/1')).toBe(true)
+    expect(withLink('http://open.spotify.com/track/1')).toBe(false)
+    expect(withLink('javascript:alert(1)')).toBe(false)
+    expect(withLink('')).toBe(false)
+  })
+
+  it('bounds how many links and categories one song carries', () => {
+    const links = Array.from({ length: MAX_SONG_LINKS + 1 }, (_unused, at) => ({
+      url: `https://example.org/${at}`,
+      label: '',
+    }))
+
+    expect(songCreateSchema.safeParse(aSong({ links: links.slice(1) })).success).toBe(true)
+    expect(songCreateSchema.safeParse(aSong({ links })).success).toBe(false)
+    expect(
+      songCreateSchema.safeParse(
+        aSong({ category_ids: Array.from({ length: MAX_SONG_CATEGORIES + 1 }, () => ID) }),
+      ).success,
+    ).toBe(false)
+  })
+
+  it('refuses a field nobody named, so a typo is not silently dropped', () => {
+    expect(songCreateSchema.safeParse(aSong({ lyrics: 'come and sing' })).success).toBe(false)
+    expect(songUpdateSchema.safeParse({ lyrics: 'come and sing' }).success).toBe(false)
+  })
+
+  it('lets an update carry one field alone, and fills nothing in', () => {
+    const parsed = songUpdateSchema.safeParse({ capo: 2 })
+
+    expect(parsed.success).toBe(true)
+    expect(parsed.data).toEqual({ capo: 2 })
   })
 })

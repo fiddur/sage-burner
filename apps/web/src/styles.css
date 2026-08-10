@@ -2357,3 +2357,133 @@ img.avatar {
   /* `.is-new` bolds the row; the date is not the part that is new. */
   font-weight: 400;
 }
+
+/* The songbook (#316). A song's body is preformatted text, not prose: the chord lines sit
+   above the words they belong to, so `white-space: pre` and a monospace face are what make
+   the layout the author typed survive — wrapping would slide every chord off its syllable.
+   `overflow-x: auto` on the block rather than the page, since a wide tab must not make the
+   whole page scroll sideways. */
+.song-body {
+  position: relative;
+  margin: 1rem 0;
+  padding: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  white-space: pre;
+  overflow-x: auto;
+  tab-size: 4;
+}
+
+.song-line.is-chords {
+  color: var(--ember);
+  font-weight: 600;
+}
+
+/* Same face and size as `.song-body`: the editor is where the columns are typed, so a
+   proportional font there would misplace every chord that looks right while writing. */
+.song-editor {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  white-space: pre;
+  overflow-wrap: normal;
+}
+
+.song-list {
+  list-style: none;
+  margin: 0.5rem 0 1.5rem;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.song-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.song-row.is-gone a {
+  color: var(--muted);
+  text-decoration-line: line-through;
+}
+
+.song-marks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+}
+
+.song-capo {
+  border: 1px solid var(--sage);
+  border-radius: 1rem;
+  padding: 0.05rem 0.5rem;
+  font-size: 0.8rem;
+  color: var(--sage);
+}
+
+.song-chip {
+  border: 1px dashed var(--line);
+  border-radius: 1rem;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 0.1rem 0.6rem;
+  cursor: pointer;
+}
+
+.song-chip.is-on {
+  border-style: solid;
+  border-color: var(--ember);
+  color: var(--ink);
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.5rem 0;
+}
+
+.song-links {
+  list-style: none;
+  margin: 0.5rem 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.song-aids {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.5rem 0 0;
+  font-size: 0.9rem;
+}
+
+.song-key {
+  min-width: 5.5rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.song-speed {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.song-speed input {
+  width: 8rem;
+}

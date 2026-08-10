@@ -28,7 +28,10 @@ const memberPages: readonly NavPage[] = [
   { href: '/faq', label: 'FAQ', icon: '❓' },
 ]
 
-const menuPages: readonly NavPage[] = [{ href: '/rides', label: 'Rideshares', icon: '🛻' }]
+const menuPages: readonly NavPage[] = [
+  { href: '/songs', label: 'Songbook', icon: '🎵' },
+  { href: '/rides', label: 'Rideshares', icon: '🛻' },
+]
 
 export const Layout = ({ api, children }: { api: BellApi; children: ComponentChildren }) => {
   const viewer = useViewer()

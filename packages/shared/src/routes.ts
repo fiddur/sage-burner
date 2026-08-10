@@ -58,6 +58,11 @@ import type {
   RideUpdate,
   SessionCreateInput,
   SessionUpdate,
+  SongCategoryCreateInput,
+  SongCategoryOrder,
+  SongCategoryUpdate,
+  SongCreateInput,
+  SongUpdate,
 } from './index.ts'
 
 export type ApiMethod = 'DELETE' | 'GET' | 'PATCH' | 'POST' | 'PUT'
@@ -138,6 +143,16 @@ export const apiRoutes = {
     method: 'POST',
     fastify: '/api/admin/questions',
     path: () => '/api/admin/questions',
+  },
+  addSong: {
+    method: 'POST',
+    fastify: '/api/songs',
+    path: () => '/api/songs',
+  },
+  addSongCategory: {
+    method: 'POST',
+    fastify: '/api/admin/song-categories',
+    path: () => '/api/admin/song-categories',
   },
   adminAddAttendance: {
     method: 'POST',
@@ -240,6 +255,16 @@ export const apiRoutes = {
     fastify: '/api/admin/questions/:id',
     path: (id: string) => `/api/admin/questions/${encodeURIComponent(id)}`,
   },
+  deleteSong: {
+    method: 'DELETE',
+    fastify: '/api/songs/:id',
+    path: (id: string) => `/api/songs/${encodeURIComponent(id)}`,
+  },
+  deleteSongCategory: {
+    method: 'DELETE',
+    fastify: '/api/admin/song-categories/:id',
+    path: (id: string) => `/api/admin/song-categories/${encodeURIComponent(id)}`,
+  },
   finishOauth: {
     method: 'GET',
     fastify: '/api/auth/oauth/:provider/callback',
@@ -269,6 +294,11 @@ export const apiRoutes = {
     method: 'GET',
     fastify: '/api/admin/accounts',
     path: () => '/api/admin/accounts',
+  },
+  getApprovedAccounts: {
+    method: 'GET',
+    fastify: '/api/accounts',
+    path: () => '/api/accounts',
   },
   getApplications: {
     method: 'GET',
@@ -455,6 +485,21 @@ export const apiRoutes = {
     fastify: '/api/events/:eventId/sessions',
     path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/sessions`,
   },
+  getSong: {
+    method: 'GET',
+    fastify: '/api/songs/:id',
+    path: (id: string) => `/api/songs/${encodeURIComponent(id)}`,
+  },
+  getSongbook: {
+    method: 'GET',
+    fastify: '/api/songs',
+    path: () => '/api/songs',
+  },
+  getSongCategories: {
+    method: 'GET',
+    fastify: '/api/song-categories',
+    path: () => '/api/song-categories',
+  },
   getChangelog: {
     method: 'GET',
     fastify: '/api/changelog',
@@ -628,6 +673,16 @@ export const apiRoutes = {
     method: 'PUT',
     fastify: '/api/admin/questions/order',
     path: () => '/api/admin/questions/order',
+  },
+  reorderSongCategories: {
+    method: 'PUT',
+    fastify: '/api/admin/song-categories/order',
+    path: () => '/api/admin/song-categories/order',
+  },
+  restoreSong: {
+    method: 'POST',
+    fastify: '/api/songs/:id/restore',
+    path: (id: string) => `/api/songs/${encodeURIComponent(id)}/restore`,
   },
   rotateCalendarToken: {
     method: 'POST',
@@ -856,6 +911,16 @@ export const apiRoutes = {
     fastify: '/api/sessions/:id',
     path: (id: string) => `/api/sessions/${encodeURIComponent(id)}`,
   },
+  updateSong: {
+    method: 'PATCH',
+    fastify: '/api/songs/:id',
+    path: (id: string) => `/api/songs/${encodeURIComponent(id)}`,
+  },
+  updateSongCategory: {
+    method: 'PATCH',
+    fastify: '/api/admin/song-categories/:id',
+    path: (id: string) => `/api/admin/song-categories/${encodeURIComponent(id)}`,
+  },
   updateWelcome: {
     method: 'PATCH',
     fastify: '/api/events/:id/welcome',
@@ -956,6 +1021,11 @@ export interface RouteBodies {
   updateQuestion: FormQuestionUpdate
   updateSession: SessionUpdate
   updateWelcome: EventWelcomeUpdate
+  addSong: SongCreateInput
+  updateSong: SongUpdate
+  addSongCategory: SongCategoryCreateInput
+  updateSongCategory: SongCategoryUpdate
+  reorderSongCategories: SongCategoryOrder
 }
 
 export type BodyOf<K extends keyof RouteBodies> = RouteBodies[K]

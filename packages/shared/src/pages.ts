@@ -9,6 +9,10 @@ export const profilePage = (accountId: string): string => `/members/${encodeURIC
 
 export const feedPage = (): string => '/feed'
 
+export const songbookPage = (): string => '/songs'
+
+export const songPage = (songId: string): string => `/songs/${encodeURIComponent(songId)}`
+
 export const OAUTH_OUTCOME_PARAM = 'from'
 
 // What the page tells an organiser to quote: the request id, which is `reqId` on the log line

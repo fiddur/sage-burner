@@ -1,0 +1,169 @@
+import type { SongCategory, SongSummary } from '@sage-burner/shared'
+
+import { MAX_TITLE, songPage } from '@sage-burner/shared'
+import { useState } from 'preact/hooks'
+
+import type { ApiClient } from '../api/client.ts'
+
+import { ErrorText } from '../components/ErrorText.tsx'
+import { GuardedPage } from '../components/GuardedPage.tsx'
+import { IconButton } from '../components/IconButton.tsx'
+import { PendingButton } from '../components/PendingButton.tsx'
+import { Refreshing } from '../components/Refreshing.tsx'
+import { useAction, useLoad } from '../load.ts'
+
+export type SongsApi = Pick<ApiClient, 'getSongbook' | 'addSong' | 'restoreSong'>
+
+const labelsFor = (categories: readonly SongCategory[], ids: readonly string[]): string[] =>
+  categories.flatMap((category) => (ids.includes(category.id) ? [category.label] : []))
+
+export const Songs = ({ api }: { api: SongsApi }) => {
+  const { loaded, refreshing, reload } = useLoad(async (signal) => await api.getSongbook(signal), {
+    fallback: 'Could not load the songbook.',
+    remember: 'songbook',
+  })
+  const { busy, error, setError, run } = useAction(reload)
+
+  const [title, setTitle] = useState('')
+  const [filter, setFilter] = useState<string | undefined>(undefined)
+
+  const book = loaded.status === 'ready' ? loaded.data : { songs: [], categories: [] }
+  const living = book.songs.filter((one) => one.deleted_at === null)
+  const gone = book.songs.filter((one) => one.deleted_at !== null)
+  const shown = filter === undefined ? living : living.filter((one) => one.category_ids.includes(filter))
+
+  const put = () => {
+    if (title.trim() === '') {
+      setError('A song needs a title. Everything else can wait.')
+      return
+    }
+
+    run(async () => {
+      await api.addSong({ title: title.trim() })
+      setTitle('')
+    }, 'Could not put that in the book.')
+  }
+
+  return (
+    <GuardedPage title="Songbook" require="approved">
+      <h1>
+        Songbook <Refreshing on={refreshing} />
+      </h1>
+
+      <p class="form-note">
+        What we sing together, so whoever has the guitar and whoever has a phone are looking at the same
+        words. It belongs to no one burn — everybody here can add a song and everybody can polish one.
+      </p>
+
+      <ErrorText message={error} />
+
+      {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
+      {loaded.status === 'failed' && <ErrorText message={loaded.message} />}
+
+      {loaded.status === 'ready' && book.categories.length > 0 && (
+        <p class="chip-row">
+          <button
+            type="button"
+            class={filter === undefined ? 'song-chip is-on' : 'song-chip'}
+            aria-pressed={filter === undefined}
+            onClick={() => setFilter(undefined)}
+          >
+            Everything
+          </button>
+          {book.categories.map((category) => (
+            <button
+              key={category.id}
+              type="button"
+              class={filter === category.id ? 'song-chip is-on' : 'song-chip'}
+              aria-pressed={filter === category.id}
+              onClick={() => setFilter(filter === category.id ? undefined : category.id)}
+            >
+              {category.label}
+            </button>
+          ))}
+        </p>
+      )}
+
+      {loaded.status === 'ready' && shown.length === 0 && (
+        <p class="form-note">
+          {living.length === 0
+            ? 'Nothing in the book yet. Paste a song in and it is everybody’s.'
+            : 'Nothing filed under that yet.'}
+        </p>
+      )}
+
+      {shown.length > 0 && (
+        <ul class="song-list">
+          {shown.map((one) => (
+            <li key={one.id} class="song-row">
+              <a href={songPage(one.id)}>{one.title}</a>
+              <Marks song={one} categories={book.categories} />
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <form
+        class="form"
+        onSubmit={(submitted) => {
+          submitted.preventDefault()
+          put()
+        }}
+      >
+        <label class="field">
+          <span>Add a song</span>
+          <input
+            type="text"
+            name="title"
+            maxLength={MAX_TITLE}
+            placeholder="Fire in the sky"
+            value={title}
+            onInput={(typed) => setTitle(typed.currentTarget.value)}
+          />
+        </label>
+
+        <p class="form-note">The words, the chords and the links go on its own page, once it is in.</p>
+
+        <PendingButton busy={busy} label="Add it" busyLabel="Adding…" type="submit" />
+      </form>
+
+      {gone.length > 0 && (
+        <section>
+          <h2>Recently taken out</h2>
+          <p class="form-note">
+            Anybody can take a song out and anybody can put it back. Nothing here is deleted for good.
+          </p>
+          <ul class="song-list">
+            {gone.map((one) => (
+              <li key={one.id} class="song-row is-gone">
+                <a href={songPage(one.id)}>{one.title}</a>
+                <IconButton
+                  icon="↩️"
+                  label={`Put ${one.title} back in the book`}
+                  disabled={busy}
+                  onClick={() => run(() => api.restoreSong(one.id), 'Could not put that back.')}
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </GuardedPage>
+  )
+}
+
+const Marks = ({ song, categories }: { song: SongSummary; categories: readonly SongCategory[] }) => {
+  const labels = labelsFor(categories, song.category_ids)
+
+  return (
+    <span class="song-marks">
+      {song.capo !== null && <span class="song-capo">capo {song.capo}</span>}
+      {song.links.length > 0 && (
+        <span class="song-has-links" title="There is somewhere to hear it">
+          🎧
+        </span>
+      )}
+      {labels.length > 0 && <span class="form-note">{labels.join(' · ')}</span>}
+    </span>
+  )
+}
