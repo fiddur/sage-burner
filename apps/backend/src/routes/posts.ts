@@ -14,7 +14,7 @@ import { viewerFor } from '../auth/viewer.ts'
 import { isEmptyPatch, patchRow } from '../db/patch.ts'
 import { event, post } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
-import { displayName, tellAttendees } from '../push/notify.ts'
+import { displayName, namedBy, tellAttendees } from '../push/notify.ts'
 import { openEventNow, todayIso } from './events.ts'
 import { addEntry, threadFor } from './threads.ts'
 
@@ -75,16 +75,27 @@ export const registerPostRoutes = (
       now(),
     )
 
+    const who = await displayName(db, viewer.account_id)
+    // Being named wins over the announcement itself, so nobody hears twice about one post.
+    const named = await namedBy(db, row.body, event_id, viewer.account_id)
+
+    await Promise.all(
+      named.map(
+        async (accountId) =>
+          await notify(accountId, {
+            category: 'mentioned',
+            body: `${who} named you in: ${row.title}`,
+            link: feedPage(),
+          }),
+      ),
+    )
+
     await tellAttendees(
       db,
       notify,
       event_id,
-      {
-        category: 'post_written',
-        body: `${await displayName(db, viewer.account_id)} announced: ${row.title}`,
-        link: feedPage(),
-      },
-      { except: [viewer.account_id] },
+      { category: 'post_written', body: `${who} announced: ${row.title}`, link: feedPage() },
+      { except: [viewer.account_id, ...named] },
     )
 
     return reply.code(201).send({ post: row } satisfies PostResponse)
@@ -106,6 +117,23 @@ export const registerPostRoutes = (
 
     const patched = await patchRow(db, post, eq(post.id, request.params.id), body)
     if (patched.kind !== 'ok') return sendError(reply, 404)
+
+    const already = new Set(await namedBy(db, existing.body, existing.event_id, viewer.account_id))
+    const newly = (await namedBy(db, patched.row.body, existing.event_id, viewer.account_id)).filter(
+      (accountId) => !already.has(accountId),
+    )
+    const by = await displayName(db, viewer.account_id)
+
+    await Promise.all(
+      newly.map(
+        async (accountId) =>
+          await notify(accountId, {
+            category: 'mentioned',
+            body: `${by} named you in: ${patched.row.title}`,
+            link: feedPage(),
+          }),
+      ),
+    )
 
     await addEntry(
       db,

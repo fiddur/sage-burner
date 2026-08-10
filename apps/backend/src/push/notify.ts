@@ -1,6 +1,11 @@
 import type { Notification, NotificationCategory } from '@sage-burner/shared'
 
-import { notificationCategories, notifiesByDefault } from '@sage-burner/shared'
+import {
+  mentionedAccounts,
+  mentionsEverybody,
+  notificationCategories,
+  notifiesByDefault,
+} from '@sage-burner/shared'
 import { and, count, desc, eq, isNull } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
@@ -154,6 +159,29 @@ export const tellAttendees = async (
   await Promise.all(audience.map(async (row) => await notify(row.account_id, told)))
 
   return audience.length
+}
+
+/**
+ * Who a body names, bounded by attendance: the composer offers only attendees, and a token
+ * pointing anywhere else is dropped rather than refused. `@everybody` is the whole burn.
+ */
+export const namedBy = async (
+  db: Database,
+  body: string,
+  eventId: string,
+  author: string,
+): Promise<string[]> => {
+  const rows = await db
+    .select({ account_id: attendance.account_id })
+    .from(attendance)
+    .where(eq(attendance.event_id, eventId))
+
+  const attending = new Set(rows.map((row) => row.account_id))
+  attending.delete(author)
+
+  if (mentionsEverybody(body)) return [...attending]
+
+  return mentionedAccounts(body).filter((id) => attending.has(id))
 }
 
 export const notifyAdmins = async (db: Database, notify: Notifier, told: Told): Promise<number> => {

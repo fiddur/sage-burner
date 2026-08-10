@@ -4,13 +4,16 @@ import { MAX_COMMENT, profilePage } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
 import type { UploadImage } from '../image-upload.ts'
+import type { Mentionable } from '../mentioning.ts'
 
 import { localDay } from '../datetime.ts'
 import { stillUploading, useImageUpload } from '../image-upload.ts'
 import { renderMarkdown } from '../markdown.ts'
+import { useMentioning } from '../mentioning.ts'
 import { rowsFor } from '../textarea.ts'
 import { AddPicture } from './AddPicture.tsx'
 import { IconButton } from './IconButton.tsx'
+import { MentionMenu } from './MentionMenu.tsx'
 import { NAMELESS } from './PersonBadge.tsx'
 
 const marks = {
@@ -45,6 +48,7 @@ export const DreamThread = ({
   busy,
   more,
   upload,
+  people,
   onSay,
   onRewrite,
   onRemove,
@@ -56,6 +60,7 @@ export const DreamThread = ({
   busy: boolean
   more: boolean
   upload: UploadImage
+  people?: readonly Mentionable[]
   onSay: (body: string) => void
   onRewrite: (id: string, body: string) => void
   onRemove: (id: string) => void
@@ -70,6 +75,8 @@ export const DreamThread = ({
     onInput: setSaying,
     upload,
   })
+
+  const naming = useMentioning({ value: saying, people: people ?? [], onInput: setSaying })
 
   const editingPictures = useImageUpload({
     value: editing?.body ?? '',
@@ -182,11 +189,18 @@ export const DreamThread = ({
           value={saying}
           onInput={(event) => setSaying(event.currentTarget.value)}
           {...sayingPictures.handlers}
+          {...naming.noticing}
         />
         <button type="button" disabled={busy || stillUploading(saying) || saying.trim() === ''} onClick={say}>
           Say it
         </button>
       </p>
+
+      <MentionMenu
+        candidates={naming.candidates}
+        subject={`what you say about ${thread.title}`}
+        onChoose={naming.choose}
+      />
 
       <AddPicture pictures={sayingPictures} label={`what you say about ${thread.title}`} />
     </div>

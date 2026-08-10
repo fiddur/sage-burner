@@ -1,6 +1,6 @@
 import type { Activity, MyBurn, Thread, ThreadEntry } from '@sage-burner/shared'
 
-import { notificationCategoryInfo } from '@sage-burner/shared'
+import { mentionsIn, mentionToken, notificationCategoryInfo } from '@sage-burner/shared'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -80,6 +80,13 @@ const stub = (over: Partial<FeedApi> = {}, activity: Activity[] = TWO, threads: 
   updateMyNotificationSettings: () => Promise.resolve({ on: [...DEFAULTS], email: [] }),
   getThread: () => Promise.reject(new Error('getThread is not stubbed here')),
   addPost: () => Promise.reject(new Error('addPost is not stubbed here')),
+  getEventAttendees: () =>
+    Promise.resolve({
+      attendees: [
+        { account_id: 'a-1', name: 'Ada', avatar: null },
+        { account_id: 'a-2', name: 'Bea', avatar: null },
+      ],
+    }),
   updatePost: () => Promise.reject(new Error('updatePost is not stubbed here')),
   deletePost: () => Promise.reject(new Error('deletePost is not stubbed here')),
   uploadImage: () => Promise.reject(new Error('uploadImage is not stubbed here')),
@@ -160,6 +167,80 @@ describe('announcing something on the feed', () => {
 
     await waitFor(() => expect(screen.getByText('Ada offered a dream: Sauna at dawn')).toBeTruthy())
     expect(screen.queryByRole('button', { name: 'Announce something' })).toBeNull()
+  })
+
+  it('offers whoever is coming after an @, and sends a token carrying the id', async () => {
+    const addPost = vi.fn<FeedApi['addPost']>(() =>
+      Promise.resolve({
+        post: {
+          id: 'p-1',
+          event_id: 'e-1',
+          author_account_id: 'a-1',
+          title: 'Sunday',
+          body: '',
+          withdrawn_at: null,
+          created_at: '2026-08-07T18:00:00.000Z',
+        },
+      }),
+    )
+    renderPage(stub({ addPost }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Announce something' }))
+    fireEvent.input(screen.getByLabelText('What you are announcing'), { target: { value: 'Sunday' } })
+    const box = screen.getByLabelText('What you want to say about it')
+    fireEvent.input(box, { target: { value: 'ask @Be' } })
+    fireEvent.keyUp(box, { target: { selectionStart: 7 } })
+
+    fireEvent.click(await screen.findByRole('button', { name: '@Bea' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Announce it' }))
+
+    await waitFor(() => expect(addPost).toHaveBeenCalled())
+    const [, sent] = addPost.mock.calls[0] ?? []
+    expect(mentionsIn(sent?.body ?? '')).toEqual([{ name: 'Bea', target: 'a-2' }])
+  })
+
+  it('offers the whole burn as well, which is nobody in the list', async () => {
+    renderPage(stub())
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Announce something' }))
+    const box = screen.getByLabelText('What you want to say about it')
+    fireEvent.input(box, { target: { value: '@' } })
+    fireEvent.keyUp(box, { target: { selectionStart: 1 } })
+
+    expect(await screen.findByRole('button', { name: '@everybody' })).toBeTruthy()
+  })
+
+  it('offers nobody for something that only looks like an address', async () => {
+    renderPage(stub())
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Announce something' }))
+    const box = screen.getByLabelText('What you want to say about it')
+    fireEvent.input(box, { target: { value: 'write to bea@example.org' } })
+    fireEvent.keyUp(box, { target: { selectionStart: 24 } })
+
+    expect(screen.queryByRole('button', { name: '@everybody' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '@Bea' })).toBeNull()
+  })
+
+  it('draws a mention as a link to the person it names', async () => {
+    renderPage(
+      stub(
+        {},
+        [],
+        [
+          aCard({
+            id: 'c-1',
+            title: 'Sunday',
+            entity_type: 'post',
+            link: null,
+            body: `ask ${mentionToken('Bea', 'a-2')}`,
+          }),
+        ],
+      ),
+    )
+
+    const link = await screen.findByRole('link', { name: '@Bea' })
+    expect(link.getAttribute('href')).toBe('/members/a-2')
   })
 
   it('says who will see it, so nobody announces to the wrong burn', async () => {

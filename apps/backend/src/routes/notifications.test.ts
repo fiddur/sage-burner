@@ -238,6 +238,7 @@ describe('what somebody has switched on', () => {
     'dream_comment',
     'introduction_comment',
     'post_comment',
+    'mentioned',
     'application',
   ]
 

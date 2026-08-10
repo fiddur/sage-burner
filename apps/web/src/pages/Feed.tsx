@@ -5,6 +5,7 @@ import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 import type { UploadImage } from '../image-upload.ts'
+import type { Mentionable } from '../mentioning.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
 import { DreamThread } from '../components/DreamThread.tsx'
@@ -30,6 +31,7 @@ export type FeedApi = Pick<
   | 'addPost'
   | 'updatePost'
   | 'deletePost'
+  | 'getEventAttendees'
 >
 
 interface Happening {
@@ -108,6 +110,15 @@ export const Feed = ({ api }: { api: FeedApi }) => {
 
   const items = loaded.status === 'ready' ? feedItems(loaded.data) : []
   const selected = useSelectedBurn()
+  const eventId = selected?.event.id
+
+  // Whoever is coming to the burn in the bar, for the `@` menu. Two columns and nothing else,
+  // which is what `getEventAttendees` exists to answer.
+  const { loaded: coming } = useLoad(
+    async (signal) => (eventId === undefined ? [] : (await api.getEventAttendees(eventId, signal)).attendees),
+    { enabled: approved && eventId !== undefined, fallback: 'Could not load who is coming.' },
+  )
+  const people = coming.status === 'ready' ? coming.data : []
 
   return (
     <GuardedPage title="Feed" require="approved" width="column">
@@ -127,8 +138,8 @@ export const Feed = ({ api }: { api: FeedApi }) => {
         burn={selected?.event}
         busy={busy}
         upload={api.uploadImage}
+        people={people}
         onAnnounce={(title, body, done) => {
-          const eventId = selected?.event.id
           if (eventId === undefined) return
 
           run(async () => {
@@ -177,6 +188,7 @@ export const Feed = ({ api }: { api: FeedApi }) => {
                 on={settings?.on}
                 talk={talk}
                 upload={api.uploadImage}
+                people={people}
                 onToggle={toggle}
               />
             ),
@@ -192,6 +204,7 @@ const Mine = ({
   mine,
   busy,
   upload,
+  people,
   onReword,
   onTakeBack,
 }: {
@@ -199,6 +212,7 @@ const Mine = ({
   mine: boolean
   busy: boolean
   upload: UploadImage
+  people: readonly Mentionable[]
   onReword: (title: string, body: string, done: () => void) => void
   onTakeBack: () => void
 }) => {
@@ -251,6 +265,7 @@ const Mine = ({
         maxLength={MAX_POST}
         rows={4}
         upload={upload}
+        people={people}
         onInput={(body) => setEditing({ ...editing, body })}
       />
 
@@ -274,11 +289,13 @@ const Announce = ({
   burn,
   busy,
   upload,
+  people,
   onAnnounce,
 }: {
   burn: { id: string; name: string } | undefined
   busy: boolean
   upload: UploadImage
+  people: readonly Mentionable[]
   onAnnounce: (title: string, body: string, done: () => void) => void
 }) => {
   const [open, setOpen] = useState(false)
@@ -331,6 +348,7 @@ const Announce = ({
         maxLength={MAX_POST}
         rows={4}
         upload={upload}
+        people={people}
         onInput={setBody}
       />
 
@@ -364,6 +382,7 @@ const Card = ({
   on,
   talk,
   upload,
+  people,
   onToggle,
 }: {
   card: Thread
@@ -380,6 +399,7 @@ const Card = ({
     takeBack: (threadId: string, id: string) => void
   }
   upload: UploadImage
+  people: readonly Mentionable[]
   onToggle: (category: NotificationCategory) => void
 }) => {
   const category = chipFor(card)
@@ -408,6 +428,7 @@ const Card = ({
           mine={card.own}
           busy={busy}
           upload={upload}
+          people={people}
           onReword={(title, body, done) => talk.reword(card.id, card.entity_id, title, body, done)}
           onTakeBack={() => talk.takeBack(card.id, card.entity_id)}
         />
@@ -420,6 +441,7 @@ const Card = ({
         busy={busy}
         more={card.entry_count > card.entries.length}
         upload={upload}
+        people={people}
         onSay={(body) => talk.say(card.id, body)}
         onRewrite={(id, body) => talk.rewrite(id, body)}
         onRemove={(id) => talk.remove(id)}

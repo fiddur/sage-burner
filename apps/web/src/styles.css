@@ -1712,6 +1712,22 @@ a.person-badge:focus-visible span:last-child {
 
 /* The box and its button on one row on a wide screen, stacked on a phone — a comment
    box that shrinks to a slit beside a button is the thing this avoids. */
+/* Who an `@` may name (#439). A row rather than a floating popover: the box it belongs to is
+   already inside a card inside a scrolling column, and anchoring a layer to a caret across all
+   three is a fight this does not need to pick. */
+.mention-menu {
+  list-style: none;
+  margin: 0.2rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.mention-menu button {
+  font-size: 0.9rem;
+}
+
 .thread-say,
 .thread-editing {
   margin: 0;

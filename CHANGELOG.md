@@ -9,6 +9,14 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-10
 
+- **You can name somebody in a comment or an announcement.** Type `@` and pick them — everyone
+  coming to the burn is offered, and so is **@everybody**, which reaches all of them. Whoever you
+  name is told, and told that rather than the general "somebody commented" — one notification per
+  person, so being named never doubles up. Fixing a typo afterwards only tells anybody you have just
+  added. Names are looked up fresh every time the feed is read, so if somebody changes their name, a
+  comment from months ago says the new one. Being named is on unless you turn it off, under
+  notification settings.
+
 - **You can announce something on the feed.** _Announce something_, above the feed — a line saying
   what it is and as much or as little as you want to add, pictures included. Everyone coming to the
   burn you have chosen sees it, and can say something under it, the same as on a dream. Rewording

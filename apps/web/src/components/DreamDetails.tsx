@@ -176,6 +176,7 @@ export const DreamDetails = ({
             busy={busy}
             more={false}
             upload={upload}
+            people={attendees}
             onSay={talk.say}
             onRewrite={talk.rewrite}
             onRemove={talk.remove}
