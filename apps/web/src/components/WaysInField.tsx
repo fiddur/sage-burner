@@ -8,7 +8,7 @@ import type { ApiClient } from '../api/client.ts'
 import { isApiError } from '../api/client.ts'
 import { useSocialLogins } from '../installation.tsx'
 import { useLoad } from '../load.ts'
-import { useOauthOutcome } from '../outcome.ts'
+import { quoting, useOauthOutcome } from '../outcome.ts'
 import { ErrorText } from './ErrorText.tsx'
 import { FormError, useFormError } from './FormError.tsx'
 
@@ -21,9 +21,6 @@ export const messageForRemoval = (failure: unknown): string => {
 
   return isApiError(failure) ? failure.message : 'Could not take that off. Please try again.'
 }
-
-/** What to add so somebody can hand an organiser something to look for. */
-const quoting = (ref: string | null) => (ref === null || ref === '' ? '' : ` Mention ${ref}.`)
 
 export const outcomeMessage = (outcome: string | null, ref: string | null = null): string | undefined => {
   if (outcome === 'linked') return 'That is linked now — you can sign in with it next time.'

@@ -599,6 +599,20 @@ describe('why a link could not be made', () => {
     expect(back.headers.location).toContain('/login?from=misconfigured')
   })
 
+  it('calls a rate-limited provider unreachable, since waiting is the fix', async () => {
+    const server = await build(
+      fakeOAuth({
+        identify: () => Promise.resolve({ failed: { at: 'token' as const, status: 429 } }),
+      }),
+    )
+    await givenProvider('discord')
+    const wren = await givenAccount()
+
+    const back = await linkThrough(server, wren.cookie, 'discord')
+
+    expect(back.headers.location).toContain('from=unreachable')
+  })
+
   it('writes nothing about somebody who was identified', async () => {
     // The passing sibling. A warn on every round trip would bury the one that matters, and a
     // test that only asserts a line appears is satisfied by logging unconditionally.

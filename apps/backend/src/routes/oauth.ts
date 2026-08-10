@@ -31,7 +31,7 @@ export const OAUTH_NONCE_COOKIE = 'sage_oauth'
 
 // Said rather than hidden: the person who can fix it is somebody you know here.
 const outcomeFor = ({ at, status }: IdentifyFailure): OAuthOutcome =>
-  at === 'network' || (status ?? 0) >= 500 ? 'unreachable' : 'misconfigured'
+  at === 'network' || (status ?? 0) >= 500 || status === 429 ? 'unreachable' : 'misconfigured'
 
 export const registerOauthRoutes = (
   app: FastifyInstance,

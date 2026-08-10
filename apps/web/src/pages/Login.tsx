@@ -10,7 +10,7 @@ import { isApiError } from '../api/client.ts'
 import { FormError, useFormError } from '../components/FormError.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
 import { useSocialLogins } from '../installation.tsx'
-import { useOauthOutcome } from '../outcome.ts'
+import { quoting, useOauthOutcome } from '../outcome.ts'
 import { messageForCeremony, passkeysWork, signInWithPasskey } from '../passkey.ts'
 import { useSetViewer, useViewer } from '../viewer.tsx'
 
@@ -195,7 +195,7 @@ export const Login = ({
 }
 
 export const signInOutcome = (outcome: string | null, ref: string | null = null): string | undefined => {
-  const quote = ref === null || ref === '' ? '' : ` Mention ${ref}.`
+  const quote = quoting(ref)
 
   if (outcome === 'unlinked') {
     return 'No account here is linked to that. Sign in another way, then link it under Your details.'
