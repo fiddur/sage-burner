@@ -1007,7 +1007,7 @@ Absent rather than present and disabled, which is #30's rule about the email col
 **"Configured" means both halves filled in**, not a row existing (#401). The secret is
 optional on the update, so a first save that leaves it blank — or one clearing it — keeps a row
 with `client_secret = ''`; selected on existence, that drew "Continue with Discord" for a trip
-that could only end at `/login?from=refused`. `configuredProviders` selects on both columns
+that could only fail. `configuredProviders` selects on both columns
 being non-empty and `usableOauthSetting` is the same rule for the routes that start and finish
 a trip, so the button and the journey cannot disagree.
 

@@ -299,8 +299,6 @@ export const App = ({
   const framed = (
     <FetchedBurnProvider api={client}>
       <Layout api={client}>
-        {/* Above the page rather than in the layout's chrome: both are about the tab,
-            not about the burn, and have to survive whatever route is open. */}
         <NewVersion api={client} />
         <InstallApp watch={installs} />
         <StaleData freshness={freshness} />
@@ -319,9 +317,6 @@ export const App = ({
   return (
     <RememberedProvider remembered={remembered}>
       <LocationProvider scope={ROUTER_SCOPE}>
-        {/* Inside the provider, which is where `route` comes from, and outside the
-            viewer's, so a tapped notification routes whether or not anyone is signed
-            in yet. */}
         <RouteOnMessage />
         {viewer === undefined ? (
           <FetchedViewerProvider api={client}>{content}</FetchedViewerProvider>

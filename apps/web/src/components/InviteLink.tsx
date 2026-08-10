@@ -28,9 +28,6 @@ export const InviteLink = ({
       <br />
       <code>{url}</code>
       <br />
-      {/* The URL above stays selectable by hand, which is what makes a copy that
-          silently did nothing recoverable — this token is stored only as a digest
-          and cannot be shown a second time. */}
       <CopyButton value={url} label="Copy link" />
     </p>
   )

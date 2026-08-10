@@ -41,8 +41,6 @@ export const Notifications = ({ api }: { api: NotificationsApi }) => {
         Notifications <Refreshing on={refreshing} />
       </h1>
 
-      {/* The link only to a member: the details page is theirs, and pointing an
-          applicant at a page that refuses them is worse than saying nothing. */}
       <p class="form-note">
         What has happened to you, newest first.
         {isMember(viewer) && (

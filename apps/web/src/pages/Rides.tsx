@@ -233,8 +233,6 @@ const Half = ({
             </p>
             {row.notes !== '' && <p class="ride-notes">{row.notes}</p>}
 
-            {/* Your own only. The lanes and the register are the burn's shared
-                furniture; this is what somebody said about their own travel. */}
             {row.account_id === mine && (
               <p class="ride-actions">
                 <IconButton

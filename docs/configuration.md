@@ -87,9 +87,12 @@ pnpm --filter sage-burner-backend db:migrate    # apply migrations to DATABASE_U
 ```
 
 `db:generate` writes SQL to `apps/backend/drizzle/` — commit it. Read the
-generated SQL before trusting it, particularly the first migration that alters
-rather than creates a column: SQLite implements that as a table rebuild, which
-interacts badly with foreign keys (see the note on `runMigrations`).
+generated SQL before trusting it, particularly a migration that alters rather than
+creates a column, or that widens a CHECK: SQLite implements either as a table
+rebuild, whose `DROP` cascade-deletes children unless foreign keys are off, which
+is what `runMigrations` is for. "Adding a network is not free" in `docs/accounts.md`
+has the trap that follows from it — a vocabulary widened in `enums.ts` alone passes
+Zod and the type checker and then fails the write.
 
 The server will also migrate on boot, so `db:migrate` is only for preparing a
 database ahead of time.

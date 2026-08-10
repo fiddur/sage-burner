@@ -128,9 +128,6 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
         later; most dreams have no time until quite close to the burn.
       </p>
 
-      {/* Only when no panel is open: the overlay covers this, and the panel shows the
-          same message itself — two would also be announced twice. The grid guards its
-          own the same way. */}
       {error !== undefined && opened === undefined && <ErrorText message={error} />}
 
       {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
@@ -144,9 +141,6 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
       <ol class="dream-list">
         {dreams.map((dream) => (
           <li key={dream.id} class="dream-row">
-            {/* Named for what it does rather than by everything inside it, which is
-                also what the grid's chip is called — the two pages open one panel and
-                a screen reader should hear one instruction. */}
             <button
               type="button"
               class="dream-row-open"

@@ -56,8 +56,6 @@ export const Menu = ({ pages }: { pages: readonly NavPage[] }) => {
         <span aria-hidden="true">☰</span>
       </button>
 
-      {/* Rendered only while open rather than hidden: no `inert` to keep in step with
-          the animation, and the links are out of the tab order the rest of the time. */}
       {showing && (
         <>
           <div class="menu-backdrop" onPointerDown={close} />
@@ -68,8 +66,6 @@ export const Menu = ({ pages }: { pages: readonly NavPage[] }) => {
               </a>
             ))}
 
-            {/* The drawer covers ☰ itself, so without this the only pointer way out is
-                the strip of backdrop beside it. */}
             <button type="button" class="menu-close" onClick={close}>
               ✕ Close
             </button>

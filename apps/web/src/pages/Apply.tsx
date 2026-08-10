@@ -276,9 +276,6 @@ export const Apply = ({ api }: ApplyProps) => {
 
         <FormError error={sendError} />
 
-        {/* Beside the button rather than in the footer alone: this is the form where
-            somebody hands over contact details before having an account, so it is the one
-            page where the policy is worth reading *before* the click. */}
         <p class="form-note">
           What happens to what you write here is in the <a href="/privacy">privacy policy</a>.
         </p>

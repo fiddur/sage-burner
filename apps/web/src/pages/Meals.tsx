@@ -214,8 +214,6 @@ const MealTable = ({
         {meals.map((meal, index) => (
           <tr key={meal.id}>
             <th scope="row">
-              {/* The day only on the first sitting of it, like the sheet's merged
-                  cells; the time on every row, since that is what tells them apart. */}
               {meals[index - 1]?.date === meal.date ? null : (
                 <>
                   {dayName(meal.date, 'short')}
@@ -229,9 +227,6 @@ const MealTable = ({
               <FoodIdea meal={meal} busy={busy} onIdea={onIdea} />
             </td>
             <td>
-              {/* A chore has nobody cooking — unless one is still recorded from before
-                  the slot became one, who then needs a way off. The API allows exactly
-                  that: vacating stays open where handing over is refused. */}
               {meal.kind === 'chore' && meal.lead === null ? (
                 <span class="form-note">—</span>
               ) : (
@@ -248,8 +243,6 @@ const MealTable = ({
                 />
               )}
             </td>
-            {/* A chore asks for no cooks — but one already signed up before the slot
-                became a chore still needs a way off, which the API allows. */}
             {meal.kind === 'chore' && meal.helpers.length === 0 ? (
               <td>
                 <span class="form-note">—</span>

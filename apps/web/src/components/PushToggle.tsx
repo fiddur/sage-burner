@@ -180,9 +180,6 @@ export const PushToggle = ({
         </>
       )}
 
-      {/* Below the per-browser toggle, and always shown: what a category is switched
-          off for is the bell as much as the push, so this applies with no browser
-          subscribed at all. */}
       <h3>What to tell me about</h3>
       <NotificationSettingsField api={api} sendsEmail={sendsEmail === true} />
     </section>

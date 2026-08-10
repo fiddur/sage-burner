@@ -82,9 +82,7 @@ const Introduction = ({ written, mine, whose }: { written: string; mine: boolean
     <p class="form-note">
       {mine ? (
         <>
-          {/* Not a second "Your details" link: the note above already carries one, and two
-              anchors with the same accessible name on one page is what a screen reader
-              reads as one place twice. */}
+          {/* Not a second "Your details" link: two anchors with one name read as one place twice. */}
           You have not written anything about yourself yet —{' '}
           <a href="/profile">write a paragraph and add a picture or two</a>. It is what makes your name mean
           something to somebody who has not met you.
@@ -150,8 +148,6 @@ export const Person = ({ api, accountId }: { api: PersonApi; accountId: string }
 
           <Ways rows={person.connections} mine={mine} whose={whose} />
 
-          {/* The free-text box from before the list existed, last of all —
-              `personProfileSchema` says why it is still here. */}
           {person.contact !== null && person.contact.trim() !== '' && (
             <p class="form-note">Also said: {person.contact}</p>
           )}

@@ -136,9 +136,7 @@ export const DreamThread = ({
                 </div>
               ) : (
                 <>
-                  {/* Safe by construction: `renderMarkdown` escapes raw HTML rather than
-                      filtering it, which is what makes untrusted authors — every member
-                      here — inside what it defends against. */}
+                  {/* `renderMarkdown` escapes raw HTML rather than filtering it, which is what makes this safe. */}
                   <div
                     class="markdown-preview"
                     dangerouslySetInnerHTML={{ __html: renderMarkdown(entry.body) }}

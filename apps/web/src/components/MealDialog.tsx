@@ -97,16 +97,6 @@ export const MealDialog = ({
         />
       </label>
 
-      {/*
-        A chore has nobody cooking, so it offers no lead and no cooks — **unless one
-        is still recorded** from before the slot became a chore. Then the control
-        appears so they can get off, which is what the API allows: vacating and
-        standing down stay open where handing over and joining are refused.
-
-        The two are gated separately, deliberately. Tied together, a chore with
-        leftover helpers showed a lead select whose only affirmative action answers
-        400, and a chore with a lead and no helpers offered no way to vacate at all.
-      */}
       {(meal.kind !== 'chore' || meal.lead !== null) && (
         <>
           <h3>Meal lead</h3>

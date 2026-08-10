@@ -190,7 +190,7 @@ export const registerOauthRoutes = (
           .update(accountIdentity)
           .set({ profile_url: profile.profile_url })
           .where(eq(accountIdentity.id, identity.id))
-      } catch {}
+      } catch {} // swallowed: a stale profile URL must not cost somebody the sign-in
     }
 
     void reply.header(
@@ -249,7 +249,7 @@ export const registerOauthRoutes = (
     let reached = false
     try {
       reached = await maybeReach(accountId, provider, profile.reach)
-    } catch {}
+    } catch {} // swallowed: the identity is already written, so the link has happened
 
     return back(reply, detailsPage(reached ? 'reached' : 'linked'))
   }

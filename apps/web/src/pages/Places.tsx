@@ -165,8 +165,6 @@ export const Places = ({ api }: { api: PlacesApi }) => {
         )}
       </ReorderableList>
 
-      {/* Only once the burn is known: the lane belongs to one, so a form rendered
-          before then would take a name and have nowhere to put it. */}
       {ready !== undefined && (
         <form
           class="form"

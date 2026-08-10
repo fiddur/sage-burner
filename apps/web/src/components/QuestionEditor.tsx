@@ -211,12 +211,6 @@ export const QuestionEditor = ({ api }: { api: QuestionsApi }) => {
           onInput={(help_text) => setDraft({ ...draft, help_text })}
         />
 
-        {/*
-          Disabled for `agreement`, not merely defaulted: that type exists because
-          submission is blocked when it is unticked, so an optional agreement is a
-          contradiction. The API refuses it too — this makes the rule visible
-          instead of turning a tick into a 400.
-        */}
         <label class="field-inline">
           <input
             type="checkbox"
@@ -227,13 +221,7 @@ export const QuestionEditor = ({ api }: { api: QuestionsApi }) => {
           <span>Required{requiredNote(draft.type)}</span>
         </label>
 
-        {/*
-          Also disabled on a whitespace-only label. `required` does not catch
-          `'   '` — it satisfies HTML constraint validation, the form submits, and
-          `nonEmptyText(500)` trims it to `''` server-side, so the admin reads
-          the unmapped "Request failed (400)". This is what makes the parity with
-          the edit form below real rather than only true for a genuinely empty box.
-        */}
+        {/* Also disabled on a whitespace-only label: `required` accepts `' '` and the server trims it away. */}
         <button type="submit" disabled={busy || draft.label.trim() === ''}>
           Add question
         </button>
@@ -267,13 +255,7 @@ const QuestionFields = ({
     <div class="question-edit">
       <label class="field">
         <span>Label</span>
-        {/*
-          No `required`: this is a `<div>`, not a `<form>`, and Save is a
-          `type="button"`, so there is no constraint validation to run — the
-          attribute would look like a guard while doing nothing. The disabled
-          button below is the actual guard, and it makes this path behave like
-          the add form, which is a real form and blocks the same input.
-        */}
+        {/* No `required`: this is a `div` with a `type="button"` Save, so nothing would validate it. */}
         <input
           maxLength={MAX_QUESTION_LABEL}
           value={label}

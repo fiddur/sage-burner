@@ -7,9 +7,7 @@ export const AddPicture = ({ pictures, label }: { pictures: ImageUpload; label: 
 
   return (
     <>
-      {/* A `div`, not a `p`: `ErrorText` renders a paragraph of its own, and one of the
-          places this is mounted is itself a row wrapper. A paragraph inside a paragraph
-          is invalid markup that Preact builds anyway, so nothing here would show it. */}
+      {/* A `div`, not a `p`: `ErrorText` is a paragraph and one mount point is a row wrapper. */}
       <div class="row">
         <label class="link-button">
           Add a picture

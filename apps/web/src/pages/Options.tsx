@@ -200,15 +200,7 @@ const OptionList = ({
         {takesCapacity(kind) && (
           <label class="field">
             <span>Spaces (blank for no limit)</span>
-            {/*
-              `min` and the implicit whole-number step are the whole check, and
-              deliberately so — the browser refuses to submit a form with an
-              invalid number, so a JavaScript guard beside them is unreachable
-              code. That is the same two-validator trap as `required` versus
-              `aria-required` elsewhere here, with the opposite conclusion: for a
-              name the page must be the authority, because it has something to
-              say; for a count the browser already says it.
-            */}
+            {/* No JavaScript guard beside `min`: the browser refuses the submit, so it is unreachable. */}
             <input
               type="number"
               min="1"

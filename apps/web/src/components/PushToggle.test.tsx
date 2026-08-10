@@ -337,6 +337,29 @@ describe('PushToggle', () => {
     expect(unsubscribe).toHaveBeenCalled()
   })
 
+  it('says why the server refused, not why the browser would not let go', async () => {
+    render(
+      <PushToggle
+        api={stub({ subscribeToPush: () => Promise.reject(apiError(500, 'internal', 'Nope.')) })}
+        browser={aBrowser({
+          register: () =>
+            Promise.resolve({
+              getSubscription: () => Promise.resolve(null),
+              subscribe: () =>
+                Promise.resolve({
+                  ...aSubscription('https://push.example/mine'),
+                  unsubscribe: () => Promise.reject(new Error('the browser said no')),
+                }),
+            }),
+        })}
+      />,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Notify me here' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Nope.')
+  })
+
   it('can be turned back on after being turned off', async () => {
     // The consequence of the bug above, from the outside: the state the page
     // derives on mount has to agree with what the server was told.

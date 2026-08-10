@@ -44,21 +44,13 @@ export const Layout = ({ api, children }: { api: BellApi; children: ComponentChi
   return (
     <div class={bottomBar ? 'layout has-bottom-bar' : 'layout'}>
       <header class="site-header">
-        {/* Ahead of the logo, at the edge its drawer slides in from. */}
         <Menu pages={approved ? menuPages : []} />
 
         <a class="brand" href="/">
-          {/* The icon route rather than the flame written out here: it answers with
-              whatever an admin uploaded and with the app's own mark when nobody has,
-              so the bar wears what the home screen does without having to ask which
-              it is. Decorative — the name is right beside it. */}
           <img class="brand-mark" src={apiRoutes.getInstallationIcon.path()} alt="" />
           <span class="brand-name">{title}</span>
         </a>
 
-        {/* Ahead of the nav, because everything after it is about the burn it names.
-            Hidden when there is nothing to choose between: one burn is the ordinary
-            case and a select with a single option is furniture. */}
         {burns.length > 1 && selected !== undefined && (
           <select
             class="burn-selector"
@@ -109,11 +101,6 @@ const TopNav = ({ api, pages }: { api: BellApi; pages: readonly NavPage[] }) => 
         </a>
       ))}
 
-      {/* One group, so a bar too narrow for everything drops the *pages* rather than
-          leaving the face on a row of its own — an admin's corner is a third icon wide
-          and was the first to go over. Signed in is the whole guard, so it sits
-          outside the approved block; a visitor gets no empty box holding the end of
-          the bar open. */}
       {viewer.account !== undefined && (
         <span class="nav-session">
           <NotificationBell api={api} />
@@ -124,9 +111,6 @@ const TopNav = ({ api, pages }: { api: BellApi; pages: readonly NavPage[] }) => 
             </a>
           )}
 
-          {/* `approved`, matching the page: an account holding `admin` and not `member`
-              has a picture, ways of being reached and a notification switch there, and
-              reaching them by typing the URL is not a way in (#396). */}
           {isApproved(viewer) && (
             <a class="nav-icon" href="/profile" aria-label="Your details" title="Your details">
               <Avatar
