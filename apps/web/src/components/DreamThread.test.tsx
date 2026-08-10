@@ -199,3 +199,39 @@ describe('a conversation about a dream', () => {
     expect(showAll).toHaveBeenCalled()
   })
 })
+
+describe('naming somebody under a dream', () => {
+  const PEOPLE = [{ account_id: 'a-2', name: 'Bea' }]
+
+  const nameIn = (label: string, value: string, caret: number) => {
+    const box = screen.getByLabelText(label)
+    fireEvent.input(box, { target: { value } })
+    fireEvent.keyUp(box, { target: { selectionStart: caret } })
+  }
+
+  it('offers whoever is coming while something is being said', () => {
+    show(aThread([]), { people: PEOPLE })
+
+    nameIn('Say something about Sauna at dawn', 'ask @Be', 7)
+
+    expect(screen.getByRole('button', { name: '@Bea' })).toBeTruthy()
+  })
+
+  it('offers them while something already said is being fixed up', () => {
+    // `tellNewlyNamed` exists to tell whoever an edit adds, which nothing could add without this.
+    show(aThread([anEntry({ id: 't-1', body: 'mine' })]), { people: PEOPLE })
+
+    fireEvent.click(screen.getByRole('button', { name: /Rewrite what you said/ }))
+    nameIn('Rewrite what you said', 'mine, ask @Be', 13)
+
+    expect(screen.getByRole('button', { name: '@Bea' })).toBeTruthy()
+  })
+
+  it('offers nobody where the caller passed none', () => {
+    show(aThread([]))
+
+    nameIn('Say something about Sauna at dawn', '@', 1)
+
+    expect(screen.queryByRole('button', { name: '@everybody' })).toBeNull()
+  })
+})

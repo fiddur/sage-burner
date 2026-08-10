@@ -9,8 +9,11 @@ export interface Mention {
   target: string
 }
 
-// No `g` on the shared one: `exec`'s `lastIndex` would carry between calls.
-const pattern = () => /@\[([^\][\n]{1,80})\]\(mention:([\w-]{1,64})\)/gu
+const MAX_TARGET = 64
+
+// A new instance per call: a shared `gu` regex carries `lastIndex` between them.
+const pattern = () =>
+  new RegExp(`@\\[([^\\][\\n]{1,${MAX_MENTION_NAME}})\\]\\(mention:([\\w-]{1,${MAX_TARGET}})\\)`, 'gu')
 
 // `[`, `]`, `(`, `)` and newlines are what the token is delimited by, so a name carrying one
 // could otherwise end it early and put the rest of itself outside.

@@ -56,19 +56,21 @@ export const useMentioning = ({
   onInput,
 }: {
   value: string
-  people: readonly Mentionable[]
+  people: readonly Mentionable[] | undefined
   onInput: (value: string) => void
 }) => {
   const [caret, setCaret] = useState<number | undefined>(undefined)
 
+  // No `people` means this field does not do mentions at all, so it offers none — an
+  // `@everybody` written where nothing reads it looks like it reached the burn and does not.
   const fragment = caret === undefined ? undefined : fragmentAt(value, caret)
-  const candidates = fragment === undefined ? [] : candidatesFor(fragment, people)
+  const candidates = people === undefined || fragment === undefined ? [] : candidatesFor(fragment, people)
 
   const choose = (candidate: Candidate) => {
     if (caret === undefined) return
 
     const next = withMentionAt(value, caret, candidate)
-    setCaret(undefined)
+    setCaret(next.caret)
     onInput(next.value)
   }
 

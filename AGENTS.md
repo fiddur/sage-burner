@@ -38,8 +38,10 @@ type definitions. All layers import from it — never duplicate a schema.
   `answers.ts` (`answerProblems`, `isTickBox`, the application form's `MAX_*`
   limits), `limits.ts` (bounds the schemas and the forms share), `media.ts`
   (what an uploaded icon may be, and `flameIcon` — the app's own mark, which the
-  backend serves when nobody has uploaded one), and `routes.ts` (`apiRoutes`, every
-  endpoint's path and verb). Nothing under `schemas/`.
+  backend serves when nobody has uploaded one), `routes.ts` (`apiRoutes`, every
+  endpoint's path and verb), `pages.ts` (the client-side paths a link is built from),
+  and `mentions.ts` (the `@[Name](mention:id)` token, which `markdown.ts` renders).
+  Nothing under `schemas/`.
 - **Every endpoint lives in `routes.ts` and nowhere else.** The client builds its
   path from it and the route file registers `fastify` from it, so the two spellings
   of one endpoint cannot drift; `routes.test.ts` checks that each built path routes

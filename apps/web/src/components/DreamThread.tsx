@@ -76,7 +76,13 @@ export const DreamThread = ({
     upload,
   })
 
-  const naming = useMentioning({ value: saying, people: people ?? [], onInput: setSaying })
+  const naming = useMentioning({ value: saying, people, onInput: setSaying })
+
+  const renaming = useMentioning({
+    value: editing?.body ?? '',
+    people,
+    onInput: (body) => setEditing((current) => (current === undefined ? current : { ...current, body })),
+  })
 
   const editingPictures = useImageUpload({
     value: editing?.body ?? '',
@@ -126,6 +132,12 @@ export const DreamThread = ({
                     value={editing.body}
                     onInput={(event) => setEditing({ id: entry.id, body: event.currentTarget.value })}
                     {...editingPictures.handlers}
+                    {...renaming.noticing}
+                  />
+                  <MentionMenu
+                    candidates={renaming.candidates}
+                    subject="what you said"
+                    onChoose={renaming.choose}
                   />
                   <AddPicture pictures={editingPictures} label="what you said" />
                   <button

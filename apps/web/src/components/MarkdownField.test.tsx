@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
+import { useState } from 'preact/hooks'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { MarkdownField } from './MarkdownField.tsx'
@@ -152,5 +153,51 @@ describe('MarkdownField', () => {
     render(<MarkdownField label="Help text" value="" maxLength={2000} onInput={vi.fn()} />)
 
     expect(screen.getByLabelText('Help text').getAttribute('maxlength')).toBe('2000')
+  })
+})
+
+describe('naming somebody in a markdown field', () => {
+  // Driven the way every caller drives it: the value is theirs, so letting it stay `''` types
+  // into a box whose contents never change and the `@` never reaches the value at all.
+  const Held = ({ people }: { people?: readonly { account_id: string; name: string | null }[] }) => {
+    const [value, setValue] = useState('')
+
+    return (
+      <MarkdownField label="Help text" value={value} maxLength={2000} people={people} onInput={setValue} />
+    )
+  }
+
+  const type = (value: string, caret: number) => {
+    const box = screen.getByLabelText('Help text')
+    fireEvent.input(box, { target: { value } })
+    fireEvent.keyUp(box, { target: { selectionStart: caret } })
+  }
+
+  it('offers nobody at all where the field does not do mentions', () => {
+    // Most fields here are prose nothing reads for names — help text, a welcome page, a dream's
+    // description. An `@everybody` written into one of those notifies nobody while looking as
+    // though it reached the burn, so the menu is absent rather than empty.
+    render(<Held />)
+
+    type('@', 1)
+
+    expect(screen.queryByRole('button', { name: '@everybody' })).toBeNull()
+  })
+
+  it('offers them where it does', () => {
+    render(<Held people={[{ account_id: 'a-1', name: 'Ada' }]} />)
+
+    type('@', 1)
+
+    expect(screen.getByRole('button', { name: '@everybody' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '@Ada' })).toBeTruthy()
+  })
+
+  it('offers them to a burn with nobody coming yet, which is not the same as no field', () => {
+    render(<Held people={[]} />)
+
+    type('@', 1)
+
+    expect(screen.getByRole('button', { name: '@everybody' })).toBeTruthy()
   })
 })

@@ -116,7 +116,11 @@ export const Feed = ({ api }: { api: FeedApi }) => {
   // which is what `getEventAttendees` exists to answer.
   const { loaded: coming } = useLoad(
     async (signal) => (eventId === undefined ? [] : (await api.getEventAttendees(eventId, signal)).attendees),
-    { enabled: approved && eventId !== undefined, fallback: 'Could not load who is coming.' },
+    {
+      enabled: approved && eventId !== undefined,
+      key: eventId ?? '',
+      fallback: 'Could not load who is coming.',
+    },
   )
   const people = coming.status === 'ready' ? coming.data : []
 

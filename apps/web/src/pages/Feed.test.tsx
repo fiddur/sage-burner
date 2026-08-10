@@ -199,6 +199,36 @@ describe('announcing something on the feed', () => {
     expect(mentionsIn(sent?.body ?? '')).toEqual([{ name: 'Bea', target: 'a-2' }])
   })
 
+  it('offers whoever is coming to the burn that is chosen now, not the one before it', async () => {
+    const getEventAttendees = vi.fn<FeedApi['getEventAttendees']>((eventId: string) =>
+      Promise.resolve({
+        attendees:
+          eventId === 'e-1'
+            ? [{ account_id: 'a-1', name: 'Ada', avatar: null }]
+            : [{ account_id: 'a-7', name: 'Zed', avatar: null }],
+      }),
+    )
+    const other: MyBurn = { event: { ...BURN.event, id: 'e-2', name: 'Autumn burn' }, attendance: null }
+    const { rerender } = render(
+      <ViewerProvider viewer={ADA}>
+        <BurnProvider value={{ status: 'ready', burns: [BURN, other], selected: BURN }}>
+          <Feed api={stub({ getEventAttendees })} />
+        </BurnProvider>
+      </ViewerProvider>,
+    )
+    await waitFor(() => expect(getEventAttendees).toHaveBeenCalledWith('e-1', expect.anything()))
+
+    rerender(
+      <ViewerProvider viewer={ADA}>
+        <BurnProvider value={{ status: 'ready', burns: [BURN, other], selected: other }}>
+          <Feed api={stub({ getEventAttendees })} />
+        </BurnProvider>
+      </ViewerProvider>,
+    )
+
+    await waitFor(() => expect(getEventAttendees).toHaveBeenCalledWith('e-2', expect.anything()))
+  })
+
   it('offers the whole burn as well, which is nobody in the list', async () => {
     renderPage(stub())
 
