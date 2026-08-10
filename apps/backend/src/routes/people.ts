@@ -14,8 +14,6 @@ import { connectionsFor } from './connections.ts'
 export const registerPeopleRoutes = (app: FastifyInstance, { db, sessions }: GuardDeps) => {
   const { requireApproved } = createGuards({ db, sessions })
 
-  // Two columns and a picture, the same reasoning as the attendees route: what the songbook's
-  // composer has to offer somebody to name, for a book that belongs to no burn.
   app.get(apiRoutes.getApprovedAccounts.fastify, { preHandler: requireApproved }, async (_request, reply) => {
     void noStore(reply)
 

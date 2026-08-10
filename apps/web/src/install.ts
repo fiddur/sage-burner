@@ -13,16 +13,26 @@ export const offerIn = (event: unknown): InstallOffer | undefined => {
 
 export interface InstallWatch {
   offer: () => InstallOffer | undefined
+  standalone: () => boolean
   onChange: (listener: () => void) => () => void
   taken: () => void
 }
+
+/**
+ * Both spellings, because a home screen app on iOS before 16.4 answers only the legacy one —
+ * and those are exactly the people the instructions strip would otherwise nag for having
+ * already followed it (#452).
+ */
+export const isStandalone = (): boolean =>
+  globalThis.matchMedia?.('(display-mode: standalone)').matches === true ||
+  Reflect.get(globalThis.navigator ?? {}, 'standalone') === true
 
 export const watchInstalls = ({
   listen = (name: string, handler: (event: Event) => void) => {
     globalThis.addEventListener(name, handler)
     return () => globalThis.removeEventListener(name, handler)
   },
-  installed = () => globalThis.matchMedia?.('(display-mode: standalone)').matches === true,
+  installed = isStandalone,
 }: {
   listen?: (name: string, handler: (event: Event) => void) => () => void
   installed?: () => boolean
@@ -50,6 +60,7 @@ export const watchInstalls = ({
 
   return {
     offer: () => offer,
+    standalone: () => installed(),
     onChange: (listener) => {
       listeners.add(listener)
       return () => listeners.delete(listener)

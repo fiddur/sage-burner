@@ -335,6 +335,11 @@ export const apiRoutes = {
     fastify: '/api/installation/icon',
     path: () => '/api/installation/icon',
   },
+  getTouchIcon: {
+    method: 'GET',
+    fastify: '/api/installation/icons/:size',
+    path: (size: string) => `/api/installation/icons/${encodeURIComponent(size)}`,
+  },
   getInviteState: {
     method: 'GET',
     fastify: '/api/invites/:token',
@@ -952,6 +957,9 @@ export type RouteKey = keyof typeof apiRoutes
 
 export const iconSrc = (version: string | null | undefined): string =>
   `${apiRoutes.getInstallationIcon.path()}?v=${encodeURIComponent(version ?? 'default')}`
+
+export const touchIconSrc = (size: number, version: string | null | undefined): string =>
+  `${apiRoutes.getTouchIcon.path(String(size))}?v=${encodeURIComponent(version ?? 'default')}`
 
 export const bannerSrc = (version: string): string =>
   `${apiRoutes.getInstallationBanner.path()}?v=${encodeURIComponent(version)}`

@@ -87,6 +87,9 @@ describe('what the worker does with a request', () => {
     expect(cacheFor(asked('/assets/index-abc123.js'))).toBe(SHELL_CACHE)
     expect(cacheFor(asked(apiRoutes.webManifest.path()))).toBe(SHELL_CACHE)
     expect(cacheFor(asked(apiRoutes.getInstallationIcon.path()))).toBe(SHELL_CACHE)
+    // The home-screen tile too (#453): it is the same picture at a size iOS can draw, and a
+    // sign-out taking it away would leave the installed app's own icon to fetch again.
+    expect(cacheFor(asked(apiRoutes.getTouchIcon.path('180')))).toBe(SHELL_CACHE)
     // The banner is the installation's own picture on a public page, so it belongs
     // with the icon rather than with the reads it shares a prefix with.
     expect(cacheFor(asked(apiRoutes.getInstallationBanner.path()))).toBe(SHELL_CACHE)

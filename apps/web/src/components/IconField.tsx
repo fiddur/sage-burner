@@ -98,11 +98,12 @@ export const IconField = ({ api }: { api: IconApi }) => {
       <ErrorText message={error} />
 
       <p class="form-note">
-        An SVG is kept as it is; anything else is cut to a square and sized down in your browser. Fill the
-        square right out to the edges and keep anything that matters within the round preview — a home screen
-        crops to that shape, and a picture with see-through edges will float rather than sit on its own
-        background. Somebody who has already installed the app sees the new one when their browser next reads
-        the manifest.
+        An SVG is kept as it is; anything else is cut to a square and sized down to 512 by 512 in your
+        browser. Fill the square right out to the edges and keep anything that matters within the round
+        preview — a home screen crops to that shape, and a picture with see-through edges will float rather
+        than sit on its own background. An iPhone cannot draw an SVG on a home screen, so upload a PNG if you
+        want yours on the tile there: an SVG leaves the tile showing the app&rsquo;s own flame. Somebody who
+        has already installed the app sees the new one when their browser next reads the manifest.
       </p>
     </div>
   )

@@ -8,7 +8,7 @@ import type { SongsApi } from './Songs.tsx'
 
 import { createRemembered, RememberedProvider } from '../remembered.tsx'
 import { ViewerProvider } from '../viewer.tsx'
-import { Songs } from './Songs.tsx'
+import { RECENTLY_GONE_DAYS, recentlyGone, Songs } from './Songs.tsx'
 
 afterEach(cleanup)
 
@@ -19,6 +19,8 @@ const ADA: Viewer = {
 
 const CHANT: SongCategory = { id: 'c-1', order: 0, label: 'Chant' }
 const SONG: SongCategory = { id: 'c-2', order: 1, label: 'Song' }
+
+const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
 
 const aSong = (over: Partial<SongSummary> & Pick<SongSummary, 'id' | 'title'>): SongSummary => ({
   capo: null,
@@ -135,15 +137,20 @@ describe('the songbook', () => {
     const restoreSong = vi.fn<SongsApi['restoreSong']>(() =>
       Promise.reject(new Error('the page reloads the book, so the response is not read')),
     )
-    renderPage(
-      stub({ restoreSong }, [aSong({ id: 's-1', title: 'Ashes', deleted_at: '2026-07-03T00:00:00.000Z' })]),
-    )
+    renderPage(stub({ restoreSong }, [aSong({ id: 's-1', title: 'Ashes', deleted_at: daysAgo(2) })]))
 
     expect(await screen.findByRole('heading', { name: 'Recently taken out' })).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Put Ashes back in the book' }))
 
     await waitFor(() => expect(restoreSong).toHaveBeenCalledWith('s-1'))
+  })
+
+  it('means recently, so one taken out months ago is not still listed as it', async () => {
+    renderPage(stub({}, [aSong({ id: 's-1', title: 'Ashes', deleted_at: daysAgo(RECENTLY_GONE_DAYS + 1) })]))
+
+    expect(await screen.findByText(/Nothing in the book yet/)).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'Recently taken out' })).toBeNull()
   })
 
   it('leaves out the taken-out heading when nothing has been', async () => {
@@ -157,5 +164,27 @@ describe('the songbook', () => {
     renderPage(stub(), { status: 'signed-out' })
 
     expect(screen.queryByRole('button', { name: 'Add it' })).toBeNull()
+  })
+})
+
+describe('what counts as recently taken out', () => {
+  const NOW = Date.parse('2026-08-10T12:00:00.000Z')
+
+  it('takes one from today and drops one from before the bound', () => {
+    expect(recentlyGone('2026-08-10T00:00:00.000Z', NOW)).toBe(true)
+    expect(recentlyGone('2026-06-01T00:00:00.000Z', NOW)).toBe(false)
+  })
+
+  it('is nothing at all for a song that is still in the book', () => {
+    expect(recentlyGone(null, NOW)).toBe(false)
+  })
+
+  it('holds right up to the bound and not past it', () => {
+    const day = 24 * 60 * 60 * 1000
+    const at = (days: number) => new Date(NOW - days * day + 1000).toISOString()
+
+    expect(recentlyGone(at(RECENTLY_GONE_DAYS - 1), NOW)).toBe(true)
+    expect(recentlyGone(at(RECENTLY_GONE_DAYS), NOW)).toBe(true)
+    expect(recentlyGone(at(RECENTLY_GONE_DAYS + 1), NOW)).toBe(false)
   })
 })

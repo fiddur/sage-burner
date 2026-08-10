@@ -1,6 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { DISMISSED_KEY, dismissedInstall, dismissInstall, offerIn, watchInstalls } from './install.ts'
+import {
+  DISMISSED_KEY,
+  dismissedInstall,
+  dismissInstall,
+  isStandalone,
+  offerIn,
+  watchInstalls,
+} from './install.ts'
 
 /** A page that records what it was asked to listen for, and can fire it. */
 const aPage = () => {
@@ -147,6 +154,46 @@ describe('watching for an install offer', () => {
     watchInstalls({ listen: page.listen, installed: () => false })
 
     expect(page.listening()).toEqual(['appinstalled', 'beforeinstallprompt'])
+  })
+
+  it('says whether it is the installed copy, which the strip asks at render', () => {
+    const page = aPage()
+
+    expect(watchInstalls({ listen: page.listen, installed: () => true }).standalone()).toBe(true)
+    expect(watchInstalls({ listen: page.listen, installed: () => false }).standalone()).toBe(false)
+  })
+})
+
+describe('telling the installed copy from a browser tab', () => {
+  const withMatchMedia = (matches: boolean) =>
+    vi.spyOn(globalThis, 'matchMedia').mockReturnValue({ matches } as MediaQueryList)
+
+  it('takes the display mode when the browser has one', () => {
+    const media = withMatchMedia(true)
+
+    expect(isStandalone()).toBe(true)
+
+    media.mockRestore()
+  })
+
+  it('takes the legacy flag as well, which is all older iOS answers', () => {
+    // Home screen apps on iOS before 16.4 report nothing for `display-mode`, so without
+    // this they read as a browser tab and get nagged to install what they have installed.
+    const media = withMatchMedia(false)
+    Object.defineProperty(globalThis.navigator, 'standalone', { value: true, configurable: true })
+
+    expect(isStandalone()).toBe(true)
+
+    Reflect.deleteProperty(globalThis.navigator, 'standalone')
+    media.mockRestore()
+  })
+
+  it('is a browser tab when neither says otherwise', () => {
+    const media = withMatchMedia(false)
+
+    expect(isStandalone()).toBe(false)
+
+    media.mockRestore()
   })
 })
 

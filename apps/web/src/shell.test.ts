@@ -4,7 +4,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 /**
- * `index.html` names three paths it cannot import (#256).
+ * `index.html` names four paths it cannot import (#256).
  *
  * Every other spelling of an endpoint comes from `apiRoutes`, which is what stops the
  * client and the route file drifting apart. A `<link href>` is the one place that
@@ -33,6 +33,18 @@ describe('the HTML shell', () => {
     // they only look for the path.
     expect(attribute('link', 'rel')).toBe('manifest')
     expect(shell).toContain('rel="apple-touch-icon"')
+  })
+
+  it('points the home-screen tile at the touch-icon route, which answers a PNG', () => {
+    // The icon route answers an SVG whenever nobody uploaded a raster one, and iOS draws
+    // no SVG for a tile — it drew a gray square instead (#453). One tag carrying both,
+    // for the reason the favicon assertion gives.
+    expect(shell).toMatch(
+      new RegExp(`<link[^>]*rel="apple-touch-icon"[^>]*href="${apiRoutes.getTouchIcon.path('180')}"`),
+    )
+    expect(shell).not.toMatch(
+      new RegExp(`<link[^>]*rel="apple-touch-icon"[^>]*href="${apiRoutes.getInstallationIcon.path()}"`),
+    )
   })
 
   it('gives the tab the installation’s icon, for a signed-out visitor too (#285)', () => {
@@ -74,5 +86,6 @@ describe('the HTML shell', () => {
     // check that they still are rather than being client-side routes by accident.
     expect(apiRoutes.webManifest.fastify).toBe('/manifest.webmanifest')
     expect(apiRoutes.getInstallationIcon.fastify).toBe('/api/installation/icon')
+    expect(apiRoutes.getTouchIcon.fastify).toBe('/api/installation/icons/:size')
   })
 })

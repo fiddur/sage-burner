@@ -35,6 +35,7 @@ export const planFor = (
   if (pathname.startsWith('/assets/')) return 'asset'
   if (pathname === apiRoutes.webManifest.path()) return 'app'
   if (pathname === apiRoutes.getInstallationIcon.path()) return 'app'
+  if (pathname.startsWith(prefixOf(apiRoutes.getTouchIcon.fastify))) return 'app'
   if (pathname === apiRoutes.getInstallationBanner.path()) return 'app'
   if (pathname === apiRoutes.getChangelog.path()) return 'app'
   if (pathname === apiRoutes.getPrivacy.path()) return 'app'

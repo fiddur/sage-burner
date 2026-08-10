@@ -1,6 +1,17 @@
 import type { FastifyInstance } from 'fastify'
 
-import { apiRoutes, flameIcon, iconSrc, isIconType, MAX_ICON_BYTES } from '@sage-burner/shared'
+import {
+  apiRoutes,
+  feedPage,
+  flameIcon,
+  iconSrc,
+  isIconType,
+  MAX_ICON_BYTES,
+  songbookPage,
+  TOUCH_ICON_SIZES,
+  TOUCH_ICON_TYPE,
+  touchIconSrc,
+} from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -8,6 +19,7 @@ import type { Database } from '../db/index.ts'
 
 import { installation, INSTALLATION_ID, installationIcon } from '../db/schema.ts'
 import { noStore, sendError } from '../http.ts'
+import { createFlameIcons } from '../pwa/flame.ts'
 
 export interface PwaDeps extends GuardDeps {
   now: () => Date
@@ -33,7 +45,17 @@ export const iconVersion = async (
   return row
 }
 
+export const DESCRIPTION = 'Where a small gathering keeps who is coming, what is on and who is cooking.'
+
+const SHORTCUTS: readonly { name: string; url: string }[] = [
+  { name: 'Schedule', url: '/schedule' },
+  { name: 'Feed', url: feedPage() },
+  { name: 'Songbook', url: songbookPage() },
+]
+
 export const registerPwaRoutes = (app: FastifyInstance, { db, now }: PwaDeps) => {
+  const flames = createFlameIcons()
+
   const currentIcon = async () => {
     const [row] = await db
       .select()
@@ -62,10 +84,28 @@ export const registerPwaRoutes = (app: FastifyInstance, { db, now }: PwaDeps) =>
     void reply.header('cache-control', 'no-cache')
     void reply.header('content-type', 'application/manifest+json; charset=utf-8')
 
+    // The PNG entries are the flame's, so they are declared only where nobody has uploaded an
+    // icon. An admin's own SVG stays the single entry it was: putting the app's flame beside
+    // somebody's logo would show the wrong mark in the install sheet, and a raster upload is
+    // already the 512 it is asked for.
+    const drawn =
+      icon === undefined
+        ? TOUCH_ICON_SIZES.map((size) => ({
+            src: touchIconSrc(size, null),
+            type: TOUCH_ICON_TYPE,
+            sizes: `${size}x${size}`,
+            purpose: 'maskable',
+          }))
+        : []
+
     return reply.send(
       JSON.stringify({
+        id: '/',
         name: named?.title ?? FALLBACK_NAME,
         short_name: named?.title ?? FALLBACK_NAME,
+        description: DESCRIPTION,
+        lang: 'en',
+        dir: 'ltr',
         start_url: '/',
         scope: '/',
         display: 'standalone',
@@ -76,9 +116,29 @@ export const registerPwaRoutes = (app: FastifyInstance, { db, now }: PwaDeps) =>
             ...entry,
             purpose: icon === undefined ? 'any' : 'any maskable',
           },
+          ...drawn,
         ],
+        shortcuts: SHORTCUTS.map((shortcut) => ({ ...shortcut })),
       }),
     )
+  })
+
+  // The upload when it is already a PNG, and the flame otherwise — an SVG upload falling back
+  // to the app's own mark is honest, since iOS draws no SVG for a tile and a gray square is what
+  // it drew before (#453). Exact spellings only, so one tile is one cache key.
+  app.get<{ Params: { size: string } }>(apiRoutes.getTouchIcon.fastify, async (request, reply) => {
+    const wanted = TOUCH_ICON_SIZES.find((size) => String(size) === request.params.size)
+    if (wanted === undefined) return sendError(reply, 404)
+
+    const row = await currentIcon()
+    const uploaded = row?.content_type === TOUCH_ICON_TYPE ? row.image : undefined
+
+    return reply
+      .header('content-type', TOUCH_ICON_TYPE)
+      .header('x-content-type-options', 'nosniff')
+      .header('content-security-policy', "default-src 'none'; sandbox")
+      .header('cache-control', 'no-cache')
+      .send(uploaded ?? flames.png(wanted))
   })
 
   app.get(apiRoutes.getInstallationIcon.fastify, async (_request, reply) => {

@@ -9,6 +9,20 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-10
 
+- **The home-screen icon works on an iPhone now.** Adding the app to your home screen used to
+  leave a gray square there, because iPhones cannot draw the kind of picture we were handing
+  them. They get a proper one now — the app's flame, or the picture an organiser uploaded if
+  they uploaded a PNG. The flame is drawn rather than borrowed from your phone's emoji, so it
+  looks the same everywhere. Long-pressing the installed app offers the schedule, the feed and
+  the songbook.
+
+- **The nudge to install the app now says how, where your browser cannot do it for you.** On an
+  iPhone — every browser there — and in Firefox and Safari, the strip used to show nothing at
+  all; it now says to open your browser's share or menu and choose Add to Home Screen, with a
+  pointer at the FAQ. _Not now_ still makes it go away for good, and it says nothing at all if
+  you have already installed it. Notifications on an iPhone only work from the installed app,
+  so the notification settings now say that instead of showing a switch that could not deliver.
+
 - **There is a songbook.** ☰ → 🎵 Songbook: one shared book of what we sing, so whoever has the
   guitar and whoever has a phone are looking at the same words. A song needs nothing but a title.
   On its page you can paste the words in — chords on their own lines above them, the way

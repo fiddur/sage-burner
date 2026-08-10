@@ -2,6 +2,7 @@ import type { Song, SongCategory, SongLink, Thread } from '@sage-burner/shared'
 
 import {
   capoSuggestion,
+  isProfileUrl,
   MAX_CAPO,
   MAX_SONG_BODY,
   MAX_SONG_LINK_LABEL,
@@ -35,7 +36,7 @@ import {
   TICK_MS,
 } from '../songbook.ts'
 import { rowsFor } from '../textarea.ts'
-import { isAdmin, useViewer } from '../viewer.tsx'
+import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
 
 export type SongApi = Pick<
   ApiClient,
@@ -61,6 +62,7 @@ interface Held {
 
 export const SongPage = ({ api, songId }: { api: SongApi; songId: string }) => {
   const viewer = useViewer()
+  const approved = isApproved(viewer)
 
   const { loaded, refreshing, reload } = useLoad<Held>(
     async (signal) => {
@@ -77,7 +79,7 @@ export const SongPage = ({ api, songId }: { api: SongApi; songId: string }) => {
         people: people.accounts,
       }
     },
-    { key: songId, fallback: 'Could not load that song.', remember: 'song' },
+    { enabled: approved, key: songId, fallback: 'Could not load that song.', remember: 'song' },
   )
 
   const { busy, error, run } = useAction(reload)
@@ -322,6 +324,7 @@ const Fields = ({
   const [label, setLabel] = useState('')
 
   const suggested = capoSuggestion(body)
+  const linkable = isProfileUrl(url) && !links.some((one) => one.url === url.trim())
 
   return (
     <form
@@ -442,7 +445,7 @@ const Fields = ({
             />
             <button
               type="button"
-              disabled={url.trim() === '' || links.some((one) => one.url === url.trim())}
+              disabled={!linkable}
               onClick={() => {
                 setLinks([...links, { url: url.trim(), label: label.trim() }])
                 setUrl('')
@@ -452,6 +455,10 @@ const Fields = ({
               Add the link
             </button>
           </p>
+        )}
+
+        {url.trim() !== '' && !isProfileUrl(url) && (
+          <p class="form-note">A link has to start with https:// — the server refuses anything else.</p>
         )}
       </fieldset>
 

@@ -112,6 +112,16 @@ describe('the stylesheet', () => {
     expect(counted.map((rule) => rule.selector)).toEqual([])
   })
 
+  it('gives the song editor a monospace face that outranks the shared field rule', () => {
+    // `.field textarea` sets `font: inherit` at (0,1,1), so a bare `.song-editor` loses to it
+    // and the editor came out proportional — which slides every chord off the syllable it was
+    // typed above. Both halves are the claim: the face, and the selector that can win.
+    const editor = rules.find((rule) => rule.selector === '.field textarea.song-editor')
+
+    expect(editor?.body).toMatch(/font-family:[^;]*monospace/)
+    expect(rules.find((rule) => rule.selector === '.song-body')?.body).toMatch(/font-family:[^;]*monospace/)
+  })
+
   it('positions every box that scrolls sideways', () => {
     // Anything establishing a horizontal scroll container has to be a containing
     // block, so an absolutely positioned descendant cannot escape to the document and

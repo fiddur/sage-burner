@@ -5,6 +5,7 @@ import type { PushBrowser, PushState } from '../push.ts'
 import type { NotificationSettingsApi } from './NotificationSettingsField.tsx'
 
 import { isApiError } from '../api/client.ts'
+import { isStandalone } from '../install.ts'
 import { useInstallationSendsEmail } from '../installation.tsx'
 import { browserPush, decodeVapidKey, subscriptionBody } from '../push.ts'
 import { FormError, useFormError } from './FormError.tsx'
@@ -144,7 +145,15 @@ export const PushToggle = ({
     <section>
       <h2>Notifications</h2>
 
-      {state === 'unsupported' && (
+      {state === 'unsupported' && !isStandalone() && (
+        <p class="form-note">
+          This browser will not show notifications for a page in a tab — on an iPhone, that is every browser.
+          Add the app to your home screen and open it from there, and this button appears.{' '}
+          <a href="/faq">More in the FAQ.</a>
+        </p>
+      )}
+
+      {state === 'unsupported' && isStandalone() && (
         <p class="form-note">
           This browser cannot show notifications, or the site is not on HTTPS. Notifications need both.
         </p>

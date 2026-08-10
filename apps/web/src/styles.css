@@ -2381,8 +2381,12 @@ img.avatar {
 }
 
 /* Same face and size as `.song-body`: the editor is where the columns are typed, so a
-   proportional font there would misplace every chord that looks right while writing. */
-.song-editor {
+   proportional font there would misplace every chord that looks right while writing.
+
+   `.field textarea` is load-bearing in the selector, not tidiness. That rule sets `font:
+   inherit`, and at (0,1,1) it beats a bare `.song-editor` — so the first spelling of this
+   rule was overridden and the editor came out proportional. `styles.test.ts` holds it. */
+.field textarea.song-editor {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.95rem;
   line-height: 1.45;
