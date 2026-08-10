@@ -15,7 +15,7 @@ const holds = {
 export const GuardedPage = ({
   title,
   require,
-  width = 'full',
+  width,
   children,
 }: {
   title: string

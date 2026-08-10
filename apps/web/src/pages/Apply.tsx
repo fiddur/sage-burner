@@ -47,7 +47,7 @@ const emailProblem = (value: string) =>
   identityProblem(value, MAX_APPLICANT_EMAIL_LENGTH) ?? (looksLikeEmail(value) ? undefined : 'malformed')
 
 const Sent = ({ sendsEmail }: { sendsEmail?: boolean }) => (
-  <article>
+  <article class="column">
     <h1>Application sent</h1>
     <p role="status">
       Thank you — we have your application. We read them together before each burn.{' '}

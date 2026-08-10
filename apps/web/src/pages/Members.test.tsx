@@ -353,11 +353,6 @@ describe('what the allergies column shows', () => {
   })
 
   it('keeps the full width, because it is a table', async () => {
-    // The other half of #421's pair. `.site-main` is unbounded on purpose, and this is one of
-    // the pages that exists for: squeezing it into a reading column was the bug that removing
-    // `--measure` from `.site-main` fixed.
-    // Asserted on the shell rather than after a load: the width is `GuardedPage`'s and does
-    // not depend on what came back, so waiting on content would only couple this to a stub.
     const { container } = renderPage(stub())
 
     expect(container.querySelector('section')?.className).toBe('page')

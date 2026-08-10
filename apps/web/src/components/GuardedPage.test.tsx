@@ -112,8 +112,6 @@ describe('GuardedPage', () => {
 
   describe('how wide the page is', () => {
     it('stays unbounded unless asked, so a roster keeps the room', () => {
-      // `.site-main` has no max-width on purpose and `.page` carries none, which is what lets
-      // the grids and rosters use the window. A default of `column` would squeeze all of them.
       const { container } = renderShell('approved', signedInAs('member'))
 
       expect(sectionClass(container)).toBe('page')
@@ -126,8 +124,6 @@ describe('GuardedPage', () => {
     })
 
     it('is the same width while loading and when refused', () => {
-      // Otherwise the page jumps sideways as the viewer resolves, or the refusal sits in a
-      // different place from the page it replaces.
       const { container: loading } = renderShell('admin', LOADING, 'column')
       expect(sectionClass(loading)).toBe('page column')
 
