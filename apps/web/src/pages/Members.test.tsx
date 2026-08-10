@@ -351,7 +351,9 @@ describe('what the allergies column shows', () => {
 
     expect(await screen.findByText('Lactose')).toBeTruthy()
   })
+})
 
+describe('how wide the page is', () => {
   it('keeps the full width, because it is a table', async () => {
     const { container } = renderPage(stub())
 

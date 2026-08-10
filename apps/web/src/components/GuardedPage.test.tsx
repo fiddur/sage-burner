@@ -10,7 +10,7 @@ import { GuardedPage } from './GuardedPage.tsx'
 
 afterEach(cleanup)
 
-const renderShell = (require: 'admin' | 'approved' | 'member', viewer: Viewer, width?: 'column' | 'full') =>
+const renderShell = (require: 'admin' | 'approved' | 'member', viewer: Viewer, width?: 'column') =>
   render(
     <ViewerProvider viewer={viewer}>
       <GuardedPage title="Places" require={require} {...(width === undefined ? {} : { width })}>

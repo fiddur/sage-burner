@@ -20,8 +20,7 @@ export const GuardedPage = ({
 }: {
   title: string
   require: keyof typeof holds
-  /** `column` for a page that is fields or cards; `full` for the grids and rosters. */
-  width?: 'column' | 'full'
+  width?: 'column'
   children: ComponentChildren
 }) => {
   const viewer = useViewer()

@@ -16,8 +16,8 @@
   --muted: #78716c;
   --line: #e0d9cf;
   --radius: 0.5rem;
-  /* A reading width, for the two pages that are actually prose. `em` rather than
-     `rem` so it tracks the text it bounds if that ever changes size. */
+  /* A reading width for prose. `em` rather than `rem` so it tracks the text it bounds
+     if that ever changes size; `--column` is `rem` because a form is not text. */
   --measure: 45em;
   --column: 40rem;
 
