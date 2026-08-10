@@ -121,7 +121,7 @@ export const Layout = ({ api, children }: { api: BellApi; children: ComponentChi
       <footer class="site-footer">
         <p>
           A co-created gathering. Run on <a href="https://github.com/fiddur/sage-burner">sage-burner</a>,
-          which is free software under the AGPL. <a href="/privacy">Privacy</a>.
+          which is free software under the AGPL. <a href="/privacy">Privacy</a>. <a href="/terms">Terms</a>.
         </p>
       </footer>
 

@@ -33,9 +33,21 @@ Only if you choose to link one, and only ever as an extra way in beside your pas
   never shown to anybody, including other members.
 - **A copy of your profile picture**, once, and only if you have not already chosen a picture
   here. After that it is an ordinary picture on your account, which you can change or remove.
+- **A link to your Facebook page**, if the organisers set their app up to ask for it — shown on
+  your profile page here, where the other members can follow it. Facebook only opens that link
+  for somebody already logged in and already a friend of yours, so it is less of a way to be
+  found than the Facebook name you can type in yourself.
 
 We ask those providers for nothing else. We do not ask for your email address, your friends,
 your posts, or anything you have done anywhere else, and we cannot see any of it.
+
+**Getting rid of it takes one button.** Under **Your details**, beside the provider under
+_Other ways to sign in_, _Take it off_ deletes that identifier and that link straight away and
+for good — after it, nothing from that provider is left. The one thing it does not undo is the
+copied picture, because by then it is an ordinary picture on your account: remove or replace it
+under **Your details** as you would any other. If that link is the only way you have left of signing
+in, the app says so and keeps it rather than locking you out of your own account — set a
+password or add a passkey first, and then it can go.
 
 # The calendar feed
 

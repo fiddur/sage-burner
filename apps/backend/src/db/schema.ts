@@ -1543,6 +1543,17 @@ export const oauthSetting = sqliteTable(
     provider: text('provider', { enum: oauthProviders }).notNull(),
     client_id: text('client_id').notNull(),
     client_secret: text('client_secret').notNull(),
+    /**
+     * Whether this installation's app may ask for the extra scope that answers a profile
+     * URL — Facebook's `user_link` (#405).
+     *
+     * A setting rather than always-on, and that is the whole of why it exists: the scope has
+     * to be named in the authorize redirect, which happens in the browser before this process
+     * sees anything, so an app that has not been approved for it cannot be recovered from
+     * server-side. Off by default, so an installation whose admin never went to the console
+     * for it keeps exactly the sign-in it has.
+     */
+    ask_profile_link: integer('ask_profile_link', { mode: 'boolean' }).notNull().default(false),
     updated_at: text('updated_at').notNull(),
   },
   (table) => [
@@ -1580,6 +1591,17 @@ export const accountIdentity = sqliteTable(
       .references(() => account.id, { onDelete: 'cascade' }),
     provider: text('provider', { enum: oauthProviders }).notNull(),
     subject: text('subject').notNull(),
+    /**
+     * Where their own page at that provider is, when it answered with one (#405).
+     *
+     * Here rather than on `account`, and that placement is what satisfies Meta's data
+     * deletion requirement without any mechanism of its own: taking the way in off deletes
+     * the row, and the row is the only place this is. Nothing has to remember to clear it.
+     *
+     * Null for Discord, which has no profile URL at all, and null for a Facebook app whose
+     * admin never asked for `user_link`.
+     */
+    profile_url: text('profile_url'),
     created_at: text('created_at').notNull(),
   },
   (table) => [

@@ -11,6 +11,7 @@ const SAVED = {
   provider: 'facebook' as const,
   client_id: 'client-1',
   has_secret: true,
+  ask_profile_link: false,
   updated_at: '2026-08-01T00:00:00.000Z',
 }
 
@@ -45,13 +46,21 @@ describe('setting a provider up', () => {
     expect(await screen.findByText('/api/auth/oauth/facebook/callback')).toBeTruthy()
   })
 
-  it('prints the privacy-policy URL app review asks for', async () => {
-    // The other string an admin pastes into the Meta console, and the one #400 named three
-    // times without ever producing a page for.
+  it('prints every URL Basic Settings asks for, so none is retyped', async () => {
+    // The strings an admin pastes into the Meta console beside the redirect URI. #400 named the
+    // privacy one three times without producing a page for it; #419 added the other two, and the
+    // deletion instructions are the privacy page again rather than a callback.
     show(stub())
 
-    expect(await screen.findByText('/privacy')).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'this page' }).getAttribute('href')).toBe('/privacy')
+    expect(await screen.findByText(/Privacy Policy/)).toBeTruthy()
+    expect(screen.getByText(/Terms of Service/)).toBeTruthy()
+    expect(screen.getByText(/Data Deletion Instructions/)).toBeTruthy()
+
+    const paths = screen.getAllByRole('link').map((link) => link.getAttribute('href'))
+
+    expect(paths).toContain('/terms')
+    // Twice: the policy is both the privacy URL and what the deletion instructions point at.
+    expect(paths.filter((path) => path === '/privacy')).toHaveLength(2)
   })
 
   it('seeds the id from what is stored, and never the secret', async () => {
@@ -75,7 +84,10 @@ describe('setting a provider up', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() =>
-      expect(updateOauthSettings).toHaveBeenCalledWith('facebook', { client_id: 'client-2' }),
+      expect(updateOauthSettings).toHaveBeenCalledWith('facebook', {
+        client_id: 'client-2',
+        ask_profile_link: false,
+      }),
     )
   })
 
@@ -90,8 +102,40 @@ describe('setting a provider up', () => {
     await waitFor(() =>
       expect(updateOauthSettings).toHaveBeenCalledWith('facebook', {
         client_id: 'client-1',
+        ask_profile_link: false,
         client_secret: 'hunter2',
       }),
+    )
+  })
+
+  it('sends the profile-link permission once an admin says it is approved', async () => {
+    const updateOauthSettings = vi.fn(() => Promise.resolve({ settings: SAVED }))
+    show(stub({ updateOauthSettings }))
+
+    fireEvent.input(await screen.findByLabelText('Facebook client ID'), { target: { value: 'client-1' } })
+    fireEvent.click(screen.getByRole('checkbox', { name: /user_link/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() =>
+      expect(updateOauthSettings).toHaveBeenCalledWith('facebook', {
+        client_id: 'client-1',
+        ask_profile_link: true,
+      }),
+    )
+  })
+
+  it('seeds the box from what is stored, so a save does not turn it back off', async () => {
+    // The failure this prevents: correcting a typo in the client id, with the box redrawn
+    // unticked, would send `false` and stop asking for the permission on every later sign-in.
+    show(
+      stub({
+        getOauthSettings: () => Promise.resolve({ settings: { ...SAVED, ask_profile_link: true } }),
+      }),
+    )
+
+    expect(await screen.findByRole<HTMLInputElement>('checkbox', { name: /user_link/ })).toHaveProperty(
+      'checked',
+      true,
     )
   })
 

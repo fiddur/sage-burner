@@ -9,6 +9,7 @@ import {
   connectionValue,
   effortLevels,
   eventOptionKinds,
+  facebookProfileLink,
   formQuestionTypes,
   inviteStatuses,
   inviteStatusOf,
@@ -261,5 +262,33 @@ describe('what is stored for a way of being reached', () => {
     expect(connectionHref('mastodon', connectionValue('mastodon', 'https://chaos.social/@wren'))).toBe(
       'https://chaos.social/@wren',
     )
+  })
+
+  describe('a profile URL Facebook itself answered', () => {
+    it('keeps a link on Facebook, whichever subdomain it is on', () => {
+      // The two shapes `user_link` actually answers: a vanity name, and `profile.php` for an
+      // account without one.
+      expect(facebookProfileLink('https://www.facebook.com/wren')).toBe('https://www.facebook.com/wren')
+      expect(facebookProfileLink('https://facebook.com/profile.php?id=1234567890')).toBe(
+        'https://facebook.com/profile.php?id=1234567890',
+      )
+      expect(facebookProfileLink('  https://m.facebook.com/wren  ')).toBe('https://m.facebook.com/wren')
+    })
+
+    it('refuses a host that only looks like Facebook', () => {
+      // `facebookNumericId`'s mistake, which this must not repeat: a loose match takes
+      // `notfacebook.com`, and one that eats an authority takes a query string naming Facebook
+      // on somebody else's host. It lands in an `href` other members click.
+      expect(facebookProfileLink('https://notfacebook.com/wren')).toBeUndefined()
+      expect(facebookProfileLink('https://evil.example?x=facebook.com/wren')).toBeUndefined()
+      expect(facebookProfileLink('https://facebook.com.evil.example/wren')).toBeUndefined()
+    })
+
+    it('refuses anything that is not https, and nothing at all', () => {
+      expect(facebookProfileLink('http://facebook.com/wren')).toBeUndefined()
+      expect(facebookProfileLink('javascript:alert(1)')).toBeUndefined()
+      expect(facebookProfileLink('')).toBeUndefined()
+      expect(facebookProfileLink(undefined)).toBeUndefined()
+    })
   })
 })

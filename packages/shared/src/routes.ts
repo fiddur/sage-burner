@@ -546,6 +546,12 @@ export const apiRoutes = {
     fastify: '/api/privacy',
     path: () => '/api/privacy',
   },
+  /** The terms of service (#419). `termsResponseSchema` carries the why. */
+  getTerms: {
+    method: 'GET',
+    fastify: '/api/terms',
+    path: () => '/api/terms',
+  },
   getVersion: {
     method: 'GET',
     fastify: '/api/version',

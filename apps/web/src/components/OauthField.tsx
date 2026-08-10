@@ -23,7 +23,7 @@ const consoles = {
   },
   facebook: {
     where: 'developers.facebook.com',
-    cost: 'An app, a privacy-policy URL, and app review for public_profile before anybody outside your own account can use it.',
+    cost: 'An app, the URLs listed below, and app review for public_profile before anybody outside your own account can use it.',
   },
 } as const satisfies Record<OAuthProvider, { where: string; cost: string }>
 
@@ -43,6 +43,7 @@ export const OauthField = ({ api, provider }: { api: OauthApi; provider: OAuthPr
   const [stored, setStored] = useState<OAuthSettings | null | undefined>(undefined)
   const [clientId, setClientId] = useState('')
   const [secret, setSecret] = useState('')
+  const [askProfileLink, setAskProfileLink] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | undefined>(undefined)
 
@@ -57,6 +58,7 @@ export const OauthField = ({ api, provider }: { api: OauthApi; provider: OAuthPr
         if (controller.signal.aborted) return
         setStored(settings)
         setClientId(settings?.client_id ?? '')
+        setAskProfileLink(settings?.ask_profile_link ?? false)
       })
       .catch(() => {
         if (!controller.signal.aborted) setStored(null)
@@ -72,6 +74,7 @@ export const OauthField = ({ api, provider }: { api: OauthApi; provider: OAuthPr
       const { settings } = await work()
       setStored(settings)
       setClientId(settings?.client_id ?? '')
+      setAskProfileLink(settings?.ask_profile_link ?? false)
       setSecret('')
     } catch {
       setError('Could not save that. Please try again.')
@@ -97,10 +100,28 @@ export const OauthField = ({ api, provider }: { api: OauthApi; provider: OAuthPr
       </p>
 
       {provider === 'facebook' && (
-        <p class="form-note">
-          The privacy-policy URL app review asks for is <code>/privacy</code> on this installation's own
-          address — <a href="/privacy">this page</a>, which anybody can read without signing in.
-        </p>
+        <>
+          <p class="form-note">
+            Basic Settings asks for three more URLs, all on this installation's own address and all readable
+            by a reviewer who is not signed in:
+          </p>
+
+          <ul class="form-note">
+            <li>
+              Privacy Policy — <a href="/privacy">/privacy</a>
+            </li>
+            <li>
+              Terms of Service — <a href="/terms">/terms</a>
+            </li>
+            <li>
+              {/* Instructions rather than a deletion callback, which `privacyResponseSchema` says
+                  why of: the callback would have to delete an identity the server refuses to let
+                  go when it is somebody's last way in. */}
+              Data Deletion Instructions — <a href="/privacy">/privacy</a> again, which says how to take a
+              linked provider off an account
+            </li>
+          </ul>
+        </>
       )}
 
       {stored === undefined ? (
@@ -114,6 +135,7 @@ export const OauthField = ({ api, provider }: { api: OauthApi; provider: OAuthPr
               async () =>
                 await api.updateOauthSettings(provider, {
                   client_id: clientId.trim(),
+                  ask_profile_link: askProfileLink,
                   // Omitted rather than sent empty: empty is a secret being cleared, and typing
                   // nothing into a box that was already blank is not that.
                   ...(secret === '' ? {} : { client_secret: secret }),
@@ -146,6 +168,28 @@ export const OauthField = ({ api, provider }: { api: OauthApi; provider: OAuthPr
               onInput={(inputEvent) => setSecret(inputEvent.currentTarget.value)}
             />
           </label>
+
+          {provider === 'facebook' && (
+            <>
+              <label class="row">
+                <input
+                  type="checkbox"
+                  name="ask_profile_link"
+                  checked={askProfileLink}
+                  disabled={busy}
+                  onChange={(changeEvent) => setAskProfileLink(changeEvent.currentTarget.checked)}
+                />
+                <span>This app has been approved for user_link</span>
+              </label>
+
+              <p class="form-note">
+                Only tick that once <code>user_link</code> shows as approved in the console. It puts
+                somebody's Facebook page on their profile here when they link a sign-in, and asking for a
+                permission the app does not have would send people to a consent screen that refuses them.
+                Untick it and the next sign-in asks for nothing extra.
+              </p>
+            </>
+          )}
 
           <p class="row">
             <PendingButton busy={busy} label="Save" busyLabel="Saving…" type="submit" />

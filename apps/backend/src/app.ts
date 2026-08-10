@@ -37,8 +37,8 @@ import { registerAuthRoutes } from './routes/auth.ts'
 import { registerAvatarRoutes } from './routes/avatars.ts'
 import { registerBannerRoutes } from './routes/banner.ts'
 import { registerCalendarRoutes } from './routes/calendar.ts'
-import { readChangelog, registerChangelogRoutes } from './routes/changelog.ts'
 import { registerConnectionRoutes } from './routes/connections.ts'
+import { readDocument, registerDocumentRoutes } from './routes/documents.ts'
 import { registerEventOptionRoutes } from './routes/event-options.ts'
 import { registerEventRoutes } from './routes/events.ts'
 import { registerFaqRoutes } from './routes/faq.ts'
@@ -56,7 +56,6 @@ import { registerOauthRoutes } from './routes/oauth.ts'
 import { registerPasskeyRoutes } from './routes/passkeys.ts'
 import { registerPeopleRoutes } from './routes/people.ts'
 import { registerPlaceRoutes } from './routes/places.ts'
-import { readPrivacy, registerPrivacyRoutes } from './routes/privacy.ts'
 import { registerProfileRoutes } from './routes/profile.ts'
 import { registerPushRoutes } from './routes/push.ts'
 import { registerPwaRoutes } from './routes/pwa.ts'
@@ -138,6 +137,12 @@ export interface AppDeps {
    * Read from `PRIVACY.md` at boot, and injected for the same reason as the changelog.
    */
   privacy?: string
+  /**
+   * What `GET /api/terms` answers with (#419). `termsResponseSchema` carries why it exists.
+   *
+   * `TERMS.md` at boot, and injected for the same reason as the other two.
+   */
+  terms?: string
 }
 
 /** The API lives here; everything else is the single-page app. */
@@ -396,8 +401,9 @@ export const createApp = async ({
   defer,
   hash,
   now = () => new Date(),
-  changelog = readChangelog(),
-  privacy = readPrivacy(),
+  changelog = readDocument('CHANGELOG.md'),
+  privacy = readDocument('PRIVACY.md'),
+  terms = readDocument('TERMS.md'),
 }: AppDeps): Promise<FastifyInstance> => {
   const app = Fastify({
     logger: loggerOptions(config.log_level),
@@ -464,8 +470,7 @@ export const createApp = async ({
   registerVersionRoutes(app, { config })
   // Read once, at boot: the file is part of the image, and a page nobody is signed in
   // to read is not worth a stat per request.
-  registerChangelogRoutes(app, { markdown: changelog })
-  registerPrivacyRoutes(app, { markdown: privacy })
+  registerDocumentRoutes(app, { changelog, privacy, terms })
 
   // One `Sessions` for both, so the guards verify what the login route signed.
   const sessions = createSessions(sessionDeps(config))

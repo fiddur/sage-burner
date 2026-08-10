@@ -8,6 +8,7 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import type { GuardDeps } from '../auth/guards.ts'
 import type { Config } from '../config.ts'
 import type { OAuthCalls } from '../oauth/client.ts'
+import type { ProviderAsks } from '../oauth/providers.ts'
 
 import { viewerFor } from '../auth/viewer.ts'
 import { accountAvatar, accountIdentity, oauthState } from '../db/schema.ts'
@@ -73,6 +74,17 @@ export const registerOauthRoutes = (
 
   const providerOf = (value: string): OAuthProvider | undefined =>
     isOAuthProvider(value) ? value : undefined
+
+  /**
+   * What this installation's app may ask for, read off the same row both legs read.
+   *
+   * Both have to agree — the authorize redirect names the scope and the profile read names the
+   * fields — and reading it twice from one place is what makes that true without either leg
+   * carrying the answer through the round trip.
+   */
+  const asksFor = (setting: { ask_profile_link: boolean }): ProviderAsks => ({
+    profileLink: setting.ask_profile_link,
+  })
 
   /**
    * A state and the nonce that ties it to this browser.
@@ -182,7 +194,15 @@ export const registerOauthRoutes = (
 
       void reply.header('set-cookie', nonceCookie(nonce, STATE_TTL_SECONDS))
 
-      return back(reply, authorizeUrl(provider, { clientId: setting.client_id, redirectUri: uri, state }))
+      return back(
+        reply,
+        authorizeUrl(provider, {
+          clientId: setting.client_id,
+          redirectUri: uri,
+          state,
+          asks: asksFor(setting),
+        }),
+      )
     }
 
   app.get<{ Params: { provider: string } }>(apiRoutes.startOauthSignIn.fastify, leaving('sign-in'))
@@ -223,14 +243,33 @@ export const registerOauthRoutes = (
    * takeover path and an oracle both. `unlinked` reads the same whether or not an account
    * exists for whatever the provider holds.
    */
-  const signIn = async (reply: FastifyReply, provider: OAuthProvider, subject: string) => {
+  const signIn = async (
+    reply: FastifyReply,
+    provider: OAuthProvider,
+    profile: { subject: string; profile_url?: string },
+  ) => {
     const [identity] = await db
-      .select({ account_id: accountIdentity.account_id })
+      .select({ id: accountIdentity.id, account_id: accountIdentity.account_id })
       .from(accountIdentity)
-      .where(and(eq(accountIdentity.provider, provider), eq(accountIdentity.subject, subject)))
+      .where(and(eq(accountIdentity.provider, provider), eq(accountIdentity.subject, profile.subject)))
       .limit(1)
 
     if (identity === undefined) return back(reply, loginPage('unlinked'))
+
+    // Refreshed here and not only at link time, which is what makes the feature reach somebody
+    // who linked before the installation asked for the scope — otherwise their only route to a
+    // profile link would be to unlink and link again. A vanity name that changes lands here
+    // too. Swallowed like the avatar: a sign-in must not fail over a cosmetic column.
+    if (profile.profile_url !== undefined) {
+      try {
+        await db
+          .update(accountIdentity)
+          .set({ profile_url: profile.profile_url })
+          .where(eq(accountIdentity.id, identity.id))
+      } catch {
+        /* empty */
+      }
+    }
 
     void reply.header(
       'set-cookie',
@@ -250,7 +289,7 @@ export const registerOauthRoutes = (
     reply: FastifyReply,
     provider: OAuthProvider,
     accountId: string | null,
-    profile: { subject: string; picture?: string },
+    profile: { subject: string; picture?: string; profile_url?: string },
   ) => {
     if (accountId === null) return back(reply, detailsPage('refused'))
 
@@ -260,6 +299,7 @@ export const registerOauthRoutes = (
         account_id: accountId,
         provider,
         subject: profile.subject,
+        profile_url: profile.profile_url ?? null,
         created_at: now().toISOString(),
       })
     } catch {
@@ -321,11 +361,12 @@ export const registerOauthRoutes = (
         clientSecret: setting.client_secret,
         redirectUri: uri,
         code,
+        asks: asksFor(setting),
       })
       if (profile === undefined) return back(reply, failed)
 
       return spent.intent === 'sign-in'
-        ? await signIn(reply, provider, profile.subject)
+        ? await signIn(reply, provider, profile)
         : await link(reply, provider, spent.account_id, profile)
     },
   )
