@@ -22,7 +22,7 @@ export const threadSchema = z.object({
   entity_id: idSchema,
   title: z.string().max(MAX_TITLE),
   link: z.string().nullable(),
-  introduction: z.string().nullable(),
+  body: z.string().nullable(),
   gone: z.boolean(),
   entry_count: z.int().min(0),
   last_at: dateTimeSchema.nullable(),

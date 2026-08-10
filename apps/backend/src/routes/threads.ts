@@ -1,4 +1,5 @@
 import type {
+  NotificationCategory,
   Thread,
   ThreadEntityType,
   ThreadEntry,
@@ -12,6 +13,7 @@ import {
   coalesces,
   commentSchema,
   dreamPage,
+  feedPage,
   INTRODUCTION_EXCERPT,
   profilePage,
 } from '@sage-burner/shared'
@@ -24,7 +26,16 @@ import type { Notifier } from '../push/notify.ts'
 
 import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
-import { account, attendance, event, session, sessionHelper, thread, threadEntry } from '../db/schema.ts'
+import {
+  account,
+  attendance,
+  event,
+  post,
+  session,
+  sessionHelper,
+  thread,
+  threadEntry,
+} from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { displayName } from '../push/notify.ts'
 
@@ -158,8 +169,8 @@ export const cardEntry = async (
   await addEntry(db, { thread_id: id, kind, author_account_id: who.account_id, body }, at)
 }
 
-export const excerptOf = (introduction: string | null): string | null => {
-  const whole = introduction?.trim() ?? ''
+export const excerptOf = (whole_text: string | null): string | null => {
+  const whole = whole_text?.trim() ?? ''
   if (whole === '') return null
   if (whole.length <= INTRODUCTION_EXCERPT) return whole
 
@@ -209,12 +220,16 @@ export const readThreads = async (
       subject: account.id,
       subject_name: account.name,
       introduction: account.introduction,
+      post_title: post.title,
+      post_body: post.body,
+      post_withdrawn_at: post.withdrawn_at,
     })
     .from(thread)
     .innerJoin(event, eq(event.id, thread.event_id))
     .leftJoin(session, and(eq(thread.entity_type, 'session'), eq(session.id, thread.entity_id)))
     .leftJoin(attendance, and(eq(thread.entity_type, 'attendance'), eq(attendance.id, thread.entity_id)))
     .leftJoin(account, eq(account.id, attendance.account_id))
+    .leftJoin(post, and(eq(thread.entity_type, 'post'), eq(post.id, thread.entity_id)))
     .where(inArray(thread.id, [...ids]))
 
   const entries = await db
@@ -258,9 +273,6 @@ export const readThreads = async (
     const shown = newest === undefined ? all : all.slice(Math.max(0, all.length - newest))
     const last = all.at(-1)
 
-    const forDream = row.entity_type === 'session'
-    const gone = forDream ? row.dream === null : row.stay === null
-
     return [
       {
         id: row.id,
@@ -268,10 +280,7 @@ export const readThreads = async (
         burn: row.burn,
         entity_type: row.entity_type,
         entity_id: row.entity_id,
-        title: forDream ? row.title : (row.subject_name ?? row.title),
-        link: linkTo(row, forDream, gone),
-        introduction: forDream ? null : excerptOf(row.introduction),
-        gone,
+        ...factsFor(row),
         entry_count: counts?.get(id) ?? all.length,
         last_at: last?.created_at ?? null,
         entries: shown,
@@ -280,15 +289,47 @@ export const readThreads = async (
   })
 }
 
-const linkTo = (
-  row: { event_id: string; entity_id: string; subject: string | null },
-  forDream: boolean,
-  gone: boolean,
-): string | null => {
-  if (forDream) return gone ? null : dreamPage(row.event_id, row.entity_id)
-
-  return row.subject === null ? null : profilePage(row.subject)
+interface CardRow {
+  event_id: string
+  entity_type: ThreadEntityType
+  entity_id: string
+  title: string
+  dream: string | null
+  stay: string | null
+  subject: string | null
+  subject_name: string | null
+  introduction: string | null
+  post_title: string | null
+  post_body: string | null
+  post_withdrawn_at: string | null
 }
+
+type CardFacts = Pick<Thread, 'title' | 'link' | 'body' | 'gone'>
+
+const dreamFacts = (row: CardRow): CardFacts => ({
+  title: row.title,
+  link: row.dream === null ? null : dreamPage(row.event_id, row.entity_id),
+  body: null,
+  gone: row.dream === null,
+})
+
+const personFacts = (row: CardRow): CardFacts => ({
+  title: row.subject_name ?? row.title,
+  link: row.subject === null ? null : profilePage(row.subject),
+  body: excerptOf(row.introduction),
+  gone: row.stay === null,
+})
+
+// A post has no page of its own: the card is the post, so its title links nowhere.
+const postFacts = (row: CardRow): CardFacts => ({
+  title: row.post_title ?? row.title,
+  link: null,
+  body: row.post_withdrawn_at === null ? row.post_body : null,
+  gone: row.post_withdrawn_at !== null,
+})
+
+const factsFor = (row: CardRow): CardFacts =>
+  ({ session: dreamFacts, attendance: personFacts, post: postFacts })[row.entity_type](row)
 
 export const subjectOf = async (
   db: Database,
@@ -318,6 +359,17 @@ export const participantsOf = async (
   if (found.entity_type === 'attendance') {
     const subject = await subjectOf(db, found.entity_id)
     if (subject !== undefined) people.add(subject.account_id)
+
+    return people
+  }
+
+  if (found.entity_type === 'post') {
+    const [row] = await db
+      .select({ author: post.author_account_id })
+      .from(post)
+      .where(eq(post.id, found.entity_id))
+      .limit(1)
+    if (row?.author != null) people.add(row.author)
 
     return people
   }
@@ -483,6 +535,16 @@ export const registerThreadRoutes = (
       return { link: dreamPage(found.event_id, found.entity_id), what: found.title }
     }
 
+    if (found.entity_type === 'post') {
+      const [row] = await db
+        .select({ title: post.title })
+        .from(post)
+        .where(eq(post.id, found.entity_id))
+        .limit(1)
+
+      return { link: feedPage(), what: row?.title ?? found.title }
+    }
+
     const subject = await subjectOf(db, found.entity_id)
 
     return subject === undefined
@@ -490,14 +552,19 @@ export const registerThreadRoutes = (
       : { link: profilePage(subject.account_id), what: subject.name ?? found.title }
   }
 
+  const commentCategories = {
+    session: { mine: 'dream_comment', anybody: 'dream_comment_any' },
+    attendance: { mine: 'introduction_comment', anybody: 'introduction_comment_any' },
+    post: { mine: 'post_comment', anybody: 'post_comment_any' },
+  } as const satisfies Record<ThreadEntityType, { mine: NotificationCategory; anybody: NotificationCategory }>
+
   const tellAbout = async (
     found: { id: string; event_id: string; entity_type: ThreadEntityType; entity_id: string; title: string },
     author: string,
   ) => {
     const { link, what } = await aboutWhat(found)
     const said = `${await displayName(db, author)} said something about ${what}`
-    const mine = found.entity_type === 'session' ? 'dream_comment' : 'introduction_comment'
-    const anybody = found.entity_type === 'session' ? 'dream_comment_any' : 'introduction_comment_any'
+    const { mine, anybody } = commentCategories[found.entity_type]
 
     const people = await participantsOf(db, found)
     people.delete(author)

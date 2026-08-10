@@ -259,7 +259,7 @@ describe('leaving for a provider', () => {
     expect(line?.provider).toBe('facebook')
   })
 
-  it('quotes the reference that is on that very log line, or it names nothing', async () => {
+  it('quotes the reference that is on that very log line', async () => {
     const logged: string[] = []
     const server = await build(fakeOAuth(), logged)
 

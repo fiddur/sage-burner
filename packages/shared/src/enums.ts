@@ -77,6 +77,9 @@ export const notificationCategories = [
   'introduction_written',
   'introduction_comment',
   'introduction_comment_any',
+  'post_written',
+  'post_comment',
+  'post_comment_any',
   'lead_role_added',
   'lead_role_filled',
   'new_version',
@@ -112,6 +115,9 @@ export const notificationCategoryInfo = {
   introduction_written: { label: 'Somebody says who they are', on: false, about: 'else' },
   introduction_comment: { label: 'Somebody comments on your own card', on: true, about: 'you' },
   introduction_comment_any: { label: 'Somebody comments on anybody’s card', on: false, about: 'else' },
+  post_written: { label: 'Somebody announces something', on: false, about: 'else' },
+  post_comment: { label: 'Somebody comments on something you announced', on: true, about: 'you' },
+  post_comment_any: { label: 'Somebody comments on an announcement', on: false, about: 'else' },
   lead_role_added: { label: 'A lead role is added', on: false, about: 'else' },
   lead_role_filled: { label: 'Somebody takes the lead of a role', on: false, about: 'else' },
   new_version: { label: 'A new version of the app is out', on: false, about: 'else' },
@@ -130,7 +136,7 @@ export const notificationSections = [
 export const categoriesAbout = (about: NotificationCategoryInfo['about']): NotificationCategory[] =>
   notificationCategories.filter((category) => notificationCategoryInfo[category].about === about)
 
-export const threadEntityTypes = ['session', 'attendance'] as const
+export const threadEntityTypes = ['session', 'attendance', 'post'] as const
 export type ThreadEntityType = (typeof threadEntityTypes)[number]
 export const isThreadEntityType = (value: unknown): value is ThreadEntityType =>
   isOneOf(threadEntityTypes, value)
@@ -140,6 +146,7 @@ export const threadEntryKinds = [
   'offered',
   'joined',
   'introduced',
+  'posted',
   'facilitator',
   'helper',
   'renamed',
@@ -169,11 +176,23 @@ const attendanceCategory = (kind: ThreadEntryKind): NotificationCategory | undef
   return undefined
 }
 
+const postCategory = (kind: ThreadEntryKind): NotificationCategory | undefined => {
+  if (kind === 'comment') return 'post_comment_any'
+  if (kind === 'posted' || kind === 'edited') return 'post_written'
+
+  return undefined
+}
+
+const categoriesFor = {
+  session: sessionCategory,
+  attendance: attendanceCategory,
+  post: postCategory,
+} as const satisfies Record<ThreadEntityType, (kind: ThreadEntryKind) => NotificationCategory | undefined>
+
 export const entryCategory = (
   entity: ThreadEntityType,
   kind: ThreadEntryKind,
-): NotificationCategory | undefined =>
-  entity === 'session' ? sessionCategory(kind) : attendanceCategory(kind)
+): NotificationCategory | undefined => categoriesFor[entity](kind)
 
 export const connectionKinds = [
   'email',

@@ -50,6 +50,7 @@ import { FetchedViewerProvider, ViewerProvider } from './viewer.tsx'
 
 export type RoutesApi = Pick<
   ApiClient,
+  | 'addPost'
   | 'addQuestion'
   | 'createEvent'
   | 'deleteQuestion'

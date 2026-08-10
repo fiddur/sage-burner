@@ -132,6 +132,7 @@ const clientWith = (
   reorderAllergyItems: () => Promise.reject(new Error('reorderAllergyItems is not stubbed in this file')),
   getPlaces: () => Promise.reject(new Error('getPlaces is not stubbed in this file')),
   getRides: () => Promise.reject(new Error('getRides is not stubbed in this file')),
+  addPost: () => Promise.reject(new Error('addPost is not stubbed in this file')),
   addRide: () => Promise.reject(new Error('addRide is not stubbed in this file')),
   updateRide: () => Promise.reject(new Error('updateRide is not stubbed in this file')),
   deleteRide: () => Promise.reject(new Error('deleteRide is not stubbed in this file')),

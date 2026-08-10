@@ -1,4 +1,4 @@
-import type { Activity, Thread, ThreadEntry } from '@sage-burner/shared'
+import type { Activity, MyBurn, Thread, ThreadEntry } from '@sage-burner/shared'
 
 import { notificationCategoryInfo } from '@sage-burner/shared'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
@@ -8,6 +8,7 @@ import type { Viewer } from '../viewer.tsx'
 import type { FeedApi } from './Feed.tsx'
 
 import { apiError } from '../api/client.ts'
+import { BurnProvider } from '../burn.tsx'
 import { ViewerProvider } from '../viewer.tsx'
 import { Feed } from './Feed.tsx'
 
@@ -52,7 +53,7 @@ const aCard = (over: Partial<Thread> & Pick<Thread, 'id' | 'title'>): Thread => 
   entity_type: 'session',
   entity_id: 's-1',
   link: '/dreams?burn=e-1&dream=s-1',
-  introduction: null,
+  body: null,
   gone: false,
   entry_count: 1,
   last_at: '2026-08-07T18:00:00.000Z',
@@ -77,6 +78,7 @@ const stub = (over: Partial<FeedApi> = {}, activity: Activity[] = TWO, threads: 
   getMyNotificationSettings: () => Promise.resolve({ on: [...DEFAULTS], email: [] }),
   updateMyNotificationSettings: () => Promise.resolve({ on: [...DEFAULTS], email: [] }),
   getThread: () => Promise.reject(new Error('getThread is not stubbed here')),
+  addPost: () => Promise.reject(new Error('addPost is not stubbed here')),
   uploadImage: () => Promise.reject(new Error('uploadImage is not stubbed here')),
   postComment: () => Promise.reject(new Error('postComment is not stubbed here')),
   updateComment: () => Promise.reject(new Error('updateComment is not stubbed here')),
@@ -84,12 +86,87 @@ const stub = (over: Partial<FeedApi> = {}, activity: Activity[] = TWO, threads: 
   ...over,
 })
 
-const renderPage = (api: FeedApi, viewer: Viewer = ADA) =>
+const BURN: MyBurn = {
+  event: {
+    id: 'e-1',
+    name: 'Summer burn',
+    slug: 'summer-burn',
+    start_date: '2026-08-01',
+    end_date: '2026-08-05',
+    start_time: '16:00',
+    end_time: '12:00',
+  },
+  attendance: null,
+}
+
+// `null` rather than `undefined`, as `Faq.test.tsx` argues: a parameter with a default
+// takes the default from `undefined`, so "no burn chosen" would silently render one.
+const renderPage = (api: FeedApi, viewer: Viewer = ADA, burn: MyBurn | null = BURN) =>
   render(
     <ViewerProvider viewer={viewer}>
-      <Feed api={api} />
+      <BurnProvider
+        value={{ status: 'ready', burns: burn === null ? [] : [burn], selected: burn ?? undefined }}
+      >
+        <Feed api={api} />
+      </BurnProvider>
     </ViewerProvider>,
   )
+
+describe('announcing something on the feed', () => {
+  it('sends the title and the body to the burn the bar has chosen', async () => {
+    const addPost = vi.fn<FeedApi['addPost']>(() =>
+      Promise.resolve({
+        post: {
+          id: 'p-1',
+          event_id: 'e-1',
+          author_account_id: 'a-1',
+          title: 'The planning call is Sunday',
+          body: 'Come.',
+          withdrawn_at: null,
+          created_at: '2026-08-07T18:00:00.000Z',
+        },
+      }),
+    )
+    renderPage(stub({ addPost }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Announce something' }))
+    fireEvent.input(screen.getByLabelText('What you are announcing'), {
+      target: { value: '  The planning call is Sunday  ' },
+    })
+    fireEvent.input(screen.getByLabelText('What you want to say about it'), { target: { value: ' Come. ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Announce it' }))
+
+    await waitFor(() =>
+      expect(addPost).toHaveBeenCalledWith('e-1', { title: 'The planning call is Sunday', body: 'Come.' }),
+    )
+  })
+
+  it('will not send one with nothing to announce', async () => {
+    const addPost = vi.fn<FeedApi['addPost']>()
+    renderPage(stub({ addPost }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Announce something' }))
+    fireEvent.input(screen.getByLabelText('What you are announcing'), { target: { value: '   ' } })
+
+    expect(screen.getByRole('button', { name: 'Announce it' })).toHaveProperty('disabled', true)
+    expect(addPost).not.toHaveBeenCalled()
+  })
+
+  it('offers nothing to announce to before a burn is chosen', async () => {
+    renderPage(stub(), ADA, null)
+
+    await waitFor(() => expect(screen.getByText('Ada offered a dream: Sauna at dawn')).toBeTruthy())
+    expect(screen.queryByRole('button', { name: 'Announce something' })).toBeNull()
+  })
+
+  it('says who will see it, so nobody announces to the wrong burn', async () => {
+    renderPage(stub())
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Announce something' }))
+
+    expect(screen.getByText(/Everyone coming to Summer burn will see this/)).toBeTruthy()
+  })
+})
 
 describe('what everyone has been doing', () => {
   it('shows a line per thing, newest first', async () => {
@@ -171,7 +248,7 @@ describe('what everyone has been doing', () => {
             title: 'Ada',
             entity_type: 'attendance',
             link: '/members/a-1',
-            introduction: 'I build **saunas**.',
+            body: 'I build **saunas**.',
             entries: [anEntry({ id: 't-1', body: 'says who they are', kind: 'introduced' })],
           }),
         ],
@@ -180,6 +257,29 @@ describe('what everyone has been doing', () => {
 
     expect(await screen.findByText('saunas')).toBeTruthy()
     expect((await screen.findByRole('link', { name: 'Ada' })).getAttribute('href')).toBe('/members/a-1')
+  })
+
+  it('offers an announcement’s own switch, not a dream’s', async () => {
+    renderPage(
+      stub(
+        {},
+        [],
+        [
+          aCard({
+            id: 'c-1',
+            title: 'The planning call is Sunday',
+            entity_type: 'post',
+            link: null,
+            body: 'Come.',
+            entries: [anEntry({ id: 't-1', body: 'noted', kind: 'comment' })],
+          }),
+        ],
+      ),
+    )
+
+    expect(
+      await screen.findByRole('button', { name: notificationCategoryInfo.post_comment_any.label }),
+    ).toBeTruthy()
   })
 
   it('offers the switch that belongs to the card, not the dream one of the same name', async () => {

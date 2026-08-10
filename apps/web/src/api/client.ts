@@ -55,6 +55,7 @@ import type {
   Place,
   PlaceOrder,
   PlacesResponse,
+  PostResponse,
   PrivacyResponse,
   ProfileResponse,
   PushKeyResponse,
@@ -678,6 +679,21 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
 
     deleteRide: (id: string) =>
       request<undefined>(apiRoutes.deleteRide.path(id), { method: apiRoutes.deleteRide.method }),
+
+    addPost: (eventId: string, body: BodyOf<'addPost'>) =>
+      request<PostResponse>(apiRoutes.addPost.path(eventId), {
+        method: apiRoutes.addPost.method,
+        body,
+      }),
+
+    updatePost: (id: string, body: BodyOf<'updatePost'>) =>
+      request<PostResponse>(apiRoutes.updatePost.path(id), {
+        method: apiRoutes.updatePost.method,
+        body,
+      }),
+
+    deletePost: (id: string) =>
+      request<undefined>(apiRoutes.deletePost.path(id), { method: apiRoutes.deletePost.method }),
 
     getEventOptions: (eventId: string, signal?: AbortSignal) =>
       request<EventOptionsResponse>(apiRoutes.getEventOptions.path(eventId), { signal, version: 'options' }),

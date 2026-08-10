@@ -1,14 +1,16 @@
 import type { Activity, NotificationCategory, NotificationSettings, Thread } from '@sage-burner/shared'
 
-import { BURN_PARAM, entryCategory, notificationCategoryInfo } from '@sage-burner/shared'
+import { BURN_PARAM, entryCategory, MAX_POST, MAX_TITLE, notificationCategoryInfo } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 import type { UploadImage } from '../image-upload.ts'
 
+import { useSelectedBurn } from '../burn.tsx'
 import { DreamThread } from '../components/DreamThread.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
+import { MarkdownField } from '../components/MarkdownField.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { localDay } from '../datetime.ts'
 import { useAction, useLoad } from '../load.ts'
@@ -25,6 +27,7 @@ export type FeedApi = Pick<
   | 'updateComment'
   | 'deleteComment'
   | 'uploadImage'
+  | 'addPost'
 >
 
 interface Happening {
@@ -85,6 +88,7 @@ export const Feed = ({ api }: { api: FeedApi }) => {
   }
 
   const items = loaded.status === 'ready' ? feedItems(loaded.data) : []
+  const selected = useSelectedBurn()
 
   return (
     <GuardedPage title="Feed" require="approved" width="column">
@@ -99,6 +103,20 @@ export const Feed = ({ api }: { api: FeedApi }) => {
       </p>
 
       <ErrorText message={error} />
+
+      <Announce
+        burn={selected?.event}
+        busy={busy}
+        upload={api.uploadImage}
+        onAnnounce={(title, body) => {
+          const eventId = selected?.event.id
+          if (eventId === undefined) return
+
+          run(async () => {
+            await api.addPost(eventId, { title, body })
+          }, 'Could not announce that. Please try again.')
+        }}
+      />
 
       {loaded.status === 'loading' && <p class="form-note">One moment…</p>}
       {loaded.status === 'failed' && <ErrorText message={loaded.message} />}
@@ -149,6 +167,83 @@ export const Feed = ({ api }: { api: FeedApi }) => {
   )
 }
 
+const Announce = ({
+  burn,
+  busy,
+  upload,
+  onAnnounce,
+}: {
+  burn: { id: string; name: string } | undefined
+  busy: boolean
+  upload: UploadImage
+  onAnnounce: (title: string, body: string) => void
+}) => {
+  const [open, setOpen] = useState(false)
+  const [title, setTitle] = useState('')
+  const [body, setBody] = useState('')
+
+  if (burn === undefined) return null
+
+  if (!open) {
+    return (
+      <p class="row">
+        <button type="button" class="link-button" disabled={busy} onClick={() => setOpen(true)}>
+          Announce something
+        </button>
+      </p>
+    )
+  }
+
+  return (
+    <form
+      class="form"
+      onSubmit={(submitEvent) => {
+        submitEvent.preventDefault()
+        if (title.trim() === '') return
+
+        onAnnounce(title.trim(), body.trim())
+        setTitle('')
+        setBody('')
+        setOpen(false)
+      }}
+    >
+      <label class="field">
+        <span>What is it</span>
+        <input
+          type="text"
+          aria-label="What you are announcing"
+          placeholder="The planning call is Sunday the 14th"
+          maxLength={MAX_TITLE}
+          disabled={busy}
+          value={title}
+          onInput={(inputEvent) => setTitle(inputEvent.currentTarget.value)}
+        />
+      </label>
+
+      <MarkdownField
+        label="Anything more"
+        accessibleName="What you want to say about it"
+        value={body}
+        maxLength={MAX_POST}
+        rows={4}
+        upload={upload}
+        onInput={setBody}
+      />
+
+      <p class="form-note">Everyone coming to {burn.name} will see this on the feed.</p>
+
+      <p class="row">
+        <button type="submit" disabled={busy || title.trim() === ''}>
+          Announce it
+        </button>
+        <button type="button" class="link-button" disabled={busy} onClick={() => setOpen(false)}>
+          Cancel
+        </button>
+      </p>
+    </form>
+  )
+}
+
 const feedItems = ({ activity, threads }: Happening): Item[] =>
   [
     ...activity.map((line) => ({ at: line.created_at, id: line.id, line })),
@@ -194,10 +289,10 @@ const Card = ({
         {card.gone && (card.entity_type === 'session' ? ' · withdrawn' : ' · no longer coming')}
       </p>
 
-      {card.introduction !== null && (
+      {card.body !== null && (
         <div
           class="markdown-preview feed-card-about"
-          dangerouslySetInnerHTML={{ __html: renderMarkdown(card.introduction) }}
+          dangerouslySetInnerHTML={{ __html: renderMarkdown(card.body) }}
         />
       )}
 

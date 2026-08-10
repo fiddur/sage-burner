@@ -49,6 +49,8 @@ import type {
   PlaceOrder,
   PlaceTransfer,
   PlaceUpdate,
+  PostCreate,
+  PostUpdate,
   ProfileUpdate,
   PushSubscriptionCreate,
   RedeemRequestInput,
@@ -121,6 +123,11 @@ export const apiRoutes = {
     method: 'POST',
     fastify: '/api/events/:eventId/places',
     path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/places`,
+  },
+  addPost: {
+    method: 'POST',
+    fastify: '/api/events/:eventId/posts',
+    path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/posts`,
   },
   addRide: {
     method: 'POST',
@@ -217,6 +224,11 @@ export const apiRoutes = {
     method: 'DELETE',
     fastify: '/api/places/:id',
     path: (id: string) => `/api/places/${encodeURIComponent(id)}`,
+  },
+  deletePost: {
+    method: 'DELETE',
+    fastify: '/api/posts/:id',
+    path: (id: string) => `/api/posts/${encodeURIComponent(id)}`,
   },
   deleteRide: {
     method: 'DELETE',
@@ -819,6 +831,11 @@ export const apiRoutes = {
     fastify: '/api/admin/allergy-items/:id',
     path: (id: string) => `/api/admin/allergy-items/${encodeURIComponent(id)}`,
   },
+  updatePost: {
+    method: 'PATCH',
+    fastify: '/api/posts/:id',
+    path: (id: string) => `/api/posts/${encodeURIComponent(id)}`,
+  },
   updateRide: {
     method: 'PATCH',
     fastify: '/api/rides/:id',
@@ -887,6 +904,7 @@ export interface RouteBodies {
   addPasskey: PasskeyRegistration
   addAllergyItem: AllergyItemCreate
   addPlace: PlaceCreate
+  addPost: PostCreate
   addRide: RideCreate
   addQuestion: FormQuestionCreateInput
   adminAddAttendance: AttendanceCreate
@@ -933,6 +951,7 @@ export interface RouteBodies {
   updateMyStay: AttendanceUpdate
   updateAllergyItem: AllergyItemUpdate
   updatePlace: PlaceUpdate
+  updatePost: PostUpdate
   updateRide: RideUpdate
   updateQuestion: FormQuestionUpdate
   updateSession: SessionUpdate
