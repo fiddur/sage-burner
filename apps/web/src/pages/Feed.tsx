@@ -74,6 +74,10 @@ export const Feed = ({ api }: { api: FeedApi }) => {
     setWhole((sofar) => ({ ...sofar, [thread.id]: thread }))
   }
 
+  const forget = (threadId: string) => {
+    setWhole(({ [threadId]: _gone, ...rest }) => rest)
+  }
+
   const talk = {
     say: (id: string, body: string) => {
       run(async () => held((await api.postComment(id, { body })).thread), 'Could not say that.')
@@ -87,14 +91,17 @@ export const Feed = ({ api }: { api: FeedApi }) => {
     showAll: (id: string) => {
       run(async () => held((await api.getThread(id)).thread), 'Could not load the rest of it.')
     },
-    reword: (id: string, title: string, body: string) => {
+    reword: (threadId: string, id: string, title: string, body: string, done: () => void) => {
       run(async () => {
         await api.updatePost(id, { title, body })
+        forget(threadId)
+        done()
       }, 'Could not save that. Please try again.')
     },
-    takeBack: (id: string) => {
+    takeBack: (threadId: string, id: string) => {
       run(async () => {
         await api.deletePost(id)
+        forget(threadId)
       }, 'Could not take that back. Please try again.')
     },
   }
@@ -182,15 +189,17 @@ export const Feed = ({ api }: { api: FeedApi }) => {
 
 const Mine = ({
   card,
+  mine,
   busy,
   upload,
   onReword,
   onTakeBack,
 }: {
   card: Thread
+  mine: boolean
   busy: boolean
   upload: UploadImage
-  onReword: (title: string, body: string) => void
+  onReword: (title: string, body: string, done: () => void) => void
   onTakeBack: () => void
 }) => {
   const [editing, setEditing] = useState<{ title: string; body: string } | undefined>(undefined)
@@ -198,14 +207,16 @@ const Mine = ({
   if (editing === undefined) {
     return (
       <p class="row">
-        <button
-          type="button"
-          class="link-button"
-          disabled={busy}
-          onClick={() => setEditing({ title: card.title, body: card.body ?? '' })}
-        >
-          Reword it
-        </button>
+        {mine && (
+          <button
+            type="button"
+            class="link-button"
+            disabled={busy}
+            onClick={() => setEditing({ title: card.title, body: card.body ?? '' })}
+          >
+            Reword it
+          </button>
+        )}
         <button
           type="button"
           class="link-button"
@@ -247,10 +258,7 @@ const Mine = ({
         <button
           type="button"
           disabled={busy || editing.title.trim() === ''}
-          onClick={() => {
-            onReword(editing.title.trim(), editing.body.trim())
-            setEditing(undefined)
-          }}
+          onClick={() => onReword(editing.title.trim(), editing.body.trim(), () => setEditing(undefined))}
         >
           Save
         </button>
@@ -296,7 +304,6 @@ const Announce = ({
         submitEvent.preventDefault()
         if (title.trim() === '') return
 
-        // Cleared inside the work `run` awaits, so a refusal keeps the draft on screen.
         onAnnounce(title.trim(), body.trim(), () => {
           setTitle('')
           setBody('')
@@ -369,8 +376,8 @@ const Card = ({
     rewrite: (id: string, body: string) => void
     remove: (id: string) => void
     showAll: (id: string) => void
-    reword: (id: string, title: string, body: string) => void
-    takeBack: (id: string) => void
+    reword: (threadId: string, id: string, title: string, body: string, done: () => void) => void
+    takeBack: (threadId: string, id: string) => void
   }
   upload: UploadImage
   onToggle: (category: NotificationCategory) => void
@@ -395,13 +402,14 @@ const Card = ({
         />
       )}
 
-      {card.own && !card.gone && (
+      {(card.own || (admin && card.entity_type === 'post')) && !card.gone && (
         <Mine
           card={card}
+          mine={card.own}
           busy={busy}
           upload={upload}
-          onReword={(title, body) => talk.reword(card.entity_id, title, body)}
-          onTakeBack={() => talk.takeBack(card.entity_id)}
+          onReword={(title, body, done) => talk.reword(card.id, card.entity_id, title, body, done)}
+          onTakeBack={() => talk.takeBack(card.id, card.entity_id)}
         />
       )}
 

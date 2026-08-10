@@ -191,6 +191,14 @@ describe('announcing something', () => {
     ).toBe(201)
   })
 
+  it('is refused to a signed-in account with no role at all', async () => {
+    const server = await build()
+    await givenBurn()
+    const applicant = await givenAccount('Dag', [])
+
+    expect((await announce(server, applicant.cookie, { title: 'Hello', body: '' })).statusCode).toBe(403)
+  })
+
   it('is nobody’s without a session', async () => {
     const server = await build()
     await givenBurn()
@@ -200,7 +208,9 @@ describe('announcing something', () => {
 })
 
 describe('who the card says may change it', () => {
-  it('is the author, an admin, and nobody else', async () => {
+  it('is whoever wrote it, and nobody else — not even an admin', async () => {
+    // `own` is authorship, which is what `PATCH` enforces. Taking back is the wider power,
+    // and the card draws that from the viewer's own admin flag rather than from here.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -214,7 +224,7 @@ describe('who the card says may change it', () => {
 
     expect((await cards(server, ada.cookie))[0]?.own).toBe(true)
     expect((await cards(server, bea.cookie))[0]?.own).toBe(false)
-    expect((await cards(server, boss.cookie))[0]?.own).toBe(true)
+    expect((await cards(server, boss.cookie))[0]?.own).toBe(false)
   })
 
   it('is nobody, for a card that is not an announcement', async () => {

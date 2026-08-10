@@ -357,7 +357,8 @@ comment on one therefore points at `/feed`, which is where the card is.
 own and an admin may withdraw any — the same split `deleteComment` already makes, and the
 answer #426 deliberately left open for its own card. Withdrawing twice adds one entry.
 `author_account_id` is `set null` rather than a cascade, so a burn's announcements outlive
-somebody leaving, and the card falls back to the thread's stored title.
+somebody leaving — the post, its title and its body all stay, and only the `posted` entry's
+author goes.
 
 **Announcing is any approved member's**, which is the repo's default for the burn's shared
 furniture. Whether a lead's announcement should read differently from a member's is a

@@ -118,30 +118,18 @@ export const addEntry = async (db: Database, entry: NewEntry, at: Date) => {
   })
 }
 
-export const threadForSession = async (
+export const threadFor = async (
   db: Database,
-  dream: { id: string; event_id: string; title: string },
+  type: ThreadEntityType,
+  entity: { id: string; event_id: string; title: string },
 ): Promise<string> => {
   const [row] = await db
     .select({ id: thread.id })
     .from(thread)
-    .where(and(eq(thread.entity_type, 'session'), eq(thread.entity_id, dream.id)))
+    .where(and(eq(thread.entity_type, type), eq(thread.entity_id, entity.id)))
     .limit(1)
 
-  return row?.id ?? threadIdFor(db, { type: 'session', ...dream })
-}
-
-export const threadForAttendance = async (
-  db: Database,
-  stay: { id: string; event_id: string; title: string },
-): Promise<string> => {
-  const [row] = await db
-    .select({ id: thread.id })
-    .from(thread)
-    .where(and(eq(thread.entity_type, 'attendance'), eq(thread.entity_id, stay.id)))
-    .limit(1)
-
-  return row?.id ?? threadIdFor(db, { type: 'attendance', ...stay })
+  return row?.id ?? threadIdFor(db, { type, ...entity })
 }
 
 export const JOINED = 'is coming'
@@ -164,7 +152,7 @@ export const cardEntry = async (
     at: Date
   },
 ): Promise<void> => {
-  const id = await threadForAttendance(db, { id: stay.id, event_id: stay.event_id, title: who.name })
+  const id = await threadFor(db, 'attendance', { id: stay.id, event_id: stay.event_id, title: who.name })
 
   await addEntry(db, { thread_id: id, kind, author_account_id: who.account_id, body }, at)
 }
@@ -290,7 +278,7 @@ export const readThreads = async (
         entity_type: row.entity_type,
         entity_id: row.entity_id,
         ...factsFor(row),
-        own: mayChange(row, viewer),
+        own: authoredBy(row, viewer),
         entry_count: counts?.get(id) ?? all.length,
         last_at: last?.created_at ?? null,
         entries: shown,
@@ -301,14 +289,8 @@ export const readThreads = async (
 
 type Viewer = { account_id: string; roles: readonly string[] } | undefined
 
-const mayChange = (row: CardRow, viewer: Viewer): boolean => {
-  if (viewer === undefined) return false
-  if (row.entity_type === 'post') {
-    return row.post_author === viewer.account_id || viewer.roles.includes('admin')
-  }
-
-  return false
-}
+const authoredBy = (row: CardRow, viewer: Viewer): boolean =>
+  viewer !== undefined && row.entity_type === 'post' && row.post_author === viewer.account_id
 
 interface CardRow {
   event_id: string

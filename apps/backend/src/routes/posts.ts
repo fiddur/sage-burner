@@ -12,11 +12,11 @@ import type { Notifier } from '../push/notify.ts'
 import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
 import { isEmptyPatch, patchRow } from '../db/patch.ts'
-import { event, post, thread } from '../db/schema.ts'
+import { event, post } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { displayName, tellAttendees } from '../push/notify.ts'
 import { openEventNow, todayIso } from './events.ts'
-import { addEntry, threadIdFor } from './threads.ts'
+import { addEntry, threadFor } from './threads.ts'
 
 export interface PostDeps extends GuardDeps {
   now: () => Date
@@ -34,23 +34,8 @@ const openPost = async (db: Database, now: () => Date, id: string): Promise<Post
   return row?.post
 }
 
-export const threadForPost = async (db: Database, announced: Post): Promise<string> => {
-  const [row] = await db
-    .select({ id: thread.id })
-    .from(thread)
-    .where(and(eq(thread.entity_type, 'post'), eq(thread.entity_id, announced.id)))
-    .limit(1)
-
-  return (
-    row?.id ??
-    threadIdFor(db, {
-      type: 'post',
-      id: announced.id,
-      event_id: announced.event_id,
-      title: announced.title,
-    })
-  )
-}
+const threadForPost = async (db: Database, announced: Post): Promise<string> =>
+  await threadFor(db, 'post', announced)
 
 export const registerPostRoutes = (
   app: FastifyInstance,

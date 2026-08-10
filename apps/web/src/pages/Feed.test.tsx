@@ -339,6 +339,112 @@ describe('what everyone has been doing', () => {
     await waitFor(() => expect(deletePost).toHaveBeenCalledWith('s-1'))
   })
 
+  it('stops showing the expanded copy of a card it has just reworded', async () => {
+    // A comment or a Show-the-whole-thread puts the card in the page's own `whole` map, which
+    // a feed reload does not touch — so without dropping it, the reworded card keeps the old
+    // words on exactly the cards people have been talking on.
+    const stale = aCard({
+      id: 'c-1',
+      title: 'Stale title',
+      entity_type: 'post',
+      entity_id: 's-1',
+      link: null,
+      own: true,
+    })
+    const updatePost = vi.fn<FeedApi['updatePost']>(() =>
+      Promise.resolve({
+        post: {
+          id: 's-1',
+          event_id: 'e-1',
+          author_account_id: 'a-1',
+          title: 'Monday',
+          body: '',
+          withdrawn_at: null,
+          created_at: '2026-08-07T18:00:00.000Z',
+        },
+      }),
+    )
+    renderPage(
+      stub(
+        { updatePost, postComment: () => Promise.resolve({ thread: stale }) },
+        [],
+        [{ ...stale, title: 'Sunday' }],
+      ),
+    )
+
+    fireEvent.input(await screen.findByLabelText('Say something about Sunday'), {
+      target: { value: 'noted' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Say it' }))
+    await waitFor(() => expect(screen.getByText('Stale title')).toBeTruthy())
+    // Enabled, not merely present: a click on a disabled button is a no-op and the next
+    // `getByRole` would then fail on the form that never opened.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Reword it' })).toHaveProperty('disabled', false),
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reword it' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(screen.queryByText('Stale title')).toBeNull())
+    expect(screen.getByText('Sunday')).toBeTruthy()
+  })
+
+  it('keeps what was typed when a rewording is refused', async () => {
+    renderPage(
+      stub(
+        { updatePost: () => Promise.reject(apiError(500, 'internal', 'Nope.')) },
+        [],
+        [aCard({ id: 'c-1', title: 'Sunday', entity_type: 'post', entity_id: 's-1', link: null, own: true })],
+      ),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Reword it' }))
+    fireEvent.input(screen.getByLabelText('What Sunday is'), { target: { value: 'Monday' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Nope.')
+    expect(screen.getByLabelText('What Sunday is')).toHaveProperty('value', 'Monday')
+  })
+
+  it('offers an organiser the take-back but not the rewording, which the route refuses them', async () => {
+    const BOSS: Viewer = {
+      status: 'signed-in',
+      account: { id: 'a-9', name: 'Cai', avatar: null, roles: ['admin', 'member'] },
+    }
+    renderPage(
+      stub(
+        {},
+        [],
+        [
+          aCard({
+            id: 'c-1',
+            title: 'Sunday',
+            entity_type: 'post',
+            entity_id: 's-1',
+            link: null,
+            own: false,
+          }),
+        ],
+      ),
+      BOSS,
+    )
+
+    expect(await screen.findByRole('button', { name: 'Take back Sunday' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Reword it' })).toBeNull()
+  })
+
+  it('offers an organiser nothing on a card that is not an announcement', async () => {
+    const BOSS: Viewer = {
+      status: 'signed-in',
+      account: { id: 'a-9', name: 'Cai', avatar: null, roles: ['admin', 'member'] },
+    }
+    renderPage(stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn', own: false })]), BOSS)
+
+    await waitFor(() => expect(screen.getByText('Sauna at dawn')).toBeTruthy())
+    expect(screen.queryByRole('button', { name: 'Take back Sauna at dawn' })).toBeNull()
+  })
+
   it('offers neither to somebody it is not theirs', async () => {
     renderPage(
       stub(

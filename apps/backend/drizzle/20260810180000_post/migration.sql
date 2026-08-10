@@ -1,6 +1,6 @@
 -- Something announced for its own sake, rather than a card mirroring another row (#438).
 -- `author_account_id` is `set null` rather than a cascade: a burn's announcements outlive
--- somebody leaving, and the card then falls back to the thread's stored title.
+-- somebody leaving, title and body and all.
 CREATE TABLE `post` (
 	`id` text NOT NULL,
 	`event_id` text NOT NULL,
