@@ -120,6 +120,18 @@ const givenComing = async (eventId: string, accountId: string) => {
 const getProfile = (server: FastifyInstance, cookie: string) =>
   server.inject({ method: 'GET', url: '/api/me/profile', headers: { cookie } })
 
+const bell = async (server: FastifyInstance, cookie: string): Promise<{ body: string }[]> =>
+  (await server.inject({ method: 'GET', url: '/api/me/notifications', headers: { cookie } })).json()
+    .notifications
+
+const listenFor = (server: FastifyInstance, cookie: string, on: string[]) =>
+  server.inject({
+    method: 'PUT',
+    url: '/api/me/notification-settings',
+    headers: { cookie },
+    payload: { on, email: [] },
+  })
+
 const patchProfile = (
   server: FastifyInstance,
   cookie: string,
@@ -993,10 +1005,15 @@ describe('an introduction on the burns somebody is coming to', () => {
   })
 
   it('says nothing for a save that did not touch the introduction', async () => {
+    // The entry count alone cannot fail this: `introduced` coalesces, so a redundant announce
+    // leaves one row with the same body either way. What tells them apart is the bell (#449).
     const server = await build()
     const member = await givenMember({ name: 'Ada' })
+    const other = await givenMember({ name: 'Bea' })
     const summer = await givenEvent({ slug: 'summer' })
     await givenComing(summer, member.id)
+    await givenComing(summer, other.id)
+    await listenFor(server, other.cookie, ['introduction_written'])
     await patchProfile(server, member.cookie, { introduction: 'I build saunas.' })
 
     await patchProfile(server, member.cookie, { allergies_notes: 'peanuts' })
@@ -1005,6 +1022,26 @@ describe('an introduction on the burns somebody is coming to', () => {
     const written = await cardsFor(member.id)
     expect(written).toHaveLength(1)
     expect(written[0]?.body).toBe('says who they are')
+    expect(await bell(server, other.cookie)).toHaveLength(1)
+  })
+
+  it('tells the burn once for however many passes at one paragraph', async () => {
+    // The card bumps once, which is what the changelog promises — and the bell used to go per
+    // save, so the two disagreed about the same event (#449).
+    const server = await build()
+    const member = await givenMember({ name: 'Ada' })
+    const other = await givenMember({ name: 'Bea' })
+    const summer = await givenEvent({ slug: 'summer' })
+    await givenComing(summer, member.id)
+    await givenComing(summer, other.id)
+    await listenFor(server, other.cookie, ['introduction_written'])
+
+    await patchProfile(server, member.cookie, { introduction: 'I build' })
+    await patchProfile(server, member.cookie, { introduction: 'I build saunas' })
+    await patchProfile(server, member.cookie, { introduction: 'I build saunas.' })
+
+    expect(await cardsFor(member.id)).toHaveLength(1)
+    expect(await bell(server, other.cookie)).toHaveLength(1)
   })
 
   it('says nothing when an introduction is cleared, since there is nothing to read', async () => {

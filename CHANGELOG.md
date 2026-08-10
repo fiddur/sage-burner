@@ -9,6 +9,16 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-10
 
+- **Leaving a burn and changing your mind no longer leaves two of you on the feed.** Rejoining
+  used to open a second card and leave the first one saying you were no longer coming — the one
+  card comes back instead, with everything anybody had said under it. A card for somebody who has
+  actually left still carries their name and links to their page.
+
+- **Writing your introduction tells the burn once, not once per save.** The card already moved to
+  the top of the feed once however many passes you made at it; the notification now agrees with
+  it. And an announcement you open and save without changing anything stays where it was rather
+  than going back to the top of everybody's feed.
+
 - **The home-screen icon works on an iPhone now.** Adding the app to your home screen used to
   leave a gray square there, because iPhones cannot draw the kind of picture we were handing
   them. They get a proper one now — the app's flame, or the picture an organiser uploaded if

@@ -724,12 +724,14 @@ export const thread = sqliteTable(
     event_id: text('event_id').references(() => event.id, { onDelete: 'cascade' }),
     entity_type: text('entity_type', { enum: threadEntityTypes }).notNull(),
     entity_id: text('entity_id').notNull(),
+    subject_account_id: text('subject_account_id').references(() => account.id, { onDelete: 'set null' }),
     title: text('title').notNull(),
   },
   (table) => [
     primaryKey({ columns: [table.id] }),
     uniqueIndex('thread_entity_idx').on(table.entity_type, table.entity_id),
     index('thread_event_idx').on(table.event_id),
+    index('thread_subject_idx').on(table.subject_account_id, table.event_id),
     check('thread_entity_type_check', oneOf(table.entity_type, threadEntityTypes)),
   ],
 )
@@ -750,7 +752,7 @@ export const threadEntry = sqliteTable(
   },
   (table) => [
     primaryKey({ columns: [table.id] }),
-    index('thread_entry_recent_idx').on(table.thread_id, table.created_at),
+    index('thread_entry_seq_idx').on(table.thread_id, table.seq),
     check('thread_entry_kind_check', oneOf(table.kind, threadEntryKinds)),
     check(
       'thread_entry_comment_author_check',
@@ -814,7 +816,6 @@ export const post = sqliteTable(
   },
   (table) => [
     primaryKey({ columns: [table.id] }),
-    index('post_event_idx').on(table.event_id, table.created_at),
     check('post_title_check', sql`length(trim(${table.title})) > 0`),
   ],
 )

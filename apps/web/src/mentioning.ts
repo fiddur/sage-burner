@@ -50,13 +50,25 @@ export const withMentionAt = (
   return { value: `${value.slice(0, start)}${token}${value.slice(caret)}`, caret: start + token.length }
 }
 
+/**
+ * Whether inserting this name would take the body past what the API will accept. A textarea's
+ * `maxlength` does not apply to a programmatic insert, so near the limit the menu wrote a body
+ * the API then refused with a generic "could not save that" (#457) — the same problem
+ * `useImageUpload.take` already refuses on.
+ */
+const fits = (value: string, fragment: string, candidate: Candidate, maxLength: number | undefined) =>
+  maxLength === undefined ||
+  value.length - fragment.length - 1 + mentionToken(candidate.name, candidate.target).length + 1 <= maxLength
+
 export const useMentioning = ({
   value,
   people,
+  maxLength,
   onInput,
 }: {
   value: string
   people: readonly Mentionable[] | undefined
+  maxLength?: number
   onInput: (value: string) => void
 }) => {
   const [caret, setCaret] = useState<number | undefined>(undefined)
@@ -64,7 +76,10 @@ export const useMentioning = ({
   // No `people` means this field does not do mentions at all, so it offers none — an
   // `@everybody` written where nothing reads it looks like it reached the burn and does not.
   const fragment = caret === undefined ? undefined : fragmentAt(value, caret)
-  const candidates = people === undefined || fragment === undefined ? [] : candidatesFor(fragment, people)
+  const candidates =
+    people === undefined || fragment === undefined
+      ? []
+      : candidatesFor(fragment, people).filter((candidate) => fits(value, fragment, candidate, maxLength))
 
   const choose = (candidate: Candidate) => {
     if (caret === undefined) return

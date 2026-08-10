@@ -1665,6 +1665,14 @@ a.person-badge:focus-visible span:last-child {
   font-weight: 600;
 }
 
+/* What the card is about — an introduction's first lines, or an announcement's words. It had no
+   rule at all, so it inherited `.markdown-preview`'s spacing and sat as far from the title as a
+   comment does (#449). */
+.feed-card-about {
+  margin: 0.25rem 0 0;
+  font-size: 0.95rem;
+}
+
 /* Loudest thing in the card, because it is why anybody opens one. The quiet lines
    beside it are what the app did, and they are deliberately at the size of a caption. */
 .thread {

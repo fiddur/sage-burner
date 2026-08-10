@@ -1,7 +1,7 @@
 import type { Thread } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { INTRODUCTION_EXCERPT } from '@sage-burner/shared'
+import { INTRODUCTION_EXCERPT, mentionToken } from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -13,7 +13,16 @@ import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, activity, attendance, event, thread, threadEntry } from '../db/schema.ts'
+import {
+  account,
+  accountRole,
+  activity,
+  attendance,
+  event,
+  place,
+  thread,
+  threadEntry,
+} from '../db/schema.ts'
 import { sendGuarded } from '../if-match.testing.ts'
 import { CARD_ENTRIES, FEED_LIMIT } from './feed.ts'
 
@@ -430,6 +439,25 @@ describe('the feed', () => {
     expect(card?.entry_count).toBe(2)
   })
 
+  it('calls a place with no time a place rather than a move in the schedule', async () => {
+    // A dream that is in no time slot is not in the schedule, so it cannot have moved in one
+    // (#387). Giving it a lane says where it will be.
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const dream = await offerDream(server, ada.cookie, 'Sauna at dawn')
+    const lane = randomUUID()
+    await db()
+      .insert(place)
+      .values({ id: lane, event_id: BURN, order: 0, name: 'The sauna', emoji: '🔥', color: 'red' })
+
+    await editDream(server, ada.cookie, dream, { place_id: lane })
+
+    const [card] = await cards(server, ada.cookie)
+    expect(card?.entries.at(-1)?.body).toBe('said where it would be')
+  })
+
   it('keeps a rename and a move apart', async () => {
     // Why these are three kinds rather than one `edited`: coalescing is per aspect, so a
     // later move must not overwrite the rename that came before it.
@@ -565,6 +593,19 @@ describe('somebody’s own card', () => {
     expect((await cards(server, ada.cookie))[0]?.link).toBe(`/members/${ada.id}`)
   })
 
+  it('links a dream card at the dream, with the burn it belongs to', async () => {
+    // The other half: building the link moved from the web to `readThreads`, and the test moved
+    // with it for the person's card only (#449).
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const dream = await offerDream(server, ada.cookie, 'Sauna at dawn')
+
+    const card = await cardOf(server, ada.cookie, 'Sauna at dawn')
+    expect(card?.link).toBe(`/dreams?burn=${BURN}&dream=${dream}`)
+  })
+
   it('carries the introduction itself, so the feed says who somebody is', async () => {
     const server = await build()
     await givenBurn()
@@ -576,6 +617,23 @@ describe('somebody’s own card', () => {
     const card = await cardOf(server, ada.cookie, 'Ada')
     expect(card?.body).toBe('I build saunas.')
     expect(card?.entries.map((entry) => entry.kind)).toEqual(['joined', 'introduced'])
+  })
+
+  it('refreshes a name written into an introduction, as it does in a comment', async () => {
+    // `readThreads` collected mention ids from entry bodies and post bodies only, so a token in
+    // an introduction kept whatever name was typed (#457). Nothing offers mentions there yet,
+    // which is what made it latent rather than broken.
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    await joinBurn(server, ada.cookie)
+    await givenComing(bea.id)
+
+    await introduce(server, ada.cookie, `I build saunas with ${mentionToken('Beatrice', bea.id)}.`)
+
+    const card = await cardOf(server, ada.cookie, 'Ada')
+    expect(card?.body).toContain(mentionToken('Bea', bea.id))
   })
 
   it('clamps a long introduction rather than putting the whole of it in the feed', async () => {
@@ -629,8 +687,33 @@ describe('somebody’s own card', () => {
 
     const [card] = await cards(server, bea.cookie)
     expect(card?.gone).toBe(true)
-    expect(card?.link).toBeNull()
+    // Still their name and still their page: the stay is what has gone, not the person, and
+    // the card is found by the person now (#449).
+    expect(card?.link).toBe(`/members/${ada.id}`)
     expect(card?.title).toBe('Ada')
     expect(card?.entries.map((entry) => entry.kind)).toEqual(['joined', 'comment'])
+  })
+
+  it('reopens the one card on a rejoin rather than stranding it and opening another', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    await givenComing(bea.id)
+    await joinBurn(server, ada.cookie)
+    const [opened] = await cards(server, bea.cookie)
+    await say(server, bea.cookie, opened?.id ?? '', 'welcome')
+
+    await server.inject({
+      method: 'DELETE',
+      url: `/api/events/${BURN}/attendance/me`,
+      headers: { cookie: ada.cookie },
+    })
+    await joinBurn(server, ada.cookie)
+
+    const mine = (await cards(server, bea.cookie)).filter((card) => card.title === 'Ada')
+    expect(mine).toHaveLength(1)
+    expect(mine[0]?.gone).toBe(false)
+    expect(mine[0]?.entries.map((entry) => entry.kind)).toEqual(['joined', 'comment', 'joined'])
   })
 })

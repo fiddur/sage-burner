@@ -78,11 +78,12 @@ export const DreamThread = ({
     upload,
   })
 
-  const naming = useMentioning({ value: saying, people, onInput: setSaying })
+  const naming = useMentioning({ value: saying, people, maxLength: MAX_COMMENT, onInput: setSaying })
 
   const renaming = useMentioning({
     value: editing?.body ?? '',
     people,
+    maxLength: MAX_COMMENT,
     onInput: (body) => setEditing((current) => (current === undefined ? current : { ...current, body })),
   })
 

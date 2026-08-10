@@ -147,6 +147,7 @@ const asDream = (row: DreamRow, { helpers, support }: People): Session => ({
 const scheduleLine = (before: DreamRow, after: DreamRow): string => {
   if (before.time_slot_start === null && after.time_slot_start !== null) return 'put it in the schedule'
   if (before.time_slot_start !== null && after.time_slot_start === null) return 'took it off the schedule'
+  if (before.time_slot_start === null && after.time_slot_start === null) return 'said where it would be'
 
   return 'moved it in the schedule'
 }
@@ -269,10 +270,16 @@ export const registerSessionRoutes = (
     kind: ThreadEntryKind,
     by: string | undefined,
     body: string,
+    talkedOn?: string,
   ) => {
     await addEntry(
       db,
-      { thread_id: await threadFor(db, 'session', dream), kind, author_account_id: by ?? null, body },
+      {
+        thread_id: talkedOn ?? (await threadFor(db, 'session', dream)),
+        kind,
+        author_account_id: by ?? null,
+        body,
+      },
       now(),
     )
   }
@@ -284,8 +291,9 @@ export const registerSessionRoutes = (
     by: string | undefined,
   ) => {
     if (body.title !== undefined && body.title !== before.title) {
-      await noteOnDream(before, 'renamed', by, `renamed it to “${after.title}”`)
-      await renameThread(db, await threadFor(db, 'session', before), after.title)
+      const talk = await threadFor(db, 'session', before)
+      await noteOnDream(before, 'renamed', by, `renamed it to “${after.title}”`, talk)
+      await renameThread(db, talk, after.title)
     }
 
     const moved =

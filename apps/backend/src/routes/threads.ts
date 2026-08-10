@@ -20,7 +20,7 @@ import {
   songPage,
   withMentionNames,
 } from '@sage-burner/shared'
-import { and, asc, count, desc, eq, inArray, max, ne, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, inArray, lte, max, ne, sql } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -52,7 +52,13 @@ export interface NewEntry {
 
 export const threadIdFor = (
   tx: Database | Transaction,
-  entity: { type: ThreadEntityType; id: string; event_id: string | null; title: string },
+  entity: {
+    type: ThreadEntityType
+    id: string
+    event_id: string | null
+    title: string
+    subject_account_id?: string
+  },
 ): string => {
   const [made] = tx
     .insert(thread)
@@ -61,6 +67,7 @@ export const threadIdFor = (
       event_id: entity.event_id,
       entity_type: entity.type,
       entity_id: entity.id,
+      subject_account_id: entity.subject_account_id ?? null,
       title: entity.title,
     })
     .onConflictDoNothing()
@@ -87,7 +94,9 @@ export const renameThread = async (db: Database, threadId: string, title: string
   await db.update(thread).set({ title }).where(eq(thread.id, threadId))
 }
 
-export const addEntry = async (db: Database, entry: NewEntry, at: Date) => {
+export type Written = 'coalesced' | 'inserted'
+
+export const addEntry = async (db: Database, entry: NewEntry, at: Date): Promise<Written> => {
   if (coalesces(entry.kind)) {
     const [newest] = await db
       .select({
@@ -106,7 +115,7 @@ export const addEntry = async (db: Database, entry: NewEntry, at: Date) => {
         .set({ body: entry.body, created_at: at.toISOString() })
         .where(eq(threadEntry.id, newest.id))
 
-      return
+      return 'coalesced'
     }
   }
 
@@ -120,6 +129,8 @@ export const addEntry = async (db: Database, entry: NewEntry, at: Date) => {
     created_at: at.toISOString(),
     edited_at: null,
   })
+
+  return 'inserted'
 }
 
 export const threadFor = async (
@@ -134,6 +145,46 @@ export const threadFor = async (
     .limit(1)
 
   return row?.id ?? threadIdFor(db, { type, ...entity })
+}
+
+/**
+ * The card for one person at one burn, found by the person rather than by the stay — and
+ * re-pointed at the current stay when they left and came back. Keyed on the attendance id
+ * alone it opened a second card on a rejoin and left the first saying "no longer coming"
+ * about somebody who is (#449).
+ */
+export const cardFor = async (
+  db: Database,
+  stay: { id: string; event_id: string },
+  subject: { account_id: string; name: string },
+): Promise<string> => {
+  const [held] = await db
+    .select({ id: thread.id, entity_id: thread.entity_id })
+    .from(thread)
+    .where(
+      and(
+        eq(thread.entity_type, 'attendance'),
+        eq(thread.subject_account_id, subject.account_id),
+        eq(thread.event_id, stay.event_id),
+      ),
+    )
+    .limit(1)
+
+  if (held === undefined) {
+    return threadIdFor(db, {
+      type: 'attendance',
+      id: stay.id,
+      event_id: stay.event_id,
+      title: subject.name,
+      subject_account_id: subject.account_id,
+    })
+  }
+
+  if (held.entity_id !== stay.id) {
+    await db.update(thread).set({ entity_id: stay.id }).where(eq(thread.id, held.id))
+  }
+
+  return held.id
 }
 
 export const JOINED = 'is coming'
@@ -155,10 +206,22 @@ export const cardEntry = async (
     body: string
     at: Date
   },
-): Promise<void> => {
-  const id = await threadFor(db, 'attendance', { id: stay.id, event_id: stay.event_id, title: who.name })
+): Promise<Written> => {
+  const id = await cardFor(db, stay, who)
 
-  await addEntry(db, { thread_id: id, kind, author_account_id: who.account_id, body }, at)
+  return await addEntry(db, { thread_id: id, kind, author_account_id: who.account_id, body }, at)
+}
+
+/**
+ * A hard cut can land inside a `@[Ada](mention:a-1)` token, which then renders as its own raw
+ * text on the card, and inside a surrogate pair, which renders as a replacement character. So
+ * the fall-back cut backs off to the last whole character, and to before a token it opened.
+ */
+const wholeCharacters = (cut: string): string => {
+  const back = /[\uD800-\uDBFF]$/u.test(cut) ? cut.slice(0, -1) : cut
+  const opened = back.lastIndexOf('@[')
+
+  return opened !== -1 && !back.slice(opened).includes(')') ? back.slice(0, opened) : back
 }
 
 export const excerptOf = (whole_text: string | null): string | null => {
@@ -166,10 +229,10 @@ export const excerptOf = (whole_text: string | null): string | null => {
   if (whole === '') return null
   if (whole.length <= INTRODUCTION_EXCERPT) return whole
 
-  const cut = whole.slice(0, INTRODUCTION_EXCERPT)
-  const space = cut.lastIndexOf(' ')
+  const cut = wholeCharacters(whole.slice(0, INTRODUCTION_EXCERPT))
+  const gap = Math.max(cut.lastIndexOf(' '), cut.lastIndexOf('\n'))
 
-  return `${(space > INTRODUCTION_EXCERPT / 2 ? cut.slice(0, space) : cut).trimEnd()}…`
+  return `${(gap > INTRODUCTION_EXCERPT / 2 ? cut.slice(0, gap) : cut).trimEnd()}…`
 }
 
 export const recentThreads = async (
@@ -202,7 +265,7 @@ export const readThreads = async (
   }: {
     newest?: number
     counts?: ReadonlyMap<string, number>
-    viewer?: { account_id: string; roles: readonly string[] }
+    viewer?: { account_id: string }
   } = {},
 ): Promise<Thread[]> => {
   if (ids.length === 0) return []
@@ -232,12 +295,15 @@ export const readThreads = async (
     .leftJoin(event, eq(event.id, thread.event_id))
     .leftJoin(session, and(eq(thread.entity_type, 'session'), eq(session.id, thread.entity_id)))
     .leftJoin(attendance, and(eq(thread.entity_type, 'attendance'), eq(attendance.id, thread.entity_id)))
-    .leftJoin(account, eq(account.id, attendance.account_id))
+    .leftJoin(account, eq(account.id, thread.subject_account_id))
     .leftJoin(post, and(eq(thread.entity_type, 'post'), eq(post.id, thread.entity_id)))
     .leftJoin(song, and(eq(thread.entity_type, 'song'), eq(song.id, thread.entity_id)))
     .where(inArray(thread.id, [...ids]))
 
-  const entries = await db
+  // Ranked rather than read whole: the feed asks for the newest few of up to fifty threads, and
+  // reading every entry of each to slice three off was the one read here that grew with how
+  // talkative a burn had been (#387).
+  const ranked = db
     .select({
       id: threadEntry.id,
       thread_id: threadEntry.thread_id,
@@ -246,12 +312,31 @@ export const readThreads = async (
       created_at: threadEntry.created_at,
       edited_at: threadEntry.edited_at,
       author_id: threadEntry.author_account_id,
-      author_name: account.name,
+      seq: threadEntry.seq,
+      newness:
+        sql<number>`row_number() over (partition by ${threadEntry.thread_id} order by ${threadEntry.seq} desc)`.as(
+          'newness',
+        ),
     })
     .from(threadEntry)
-    .leftJoin(account, eq(account.id, threadEntry.author_account_id))
     .where(inArray(threadEntry.thread_id, [...ids]))
-    .orderBy(asc(threadEntry.thread_id), asc(threadEntry.seq))
+    .as('ranked')
+
+  const entries = await db
+    .select({
+      id: ranked.id,
+      thread_id: ranked.thread_id,
+      kind: ranked.kind,
+      body: ranked.body,
+      created_at: ranked.created_at,
+      edited_at: ranked.edited_at,
+      author_id: ranked.author_id,
+      author_name: account.name,
+    })
+    .from(ranked)
+    .leftJoin(account, eq(account.id, ranked.author_id))
+    .where(newest === undefined ? undefined : lte(ranked.newness, newest))
+    .orderBy(asc(ranked.thread_id), asc(ranked.seq))
 
   const held = new Map<string, ThreadEntry[]>()
   for (const row of entries) {
@@ -272,7 +357,7 @@ export const readThreads = async (
 
   const namesById = await mentionedNames(db, [
     ...entries.map((row) => row.body),
-    ...rows.map((row) => row.post_body ?? ''),
+    ...rows.flatMap((row) => [row.post_body ?? '', row.introduction ?? '']),
   ])
   const named = (body: string) => withMentionNames(body, (target) => namesById.get(target))
 
@@ -280,9 +365,8 @@ export const readThreads = async (
     const row = byId.get(id)
     if (row === undefined) return []
 
-    const all = (held.get(id) ?? []).map((entry) => ({ ...entry, body: named(entry.body) }))
-    const shown = newest === undefined ? all : all.slice(Math.max(0, all.length - newest))
-    const last = all.at(-1)
+    const shown = (held.get(id) ?? []).map((entry) => ({ ...entry, body: named(entry.body) }))
+    const last = shown.at(-1)
 
     return [
       {
@@ -293,7 +377,7 @@ export const readThreads = async (
         entity_id: row.entity_id,
         ...withNamedBody(factsFor(row), named),
         own: authoredBy(row, viewer),
-        entry_count: counts?.get(id) ?? all.length,
+        entry_count: counts?.get(id) ?? shown.length,
         last_at: last?.created_at ?? null,
         entries: shown,
       } satisfies Thread,
@@ -301,7 +385,7 @@ export const readThreads = async (
   })
 }
 
-type Viewer = { account_id: string; roles: readonly string[] } | undefined
+type Viewer = { account_id: string } | undefined
 
 const authoredBy = (row: CardRow, viewer: Viewer): boolean =>
   viewer !== undefined &&
@@ -344,10 +428,12 @@ const personFacts = (row: CardRow): CardFacts => ({
   gone: row.stay === null,
 })
 
+const written = (body: string | null): string | null => (body?.trim() === '' ? null : body)
+
 const postFacts = (row: CardRow): CardFacts => ({
   title: row.post_title ?? row.title,
   link: null,
-  body: row.post_withdrawn_at === null ? row.post_body : null,
+  body: row.post_withdrawn_at === null ? written(row.post_body) : null,
   gone: row.post_withdrawn_at !== null,
 })
 

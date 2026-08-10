@@ -335,6 +335,11 @@ export const apiRoutes = {
     fastify: '/api/installation/icon',
     path: () => '/api/installation/icon',
   },
+  getThread: {
+    method: 'GET',
+    fastify: '/api/threads/:id',
+    path: (id: string) => `/api/threads/${encodeURIComponent(id)}`,
+  },
   getTouchIcon: {
     method: 'GET',
     fastify: '/api/installation/icons/:size',
@@ -354,11 +359,6 @@ export const apiRoutes = {
     method: 'GET',
     fastify: '/api/feed',
     path: () => '/api/feed',
-  },
-  getThread: {
-    method: 'GET',
-    fastify: '/api/threads/:id',
-    path: (id: string) => `/api/threads/${encodeURIComponent(id)}`,
   },
   getFaq: {
     method: 'GET',

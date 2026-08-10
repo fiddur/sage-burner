@@ -148,16 +148,20 @@ export const registerPostRoutes = (
       ),
     )
 
-    await addEntry(
-      db,
-      {
-        thread_id: await threadForPost(db, patched.row),
-        kind: 'edited',
-        author_account_id: viewer.account_id,
-        body: 'reworded it',
-      },
-      now(),
-    )
+    const reworded = patched.row.title !== existing.title || patched.row.body !== existing.body
+
+    if (reworded) {
+      await addEntry(
+        db,
+        {
+          thread_id: await threadForPost(db, patched.row),
+          kind: 'edited',
+          author_account_id: viewer.account_id,
+          body: 'reworded it',
+        },
+        now(),
+      )
+    }
 
     return { post: patched.row } satisfies PostResponse
   })

@@ -31,7 +31,7 @@ export const MarkdownField = ({
   people?: readonly Mentionable[]
   onInput: (value: string) => void
 }) => {
-  const mentioning = useMentioning({ value, people, onInput })
+  const mentioning = useMentioning({ value, people, maxLength, onInput })
   const [previewing, setPreviewing] = useState(false)
   const fieldId = useId()
   const pictures = useImageUpload({ value, maxLength, onInput, upload })

@@ -402,10 +402,19 @@ comment on one therefore points at `/feed`, which is where the card is.
 **Withdrawing keeps the conversation**, exactly as a dream's does: `withdrawn_at` is set, a
 `withdrawn` entry is added, the title stays and the body goes. The author may withdraw their
 own and an admin may withdraw any — the same split `deleteComment` already makes, and the
-answer #426 deliberately left open for its own card. Withdrawing twice adds one entry.
-`author_account_id` is `set null` rather than a cascade, so a burn's announcements outlive
-somebody leaving — the post, its title and its body all stay, and only the `posted` entry's
-author goes.
+answer #426 deliberately left open for its own card. Withdrawing twice adds one entry. A save
+that reworded nothing adds none: the page sends both fields whatever was typed, so `isEmptyPatch`
+never fires from it and pressing Save on an unchanged form used to re-top the announcement on
+everybody's feed (#455).
+
+`post.author_account_id` is `set null` rather than a cascade, so the row outlives somebody
+leaving — but **that is a claim about the row, not about the card** (#455).
+`thread_entry.author_account_id` cascades, so deleting an account takes its entries with it, and
+a post whose only entry was `posted` then draws no card at all: `recentThreads` is built from
+`thread_entry`, and a thread with no entries is never returned. `set null` there is not the
+answer either, because `thread_entry_comment_author_check` requires a comment to have an author,
+so the cascade would fail the constraint instead. Nothing in the tree deletes an account (#35),
+which is why this is written down rather than fixed.
 
 **Announcing is any approved member's**, which is the repo's default for the burn's shared
 furniture. Whether a lead's announcement should read differently from a member's is a
@@ -422,10 +431,20 @@ category everybody would have had to switch off.
 
 **One card per (person, burn), and joining opens it** (#426). Saying you are coming and
 saying who you are are the same card: `entity_type: 'attendance'` with the attendance id,
-so `thread_entity_idx` already means one conversation per person per burn and
-`thread.event_id` files it under the right burn and carries the same retention. An
-`account`-keyed thread cannot do it — one thread per person, pinned to one burn by a
-`NOT NULL` `event_id`.
+which `thread.event_id` files under the right burn and gives the same retention.
+
+**Found by the person, pointed at the stay** (#449). The attendance id alone was not enough,
+and the sentence that used to stand here — "`thread_entity_idx` already means one conversation
+per person per burn" — was one step ahead of the code: leaving **deletes** the attendance row,
+so rejoining minted a fresh one, opened a second card, and left the first permanently saying
+"no longer coming" about somebody who is. `subject_account_id` is what a card is looked up by,
+so a rejoin re-points the surviving card at the new stay and keeps what people said under it.
+`entity_id` still carries the current stay, which is what `gone` is read from — and the subject
+resolving from the thread rather than through the stay is why a card for somebody who has left
+still carries their name and their page.
+
+An `account`-keyed `entity_id` was the other way out and cannot work: `thread_entity_idx` is
+unique on `(entity_type, entity_id)`, so it would mean one thread per person across every burn.
 
 **The introduction is resolved and clamped, not stored on the entry.** `readThreads` reads
 `account.introduction` and `excerptOf` cuts it at `INTRODUCTION_EXCERPT` on a word
@@ -434,9 +453,12 @@ the feed quoting the old one, and `MAX_INTRODUCTION` is 10,000 against a card's 
 fifty-in-one-cache-key. The whole of it is on the person's page, which the card's title
 links to.
 
-**Rewriting bumps once.** `introduced` coalesces, so six passes at a paragraph move one
-card up the feed rather than leaving six lines — the argument `renamed`, `scheduled` and
-`edited` already make for being kinds of their own rather than one `edited`.
+**Rewriting bumps once, and tells the burn once.** `introduced` coalesces, so six passes at a
+paragraph move one card up the feed rather than leaving six lines — the argument `renamed`,
+`scheduled` and `edited` already make for being kinds of their own rather than one `edited`.
+The bell follows the card because `addEntry` **reports whether it inserted or coalesced** and
+the notification only goes on an insert (#449). Before that the feed said one thing happened
+and the bell said six, about the same six saves.
 
 **Only burns that have not ended.** An introduction written today should not resurrect the
 card from a burn two years ago, so `announceIntroduction` filters on `event.end_date >=`
@@ -534,6 +556,13 @@ than one that would change nothing.
 feed that marked itself read would be a second thing to keep in step with them. And
 `requireApproved`, like the roster: everything on it is already readable by an approved
 member, gathered into one place.
+
+**A card carries the newest few entries, not all of them.** `readThreads` ranks a thread's
+entries with `row_number() over (partition by thread_id order by seq desc)` and takes the
+`newest` it was asked for; the whole-thread read passes none and gets all of them. Reading every
+entry of fifty threads to slice three off each was the one read here that grew with how talkative
+a burn had been (#387). `thread_entry_seq_idx` is `(thread_id, seq)` because that is what all
+three readers order by — it was `(thread_id, created_at)`, which served none of them.
 
 **Retention is the burn, for everything that has one.** `activity` cascades with `event`
 and so does a `thread` that names one, and the route reads the newest fifty. An audit log
