@@ -144,12 +144,12 @@ describe('why a round trip could not be finished', () => {
     })
   })
 
-  it('names the profile leg when the answer carries no id', async () => {
+  it('keeps none of an ok answer, because that is the member’s own profile', async () => {
+    // A 200 that fails to read carries their id, their picture URL and their page — and the rest
+    // of the app keeps member detail out of logs. The status is all an operator can act on.
     answering(json({ access_token: TOKEN }), json({ picture: { data: { url: 'https://x.example/f.png' } } }))
 
-    expect(await identifyOverHttps(input())).toEqual({
-      failed: { at: 'profile', status: 200, said: expect.stringContaining('picture') },
-    })
+    expect(await identifyOverHttps(input())).toEqual({ failed: { at: 'profile', status: 200 } })
   })
 
   it('keeps html and form-encoded answers verbatim rather than calling them nothing', async () => {

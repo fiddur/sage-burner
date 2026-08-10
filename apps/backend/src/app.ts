@@ -146,11 +146,9 @@ export interface AppDeps {
   /**
    * Where the log goes, for a test that asserts on what was written (#430).
    *
-   * The seam `errors.test.ts` says is missing — it builds a bare Fastify instance instead,
-   * because this took its logger from config and offered nowhere to put a stream. Some of what
-   * this app logs is the only record of a thing: a provider refusing a link is the reason an
-   * admin has, and a log line nothing asserts on is a log line that can quietly stop being
-   * written.
+   * Some of what this app logs is the only record of a thing: a provider refusing a link is the
+   * whole reason an admin has, and a log line nothing asserts on is one that can quietly stop
+   * being written. Removing the route's `log.warn` broke no test until this existed.
    *
    * Absent in production, where `loggerOptions` decides everything.
    */

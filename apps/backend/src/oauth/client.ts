@@ -55,6 +55,11 @@ export interface IdentifyInput {
  * **What we sent is never in here.** The client secret, the authorization code and the
  * access token are all things this module *sends*; `said` is what came back, so none of them
  * can appear in it. `client.test.ts` asserts that rather than trusting it.
+ *
+ * **Nor is what the provider said about the member.** `said` is kept only where the answer was
+ * a refusal. A 200 that fails to read is somebody's *profile* — the provider's id for them,
+ * their picture URL, their page — and the rest of this app keeps member detail out of logs; the
+ * status alone says as much as an operator can act on there.
  */
 export interface IdentifyFailure {
   /** Which leg gave up: exchanging the code, reading the profile, or never arriving. */
@@ -159,7 +164,14 @@ export const identifyOverHttps: Identify = async ({
     const answered = await bodyOf(identified)
     const profile = identified.ok ? shape.read(answered.json) : undefined
     if (profile === undefined) {
-      return { failed: { at: 'profile', status: identified.status, ...saidOnly(answered) } }
+      return {
+        failed: {
+          at: 'profile',
+          status: identified.status,
+          // Only a refusal's words. An ok answer here is the member's own profile.
+          ...(identified.ok ? {} : saidOnly(answered)),
+        },
+      }
     }
 
     return { profile }
