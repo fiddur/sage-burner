@@ -355,7 +355,7 @@ export const registerOauthRoutes = (
       const uri = redirectUri(request, provider)
       if (setting === undefined || uri === undefined) return back(reply, failed)
 
-      const profile = await oauth.identify({
+      const identified = await oauth.identify({
         provider,
         clientId: setting.client_id,
         clientSecret: setting.client_secret,
@@ -363,11 +363,22 @@ export const registerOauthRoutes = (
         code,
         asks: asksFor(setting),
       })
-      if (profile === undefined) return back(reply, failed)
+
+      if ('failed' in identified) {
+        // The one place the reason is kept (#430). A member is answered the same either way —
+        // none of this is theirs and none of it is actionable by them — but whoever configured
+        // the provider is whoever runs the installation, and `docker logs` is where they look.
+        request.log.warn(
+          { provider, intent: spent.intent, ...identified.failed },
+          'could not identify somebody at a provider',
+        )
+
+        return back(reply, failed)
+      }
 
       return spent.intent === 'sign-in'
-        ? await signIn(reply, provider, profile)
-        : await link(reply, provider, spent.account_id, profile)
+        ? await signIn(reply, provider, identified.profile)
+        : await link(reply, provider, spent.account_id, identified.profile)
     },
   )
 

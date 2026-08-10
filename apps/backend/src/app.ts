@@ -143,6 +143,18 @@ export interface AppDeps {
    * `TERMS.md` at boot, and injected for the same reason as the other two.
    */
   terms?: string
+  /**
+   * Where the log goes, for a test that asserts on what was written (#430).
+   *
+   * The seam `errors.test.ts` says is missing — it builds a bare Fastify instance instead,
+   * because this took its logger from config and offered nowhere to put a stream. Some of what
+   * this app logs is the only record of a thing: a provider refusing a link is the reason an
+   * admin has, and a log line nothing asserts on is a log line that can quietly stop being
+   * written.
+   *
+   * Absent in production, where `loggerOptions` decides everything.
+   */
+  logStream?: { write: (chunk: string) => void }
 }
 
 /** The API lives here; everything else is the single-page app. */
@@ -401,12 +413,16 @@ export const createApp = async ({
   defer,
   hash,
   now = () => new Date(),
+  logStream,
   changelog = readDocument('CHANGELOG.md'),
   privacy = readDocument('PRIVACY.md'),
   terms = readDocument('TERMS.md'),
 }: AppDeps): Promise<FastifyInstance> => {
   const app = Fastify({
-    logger: loggerOptions(config.log_level),
+    logger: {
+      ...loggerOptions(config.log_level),
+      ...(logStream === undefined ? {} : { stream: logStream }),
+    },
     // Defaults to trusting nothing. `true` would believe the whole
     // X-Forwarded-For chain from whoever connects, making request.ip
     // client-controlled — which matters as soon as a rate limiter on invite
