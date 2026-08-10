@@ -574,7 +574,7 @@ describe('somebody’s own card', () => {
     await introduce(server, ada.cookie, 'I build saunas.')
 
     const card = await cardOf(server, ada.cookie, 'Ada')
-    expect(card?.introduction).toBe('I build saunas.')
+    expect(card?.body).toBe('I build saunas.')
     expect(card?.entries.map((entry) => entry.kind)).toEqual(['joined', 'introduced'])
   })
 
@@ -587,11 +587,11 @@ describe('somebody’s own card', () => {
     await introduce(server, ada.cookie, `${'word '.repeat(200)}end`)
 
     const card = await cardOf(server, ada.cookie, 'Ada')
-    expect(card?.introduction?.length).toBeLessThanOrEqual(INTRODUCTION_EXCERPT + 1)
-    expect(card?.introduction?.endsWith('…')).toBe(true)
+    expect(card?.body?.length).toBeLessThanOrEqual(INTRODUCTION_EXCERPT + 1)
+    expect(card?.body?.endsWith('…')).toBe(true)
   })
 
-  it('carries none for a dream, which has no introduction to carry', async () => {
+  it('carries no body for a dream, whose content is its title and its entries', async () => {
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -599,7 +599,7 @@ describe('somebody’s own card', () => {
 
     await offerDream(server, ada.cookie, 'Sauna at dawn')
 
-    expect((await cards(server, ada.cookie))[0]?.introduction).toBeNull()
+    expect((await cards(server, ada.cookie))[0]?.body).toBeNull()
   })
 
   it('is not gone while somebody is still coming', async () => {

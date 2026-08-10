@@ -18,6 +18,7 @@ const marks = {
   offered: '🌱',
   joined: '🎪',
   introduced: '✍️',
+  posted: '📣',
   facilitator: '👉',
   helper: '🙋',
   renamed: '✏️',

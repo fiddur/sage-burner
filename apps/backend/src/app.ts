@@ -56,6 +56,7 @@ import { registerOauthRoutes } from './routes/oauth.ts'
 import { registerPasskeyRoutes } from './routes/passkeys.ts'
 import { registerPeopleRoutes } from './routes/people.ts'
 import { registerPlaceRoutes } from './routes/places.ts'
+import { registerPostRoutes } from './routes/posts.ts'
 import { registerProfileRoutes } from './routes/profile.ts'
 import { registerPushRoutes } from './routes/push.ts'
 import { registerPwaRoutes } from './routes/pwa.ts'
@@ -274,6 +275,7 @@ export const createApp = async ({
   registerRedemptionRoutes(app, { db, config, sessions, now, hash, gate })
   registerAllergyRoutes(app, { db })
   registerAttendanceRoutes(app, { db, sessions, now, notify: tellAccount })
+  registerPostRoutes(app, { db, sessions, now, notify: tellAccount })
   registerProfileRoutes(app, { db, sessions, now, notify: tellAccount })
   registerRosterRoutes(app, { db, sessions, now, notify: tellAccount })
   registerLeadRoleRoutes(app, { db, sessions, now, notify: tellAccount })

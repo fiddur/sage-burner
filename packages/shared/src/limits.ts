@@ -20,6 +20,8 @@ export const MAX_DESCRIPTION = 20_000
 
 export const MAX_COMMENT = 2000
 
+export const MAX_POST = 8000
+
 export const MAX_INTRODUCTION = 10_000
 
 export const INTRODUCTION_EXCERPT = 280

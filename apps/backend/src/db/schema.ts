@@ -799,6 +799,26 @@ export const accountConnection = sqliteTable(
   ],
 )
 
+export const post = sqliteTable(
+  'post',
+  {
+    id: text('id').notNull(),
+    event_id: text('event_id')
+      .notNull()
+      .references(() => event.id, { onDelete: 'cascade' }),
+    author_account_id: text('author_account_id').references(() => account.id, { onDelete: 'set null' }),
+    title: text('title').notNull(),
+    body: text('body').notNull().default(''),
+    withdrawn_at: text('withdrawn_at'),
+    created_at: text('created_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    index('post_event_idx').on(table.event_id, table.created_at),
+    check('post_title_check', sql`length(trim(${table.title})) > 0`),
+  ],
+)
+
 export const oauthSetting = sqliteTable(
   'oauth_setting',
   {

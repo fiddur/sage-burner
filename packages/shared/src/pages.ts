@@ -7,6 +7,8 @@ export const dreamPage = (eventId: string, dreamId: string): string =>
 
 export const profilePage = (accountId: string): string => `/members/${encodeURIComponent(accountId)}`
 
+export const feedPage = (): string => '/feed'
+
 export const OAUTH_OUTCOME_PARAM = 'from'
 
 // What the page tells an organiser to quote: the request id, which is `reqId` on the log line

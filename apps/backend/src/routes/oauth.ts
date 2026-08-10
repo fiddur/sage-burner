@@ -244,7 +244,7 @@ export const registerOauthRoutes = (
 
     try {
       await maybeAvatar(accountId, profile.picture)
-    } catch {}
+    } catch {} // swallowed: a CDN having a bad day must not undo a link already written
 
     let reached = false
     try {

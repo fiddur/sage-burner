@@ -1,4 +1,4 @@
-import type { Activity, Thread, ThreadEntry } from '@sage-burner/shared'
+import type { Activity, MyBurn, Thread, ThreadEntry } from '@sage-burner/shared'
 
 import { notificationCategoryInfo } from '@sage-burner/shared'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
@@ -8,6 +8,7 @@ import type { Viewer } from '../viewer.tsx'
 import type { FeedApi } from './Feed.tsx'
 
 import { apiError } from '../api/client.ts'
+import { BurnProvider } from '../burn.tsx'
 import { ViewerProvider } from '../viewer.tsx'
 import { Feed } from './Feed.tsx'
 
@@ -52,7 +53,8 @@ const aCard = (over: Partial<Thread> & Pick<Thread, 'id' | 'title'>): Thread => 
   entity_type: 'session',
   entity_id: 's-1',
   link: '/dreams?burn=e-1&dream=s-1',
-  introduction: null,
+  body: null,
+  own: false,
   gone: false,
   entry_count: 1,
   last_at: '2026-08-07T18:00:00.000Z',
@@ -77,6 +79,9 @@ const stub = (over: Partial<FeedApi> = {}, activity: Activity[] = TWO, threads: 
   getMyNotificationSettings: () => Promise.resolve({ on: [...DEFAULTS], email: [] }),
   updateMyNotificationSettings: () => Promise.resolve({ on: [...DEFAULTS], email: [] }),
   getThread: () => Promise.reject(new Error('getThread is not stubbed here')),
+  addPost: () => Promise.reject(new Error('addPost is not stubbed here')),
+  updatePost: () => Promise.reject(new Error('updatePost is not stubbed here')),
+  deletePost: () => Promise.reject(new Error('deletePost is not stubbed here')),
   uploadImage: () => Promise.reject(new Error('uploadImage is not stubbed here')),
   postComment: () => Promise.reject(new Error('postComment is not stubbed here')),
   updateComment: () => Promise.reject(new Error('updateComment is not stubbed here')),
@@ -84,12 +89,87 @@ const stub = (over: Partial<FeedApi> = {}, activity: Activity[] = TWO, threads: 
   ...over,
 })
 
-const renderPage = (api: FeedApi, viewer: Viewer = ADA) =>
+const BURN: MyBurn = {
+  event: {
+    id: 'e-1',
+    name: 'Summer burn',
+    slug: 'summer-burn',
+    start_date: '2026-08-01',
+    end_date: '2026-08-05',
+    start_time: '16:00',
+    end_time: '12:00',
+  },
+  attendance: null,
+}
+
+// `null` rather than `undefined`, as `Faq.test.tsx` argues: a parameter with a default
+// takes the default from `undefined`, so "no burn chosen" would silently render one.
+const renderPage = (api: FeedApi, viewer: Viewer = ADA, burn: MyBurn | null = BURN) =>
   render(
     <ViewerProvider viewer={viewer}>
-      <Feed api={api} />
+      <BurnProvider
+        value={{ status: 'ready', burns: burn === null ? [] : [burn], selected: burn ?? undefined }}
+      >
+        <Feed api={api} />
+      </BurnProvider>
     </ViewerProvider>,
   )
+
+describe('announcing something on the feed', () => {
+  it('sends the title and the body to the burn the bar has chosen', async () => {
+    const addPost = vi.fn<FeedApi['addPost']>(() =>
+      Promise.resolve({
+        post: {
+          id: 'p-1',
+          event_id: 'e-1',
+          author_account_id: 'a-1',
+          title: 'The planning call is Sunday',
+          body: 'Come.',
+          withdrawn_at: null,
+          created_at: '2026-08-07T18:00:00.000Z',
+        },
+      }),
+    )
+    renderPage(stub({ addPost }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Announce something' }))
+    fireEvent.input(screen.getByLabelText('What you are announcing'), {
+      target: { value: '  The planning call is Sunday  ' },
+    })
+    fireEvent.input(screen.getByLabelText('What you want to say about it'), { target: { value: ' Come. ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Announce it' }))
+
+    await waitFor(() =>
+      expect(addPost).toHaveBeenCalledWith('e-1', { title: 'The planning call is Sunday', body: 'Come.' }),
+    )
+  })
+
+  it('will not send one with nothing to announce', async () => {
+    const addPost = vi.fn<FeedApi['addPost']>()
+    renderPage(stub({ addPost }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Announce something' }))
+    fireEvent.input(screen.getByLabelText('What you are announcing'), { target: { value: '   ' } })
+
+    expect(screen.getByRole('button', { name: 'Announce it' })).toHaveProperty('disabled', true)
+    expect(addPost).not.toHaveBeenCalled()
+  })
+
+  it('offers nothing to announce to before a burn is chosen', async () => {
+    renderPage(stub(), ADA, null)
+
+    await waitFor(() => expect(screen.getByText('Ada offered a dream: Sauna at dawn')).toBeTruthy())
+    expect(screen.queryByRole('button', { name: 'Announce something' })).toBeNull()
+  })
+
+  it('says who will see it, so nobody announces to the wrong burn', async () => {
+    renderPage(stub())
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Announce something' }))
+
+    expect(screen.getByText(/Everyone coming to Summer burn will see this/)).toBeTruthy()
+  })
+})
 
 describe('what everyone has been doing', () => {
   it('shows a line per thing, newest first', async () => {
@@ -171,7 +251,7 @@ describe('what everyone has been doing', () => {
             title: 'Ada',
             entity_type: 'attendance',
             link: '/members/a-1',
-            introduction: 'I build **saunas**.',
+            body: 'I build **saunas**.',
             entries: [anEntry({ id: 't-1', body: 'says who they are', kind: 'introduced' })],
           }),
         ],
@@ -180,6 +260,246 @@ describe('what everyone has been doing', () => {
 
     expect(await screen.findByText('saunas')).toBeTruthy()
     expect((await screen.findByRole('link', { name: 'Ada' })).getAttribute('href')).toBe('/members/a-1')
+  })
+
+  it('says an announcement was taken back, not that somebody is no longer coming', async () => {
+    renderPage(
+      stub(
+        {},
+        [],
+        [
+          aCard({
+            id: 'c-1',
+            title: 'The planning call is Sunday',
+            entity_type: 'post',
+            link: null,
+            gone: true,
+          }),
+        ],
+      ),
+    )
+
+    expect(await screen.findByText(/taken back/)).toBeTruthy()
+    expect(screen.queryByText(/no longer coming|withdrawn/)).toBeNull()
+  })
+
+  it('offers rewording and taking back to whoever the server says it is theirs', async () => {
+    const updatePost = vi.fn<FeedApi['updatePost']>(() =>
+      Promise.resolve({
+        post: {
+          id: 's-1',
+          event_id: 'e-1',
+          author_account_id: 'a-1',
+          title: 'Monday, not Sunday',
+          body: '',
+          withdrawn_at: null,
+          created_at: '2026-08-07T18:00:00.000Z',
+        },
+      }),
+    )
+    renderPage(
+      stub(
+        { updatePost },
+        [],
+        [
+          aCard({
+            id: 'c-1',
+            title: 'Sunday',
+            entity_type: 'post',
+            entity_id: 's-1',
+            link: null,
+            body: 'Come.',
+            own: true,
+          }),
+        ],
+      ),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Reword it' }))
+    fireEvent.input(screen.getByLabelText('What Sunday is'), { target: { value: ' Monday, not Sunday ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() =>
+      expect(updatePost).toHaveBeenCalledWith('s-1', { title: 'Monday, not Sunday', body: 'Come.' }),
+    )
+  })
+
+  it('takes one back by the entity it is about, not by the thread', async () => {
+    const deletePost = vi.fn<FeedApi['deletePost']>(() => Promise.resolve(undefined))
+    renderPage(
+      stub(
+        { deletePost },
+        [],
+        [aCard({ id: 'c-1', title: 'Sunday', entity_type: 'post', entity_id: 's-1', link: null, own: true })],
+      ),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Take back Sunday' }))
+
+    await waitFor(() => expect(deletePost).toHaveBeenCalledWith('s-1'))
+  })
+
+  it('stops showing the expanded copy of a card it has just reworded', async () => {
+    // A comment or a Show-the-whole-thread puts the card in the page's own `whole` map, which
+    // a feed reload does not touch — so without dropping it, the reworded card keeps the old
+    // words on exactly the cards people have been talking on.
+    const stale = aCard({
+      id: 'c-1',
+      title: 'Stale title',
+      entity_type: 'post',
+      entity_id: 's-1',
+      link: null,
+      own: true,
+    })
+    const updatePost = vi.fn<FeedApi['updatePost']>(() =>
+      Promise.resolve({
+        post: {
+          id: 's-1',
+          event_id: 'e-1',
+          author_account_id: 'a-1',
+          title: 'Monday',
+          body: '',
+          withdrawn_at: null,
+          created_at: '2026-08-07T18:00:00.000Z',
+        },
+      }),
+    )
+    renderPage(
+      stub(
+        { updatePost, postComment: () => Promise.resolve({ thread: stale }) },
+        [],
+        [{ ...stale, title: 'Sunday' }],
+      ),
+    )
+
+    fireEvent.input(await screen.findByLabelText('Say something about Sunday'), {
+      target: { value: 'noted' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Say it' }))
+    await waitFor(() => expect(screen.getByText('Stale title')).toBeTruthy())
+    // Enabled, not merely present: a click on a disabled button is a no-op and the next
+    // `getByRole` would then fail on the form that never opened.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Reword it' })).toHaveProperty('disabled', false),
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reword it' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(screen.queryByText('Stale title')).toBeNull())
+    expect(screen.getByText('Sunday')).toBeTruthy()
+  })
+
+  it('keeps what was typed when a rewording is refused', async () => {
+    renderPage(
+      stub(
+        { updatePost: () => Promise.reject(apiError(500, 'internal', 'Nope.')) },
+        [],
+        [aCard({ id: 'c-1', title: 'Sunday', entity_type: 'post', entity_id: 's-1', link: null, own: true })],
+      ),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Reword it' }))
+    fireEvent.input(screen.getByLabelText('What Sunday is'), { target: { value: 'Monday' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Nope.')
+    expect(screen.getByLabelText('What Sunday is')).toHaveProperty('value', 'Monday')
+  })
+
+  it('offers an organiser the take-back but not the rewording, which the route refuses them', async () => {
+    const BOSS: Viewer = {
+      status: 'signed-in',
+      account: { id: 'a-9', name: 'Cai', avatar: null, roles: ['admin', 'member'] },
+    }
+    renderPage(
+      stub(
+        {},
+        [],
+        [
+          aCard({
+            id: 'c-1',
+            title: 'Sunday',
+            entity_type: 'post',
+            entity_id: 's-1',
+            link: null,
+            own: false,
+          }),
+        ],
+      ),
+      BOSS,
+    )
+
+    expect(await screen.findByRole('button', { name: 'Take back Sunday' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Reword it' })).toBeNull()
+  })
+
+  it('offers an organiser nothing on a card that is not an announcement', async () => {
+    const BOSS: Viewer = {
+      status: 'signed-in',
+      account: { id: 'a-9', name: 'Cai', avatar: null, roles: ['admin', 'member'] },
+    }
+    renderPage(stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn', own: false })]), BOSS)
+
+    await waitFor(() => expect(screen.getByText('Sauna at dawn')).toBeTruthy())
+    expect(screen.queryByRole('button', { name: 'Take back Sauna at dawn' })).toBeNull()
+  })
+
+  it('offers neither to somebody it is not theirs', async () => {
+    renderPage(
+      stub(
+        {},
+        [],
+        [
+          aCard({
+            id: 'c-1',
+            title: 'Sunday',
+            entity_type: 'post',
+            entity_id: 's-1',
+            link: null,
+            own: false,
+          }),
+        ],
+      ),
+    )
+
+    await waitFor(() => expect(screen.getByText('Sunday')).toBeTruthy())
+    expect(screen.queryByRole('button', { name: 'Reword it' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Take back Sunday' })).toBeNull()
+  })
+
+  it('keeps what was typed when an announcement is refused', async () => {
+    renderPage(stub({ addPost: () => Promise.reject(apiError(500, 'internal', 'Nope.')) }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Announce something' }))
+    fireEvent.input(screen.getByLabelText('What you are announcing'), { target: { value: 'Sunday' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Announce it' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Nope.')
+    expect(screen.getByLabelText('What you are announcing')).toHaveProperty('value', 'Sunday')
+  })
+
+  it('offers an announcement’s own switch, not a dream’s', async () => {
+    renderPage(
+      stub(
+        {},
+        [],
+        [
+          aCard({
+            id: 'c-1',
+            title: 'The planning call is Sunday',
+            entity_type: 'post',
+            link: null,
+            body: 'Come.',
+            entries: [anEntry({ id: 't-1', body: 'noted', kind: 'comment' })],
+          }),
+        ],
+      ),
+    )
+
+    expect(
+      await screen.findByRole('button', { name: notificationCategoryInfo.post_comment_any.label }),
+    ).toBeTruthy()
   })
 
   it('offers the switch that belongs to the card, not the dream one of the same name', async () => {

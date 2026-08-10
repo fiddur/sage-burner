@@ -42,7 +42,7 @@ import { refuseIfStale, withCollectionVersion, withVersion } from '../if-match.t
 import { displayName, tellAttendees } from '../push/notify.ts'
 import { attendanceFor } from './attendance.ts'
 import { openEventNow } from './events.ts'
-import { addEntry, renameThread, threadForSession, threadIdFor } from './threads.ts'
+import { addEntry, renameThread, threadFor, threadIdFor } from './threads.ts'
 
 export interface SessionDeps extends GuardDeps {
   now: () => Date
@@ -272,7 +272,7 @@ export const registerSessionRoutes = (
   ) => {
     await addEntry(
       db,
-      { thread_id: await threadForSession(db, dream), kind, author_account_id: by ?? null, body },
+      { thread_id: await threadFor(db, 'session', dream), kind, author_account_id: by ?? null, body },
       now(),
     )
   }
@@ -285,7 +285,7 @@ export const registerSessionRoutes = (
   ) => {
     if (body.title !== undefined && body.title !== before.title) {
       await noteOnDream(before, 'renamed', by, `renamed it to “${after.title}”`)
-      await renameThread(db, await threadForSession(db, before), after.title)
+      await renameThread(db, await threadFor(db, 'session', before), after.title)
     }
 
     const moved =

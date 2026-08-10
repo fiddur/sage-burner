@@ -276,9 +276,9 @@ A page of what everyone has been doing (#303) and what they are talking about (#
 because between burns the app was quiet and quiet reads as nothing-to-do.
 
 **Two things on one page, deliberately.** Anything you can talk about is one **card**
-carrying its whole history and the talk under it — a dream, and since #426 a person at a
-burn; the burn's own news that nobody talks to — a lead role added, a lead taken — stays a
-**line**. Collapsing everything by thread was the first design and it does not work: the
+carrying its whole history and the talk under it — a dream, a person at a burn (#426), an
+announcement (#438); the burn's own news that nobody talks to — a lead role added, a lead
+taken — stays a **line**. Collapsing everything by thread was the first design and it does not work: the
 lines that belong to no card would end up behind one card per burn, which is the page's
 list disappearing into an accordion. So `activity` keeps what has no conversation to hang
 on, and shrinks as each kind of thing gains one — saying you are coming was a line until
@@ -331,6 +331,45 @@ deleting what people said to each other, which is why `thread.entity_id` deliber
 carries no foreign key, and why `event_id` and `title` sit on the thread rather than
 being joined out of a row that may be gone. Retention is still the burn: a thread
 cascades with the event.
+
+#### An announcement
+
+**A post is the one card that mirrors nothing else** (#438). Everything else on the feed is a
+view of a row that exists for its own reasons — a dream, a stay. A post exists to be
+announced: "the planning call is Sunday the 14th". So it is an ordinary entity with an
+ordinary thread, `entity_type: 'post'`, and commenting, bumping, notifying and the retention
+rule all fall out of the thread design without a line of new machinery.
+
+**The body is on the row, not on the first entry.** The alternative was tried on paper and is
+worse: it forces `MAX_COMMENT` on an announcement and makes "edit the post" mean "edit entry
+seq 0". `MAX_POST` is 8,000 — longer than a comment, shorter than a welcome page — and the
+card reads it at query time, so a rewording cannot leave the feed quoting the old wording.
+`posted` is the entry that opens the card and `edited` the one a rewording adds, which
+coalesces — so six passes leave one line rather than six, and each of them still brings the card
+back to the top, because coalescing rewrites the entry's `created_at`.
+
+**Its card links nowhere, because the card is the post.** A dream's card links to its panel
+and a person's to their page; an announcement has no elsewhere to be. The notification about a
+comment on one therefore points at `/feed`, which is where the card is.
+
+**Withdrawing keeps the conversation**, exactly as a dream's does: `withdrawn_at` is set, a
+`withdrawn` entry is added, the title stays and the body goes. The author may withdraw their
+own and an admin may withdraw any — the same split `deleteComment` already makes, and the
+answer #426 deliberately left open for its own card. Withdrawing twice adds one entry.
+`author_account_id` is `set null` rather than a cascade, so a burn's announcements outlive
+somebody leaving — the post, its title and its body all stay, and only the `posted` entry's
+author goes.
+
+**Announcing is any approved member's**, which is the repo's default for the burn's shared
+furniture. Whether a lead's announcement should read differently from a member's is a
+question about presentation, not a permission, and there is no bit here to change if the
+answer turns out to be yes.
+
+**`post_written` is off by default**, which sits oddly for content whose whole point is reach —
+and is still right. #259's rule is that what happens _around_ you is off unless asked for, and
+the reach is the card on the feed rather than the bell. An author who needs the burn's
+attention has @-mentions (#439) to say so in the body, which is a better instrument than a
+category everybody would have had to switch off.
 
 #### Somebody's own card
 
