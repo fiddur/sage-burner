@@ -74,6 +74,9 @@ export const notificationCategories = [
   'dream_comment',
   'dream_comment_any',
   'member_joined',
+  'introduction_written',
+  'introduction_comment',
+  'introduction_comment_any',
   'lead_role_added',
   'lead_role_filled',
   'new_version',
@@ -106,6 +109,9 @@ export const notificationCategoryInfo = {
   dream_comment: { label: 'Somebody comments on a dream you are part of', on: true, about: 'you' },
   dream_comment_any: { label: 'Somebody comments on any dream', on: false, about: 'else' },
   member_joined: { label: 'Somebody says they are coming', on: false, about: 'else' },
+  introduction_written: { label: 'Somebody says who they are', on: false, about: 'else' },
+  introduction_comment: { label: 'Somebody comments on your own card', on: true, about: 'you' },
+  introduction_comment_any: { label: 'Somebody comments on anybody’s card', on: false, about: 'else' },
   lead_role_added: { label: 'A lead role is added', on: false, about: 'else' },
   lead_role_filled: { label: 'Somebody takes the lead of a role', on: false, about: 'else' },
   new_version: { label: 'A new version of the app is out', on: false, about: 'else' },
@@ -124,7 +130,7 @@ export const notificationSections = [
 export const categoriesAbout = (about: NotificationCategoryInfo['about']): NotificationCategory[] =>
   notificationCategories.filter((category) => notificationCategoryInfo[category].about === about)
 
-export const threadEntityTypes = ['session'] as const
+export const threadEntityTypes = ['session', 'attendance'] as const
 export type ThreadEntityType = (typeof threadEntityTypes)[number]
 export const isThreadEntityType = (value: unknown): value is ThreadEntityType =>
   isOneOf(threadEntityTypes, value)
@@ -132,6 +138,8 @@ export const isThreadEntityType = (value: unknown): value is ThreadEntityType =>
 export const threadEntryKinds = [
   'comment',
   'offered',
+  'joined',
+  'introduced',
   'facilitator',
   'helper',
   'renamed',
@@ -144,14 +152,28 @@ export const isThreadEntryKind = (value: unknown): value is ThreadEntryKind =>
   isOneOf(threadEntryKinds, value)
 
 export const coalesces = (kind: ThreadEntryKind): boolean =>
-  kind === 'renamed' || kind === 'scheduled' || kind === 'edited'
+  kind === 'renamed' || kind === 'scheduled' || kind === 'edited' || kind === 'introduced'
 
-export const entryCategory = (kind: ThreadEntryKind): NotificationCategory | undefined => {
+const sessionCategory = (kind: ThreadEntryKind): NotificationCategory | undefined => {
   if (kind === 'comment') return 'dream_comment_any'
   if (kind === 'offered') return 'dream_offered'
 
   return undefined
 }
+
+const attendanceCategory = (kind: ThreadEntryKind): NotificationCategory | undefined => {
+  if (kind === 'comment') return 'introduction_comment_any'
+  if (kind === 'introduced') return 'introduction_written'
+  if (kind === 'joined') return 'member_joined'
+
+  return undefined
+}
+
+export const entryCategory = (
+  entity: ThreadEntityType,
+  kind: ThreadEntryKind,
+): NotificationCategory | undefined =>
+  entity === 'session' ? sessionCategory(kind) : attendanceCategory(kind)
 
 export const connectionKinds = [
   'email',

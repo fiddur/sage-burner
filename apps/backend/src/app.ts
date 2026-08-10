@@ -274,7 +274,7 @@ export const createApp = async ({
   registerRedemptionRoutes(app, { db, config, sessions, now, hash, gate })
   registerAllergyRoutes(app, { db })
   registerAttendanceRoutes(app, { db, sessions, now, notify: tellAccount })
-  registerProfileRoutes(app, { db, sessions, now })
+  registerProfileRoutes(app, { db, sessions, now, notify: tellAccount })
   registerRosterRoutes(app, { db, sessions, now, notify: tellAccount })
   registerLeadRoleRoutes(app, { db, sessions, now, notify: tellAccount })
   registerFaqRoutes(app, { db, sessions, now })

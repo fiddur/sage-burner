@@ -576,6 +576,8 @@ describe('Dreams', () => {
           entity_type: 'session',
           entity_id: 's-1',
           title: 'Sunrise yoga',
+          link: '/dreams?burn=e-1&dream=s-1',
+          introduction: null,
           gone: false,
           entry_count: 1,
           last_at: '2026-08-07T18:00:00.000Z',

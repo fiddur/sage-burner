@@ -21,6 +21,8 @@ import {
   event,
   eventOption,
   image,
+  thread,
+  threadEntry,
 } from '../db/schema.ts'
 import { writeAllergyTicks } from './allergy-ticks.ts'
 import { helpingIdsFor, writeHelping } from './helping.ts'
@@ -929,5 +931,111 @@ describe('an allergy item deleted while somebody is saving', () => {
 
     expect(answer.statusCode).toBe(400)
     expect((await getProfile(server, ada.cookie)).json().profile.name).toBe('Ada')
+  })
+})
+
+describe('an introduction on the burns somebody is coming to', () => {
+  const cardsFor = async (accountId: string) =>
+    await db()
+      .select({
+        thread_id: thread.id,
+        event_id: thread.event_id,
+        title: thread.title,
+        kind: threadEntry.kind,
+        body: threadEntry.body,
+        author: threadEntry.author_account_id,
+      })
+      .from(thread)
+      .innerJoin(attendance, eq(attendance.id, thread.entity_id))
+      .leftJoin(threadEntry, eq(threadEntry.thread_id, thread.id))
+      .where(and(eq(thread.entity_type, 'attendance'), eq(attendance.account_id, accountId)))
+
+  it('says who they are on the card of every burn still to come', async () => {
+    const server = await build()
+    const member = await givenMember({ name: 'Ada' })
+    const summer = await givenEvent({ slug: 'summer' })
+    const autumn = await givenEvent({ slug: 'autumn', start_date: '2026-09-01', end_date: '2026-09-05' })
+    await givenComing(summer, member.id)
+    await givenComing(autumn, member.id)
+
+    await patchProfile(server, member.cookie, { introduction: 'I build saunas.' })
+
+    const written = await cardsFor(member.id)
+    expect(written.map((row) => row.event_id).toSorted()).toEqual([summer, autumn].toSorted())
+    expect(written.map((row) => [row.kind, row.body, row.author])).toEqual([
+      ['introduced', 'says who they are', member.id],
+      ['introduced', 'says who they are', member.id],
+    ])
+  })
+
+  it('leaves a burn that has already ended alone', async () => {
+    const server = await build()
+    const member = await givenMember({ name: 'Ada' })
+    const over = await givenEvent({ slug: 'spring', start_date: '2026-05-01', end_date: '2026-05-03' })
+    await givenComing(over, member.id)
+
+    await patchProfile(server, member.cookie, { introduction: 'I build saunas.' })
+
+    expect(await cardsFor(member.id)).toEqual([])
+  })
+
+  it('bumps the one card rather than leaving a line per rewrite', async () => {
+    const server = await build()
+    const member = await givenMember({ name: 'Ada' })
+    const summer = await givenEvent({ slug: 'summer' })
+    await givenComing(summer, member.id)
+
+    await patchProfile(server, member.cookie, { introduction: 'I build saunas.' })
+    await patchProfile(server, member.cookie, { introduction: 'I build saunas, mostly.' })
+    await patchProfile(server, member.cookie, { introduction: 'I build saunas, mostly, and dig.' })
+
+    expect(await cardsFor(member.id)).toHaveLength(1)
+  })
+
+  it('says nothing for a save that did not touch the introduction', async () => {
+    const server = await build()
+    const member = await givenMember({ name: 'Ada' })
+    const summer = await givenEvent({ slug: 'summer' })
+    await givenComing(summer, member.id)
+    await patchProfile(server, member.cookie, { introduction: 'I build saunas.' })
+
+    await patchProfile(server, member.cookie, { allergies_notes: 'peanuts' })
+    await patchProfile(server, member.cookie, { introduction: 'I build saunas.' })
+
+    const written = await cardsFor(member.id)
+    expect(written).toHaveLength(1)
+    expect(written[0]?.body).toBe('says who they are')
+  })
+
+  it('says nothing when an introduction is cleared, since there is nothing to read', async () => {
+    const server = await build()
+    const member = await givenMember({ name: 'Ada' })
+    const summer = await givenEvent({ slug: 'summer' })
+    await givenComing(summer, member.id)
+
+    await patchProfile(server, member.cookie, { introduction: '' })
+
+    expect(await cardsFor(member.id)).toEqual([])
+  })
+
+  it('says nothing for somebody who is not coming to anything', async () => {
+    const server = await build()
+    const member = await givenMember({ name: 'Ada' })
+    await givenEvent({ slug: 'summer' })
+
+    await patchProfile(server, member.cookie, { introduction: 'I build saunas.' })
+
+    expect(await cardsFor(member.id)).toEqual([])
+  })
+
+  it('titles the card with the name at the time, which the feed then re-resolves', async () => {
+    const server = await build()
+    const member = await givenMember({ name: 'Ada' })
+    const summer = await givenEvent({ slug: 'summer' })
+    await givenComing(summer, member.id)
+
+    await patchProfile(server, member.cookie, { introduction: 'I build saunas.' })
+
+    expect((await cardsFor(member.id))[0]?.title).toBe('Ada')
   })
 })

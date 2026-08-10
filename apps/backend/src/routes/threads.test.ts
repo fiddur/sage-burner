@@ -132,6 +132,14 @@ const remove = (server: FastifyInstance, cookie: string, id: string) =>
 const entriesOf = async (server: FastifyInstance, cookie: string, id: string): Promise<Thread['entries']> =>
   (await read(server, id, cookie)).json().thread.entries
 
+const setOn = (server: FastifyInstance, cookie: string, on: string[]) =>
+  server.inject({
+    method: 'PUT',
+    url: '/api/me/notification-settings',
+    headers: { cookie },
+    payload: { on, email: [] },
+  })
+
 const bell = async (server: FastifyInstance, cookie: string): Promise<{ category: string; body: string }[]> =>
   (await server.inject({ method: 'GET', url: '/api/me/notifications', headers: { cookie } })).json()
     .notifications
@@ -595,5 +603,107 @@ describe('a thread', () => {
     expect(await db().select().from(thread)).toEqual([])
     expect(await db().select().from(threadEntry)).toEqual([])
     expect((await read(server, id, ada.cookie)).statusCode).toBe(404)
+  })
+})
+
+describe('a conversation about a person', () => {
+  const joinBurn = (server: FastifyInstance, cookie: string) =>
+    server.inject({ method: 'POST', url: `/api/events/${BURN}/attendance/me`, headers: { cookie } })
+
+  const introduce = (server: FastifyInstance, cookie: string, introduction: string) =>
+    server.inject({ method: 'PATCH', url: '/api/me/profile', headers: { cookie }, payload: { introduction } })
+
+  const cardOf = async (server: FastifyInstance, cookie: string): Promise<Thread> => {
+    const [card] = (await server.inject({ method: 'GET', url: '/api/feed', headers: { cookie } })).json()
+      .threads as Thread[]
+    if (card === undefined) throw new Error('no card')
+
+    return card
+  }
+
+  it('tells the person it is about, and only asks the rest of the burn', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    const dag = await givenAccount('Dag')
+    await givenComing(bea.id)
+    await givenComing(dag.id)
+    await joinBurn(server, ada.cookie)
+    const card = await cardOf(server, ada.cookie)
+
+    await say(server, bea.cookie, card.id, 'good to have you')
+
+    expect((await bell(server, ada.cookie)).map((one) => one.category)).toEqual(['introduction_comment'])
+    expect(await bell(server, bea.cookie)).toEqual([])
+    expect(await bell(server, dag.cookie)).toEqual([])
+  })
+
+  it('reaches whoever asked about anybody’s card, on its own switch', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    const dag = await givenAccount('Dag')
+    await givenComing(bea.id)
+    await givenComing(dag.id)
+    await joinBurn(server, ada.cookie)
+    const card = await cardOf(server, ada.cookie)
+    await setOn(server, dag.cookie, ['introduction_comment_any'])
+
+    await say(server, bea.cookie, card.id, 'good to have you')
+
+    expect((await bell(server, dag.cookie)).map((one) => one.category)).toEqual(['introduction_comment_any'])
+  })
+
+  it('names the person rather than the title stored when they joined', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    await givenComing(bea.id)
+    await joinBurn(server, ada.cookie)
+    const card = await cardOf(server, ada.cookie)
+    await db().update(account).set({ name: 'Ada B' }).where(eq(account.id, ada.id))
+
+    await say(server, bea.cookie, card.id, 'good to have you')
+
+    const [told] = await bell(server, ada.cookie)
+    expect(told?.body).toBe('Bea said something about Ada B')
+  })
+
+  it('says nothing to the burn when an introduction is taken away again', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    await givenComing(bea.id)
+    await joinBurn(server, ada.cookie)
+    await setOn(server, bea.cookie, ['introduction_written'])
+    await introduce(server, ada.cookie, 'I build saunas.')
+
+    await introduce(server, ada.cookie, '')
+
+    expect(await bell(server, bea.cookie)).toHaveLength(1)
+  })
+
+  it('tells the burn when somebody says who they are, and never the author', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    await givenComing(bea.id)
+    await joinBurn(server, ada.cookie)
+    await setOn(server, bea.cookie, ['introduction_written'])
+
+    await server.inject({
+      method: 'PATCH',
+      url: '/api/me/profile',
+      headers: { cookie: ada.cookie },
+      payload: { introduction: 'I build saunas.' },
+    })
+
+    expect((await bell(server, bea.cookie)).map((one) => one.body)).toEqual(['Ada says who they are.'])
+    expect(await bell(server, ada.cookie)).toEqual([])
   })
 })
