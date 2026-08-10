@@ -43,6 +43,7 @@ import { ProfilePage } from './pages/Profile.tsx'
 import { Rides } from './pages/Rides.tsx'
 import { Roles } from './pages/Roles.tsx'
 import { Schedule } from './pages/Schedule.tsx'
+import { Terms } from './pages/Terms.tsx'
 import { createRemembered, RememberedProvider } from './remembered.tsx'
 import { FetchedViewerProvider, ViewerProvider } from './viewer.tsx'
 
@@ -70,6 +71,7 @@ export type RoutesApi = Pick<
   | 'getAllergyItems'
   | 'getChangelog'
   | 'getPrivacy'
+  | 'getTerms'
   | 'addAllergyItem'
   | 'updateAllergyItem'
   | 'deleteAllergyItem'
@@ -258,6 +260,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
   const ApplyRoute = useMemo(() => () => <Apply api={api} />, [api])
   const ChangelogRoute = useMemo(() => () => <Changelog api={api} />, [api])
   const PrivacyRoute = useMemo(() => () => <Privacy api={api} />, [api])
+  const TermsRoute = useMemo(() => () => <Terms api={api} />, [api])
   // Both of these take a prop from the route pattern, rather than closing over nothing
   // like the others.
   const PersonRoute = useMemo(
@@ -277,6 +280,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
       <Route path="/apply" component={ApplyRoute} />
       <Route path="/changelog" component={ChangelogRoute} />
       <Route path="/privacy" component={PrivacyRoute} />
+      <Route path="/terms" component={TermsRoute} />
       <Route path="/members" component={MembersRoute} />
       <Route path="/members/:accountId" component={PersonRoute} />
       <Route path="/meals" component={MealsRoute} />

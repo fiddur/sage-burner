@@ -75,11 +75,12 @@ COPY --from=builder /app/apps/web/dist ./apps/web/dist
 # load-bearing rather than decorative — do not tidy it away in a redesign.
 COPY LICENSE ./
 
-# What `GET /api/changelog` (#325) and `GET /api/privacy` (#402) answer with. In the image
-# because the app serves them, unlike every other markdown file here — `.dockerignore`
-# un-ignores these two.
+# What `GET /api/changelog` (#325), `GET /api/privacy` (#402) and `GET /api/terms` (#419)
+# answer with. In the image because the app serves them, unlike every other markdown file
+# here — `.dockerignore` un-ignores these three.
 COPY CHANGELOG.md ./
 COPY PRIVACY.md ./
+COPY TERMS.md ./
 
 # The volume mount point, and the only thing the app needs to write. /app stays
 # root-owned and world-readable: `node` can read its own code and dependencies

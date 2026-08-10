@@ -23,7 +23,7 @@ const consoles = {
   },
   facebook: {
     where: 'developers.facebook.com',
-    cost: 'An app, a privacy-policy URL, and app review for public_profile before anybody outside your own account can use it.',
+    cost: 'An app, the URLs listed below, and app review for public_profile before anybody outside your own account can use it.',
   },
 } as const satisfies Record<OAuthProvider, { where: string; cost: string }>
 
@@ -97,10 +97,28 @@ export const OauthField = ({ api, provider }: { api: OauthApi; provider: OAuthPr
       </p>
 
       {provider === 'facebook' && (
-        <p class="form-note">
-          The privacy-policy URL app review asks for is <code>/privacy</code> on this installation's own
-          address — <a href="/privacy">this page</a>, which anybody can read without signing in.
-        </p>
+        <>
+          <p class="form-note">
+            Basic Settings asks for three more URLs, all on this installation's own address and all readable
+            by a reviewer who is not signed in:
+          </p>
+
+          <ul class="form-note">
+            <li>
+              Privacy Policy — <a href="/privacy">/privacy</a>
+            </li>
+            <li>
+              Terms of Service — <a href="/terms">/terms</a>
+            </li>
+            <li>
+              {/* Instructions rather than a deletion callback, which `privacyResponseSchema` says
+                  why of: the callback would have to delete an identity the server refuses to let
+                  go when it is somebody's last way in. */}
+              Data Deletion Instructions — <a href="/privacy">/privacy</a> again, which says how to take a
+              linked provider off an account
+            </li>
+          </ul>
+        </>
       )}
 
       {stored === undefined ? (

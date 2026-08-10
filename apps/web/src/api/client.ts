@@ -64,6 +64,7 @@ import type {
   RosterResponse,
   SessionResponse,
   SessionsResponse,
+  TermsResponse,
   ThreadResponse,
   VersionResponse,
 } from '@sage-burner/shared'
@@ -590,6 +591,9 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
 
     /** Public (#402). `privacyResponseSchema` carries why. */
     getPrivacy: (signal?: AbortSignal) => request<PrivacyResponse>(apiRoutes.getPrivacy.path(), { signal }),
+
+    /** Public (#419). `termsResponseSchema` carries why. */
+    getTerms: (signal?: AbortSignal) => request<TermsResponse>(apiRoutes.getTerms.path(), { signal }),
 
     /** The ways in on this account (#393). Signed in at all is the whole guard. */
     getMyIdentities: (signal?: AbortSignal) =>

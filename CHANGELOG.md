@@ -9,6 +9,12 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-10
 
+- **There are terms now, at `/terms`, linked in the footer beside the privacy policy.** Mostly
+  they say the thing that is easy to assume wrong: using this is an agreement with the people
+  who invited you, not with a company, because there is not one.
+- **The privacy policy now says how to get rid of what a Discord or Facebook sign-in gave us.**
+  One button under Your details, what it does not undo, and what happens if that link is the
+  only way you have left of signing in.
 - **The calendar link has an address of its own, and every existing one has changed.** It used
   to be built from the burn's own identifier, which the front page hands to anybody who opens
   it — so for the gathering being planned, the schedule was readable by any stranger. If you

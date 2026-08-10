@@ -37,6 +37,14 @@ Only if you choose to link one, and only ever as an extra way in beside your pas
 We ask those providers for nothing else. We do not ask for your email address, your friends,
 your posts, or anything you have done anywhere else, and we cannot see any of it.
 
+**Getting rid of it takes one button.** Under **Your details**, beside the provider under
+_Other ways to sign in_, _Take it off_ deletes that identifier straight away and for good —
+after it, nothing from that provider is left. The one thing it does not undo is the copied
+picture, because by then it is an ordinary picture on your account: remove or replace it under
+**Your details** as you would any other. If that link is the only way you have left of signing
+in, the app says so and keeps it rather than locking you out of your own account — set a
+password or add a passkey first, and then it can go.
+
 # The calendar feed
 
 The programme can be subscribed to as a calendar, so that what is being offered turns up in

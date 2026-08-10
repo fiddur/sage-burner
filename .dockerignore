@@ -37,16 +37,19 @@ node_modules
 **/*.sqlite-wal
 **/*.sqlite-shm
 
-# Documentation, with two exceptions — the markdown files the app *serves* rather than the
+# Documentation, with three exceptions — the markdown files the app *serves* rather than the
 # ones a reader of the repository looks at:
 #
 #   `CHANGELOG.md` at `/changelog`, where the "a new version is out" notification leads (#325).
-#   `PRIVACY.md` at `/privacy`, which Facebook's app review reads as a stranger (#402).
+#   `PRIVACY.md` at `/privacy`, which Facebook's app review reads as a stranger (#402), and
+#   which Meta's data deletion instructions URL points at (#419).
+#   `TERMS.md` at `/terms`, the other URL Basic Settings asks for (#419).
 #
-# Both have to be in the image for their route to answer, which is why they are named here.
+# Each has to be in the image for its route to answer, which is why they are named here.
 **/*.md
 !CHANGELOG.md
 !PRIVACY.md
+!TERMS.md
 docs
 
 # Environment files (passed in as env vars instead)

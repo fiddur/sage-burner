@@ -1,42 +1,18 @@
 import type { ApiClient } from '../api/client.ts'
 
-import { ErrorText } from '../components/ErrorText.tsx'
-import { useLoad } from '../load.ts'
-import { renderMarkdown } from '../markdown.ts'
+import { MarkdownPage } from '../components/MarkdownPage.tsx'
 
 export type PrivacyApi = Pick<ApiClient, 'getPrivacy'>
 
 /**
  * What this app holds about somebody, and who can see it (#402). `privacyResponseSchema`
- * carries why the page is public.
- *
- * `Changelog`'s shape throughout — the page owns the `<h1>` so the file needs none, and
- * `renderMarkdown` shifts a `#` down a level under it.
+ * carries why the page is public — and why Meta's data deletion instructions point at it.
  */
-export const Privacy = ({ api }: { api: PrivacyApi }) => {
-  const { loaded } = useLoad((signal) => api.getPrivacy(signal), {
-    fallback: 'Could not load the privacy policy. Please try again shortly.',
-  })
-
-  return (
-    <section class="page prose">
-      <h1>Privacy</h1>
-
-      {loaded.status === 'loading' && <p class="form-note">One moment…</p>}
-
-      {loaded.status === 'failed' && <ErrorText message={loaded.message} />}
-
-      {loaded.status === 'ready' &&
-        (loaded.data.markdown.trim() === '' ? (
-          // An installation built without the file. Said plainly rather than shown as an
-          // error, because the page has to answer *something* to whoever opened it.
-          <p class="form-note">No privacy policy is written down for this version.</p>
-        ) : (
-          <div
-            class="markdown-preview"
-            dangerouslySetInnerHTML={{ __html: renderMarkdown(loaded.data.markdown) }}
-          />
-        ))}
-    </section>
-  )
-}
+export const Privacy = ({ api }: { api: PrivacyApi }) => (
+  <MarkdownPage
+    title="Privacy"
+    load={(signal) => api.getPrivacy(signal)}
+    empty="No privacy policy is written down for this version."
+    fallback="Could not load the privacy policy. Please try again shortly."
+  />
+)

@@ -39,6 +39,7 @@ const clientWith = (
   removeMyImage: () => Promise.reject(new Error('removeMyImage is not stubbed in this file')),
   getAccountProfile: () => Promise.reject(new Error('getAccountProfile is not stubbed in this file')),
   getPrivacy: () => Promise.resolve({ markdown: '' }),
+  getTerms: () => Promise.resolve({ markdown: '' }),
   getMyIdentities: () => Promise.resolve({ identities: [] }),
   removeMyIdentity: () => Promise.reject(new Error('removeMyIdentity is not stubbed in this file')),
   getOauthSettings: () => Promise.resolve({ settings: null }),

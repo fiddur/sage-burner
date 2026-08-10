@@ -45,13 +45,21 @@ describe('setting a provider up', () => {
     expect(await screen.findByText('/api/auth/oauth/facebook/callback')).toBeTruthy()
   })
 
-  it('prints the privacy-policy URL app review asks for', async () => {
-    // The other string an admin pastes into the Meta console, and the one #400 named three
-    // times without ever producing a page for.
+  it('prints every URL Basic Settings asks for, so none is retyped', async () => {
+    // The strings an admin pastes into the Meta console beside the redirect URI. #400 named the
+    // privacy one three times without producing a page for it; #419 added the other two, and the
+    // deletion instructions are the privacy page again rather than a callback.
     show(stub())
 
-    expect(await screen.findByText('/privacy')).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'this page' }).getAttribute('href')).toBe('/privacy')
+    expect(await screen.findByText(/Privacy Policy/)).toBeTruthy()
+    expect(screen.getByText(/Terms of Service/)).toBeTruthy()
+    expect(screen.getByText(/Data Deletion Instructions/)).toBeTruthy()
+
+    const paths = screen.getAllByRole('link').map((link) => link.getAttribute('href'))
+
+    expect(paths).toContain('/terms')
+    // Twice: the policy is both the privacy URL and what the deletion instructions point at.
+    expect(paths.filter((path) => path === '/privacy')).toHaveLength(2)
   })
 
   it('seeds the id from what is stored, and never the secret', async () => {
