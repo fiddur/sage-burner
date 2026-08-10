@@ -9,6 +9,11 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-10
 
+- **Signing in with Facebook or Discord works from the button again.** Clicking it landed on a
+  "Nothing here" page instead of going to the provider — both on the login page and on Your
+  details. Nothing was wrong with where the button pointed; the app was catching the click
+  itself.
+
 - **Linking Facebook can now fill in your profile page**, if whoever runs this gathering set
   their Facebook app up to ask for it — there is a tick box under ⚙️ → Settings for that, and it
   needs Facebook's approval first. Typing your Facebook name under How people can reach you is
