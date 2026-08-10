@@ -166,6 +166,14 @@ export const OauthField = ({ api, provider }: { api: OauthApi; provider: OAuthPr
             />
           </label>
 
+          {stored?.has_secret === true && (
+            <p class="form-note">
+              A secret pasted from the console often brings a line break with it. It is trimmed on the way in
+              — but one stored before that fix still has it, and every sign-in will keep failing until you
+              paste it again here.
+            </p>
+          )}
+
           {provider === 'facebook' && (
             <>
               <label class="row">

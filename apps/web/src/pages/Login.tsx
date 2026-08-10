@@ -201,7 +201,7 @@ export const signInOutcome = (outcome: string | null, ref: string | null = null)
     return 'No account here is linked to that. Sign in another way, then link it under Your details.'
   }
   if (outcome === 'misconfigured') {
-    return `That provider refused the connection, so it is not set up correctly here. Sign in with your password, and please tell an organiser.${quote}`
+    return `That sign-in is not set up correctly here. Sign in with your password, and please tell an organiser.${quote}`
   }
   if (outcome === 'unreachable') {
     return `That provider could not be reached. Try again in a moment, or sign in with your password; if it keeps happening, tell an organiser.${quote}`

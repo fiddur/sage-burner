@@ -229,13 +229,34 @@ describe('leaving for a provider', () => {
     expect(not.searchParams.get('scope')).toBe('public_profile')
   })
 
-  it('refuses a provider nobody has set up, rather than sending somebody nowhere', async () => {
+  it('calls a provider nobody has set up misconfigured, rather than sending somebody nowhere', async () => {
     const server = await build()
 
     const leaving = await start(server, 'facebook')
 
-    expect(leaving.headers.location).toBe('/login?from=refused')
+    expect(leaving.headers.location).toMatch(/^\/login\?from=misconfigured&ref=/u)
     expect(await db().select().from(oauthState)).toEqual([])
+  })
+
+  it('sends somebody linking to their own details, not to the login page', async () => {
+    const server = await build()
+    const wren = await givenAccount()
+
+    const leaving = await startLink(server, 'facebook', wren.cookie)
+
+    expect(leaving.headers.location).toMatch(/^\/profile\?from=misconfigured&ref=/u)
+  })
+
+  it('writes why it could not set off, where an admin can read it', async () => {
+    const logged: string[] = []
+    const server = await build(fakeOAuth(), logged)
+
+    await start(server, 'facebook')
+
+    const line = lastLogLine(logged)
+    expect(line?.msg).toBe('could not set off for a provider')
+    expect(line?.at).toBe('setting')
+    expect(line?.provider).toBe('facebook')
   })
 
   it('is a 404 for something that is not a provider at all', async () => {
@@ -257,8 +278,6 @@ describe('leaving for a provider', () => {
   })
 
   it('will not leave for a provider whose secret is empty', async () => {
-    // The row exists, so `oauthSettingFor` answers it — but a trip made with no secret can
-    // only end at `/login?from=refused` after a full journey out and back (#401).
     const server = await build()
     await db().insert(oauthSetting).values({
       provider: 'discord',
@@ -269,7 +288,7 @@ describe('leaving for a provider', () => {
 
     const leaving = await start(server, 'discord')
 
-    expect(leaving.headers.location).toBe('/login?from=refused')
+    expect(leaving.headers.location).toMatch(/^\/login\?from=misconfigured&ref=/u)
   })
 
   it('starts a link for somebody with no role at all', async () => {

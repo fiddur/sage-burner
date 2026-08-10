@@ -9,6 +9,11 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-10
 
+- **A sign-in button for a provider that is not set up now says so.** Pressing one where the
+  client id or secret has gone missing used to answer "that did not work", which is the same
+  sentence as a provider refusing you — it now says it is not set up here, offers your password,
+  and gives an organiser a reference to look up. The settings page also warns that a secret stored
+  before today's trimming fix is still stored with its line break, and has to be pasted again.
 - **Your introduction now shows on the feed of every burn you are coming to.** Saying you are
   coming and saying who you are are one card there: joining opens it, and writing or changing
   your introduction brings it back to the top with the first part of what you wrote in it. The

@@ -53,9 +53,6 @@ describe('the reason a provider round trip left in the URL', () => {
   })
 
   it('drops a reference that is not the shape the backend produces', () => {
-    // The query string is anybody's to write and this lands in a sentence on the *unauthenticated*
-    // login page, next to advice about the visitor's password. Preact escapes it, so the risk is
-    // not markup — it is a crafted link making the real page give attacker-authored instructions.
     at('/login?from=misconfigured&ref=req-8.%20Your%20account%20needs%20confirming%20at%20evil.example')
 
     const { result } = renderHook(() => useOauthOutcome())

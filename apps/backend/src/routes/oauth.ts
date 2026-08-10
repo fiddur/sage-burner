@@ -116,14 +116,21 @@ export const registerOauthRoutes = (
       const provider = providerOf(request.params.provider)
       if (provider === undefined) return sendError(reply, 404)
 
-      const failed = intent === 'sign-in' ? loginPage('refused') : detailsPage('refused')
-
       const viewer = intent === 'link' ? await viewerFor(request, { db, sessions }) : undefined
       if (intent === 'link' && viewer === undefined) return back(reply, loginPage())
 
       const setting = await usableOauthSetting(db, provider)
       const uri = redirectUri(request, provider)
-      if (setting === undefined || uri === undefined) return back(reply, failed)
+      if (setting === undefined || uri === undefined) {
+        request.log.warn(
+          { provider, intent, at: setting === undefined ? 'setting' : 'origin' },
+          'could not set off for a provider',
+        )
+
+        const page = intent === 'sign-in' ? loginPage : detailsPage
+
+        return back(reply, page('misconfigured', String(request.id)))
+      }
 
       const { state, nonce } = await mintState(provider, intent, viewer?.account_id ?? null)
 

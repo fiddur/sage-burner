@@ -29,7 +29,7 @@ export const outcomeMessage = (outcome: string | null, ref: string | null = null
   }
   if (outcome === 'taken') return 'That account is already linked to somebody here.'
   if (outcome === 'misconfigured') {
-    return `That provider refused the connection, so it is not set up correctly here. Nothing has changed. Please tell an organiser.${quoting(ref)}`
+    return `That sign-in is not set up correctly here. Nothing has changed. Please tell an organiser.${quoting(ref)}`
   }
   if (outcome === 'unreachable') {
     return `That provider could not be reached, so nothing has changed. Try again in a moment; if it keeps happening, tell an organiser.${quoting(ref)}`

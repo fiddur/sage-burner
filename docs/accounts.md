@@ -1054,6 +1054,12 @@ rather than asking for it.
 which is what `mail/smtp.ts` and `push/web-push.ts` are for theirs. Nothing in it throws: a
 provider that is down or answering nonsense costs a sign-in attempt rather than a stack trace.
 
+**The reference is bounded before it reaches a sentence.** It lands on the _unauthenticated_
+login page beside advice about the visitor's password, and a query string is anybody's to write —
+so the risk is not markup, which Preact escapes, but a crafted link making the real page give
+attacker-authored instructions. `quotable` lets through only the shape the backend produces,
+`String(request.id)`, which is `req-N`.
+
 **It must not cost the reason as well** (#430). `Identify` answers `{ profile }` or `{ failed }`,
 where the failure names which leg gave up — the token exchange, the profile read, or a request that
 never arrived — with the status and the provider's own words. A bare `undefined` had made a secret
@@ -1061,12 +1067,20 @@ with a stray space, a redirect URI registered slightly differently, a scope the 
 approved for and a container with no outbound HTTPS into one indistinguishable refusal recorded
 nowhere; the person who configured the provider is the person running the installation, so that was
 the difference between a five-minute fix and an unfixable mystery. The route logs it, and since #440
-the page says which of two kinds it was: `network` or a 5xx is `unreachable`, which is actionable by
-whoever hit it — try again — and anything else is `misconfigured`, which asks them to tell an
-organiser and quotes `request.id`, the `reqId` on that log line. The detail itself still does not
+the page says which of two kinds it was, split by **whether the person reading can do anything about
+it**: `unreachable` means try again in a moment, `misconfigured` means tell an organiser and quotes
+`request.id`, the `reqId` on that log line. Which status falls where is `outcomeFor`, with a test per
+branch — enumerating it here as well produced a sentence that called a 429
+`misconfigured` for two PRs after the code stopped agreeing. The detail itself still does not
 travel; what the module _sends_ never appears in it, which `client.test.ts` pins as a whole shape
 rather than field by field, because spreading the decoded body straight in is the mistake that was
 made while writing it.
+
+**A secret already stored with a stray line break does not heal itself** (#440). The trim is on
+the way in, and a save that omits the field keeps what is stored — so an installation that was
+already refusing every sign-in goes on refusing until an admin re-saves the secret under ⚙️ →
+Settings. Deliberately not a migration: rewriting a stored credential in place is not something to
+do quietly, and re-pasting it is one action for the one person who has it.
 
 **The URLs Meta's console asks for are routes, not promises.** App review will not take an app
 without a privacy policy at a URL, and Basic Settings asks for terms of service and data deletion
