@@ -392,9 +392,6 @@ export const App = ({
 
   return (
     <RememberedProvider remembered={remembered}>
-      {/* The scope is what keeps the router's global click handler off the paths the
-          backend serves — `router-scope.ts` says why a missing one showed people
-          "Nothing here" instead of sending them to a provider (#422). */}
       <LocationProvider scope={ROUTER_SCOPE}>
         {/* Inside the provider, which is where `route` comes from, and outside the
             viewer's, so a tapped notification routes whether or not anyone is signed

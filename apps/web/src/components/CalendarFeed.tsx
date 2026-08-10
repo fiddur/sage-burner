@@ -21,11 +21,9 @@ export type CalendarFeedApi = Pick<ApiClient, 'getCalendarToken' | 'rotateCalend
  * into *Other calendars → From URL* — which is what the copy button is for, and why
  * that keeps the `https` form.
  *
- * It also fixes a bug it was not chosen for. `preact-iso` takes any click on a
- * same-origin `<a>` that carries no `download` or `target`, so the `https` link was
- * routed client-side, matched nothing and rendered "Nothing here"; only a reload
- * reached the backend. A `webcal:` URL has origin `"null"`, so the router's
- * `link.origin != location.origin` check leaves it alone.
+ * It used to sidestep a routing bug as well, and no longer needs to: the client-side
+ * router swallowed the `https` link until `ROUTER_SCOPE` put `/calendar/` outside what
+ * it may claim (#422). Both forms reach the backend now.
  *
  * **The address is fetched rather than built from the burn's id.** It is
  * `event.feed_token`, which the public homepage is never told — keyed by the id, this

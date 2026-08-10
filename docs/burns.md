@@ -322,12 +322,10 @@ opposite of the point. Apple Calendar on macOS and iOS, Outlook on the desktop a
 Thunderbird all take `webcal`. Google Calendar on Android does not, and wants a URL
 pasted into _Other calendars → From URL_ — so the copy button keeps the `https` form.
 
-It also fixed a bug it was not chosen for. `preact-iso` takes any click on a
-same-origin `<a>` carrying no `download` or `target`, so the `https` link was routed
-client-side, matched no route and rendered "Nothing here"; only a reload reached the
-backend, where `scheduleFeed` is a registered route and answers directly. A `webcal:`
-URL has origin `"null"`, so the router's `link.origin != location.origin` check leaves
-the click alone.
+It used to fix a routing bug as a side effect, and no longer has to: the client-side
+router swallowed the `https` link and rendered "Nothing here" until `ROUTER_SCOPE` put
+`/calendar/` outside what it may claim (#422). Either form reaches the backend now, so
+`webcal` is chosen for what it does rather than for what it avoided.
 
 **Unauthenticated**, because a calendar client cannot hold a session — subscribing
 is a URL a phone re-fetches on its own. So the address is the only thing protecting

@@ -22,8 +22,8 @@ const Start = () => (
   </>
 )
 
-/** Stops jsdom trying to navigate for real. Registered after the provider's, so it cannot
-    stop the routing this is testing — it only silences the "Not implemented" that follows. */
+/** Stops happy-dom trying to navigate for real. Registered after the provider's, so it cannot
+    stop the routing this is testing. */
 const swallow = (event: Event) => event.preventDefault()
 
 const show = () => {
@@ -41,7 +41,12 @@ const show = () => {
   return shown
 }
 
-afterEach(() => removeEventListener('click', swallow))
+afterEach(() => {
+  removeEventListener('click', swallow)
+  // `app.test.tsx` does the same. Without it the second case below leaves history at
+  // `/members`, and a third one added later would start from there rather than from `/`.
+  window.history.replaceState(null, '', '/')
+})
 
 describe('clicking a link the backend serves', () => {
   it('is left to the browser rather than routed to Nothing here', async () => {
