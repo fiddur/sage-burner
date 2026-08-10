@@ -723,10 +723,13 @@ exactly why they are worth sending, and why they run outside the payment's
 transaction. Recording that somebody paid must not fail because a bell could not be
 rung.
 
-The five burn-wide ones fan out with `notifyAttendees`, and **attendance is the whole
+The burn-wide ones fan out over the attendance list, and **attendance is the whole
 audience**: somebody who has not said they are coming hears nothing about that burn,
 however their switches are set, and a member who leaves stops hearing about it the
-moment their row goes. They name people — "Ada offered a dream: Sauna at dawn" —
+moment their row goes. `notifyAttendees` is the fan-out that also writes an `activity`
+line; `tellAttendees` is the same fan-out without one, which is what anything carrying a
+thread uses — a comment, and since #426 saying you are coming and saying who you are.
+A line beside a card would put one thing on the feed twice. They name people — "Ada offered a dream: Sauna at dawn" —
 unlike the applications notification, which hides an applicant. The difference is who
 is reading: these go only to people attending the same burn, who already read each
 other's names on the Members page, and "somebody is coming" is not worth switching on.
@@ -1269,11 +1272,13 @@ it.
 surface: an introduction is a page of prose and half a dozen photographs, and a thread is as
 many as anybody has posted.
 
-**Whether a first introduction is a feed entry is not decided.** #375 gave the burn its own
-thread for lines belonging to no dream, so "Wren introduced themselves" would need no new
-`entity_type`. Against it: an edit is not an event, so it fires once and never again, and
-#259's rule puts something happening _around_ you off unless asked for — so almost nobody
-would see the line. Build the field, decide the entry when there is one to look at.
+**An introduction is a feed entry, on the card of every burn somebody is coming to** (#426).
+It went the other way from the guess recorded here: not a line on the burn's own thread but a
+second `entity_type`, `attendance`, so joining and introducing yourself are one card. The
+worry that "an edit is not an event, so it fires once and never again" is answered by
+coalescing — a rewrite bumps the same card rather than adding to it — and `introduction_written`
+is `about: 'else'` and off, exactly as #259 says. "Somebody's own card" in `docs/the-app.md`
+has the rest.
 
 **Every picture in a row renders as a wall of full-width images.** A row of thumbnails is the
 obvious next thing, and it is a rendering decision — so it belongs to `markdown.ts`, and

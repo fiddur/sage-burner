@@ -1,6 +1,7 @@
 import type { Thread } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
+import { INTRODUCTION_EXCERPT } from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -23,9 +24,9 @@ import { CARD_ENTRIES, FEED_LIMIT } from './feed.ts'
  * matching notification on — so no test here turns one on, and the burn-wide writes
  * still fill the feed.
  *
- * **Joining a burn is what stages a line now**, where offering a dream used to: a dream
- * has a thread, so its news is a card and no `activity` row is written for it at all.
- * The two halves are asserted separately, which is what the response's two arrays are.
+ * **A lead role is what stages a line**, since anything with a thread is a card instead:
+ * offering a dream, and — since #426 — saying you are coming. The two halves are asserted
+ * separately, which is what the response's two arrays are.
  */
 
 const SECRET = 'v'.repeat(40)
@@ -122,9 +123,16 @@ const offerDream = async (server: FastifyInstance, cookie: string, title: string
   return response.json().session.id as string
 }
 
-/** Saying you are coming, which is a line rather than a card: nobody talks to a joining. */
 const joinBurn = (server: FastifyInstance, cookie: string, eventId = BURN) =>
   server.inject({ method: 'POST', url: `/api/events/${eventId}/attendance/me`, headers: { cookie } })
+
+const addLeadRole = (server: FastifyInstance, cookie: string, title: string, eventId = BURN) =>
+  server.inject({
+    method: 'POST',
+    url: `/api/events/${eventId}/roles`,
+    headers: { cookie },
+    payload: { title },
+  })
 
 const cards = async (server: FastifyInstance, cookie: string): Promise<Thread[]> =>
   (await feed(server, cookie)).json().threads
@@ -234,16 +242,12 @@ describe('the feed', () => {
   })
 
   it('names the burn, and spans them', async () => {
-    // Between burns the app is quiet, which is what the page is for — so a line from the
-    // burn somebody is not in still shows, with its name on it.
     const server = await build()
     await givenBurn()
     await givenBurn(OTHER_BURN, 'Autumn burn', 'autumn')
     const ada = await givenAccount('Ada')
-    const bea = await givenAccount('Bea')
-
-    await joinBurn(server, ada.cookie)
-    await joinBurn(server, bea.cookie, OTHER_BURN)
+    await givenLine('Something here', NOW)
+    await givenLine('Something there', NOW, OTHER_BURN)
 
     const rows = (await feed(server, ada.cookie)).json().activity
     expect(rows.map((one: { burn: string }) => one.burn).toSorted()).toEqual(['Autumn burn', 'Summer burn'])
@@ -253,39 +257,29 @@ describe('the feed', () => {
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
 
-    await joinBurn(server, ada.cookie)
+    await addLeadRole(server, ada.cookie, 'Firewood')
 
     const [row] = (await feed(server, ada.cookie)).json().activity
-    expect(row.category).toBe('member_joined')
-    expect(row.link).toBe('/members')
+    expect(row.category).toBe('lead_role_added')
+    expect(row.link).toBe('/roles')
   })
 
-  it('has a line for somebody saying they are coming, and for a lead role', async () => {
+  it('has a line for a lead role, and a card for somebody saying they are coming', async () => {
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
     await givenComing(ada.id)
     const bea = await givenAccount('Bea')
 
-    await server.inject({
-      method: 'POST',
-      url: `/api/events/${BURN}/attendance/me`,
-      headers: { cookie: bea.cookie },
-    })
-    await server.inject({
-      method: 'POST',
-      url: `/api/events/${BURN}/roles`,
-      headers: { cookie: ada.cookie },
-      payload: { title: 'Firewood' },
-    })
+    await joinBurn(server, bea.cookie)
+    await addLeadRole(server, ada.cookie, 'Firewood')
 
-    // Sorted, not in feed order: the suite's clock is frozen, so both lines share a
-    // stamp and which comes first is the tie-break's business rather than this test's.
-    expect((await lines(server, ada.cookie)).toSorted()).toEqual([
-      'A new lead role: Firewood',
-      'Bea is coming.',
-    ])
+    expect(await lines(server, ada.cookie)).toEqual(['A new lead role: Firewood'])
+    const [card] = await cards(server, ada.cookie)
+    expect(card?.title).toBe('Bea')
+    expect(card?.entries.map((entry) => [entry.kind, entry.body])).toEqual([['joined', 'is coming']])
   })
 
   it('is newest first', async () => {
@@ -365,7 +359,8 @@ describe('the feed', () => {
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
-    await joinBurn(server, ada.cookie)
+    await givenComing(ada.id)
+    await addLeadRole(server, ada.cookie, 'Firewood')
     await offerDream(server, ada.cookie, 'Sauna at dawn')
     expect(await db().select().from(activity)).toHaveLength(1)
     expect(await db().select().from(thread)).toHaveLength(1)
@@ -401,7 +396,8 @@ describe('the feed', () => {
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
-    await joinBurn(server, ada.cookie)
+    await givenComing(ada.id)
+    await addLeadRole(server, ada.cookie, 'Firewood')
 
     const [row] = (await feed(server, ada.cookie)).json().activity
     expect(Object.keys(row).toSorted()).toEqual([
@@ -522,7 +518,8 @@ describe('the feed', () => {
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
-    await joinBurn(server, ada.cookie)
+    await givenComing(ada.id)
+    await addLeadRole(server, ada.cookie, 'Firewood')
     await offerDream(server, ada.cookie, 'Sauna at dawn')
 
     await feed(server, ada.cookie)
@@ -538,5 +535,102 @@ describe('the feed', () => {
       headers: { cookie: ada.cookie },
     })
     expect(bell.json().notifications).toEqual([])
+  })
+})
+
+describe('somebody’s own card', () => {
+  const introduce = (server: FastifyInstance, cookie: string, introduction: string) =>
+    server.inject({ method: 'PATCH', url: '/api/me/profile', headers: { cookie }, payload: { introduction } })
+
+  const cardOf = async (server: FastifyInstance, cookie: string, title: string) =>
+    (await cards(server, cookie)).find((one) => one.title === title)
+
+  it('is titled by the name now, not the one frozen when they joined', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await joinBurn(server, ada.cookie)
+
+    await db().update(account).set({ name: 'Ada B' }).where(eq(account.id, ada.id))
+
+    expect((await cards(server, ada.cookie))[0]?.title).toBe('Ada B')
+  })
+
+  it('links to the person rather than to a dream', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await joinBurn(server, ada.cookie)
+
+    expect((await cards(server, ada.cookie))[0]?.link).toBe(`/members/${ada.id}`)
+  })
+
+  it('carries the introduction itself, so the feed says who somebody is', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await joinBurn(server, ada.cookie)
+
+    await introduce(server, ada.cookie, 'I build saunas.')
+
+    const card = await cardOf(server, ada.cookie, 'Ada')
+    expect(card?.introduction).toBe('I build saunas.')
+    expect(card?.entries.map((entry) => entry.kind)).toEqual(['joined', 'introduced'])
+  })
+
+  it('clamps a long introduction rather than putting the whole of it in the feed', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await joinBurn(server, ada.cookie)
+
+    await introduce(server, ada.cookie, `${'word '.repeat(200)}end`)
+
+    const card = await cardOf(server, ada.cookie, 'Ada')
+    expect(card?.introduction?.length).toBeLessThanOrEqual(INTRODUCTION_EXCERPT + 1)
+    expect(card?.introduction?.endsWith('…')).toBe(true)
+  })
+
+  it('carries none for a dream, which has no introduction to carry', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+
+    await offerDream(server, ada.cookie, 'Sauna at dawn')
+
+    expect((await cards(server, ada.cookie))[0]?.introduction).toBeNull()
+  })
+
+  it('is not gone while somebody is still coming', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await joinBurn(server, ada.cookie)
+
+    expect((await cards(server, ada.cookie))[0]?.gone).toBe(false)
+  })
+
+  it('says somebody is no longer coming once they have left, and keeps what was said', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    await givenComing(bea.id)
+    await joinBurn(server, ada.cookie)
+    const [before] = await cards(server, bea.cookie)
+    await say(server, bea.cookie, before?.id ?? '', 'welcome')
+
+    await server.inject({
+      method: 'DELETE',
+      url: `/api/events/${BURN}/attendance/me`,
+      headers: { cookie: ada.cookie },
+    })
+
+    const [card] = await cards(server, bea.cookie)
+    expect(card?.gone).toBe(true)
+    expect(card?.link).toBeNull()
+    expect(card?.title).toBe('Ada')
+    expect(card?.entries.map((entry) => entry.kind)).toEqual(['joined', 'comment'])
   })
 })

@@ -1,3 +1,9 @@
+import {
+  connectionKinds,
+  notificationCategories,
+  threadEntityTypes,
+  threadEntryKinds,
+} from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 import { cpSync, mkdtempSync, readdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -123,6 +129,34 @@ describe('migrations', () => {
       'session',
     ]) {
       expect(names).toContain(table)
+    }
+  })
+
+  it('checks every vocabulary against the one the code has, not the one it had', () => {
+    const listed = (table: string, check: string): string[] => {
+      const held = handle.client
+        .prepare('select sql from sqlite_master where type = ? and name = ?')
+        .get('table', table)?.sql
+      const sql = typeof held === 'string' ? held : ''
+      const found = new RegExp(`["\`]${check}["\`][^(]*\\(([^)]*)\\)`, 'u').exec(sql)?.[1] ?? ''
+      const values = [...found.matchAll(/'([^']*)'/gu)].map((one) => one[1] ?? '')
+
+      expect(values, `${table}.${check}`).not.toHaveLength(0)
+
+      return values.toSorted()
+    }
+
+    const vocabularies: [string, string, readonly string[]][] = [
+      ['notification', 'notification_category_check', notificationCategories],
+      ['notification_setting', 'notification_setting_category_check', notificationCategories],
+      ['activity', 'activity_category_check', notificationCategories],
+      ['thread', 'thread_entity_type_check', threadEntityTypes],
+      ['thread_entry', 'thread_entry_kind_check', threadEntryKinds],
+      ['account_connection', 'account_connection_kind_check', connectionKinds],
+    ]
+
+    for (const [table, check, vocabulary] of vocabularies) {
+      expect(listed(table, check), `${table}.${check}`).toEqual([...vocabulary].toSorted())
     }
   })
 

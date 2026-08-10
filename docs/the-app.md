@@ -275,12 +275,14 @@ Three rules the pages follow, all of them things a phone found first:
 A page of what everyone has been doing (#303) and what they are talking about (#375),
 because between burns the app was quiet and quiet reads as nothing-to-do.
 
-**Two things on one page, deliberately.** A dream is one **card** carrying its whole
-history and the talk under it; the burn's own news — somebody joined, a lead role added,
-a lead taken — stays a **line**. Collapsing everything by thread was the first design and
-it does not work: the lines that belong to no dream would end up behind one card per
-burn, which is the page's list disappearing into an accordion. So `activity` keeps what
-has no conversation to hang on, and shrinks as each kind of thing gains one.
+**Two things on one page, deliberately.** Anything you can talk about is one **card**
+carrying its whole history and the talk under it — a dream, and since #426 a person at a
+burn; the burn's own news that nobody talks to — a lead role added, a lead taken — stays a
+**line**. Collapsing everything by thread was the first design and it does not work: the
+lines that belong to no card would end up behind one card per burn, which is the page's
+list disappearing into an accordion. So `activity` keeps what has no conversation to hang
+on, and shrinks as each kind of thing gains one — saying you are coming was a line until
+#426 and is a card now.
 
 The server merges both halves by time and cuts them to fifty **against each other**, so a
 burn full of talk cannot push its news off the page and a quiet one does not leave the
@@ -314,17 +316,56 @@ also the only place a withdrawn dream's thread can be read, since there is no pa
 to open. The same component draws it inside the dream's own panel (#342), so the two
 cannot come to show one conversation differently.
 
-**The title is the thread's own, and that is the bug this fixed.** An `activity` line
-freezes the title into a sentence — "Ada offered a dream: Sauna at dawn" — and goes on
-saying it after the dream has been renamed. A card heads with `thread.title`, which the
-rename keeps in step, and an entry's body carries neither the title nor the actor's name:
-the author is a column, so a name is resolved when the line is read.
+**The title is never frozen into a sentence, and that is the bug this fixed.** An
+`activity` line freezes it — "Ada offered a dream: Sauna at dawn" — and goes on saying it
+after the dream has been renamed. A dream's card heads with `thread.title`, which the
+rename keeps in step. A person's card cannot use the stored title at all: a name is the
+account's, and renaming yourself must not leave the old one on the feed, so `readThreads`
+resolves it from `account.name` and keeps `thread.title` only as the fallback for when the
+account is gone — the same shape as a null title meaning "withdrawn" for a session. An
+entry's body carries neither the title nor the actor's name: the author is a column, so a
+name is resolved when the line is read.
 
 **A thread outlives the dream.** Withdrawing one leaves a line saying so rather than
 deleting what people said to each other, which is why `thread.entity_id` deliberately
 carries no foreign key, and why `event_id` and `title` sit on the thread rather than
 being joined out of a row that may be gone. Retention is still the burn: a thread
 cascades with the event.
+
+#### Somebody's own card
+
+**One card per (person, burn), and joining opens it** (#426). Saying you are coming and
+saying who you are are the same card: `entity_type: 'attendance'` with the attendance id,
+so `thread_entity_idx` already means one conversation per person per burn and
+`thread.event_id` files it under the right burn and carries the same retention. An
+`account`-keyed thread cannot do it — one thread per person, pinned to one burn by a
+`NOT NULL` `event_id`.
+
+**The introduction is resolved and clamped, not stored on the entry.** `readThreads` reads
+`account.introduction` and `excerptOf` cuts it at `INTRODUCTION_EXCERPT` on a word
+boundary; the entry itself is a bump. Two reasons: rewriting a paragraph must not leave
+the feed quoting the old one, and `MAX_INTRODUCTION` is 10,000 against a card's budget of
+fifty-in-one-cache-key. The whole of it is on the person's page, which the card's title
+links to.
+
+**Rewriting bumps once.** `introduced` coalesces, so six passes at a paragraph move one
+card up the feed rather than leaving six lines — the argument `renamed`, `scheduled` and
+`edited` already make for being kinds of their own rather than one `edited`.
+
+**Only burns that have not ended.** An introduction written today should not resurrect the
+card from a burn two years ago, so `announceIntroduction` filters on `event.end_date >=`
+today. Nothing is backfilled either: somebody whose introduction is already written gets no
+card until they next change it.
+
+**Clearing it says nothing.** A write that leaves the introduction empty, and a profile
+save that never touched it, both announce nothing — the guard compares before and after
+rather than trusting that a PATCH carrying the field means it changed.
+
+**Nobody moderates it.** A conversation _about a person_ sits on their own card, and the
+question of whether the subject may delete other people's comments was decided against on
+purpose: the card is automatic and what it mostly shows is their own introduction, so their
+lever is editing that or their contact list. Comments follow the dream rule — an author
+deletes their own, and an admin may delete any.
 
 **What leaves a quiet line, and what does not.** Offered, facilitated, handed over, a
 hand up or down, renamed, moved, edited, withdrawn. A ❤️‍🔥 does not — the faces are on
@@ -360,13 +401,18 @@ that is not scoped to an open burn. Talking about a burn is not arranging one, a
 was lovely" is a thing somebody posts on the way home. Every other dream write stays on
 `openEvent`.
 
-**Two categories, split the way every other pair here is** (#259). A comment on a thread
-you are part of is `about: 'you'` and **on**; a comment on any dream at a burn you are
-coming to is `about: 'else'` and **off**. The audiences are disjoint so nobody is told
-twice, and never the person who just wrote it (#247). Who is "part of it" is whoever has
-spoken on the thread, plus the facilitator and the helpers — appointing somebody writes a
-line authored by whoever appointed, so a facilitator handed the dream has said nothing
-and would otherwise never hear a question about it.
+**A pair of categories per kind of card, split the way every other pair here is** (#259).
+A comment on a thread you are part of is `about: 'you'` and **on**; a comment on any card
+of that kind at a burn you are coming to is `about: 'else'` and **off**. So
+`dream_comment`/`dream_comment_any` for a dream and
+`introduction_comment`/`introduction_comment_any` for a person, and `entryCategory` takes
+the entity type as well as the kind — without that, the chip under a person's card would
+offer to switch on comments about every dream. The audiences are disjoint so nobody is
+told twice, and never the person who just wrote it (#247). Who is "part of it" is whoever
+has spoken on the thread, plus — for a dream — the facilitator and the helpers, and for a
+person, the person it is about. Appointing somebody writes a line authored by whoever
+appointed, so a facilitator handed the dream has said nothing and would otherwise never
+hear a question about it.
 
 Neither writes an `activity` row: the entry is the record, and a line beside it would put
 one comment on the page twice. That is what `tellAttendees` is for beside
@@ -415,9 +461,13 @@ problem #311 fixed for the banner. Offline you get the card's newest lines; the 
 the conversation needs the network.
 
 What is _not_ on it yet: an unread mark per thread, a digest instead of one notification
-per comment, reactions on a line, and threads on anything but a dream. `entity_type` is
-what makes a meal, a ride or a plan item a value in the vocabulary and a branch in the
-link builder rather than a migration.
+per comment, reactions on a line, and threads on a meal, a ride or a plan item.
+`entity_type` is what makes each of those a value in the vocabulary and a branch in three
+places — the link, the participants, and the comment's categories. Adding one is **not**
+free of a migration, which #426 established by being the second: the column carries a
+CHECK listing the vocabulary, so a value added to `enums.ts` alone passes Zod and the type
+checker and then fails the write. `db.integration.test.ts` now checks each vocabulary in
+the database against the one in the code, so the two cannot drift silently again.
 
 ## What this installation is called
 

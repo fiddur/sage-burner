@@ -14,6 +14,18 @@ under today's heading, and make a new heading when there is none.
   sentence as a provider refusing you — it now says it is not set up here, offers your password,
   and gives an organiser a reference to look up. The settings page also warns that a secret stored
   before today's trimming fix is still stored with its line break, and has to be pasted again.
+- **Your introduction now shows on the feed of every burn you are coming to.** Saying you are
+  coming and saying who you are are one card there: joining opens it, and writing or changing
+  your introduction brings it back to the top with the first part of what you wrote in it. The
+  whole of it is still on your page, which the card's title links to. Rewriting a paragraph six
+  times bumps the card once rather than filling the feed. Other people can say something under
+  it, and there are three new switches on your notification settings — being told when somebody
+  says who they are, when somebody comments on your own card, and when somebody comments on
+  anybody's. Nothing is filled in for you: if your introduction is already written, the card
+  appears the next time you change it.
+- **Saying you are coming is a card rather than a line**, for the same reason — it is now
+  something people can welcome you under. Lines written before today stay as they are, so the
+  feed shows both for a while.
 
 - **Linking Discord now puts your Discord name in how people can reach you.** That was the one
   thing linking did not do, so people were linking a sign-in and then typing the same name in by

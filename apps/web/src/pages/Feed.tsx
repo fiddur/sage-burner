@@ -1,6 +1,6 @@
 import type { Activity, NotificationCategory, NotificationSettings, Thread } from '@sage-burner/shared'
 
-import { BURN_PARAM, dreamPage, entryCategory, notificationCategoryInfo } from '@sage-burner/shared'
+import { BURN_PARAM, entryCategory, notificationCategoryInfo } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -12,6 +12,7 @@ import { GuardedPage } from '../components/GuardedPage.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { localDay } from '../datetime.ts'
 import { useAction, useLoad } from '../load.ts'
+import { renderMarkdown } from '../markdown.ts'
 import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
 
 export type FeedApi = Pick<
@@ -180,19 +181,25 @@ const Card = ({
   upload: UploadImage
   onToggle: (category: NotificationCategory) => void
 }) => {
-  const page = pageFor(card)
   const category = chipFor(card)
 
   return (
     <li class="feed-card">
       <p class="feed-card-head">
-        {page === undefined ? <span>{card.title}</span> : <a href={page}>{card.title}</a>}
+        {card.link === null ? <span>{card.title}</span> : <a href={card.link}>{card.title}</a>}
       </p>
       <p class="feed-when">
         {card.burn}
         {card.last_at !== null && ` · ${localDay(card.last_at)}`}
-        {card.gone && ' · withdrawn'}
+        {card.gone && (card.entity_type === 'session' ? ' · withdrawn' : ' · no longer coming')}
       </p>
+
+      {card.introduction !== null && (
+        <div
+          class="markdown-preview feed-card-about"
+          dangerouslySetInnerHTML={{ __html: renderMarkdown(card.introduction) }}
+        />
+      )}
 
       <DreamThread
         thread={card}
@@ -219,12 +226,9 @@ const Card = ({
   )
 }
 
-const pageFor = (card: Thread): string | undefined =>
-  card.gone ? undefined : dreamPage(card.event_id, card.entity_id)
-
 const chipFor = (card: Thread): NotificationCategory | undefined =>
   card.entries.reduceRight<NotificationCategory | undefined>(
-    (found, entry) => found ?? entryCategory(entry.kind),
+    (found, entry) => found ?? entryCategory(card.entity_type, entry.kind),
     undefined,
   )
 

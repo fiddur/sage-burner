@@ -1,5 +1,6 @@
 import type { Activity, Thread, ThreadEntry } from '@sage-burner/shared'
 
+import { notificationCategoryInfo } from '@sage-burner/shared'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -50,6 +51,8 @@ const aCard = (over: Partial<Thread> & Pick<Thread, 'id' | 'title'>): Thread => 
   burn: 'Summer burn',
   entity_type: 'session',
   entity_id: 's-1',
+  link: '/dreams?burn=e-1&dream=s-1',
+  introduction: null,
   gone: false,
   entry_count: 1,
   last_at: '2026-08-07T18:00:00.000Z',
@@ -132,9 +135,9 @@ describe('what everyone has been doing', () => {
     expect(document.querySelector('.feed-when')?.textContent).toBe('Summer burn')
   })
 
-  it('heads a card with what the dream is called, and links to it at its burn', async () => {
+  it('heads a card with what it is called, and links where the card says', async () => {
     renderPage(
-      stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn', event_id: 'e-2', entity_id: 's-9' })]),
+      stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn', link: '/dreams?burn=e-2&dream=s-9' })]),
     )
 
     const link = await screen.findByRole('link', { name: 'Sauna at dawn' })
@@ -142,11 +145,63 @@ describe('what everyone has been doing', () => {
   })
 
   it('keeps a withdrawn dream readable, and links nowhere', async () => {
-    // The card is the only place its thread can be read: there is no panel to open.
-    renderPage(stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn', gone: true })]))
+    renderPage(stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn', gone: true, link: null })]))
 
     expect(await screen.findByText(/withdrawn/)).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'Sauna at dawn' })).toBeNull()
+  })
+
+  it('says somebody is no longer coming rather than withdrawn, on their own card', async () => {
+    renderPage(
+      stub({}, [], [aCard({ id: 'c-1', title: 'Ada', entity_type: 'attendance', gone: true, link: null })]),
+    )
+
+    expect(await screen.findByText(/no longer coming/)).toBeTruthy()
+    expect(screen.queryByText(/withdrawn/)).toBeNull()
+  })
+
+  it('carries somebody’s introduction in the top of their card', async () => {
+    renderPage(
+      stub(
+        {},
+        [],
+        [
+          aCard({
+            id: 'c-1',
+            title: 'Ada',
+            entity_type: 'attendance',
+            link: '/members/a-1',
+            introduction: 'I build **saunas**.',
+            entries: [anEntry({ id: 't-1', body: 'says who they are', kind: 'introduced' })],
+          }),
+        ],
+      ),
+    )
+
+    expect(await screen.findByText('saunas')).toBeTruthy()
+    expect((await screen.findByRole('link', { name: 'Ada' })).getAttribute('href')).toBe('/members/a-1')
+  })
+
+  it('offers the switch that belongs to the card, not the dream one of the same name', async () => {
+    renderPage(
+      stub(
+        {},
+        [],
+        [
+          aCard({
+            id: 'c-1',
+            title: 'Ada',
+            entity_type: 'attendance',
+            link: '/members/a-1',
+            entries: [anEntry({ id: 't-1', body: 'nice one', kind: 'comment' })],
+          }),
+        ],
+      ),
+    )
+
+    expect(
+      await screen.findByRole('button', { name: notificationCategoryInfo.introduction_comment_any.label }),
+    ).toBeTruthy()
   })
 
   it('draws what somebody said differently from what the app did', async () => {

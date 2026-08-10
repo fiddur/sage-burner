@@ -16,6 +16,8 @@ import { NAMELESS } from './PersonBadge.tsx'
 const marks = {
   comment: '',
   offered: '🌱',
+  joined: '🎪',
+  introduced: '✍️',
   facilitator: '👉',
   helper: '🙋',
   renamed: '✏️',
