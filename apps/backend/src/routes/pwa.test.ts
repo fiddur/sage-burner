@@ -170,9 +170,9 @@ describe('the web manifest', () => {
     const server = await build()
     const root = await givenAccount()
 
-    // The SVG entry is never maskable: it has no background of its own, and a launcher
-    // fills a maskable icon's box. The drawn PNGs beside it are, since they are opaque
-    // and keep a tenth of the tile clear at every edge (#453).
+    // The flame's SVG entry is not maskable: it has no background of its own, and a
+    // launcher fills a maskable icon's box. The drawn PNGs beside it are, being opaque and
+    // keeping a tenth of the tile clear at every edge (#453).
     expect((await getManifest(server)).json().icons.map((icon: { purpose: string }) => icon.purpose)).toEqual(
       ['any', 'maskable', 'maskable', 'maskable'],
     )
@@ -208,15 +208,15 @@ describe('the web manifest', () => {
         .filter((icon: { type: string }) => icon.type === 'image/png')
         .map((icon: { src: string; sizes: string }) => [icon.src, icon.sizes]),
     ).toEqual([
-      ['/api/installation/icons/180?v=default', '180x180'],
-      ['/api/installation/icons/192?v=default', '192x192'],
-      ['/api/installation/icons/512?v=default', '512x512'],
+      ['/api/installation/icons/180', '180x180'],
+      ['/api/installation/icons/192', '192x192'],
+      ['/api/installation/icons/512', '512x512'],
     ])
   })
 
   it('leaves the drawn flame out once an admin has uploaded a mark of their own', async () => {
     // Mixing the app's flame in beside somebody's logo would show the wrong one in the
-    // install sheet, and an SVG upload cannot honestly claim a pixel size.
+    // install sheet.
     const server = await build()
     const root = await givenAccount()
 

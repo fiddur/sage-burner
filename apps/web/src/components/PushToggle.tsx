@@ -147,9 +147,9 @@ export const PushToggle = ({
 
       {state === 'unsupported' && !isStandalone() && (
         <p class="form-note">
-          This browser will not show notifications for a page in a tab — on an iPhone, that is every browser.
-          Add the app to your home screen and open it from there, and this button appears.{' '}
-          <a href="/faq">More in the FAQ.</a>
+          Notifications are not available on this page. On an iPhone that is every browser until the app is
+          installed — add it to your home screen and open it from there. Otherwise the site is not on HTTPS,
+          which they also need. <a href="/faq">More in the FAQ.</a>
         </p>
       )}
 

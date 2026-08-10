@@ -18,11 +18,6 @@ export interface InstallWatch {
   taken: () => void
 }
 
-/**
- * Both spellings, because a home screen app on iOS before 16.4 answers only the legacy one —
- * and those are exactly the people the instructions strip would otherwise nag for having
- * already followed it (#452).
- */
 export const isStandalone = (): boolean =>
   globalThis.matchMedia?.('(display-mode: standalone)').matches === true ||
   Reflect.get(globalThis.navigator ?? {}, 'standalone') === true

@@ -44,9 +44,6 @@ const aWatch = (start?: InstallOffer, standalone = false) => {
 
 describe('offering to install the app', () => {
   it('says how by hand where the browser has made no offer', () => {
-    // Firefox, Safari and everything on iOS, none of which has the API — and iOS is the
-    // one platform where the Share sheet is the only way in (#452). Before this the strip
-    // rendered nothing at all there.
     render(<InstallApp watch={aWatch().watch} />)
 
     expect(screen.queryByRole('button', { name: 'Install' })).toBeNull()
@@ -54,8 +51,6 @@ describe('offering to install the app', () => {
   })
 
   it('says nothing to the installed copy, however it answers being asked', () => {
-    // A home screen app on older iOS answers only `navigator.standalone`, so without that
-    // check the instructions would nag whoever had already followed them.
     render(<InstallApp watch={aWatch(undefined, true).watch} />)
 
     expect(screen.queryByRole('status')).toBeNull()
@@ -149,9 +144,23 @@ describe('offering to install the app', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Install' }))
 
     expect(prompted).toHaveBeenCalledTimes(1)
-    // One prompt per event, so the strip goes rather than offering a second that the
-    // browser would refuse.
     expect(screen.queryByRole('button', { name: 'Install' })).toBeNull()
+  })
+
+  it('goes quiet after the prompt rather than telling somebody to do it by hand', async () => {
+    // The whole strip, not only the button: a spent offer is not "this browser has no API",
+    // and the instructions came up on top of Chromium's own dialog and stayed there — a tab's
+    // display mode is `browser` however that dialog was answered.
+    const { watch, offers } = aWatch()
+    render(<InstallApp watch={watch} />)
+    await act(() => {
+      offers()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Install' }))
+
+    await act(() => Promise.resolve())
+    expect(screen.queryByRole('status')).toBeNull()
   })
 
   it('takes no for an answer, and remembers it', async () => {
@@ -207,6 +216,6 @@ describe('offering to install the app', () => {
       watch.taken()
     })
 
-    expect(screen.queryByRole('button', { name: 'Install' })).toBeNull()
+    expect(screen.queryByRole('status')).toBeNull()
   })
 })

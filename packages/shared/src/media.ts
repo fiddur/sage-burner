@@ -7,8 +7,6 @@ export const isIconType = (value: unknown): value is IconType =>
 
 export const ICON_PIXELS = 512
 
-// 180 is what iOS fetches for a home-screen tile, 192 what Chromium wants for the install
-// banner, 512 what the manifest declares as the large one.
 export const TOUCH_ICON_SIZES = [180, 192, 512] as const
 
 export type TouchIconSize = (typeof TOUCH_ICON_SIZES)[number]
@@ -59,13 +57,6 @@ export const FLAME_BOX = 64
 
 export const FLAME_BACKGROUND = '#1c1917'
 
-/**
- * The app's own mark, as geometry rather than as an emoji (#453). An emoji is a glyph, so
- * `<text>🔥</text>` draws whatever font the reader has — and nothing can rasterize it to the
- * PNG iOS demands for a home-screen tile without carrying a font. These curves are the one
- * description both renderings come from: `flameIcon` writes them as SVG and `pwa/flame.ts`
- * fills them into a PNG.
- */
 export const FLAME_SHAPES: readonly FlameShape[] = [
   {
     fill: '#ea580c',

@@ -11,15 +11,25 @@ export const WHY = 'Installed, it opens like an app — and on some phones that 
 
 export const InstallApp = ({ watch }: { watch: InstallWatch | null }) => {
   const [offer, setOffer] = useState(() => watch?.offer())
+  // A spent offer is not "this browser has no API": the strip would flip to the instructions
+  // on top of Chromium's own install dialog, and stay there afterwards, since a tab's display
+  // mode is `browser` however the dialog was answered.
+  const [offered, setOffered] = useState(() => watch?.offer() !== undefined)
   const [dismissed, setDismissed] = useState(dismissedInstall)
   const viewer = useViewer()
 
   useEffect(() => {
     if (watch === null) return undefined
 
-    setOffer(watch.offer())
+    const held = () => {
+      const found = watch.offer()
+      if (found !== undefined) setOffered(true)
+      setOffer(found)
+    }
 
-    return watch.onChange(() => setOffer(watch.offer()))
+    held()
+
+    return watch.onChange(held)
   }, [watch])
 
   if (watch === null || dismissed || watch.standalone()) return null
@@ -37,11 +47,8 @@ export const InstallApp = ({ watch }: { watch: InstallWatch | null }) => {
     </button>
   )
 
-  // No offer means no `beforeinstallprompt`, which is every browser on iOS — all WebKit — and
-  // Firefox and Safari on the desktop. Saying nothing there hid the nudge from exactly the
-  // platform where installing takes the most convincing (#452). The wording stays generic on
-  // purpose: an exact menu path goes stale silently, and the FAQ is where a walkthrough can be
-  // edited without a deploy.
+  if (offer === undefined && offered) return null
+
   if (offer === undefined) {
     return (
       <p class="install-app" role="status">

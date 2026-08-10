@@ -36,9 +36,7 @@ describe('the HTML shell', () => {
   })
 
   it('points the home-screen tile at the touch-icon route, which answers a PNG', () => {
-    // The icon route answers an SVG whenever nobody uploaded a raster one, and iOS draws
-    // no SVG for a tile — it drew a gray square instead (#453). One tag carrying both,
-    // for the reason the favicon assertion gives.
+    // One tag carrying both, for the reason the favicon assertion gives.
     expect(shell).toMatch(
       new RegExp(`<link[^>]*rel="apple-touch-icon"[^>]*href="${apiRoutes.getTouchIcon.path('180')}"`),
     )

@@ -958,9 +958,6 @@ export type RouteKey = keyof typeof apiRoutes
 export const iconSrc = (version: string | null | undefined): string =>
   `${apiRoutes.getInstallationIcon.path()}?v=${encodeURIComponent(version ?? 'default')}`
 
-export const touchIconSrc = (size: number, version: string | null | undefined): string =>
-  `${apiRoutes.getTouchIcon.path(String(size))}?v=${encodeURIComponent(version ?? 'default')}`
-
 export const bannerSrc = (version: string): string =>
   `${apiRoutes.getInstallationBanner.path()}?v=${encodeURIComponent(version)}`
 

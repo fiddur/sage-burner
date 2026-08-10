@@ -12,8 +12,6 @@ describe('the app’s own mark', () => {
   })
 
   it('is geometry rather than a glyph, so a tile can be drawn from it', () => {
-    // It was `<text>🔥</text>`, which draws whatever font the reader has and cannot be
-    // rasterized without carrying one — which is how iOS came to show a gray square (#453).
     expect(flameIcon()).not.toContain('<text')
     expect(flameIcon()).not.toContain('font-size')
     expect(FLAME_SHAPES.length).toBeGreaterThan(0)

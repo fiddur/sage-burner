@@ -1031,9 +1031,11 @@ what it declares and a flame reaching the corners loses its tip to a circular ma
 different app; `description` matching the shell's; `lang` and `dir`; and `shortcuts` for a
 long press — the schedule, the feed and the songbook. The drawn PNGs are declared at 180, 192
 and 512 **only where nobody has uploaded an icon**: mixing the app's flame in beside somebody's
-logo would show the wrong mark in the install sheet. The SVG entry stays `purpose: 'any'` and
-never maskable, because it has no background of its own and a launcher fills a maskable icon's
-box; the PNGs are maskable, being opaque with that margin. A raster upload is resized to 512
+logo would show the wrong mark in the install sheet. The flame's own SVG entry stays
+`purpose: 'any'`, because it has no background and a launcher fills a maskable icon's box; the
+PNGs beside it are maskable, being opaque with that margin. An upload keeps the `any maskable`
+it has had since #256, which is a claim about a picture an admin chose rather than one the app
+draws. A raster upload is resized to 512
 in the browser before it is sent, so the `512x512` the manifest has always claimed is true of
 anything uploaded through the page.
 

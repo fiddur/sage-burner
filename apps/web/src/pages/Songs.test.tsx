@@ -179,12 +179,10 @@ describe('what counts as recently taken out', () => {
     expect(recentlyGone(null, NOW)).toBe(false)
   })
 
-  it('holds right up to the bound and not past it', () => {
-    const day = 24 * 60 * 60 * 1000
-    const at = (days: number) => new Date(NOW - days * day + 1000).toISOString()
+  it('holds right up to the bound and not on it', () => {
+    const bound = RECENTLY_GONE_DAYS * 24 * 60 * 60 * 1000
 
-    expect(recentlyGone(at(RECENTLY_GONE_DAYS - 1), NOW)).toBe(true)
-    expect(recentlyGone(at(RECENTLY_GONE_DAYS), NOW)).toBe(true)
-    expect(recentlyGone(at(RECENTLY_GONE_DAYS + 1), NOW)).toBe(false)
+    expect(recentlyGone(new Date(NOW - bound + 1).toISOString(), NOW)).toBe(true)
+    expect(recentlyGone(new Date(NOW - bound).toISOString(), NOW)).toBe(false)
   })
 })

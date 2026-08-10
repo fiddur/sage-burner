@@ -178,11 +178,6 @@ export const drawFlame = (size: number): Buffer => {
   return pixels
 }
 
-/**
- * Held per size in a closure rather than at module scope, and computed rather than shipped:
- * nothing here decodes an image — the input is the geometry in `media.ts`, which is why this
- * does not break the rule uploads live under.
- */
 export const createFlameIcons = (): { png: (size: TouchIconSize) => Buffer } => {
   const drawn = new Map<number, Buffer>()
 

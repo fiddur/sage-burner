@@ -10,7 +10,6 @@ import {
   songbookPage,
   TOUCH_ICON_SIZES,
   TOUCH_ICON_TYPE,
-  touchIconSrc,
 } from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 
@@ -84,14 +83,10 @@ export const registerPwaRoutes = (app: FastifyInstance, { db, now }: PwaDeps) =>
     void reply.header('cache-control', 'no-cache')
     void reply.header('content-type', 'application/manifest+json; charset=utf-8')
 
-    // The PNG entries are the flame's, so they are declared only where nobody has uploaded an
-    // icon. An admin's own SVG stays the single entry it was: putting the app's flame beside
-    // somebody's logo would show the wrong mark in the install sheet, and a raster upload is
-    // already the 512 it is asked for.
     const drawn =
       icon === undefined
         ? TOUCH_ICON_SIZES.map((size) => ({
-            src: touchIconSrc(size, null),
+            src: apiRoutes.getTouchIcon.path(String(size)),
             type: TOUCH_ICON_TYPE,
             sizes: `${size}x${size}`,
             purpose: 'maskable',
@@ -118,14 +113,11 @@ export const registerPwaRoutes = (app: FastifyInstance, { db, now }: PwaDeps) =>
           },
           ...drawn,
         ],
-        shortcuts: SHORTCUTS.map((shortcut) => ({ ...shortcut })),
+        shortcuts: SHORTCUTS,
       }),
     )
   })
 
-  // The upload when it is already a PNG, and the flame otherwise — an SVG upload falling back
-  // to the app's own mark is honest, since iOS draws no SVG for a tile and a gray square is what
-  // it drew before (#453). Exact spellings only, so one tile is one cache key.
   app.get<{ Params: { size: string } }>(apiRoutes.getTouchIcon.fastify, async (request, reply) => {
     const wanted = TOUCH_ICON_SIZES.find((size) => String(size) === request.params.size)
     if (wanted === undefined) return sendError(reply, 404)
