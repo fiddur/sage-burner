@@ -165,6 +165,10 @@ describe('what the page says when a provider refuses', () => {
     expect(outcomeMessage('misconfigured', 'req-8s')).toContain('Mention req-8s.')
   })
 
+  it('does not say the provider refused, since on one path it was never asked', () => {
+    expect(outcomeMessage('misconfigured')).not.toMatch(/refus|reject|declin/iu)
+  })
+
   it('tells somebody to try again when the provider could not be reached', () => {
     // Distinct from the above on purpose: nothing an organiser changes fixes an outage, and
     // "tell an organiser" for one teaches people to ignore that sentence.

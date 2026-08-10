@@ -1069,8 +1069,8 @@ nowhere; the person who configured the provider is the person running the instal
 the difference between a five-minute fix and an unfixable mystery. The route logs it, and since #440
 the page says which of two kinds it was, split by **whether the person reading can do anything about
 it**: `unreachable` means try again in a moment, `misconfigured` means tell an organiser and quotes
-`request.id`, the `reqId` on that log line. Which status falls where is `outcomeFor`, four lines with
-a test per branch — enumerating it here as well produced a sentence that called a 429
+`request.id`, the `reqId` on that log line. Which status falls where is `outcomeFor`, with a test per
+branch — enumerating it here as well produced a sentence that called a 429
 `misconfigured` for two PRs after the code stopped agreeing. The detail itself still does not
 travel; what the module _sends_ never appears in it, which `client.test.ts` pins as a whole shape
 rather than field by field, because spreading the decoded body straight in is the mistake that was

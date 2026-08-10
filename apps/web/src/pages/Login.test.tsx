@@ -75,6 +75,10 @@ describe('what a provider round trip says when it comes back here', () => {
     expect(message).toContain('Mention req-8s.')
   })
 
+  it('does not say the provider refused, since on one path it was never asked', () => {
+    expect(signInOutcome('misconfigured')).not.toMatch(/refus|reject|declin/iu)
+  })
+
   it('tells somebody to try again when nothing could be reached, and quotes nothing without a ref', () => {
     expect(signInOutcome('unreachable', 'req-8s')).toContain('Try again in a moment')
     expect(signInOutcome('unreachable', null)).not.toContain('Mention')
