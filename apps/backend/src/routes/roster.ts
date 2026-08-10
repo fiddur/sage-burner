@@ -16,7 +16,7 @@ import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
 import { allOf } from '../db/conditions.ts'
 import { isEmptyPatch, patchRow } from '../db/patch.ts'
-import { account, attendance, event, eventOption } from '../db/schema.ts'
+import { account, accountAvatar, attendance, event, eventOption } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { allergyLabelsFor } from './allergy-ticks.ts'
 import { activeEventNow, todayIso } from './events.ts'
@@ -42,6 +42,7 @@ const asMemberEntry = (entry: RosterEntry): MemberRosterEntry => ({
   helping_other: entry.helping_other,
   notes: entry.notes,
   name: entry.name,
+  avatar: entry.avatar,
   contact: entry.contact,
   allergies_notes: entry.allergies_notes,
   allergy_items: entry.allergy_items,
@@ -182,11 +183,13 @@ export const registerRosterRoutes = (
         payment_date: attendance.payment_date,
         email: account.email,
         name: account.name,
+        avatar: accountAvatar.updated_at,
         contact: account.contact,
         allergies_notes: account.allergies_notes,
       })
       .from(attendance)
       .innerJoin(account, eq(account.id, attendance.account_id))
+      .leftJoin(accountAvatar, eq(accountAvatar.account_id, account.id))
       .leftJoin(eventOption, eq(eventOption.id, attendance.lodging_option_id))
       .where(eq(attendance.event_id, eventId))
 

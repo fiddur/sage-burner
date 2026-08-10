@@ -9,6 +9,15 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-10
 
+- **Faces on the two lists of who is coming.** The Members page and the organiser's roster show
+  everybody's picture beside their name, the way the rest of the app already did — initials where
+  somebody has not set one.
+
+- **The list of ways to reach you no longer offers an Add before it has loaded.** For a moment
+  after opening your details it offered every kind including one you already had, so pressing
+  _Use my sign-in address_ could collide with the row it was still fetching. And _Signed in as …_
+  now sits beside the Sign out button, which is the sentence that button answers.
+
 - **Guessing at somebody's password now runs out of tries.** Ten attempts per address per quarter
   of an hour, and getting it right clears the count — so mistyping your own a few times costs you
   nothing. If you do hit it, the page says how long to wait rather than inviting you to try again

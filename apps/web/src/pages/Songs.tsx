@@ -20,11 +20,6 @@ const labelsFor = (categories: readonly SongCategory[], ids: readonly string[]):
 
 export const RECENTLY_GONE_DAYS = 30
 
-/**
- * The heading says "recently", so the list has to mean it: without a bound it was every song
- * ever taken out, for ever. Nothing is purged — an older one is still reachable by its link,
- * and its page still offers to put it back.
- */
 export const recentlyGone = (deletedAt: string | null, now: number): boolean =>
   deletedAt !== null && now - Date.parse(deletedAt) < RECENTLY_GONE_DAYS * 24 * 60 * 60 * 1000
 

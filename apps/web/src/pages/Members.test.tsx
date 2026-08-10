@@ -13,6 +13,7 @@ import { Members } from './Members.tsx'
 afterEach(cleanup)
 
 const anEntry = (over: Partial<MemberRosterEntry> = {}): MemberRosterEntry => ({
+  avatar: null,
   id: `att-${over.name ?? 'x'}`,
   event_id: 'e-1',
   account_id: `acc-${over.name ?? 'x'}`,
@@ -135,6 +136,25 @@ describe('Members', () => {
     )
 
     expect(await screen.findByText(/1 of 2 places taken, 1 waiting/)).toBeTruthy()
+  })
+
+  it('shows the face beside the name, which the roster now carries', async () => {
+    const { container } = renderPage(
+      stub(aRoster({ entries: [anEntry({ name: 'Ana', avatar: '2026-07-02T00:00:00.000Z' })] })),
+    )
+
+    await screen.findByText('Ana')
+    expect(container.querySelector('.person-cell img')?.getAttribute('src')).toBe(
+      '/api/accounts/acc-Ana/avatar?v=2026-07-02T00%3A00%3A00.000Z',
+    )
+  })
+
+  it('shows the initials where somebody has no face yet', async () => {
+    const { container } = renderPage(stub(aRoster({ entries: [anEntry({ name: 'Ana Beam' })] })))
+
+    await screen.findByText('Ana Beam')
+    expect(container.querySelector('.person-cell img')).toBeNull()
+    expect(container.querySelector('.person-cell .avatar')?.textContent).toBe('AB')
   })
 
   it('says a name is missing rather than falling back to an address it was not sent', async () => {

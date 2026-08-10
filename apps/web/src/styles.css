@@ -265,6 +265,23 @@ a:hover {
   flex: none;
 }
 
+/* A face beside a name in a table cell, which is two lines tall — so `align-items: start`
+   rather than centre, or the face floats between the name and the contact under it. */
+.person-cell {
+  display: flex;
+  align-items: start;
+  gap: 0.5rem;
+}
+
+/* Below `.avatar`, which sets the same properties at equal specificity: above it, the size
+   would lose to the base rule. */
+.person-cell-face {
+  width: 2rem;
+  height: 2rem;
+  font-size: 0.8rem;
+  flex: none;
+}
+
 /*
   Full width, and prose opts *in* to a measure rather than out of it.
 

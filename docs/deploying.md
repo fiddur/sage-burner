@@ -191,6 +191,11 @@ ProxyPass        / http://127.0.0.1:8081/
 ProxyPassReverse / http://127.0.0.1:8081/
 ```
 
+**`TRUST_PROXY=1` matters more than it did.** Both of the app's own bounds are keyed on
+`request.ip`, so with the default `false` behind this hop every request looks like it came from
+the Docker bridge — and the two per-origin bounds collapse into one bucket for the whole
+installation: thirty logins per five minutes and twenty redemptions per ten, shared by everybody.
+
 **Throttling here is still worth having, and is no longer the only thing.** The app bounds
 login per address and per origin, and invite redemption per origin (see
 [Accounts and sessions](./accounts.md)) — so a guesser gets ten tries per address per

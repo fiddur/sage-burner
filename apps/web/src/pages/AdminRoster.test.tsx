@@ -13,6 +13,7 @@ import { AdminRoster } from './AdminRoster.tsx'
 afterEach(cleanup)
 
 const anEntry = (over: Partial<RosterEntry> = {}): RosterEntry => ({
+  avatar: null,
   id: `att-${over.name ?? 'x'}`,
   event_id: 'e-1',
   account_id: `acc-${over.name ?? 'x'}`,

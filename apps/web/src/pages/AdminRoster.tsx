@@ -1,6 +1,5 @@
 import type { RosterEntry } from '@sage-burner/shared'
 
-import { profilePage } from '@sage-burner/shared'
 import { Fragment } from 'preact'
 import { useState } from 'preact/hooks'
 
@@ -9,6 +8,7 @@ import type { ApiClient } from '../api/client.ts'
 import { allergiesOf } from '../allergies.ts'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
+import { PersonCell } from '../components/PersonCell.tsx'
 import { Table } from '../components/Table.tsx'
 import { startsTheWaitingList, WaitingListLine } from '../components/WaitingListLine.tsx'
 import { toCsv } from '../csv.ts'
@@ -35,7 +35,7 @@ const COLUMNS = [
   'payment_status',
   'payment_date',
   'waiting',
-] as const
+] as const satisfies readonly (keyof RosterEntry)[]
 
 const download = (name: string, csv: string) => {
   const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
@@ -127,10 +127,13 @@ export const AdminRoster = ({ api }: { api: RosterApi }) => {
                     {startsTheWaitingList(roster.entries, index) && <WaitingListLine columns={4} />}
                     <tr class={entry.waiting ? 'waiting' : undefined}>
                       <td>
-                        <a href={profilePage(entry.account_id)}>{entry.name ?? entry.email}</a>
-                        {entry.waiting && <span class="form-note"> · waiting</span>}
-                        <br />
-                        <span class="form-note">{entry.contact ?? entry.email}</span>
+                        <PersonCell
+                          accountId={entry.account_id}
+                          name={entry.name ?? entry.email}
+                          avatar={entry.avatar}
+                          waiting={entry.waiting}
+                          under={entry.contact ?? entry.email}
+                        />
                       </td>
                       <td>{allergiesOf(entry)}</td>
                       <td>

@@ -119,6 +119,29 @@ describe('the list on your own details page', () => {
     expect(screen.queryByText(/have not added any yet/)).toBeNull()
   })
 
+  it('offers no add form until the list has been read', async () => {
+    // While it was loading, `kindsToOffer([])` offered all ten and the form opened on Email —
+    // so somebody who already had an email row could add a second and get a 409 (#445).
+    let answer = (_rows: { connections: Connection[] }) => undefined as unknown as void
+    const held = new Promise<{ connections: Connection[] }>((resolve) => {
+      answer = resolve
+    })
+    render(<ConnectionsField api={stub({ getMyConnections: () => held })} />)
+
+    expect(screen.queryByRole('button', { name: 'Add it' })).toBeNull()
+
+    answer({ connections: [] })
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Add it' })).toBeTruthy())
+  })
+
+  it('offers none after a failed load either, since it cannot say what is already there', async () => {
+    render(<ConnectionsField api={stub({ getMyConnections: () => Promise.reject(new Error('offline')) })} />)
+
+    await screen.findByRole('alert')
+    expect(screen.queryByRole('button', { name: 'Add it' })).toBeNull()
+  })
+
   it('keeps what was typed when the save is refused', async () => {
     render(
       <ConnectionsField

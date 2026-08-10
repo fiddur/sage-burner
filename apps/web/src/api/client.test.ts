@@ -142,6 +142,12 @@ describe('createApiClient', () => {
       await expect(createApiClient(doFetch).request('/auth/login')).rejects.toThrow('in 45 seconds')
     })
 
+    it('says one second rather than "1 seconds", which the gate really does answer', async () => {
+      const doFetch = respondWith({ error: 'rate_limited' }, { status: 429, headers: { 'retry-after': '1' } })
+
+      await expect(createApiClient(doFetch).request('/auth/login')).rejects.toThrow('in a second')
+    })
+
     it('says it in minutes for a wait nobody counts in seconds', async () => {
       const doFetch = respondWith(
         { error: 'rate_limited' },

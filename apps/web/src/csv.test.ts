@@ -36,7 +36,9 @@ describe('toCsv', () => {
   })
 
   it('writes an empty cell for a missing or null value', () => {
-    expect(toCsv(['a', 'b'], [{ a: null }])).toBe('"a","b"\r\n"",""')
+    const row: { a: string | null; b?: string } = { a: null }
+
+    expect(toCsv(['a', 'b'], [row])).toBe('"a","b"\r\n"",""')
   })
 
   it('writes just the header when there is nobody', () => {

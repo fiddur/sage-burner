@@ -33,12 +33,29 @@ type Editable = Pick<
   | 'transfer_info_markdown'
 >
 
-export const changedFields = (before: Editable | undefined, now: Editable): Partial<Editable> =>
-  before === undefined
-    ? now
-    : Object.fromEntries(
-        Object.entries(now).filter(([key, value]) => value !== before[key as keyof Editable]),
-      )
+const EDITABLE_KEYS = [
+  'name',
+  'start_date',
+  'end_date',
+  'start_time',
+  'end_time',
+  'location',
+  'member_cap',
+  'welcome_markdown',
+  'payment_info_markdown',
+  'transfer_info_markdown',
+] as const satisfies readonly (keyof Editable)[]
+
+export const changedFields = (before: Editable | undefined, now: Editable): Partial<Editable> => {
+  if (before === undefined) return now
+
+  const changed: Partial<Editable> = {}
+  for (const key of EDITABLE_KEYS) {
+    if (now[key] !== before[key]) Object.assign(changed, { [key]: now[key] })
+  }
+
+  return changed
+}
 
 const BLANK = {
   name: '',

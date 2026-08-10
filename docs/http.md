@@ -103,9 +103,8 @@ the server log, where a SQL fragment or a file path is useful rather than public
 The vocabulary is `errorCodes` in
 [`packages/shared`](../packages/shared/src/schemas/error.ts), and that is where it is read
 rather than copied — this paragraph listed eight of them and was five short, which is what a
-list in prose does. The four baseline codes carry no argument beyond their status; every one
-added since says there why it is not one of those. It grows with the routes that emit it,
-rather than being listed in advance and left unreachable.
+list in prose does. It grows with the routes that emit it, rather than being listed in advance
+and left unreachable.
 
 `unauthenticated` and `forbidden` are separate because 401 and 403 are the one
 distinction a client cannot safely collapse — signing in fixes the first and

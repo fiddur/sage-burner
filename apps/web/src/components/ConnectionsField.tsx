@@ -161,8 +161,11 @@ export const ConnectionsField = ({ api, loginAddress }: { api: ConnectionsApi; l
   const rows = loaded.status === 'ready' ? loaded.data : undefined
   const held = rows?.length ?? 0
 
-  const offered = kindsToOffer(rows ?? [])
-  const draft = draftFor(typed, offered)
+  // Offered from the list as read, never from an empty stand-in: while it was loading, and after
+  // a failed load, all ten kinds were offered and the form opened on Email — so somebody who
+  // already had an email row could press Use my sign-in address and collide with it (#445).
+  const offered = rows === undefined ? [] : kindsToOffer(rows)
+  const draft = rows === undefined ? undefined : draftFor(typed, offered)
 
   const { busy, formError, setError, run } = useAction(reload)
 
