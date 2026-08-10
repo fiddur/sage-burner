@@ -67,12 +67,32 @@ sessions being signed rather than stored — there is no row to delete — and n
 from anything above. A compromised session can only be revoked by rotating
 `SESSION_SECRET`, which logs everyone out at once.
 
-**Login is not rate-limited in the app, deliberately.** Throttling repeated
-attempts is the reverse proxy's job for now — Apache sees every request first
-and can drop a flood before it costs a scrypt hash. [#57] tracks doing it in
-the app if that ever stops being enough.
+**Login is bounded twice, and they are different properties** (#57). A reverse proxy in
+front of this is still worth having, but the app no longer depends on one.
 
-There is a bound on concurrent _work_, which is a different thing. At most two
+**Per address, ten in fifteen minutes**, which is the guessing bound. It is keyed on the
+address **as sent** rather than on whether it names an account — keying or answering
+differently for a known address would hand back the enumeration oracle the constant-time
+verify exists to close. A right answer **forgives** the address, so somebody who mistypes
+nine times and then gets in is not one attempt from a lockout.
+
+**Per address of origin, thirty in five minutes**, which is the availability bound, and it
+is claimed **ahead of** the concurrency gate below. Per-address alone does not close that
+hole: an attacker cycling addresses never fills one bucket, so two sustained requests would
+hold the gate's whole capacity and answer 429 to every member for as long as they held them.
+Thirty is deliberately generous, because everybody at a gathering shares one public address
+— a bound tight enough to stop a determined guesser from one machine would lock out a camp.
+What it does bound is the CPU one client can ask for, which is the actual exposure.
+
+Both are one `Map` of counters with an injected clock, bounded at four thousand keys: the
+expired ones are reclaimed first, and if every bucket is live the one closest to expiry is
+forgotten to make room. Forgetting rather than refusing, because a limiter that runs out of
+memory to be a limiter with is an outage.
+
+Neither is `@fastify/rate-limit`. Forty lines with the clock passed in is less than the
+configuration surface of the plugin, and it is testable without waiting for a real window.
+
+There is also a bound on concurrent _work_, which is a third thing. At most two
 **scrypt hashes** run at once, and up to eight further callers wait in a FIFO
 queue; the eleventh concurrent caller, or one still waiting after five seconds,
 gets a `429` with `Retry-After`.
@@ -117,7 +137,6 @@ out on each deploy — with watchtower redeploying on a tag move, every few
 minutes after a merge.
 
 [#17]: https://github.com/fiddur/sage-burner/issues/17
-[#57]: https://github.com/fiddur/sage-burner/issues/57
 [#58]: https://github.com/fiddur/sage-burner/issues/58
 
 ## Applying
@@ -414,9 +433,9 @@ timing: `409` for a member, `201` for anyone else. Latency was a redundant secon
 copy of an answer the status line already gives. What the ordering buys is cost:
 each probe now spends a gated scrypt. With `SCRYPT_GATE`'s two slots and scrypt at
 ~230ms that is a ceiling of **about nine probes a second**, shared with every
-login — against thousands a second when the refusal was free. #57 is what would bound it
-properly, and there is a test that pins the residual so this paragraph cannot
-quietly go stale.
+login — against thousands a second when the refusal was free. The per-origin bound on
+redemption (twenty in ten minutes) is what caps it properly now, and there is a test that
+pins the residual so this paragraph cannot quietly go stale.
 
 Spending the token on the taken-address refusal would cap a held invite at one
 probe. It is deliberately not done: someone who typos an address that happens to

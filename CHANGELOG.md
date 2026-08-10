@@ -9,6 +9,13 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-10
 
+- **Guessing at somebody's password now runs out of tries.** Ten attempts per address per quarter
+  of an hour, and getting it right clears the count — so mistyping your own a few times costs you
+  nothing. If you do hit it, the page says how long to wait rather than inviting you to try again
+  straight away. Redeeming an invite is bounded the same way. None of it can be used to find out
+  whether an address has an account here: a wrong guess at an address nobody uses is answered
+  exactly like a wrong guess at one somebody does.
+
 - **Leaving a burn and changing your mind no longer leaves two of you on the feed.** Rejoining
   used to open a second card and leave the first one saying you were no longer coming — the one
   card comes back instead, with everything anybody had said under it. A card for somebody who has

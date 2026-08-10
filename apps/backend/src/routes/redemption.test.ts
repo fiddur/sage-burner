@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm'
 import { createHash, randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import type { AppDeps } from '../app.ts'
 import type { Gate } from '../auth/gate.ts'
 import type { DbHandle } from '../db/index.ts'
 
@@ -40,6 +41,7 @@ const build = async (
   now: () => Date = () => new Date(NOW),
   hash?: (password: string) => Promise<string>,
   gate?: Gate,
+  bounds?: AppDeps['bounds'],
 ) => {
   handle = createDb({ url: ':memory:' })
   runMigrations(handle)
@@ -49,6 +51,7 @@ const build = async (
     now,
     hash,
     gate,
+    bounds,
   })
   return app
 }
@@ -143,6 +146,25 @@ const redeem = (
   body: Record<string, unknown> = applicant,
 ): Promise<LightMyRequestResponse> =>
   server.inject({ method: 'POST', url: `/api/invites/${encodeURIComponent(token)}/redeem`, payload: body })
+
+describe('how often one client may try a token', () => {
+  it('refuses past its allowance, and says how long to wait', async () => {
+    // An unguessable token is only unguessable if you cannot try quickly (#57), and every try
+    // costs a gated scrypt whether the token is real or not.
+    const server = await build(undefined, undefined, undefined, {
+      redeem: { attempts: 2, windowMs: 60_000 },
+    })
+    const token = await givenInvite()
+
+    expect((await redeem(server, 'no-such-token')).statusCode).toBe(409)
+    expect((await redeem(server, 'nor-this-one')).statusCode).toBe(409)
+
+    const refused = await redeem(server, token)
+    expect(refused.statusCode).toBe(429)
+    expect(refused.json()).toEqual({ error: 'rate_limited' })
+    expect(refused.headers['retry-after']).toBe('60')
+  })
+})
 
 describe('looking at an invite before redeeming it', () => {
   it('says a live one is outstanding', async () => {

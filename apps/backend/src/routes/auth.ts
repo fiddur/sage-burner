@@ -6,6 +6,7 @@ import { eq } from 'drizzle-orm'
 
 import type { Gate } from '../auth/gate.ts'
 import type { Sessions } from '../auth/session.ts'
+import type { Throttle } from '../auth/throttle.ts'
 import type { Config } from '../config.ts'
 import type { Database } from '../db/index.ts'
 
@@ -26,20 +27,41 @@ export const cookieHeader = (token: string, config: Config, maxAgeSeconds: numbe
   return parts.join('; ')
 }
 
+export interface LoginLimits {
+  byIp: Throttle
+  byAddress: Throttle
+}
+
 export interface AuthRouteDeps {
   db: Database
   config: Config
   sessions: Sessions
   gate: Gate
+  limits: LoginLimits
 }
 
-export const registerAuthRoutes = (app: FastifyInstance, { db, config, sessions, gate }: AuthRouteDeps) => {
+const refuse = (reply: FastifyReply, retryAfterSeconds: number) => {
+  void reply.header('retry-after', String(retryAfterSeconds))
+
+  return sendError(reply, 429)
+}
+
+export const registerAuthRoutes = (
+  app: FastifyInstance,
+  { db, config, sessions, gate, limits }: AuthRouteDeps,
+) => {
   const handleLogin = async (request: FastifyRequest, reply: FastifyReply) => {
     const parsed = loginRequestSchema.safeParse(request.body)
 
     if (!parsed.success) {
       return reply.code(401).send(errorResponse('invalid_credentials'))
     }
+
+    // Keyed on what was sent, not on whether it names an account: a bound that only counted
+    // known addresses would answer differently for one that exists, which is the enumeration
+    // oracle the constant-time verify was added to close (#57).
+    const attempt = limits.byAddress.take(parsed.data.email)
+    if (!attempt.ok) return refuse(reply, attempt.retryAfterSeconds)
 
     const [row] = await db
       .select({ id: account.id, password_hash: account.password_hash })
@@ -71,6 +93,8 @@ export const registerAuthRoutes = (app: FastifyInstance, { db, config, sessions,
     const viewer = await viewerOf(db, row.id)
     if (viewer === undefined) return reply.code(401).send(errorResponse('invalid_credentials'))
 
+    limits.byAddress.forget(parsed.data.email)
+
     void reply.header('set-cookie', cookieHeader(sessions.issue(row.id), config, config.session_ttl_seconds))
 
     return reply.code(200).send({ viewer } satisfies MeResponse)
@@ -78,6 +102,15 @@ export const registerAuthRoutes = (app: FastifyInstance, { db, config, sessions,
 
   app.post(apiRoutes.login.fastify, async (request, reply) => {
     void noStore(reply)
+
+    // Ahead of the slot claim, or two sustained anonymous requests hold the gate's whole
+    // capacity and every member's login answers 429 for as long as they keep them open.
+    const room = limits.byIp.take(request.ip)
+    if (!room.ok) {
+      request.log.warn({ status: 429 }, 'login throttled')
+
+      return refuse(reply, room.retryAfterSeconds)
+    }
 
     const admission = await gate.enter()
 

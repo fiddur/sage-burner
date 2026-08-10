@@ -191,13 +191,13 @@ ProxyPass        / http://127.0.0.1:8081/
 ProxyPassReverse / http://127.0.0.1:8081/
 ```
 
-**Add throttling here too.** The app deliberately does not rate-limit login
-(see [Accounts and sessions](./accounts.md)), so this vhost is the only
-thing between an attacker and roughly 8–9 password guesses a second against one
-address. Nothing else will stop it.
+**Throttling here is still worth having, and is no longer the only thing.** The app bounds
+login per address and per origin, and invite redemption per origin (see
+[Accounts and sessions](./accounts.md)) — so a guesser gets ten tries per address per
+quarter hour rather than 8–9 a second. What a vhost limiter adds is dropping a flood before
+it reaches Node at all.
 
-`POST /api/applications` is unthrottled for the same reason and is worth a
-separate thought, because it is the only **unauthenticated write** in the app.
+`POST /api/applications` is unthrottled and is worth a separate thought, because it is the only **unauthenticated write** in the app.
 The exposure is different in kind: nothing there grants access, approval is a
 deliberate human act, and the worst case is an admin deleting junk out of the
 review list rather than anyone getting in. It is a nuisance, not a way through —

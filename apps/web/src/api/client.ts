@@ -95,10 +95,29 @@ const orderBody = (ids: readonly string[]) => ({ ids: [...ids] })
 export const isApiError = (value: unknown): value is ApiError =>
   value instanceof Error && 'status' in value && 'code' in value
 
-const messageFor = (status: number) => {
+export const inAWhile = (seconds: number): string => {
+  if (seconds <= 90) return `${seconds} seconds`
+
+  const minutes = Math.ceil(seconds / 60)
+
+  return minutes === 1 ? 'a minute' : `${minutes} minutes`
+}
+
+/** Whole seconds only: the header carries either those or a date, and the app only sends the first. */
+export const waitFrom = (header: string | null): number | undefined => {
+  const seconds = Number(header)
+
+  return header !== null && Number.isInteger(seconds) && seconds > 0 ? seconds : undefined
+}
+
+const messageFor = (status: number, retryAfter?: number) => {
   if (status === 401) return 'You need to sign in.'
   if (status === 403) return 'You do not have access to that.'
-  if (status === 429) return 'Too many attempts just now. Wait a few seconds and try again.'
+  if (status === 429) {
+    return retryAfter === undefined
+      ? 'Too many attempts just now. Wait a few seconds and try again.'
+      : `Too many attempts just now. Try again in ${inAWhile(retryAfter)}.`
+  }
   if (status === 404) return 'Not found.'
   if (status === 412 || status === 428) {
     return 'Somebody else changed this while you had it open. It has been refreshed — have a look and try again.'
@@ -189,7 +208,12 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
 
     if (!response.ok) {
       const failure = await failureFrom(response)
-      throw apiError(response.status, failure.code, messageFor(response.status), failure.payload)
+      throw apiError(
+        response.status,
+        failure.code,
+        messageFor(response.status, waitFrom(response.headers.get('retry-after'))),
+        failure.payload,
+      )
     }
 
     if (method === 'GET') onRead?.(response)
