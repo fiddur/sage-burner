@@ -974,8 +974,8 @@ with no role yet still has to be able to add a way in and get back in with it.
 **Nothing about it is in the environment.** A client id and secret are a row an admin fills in
 under ⚙️ → Settings, keyed by provider — `mail_setting`'s argument, and the VAPID pair's:
 `docker compose up` has to stay sufficient, and an installation that never wants this never
-has a row. Zero rows is the ordinary state. The secret is stored as given, because that is
-what an authorization-code exchange sends, and the read answers `has_secret`.
+has a row. Zero rows is the ordinary state. The secret is stored trimmed and never read back — the read
+answers `has_secret`.
 
 **A provider that is not configured has no button anywhere.** `GET /api/installation` carries
 `social_logins` — provider names, nothing else — for the reason `sends_email` is public: the
@@ -1038,9 +1038,11 @@ never arrived — with the status and the provider's own words. A bare `undefine
 with a stray space, a redirect URI registered slightly differently, a scope the app was never
 approved for and a container with no outbound HTTPS into one indistinguishable refusal recorded
 nowhere; the person who configured the provider is the person running the installation, so that was
-the difference between a five-minute fix and an unfixable mystery. The route logs it and words the
-refusal exactly as before — none of the detail is the member's, and none of it is actionable by
-them. What the module _sends_ never appears in it, which `client.test.ts` pins as a whole shape
+the difference between a five-minute fix and an unfixable mystery. The route logs it, and since #440
+the page says which of two kinds it was: `network` or a 5xx is `unreachable`, which is actionable by
+whoever hit it — try again — and anything else is `misconfigured`, which asks them to tell an
+organiser and quotes `request.id`, the `reqId` on that log line. The detail itself still does not
+travel; what the module _sends_ never appears in it, which `client.test.ts` pins as a whole shape
 rather than field by field, because spreading the decoded body straight in is the mistake that was
 made while writing it.
 

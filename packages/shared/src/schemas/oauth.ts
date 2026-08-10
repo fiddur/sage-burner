@@ -18,9 +18,6 @@ export type OAuthSettings = z.infer<typeof oauthSettingsSchema>
 
 export const oauthSettingsUpdateSchema = oauthSettingsFields
   .extend({
-    // Trimmed like the id: a provider's client secret is an issued token, never a value whose
-    // surrounding whitespace means anything — unlike `mail_setting.password`, which is stored
-    // exactly as given because SMTP AUTH sends the password itself.
     client_secret: z.string().trim().max(MAX_OAUTH_CLIENT_SECRET).optional(),
     ask_profile_link: z.boolean().optional(),
   })
