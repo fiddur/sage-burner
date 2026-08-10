@@ -1,9 +1,3 @@
-/**
- * Client-side 404.
- *
- * The backend serves the app shell for any extensionless path it does not
- * recognise, so an unknown route lands here rather than on a server error page.
- */
 export const NotFound = () => (
   <article class="prose">
     <h1>Nothing here</h1>

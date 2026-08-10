@@ -2,34 +2,10 @@ import type { RefObject } from 'preact'
 
 import { useEffect } from 'preact/hooks'
 
-/**
- * What everything in `inside` can reach with Tab.
- *
- * Written out rather than derived: there is no way to ask the DOM "what is in the tab
- * order", and `tabbable`-style packages exist because the full answer needs layout.
- * This is the subset the overlays are built from; a caller reaching for something else
- * has to add it here.
- */
 const REACHABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]),' +
   ' textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
-/**
- * While an overlay is up, the page behind it is not there: it does not scroll, and Tab
- * cannot reach into it (#364).
- *
- * Both halves are the same claim. An overlay that looks like it covers the page while
- * the page scrolls under it, or hands focus to a control nobody can see behind an
- * opaque backdrop, is telling two different stories about what is interactive.
- *
- * `open` defaults to true, for a caller mounted only while it is showing — the dream
- * panel is. ☰ is in the bar whether or not its drawer is out, so it says which.
- *
- * Only the **boundaries** are taken over; Tab in the middle is the browser's, as it
- * should be. At the last control Tab goes back to the first, and at the first —
- * or on the panel itself, which holds focus on open and is not in the tab order —
- * Shift+Tab goes to the last.
- */
 export const useOverlay = (inside: RefObject<HTMLElement | null>, open = true) => {
   useEffect(() => {
     if (!open) return undefined

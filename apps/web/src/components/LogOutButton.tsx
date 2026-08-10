@@ -4,18 +4,6 @@ import { forgetCachedMemberData } from '../offline.ts'
 import { useRemembered } from '../remembered.tsx'
 import { useSetViewer } from '../viewer.tsx'
 
-/**
- * Signing out, from the page that says who you are signed in as.
- *
- * It used to sit in the bar, where it competed for space with the entries that go
- * somewhere — and where its neighbours are all places, not actions. It belongs
- * beside the sentence naming the account it ends.
- *
- * One call site, which took two goes to get to: #195 put a second button on ⚙️ → Settings
- * because the details page was `require="member"` and turned an `admin`-without-`member`
- * account away, and #396 made that page `approved` instead — so the account the copy existed
- * for can reach the original, and the copy could go.
- */
 export const LogOutButton = ({
   api,
   forget = forgetCachedMemberData,
@@ -27,29 +15,13 @@ export const LogOutButton = ({
   const remembered = useRemembered()
 
   const logOut = async () => {
-    // The same reasoning as the cache below, one layer up: the pages held in memory
-    // are the same member data, and the tab is not reloaded on the way out.
     remembered.forget()
 
-    // Before the request, not after: this is the half that has to happen. The cookie
-    // expires on its own and a stale one reaches nothing, but a roster left in the
-    // browser's cache is member data still on the device — and if the request throws
-    // it is the branch that would have been skipped (#256).
     await forget()
 
-    // The cookie is cleared server-side; the local viewer is cleared either way. A
-    // failed logout that left the nav saying "Log out" would be worse than one that
-    // says signed-out while a stale cookie expires on its own.
-    //
-    // Caught rather than only `finally`, which is what this had first: without a
-    // catch the rejection escapes as an unhandled promise rejection, since the click
-    // handler cannot await it. There is nothing to report — the user asked to be
-    // signed out and, locally, they are.
     try {
       await api.logout()
-    } catch {
-      // Deliberately ignored; see above.
-    }
+    } catch {}
 
     setViewer(null)
   }

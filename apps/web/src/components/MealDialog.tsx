@@ -8,13 +8,6 @@ import { HelperStrip } from './HelperStrip.tsx'
 
 type Person = EventAttendeesResponse['attendees'][number]
 
-/**
- * One sitting, opened from the kitchen lane.
- *
- * The dream panel's shell, and much of its shape: read it, take something on, change
- * what it is called. What it does not offer is dropping the sitting — that is
- * admin's, under Events, because it decides whether people get fed.
- */
 export const MealDialog = ({
   meal,
   attendees,
@@ -121,8 +114,6 @@ export const MealDialog = ({
             label={meal.label}
             people={meal.lead === null ? [] : [meal.lead]}
             max={1}
-            // A chore takes no new lead, so it offers nobody — whoever is still on one
-            // keeps their ✕, which is what the API allows.
             candidates={meal.kind === 'chore' ? [] : attendees}
             everyone={attendees}
             viewerId={viewerId}
@@ -181,7 +172,6 @@ const Crew = ({
   attendees: readonly Person[]
   viewerId: string | undefined
   busy: boolean
-  /** False for a chore's cooks: whoever is on it may leave, nobody new may join. */
   joinable: boolean
   onStand: (role: 'cleanup' | 'helper', joining: boolean, accountId: string) => void
 }) => (
@@ -190,9 +180,6 @@ const Crew = ({
     <HelperStrip
       label={`${role === 'helper' ? 'cooking' : 'cleanup'} at ${meal.label}`}
       people={role === 'helper' ? meal.helpers : meal.cleanup}
-      // The lead is already cooking it, so they are not offered a second pair of
-      // hands for the same thing — and may still wash up, which is why this is per
-      // role. A chore's cooks take nobody at all.
       candidates={
         joinable
           ? attendees.filter((who) => role === 'cleanup' || who.account_id !== meal.lead?.account_id)

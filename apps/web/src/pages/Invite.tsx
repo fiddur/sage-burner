@@ -21,30 +21,16 @@ export type InviteApi = Pick<
   'getActiveEvent' | 'getEventOptions' | 'getInviteState' | 'joinEvent' | 'redeemInvite' | 'updateMyStay'
 >
 
-/** The burn the form offers to join, and the two lists its stay questions need. */
 interface Upcoming {
   event: Event
   options: readonly EventOptionTaken[]
 }
 
-/** What this page is about: the invite, and the burn it can offer alongside it. */
 interface Invited {
   state: InviteState
   upcoming: Upcoming | undefined
 }
 
-/**
- * The burn to offer, or nothing.
- *
- * `/events/active` and its options are both public — the second for the reason the
- * places are, that nothing in it is about a person — so the form can name the burn and
- * draw its lodging list without this page's unauthenticated route learning to hand out
- * anything new.
- *
- * Its own failure is swallowed rather than failing the page: the invite is what this
- * page is for, and somebody who cannot be offered a burn can still become a member and
- * pick one afterwards.
- */
 const upcomingBurn = async (api: InviteApi, signal: AbortSignal): Promise<Upcoming | undefined> => {
   try {
     const { event } = await api.getActiveEvent(signal)
@@ -57,31 +43,6 @@ const upcomingBurn = async (api: InviteApi, signal: AbortSignal): Promise<Upcomi
   }
 }
 
-/**
- * The failures redeeming can produce, each wanting different behaviour.
- *
- * A 409 means the invite went while this page was open, or the email is already
- * an account. Either way the answer is not "try again": the same request fails
- * the same way.
- *
- * A 429 is the opposite — the server is spending all the password hashing it will
- * run at once, and waiting a moment is exactly the right advice.
- *
- * `network` is the API client's own code for a request that never reached a
- * server, and its message already says to check the connection. Advice about a
- * connection belongs there and nowhere else: every other branch here is answering
- * a response that did arrive, so telling those callers to check their wifi sends
- * them after the wrong thing.
- *
- * Matched on the code rather than on status 0, which `aborted` also carries — a
- * cancellation is the page's own tidying up and has no business being rendered.
- * Unreachable while this call passes no signal, and the wrong thing to be relying
- * on either way.
- *
- * The near-duplicate 429 copy here and in `Login.tsx` is intentional rather than
- * drift: this page can say "signing up" where that one says "sign-in attempts".
- * If one is edited, decide about the other rather than assuming they must match.
- */
 const messageForFailure = (failure: unknown): string => {
   if (!isApiError(failure)) return 'Could not finish signing you up. Please try again.'
   if (failure.status === 409) {
@@ -93,15 +54,6 @@ const messageForFailure = (failure: unknown): string => {
   return 'Could not finish signing you up. Please try again.'
 }
 
-/**
- * The burn this page used to only describe (#104).
- *
- * Somebody who has just joined the community is the person most likely to want the
- * next burn, and this is the moment they are paying attention — so the welcome
- * offers it rather than sending them to a start page to find their own way. Its own
- * write, after the token is already spent, so a burn that will not take them costs
- * them nothing they cannot come back for.
- */
 const OpenBurnOffer = ({ api, burn }: { api: Pick<InviteApi, 'joinEvent'>; burn: Event | undefined }) => {
   const [adding, setAdding] = useState(false)
   const [added, setAdded] = useState(false)
@@ -145,15 +97,6 @@ const OpenBurnOffer = ({ api, burn }: { api: Pick<InviteApi, 'joinEvent'>; burn:
   )
 }
 
-/**
- * Spending an invitation: the page where someone becomes a member.
- *
- * The controls are `aria-required` rather than natively `required`, and carry no
- * `minLength`, for the reason the application form gives: native validation
- * blocks submission before this handler runs, which would leave the browser
- * deciding the empty cases and this page the rest. The browser's rules are the
- * weaker ones — it accepts `"   "` for a name.
- */
 export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
   const viewer = useViewer()
   const setViewer = useSetViewer()
@@ -165,8 +108,6 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
   const [stay, setStay] = useState<StayDraft | undefined>(undefined)
   const [done, setDone] = useState<'joined' | 'member' | undefined>(undefined)
 
-  // Keyed on the token rather than on a role: this is the one page whose load is
-  // about what is in the URL, so a second invite opened in the same tab reloads.
   const { loaded } = useLoadInto(
     async (signal): Promise<Invited> => {
       const [state, upcoming] = await Promise.all([
@@ -177,17 +118,12 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
       return { state, upcoming }
     },
     ({ state, upcoming }) => {
-      // What they typed on the application. Asked for it twice, a form reads as one
-      // that was not listening the first time — and the address doubly so once the
-      // invite arrives at it (#30). Still editable: this becomes the login, and
-      // somebody may want a different address for that than the one they applied with.
       if (state.name !== null) setName(state.name)
       if (state.email !== null) setEmail(state.email)
       if (upcoming !== undefined) {
         setStay(stayForBurn(upcoming.event.start_date, upcoming.event.end_date))
       }
     },
-    // No `fallback`: the page has its own wording for a failed load, below.
     { key: token },
   )
 
@@ -197,7 +133,6 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
 
   const joining = offered !== undefined && coming
 
-  /** What is wrong with the form, in words, or nothing — nothing being the signal to send. */
   const problem = (): string | undefined => {
     if (email.trim() === '') return 'Please give us an email address — it becomes your login.'
     if (name.trim() === '') return 'Please tell us your name.'
@@ -219,10 +154,6 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
         allergies_notes: allergies.trim() === '' ? null : allergies.trim(),
         join_event_id: joining ? offered.event.id : null,
       })
-      // The cookie is set server-side, but the shared viewer is populated once on
-      // mount and not refetched on client-side navigation — so without this the
-      // nav still offers "Log in" to someone holding a valid session. `Login.tsx`
-      // does the same thing after its own sign-in.
       if (signedIn !== null) {
         setViewer({
           id: signedIn.account_id,
@@ -232,11 +163,6 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
         })
       }
 
-      // A second write, and deliberately not part of the redemption: that one spends
-      // a token which cannot be spent again, so nothing optional may be able to roll
-      // it back. Its failure is reported where it happens and leaves somebody signed
-      // in and on the list — the details are the one thing here they can come back
-      // and change.
       if (attendance !== null && stay !== undefined) {
         try {
           await api.updateMyStay(attendance.event_id, stayUpdate(stay))
@@ -271,8 +197,6 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
   }
 
   if (viewer.status === 'signed-in') {
-    // Redeeming would create a second account for the same human, and the page
-    // has no way to tell whether that is what they meant.
     return (
       <section class="page">
         <h1>You are already signed in</h1>
@@ -303,9 +227,6 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
   }
 
   if (loaded.data.state.status !== 'outstanding') {
-    // Three different dead ends, three different things to do about them — an
-    // expired link can be re-sent, a used one probably means you already have an
-    // account, and an unknown one is usually a truncated paste.
     const explanation = {
       expired: 'This invitation has expired. Ask someone with admin for a fresh one.',
       used: 'This invitation has already been used. If that was you, log in instead.',

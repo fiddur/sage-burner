@@ -12,23 +12,7 @@ export interface GuardDeps {
   sessions: Sessions
 }
 
-/**
- * `preHandler` guards. Authorization is here, not in the UI.
- *
- * 401 and 403 are deliberately different answers, and the difference is the
- * contract the client is expected to honour: 401 is its cue to send the visitor
- * to login, 403 must never be — that would bounce a member around a loop they
- * can never leave, since logging in again changes nothing.
- *
- * Stated as intent rather than as description. Nothing in `apps/web` navigates
- * on a 401 today; both are rendered as a message. The reason the codes differ
- * holds either way, but the comment should not claim behaviour that is not
- * there yet.
- */
 export const createGuards = ({ db, sessions }: GuardDeps) => {
-  // At least one role is required, so there is no role-less branch to leave
-  // untested. An admin is not automatically a member: the two roles are separate
-  // rows in `account_role`, and redemption grants only `member`.
   const guard =
     (...roles: [AccountRole, ...AccountRole[]]) =>
     async (request: FastifyRequest, reply: FastifyReply) => {
@@ -45,19 +29,6 @@ export const createGuards = ({ db, sessions }: GuardDeps) => {
   return {
     requireAdmin: guard('admin'),
     requireMember: guard('member'),
-    /**
-     * Anyone who is in — the gate for what the shared spreadsheet let everyone
-     * edit.
-     *
-     * `admin` counts, and has to: the two roles are independent, so an account can
-     * hold `admin` without `member` — the accounts table under Organise grants
-     * either on its own, and somebody organising but not attending is coherent. A
-     * `member`-only guard would lock that person out of setting the burn up.
-     *
-     * A third guard rather than a change to `requireMember`, because neither role
-     * implies the other anywhere else and `requireMember` is what keeps a stay a
-     * member's own.
-     */
     requireApproved: guard('member', 'admin'),
   }
 }

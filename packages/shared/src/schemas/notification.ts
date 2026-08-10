@@ -3,13 +3,6 @@ import { z } from 'zod'
 import { notificationCategories } from '../enums.ts'
 import { dateTimeSchema, idSchema } from './common.ts'
 
-/**
- * One thing that happened to somebody, as the bell shows it.
- *
- * `link` is a path in this app rather than a URL — the bell renders it as an
- * `href`, and anything that could be somewhere else would be an open redirect
- * dressed up as a notification.
- */
 export const notificationSchema = z.object({
   id: idSchema,
   category: z.enum(notificationCategories),
@@ -22,28 +15,10 @@ export type Notification = z.infer<typeof notificationSchema>
 
 export const notificationsResponseSchema = z.object({
   notifications: z.array(notificationSchema),
-  /** What the red bubble counts. Derived here so two readers cannot disagree. */
   unseen: z.int().min(0),
 })
 export type NotificationsResponse = z.infer<typeof notificationsResponseSchema>
 
-/**
- * Which categories are switched **on**, in full, per channel.
- *
- * Was `muted` — the ones switched off — which worked while every category was on by
- * default. #259 added five that are off by default, and one list of exceptions
- * cannot mean "off" for some categories and "on" for others without the reader
- * having to know which is which. So the wire carries the answer rather than the
- * delta: what is on, whatever the defaults are.
- *
- * The server fills the defaults in for an account that has never saved, so a client
- * never has to know them either.
- *
- * `on` is the bell and the push, whose defaults differ per category. `email` is
- * **off for every category until somebody asks** (#30), so it needs no defaults at
- * all — but it is still carried in full rather than as a delta, because two lists
- * meaning two different things is exactly what the `muted` rewrite got rid of.
- */
 export const notificationSettingsSchema = z
   .object({
     on: z.array(z.enum(notificationCategories)),

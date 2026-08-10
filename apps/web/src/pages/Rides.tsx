@@ -18,7 +18,6 @@ import { isApproved, useViewer } from '../viewer.tsx'
 
 export type RidesApi = Pick<ApiClient, 'getRides' | 'addRide' | 'updateRide' | 'deleteRide'>
 
-/** What each half of the board is called, and what its empty state says. */
 const HALVES: Record<RideKind, { heading: string; empty: string }> = {
   needs: {
     heading: 'Looking for a lift',
@@ -32,21 +31,6 @@ const HALVES: Record<RideKind, { heading: string; empty: string }> = {
 
 const BLANK = { kind: 'needs' as RideKind, from: '', when: '', seats: '0', notes: '' }
 
-/**
- * Getting to the burn and back (#26) — the spreadsheet's Rideshares tab.
- *
- * Two lists: who is looking for a lift, and who has room. Both carry the poster's
- * **contact**, which is the point of the page and is why it is behind the members
- * gate: the spreadsheet was a publicly linked document with phone numbers in it, and
- * this is the same board without that.
- *
- * The contact comes from the account rather than from the row, so a number changed on
- * the details page is changed on every journey at once.
- *
- * **Your own journey is yours**, unlike the lanes or the lead-roles register, which
- * anyone may rearrange: a row here is somebody's statement about their own travel.
- * Nothing claims a seat — the board is two lists, and whoever wants one gets in touch.
- */
 export const Rides = ({ api }: { api: RidesApi }) => {
   const viewer = useViewer()
   const approved = isApproved(viewer)
@@ -79,7 +63,6 @@ export const Rides = ({ api }: { api: RidesApi }) => {
         kind: draft.kind,
         from: draft.from.trim(),
         when: draft.when.trim(),
-        // Only ever meaningful on an offer, and the schema refuses a negative one.
         seats: draft.kind === 'offers' ? Math.max(0, Number(draft.seats) || 0) : 0,
         notes: draft.notes.trim(),
       })
@@ -210,12 +193,6 @@ export const Rides = ({ api }: { api: RidesApi }) => {
   )
 }
 
-/**
- * One half of the board.
- *
- * The heading is the section's, so a row says only what is particular to it — where
- * from, when, how much room, and who to ask.
- */
 const Half = ({
   rides,
   empty,
@@ -281,7 +258,6 @@ const Half = ({
   )
 }
 
-/** The same fields as the form below, on a row that already exists. */
 const RideFields = ({
   ride,
   busy,

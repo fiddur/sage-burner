@@ -6,21 +6,6 @@ import type { StayDraft } from '../stay.ts'
 
 import { rowsFor } from '../textarea.ts'
 
-/**
- * The questions one burn asks, without a form around them.
- *
- * Two forms ask them: `StayForm` on somebody's own page, and the invite page, where a
- * new member answers them in the same breath as choosing a password (#224). Split out
- * rather than duplicated — a second copy would be the lodging capacity rules written
- * twice, and those are the fiddly part.
- *
- * `lodgingTaken` decides what is full. The option somebody already holds is never
- * disabled, and that is compared against what is *saved* rather than what is picked:
- * against the live value, clicking away from a full option and back would find it
- * disabled, and a native select will not let you choose a disabled option. You would
- * be stuck until you reloaded. A new member holds nothing, so `heldLodging` is
- * undefined there and every full option is simply full.
- */
 export const StayFields = ({
   draft,
   onChange,
@@ -32,20 +17,10 @@ export const StayFields = ({
 }: {
   draft: StayDraft
   onChange: (next: StayDraft) => void
-  /** This burn's lodging list, in the admin's order. */
   lodgingOptions?: readonly EventOption[]
-  /** This burn's helping-out list, in the admin's order. */
   helpingOptions?: readonly EventOption[]
-  /** How many have already picked each option, by option id. */
   lodgingTaken?: Readonly<Record<string, number>>
-  /** The lodging they are already down for, which is never offered as full. */
   heldLodging?: string | null
-  /**
-   * Whether the person filling this in is a signed-in member.
-   *
-   * Off on the invite page, which draws these fields before the account exists — and
-   * a link to a members-only page is one that cannot be followed.
-   */
   signedInMember?: boolean
 }) => {
   const change = (part: Partial<StayDraft>) => onChange({ ...draft, ...part })
@@ -57,10 +32,6 @@ export const StayFields = ({
         <input
           type="date"
           name="arrival_date"
-          // Bound to its partner so the picker cannot offer an inverted range at
-          // all. The server still refuses one — a `max` is a hint a keyboard can
-          // walk straight past — but this is the difference between being told
-          // afterwards and never being able to say it.
           max={draft.departure_date === '' ? undefined : draft.departure_date}
           value={draft.arrival_date}
           onInput={(event) => change({ arrival_date: event.currentTarget.value })}

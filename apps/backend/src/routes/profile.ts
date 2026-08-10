@@ -24,25 +24,9 @@ export interface ProfileDeps extends GuardDeps {
   now: () => Date
 }
 
-/**
- * The stay-order rule for a PATCH carrying only one date, as SQL.
- *
- * A partial body can invert the stored pair without ever containing both values,
- * so the schema's refinement cannot see it. Comparing against a row read a moment
- * earlier is check-then-act; composing the condition into the `WHERE` decides it
- * against the row as it is at write time.
- *
- * `events.ts` and `sessions.ts` had the same problem and answered it the other
- * way, by reading the row and checking the merge in JavaScript — because their
- * rules grew to span fields a SQL comparison could not see soundly. This one is
- * still two fixed-width dates, where the comparison is sound and the statement is
- * one query rather than two.
- */
 const stayOrderCondition = ({ arrival_date, departure_date }: AttendanceUpdate) => {
   if (arrival_date === undefined && departure_date === undefined) return undefined
-  // Both present: the schema's own refinement already compared them.
   if (arrival_date !== undefined && departure_date !== undefined) return undefined
-  // Null clears one end, and a comparison against null is never a conflict.
   if (arrival_date === null || departure_date === null) return undefined
   if (arrival_date !== undefined) {
     return sql`${attendance.departure_date} is null or ${arrival_date} <= ${attendance.departure_date}`
@@ -51,18 +35,6 @@ const stayOrderCondition = ({ arrival_date, departure_date }: AttendanceUpdate) 
   return sql`${attendance.arrival_date} is null or ${attendance.arrival_date} <= ${departure_date}`
 }
 
-/**
- * Whether this burn's lodging list will take one more person here.
- *
- * Scoped to the event **and** the kind, not just the id: the select disables a
- * full option but the API takes what it is sent, so a direct PATCH could
- * otherwise name another burn's option, or a `helping` one — which has no
- * capacity and so could never be full. Both are refused as invalid, the same as
- * an id that names nothing.
- *
- * Their own current choice does not count against them, or re-saving an
- * unrelated field would refuse the bed they are already in.
- */
 const lodgingVerdict = async (
   db: Database,
   eventId: string,
@@ -94,14 +66,6 @@ const lodgingVerdict = async (
   return others.length >= option.capacity ? 'full' : 'ok'
 }
 
-/**
- * What is wrong with a stay update, before anything is written.
- *
- * Both checks live here rather than in the handler because both must happen
- * *before* the column write: the form sends the ticks and the columns in one
- * PATCH, so rejecting either afterwards answers an error with the rest already
- * saved.
- */
 const stayProblem = async (
   db: Database,
   eventId: string,
@@ -123,18 +87,6 @@ const stayProblem = async (
 
 const problemBody = (code: 400 | 409) => (code === 409 ? 'conflict' : 'bad_request')
 
-/**
- * The stay's two writes, as one.
- *
- * The columns live on `attendance` and the ticks in `attendance_helping`, but
- * they arrive in a single PATCH, so committing one without the other would
- * answer an error over a half-saved stay. `stayProblem` catches what it can
- * beforehand; this is what makes the answer honest when the pre-check's own
- * window closes underneath it.
- *
- * Exported for the test that proves the rollback — the window it guards cannot
- * be opened through `inject`, which serialises requests.
- */
 export const writeStay = (
   db: Database,
   mine: SQL,
@@ -142,10 +94,6 @@ export const writeStay = (
   helping: readonly string[] | undefined,
 ): (typeof attendance.$inferSelect)[] =>
   db.transaction((tx) => {
-    // No columns to set is not an error: the body may be empty, or may carry only
-    // the helping ticks, which live in their own table. Both read instead of writing —
-    // see `isEmptyPatch`. Not `patchRow`, which is one statement per call and would
-    // commit the columns outside this transaction.
     const rows = isEmptyPatch(columns)
       ? tx.select().from(attendance).where(mine).limit(1).all()
       : tx
@@ -161,21 +109,6 @@ export const writeStay = (
     return rows
   })
 
-/**
- * Somebody maintaining their own record.
- *
- * Two halves, because they have two lifetimes: who you are lives on the account
- * and outlives every burn, while when you arrive and where you sleep belong to
- * one stay. Both routes derive whose row it is from the session, so there is no
- * id in either body to get wrong or to tamper with.
- *
- * **The account half is `requireApproved`, the stay is `requireMember`** (#412). An account
- * holding `admin` and not `member` has a name, a picture, ways of being reached and an
- * introduction like anybody else — its own page renders them to every member, and #390's
- * empty state actively invites it to write one. `requireMember` here made that invitation a
- * dead end, and was the root of what #396 had to work around on the page. Nothing in this
- * half is burn-scoped: it reads and writes the caller's own `account` row.
- */
 export const registerProfileRoutes = (app: FastifyInstance, { db, sessions, now }: ProfileDeps) => {
   const { requireApproved, requireMember } = createGuards({ db, sessions })
 
@@ -193,8 +126,6 @@ export const registerProfileRoutes = (app: FastifyInstance, { db, sessions, now 
       .where(eq(account.id, accountId))
       .limit(1)
 
-    // The ticks travel with the row wherever it is returned, so a caller never has
-    // to know they live in another table — the same as a stay's helping options.
     return row === undefined
       ? undefined
       : { ...row, allergy_item_ids: await allergyTickIdsFor(db, accountId) }
@@ -223,9 +154,6 @@ export const registerProfileRoutes = (app: FastifyInstance, { db, sessions, now 
 
     const { allergy_item_ids: ticks, ...columns } = body
 
-    // One transaction, because the columns and the ticks arrive together and a
-    // half-saved profile would answer an error over a record that did change. An empty
-    // column set is skipped rather than written — see `isEmptyPatch`.
     if (!isEmptyPatch(columns) || ticks !== undefined) {
       try {
         db.transaction((tx) => {
@@ -235,13 +163,6 @@ export const registerProfileRoutes = (app: FastifyInstance, { db, sessions, now 
           if (ticks !== undefined) writeAllergyTicks(tx, viewer.account_id, ticks)
         })
       } catch (failure) {
-        // A tick naming an item that is not there — misspelled, or deleted while
-        // this request was in flight. The foreign key is the only authority, with no
-        // pre-read beside it: a read would say exactly what the key says and could go
-        // stale between the two. (`updateMyStay` keeps its pre-read because
-        // `areHelpingOptions` checks a burn-and-kind pairing the key cannot see;
-        // there is no such second rule here.) Both halves are one transaction, so
-        // this answers 400 over a profile that did not change.
         if (isForeignKeyViolation(failure)) return sendError(reply, 400)
         throw failure
       }
@@ -265,17 +186,11 @@ export const registerProfileRoutes = (app: FastifyInstance, { db, sessions, now 
       const viewer = await viewerFor(request, { db, sessions })
       if (viewer === undefined) return sendError(reply, 401)
 
-      // Named by id rather than scoped to the active burn, so a stay at the second
-      // burn on the details page can be filled in — and still refused once that
-      // burn has ended, which is what `openEvent` decides.
       const found = await openEventNow(db, now, request.params.eventId)
       if (found === undefined) return sendError(reply, 404)
 
-      // `allOf` rather than `and`: this reaches an `UPDATE` as well as two reads, and
-      // drizzle types `and` as possibly undefined — which there is the whole table.
       const mine = allOf(eq(attendance.event_id, found.id), eq(attendance.account_id, viewer.account_id))
 
-      // `helping_option_ids` lives in its own table, so it never reaches `set()`.
       const { helping_option_ids: helping, ...columns } = body
 
       const problem = await stayProblem(db, found.id, viewer.account_id, body)
@@ -285,10 +200,6 @@ export const registerProfileRoutes = (app: FastifyInstance, { db, sessions, now 
       try {
         updated = writeStay(db, mine, columns, helping)
       } catch (failure) {
-        // A `lodging_option_id` naming no option, or a tick naming an option that
-        // has just been deleted. The foreign key is the authority rather than a
-        // pre-read, which would be a second query saying the same — and because
-        // both writes are one transaction, neither half survives being told no.
         if (isForeignKeyViolation(failure)) return sendError(reply, 400)
         throw failure
       }
@@ -299,8 +210,6 @@ export const registerProfileRoutes = (app: FastifyInstance, { db, sessions, now 
         return { attendance: { ...first, helping_option_ids: await helpingIdsFor(db, first.id) } }
       }
 
-      // Nothing was written, which is either "not coming to this burn" or "that
-      // would put the departure before the arrival" — see `whyNothingWritten`.
       const why = await whyNothingWritten(db, attendance, mine)
 
       return sendError(reply, why === 'not_found' ? 404 : 400)

@@ -18,17 +18,6 @@ export interface MailRouteDeps extends GuardDeps {
   now: () => Date
 }
 
-/**
- * Setting up where this installation posts from, and proving it works (#30).
- *
- * Admin's, under the admin prefix, with no exception — this is a password for
- * somebody else's server and the address every invite will appear to come from.
- *
- * **The read never carries the password.** `has_password` says whether one is
- * stored, and the write treats an absent `password` as "leave what is there": a form
- * that had to re-type it to change the port would end up putting it in a text input
- * on every visit, and a masked value invites a save that stores the mask.
- */
 export const registerMailRoutes = (app: FastifyInstance, { db, sessions, mail, now }: MailRouteDeps) => {
   const current = async (): Promise<MailSettingsResponse['mail']> => {
     const [row] = await db.select().from(mailSetting).where(eq(mailSetting.id, INSTALLATION_ID)).limit(1)
@@ -61,8 +50,6 @@ export const registerMailRoutes = (app: FastifyInstance, { db, sessions, mail, n
 
     const row = {
       ...settings,
-      // Absent leaves what is stored — and, on a first save, is empty rather than an
-      // error: a relay on the same machine may authenticate by network alone.
       password: password ?? held?.password ?? '',
       updated_at: now().toISOString(),
     }
@@ -80,18 +67,9 @@ export const registerMailRoutes = (app: FastifyInstance, { db, sessions, mail, n
 
     await db.delete(mailSetting).where(eq(mailSetting.id, INSTALLATION_ID))
 
-    // Back to the ordinary state rather than 204: the settings page redraws from
-    // this, and "there is no mail server" is the answer it needs.
     return { mail: null } satisfies MailSettingsResponse
   })
 
-  /**
-   * A message to the admin's own address.
-   *
-   * Their own, not one they type: a Send-to box on an admin page is an open relay
-   * with extra steps, and the question being answered — do these settings work — is
-   * answered just as well by a message to the person asking.
-   */
   app.post(apiRoutes.sendTestEmail.fastify, async (request, reply) => {
     void noStore(reply)
 
@@ -119,9 +97,6 @@ export const registerMailRoutes = (app: FastifyInstance, { db, sessions, mail, n
 
     const posted = await post(mail, testMessage({ installation: named?.title ?? '', to: who.email }))
 
-    // 200 either way. A refusal by somebody else's SMTP server is an answer to the
-    // question the button asked, not a fault in this one — and the page renders the
-    // reason, which a 502 would leave it having to dig out of an error envelope.
     return { sent: posted.sent, to: who.email, reason: posted.reason } satisfies MailTestResponse
   })
 }

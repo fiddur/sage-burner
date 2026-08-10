@@ -26,26 +26,14 @@ const answerText = (value: string | boolean) => {
 export const AdminApplications = ({ api }: { api: ApplicationsApi }) => {
   const viewer = useViewer()
   const admin = isAdmin(viewer)
-  // The link and what happened to the emailed copy, kept together: both are answered
-  // once and the reload that follows returns neither (#327).
   const [invites, setInvites] = useState<Record<string, { invite: Invite; delivery: InviteDelivery }>>({})
   const { loaded, reload } = useLoad((signal) => api.getApplications(signal), {
     enabled: admin,
     fallback: 'Could not load the applications.',
   })
 
-  // `busyWith` is the row: only the application being decided should show it, and a
-  // click refused while another is in flight marks nothing.
   const { busyWith, error, run } = useAction(reload)
 
-  /**
-   * A fresh link when the first was lost.
-   *
-   * Offered on every approved application rather than only where one is known to be
-   * outstanding: the page cannot tell — the invite's state is not in this response —
-   * and the server refuses a used one with a 409 that says so. Guessing here would
-   * mean hiding the button from the person who needs it.
-   */
   const reissue = (id: string) => {
     run(
       async () => {
@@ -55,8 +43,6 @@ export const AdminApplications = ({ api }: { api: ApplicationsApi }) => {
       (failure: unknown) => {
         if (!isApiError(failure)) return 'Could not make a new link. Please try again.'
 
-        // By the slug, not the status: both refusals are 409 and mean opposite
-        // things. `errorCodes` says why (#178).
         return (
           {
             invite_used: 'That invite has already been used, so they are already in.',
@@ -74,13 +60,9 @@ export const AdminApplications = ({ api }: { api: ApplicationsApi }) => {
         const response =
           decision === 'approve' ? await api.approveApplication(id) : await api.rejectApplication(id)
 
-        // Kept rather than re-read: the token is shown once, and the reload that
-        // follows returns the application without it.
         const { invite, delivery } = response
         if (invite !== null) setInvites((current) => ({ ...current, [id]: { invite, delivery } }))
       },
-      // A 409 means someone else decided it first, so the list on screen is stale —
-      // saying "try again" would send them round the same loop.
       (failure: unknown) =>
         isApiError(failure) && failure.status === 409
           ? 'That application was already decided. Reload to see where it stands.'

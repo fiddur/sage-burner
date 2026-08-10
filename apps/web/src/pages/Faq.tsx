@@ -37,39 +37,15 @@ export type FaqApi = Pick<
 interface Shown {
   eventId: string
   name: string
-  /** Whether the bar picked it, as opposed to the fallback below (#321). */
   picked: boolean
   entries: readonly FaqEntry[]
   sources: readonly CopySource[]
 }
 
-/** Null rather than a fourth status: "there is no burn at all" is data, not an outcome. */
 type Questions = Shown | null
 
 const UNANSWERED = 'Nobody has answered this yet.'
 
-/**
- * The Q&A the spreadsheet had a tab for (#28).
- *
- * **Questions are always visible, answers are not.** The list is read by somebody
- * looking for one thing, so it is a column of headings they scan and open — a page
- * of expanded answers would be the wall of text the tab already was. `<details>`
- * rather than state of our own: it keeps the browser's find-in-page working, which
- * is how half of finding an answer actually happens.
- *
- * **Anyone may ask, and anyone may answer.** The person with the question is rarely
- * the person with the answer, so an entry can exist with no answer at all and says
- * where one is still wanted. The order is somebody's arrangement — a FAQ is read top
- * to bottom, and the question people have first belongs first — so it is a
- * `ReorderableList`.
- *
- * **It does not need a burn you are in** (#321). Every burn-scoped page takes its burn
- * from the bar, which lists the ones you have said you are coming to — so an approved
- * member who has not joined one landed on `NoBurn` and could read nothing. This is the
- * page that answers "what does taking part actually ask of me?", which is read *before*
- * deciding, so the next burn answers when the bar has nothing. The guard is unchanged:
- * members, not the public, and writes are any approved member's as they already were.
- */
 export const Faq = ({ api }: { api: FaqApi }) => {
   const viewer = useViewer()
   const approved = isApproved(viewer)
@@ -81,9 +57,6 @@ export const Faq = ({ api }: { api: FaqApi }) => {
   const { loaded, refreshing, reload } = useLoad<Questions>(
     async (signal) => {
       const picked = burn?.event
-      // `getActiveEvent` is the next burn that has not ended, and is public — so this
-      // asks nothing the reader is not already allowed. Null there is the one state
-      // with nothing to show: no burn planned at all.
       const shown = picked ?? (await api.getActiveEvent(signal)).event
       if (shown === null) return null
 
@@ -101,8 +74,6 @@ export const Faq = ({ api }: { api: FaqApi }) => {
       }
     },
     {
-      // Waited for, or a member's own burn would arrive after the fallback had already
-      // loaded somebody else's — the burns are fetched once for the session.
       enabled: approved && burns.status !== 'loading',
       key: burn?.event.id ?? burns.status,
       fallback: 'Could not load the questions.',
@@ -229,13 +200,6 @@ export const Faq = ({ api }: { api: FaqApi }) => {
   )
 }
 
-/**
- * One question, closed until somebody opens it.
- *
- * Removing takes two clicks, like a lead role and unlike a lane (#323). What one row
- * holds is a paragraph somebody else wrote and nobody has a copy of, so a misplaced
- * tap costs an answer rather than a word.
- */
 const FaqRow = ({
   entry,
   busy,
@@ -255,9 +219,6 @@ const FaqRow = ({
       <summary>{entry.question}</summary>
 
       {answered ? (
-        // Written by any approved member and read by all of them. `renderMarkdown`
-        // escapes raw HTML rather than filtering it, which is what makes a member
-        // author safe to have.
         <div class="markdown-preview" dangerouslySetInnerHTML={{ __html: renderMarkdown(entry.answer) }} />
       ) : (
         <p class="form-note">{UNANSWERED}</p>
@@ -296,17 +257,6 @@ const FaqRow = ({
   )
 }
 
-/**
- * Which burn this is, and whether there is anything on it yet.
- *
- * Says the name whenever the bar did not choose it, because two burns' answers read
- * alike (#321). It says only that, and nothing about the reader: the bar is empty
- * either because they are signed up to no burn or because the burns fetch failed, and
- * #193's rule is that the second must not be described as a fact about them.
- *
- * With no burn at all, the admin gets the one pointer that leads somewhere — they are
- * the only person who can make one.
- */
 const Notice = ({ loaded }: { loaded: Loaded<Questions> }) => {
   const admin = isAdmin(useViewer())
 
@@ -347,8 +297,6 @@ const FaqFields = ({
   onSave: (changes: { question?: string; answer?: string }) => void
   onCancel: () => void
 }) => {
-  // Seeded once. The page re-reads under a refused save (#274), and taking the fresh
-  // text into the box would throw away what is being written.
   const [question, setQuestion] = useState(entry.question)
   const [answer, setAnswer] = useState(entry.answer)
 

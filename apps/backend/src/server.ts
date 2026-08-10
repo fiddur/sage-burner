@@ -5,33 +5,13 @@ import { announceDeploy } from './push/deploy.ts'
 import { recordAndPush } from './push/notify.ts'
 import { DEFAULT_PUSH_CONTACT, deliverWithWebPush, generateVAPIDKeys } from './push/web-push.ts'
 
-/**
- * Entry point. Everything it does is sequencing — the pieces themselves are
- * testable without it.
- */
 const config = createConfig()
 const handle = createDb({ url: config.database_url })
 
-// Before listening, not after: a fresh volume needs its schema, and a boot that
-// cannot migrate should fail rather than serve against a half-built database.
 runMigrations(handle)
 
 const app = await createApp({ db: handle.db, config })
 
-/**
- * Say the app has been redeployed, to whoever asked to hear it (#259).
- *
- * Here rather than inside `createApp` on purpose: the suite builds an app per test,
- * and this would fire in every one of them. The build sha is what makes a redeploy
- * different from a restart, and the first boot on a fresh database records without
- * announcing.
- *
- * After `listen` would be tidier to read and wrong to do: a member who reloads on the
- * strength of the notification should find the new version already serving. The whole
- * fan-out is awaited before the port opens, sequentially and per account — which is
- * bounded by forty-two people, on a category that is off until somebody asks for it.
- * If it ever shows up in boot time, this is the line to revisit (#270).
- */
 await announceDeploy(
   handle.db,
   config.build_sha,
@@ -43,8 +23,6 @@ await announceDeploy(
     },
   ),
 ).catch((failure: unknown) => {
-  // Never fatal. Nobody hearing about a release is a smaller problem than an
-  // installation that will not boot because a push service was unreachable.
   app.log.error({ err: failure }, 'could not announce the deploy')
 })
 

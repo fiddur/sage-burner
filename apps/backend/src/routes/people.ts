@@ -11,21 +11,6 @@ import { account, accountAvatar, accountIdentity } from '../db/schema.ts'
 import { noStore, sendError } from '../http.ts'
 import { connectionsFor } from './connections.ts'
 
-/**
- * Somebody, as the rest of the community sees them (#389).
- *
- * `requireApproved`, the same guard as the face beside the name: a page that answers "how
- * do I get hold of this person" is exactly as private as the attendee list it is reached
- * from, and no more.
- *
- * **The projection is an object literal**, in the manner of `asMemberEntry`, and that is
- * the safety property rather than tidiness — a column added to `account` reaches every
- * member's reading of every other member only when somebody names it here. Spreading the
- * row and deleting keys would not have that property.
- *
- * An account holding `admin` and not `member` has a page too: organising without attending
- * is coherent here, and that is often the person most in need of reaching.
- */
 export const registerPeopleRoutes = (app: FastifyInstance, { db, sessions }: GuardDeps) => {
   const { requireApproved } = createGuards({ db, sessions })
 
@@ -50,30 +35,12 @@ export const registerPeopleRoutes = (app: FastifyInstance, { db, sessions }: Gua
         .where(eq(account.id, accountId))
         .limit(1)
 
-      // A page for a gone account should not be linked from anywhere — every name is drawn
-      // from a row that cascades — but a tab somebody left open still wants a 404 that
-      // reads as one.
       if (row === undefined) return sendError(reply, 404)
 
       const connections = await connectionsFor(db, accountId)
 
-      /**
-       * Their Facebook page — the handle they typed for Messenger first, and a linked sign-in
-       * second (#405).
-       *
-       * **The typed handle wins**, because it is the better of the two links: it builds
-       * `facebook.com/wren`, which resolves for anybody, while Facebook's own `link` only
-       * resolves for a viewer who is logged in *and* already a friend. So the linked URL is a
-       * fallback for somebody who never typed a handle, not an upgrade over one.
-       *
-       * **Still never the subject.** `public_profile`'s id is app-scoped and identifies nobody
-       * outside this installation's Meta app; `profile_url` is a URL Facebook itself answered,
-       * which is a different thing, and `schema.ts` keeps the subject from ever leaving.
-       */
       const messenger = connections.find((connection) => connection.kind === 'messenger')
 
-      // Read only where it would be used: a typed handle wins, so the common path asks for
-      // nothing here.
       const linked =
         messenger !== undefined
           ? undefined

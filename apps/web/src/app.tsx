@@ -48,16 +48,6 @@ import { createRemembered, RememberedProvider } from './remembered.tsx'
 import { ROUTER_SCOPE } from './router-scope.ts'
 import { FetchedViewerProvider, ViewerProvider } from './viewer.tsx'
 
-/**
- * What the route table reaches for.
- *
- * Narrow on purpose: a test supplying a stub then has to satisfy exactly these,
- * which is what lets it be a plain object rather than a cast.
- *
- * One list, consumed twice. It was written out again as `Routes`' prop type, in a
- * different key order — two ~50-key lists nobody would diff by eye, which is how
- * they drift.
- */
 export type RoutesApi = Pick<
   ApiClient,
   | 'addQuestion'
@@ -207,35 +197,9 @@ export type RoutesApi = Pick<
   | 'updateQuestion'
 >
 
-/**
- * What the whole app reaches for: the route table, plus what the providers and
- * the layout need — the viewer they resolve on mount, and signing out.
- */
 export type AppApi = RoutesApi & BellApi & Pick<ApiClient, 'getMe' | 'logout' | 'getVersion'>
 
-/**
- * The route table.
- *
- * Note the constraint the backend imposes: it tells a missing asset apart from
- * a client-side route by whether the last path segment has a file extension, so
- * **no route here may contain a dot** — no filenames, no email addresses in a
- * path, and invite tokens must be dot-free. A path with an extension gets a 404
- * from the server and never reaches this router.
- */
 export const Routes = ({ api }: { api: RoutesApi }) => {
-  // Memoised because `component` is compared by identity: a fresh arrow each
-  // render is a *different component type*, so a re-rendered `Routes` would
-  // unmount and remount `Login` — and its `useState` — rather than diff it.
-  //
-  // Not a live bug today, which was measured rather than assumed. `Routes` does
-  // not re-render when the viewer resolves: `Layout` consumes the context and
-  // re-renders, but `children` is the same vnode reference it was handed, and
-  // Preact skips diffing an identical vnode. Typing into `/login` during the
-  // first `getMe` round-trip keeps the same DOM node and the same value.
-  //
-  // Kept anyway, at one line: it stops being true the moment anything makes
-  // `Routes` itself re-render — a prop from a consumer, a route-level context —
-  // and the symptom then is a member losing what they typed.
   const LoginRoute = useMemo(() => () => <Login api={api} />, [api])
   const AdminRoute = useMemo(() => () => <Admin api={api} />, [api])
   const AdminEventsRoute = useMemo(() => () => <AdminEvents api={api} />, [api])
@@ -262,8 +226,6 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
   const ChangelogRoute = useMemo(() => () => <Changelog api={api} />, [api])
   const PrivacyRoute = useMemo(() => () => <Privacy api={api} />, [api])
   const TermsRoute = useMemo(() => () => <Terms api={api} />, [api])
-  // Both of these take a prop from the route pattern, rather than closing over nothing
-  // like the others.
   const PersonRoute = useMemo(
     () =>
       ({ accountId }: { accountId?: string }) => <Person api={api} accountId={accountId ?? ''} />,
@@ -310,17 +272,6 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
   )
 }
 
-/**
- * `viewer`, `title` and `api` are injectable so tests drive the real route
- * table and the real layout rather than a copy that can silently fall out of
- * step with this one.
- *
- * `viewer` and `title` each select their provider: a test that states who is
- * looking, or what this installation is called, gets that, and the app — which
- * passes neither — gets the pair that ask the API. Two providers rather than a
- * flag, because "fetch unless told otherwise" is the kind of conditional that
- * ends up fetching in a test suite.
- */
 export const App = ({
   viewer,
   title,
@@ -330,31 +281,9 @@ export const App = ({
   viewer?: Viewer
   title?: string
   api?: AppApi
-  /**
-   * The install offer, watched from before the first render (#281).
-   *
-   * Built in `main.tsx` rather than here, for the reason `InstallWatch` gives. `null`
-   * in every test that does not ask for one.
-   */
   installs?: InstallWatch | null
 }) => {
-  // Not a default parameter. `api = createApiClient()` builds a fresh client on
-  // every render of `App`, and that identity is load-bearing twice over: it is
-  // the `useEffect` dependency in `FetchedViewerProvider`, so a new one aborts
-  // the in-flight `getMe` and refetches, and it is the `useMemo` dependency for
-  // `LoginRoute`, so a new one makes `Login` a different component type and
-  // remounts it with its state reset — defeating the memo that exists to
-  // prevent exactly that.
-  //
-  // Inert while `App` is the root and holds no state. The memo below it is
-  // written to survive that changing; this would have stopped it.
-  //
-  // Built here and handed to both the client and the bar rather than kept in a
-  // module: two tests in one process would otherwise share one, and the second
-  // would start out believing the first one's fetches were its own.
   const freshness = useMemo(() => createFreshness(), [])
-  // Same reasoning, and it has to outlive every route below it: what it is for is the
-  // page somebody left a moment ago still being there when they come back.
   const remembered = useMemo(() => createRemembered(), [])
   const client = useMemo(
     () =>
@@ -367,9 +296,6 @@ export const App = ({
     [api, freshness],
   )
 
-  // Inside the viewer provider, since which burns can be chosen between depends on
-  // who is looking, and outside `Layout`, since the selector is in the bar and every
-  // burn-scoped page below it reads the same choice.
   const framed = (
     <FetchedBurnProvider api={client}>
       <Layout api={client}>

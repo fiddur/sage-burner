@@ -5,30 +5,8 @@ import type { Notifier } from '../push/notify.ts'
 
 import { attendance, event } from '../db/schema.ts'
 
-/**
- * How close to full is close enough to warn somebody (#248).
- *
- * Four places, which is the sketch's number. Inside that window every genuine
- * payment does warn every unpaid member again — so on a cap of 42 somebody who has
- * not paid hears it as payments 38 through 41 land. That is a countdown rather than
- * a repeat, and it is the point: the number of places left is what changed. Outside
- * the window nothing is sent at all.
- */
 const NEARLY_FULL = 4
 
-/**
- * What one payment did to everybody who has not made one.
- *
- * These are the only notifications not caused by an action taken *against* the
- * person told: somebody else pays, the burn gets fuller, and an unpaid member's
- * standing changes without anybody touching their row. That is exactly why they are
- * worth sending — it is the one change nobody would otherwise see coming.
- *
- * Called after the payment is written, so the counts are what the payment made true.
- * Delivery failure is swallowed by the notifier, and this is deliberately not in the
- * same transaction as the payment: recording that somebody paid must not fail
- * because a bell could not be rung.
- */
 export const tellAboutTheWaitingList = async (
   db: Database,
   eventId: string,
@@ -50,14 +28,8 @@ export const tellAboutTheWaitingList = async (
   const paid = rows.filter((row) => row.payment_status === 'paid').length
   const unpaid = rows.filter((row) => row.payment_status !== 'paid')
 
-  // Past the cap the line says nothing new — it is already full and stays full.
-  // Every call follows exactly one transition to paid, so the count landing *on*
-  // the cap is the crossing, and a jump that skips the value costs one message
-  // rather than repeating it to everybody.
   if (paid > burn.member_cap) return
 
-  // Just full. Paid members come first, so an unpaid one is now behind the line
-  // whatever order they joined in.
   if (paid === burn.member_cap) {
     for (const row of unpaid) {
       await notify(row.account_id, {

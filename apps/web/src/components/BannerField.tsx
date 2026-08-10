@@ -10,12 +10,6 @@ import { ErrorText } from './ErrorText.tsx'
 
 export type BannerApi = Pick<ApiClient, 'removeInstallationBanner' | 'setInstallationBanner'>
 
-/**
- * Why the banner did not go up.
- *
- * Split out for the same reason `IconField`'s is: `preparedBanner` throws in happy-dom
- * before any request is made, so a component test cannot reach these branches at all.
- */
 export const messageForFailure = (failure: unknown): string => {
   if (!isApiError(failure)) return 'Could not read that image. A wide photograph works best.'
   if (failure.status === 415) return 'That is not an image we can use. A wide photograph works best.'
@@ -27,17 +21,6 @@ export const messageForFailure = (failure: unknown): string => {
   return 'Could not save that banner. Please try again.'
 }
 
-/**
- * The picture a link to this installation shows, and the homepage's own banner (#306).
- *
- * Shown at the shape it will be — the format is what decides whether a card is a big
- * picture or a thumbnail beside two lines of text, and that is not something to find
- * out from Facebook afterwards.
- *
- * The new banner goes into the installation context rather than only into local state:
- * it is drawn on the homepage, which is one client-side navigation away and fetches
- * nothing on the way there.
- */
 export const BannerField = ({ api }: { api: BannerApi }) => {
   const banner = useInstallationBanner()
   const setBanner = useSetInstallationBanner()
@@ -89,8 +72,6 @@ export const BannerField = ({ api }: { api: BannerApi }) => {
             disabled={busy}
             onChange={(changeEvent) => {
               const file = changeEvent.currentTarget.files?.[0]
-              // Cleared, so the same file can be chosen again after a failure —
-              // without this a retry of the identical image fires no change event.
               changeEvent.currentTarget.value = ''
               if (file !== undefined) void choose(file)
             }}

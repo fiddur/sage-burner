@@ -32,27 +32,8 @@ interface Happening {
   settings: NotificationSettings
 }
 
-/** One thing on the page: something that happened, or somewhere people are talking. */
 type Item = { at: string; id: string } & ({ line: Activity } | { card: Thread })
 
-/**
- * The feed — what everyone has been doing (#303) and what they are talking about (#375).
- * `docs/the-app.md` has the why.
- *
- * **Two things on one page, deliberately.** A dream is one card carrying its whole
- * history and the talk under it, so a morning of four comments is not four lines; the
- * burn's own news — somebody joined, a lead role taken — stays a line, because collapsing
- * that by thread would put the lot behind one card per burn. The server has already
- * merged and cut them to fifty; this interleaves by time.
- *
- * **A card is the conversation, not a preview of one.** It is also the only place a
- * withdrawn dream's thread can be read, since there is no panel left to open.
- *
- * **Each link carries the burn it is about** (#333). The links are burn-agnostic —
- * `/dreams`, `/members`, `/roles` — so following one about the autumn burn while the
- * selector sat on the summer one opened the summer page. Added here rather than stored
- * on the row, so the lines already written land right too; `burn.tsx` is what reads it.
- */
 export const Feed = ({ api }: { api: FeedApi }) => {
   const viewer = useViewer()
   const approved = isApproved(viewer)
@@ -67,21 +48,10 @@ export const Feed = ({ api }: { api: FeedApi }) => {
 
   const { busy, error, run } = useAction(reload)
 
-  // Whichever threads somebody has opened out, keyed by id. The card carries its newest
-  // few lines; this is what replaces them once the whole conversation has been asked
-  // for, and what every write here answers with. Held until the page goes: a reload
-  // refreshes the cards underneath but not these, so one opened out shows what it last
-  // answered rather than closing itself under somebody.
   const [whole, setWhole] = useState<Record<string, Thread>>({})
 
   const settings = loaded.status === 'ready' ? loaded.data.settings : undefined
 
-  /**
-   * The chip's whole job: switch this category's bell on, or off again.
-   *
-   * The wire carries the complete set, so what is sent is what is held plus or minus
-   * one — the same shape the settings table sends (#259).
-   */
   const toggle = (category: NotificationCategory) => {
     if (settings === undefined) return
 
@@ -94,7 +64,6 @@ export const Feed = ({ api }: { api: FeedApi }) => {
     run(() => api.updateMyNotificationSettings(wanted), 'Could not change that. Please try again.')
   }
 
-  /** Every write here answers with the thread it changed, so nothing needs a second read. */
   const held = (thread: Thread) => {
     setWhole((sofar) => ({ ...sofar, [thread.id]: thread }))
   }
@@ -179,31 +148,14 @@ export const Feed = ({ api }: { api: FeedApi }) => {
   )
 }
 
-/**
- * Both halves in one order.
- *
- * The server has already cut them to fifty against each other; this only has to
- * interleave. Newest first, with the id breaking a shared stamp for the reason the
- * server's own query does: an order that changes between two reads of the same data
- * reads as though something happened twice.
- */
 const feedItems = ({ activity, threads }: Happening): Item[] =>
   [
     ...activity.map((line) => ({ at: line.created_at, id: line.id, line })),
-    // A card on the feed always has entries — it comes from grouping them — so the
-    // fallback is for the one that has had its last comment taken back while the page
-    // was open. It sorts to the bottom, which is where something with no news belongs.
     ...threads.map((card) => ({ at: card.last_at ?? '', id: card.id, card })),
   ].sort((one, other) =>
     one.at === other.at ? other.id.localeCompare(one.id) : other.at.localeCompare(one.at),
   )
 
-/**
- * One conversation on the page: what it is about, and everything said about it.
- *
- * The heading is the thread's own title, which the rename keeps in step — the bug this
- * replaced was a line frozen at the wording a dream was offered under.
- */
 const Card = ({
   card,
   viewerId,
@@ -267,35 +219,15 @@ const Card = ({
   )
 }
 
-/**
- * Where the thing a thread is about lives, or nothing once it has gone.
- *
- * The link builder `entity_type` exists for: a meal or a ride becomes a branch here and
- * a value in the vocabulary, rather than a migration.
- */
 const pageFor = (card: Thread): string | undefined =>
   card.gone ? undefined : dreamPage(card.event_id, card.entity_id)
 
-/**
- * The switch this card offers, which is what the top of it is.
- *
- * The newest line that names a category somebody could actually be told through — a
- * dream being moved sends nothing, so a card whose latest news is a move offers no chip
- * rather than one that would change nothing.
- */
 const chipFor = (card: Thread): NotificationCategory | undefined =>
   card.entries.reduceRight<NotificationCategory | undefined>(
     (found, entry) => found ?? entryCategory(entry.kind),
     undefined,
   )
 
-/**
- * The same page, about the burn the line belongs to rather than whichever is selected.
- *
- * Cut at the first `#`: no notification link carries a fragment today, and appending to
- * one would put the query inside it, where it is not a query at all. `split` would drop
- * everything past a second `#`.
- */
 const atItsBurn = (link: string, eventId: string) => {
   const hash = link.indexOf('#')
   const path = hash === -1 ? link : link.slice(0, hash)
@@ -305,17 +237,6 @@ const atItsBurn = (link: string, eventId: string) => {
   return fragment === undefined ? joined : `${joined}#${fragment}`
 }
 
-/**
- * What kind of thing this is, and the door onto the setting for it.
- *
- * Half the point of the page: this is where somebody discovers the switch exists, in
- * the moment they have just found the thing interesting — which is a better place for
- * it than a table of thirteen rows they went looking for.
- *
- * The label is the settings table's own, rather than a second vocabulary to keep in
- * step. A toggle button rather than a link, because it changes something: `aria-pressed`
- * is what says which way it is set.
- */
 const Chip = ({
   category,
   on,

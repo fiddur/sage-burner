@@ -10,30 +10,6 @@ import { FormError } from './FormError.tsx'
 
 export type CalendarFeedApi = Pick<ApiClient, 'getCalendarToken' | 'rotateCalendarToken'>
 
-/**
- * The subscribe link for one burn's schedule (#258, #298, #408).
- *
- * **`webcal://`, not `https://`.** The point is a subscription that keeps itself up
- * to date; following the `https` URL downloads a snapshot that never changes, which
- * is the opposite. `webcal` is what asks an operating system to subscribe, and is
- * handled by Apple Calendar on macOS and iOS, Outlook on the desktop, and
- * Thunderbird. Google Calendar on Android does not take it and wants the URL pasted
- * into *Other calendars → From URL* — which is what the copy button is for, and why
- * that keeps the `https` form.
- *
- * It used to sidestep a routing bug as well, and no longer needs to: the client-side
- * router swallowed the `https` link until `ROUTER_SCOPE` put `/calendar/` outside what
- * it may claim (#422). Both forms reach the backend now.
- *
- * **The address is fetched rather than built from the burn's id.** It is
- * `event.feed_token`, which the public homepage is never told — keyed by the id, this
- * link was readable by any stranger who loaded the front page. The URL is still the only
- * thing protecting the feed, which is why the warning is here rather than assumed; what
- * changed is that it can now be taken back, and an admin is offered that.
- *
- * Built from `window.location.origin`, like the invite link, because the API has no
- * notion of its own public URL.
- */
 export const CalendarFeed = ({ api, eventId }: { api: CalendarFeedApi; eventId: string }) => {
   const viewer = useViewer()
   const { loaded, reload } = useLoad(async (signal) => (await api.getCalendarToken(eventId, signal)).token, {

@@ -25,19 +25,9 @@ import { tellAboutTheWaitingList } from './waiting-list.ts'
 
 export interface RosterDeps extends GuardDeps {
   now: () => Date
-  /** Told when their payment is recorded, and when somebody else's fills the burn. */
   notify?: Notifier
 }
 
-/**
- * What a member is shown of somebody else's stay.
- *
- * Written out field by field rather than spread-and-delete, and that is the whole
- * safety property: this is an object literal against `MemberRosterEntry`, so a
- * column added to the admin's row reaches members only when somebody names it
- * here, and one removed from the member schema stops compiling instead of quietly
- * still being sent.
- */
 const asMemberEntry = (entry: RosterEntry): MemberRosterEntry => ({
   id: entry.id,
   event_id: entry.event_id,
@@ -59,20 +49,6 @@ const asMemberEntry = (entry: RosterEntry): MemberRosterEntry => ({
   waiting: entry.waiting,
 })
 
-/**
- * Who is coming to a burn, and recording that they have paid.
- *
- * The direct replacement for the spreadsheet's Members tab. Person-level fields
- * are joined in from `account` rather than copied, so an allergy corrected on
- * someone's own profile page is corrected here in the same moment — which is the
- * point of the account/attendance split.
- *
- * Two readers, one query. The admin's is under `/api/admin/` and carries
- * payment; the member's is `/api/events/…/members`, outside that prefix rather than
- * exempted inside it (#159, and #64 for why). They share `rosterFor` so the order —
- * which decides who actually has a place — cannot come out differently on the two
- * pages, and differ only by `asMemberEntry`.
- */
 export const registerRosterRoutes = (
   app: FastifyInstance,
   { db, sessions, now, notify = async () => undefined }: RosterDeps,
@@ -129,7 +105,6 @@ export const registerRosterRoutes = (
       const body = bodyOf(paymentUpdateSchema, request)
       if (body === undefined) return sendError(reply, 400)
 
-      // The pair, not an id: an attendance is found by the burn and the person.
       const theirs = allOf(eq(attendance.event_id, eventId), eq(attendance.account_id, accountId))
 
       const [before] = await db
@@ -146,23 +121,14 @@ export const registerRosterRoutes = (
           ? {}
           : {
               payment_status: body.payment_status,
-              // Cleared on unmarking, in the same statement that unmarks — so a date
-              // cannot outlive the payment it recorded.
               payment_date: body.payment_status === 'paid' ? todayIso(now) : null,
             },
       )
 
-      // No condition, so nothing but `ok` is "not coming to this burn".
       if (patched.kind !== 'ok') return sendError(reply, 404)
       const updated = patched.row
 
-      // Both only on the transition. Re-saving 'paid' over 'paid' — which the
-      // roster's checkbox does on a double click — changes no count and must not
-      // say anything, least of all to *everybody* who has not paid.
       if (updated.payment_status === 'paid' && before?.payment_status !== 'paid') {
-        // Never for your own click, like every other category: an admin ticking
-        // their own box already knows they ticked it. The fan-out below still runs
-        // — it is about everybody else, and they did not do anything.
         const actor = (await viewerFor(request, { db, sessions }))?.account_id
         if (actor !== accountId) {
           await notify(accountId, {
@@ -172,9 +138,6 @@ export const registerRosterRoutes = (
           })
         }
 
-        // And what that payment did to everybody who has not made one. Not in the
-        // write's transaction: recording a payment must not fail because a bell
-        // could not be rung.
         await tellAboutTheWaitingList(db, eventId, notify)
       }
 
@@ -182,13 +145,6 @@ export const registerRosterRoutes = (
     },
   )
 
-  /**
-   * The ticks travel with the row here too.
-   *
-   * Nothing reads them off a payment response today, but `Attendance` says every
-   * one of these carries them, and a route quietly answering a different shape is
-   * how that stops being true.
-   */
   async function withHelping(row: typeof attendance.$inferSelect) {
     return { ...row, helping_option_ids: await helpingIdsFor(db, row.id) }
   }
@@ -231,27 +187,19 @@ export const registerRosterRoutes = (
       })
       .from(attendance)
       .innerJoin(account, eq(account.id, attendance.account_id))
-      // Left, so someone who has not said where they are sleeping is still on
-      // the roster. An inner join would quietly shorten the list an admin
-      // counts heads from.
       .leftJoin(eventOption, eq(eventOption.id, attendance.lodging_option_id))
       .where(eq(attendance.event_id, eventId))
 
-    // One query for the whole page's ticks rather than one per row.
     const helping = await helpingLabelsFor(
       db,
       rows.map((row) => row.id),
     )
 
-    // Keyed by account, not by stay: allergies describe a human, so the same person
-    // at two burns has one set.
     const allergies = await allergyLabelsFor(
       db,
       rows.map((row) => row.account_id),
     )
 
-    // Ordered and cut by the shared rule rather than here, so #79's member-facing
-    // list gives the same answer when it arrives.
     return withPlaces(
       rows.map((row) => {
         const ticked = helping.get(row.id) ?? []

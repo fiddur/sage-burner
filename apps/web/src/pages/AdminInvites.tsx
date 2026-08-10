@@ -33,8 +33,6 @@ export const AdminInvites = ({ api }: { api: InvitesApi }) => {
   const { busy, error, run } = useAction(reload)
 
   const mint = () => {
-    // Cleared before the call, so a failure cannot leave the previous link on
-    // screen beside the error and read as one invite.
     setMinted(undefined)
     run(async () => {
       const response = await api.createInvite()

@@ -15,26 +15,6 @@ import {
 } from './cache.ts'
 import { alertFrom, landOn } from './notification.ts'
 
-/**
- * The service worker: push notifications (#248) and offline (#256).
- *
- * Bundled from TypeScript rather than hand-written into `public/`, which is where it
- * lived while it only handled push. The old file said in its own header that nothing
- * verified it and that caching must therefore stay out — true then, and the reason
- * this moved rather than grew. Every decision worth testing is in `cache.ts`; what is
- * left here is wiring to browser events, which a unit test could only restate.
- *
- * Vite emits it to `dist/sw.js`, at the site root, which is where a worker has to
- * live to claim `/` as its scope. `@fastify/static` serves everything outside
- * `assets/` as `no-cache`, so a redeploy replaces it rather than leaving browsers on
- * an old copy.
- *
- * The browser's own types for a worker global are in `lib.webworker`, which cannot be
- * loaded beside `lib.dom` — the app needs DOM, and the two redeclare each other. So
- * the parts used are declared here, in the same spirit as `push.ts`'s `PushBrowser`:
- * narrow enough to be honest about what is touched.
- */
-
 interface ExtendableEvent {
   waitUntil: (work: Promise<unknown>) => void
 }
@@ -70,9 +50,6 @@ interface WorkerScope {
 
 declare const self: WorkerScope
 
-// Take over straight away rather than waiting for every tab to close. A worker that
-// only starts controlling pages on the next cold start would leave somebody who just
-// installed the app with no offline support until they closed it.
 self.addEventListener('install', (event) => {
   event.waitUntil(self.skipWaiting())
 })
@@ -93,13 +70,6 @@ const fromCache = async (cacheName: string, key: Request | string) => {
   return cache.match(key)
 }
 
-/**
- * Try the network, fall back to what was stored.
- *
- * Network-first rather than cache-first for everything but hashed assets: what is on
- * screen should be what the server has whenever that is reachable at all. The stored
- * copy is a floor under being offline, not a way of being faster.
- */
 const freshFirst = async (event: SwFetchEvent, plan: CachePlan, cacheName: string, key: Request | string) => {
   try {
     const response = await fetch(event.request)
@@ -156,8 +126,6 @@ const payloadOf = (event: SwPushEvent): unknown => {
   try {
     return event.data?.json()
   } catch {
-    // A payload that will not parse is still worth a notification; `alertFrom`
-    // answers with the wording that says so.
     return undefined
   }
 }

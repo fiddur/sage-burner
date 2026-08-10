@@ -15,7 +15,6 @@ export interface EnsureAdminInput {
   db: Database
   email: string
   password: string
-  /** Injected so tests can hash cheaply. */
   params?: ScryptParams
   now?: () => Date
   newId?: () => string
@@ -23,31 +22,9 @@ export interface EnsureAdminInput {
 
 export interface EnsureAdminResult {
   account_id: string
-  /** False when the account already existed and was only granted the role. */
   created: boolean
 }
 
-/**
- * Make sure an admin exists, so a fresh deploy has someone who can approve
- * anything.
- *
- * Grants `member` alongside `admin`. The roles stay separate concepts —
- * somebody organising but not attending is coherent — but `member` is what gates a
- * person's own profile and saying they are coming, so admin alone left the
- * account every installation starts with unable to use half the app, with no
- * way to fix it from inside (#110). Granting both is the ordinary case; the
- * accounts list is where either is taken away.
- *
- * **Never touches an existing account's password.** If the address is already
- * here, this grants the roles and stops. Otherwise the bootstrap command would
- * double as an offline password reset for any account — anyone who can run it
- * could take over the admin's login rather than merely create one, and the
- * operator running it a second time with a different password would think it
- * had changed when it had not. Granting is idempotent; resetting would not be.
- *
- * Throws on invalid input rather than returning a result, because the only
- * caller is a CLI whose failure mode is "print it and exit non-zero".
- */
 export const ensureAdmin = async ({
   db,
   email,
@@ -73,9 +50,6 @@ export const ensureAdmin = async ({
     return { account_id: existing.id, created: false }
   }
 
-  // Checked only on the branch that uses it: refusing over the password while
-  // merely granting a role to an existing account would refuse to do something
-  // the password has no part in.
   if (!newPasswordSchema.safeParse(password).success) {
     throw new Error('Set a password — ADMIN_PASSWORD is empty.')
   }
@@ -88,8 +62,6 @@ export const ensureAdmin = async ({
     created_at: now().toISOString(),
   })
   await db.insert(accountRole).values(BOOTSTRAP_ROLES.map((role) => ({ account_id: id, role })))
-  // Only where the account is created: an account that already existed has whatever list
-  // its owner made, and re-running the bootstrap must not put a row back that they took off.
   await db.insert(accountConnection).values(loginAddressConnection(id, parsedEmail.data))
 
   return { account_id: id, created: true }

@@ -6,27 +6,8 @@ import type { Notifier } from './notify.ts'
 import { installation, INSTALLATION_ID } from '../db/schema.ts'
 import { notifyEveryone } from './notify.ts'
 
-/**
- * Tell whoever asked that the app has been redeployed (#259).
- *
- * The one notification not caused by somebody doing something. Watchtower replaces
- * the container on every merge to `develop`, so a boot is the event — the build sha
- * this process was given, against the one the last boot recorded.
- *
- * **Called from `server.ts`, deliberately not from `createApp`.** The suite builds an
- * app per test, and a deploy announcement wired into that would fire hundreds of
- * times and have to be stubbed out everywhere. Here it is one call on the real entry
- * point, and this function is directly testable without one.
- *
- * The first boot on a fresh database records and says nothing. There is no previous
- * version for it to be new against, and announcing one at install would greet the
- * first admin with news about an app they have just put there.
- *
- * `unknown` is what `config.ts` defaults `BUILD_SHA` to — a local `pnpm start`, or an
- * image built without the arg. Recorded like any other, so a real sha arriving after
- * one is a genuine change and announces itself; what it cannot do is announce the
- * transition *to* `unknown`, which is a build going backwards rather than a deploy.
- */
+// Called from `server.ts`, deliberately not from `createApp`: the suite builds an app per test,
+// and a deploy announcement wired in there would fire hundreds of times.
 export const announceDeploy = async (
   db: Database,
   buildSha: string,
@@ -41,17 +22,8 @@ export const announceDeploy = async (
   if (row === undefined) return 'unchanged'
   if (row.seen === buildSha) return 'unchanged'
 
-  // An `unknown` build is not recorded, which is stronger than merely not announcing
-  // it. Recording it would make the *next* boot a change — so a local `pnpm start`
-  // against the live volume, followed by the container coming back on the build it
-  // was already running, would announce a version nobody deployed.
   if (buildSha === 'unknown') return 'unchanged'
 
-  // Recorded **before** the fan-out, so a crash halfway through it loses the
-  // announcements rather than repeating them on every restart until one succeeds
-  // (#270). The trade is deliberate: a missed "there is a new version" costs a
-  // reload somebody would have done anyway, and the alternative is a boot loop that
-  // pings forty-two people each time round.
   await db.update(installation).set({ last_build_sha: buildSha }).where(eq(installation.id, INSTALLATION_ID))
 
   if (row.seen === null) return 'first-boot'
@@ -59,9 +31,6 @@ export const announceDeploy = async (
   await notifyEveryone(db, notify, {
     category: 'new_version',
     body: 'A new version of the app is out. Reload to pick it up.',
-    // The changelog, since #325 — until there was one, nothing in the app could say
-    // what a release contained, and naming any other screen would have claimed
-    // something about it that is not known here.
     link: '/changelog',
   })
 

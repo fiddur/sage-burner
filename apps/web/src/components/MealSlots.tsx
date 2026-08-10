@@ -14,14 +14,6 @@ export type MealSlotsApi = Pick<
   'getMealSlots' | 'addMealSlot' | 'updateMealSlot' | 'deleteMealSlot' | 'generateMeals'
 >
 
-/**
- * The burn's meal times, and filling its days in from them.
- *
- * A template and a button, not the plan: **generating adds what is missing and
- * touches nothing else**, so it is safe to press again after adding a slot or
- * moving the dates. It never removes a sitting — somebody may already have signed
- * up to cook it — which is also why removing a slot leaves what it has made alone.
- */
 export const MealSlots = ({ api, eventId }: { api: MealSlotsApi; eventId: string }) => {
   const [label, setLabel] = useState('')
   const [at, setAt] = useState('13:00')

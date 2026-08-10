@@ -13,13 +13,6 @@ import { PendingButton } from './PendingButton.tsx'
 
 export type PasskeysApi = PasskeyApi & Pick<ApiClient, 'getMyPasskeys' | 'removePasskey'>
 
-/**
- * Why a passkey could not be removed.
- *
- * The 409 is the only interesting one, and it is worth its own sentence: the
- * server refuses to leave an account with no password and no passkey, and the
- * generic "that did not work" would send somebody trying again forever.
- */
 export const messageForRemoval = (failure: unknown): string => {
   if (isApiError(failure) && failure.status === 409) {
     return 'That is the only way you have left to sign in. Set a password first — ask someone with admin — and then it can go.'
@@ -30,17 +23,6 @@ export const messageForRemoval = (failure: unknown): string => {
 
 const added = (iso: string) => new Date(iso).toLocaleDateString()
 
-/**
- * The passkeys on this account, and adding one from the device in front of you.
- *
- * Per device rather than per person, like notifications: a passkey lives in the
- * phone or laptop that made it, so somebody with both registers twice and names
- * them so the list means something later.
- *
- * `ceremony` and `supported` are injectable because `navigator.credentials` is
- * absent under happy-dom — a test driving the real one would exercise the
- * unsupported branch and nothing else.
- */
 export const PasskeysField = ({
   api,
   ceremony,
@@ -54,9 +36,6 @@ export const PasskeysField = ({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useFormError()
 
-  // `useLoad` rather than a fetch-and-catch of its own, so a failure is a sentence
-  // instead of an empty list — which reads as "you have none" and invites a second
-  // registration of a device that is already here.
   const { loaded, reload } = useLoad(async (signal) => (await api.getMyPasskeys(signal)).passkeys, {
     enabled: supported,
     fallback: 'Could not load your passkeys. Please reload the page.',
@@ -71,9 +50,6 @@ export const PasskeysField = ({
       await reload()
       setLabel('')
     } catch (failure) {
-      // Undefined for a cancelled dialog: closing it is an ordinary thing to do,
-      // and reporting it as an error would be the page telling somebody off for
-      // changing their mind.
       setError(messageForCeremony(failure, 'Could not register that passkey. Please try again.'))
     } finally {
       setBusy(false)

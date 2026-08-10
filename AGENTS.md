@@ -93,17 +93,33 @@ by reading Rollup's docs.
   (db handle, clock, config) in as arguments rather than importing singletons.
 - Avoid global variables, module-level mutable state, and singletons.
 - Avoid casting. Use proper typing and type guards.
-- **Comment sparingly.** Good naming should carry the code; in almost every case
-  it can. Add a comment only where a reader needs to know _why_ the code is as it
-  is — a decision they would otherwise undo, a constraint that is not visible
-  locally. Do not narrate what the next line does, restate a well-named function,
-  or record how a bug was found; that belongs in the commit message.
+- **Comments are a last resort, and the target is close to zero.** They are not
+  typed and not tested, so they rot while the code moves — and the reader here is
+  a coding agent, which reads the code, the types and the tests faster than prose
+  about them. Every comment is a claim nothing verifies.
 
-  If a block needs a comment to say what it does, give it a name instead.
+  Before writing one, spend it where it cannot go stale:
 
-  Much of the existing code predates this and is far more heavily commented.
-  Follow the rule, not the surroundings, and thin the prose where you are editing
-  anyway.
+  - **a name**, if it would say what a block does;
+  - **a type**, if it would say what a value may be;
+  - **a test**, if it would say what must hold — a test name is a sentence that
+    fails when it stops being true, which is the one kind of prose this repo can
+    trust;
+  - **`docs/`**, if it is a paragraph of reasoning. That is where the _why_ of a
+    feature belongs, and pointing at it beats copying it.
+
+  Delete on sight: anything restating the code or a well-named symbol; history
+  ("used to be", "before #N", which PR moved what, what a thing was called
+  before); how a bug was found; an alternative the compiler already rejects; the
+  second and third paragraph of anything.
+
+  What survives is the rare line where the code's **absence** is deliberate and a
+  well-meaning agent would otherwise "fix" it — a cascade not added, an `await`
+  not awaited, a guard whose omission is intended. Nothing in the code or the
+  tests can say "this is on purpose", so one line may.
+
+  Most of the tree predates this and is far heavier than it should be. Thin it
+  wherever you are editing anyway, and never match the surrounding density.
 
 - `pnpm fix` formats and auto-fixes lint. `pnpm check` verifies formatting,
   type-checks, and lints — it is the same gate CI runs, so a green `check`

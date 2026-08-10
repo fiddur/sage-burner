@@ -16,41 +16,18 @@ import { useAction, useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
 import { isApproved, isMember, useViewer } from '../viewer.tsx'
 
-/** The burn the page is about, or `null` when there is none open. */
 type Active = Loaded<Event | null>
 
 export type HomeApi = Pick<ApiClient, 'getActiveEvent' | 'updateWelcome'>
 
-/**
- * The picture an admin uploaded, above the burn it is a picture of (#306).
- *
- * `undefined` while the installation is still arriving and `null` when nobody has
- * uploaded one — both draw nothing, so the page does not flash a broken image at a
- * URL that would 404.
- *
- * The alt is empty deliberately: what it shows is the burn whose name follows it, and
- * nobody has been asked to describe the photograph. The dimensions are the ones the
- * browser drew it at, so the space is reserved before the bytes arrive.
- */
 const Banner = ({ version }: { version?: string | null }) =>
   version === undefined || version === null ? null : (
     <img class="burn-banner" src={bannerSrc(version)} alt="" width={BANNER_WIDTH} height={BANNER_HEIGHT} />
   )
 
-/**
- * Everything the page says when it has no burn to show yet, and nothing when it has.
- *
- * The heading included: the burn's name is normally the `h1`, so with no burn the
- * public page had none at all (#309), and this is the one state where the
- * installation's name is not then on screen twice. Not while either answer is still
- * coming — a heading that turns into a different one is worse than a late one.
- */
 const NoOpenBurn = ({ active, title }: { active: Active; title?: string }) => {
   if (active.status === 'loading') return <p class="form-note">One moment…</p>
 
-  // The message `useLoad` carries is deliberately dropped. A visitor who cannot reach
-  // the API can do nothing with the reason, and this is also what an offline first
-  // paint looks like — an error banner would be worse than "come back later".
   if (active.status === 'failed') {
     return <p class="notice">Could not load the current burn just now. Please try again shortly.</p>
   }
@@ -68,20 +45,6 @@ const NoOpenBurn = ({ active, title }: { active: Active; title?: string }) => {
   )
 }
 
-/**
- * The public landing page.
- *
- * Almost nothing here is written by us: the banner is uploaded, and everything below
- * the burn's name comes from `welcome_markdown` on the active event, because copy that
- * lives in this file is copy an admin cannot change without a deploy — which is the
- * whole point of #11 and this page.
- *
- * The burn's name is the heading. What the installation calls itself is in the bar
- * above, on every page and beside its icon, so a second copy of it here was the same
- * words twice on the one page where the burn should lead (#306).
- *
- * Reachable signed out; `getActiveEvent` needs no session.
- */
 export const Home = ({ api }: { api: HomeApi }) => {
   const viewer = useViewer()
   const banner = useInstallationBanner()
@@ -89,50 +52,23 @@ export const Home = ({ api }: { api: HomeApi }) => {
   const [editing, setEditing] = useState<string | undefined>(undefined)
   const [opening, setOpening] = useState(false)
 
-  // No `fallback`: `NoOpenBurn` says "come back later" instead, and says why.
   const { loaded: active, reload } = useLoad(async (signal) => (await api.getActiveEvent(signal)).event, {})
 
   const { busy: saving, formError, setError, failure: refused, run } = useAction(reload)
 
   const openEvent = active.status === 'ready' ? active.data : null
 
-  /**
-   * Open the editor on the text as it is now, not as it was when the page loaded.
-   *
-   * `PATCH …/welcome` overwrites the whole field, so a homepage left open for an
-   * hour and then edited would discard whatever was written in between. Re-reading
-   * here shrinks that window from "since the page loaded" to "since Edit was
-   * pressed", which for a field forty-odd people share is the difference that
-   * matters. What closes it is the `If-Match` the save carries (#274): this read is
-   * where the version it quotes comes from, so an edit landing after it is refused
-   * rather than overwritten.
-   *
-   * A failed re-read falls back to what is on screen: refusing to open the editor
-   * because the network hiccuped would be the worse answer.
-   */
   const openEditor = async (fallback: string) => {
     setError(undefined)
-    // Said out loud, because the re-read is a round trip with nothing else
-    // changing on screen. Without it this is a button that appears to do nothing
-    // for as long as the network takes — the symptom `FormError` exists for,
-    // reintroduced by the fix for the stale draft.
     setOpening(true)
     try {
       const { event } = await api.getActiveEvent()
 
-      // No active burn means the last one ended while this page sat open. Opening
-      // the editor would write to a burn nobody is looking at any more — and the
-      // save would put it back on screen as though it were still open. Re-reading
-      // drops the page into its no-burn state instead, which is the whole section
-      // disappearing and so is its own explanation.
       if (event === null) {
         void reload()
         return
       }
 
-      // Not written back over `active`: the editor replaces the text on screen, so
-      // the only thing this read is for is what the form is seeded with — and the
-      // version the save's `If-Match` quotes, which the client took from it.
       setEditing(event.welcome_markdown)
     } catch {
       setEditing(fallback)
@@ -141,12 +77,6 @@ export const Home = ({ api }: { api: HomeApi }) => {
     }
   }
 
-  /**
-   * The editor stays open with what was typed still in it when a save is refused. A
-   * paragraph somebody wrote is not something to throw away because somebody else
-   * saved first — `TheirVersion` puts the other one beside it to be reconciled
-   * against, which is what `useAction` holds `failure` for.
-   */
   const save = (id: string, welcome_markdown: string) => {
     run(async () => {
       await api.updateWelcome(id, { welcome_markdown })

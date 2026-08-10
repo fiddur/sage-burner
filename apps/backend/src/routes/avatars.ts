@@ -14,40 +14,10 @@ export interface AvatarDeps extends GuardDeps {
   now: () => Date
 }
 
-/**
- * What the upload route accepts, and what the CHECK allows.
- *
- * Three formats and no more: every browser this runs in can produce all three from a
- * canvas, so a longer list would only be more shapes to serve back.
- */
 export const AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const
 
-/**
- * The cap, enforced by Fastify before the body is read.
- *
- * The browser sizes the picture down to a couple of hundred pixels before sending, so
- * anything approaching this is either a client that did not or one that means harm.
- * Half a megabyte is generous for the former and cheap for the latter.
- *
- * Stated on the route rather than on the content-type parser, which is shared with
- * the app icon and must therefore carry no limit of its own — see `image-body.ts`.
- */
 export const MAX_AVATAR_BYTES = 512 * 1024
 
-/**
- * Avatars — the picture in the circle, instead of initials.
- *
- * Stored in the database rather than on disk: the container has no writable path but
- * the data volume, and `docker compose up` has to stay sufficient.
- *
- * **Nothing here decodes an image.** There is no image library in this process and no
- * appetite for one, so the browser resizes before sending and the server takes the
- * bytes as given. The consequence is worth stating: the content type is what the
- * caller claims, and these bytes are served back with it. They are served to approved
- * members only, `Content-Disposition: inline` is never sent for an unknown type
- * because only three are storable, and `X-Content-Type-Options: nosniff` stops a
- * browser deciding for itself that a PNG is really HTML.
- */
 export const registerAvatarRoutes = (app: FastifyInstance, { db, sessions, now }: AvatarDeps) => {
   const { requireApproved } = createGuards({ db, sessions })
 
@@ -76,8 +46,6 @@ export const registerAvatarRoutes = (app: FastifyInstance, { db, sessions, now }
         set: { image: request.body, content_type: type, updated_at },
       })
 
-    // The version the circle's URL will carry, so a new picture is a new URL and no
-    // cache has to be persuaded to let go of the old one.
     return { avatar: updated_at }
   })
 
@@ -92,17 +60,6 @@ export const registerAvatarRoutes = (app: FastifyInstance, { db, sessions, now }
     return reply.code(204).send()
   })
 
-  /**
-   * Somebody's picture.
-   *
-   * `requireApproved`, like the attendee list it is drawn beside: a face is no more
-   * public than the name next to it, and both are already shown to every member.
-   *
-   * Cached, unlike everything else here, and it is safe *because* of the version in
-   * the URL: `?v=` changes whenever the picture does, so a long max-age can never
-   * show a stale one. `private` keeps it out of shared caches, since it is member
-   * data — the same reason the rest of this app sends `no-store`.
-   */
   app.get<{ Params: { accountId: string } }>(
     apiRoutes.accountAvatar.fastify,
     { preHandler: requireApproved },
@@ -118,16 +75,11 @@ export const registerAvatarRoutes = (app: FastifyInstance, { db, sessions, now }
         return sendError(reply, 404)
       }
 
-      return (
-        reply
-          .header('content-type', row.content_type)
-          // The bytes are whatever was uploaded and the type is what the uploader
-          // claimed, so a browser must not be allowed to decide for itself that a PNG
-          // is really something it should run.
-          .header('x-content-type-options', 'nosniff')
-          .header('cache-control', 'private, max-age=604800')
-          .send(row.image)
-      )
+      return reply
+        .header('content-type', row.content_type)
+        .header('x-content-type-options', 'nosniff')
+        .header('cache-control', 'private, max-age=604800')
+        .send(row.image)
     },
   )
 }

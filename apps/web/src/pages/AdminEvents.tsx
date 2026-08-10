@@ -33,15 +33,6 @@ type Editable = Pick<
   | 'transfer_info_markdown'
 >
 
-/**
- * The fields that differ from the event as loaded.
- *
- * Sending the whole event means an admin fixing the cap overwrites the
- * welcome text someone else edited in between — `eventUpdateSchema` is
- * `.partial()` precisely so that does not happen. Two admins editing the
- * *same* field still last-writer-wins; this is only about the ones they did not
- * touch.
- */
 export const changedFields = (before: Editable | undefined, now: Editable): Partial<Editable> =>
   before === undefined
     ? now
@@ -54,8 +45,6 @@ const BLANK = {
   slug: '',
   start_date: '',
   end_date: '',
-  // The whole of both days, which is what the schedule assumed before the hours
-  // existed. An admin who knows the gate times narrows it.
   start_time: '00:00',
   end_time: '23:59',
   location: '',
@@ -65,22 +54,10 @@ const BLANK = {
 const messageFor = (failure: unknown, fallback: string) => {
   if (!isApiError(failure)) return fallback
   if (failure.status === 409) return 'That slug is already taken — pick another.'
-  // Not "check the dates". A 400 is also a name over 200 characters or a slug
-  // over 64, and the error envelope carries no field detail, so anything more
-  // specific than this is a guess that will sometimes point at the wrong field.
-  // The `maxlength` attributes below stop the browser sending those at all,
-  // which is the fix that actually helps.
   if (failure.status === 400) return 'Something in that form was rejected — check the dates and lengths.'
   return failure.message
 }
 
-/**
- * Create events and edit their welcome text.
- *
- * The welcome text gets a preview because it is markdown, and the alternative is
- * publishing to the homepage to find out what a heading looks like. It is
- * `MarkdownField`'s, so it runs the same `renderMarkdown` the public page will.
- */
 export const AdminEvents = ({ api }: { api: EventsApi }) => {
   const viewer = useViewer()
   const admin = isAdmin(viewer)
@@ -88,10 +65,7 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
   const [draft, setDraft] = useState(BLANK)
 
   const [editing, setEditing] = useState<string | undefined>(undefined)
-  // Which row the form is on *now*, readable from inside an awaited save whose
-  // `editing` is pinned to the row it started on.
   const editingNow = useRef<string | undefined>(undefined)
-  // The row as loaded into the form, so a save can send only what differs.
   const original = useRef<Event | undefined>(undefined)
   const [welcome, setWelcome] = useState('')
   const [payment, setPayment] = useState('')
@@ -112,9 +86,6 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
     fallback: 'Could not load the events.',
   })
 
-  // Two, because the page has two forms in flight independently: the one that makes a
-  // burn and the one that edits it. Sharing a busy flag would grey out whichever the
-  // other was using.
   const { busy: creating, error: createError, run: runCreate } = useAction(reload)
   const { busy: saving, error: saveError, setError: setSaveError, run: runSave } = useAction(reload)
 
@@ -132,20 +103,10 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
           end_time: draft.end_time,
           location: draft.location,
           welcome_markdown: '',
-          // Sent rather than left to the schema's default, like the welcome text and
-          // for the same reason: both are written after the burn exists.
           payment_info_markdown: '',
-          // `transfer_info_markdown` is deliberately *not* sent. Its default is a real
-          // sentence rather than an empty string, and sending '' would override it —
-          // leaving every new burn with nothing to say at the moment it fills, which is
-          // the one moment this field exists for.
           member_cap: Number(draft.member_cap),
         })
         setDraft(BLANK)
-        // The list comes back from the server rather than being patched here. It used
-        // to be spliced in start-date order by hand, because appending showed a winter
-        // burn above a summer one — an ordering rule written twice, once here and once
-        // in the route.
       },
       (failure) => messageFor(failure, 'Could not create the event.'),
     )
@@ -196,13 +157,6 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
 
         const { event: updated } = await api.updateEvent(id, changes)
 
-        // The still-open form gets the canonical row too. Updating only the list
-        // leaves the header showing what was stored and the inputs showing what was
-        // typed — the same inconsistency this avoids one level down.
-        //
-        // Only if the form is still on this row: clicking Edit on another event
-        // while a save is in flight would otherwise drop this response into that
-        // form and report "Saved." under fields nobody sent.
         if (editingNow.current === id) {
           original.current = updated
           setDetails({
@@ -444,8 +398,6 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
           <input
             type="date"
             required
-            // Bound to its partner, so the picker will not offer a burn that ends
-            // before it starts. The schema and the CHECK still decide it.
             max={draft.end_date === '' ? undefined : draft.end_date}
             value={draft.start_date}
             onInput={(inputEvent) => setDraft({ ...draft, start_date: inputEvent.currentTarget.value })}

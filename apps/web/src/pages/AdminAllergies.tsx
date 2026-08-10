@@ -17,16 +17,6 @@ export type AllergiesApi = Pick<
   'getAllergyItems' | 'addAllergyItem' | 'updateAllergyItem' | 'deleteAllergyItem' | 'reorderAllergyItems'
 >
 
-/**
- * The allergy vocabulary everybody's record is expressed in (#254).
- *
- * Admin's, unlike the burn's lanes and lodging, which any approved member edits:
- * renaming an item rewrites what everybody who ticked it is taken to have said.
- *
- * Removing one somebody has ticked is refused by the database, and the message says
- * what to do instead. That refusal is the point rather than an inconvenience — the
- * alternative is a label going and taking part of somebody's record with it.
- */
 export const AdminAllergies = ({ api }: { api: AllergiesApi }) => {
   const { loaded, reload } = useLoad(async (signal) => await api.getAllergyItems(signal), {
     fallback: 'Could not load the list. Please reload the page.',
@@ -59,8 +49,6 @@ export const AdminAllergies = ({ api }: { api: AllergiesApi }) => {
   const remove = (item: AllergyItem) => {
     run(
       async () => await api.deleteAllergyItem(item.id),
-      // Named rather than generic: a 409 here means somebody's record depends on it,
-      // and the useful next step is renaming, not retrying.
       (failure) =>
         isApiError(failure) && failure.status === 409
           ? `Somebody has ticked “${item.label}”, so it cannot be removed. Rename it instead.`

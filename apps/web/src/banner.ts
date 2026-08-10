@@ -1,27 +1,7 @@
 import { BANNER_HEIGHT, BANNER_TYPE, BANNER_WIDTH } from '@sage-burner/shared'
 
-/**
- * A chosen file, as the bytes the banner route will take (#306).
- *
- * Drawn to 1200 × 630 here rather than on the server, exactly as an avatar and the app
- * icon are: nothing in that process decodes an image, so nothing there has to be
- * trusted to do it safely. It also means `og:image:width` can be declared without
- * measuring anything — this is what makes it true.
- */
-
-/** What the file input offers. Anything a canvas can draw; what goes up is a JPEG. */
 export const BANNER_ACCEPT = 'image/*'
 
-/**
- * The widest 1200 : 630 rectangle inside a picture, centred.
- *
- * A card is a fixed shape and a photograph is whatever shape it is, so one of the two
- * has to give. Cropping keeps the middle at full size; scaling to fit would squash a
- * portrait into a letterbox, which is the one result nobody would choose on purpose.
- *
- * The arithmetic lives here, and is tested, because the drawing around it cannot be:
- * happy-dom has no canvas that draws.
- */
 export const coverCrop = (
   width: number,
   height: number,
@@ -38,10 +18,6 @@ export const coverCrop = (
   }
 }
 
-/**
- * Not unit-tested past `coverCrop`, and cannot usefully be: happy-dom has no canvas
- * that draws, so a test would assert against a stub of the thing under test.
- */
 export const preparedBanner = async (file: Blob): Promise<Blob> => {
   const bitmap = await createImageBitmap(file)
 
@@ -57,8 +33,6 @@ export const preparedBanner = async (file: Blob): Promise<Blob> => {
     context.drawImage(bitmap, x, y, width, height, 0, 0, BANNER_WIDTH, BANNER_HEIGHT)
 
     const blob = await new Promise<Blob | null>((resolve) => {
-      // A quality a photograph survives, which is what a banner is. `BANNER_TYPE`
-      // says why it is the only format.
       canvas.toBlob(resolve, BANNER_TYPE, 0.9)
     })
 

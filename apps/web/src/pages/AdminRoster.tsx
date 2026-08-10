@@ -55,16 +55,9 @@ export const AdminRoster = ({ api }: { api: RosterApi }) => {
     fallback: 'Could not load the list. Please reload the page.',
   })
 
-  // Reloaded rather than patched in place: paying re-sorts the whole list and can
-  // move someone else across the waiting line.
-  // Every box, not just the one clicked: a controlled checkbox that `run` refuses keeps
-  // the tick the browser drew, since nothing re-renders to put it back (#369).
   const { busy, error, run } = useAction(reload)
 
   const record = (eventId: string, entry: RosterEntry, paid: boolean) => {
-    // The date is the server's to stamp, from its own clock: a browser's idea of
-    // today can differ by a day, and the two fields could disagree at all only
-    // because this was the one caller keeping them in step.
     run(
       () => api.setPayment(eventId, entry.account_id, { payment_status: paid ? 'paid' : 'unpaid' }),
       'Could not record that. Please try again.',
@@ -171,12 +164,6 @@ export const AdminRoster = ({ api }: { api: RosterApi }) => {
   )
 }
 
-/**
- * Putting somebody on the burn who did not say so when they signed up.
- *
- * Fetched here rather than with the roster so a failure to load the accounts costs
- * the picker rather than the page.
- */
 const AddToBurn = ({
   eventId,
   api,
@@ -191,7 +178,6 @@ const AddToBurn = ({
   const [chosen, setChosen] = useState('')
 
   const { loaded } = useLoad((signal) => api.getAdminAccounts(signal), {
-    // Never rendered: the picker returns null for every state but ready, on purpose.
     fallback: 'unused — the picker hides itself when the accounts will not load',
   })
 

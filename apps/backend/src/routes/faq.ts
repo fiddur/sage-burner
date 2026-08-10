@@ -33,37 +33,13 @@ export const faqFor = (db: Database, eventId: string): Promise<FaqEntry[]> =>
     .where(eq(faqEntry.event_id, eventId))
     .orderBy(asc(faqEntry.order), asc(faqEntry.id))
 
-/**
- * The Q&A the spreadsheet had a tab for (#28).
- *
- * **Any approved member may ask, answer, re-answer, reorder or remove**, which is
- * the default for the burn's shared furniture — the same reasoning the lead-roles
- * register spells out. The person with the question is rarely the person with the
- * answer, so an entry can exist with no answer at all and the page says where one is
- * still wanted.
- *
- * **Members, not the public.** The welcome text is this app's public surface; these
- * answers are the practical ones — how to find the gate, what the shower situation
- * is — and they are written for people who are already coming. It is the page most
- * worth reading *before* deciding to come, though, so the reader need not be coming
- * to this burn: `Faq.tsx` falls back to the open burn when the selector is empty
- * (#321), and the guard here is unchanged.
- *
- * Reads and writes are both `requireApproved`, and every write needs the burn to be
- * open: a finished burn's Q&A is the record of what was asked, and an id noted while
- * it was current should not still be a way to rewrite it. `openEventNow`, not the
- * active burn — the questions are answered months ahead, which is when they are
- * asked.
- */
 export const registerFaqRoutes = (app: FastifyInstance, { db, sessions, now }: FaqDeps) => {
   const { requireApproved } = createGuards({ db, sessions })
 
-  /** The list, as both the `GET` and every `If-Match` guard below see it (#274). */
   const questions = async (eventId: string): Promise<FaqListResponse> => ({
     entries: await faqFor(db, eventId),
   })
 
-  /** The entry, when the burn it belongs to is open — the id alone does not say which. */
   const openEntry = async (id: string) => {
     const [row] = await db.select().from(faqEntry).where(eq(faqEntry.id, id)).limit(1)
     if (row === undefined) return undefined
@@ -96,9 +72,6 @@ export const registerFaqRoutes = (app: FastifyInstance, { db, sessions, now }: F
       const id = randomUUID()
       const created_at = now().toISOString()
 
-      // One transaction, for the reason `nextOrder` gives. Scoped to the burn: a new
-      // burn's first question starts at zero rather than wherever the last one
-      // stopped.
       const order = db.transaction((tx) => {
         const next = nextOrder(tx, faqEntry, eq(faqEntry.event_id, eventId))
         tx.insert(faqEntry)
@@ -123,9 +96,6 @@ export const registerFaqRoutes = (app: FastifyInstance, { db, sessions, now }: F
       const body = bodyOf(faqUpdateSchema, request)
       if (body === undefined) return sendError(reply, 400)
 
-      // One read answering both "is it there" and "is its burn still open", so the
-      // two cannot answer differently. `set({})` is not valid SQL, so the one body
-      // that never reaches the UPDATE returns this row instead.
       const existing = await openEntry(request.params.id)
       if (existing === undefined) return sendError(reply, 404)
       if (Object.keys(body).length === 0) return { entry: existing } satisfies FaqResponse
@@ -158,9 +128,6 @@ export const registerFaqRoutes = (app: FastifyInstance, { db, sessions, now }: F
 
       await db.delete(faqEntry).where(eq(faqEntry.id, request.params.id))
 
-      // Deliberately does not renumber the survivors: `order` only has to sort, not
-      // be contiguous, and renumbering here would fight a concurrent reorder for no
-      // visible gain — the same call `places.ts` makes.
       return reply.code(204).send()
     },
   )
@@ -192,7 +159,6 @@ export const registerFaqRoutes = (app: FastifyInstance, { db, sessions, now }: F
     },
   )
 
-  /** The burns whose Q&A this one's could be seeded from, newest first. */
   app.get<{ Params: { eventId: string } }>(
     apiRoutes.getFaqSources.fastify,
     { preHandler: requireApproved },
@@ -209,19 +175,6 @@ export const registerFaqRoutes = (app: FastifyInstance, { db, sessions, now }: F
     },
   )
 
-  /**
-   * Seed this burn's Q&A from a previous burn's.
-   *
-   * Most of the answers carry over — what to bring, what the shower situation is —
-   * and retyping fifteen of them four times a year is the friction worth removing,
-   * exactly as it was for the roles. Refuses when this burn already has questions:
-   * merging two lists is a decision nobody asked for, and "copy into empty" is the
-   * case that removes the retyping.
-   *
-   * The emptiness check and the inserts are one transaction, or that refusal is not
-   * true — two members clicking between separate awaits would both seed it. Not
-   * something a test can hold: `inject` runs requests to completion in turn.
-   */
   app.post<{ Params: { eventId: string } }>(
     apiRoutes.copyFaq.fastify,
     { preHandler: requireApproved },
@@ -235,12 +188,6 @@ export const registerFaqRoutes = (app: FastifyInstance, { db, sessions, now }: F
       const created_at = now().toISOString()
       const today = todayIso(now)
       const seeded = db.transaction((tx) => {
-        // **Open**, not merely existing — every other write here is scoped that way,
-        // and seeding a burn that has ended would leave rows nothing can afterwards
-        // edit, reorder or remove. Checked rather than left to the foreign key,
-        // which only fires when there is a row to insert: copying from an empty
-        // source into a burn that is not there would otherwise answer 200 with
-        // nothing.
         const [burn] = tx
           .select({ id: event.id })
           .from(event)
@@ -275,9 +222,6 @@ export const registerFaqRoutes = (app: FastifyInstance, { db, sessions, now }: F
           .orderBy(asc(faqEntry.order), asc(faqEntry.id))
           .all()
 
-        // The order comes across as the order, not as the created stamp: this list is
-        // read top to bottom, and the sequence somebody arranged is most of what the
-        // copy is for.
         source.forEach((row, index) => {
           tx.insert(faqEntry)
             .values({
@@ -297,8 +241,6 @@ export const registerFaqRoutes = (app: FastifyInstance, { db, sessions, now }: F
       if (seeded === 'not_found') return sendError(reply, 404)
       if (seeded === 'conflict') return sendError(reply, 409)
 
-      // 201 like `copyPlaces` and `copyLeadRoles`: rows were created. Tagged as well,
-      // which those two are not — this is a read of the list either way.
       void reply.code(201)
 
       return withVersion(reply, await questions(request.params.eventId))

@@ -23,13 +23,6 @@ import { nextOrder, reorder } from '../db/ordered.ts'
 import { accountConnection } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 
-/**
- * One account's list, in the order they put it in.
- *
- * Named columns rather than the row, and for the reason `asMemberEntry` is an object
- * literal: somebody else's page reads this, so a column added to `account_connection`
- * reaches every member only when somebody names it here.
- */
 export const connectionsFor = async (db: Database, accountId: string): Promise<Connection[]> =>
   await db
     .select({
@@ -44,17 +37,6 @@ export const connectionsFor = async (db: Database, accountId: string): Promise<C
     .where(eq(accountConnection.account_id, accountId))
     .orderBy(asc(accountConnection.order), asc(accountConnection.id))
 
-/**
- * The ways somebody can be reached, which are their own to write (#388).
- *
- * Outside `/api/admin/` and outside anybody else's reach: whose rows these are comes from
- * the session, never from a body, which is the rule `profile.ts` already holds for a
- * name, a contact and an allergy. Reading somebody else's list belongs to their profile
- * page and is a separate route.
- *
- * **No `If-Match`.** Preconditions are for the burn's shared furniture (#274), where two
- * people edit one thing; this is one person's own record with exactly one writer.
- */
 export const registerConnectionRoutes = (app: FastifyInstance, { db, sessions }: GuardDeps) => {
   const { requireApproved } = createGuards({ db, sessions })
 
@@ -79,25 +61,15 @@ export const registerConnectionRoutes = (app: FastifyInstance, { db, sessions }:
     if (viewer === undefined) return sendError(reply, 401)
 
     const held = await connectionsFor(db, viewer.account_id)
-    // Its own code, not the bare `conflict` the duplicate raises — `errorCodes` has why.
     if (held.length >= MAX_CONNECTIONS) return reply.code(409).send(errorResponse('list_full'))
 
-    // Normalised here rather than only in the form, so a pasted profile URL is stored as
-    // the handle whatever the caller is — and so `unique(account_id, kind, value)` refuses
-    // `wren` and `@wren` as one handle instead of keeping both.
     const row = { ...body, value: connectionValue(body.kind, body.value) }
 
-    // Checked again because normalising happens *after* the schema, and can empty a value
-    // it accepted: `@` is a legal one-character handle to Zod and nothing at all once the
-    // leading `@` comes off. Left to the insert, that is a CHECK violation and a 500 where
-    // a refusal belongs.
     if (row.value === '') return sendError(reply, 400)
 
     const id = randomUUID()
 
     try {
-      // One transaction, for the reason `nextOrder` gives. Scoped to the account, so
-      // somebody's first way of being reached starts at zero.
       const order = db.transaction((tx) => {
         const next = nextOrder(tx, accountConnection, eq(accountConnection.account_id, viewer.account_id))
         tx.insert(accountConnection)
@@ -111,8 +83,6 @@ export const registerConnectionRoutes = (app: FastifyInstance, { db, sessions }:
         connection: { ...row, id, account_id: viewer.account_id, order },
       } satisfies ConnectionResponse)
     } catch (failure) {
-      // The same handle twice on one account. A 409 rather than a silent second row,
-      // since the list is what somebody reads to know how to reach this person.
       if (isUniqueViolation(failure)) return sendError(reply, 409)
       throw failure
     }
@@ -134,8 +104,6 @@ export const registerConnectionRoutes = (app: FastifyInstance, { db, sessions }:
       if (value === '') return sendError(reply, 400)
 
       try {
-        // The account id is in the `WHERE`, so somebody else's row is a 404 rather than
-        // a write — the id is the only thing a caller supplies here.
         const [updated] = await db
           .update(accountConnection)
           .set({ ...body, value })
@@ -178,8 +146,6 @@ export const registerConnectionRoutes = (app: FastifyInstance, { db, sessions }:
 
       if (gone === undefined) return sendError(reply, 404)
 
-      // Deliberately does not renumber the survivors: `order` only has to sort, not be
-      // contiguous — the same call `faq.ts` and `places.ts` make.
       return reply.code(204).send()
     },
   )
