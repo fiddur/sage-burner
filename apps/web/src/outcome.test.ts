@@ -17,11 +17,11 @@ describe('the reason a provider round trip left in the URL', () => {
 
     const { result, rerender } = renderHook(() => useOauthOutcome())
 
-    expect(result.current).toBe('linked')
+    expect(result.current.outcome).toBe('linked')
     // The page still says the thing this time; what goes is the parameter behind it.
     expect(window.location.search).toBe('')
     rerender()
-    expect(result.current).toBe('linked')
+    expect(result.current.outcome).toBe('linked')
   })
 
   it('leaves the rest of the query alone', async () => {
@@ -39,7 +39,16 @@ describe('the reason a provider round trip left in the URL', () => {
 
     const { result } = renderHook(() => useOauthOutcome())
 
-    expect(result.current).toBeNull()
+    expect(result.current.outcome).toBeNull()
     expect(window.location.search).toBe('?burn=e-1')
+  })
+
+  it('carries the reference an organiser is asked for, and clears it too', () => {
+    at('/profile?from=misconfigured&ref=req-8s')
+
+    const { result } = renderHook(() => useOauthOutcome())
+
+    expect(result.current).toEqual({ outcome: 'misconfigured', ref: 'req-8s' })
+    expect(window.location.search).toBe('')
   })
 })

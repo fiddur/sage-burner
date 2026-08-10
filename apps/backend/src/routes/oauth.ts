@@ -1,4 +1,4 @@
-import type { IdentitiesResponse, OAuthIntent, OAuthProvider } from '@sage-burner/shared'
+import type { IdentitiesResponse, OAuthIntent, OAuthOutcome, OAuthProvider } from '@sage-burner/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
 import { apiRoutes, detailsPage, isOAuthProvider, loginPage } from '@sage-burner/shared'
@@ -7,7 +7,7 @@ import { randomBytes, randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
 import type { Config } from '../config.ts'
-import type { OAuthCalls } from '../oauth/client.ts'
+import type { IdentifyFailure, OAuthCalls } from '../oauth/client.ts'
 import type { ProviderAsks } from '../oauth/providers.ts'
 
 import { viewerFor } from '../auth/viewer.ts'
@@ -28,6 +28,11 @@ export interface OAuthDeps extends GuardDeps {
 export const STATE_TTL_SECONDS = 300
 
 export const OAUTH_NONCE_COOKIE = 'sage_oauth'
+
+// Said rather than hidden: the person who can fix it is somebody you know here, so the page names
+// which of the two it is. `network` and a 5xx are "try again"; anything else needs an admin.
+const outcomeFor = ({ at, status }: IdentifyFailure): OAuthOutcome =>
+  at === 'network' || (status ?? 0) >= 500 ? 'unreachable' : 'misconfigured'
 
 export const registerOauthRoutes = (
   app: FastifyInstance,
@@ -253,7 +258,14 @@ export const registerOauthRoutes = (
           'could not identify somebody at a provider',
         )
 
-        return back(reply, failed)
+        const kind = outcomeFor(identified.failed)
+
+        return back(
+          reply,
+          spent.intent === 'sign-in'
+            ? loginPage(kind, String(request.id))
+            : detailsPage(kind, String(request.id)),
+        )
       }
 
       return spent.intent === 'sign-in'

@@ -22,9 +22,18 @@ export const messageForRemoval = (failure: unknown): string => {
   return isApiError(failure) ? failure.message : 'Could not take that off. Please try again.'
 }
 
-export const outcomeMessage = (outcome: string | null): string | undefined => {
+/** What to add so somebody can hand an organiser something to look for. */
+const quoting = (ref: string | null) => (ref === null || ref === '' ? '' : ` Mention ${ref}.`)
+
+export const outcomeMessage = (outcome: string | null, ref: string | null = null): string | undefined => {
   if (outcome === 'linked') return 'That is linked now — you can sign in with it next time.'
   if (outcome === 'taken') return 'That account is already linked to somebody here.'
+  if (outcome === 'misconfigured') {
+    return `That provider refused the connection, so it is not set up correctly here. Nothing has changed. Please tell an organiser.${quoting(ref)}`
+  }
+  if (outcome === 'unreachable') {
+    return `That provider could not be reached, so nothing has changed. Try again in a moment; if it keeps happening, tell an organiser.${quoting(ref)}`
+  }
   if (outcome === 'refused') return 'That did not work. Nothing has changed.'
 
   return undefined
@@ -36,7 +45,8 @@ export const WaysInField = ({ api }: { api: WaysInApi }) => {
   const configured = useSocialLogins()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useFormError()
-  const outcome = outcomeMessage(useOauthOutcome())
+  const { outcome: came, ref } = useOauthOutcome()
+  const outcome = outcomeMessage(came, ref)
 
   const { loaded, reload } = useLoad(async (signal) => (await api.getMyIdentities(signal)).identities, {
     fallback: 'Could not load your ways in. Please reload the page.',
