@@ -1,4 +1,4 @@
-import type { EventOption, EventOptionsResponse, EventOptionTaken } from '@sage-burner/shared'
+import type { EventOptionResponse, EventOptionsResponse, EventOptionTaken } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
 import {
@@ -87,8 +87,8 @@ export const registerEventOptionRoutes = (app: FastifyInstance, { db, sessions }
       }
 
       return reply.code(201).send({
-        option: { ...body, id, event_id: eventId, order } satisfies EventOption,
-      })
+        option: { ...body, id, event_id: eventId, order },
+      } satisfies EventOptionResponse)
     },
   )
 
@@ -109,14 +109,16 @@ export const registerEventOptionRoutes = (app: FastifyInstance, { db, sessions }
 
       if (existing === undefined) return sendError(reply, 404)
 
-      if (isEmptyPatch(body)) return { option: existing }
+      if (isEmptyPatch(body)) return { option: existing } satisfies EventOptionResponse
 
       if (await refuseIfStale(request, reply, () => choices(existing.event_id))) return reply
 
       const patched = await patchRow(db, eventOption, eq(eventOption.id, request.params.id), body)
       if (patched.kind !== 'ok') return sendError(reply, 404)
 
-      return await withCollectionVersion(reply, { option: patched.row }, () => choices(existing.event_id))
+      return await withCollectionVersion(reply, { option: patched.row } satisfies EventOptionResponse, () =>
+        choices(existing.event_id),
+      )
     },
   )
 

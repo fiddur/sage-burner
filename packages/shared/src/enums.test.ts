@@ -118,6 +118,14 @@ describe('where a way of being reached points', () => {
     expect(connectionHref('mastodon', '@wren')).toBeUndefined()
   })
 
+  it('offers no link for a value kept whole, rather than a dead one', () => {
+    // A URL has one `@` in it too, so the handle pattern matched a value `connectionValue`
+    // deliberately kept as typed — and built `https://wren/statuses/1/@https://chaos.social/`,
+    // a link to host `wren` (#433).
+    expect(connectionHref('mastodon', 'https://chaos.social/@wren/statuses/1')).toBeUndefined()
+    expect(connectionHref('mastodon', 'https://chaos.social/@wren\\x')).toBeUndefined()
+  })
+
   it('says there is nowhere to go for the ones with no profile page', () => {
     // Discord is the one that matters: a username is a string you paste into Discord's
     // own search, so the page has to offer something to copy rather than an anchor.

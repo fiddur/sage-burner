@@ -18,6 +18,9 @@ export const placeSchema = z.object({
 
 export type Place = z.infer<typeof placeSchema>
 
+export const placeResponseSchema = z.object({ place: placeSchema })
+export type PlaceResponse = z.infer<typeof placeResponseSchema>
+
 export const placesResponseSchema = z.object({ places: z.array(placeSchema) })
 export type PlacesResponse = z.infer<typeof placesResponseSchema>
 

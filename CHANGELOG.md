@@ -9,6 +9,10 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-10
 
+- **A pasted Mastodon post link no longer offers a link that goes nowhere.** If what you put in
+  your contact list was a whole URL rather than an `@you@instance` handle, the page built a link to
+  a host that does not exist. It shows the value as you typed it and offers no link now.
+
 - **Faces on the two lists of who is coming.** The Members page and the organiser's roster show
   everybody's picture beside their name, the way the rest of the app already did — initials where
   somebody has not set one.

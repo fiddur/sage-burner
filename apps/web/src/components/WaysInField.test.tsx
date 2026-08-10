@@ -55,7 +55,9 @@ describe('what a round trip that came back says', () => {
     const said = outcomeMessage('reached')
 
     expect(said).toContain('how people can reach you')
-    expect(said).toContain('Take it off')
+    // The label on the button in that list is **Remove**; *Take it off* is the one on the
+    // provider beside it, which is a different control (#447).
+    expect(said).toContain('Remove it from that list')
   })
 
   it('says nothing for an ordinary visit', () => {

@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 
+import { eventOptionResponseSchema } from '@sage-burner/shared'
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it } from 'vitest'
 
@@ -167,6 +168,7 @@ describe('the lists a member picks from', () => {
       capacity: 9,
       order: 0,
     })
+    expect(eventOptionResponseSchema.safeParse(response.json()).success).toBe(true)
   })
 
   it('leaves the capacity unset when there is no limit', async () => {

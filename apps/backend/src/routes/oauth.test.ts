@@ -1129,6 +1129,28 @@ describe('what a link adds to how people can reach you', () => {
     ])
   })
 
+  it('publishes none of it for somebody signing in rather than linking', async () => {
+    // `signIn` ignores `profile.reach`, which is a privacy choice with nothing failing if
+    // somebody later threads it through (#447). The test above answers the same handle from the
+    // same fake, so this is a claim about the sign-in path rather than about the fake.
+    const server = await build(reaching())
+    await givenProvider('discord')
+    const wren = await givenAccount()
+    await db().insert(accountIdentity).values({
+      id: randomUUID(),
+      account_id: wren.id,
+      provider: 'discord',
+      subject: 'discord-1',
+      profile_url: null,
+      created_at: NOW.toISOString(),
+    })
+
+    const back = await signInThrough(server, 'discord')
+
+    expect(back.headers.location).toBe('/')
+    expect(await listed(wren.id)).toEqual([])
+  })
+
   it('adds nothing for a provider with no handle to offer, and says only that it linked', async () => {
     const server = await build()
     await givenProvider('facebook')

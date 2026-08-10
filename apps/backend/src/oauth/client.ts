@@ -92,7 +92,6 @@ export const identifyOverHttps: Identify = async ({
         failed: {
           at: 'profile',
           status: identified.status,
-          // Only a refusal's words: an ok answer here is the member's own profile.
           ...(identified.ok ? {} : saidOnly(answered)),
         },
       }

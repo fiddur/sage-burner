@@ -33,7 +33,7 @@ const opened = async (pages: readonly NavPage[] = RIDES, at = '/') => {
   return await screen.findByRole('link', { name: /Rideshares/ })
 }
 
-describe('the menu beside the logo', () => {
+describe('the menu ahead of the logo', () => {
   it('opens on ☰ and lists what the bar has no room for', async () => {
     expect((await opened()).getAttribute('href')).toBe('/rides')
   })

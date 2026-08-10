@@ -27,7 +27,7 @@ const consoles = {
   facebook: {
     where: 'developers.facebook.com',
     cost: 'An app, the URLs listed below, and app review for public_profile before anybody outside your own account can use it.',
-    consent: 'your public profile — the eight fields public_profile covers, of which this app reads three',
+    consent: 'your public profile — the eight fields public_profile covers, of which this app reads two',
     keeps: 'an identifier and, if they have no picture here, a copy of theirs',
   },
 } as const satisfies Record<OAuthProvider, { where: string; cost: string; consent: string; keeps: string }>

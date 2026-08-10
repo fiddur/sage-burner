@@ -1,4 +1,4 @@
-import type { CopySourcesResponse, Place, PlacesResponse } from '@sage-burner/shared'
+import type { CopySourcesResponse, Place, PlaceResponse, PlacesResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
 import {
@@ -86,7 +86,7 @@ export const registerPlaceRoutes = (app: FastifyInstance, { db, sessions, now }:
         throw failure
       }
 
-      return reply.code(201).send({ place: { ...body, id, event_id, order } satisfies Place })
+      return reply.code(201).send({ place: { ...body, id, event_id, order } } satisfies PlaceResponse)
     },
   )
 
@@ -101,14 +101,16 @@ export const registerPlaceRoutes = (app: FastifyInstance, { db, sessions, now }:
 
       const existing = await openLane(db, now, request.params.id)
       if (existing === undefined) return sendError(reply, 404)
-      if (isEmptyPatch(body)) return { place: existing }
+      if (isEmptyPatch(body)) return { place: existing } satisfies PlaceResponse
 
       if (await refuseIfStale(request, reply, () => grid(existing.event_id))) return reply
 
       const patched = await patchRow(db, place, eq(place.id, request.params.id), body)
       if (patched.kind !== 'ok') return sendError(reply, 404)
 
-      return await withCollectionVersion(reply, { place: patched.row }, () => grid(existing.event_id))
+      return await withCollectionVersion(reply, { place: patched.row } satisfies PlaceResponse, () =>
+        grid(existing.event_id),
+      )
     },
   )
 

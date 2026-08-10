@@ -345,14 +345,21 @@ export const registerOauthRoutes = (
 
     if (gone.length === 0) return sendError(reply, 409)
 
-    await db
-      .delete(accountConnection)
-      .where(
-        and(
-          eq(accountConnection.account_id, viewer.account_id),
-          eq(accountConnection.from_provider, provider),
-        ),
-      )
+    try {
+      await db
+        .delete(accountConnection)
+        .where(
+          and(
+            eq(accountConnection.account_id, viewer.account_id),
+            eq(accountConnection.from_provider, provider),
+          ),
+        )
+    } catch (failure) {
+      // Swallowed for the reason the link's is: the identity is already gone, so the unlink has
+      // happened, and a 500 would say otherwise. A row left behind is left alone by the next
+      // link and removed by the next unlink.
+      request.log.warn({ err: failure, provider }, 'unlinked but could not take the handle off')
+    }
 
     return reply.code(204).send()
   })

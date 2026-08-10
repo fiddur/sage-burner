@@ -85,6 +85,9 @@ describe('the installation pictures, which several callers have to spell alike',
   it('says default for an installation nobody has uploaded an icon to', () => {
     // The manifest names an icon unconditionally — the route answers the app's flame.
     expect(iconSrc(null)).toBe('/api/installation/icon?v=default')
+    // What every call site actually passes: `icon?.updated_at`, which is `undefined` for an
+    // installation with no row rather than `null` (#383).
+    expect(iconSrc(undefined)).toBe('/api/installation/icon?v=default')
   })
 
   it('has no such word for the banner, which is there or is not', () => {

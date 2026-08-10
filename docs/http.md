@@ -1,8 +1,24 @@
 # Over the wire
 
-The security headers every response carries, and the shape every error takes.
+The security headers every response carries, the shape every error takes, and what holds a
+successful body to its shape.
 
 [← back to the README](../README.md)
+
+## What holds a response to its shape
+
+Every wrapper a route sends has a schema in `packages/shared`, the route `satisfies` it and the
+client asks for the inferred type — so a renamed key stops compiling on both sides at once.
+
+**`reply.send` is not type-checked**, which is the whole reason the `satisfies` habit matters and
+the reason five wrappers had drifted out of it (#149): `attendance`, `place`, `option`, the minted
+invite and the redemption were literals nothing compared to anything. Adding the `satisfies` found
+a real hole in `adminAddAttendance`, which could send `{ attendance: undefined }` — a `{}` body —
+where the row it had just inserted came back missing.
+
+**Zod stays out of the browser**, so nothing parses a body at runtime there. The runtime half is in
+**backend route tests**, which parse a response through the shared schema — a compile-time contract
+and a runtime one, neither of which the other covers.
 
 ## Security headers
 
