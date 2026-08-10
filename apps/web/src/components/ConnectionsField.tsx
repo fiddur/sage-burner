@@ -52,7 +52,19 @@ interface Draft {
   label: string
 }
 
-const BLANK: Draft = { kind: 'discord', value: '', label: '' }
+export const kindsToOffer = (
+  held: readonly Pick<Connection, 'kind'>[],
+  keeping?: ConnectionKind,
+): ConnectionKind[] =>
+  connectionKinds.filter(
+    (kind) => kind === keeping || connectionKindInfo[kind].labelled || !held.some((row) => row.kind === kind),
+  )
+
+const draftFor = (typed: Draft | undefined, offered: readonly ConnectionKind[]): Draft | undefined => {
+  const kind = typed !== undefined && offered.includes(typed.kind) ? typed.kind : offered[0]
+
+  return kind === undefined ? undefined : { value: '', label: '', ...typed, kind }
+}
 
 export const problemWith = (draft: Draft): string | undefined => {
   if (draft.value.trim() === '') return 'Fill in how to reach you first.'
@@ -65,12 +77,14 @@ export const problemWith = (draft: Draft): string | undefined => {
 
 const Fields = ({
   draft,
+  kinds,
   busy,
   subject,
   loginAddress,
   onChange,
 }: {
   draft: Draft
+  kinds: readonly ConnectionKind[]
   busy: boolean
   subject: string
   loginAddress?: string
@@ -88,7 +102,7 @@ const Fields = ({
           if (isConnectionKind(kind)) onChange({ ...draft, kind })
         }}
       >
-        {connectionKinds.map((kind) => (
+        {kinds.map((kind) => (
           <option key={kind} value={kind}>
             {connectionKindInfo[kind].icon} {connectionKindInfo[kind].label}
           </option>
@@ -138,7 +152,7 @@ const Fields = ({
 )
 
 export const ConnectionsField = ({ api, loginAddress }: { api: ConnectionsApi; loginAddress?: string }) => {
-  const [draft, setDraft] = useState<Draft>(BLANK)
+  const [typed, setTyped] = useState<Draft | undefined>(undefined)
   const [editing, setEditing] = useState<{ id: string; draft: Draft } | undefined>(undefined)
 
   const { loaded, reload } = useLoad(async (signal) => (await api.getMyConnections(signal)).connections, {
@@ -147,10 +161,13 @@ export const ConnectionsField = ({ api, loginAddress }: { api: ConnectionsApi; l
   const rows = loaded.status === 'ready' ? loaded.data : undefined
   const held = rows?.length ?? 0
 
+  const offered = kindsToOffer(rows ?? [])
+  const draft = draftFor(typed, offered)
+
   const { busy, formError, setError, run } = useAction(reload)
 
-  const add = () => {
-    const problem = problemWith(draft)
+  const add = (wanted: Draft) => {
+    const problem = problemWith(wanted)
     if (problem !== undefined) {
       setError(problem)
       return
@@ -158,11 +175,11 @@ export const ConnectionsField = ({ api, loginAddress }: { api: ConnectionsApi; l
 
     run(async () => {
       await api.addMyConnection({
-        kind: draft.kind,
-        value: connectionValue(draft.kind, draft.value),
-        label: draft.label.trim(),
+        kind: wanted.kind,
+        value: connectionValue(wanted.kind, wanted.value),
+        label: wanted.label.trim(),
       })
-      setDraft(BLANK)
+      setTyped(undefined)
     }, messageForFailure)
   }
 
@@ -194,9 +211,6 @@ export const ConnectionsField = ({ api, loginAddress }: { api: ConnectionsApi; l
 
       {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
 
-      {/* Said rather than shown as an empty list: a failed load and "you have added none"
-          are different facts, and the wrong one invites an Add that then 409s against rows
-          nobody can see. */}
       {loaded.status === 'failed' && <ErrorText message={loaded.message} />}
 
       {rows?.length === 0 && <p class="form-note">You have not added any yet.</p>}
@@ -218,6 +232,7 @@ export const ConnectionsField = ({ api, loginAddress }: { api: ConnectionsApi; l
               <div class="connection-edit">
                 <Fields
                   draft={editing.draft}
+                  kinds={kindsToOffer(rows, row.kind)}
                   busy={busy}
                   subject={nameOf(row)}
                   loginAddress={loginAddress}
@@ -275,20 +290,21 @@ export const ConnectionsField = ({ api, loginAddress }: { api: ConnectionsApi; l
 
       <FormError error={formError} />
 
-      {held < MAX_CONNECTIONS && (
+      {held < MAX_CONNECTIONS && draft !== undefined && (
         <form
           class="form"
           onSubmit={(submitEvent) => {
             submitEvent.preventDefault()
-            add()
+            add(draft)
           }}
         >
           <Fields
             draft={draft}
+            kinds={offered}
             busy={busy}
             subject="a new way to reach you"
             loginAddress={loginAddress}
-            onChange={setDraft}
+            onChange={setTyped}
           />
           <button type="submit" disabled={busy}>
             Add it

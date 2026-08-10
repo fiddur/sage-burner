@@ -93,12 +93,16 @@ by reading Rollup's docs.
   (db handle, clock, config) in as arguments rather than importing singletons.
 - Avoid global variables, module-level mutable state, and singletons.
 - Avoid casting. Use proper typing and type guards.
-- **Comments are a last resort, and the target is close to zero.** They are not
-  typed and not tested, so they rot while the code moves — and the reader here is
-  a coding agent, which reads the code, the types and the tests faster than prose
-  about them. Every comment is a claim nothing verifies.
+- **Write no comments.** Not "few", not "only the good ones" — the default is
+  none, and the bar for an exception is that **a future coding agent could not
+  work out what is going on without it**. Nothing softer qualifies: not helpful,
+  not clarifying, not "worth recording". They are not typed and not tested, so
+  they rot while the code moves, and every one is a claim nothing verifies. The
+  reader here is an agent that reads the code, the types and the tests faster
+  than prose about them.
 
-  Before writing one, spend it where it cannot go stale:
+  A comment you are tempted to write is nearly always a name, a type, a test or a
+  `docs/` paragraph that has not been written yet:
 
   - **a name**, if it would say what a block does;
   - **a type**, if it would say what a value may be;
@@ -106,17 +110,22 @@ by reading Rollup's docs.
     fails when it stops being true, which is the one kind of prose this repo can
     trust;
   - **`docs/`**, if it is a paragraph of reasoning. That is where the _why_ of a
-    feature belongs, and pointing at it beats copying it.
+    feature belongs, and pointing at it beats copying it. **A `docs/` paragraph
+    replaces the comment; it does not license one beside it.**
 
-  Delete on sight: anything restating the code or a well-named symbol; history
-  ("used to be", "before #N", which PR moved what, what a thing was called
-  before); how a bug was found; an alternative the compiler already rejects; the
-  second and third paragraph of anything.
+  Delete on sight, without weighing whether it is nice to have: anything
+  restating the code or a well-named symbol; history ("used to be", "before #N",
+  which PR moved what, what a thing was called before); how a bug was found; an
+  alternative the compiler already rejects; a rationale that belongs in `docs/`;
+  an issue number as decoration; the second and third paragraph of anything;
+  **every comment in a test whose name already says what it asserts.**
 
-  What survives is the rare line where the code's **absence** is deliberate and a
-  well-meaning agent would otherwise "fix" it — a cascade not added, an `await`
-  not awaited, a guard whose omission is intended. Nothing in the code or the
-  tests can say "this is on purpose", so one line may.
+  The one thing that survives is a line where the code's **absence** is
+  deliberate and an agent would otherwise "fix" it — a cascade not added, an
+  `await` not awaited, a guard whose omission is intended, a constant that looks
+  wrong and is not. Nothing in the code or the tests can say "this is on
+  purpose", so one line may. One line, and only where a test cannot say it
+  instead.
 
   Most of the tree predates this and is far heavier than it should be. Thin it
   wherever you are editing anyway, and never match the surrounding density.
