@@ -1235,7 +1235,8 @@ bytes. The route answers `private, max-age, immutable`, which is safe because an
 answers with different bytes, so the browser's own cache still holds them between visits.
 
 **How many one account may hold is a number**, not an absence: this is the first
-unbounded write any member can make, and rate limiting (#57) is still unbuilt.
+unbounded write any member can make, and nothing rate-limits a signed-in member — the two
+bounds #57 added are on the unauthenticated routes.
 `MAX_IMAGES_PER_ACCOUNT` in `media.ts` says what it is and why.
 
 **A ceiling has to be one you can get back under** (#392), and at first it was not. The

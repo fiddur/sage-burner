@@ -214,10 +214,10 @@ describe('the error envelope', () => {
     expect(response.headers['www-authenticate']).toBe('Bearer')
   })
 
-  it('carries a numeric Retry-After, which is how rate limiters emit it', async () => {
-    // Filtering headers to strings would drop this silently, telling a client
-    // to back off without saying for how long — and @fastify/rate-limit
-    // computes Retry-After as a number.
+  it('carries a numeric Retry-After, which is how a thrown limit emits it', async () => {
+    // Filtering headers to strings would drop this silently, telling a client to back off
+    // without saying for how long. The app's own limiter sets the header on the reply as a
+    // string; this is the path an error carrying one takes.
     await build()
     app.get('/api/limited', async () => {
       throw Object.assign(new Error('slow down'), {

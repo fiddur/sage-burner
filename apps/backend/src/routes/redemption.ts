@@ -7,6 +7,7 @@ import { randomUUID } from 'node:crypto'
 
 import type { Gate } from '../auth/gate.ts'
 import type { Sessions } from '../auth/session.ts'
+import type { Throttle } from '../auth/throttle.ts'
 import type { Config } from '../config.ts'
 import type { Database } from '../db/index.ts'
 
@@ -26,13 +27,14 @@ export interface RedemptionDeps {
   now: () => Date
   hash?: (password: string) => Promise<string>
   gate: Gate
+  throttle: Throttle
 }
 
 const isEmailConflict = (error: unknown) => isUniqueViolation(error, 'account.email')
 
 export const registerRedemptionRoutes = (
   app: FastifyInstance,
-  { db, config, sessions, now, hash = hashPassword, gate }: RedemptionDeps,
+  { db, config, sessions, now, hash = hashPassword, gate, throttle }: RedemptionDeps,
 ) => {
   app.get<{ Params: { token: string } }>(apiRoutes.getInviteState.fastify, async (request, reply) => {
     void noStore(reply)
@@ -60,6 +62,16 @@ export const registerRedemptionRoutes = (
 
   app.post<{ Params: { token: string } }>(apiRoutes.redeemInvite.fastify, async (request, reply) => {
     void noStore(reply)
+
+    // An unguessable token is only unguessable if you cannot try quickly (#57). Keyed on the
+    // address rather than the token, which is what somebody guessing would be cycling.
+    const room = throttle.take(request.ip)
+    if (!room.ok) {
+      void reply.header('retry-after', String(room.retryAfterSeconds))
+      request.log.warn({ status: 429 }, 'redemption throttled')
+
+      return sendError(reply, 429)
+    }
 
     const body = bodyOf(redeemRequestSchema, request)
     if (body === undefined) return sendError(reply, 400)

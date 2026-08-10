@@ -133,6 +133,37 @@ describe('createApiClient', () => {
       }
     })
 
+    it('says how long to wait when the answer carries it', async () => {
+      const doFetch = respondWith(
+        { error: 'rate_limited' },
+        { status: 429, headers: { 'retry-after': '45' } },
+      )
+
+      await expect(createApiClient(doFetch).request('/auth/login')).rejects.toThrow('in 45 seconds')
+    })
+
+    it('says it in minutes for a wait nobody counts in seconds', async () => {
+      const doFetch = respondWith(
+        { error: 'rate_limited' },
+        { status: 429, headers: { 'retry-after': '900' } },
+      )
+
+      await expect(createApiClient(doFetch).request('/auth/login')).rejects.toThrow('in 15 minutes')
+    })
+
+    it('falls back to the vague wording for a Retry-After it cannot read', async () => {
+      // The header may carry an HTTP date instead of seconds, and nothing in this app sends one
+      // — but a reverse proxy in front of it might.
+      for (const header of ['Wed, 21 Oct 2026 07:28:00 GMT', '-1', 'soon', '1.5']) {
+        const doFetch = respondWith(
+          { error: 'rate_limited' },
+          { status: 429, headers: { 'retry-after': header } },
+        )
+
+        await expect(createApiClient(doFetch).request('/auth/login')).rejects.toThrow('a few seconds')
+      }
+    })
+
     it('never shows a member the backend machine code for an unmapped status', async () => {
       // 400/409/422 all arrive once the application form lands. Surfacing
       // `validation_failed` verbatim would be worse than saying nothing.

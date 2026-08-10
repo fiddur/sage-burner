@@ -4,9 +4,11 @@ import { eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it } from 'vitest'
 
+import type { AppDeps } from '../app.ts'
 import type { DbHandle } from '../db/index.ts'
 
 import { createApp } from '../app.ts'
+import { createGate, SCRYPT_GATE } from '../auth/gate.ts'
 import { defaultScryptParams, hashPassword, needsRehash, verifyPassword } from '../auth/password.ts'
 import { readSessionCookie, SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
@@ -33,7 +35,7 @@ afterEach(async () => {
   handle = undefined
 })
 
-const build = async (env: NodeJS.ProcessEnv = {}) => {
+const build = async (env: NodeJS.ProcessEnv = {}, over: Partial<AppDeps> = {}) => {
   handle = createDb({ url: ':memory:' })
   runMigrations(handle)
   app = await createApp({
@@ -43,6 +45,7 @@ const build = async (env: NodeJS.ProcessEnv = {}) => {
       SESSION_SECRET: 's'.repeat(40),
       ...env,
     }),
+    ...over,
   })
   return app
 }
@@ -492,7 +495,7 @@ describe('GET /api/auth/me', () => {
 })
 
 describe('concurrency', () => {
-  // Not a rate limiter (#57) — the availability guard. scrypt runs on libuv's
+  // Not the rate limiter below — the availability guard. scrypt runs on libuv's
   // four-slot threadpool, which @fastify/static reads files through, so a
   // client holding concurrent logins would otherwise stall the whole app.
   //
@@ -518,13 +521,32 @@ describe('concurrency', () => {
   // worse than a slow test.
   const SLOW_TEST_TIMEOUT_MS = 15_000
 
+  // The gate's own window, injected rather than left at `SCRYPT_GATE`'s five seconds (#61).
+  // A contended runner that crossed it resolved waiters as `timed-out`, which reads as a
+  // broken gate — an earlier `retry-after: 5` and fewer than ten admissions — and raising
+  // vitest's timeout could not rescue a window the route did not take as an argument.
+  // Bounds wide enough to be out of the way as well: these are about the gate, and eleven
+  // concurrent attempts on one address would otherwise be shed by the limiter for a different
+  // reason than the queue.
+  const patient = async () =>
+    await build(
+      {},
+      {
+        gate: createGate({ ...SCRYPT_GATE, timeoutMs: 60_000 }),
+        bounds: {
+          login: { attempts: 1000, windowMs: 60_000 },
+          address: { attempts: 1000, windowMs: 60_000 },
+        },
+      },
+    )
+
   it(
     'queues a third concurrent login rather than refusing it',
     async () => {
       // The property that matters. A hard cap refused here, which turned two
       // sustained anonymous requests into a permanent outage of the only way
       // into the app — nothing to wait out, nothing to retry into.
-      const server = await build()
+      const server = await patient()
       await slowAccount()
 
       const statuses = (await attempts(server, 3)).map((response) => response.statusCode)
@@ -539,7 +561,7 @@ describe('concurrency', () => {
     async () => {
       // Two running plus eight waiting; the eleventh has nowhere to go. The queue
       // is bounded so it cannot become the exhaustion it exists to prevent.
-      const server = await build()
+      const server = await patient()
       await slowAccount()
 
       const responses = await attempts(server, 11)
@@ -548,10 +570,8 @@ describe('concurrency', () => {
       expect(shed.length).toBeGreaterThanOrEqual(1)
       expect(responses.filter((response) => response.statusCode === 200).length).toBeGreaterThanOrEqual(10)
       expect(shed[0]?.json()).toEqual({ error: 'rate_limited' })
-      // `1`, not the 5s a timed-out caller gets: a full queue clears as the work
-      // in flight finishes. The timed-out branch cannot be reached from here
-      // without holding the suite for the whole window, and is covered directly
-      // in `gate.test.ts` with injected timers.
+      // `1`, not the window a timed-out caller gets: a full queue clears as the work in
+      // flight finishes.
       expect(shed[0]?.headers['retry-after']).toBe('1')
     },
     SLOW_TEST_TIMEOUT_MS,
@@ -562,7 +582,7 @@ describe('concurrency', () => {
     async () => {
       // The release is in a `finally`; without it a throw leaks a slot and login
       // degrades permanently until a restart.
-      const server = await build()
+      const server = await patient()
       await slowAccount()
 
       await attempts(server, 11)
@@ -571,6 +591,125 @@ describe('concurrency', () => {
     },
     SLOW_TEST_TIMEOUT_MS,
   )
+})
+
+describe('the timed-out branch of the gate', () => {
+  it('answers the window rather than a second, so a client waits it out', async () => {
+    // A timer that fires on the next macrotask, not synchronously: `createGate` builds the
+    // entry before pushing it, so a same-tick callback would read `entry` in its own TDZ.
+    const server = await build(
+      {},
+      {
+        gate: createGate({
+          slots: 1,
+          queue: 8,
+          timeoutMs: 7000,
+          setTimer: (fire) => {
+            const timer = setTimeout(fire, 0)
+
+            return { clear: () => clearTimeout(timer) }
+          },
+        }),
+      },
+    )
+    await givenAccount({ email: 'ada@example.org', password: 'a good long passphrase' })
+
+    const [, second] = await Promise.all([
+      login(server, 'ada@example.org', 'a good long passphrase'),
+      login(server, 'ada@example.org', 'a good long passphrase'),
+    ])
+
+    expect(second?.statusCode).toBe(429)
+    expect(second?.headers['retry-after']).toBe('7')
+  })
+})
+
+describe('how often one client may try', () => {
+  const tries = (server: FastifyInstance, count: number, email = 'ada@example.org') =>
+    Array.from({ length: count }, () => login(server, email, 'wrong passphrase'))
+
+  it('refuses one address past its allowance, and says how long to wait', async () => {
+    const server = await build({}, { bounds: { address: { attempts: 2, windowMs: 60_000 } } })
+    await givenAccount({ email: 'ada@example.org', password: 'a good long passphrase' })
+
+    for (const attempt of tries(server, 2)) expect((await attempt).statusCode).toBe(401)
+
+    const refused = await login(server, 'ada@example.org', 'wrong passphrase')
+    expect(refused.statusCode).toBe(429)
+    expect(refused.json()).toEqual({ error: 'rate_limited' })
+    expect(refused.headers['retry-after']).toBe('60')
+  })
+
+  it('counts an address with no account the same, so nothing here says who exists', async () => {
+    // The bound is keyed on what was sent, never on whether it names an account — keying or
+    // answering differently would reintroduce the enumeration oracle the constant-time verify
+    // closes (#57).
+    const server = await build({}, { bounds: { address: { attempts: 1, windowMs: 60_000 } } })
+    await givenAccount({ email: 'ada@example.org', password: 'a good long passphrase' })
+
+    const known = await login(server, 'ada@example.org', 'wrong passphrase')
+    const unknown = await login(server, 'nobody@example.org', 'wrong passphrase')
+
+    expect(known.statusCode).toBe(401)
+    expect(unknown.statusCode).toBe(401)
+
+    const afterKnown = await login(server, 'ada@example.org', 'wrong passphrase')
+    const afterUnknown = await login(server, 'nobody@example.org', 'wrong passphrase')
+
+    expect(afterKnown.statusCode).toBe(429)
+    expect(afterUnknown.statusCode).toBe(429)
+    expect(afterKnown.headers['retry-after']).toBe(afterUnknown.headers['retry-after'])
+  })
+
+  it('spends one address’s allowance without touching another’s', async () => {
+    const server = await build({}, { bounds: { address: { attempts: 1, windowMs: 60_000 } } })
+    await givenAccount({ email: 'ada@example.org', password: 'a good long passphrase' })
+    await givenAccount({ email: 'bea@example.org', password: 'another long passphrase' })
+
+    await login(server, 'ada@example.org', 'wrong passphrase')
+
+    expect((await login(server, 'ada@example.org', 'wrong passphrase')).statusCode).toBe(429)
+    expect((await login(server, 'bea@example.org', 'wrong passphrase')).statusCode).toBe(401)
+  })
+
+  it('forgives an address that gets it right, so a typo is not a lockout', async () => {
+    const server = await build({}, { bounds: { address: { attempts: 2, windowMs: 60_000 } } })
+    await givenAccount({ email: 'ada@example.org', password: 'a good long passphrase' })
+
+    expect((await login(server, 'ada@example.org', 'wrong passphrase')).statusCode).toBe(401)
+    expect((await login(server, 'ada@example.org', 'a good long passphrase')).statusCode).toBe(200)
+
+    expect((await login(server, 'ada@example.org', 'wrong passphrase')).statusCode).toBe(401)
+    expect((await login(server, 'ada@example.org', 'wrong passphrase')).statusCode).toBe(401)
+  })
+
+  it('bounds one address ahead of the gate, whatever address it cycles', async () => {
+    // The availability half: an attacker cycling addresses never fills a per-address bucket,
+    // so without this two sustained requests hold the gate's whole capacity (#57).
+    const server = await build({}, { bounds: { login: { attempts: 2, windowMs: 60_000 } } })
+    await givenAccount({ email: 'ada@example.org', password: 'a good long passphrase' })
+
+    await login(server, 'one@example.org', 'wrong passphrase')
+    await login(server, 'two@example.org', 'wrong passphrase')
+
+    const refused = await login(server, 'ada@example.org', 'a good long passphrase')
+    expect(refused.statusCode).toBe(429)
+    expect(refused.headers['retry-after']).toBe('60')
+  })
+
+  it('does the expensive work only for an attempt it admitted', async () => {
+    // The point of the bound is the CPU, and the decoy derivation means even an unknown
+    // address costs a full scrypt — so the refusal has to come before the hash.
+    const server = await build({}, { bounds: { login: { attempts: 1, windowMs: 60_000 } } })
+    await givenAccount({ email: 'ada@example.org', password: 'a good long passphrase' })
+    await login(server, 'one@example.org', 'wrong passphrase')
+
+    const started = Date.now()
+    const refused = await login(server, 'two@example.org', 'wrong passphrase')
+
+    expect(refused.statusCode).toBe(429)
+    expect(Date.now() - started).toBeLessThan(100)
+  })
 })
 
 describe('rehashing on login', () => {

@@ -9,6 +9,7 @@ import path from 'node:path'
 
 import type { Gate } from './auth/gate.ts'
 import type { GuardDeps } from './auth/guards.ts'
+import type { Bound } from './auth/throttle.ts'
 import type { Config } from './config.ts'
 import type { Database } from './db/index.ts'
 import type { Send } from './mail/mail.ts'
@@ -19,6 +20,7 @@ import type { Delivery, VapidKeys } from './push/push.ts'
 import { createGate, SCRYPT_GATE } from './auth/gate.ts'
 import { createGuards } from './auth/guards.ts'
 import { createSessions } from './auth/session.ts'
+import { createThrottle, LOGIN_BY_ADDRESS, LOGIN_BY_IP, REDEEM_BY_IP } from './auth/throttle.ts'
 import { refuseEnvelopeStrippers } from './envelope.ts'
 import { clientErrorHandler, frameworkErrorHandler, registerErrorHandler } from './errors.ts'
 import { sendError } from './http.ts'
@@ -83,6 +85,7 @@ export interface AppDeps {
   oauth?: OAuthCalls
   defer?: EmailQueue['defer']
   gate?: Gate
+  bounds?: { login?: Bound; address?: Bound; redeem?: Bound }
   changelog?: string
   privacy?: string
   terms?: string
@@ -150,6 +153,14 @@ const sessionDeps = (config: Config) => ({
   ttlSeconds: config.session_ttl_seconds,
 })
 
+const throttles = (bounds: NonNullable<AppDeps['bounds']>, now: () => number) => ({
+  limits: {
+    byIp: createThrottle({ ...(bounds.login ?? LOGIN_BY_IP), now }),
+    byAddress: createThrottle({ ...(bounds.address ?? LOGIN_BY_ADDRESS), now }),
+  },
+  redemptions: createThrottle({ ...(bounds.redeem ?? REDEEM_BY_IP), now }),
+})
+
 const ADMIN_PREFIX = '/api/admin'
 
 const registerAdminPrefixGuard = (app: FastifyInstance, deps: GuardDeps) => {
@@ -168,6 +179,7 @@ export const createApp = async ({
   db,
   config,
   gate: suppliedGate,
+  bounds = {},
   deliver = deliverWithWebPush(DEFAULT_PUSH_CONTACT),
   mintKeys = generateVAPIDKeys,
   send = sendWithSmtp,
@@ -211,6 +223,8 @@ export const createApp = async ({
 
   const gate = suppliedGate ?? createGate(SCRYPT_GATE)
 
+  const { limits, redemptions } = throttles(bounds, () => now().getTime())
+
   registerAdminPrefixGuard(app, { db, sessions })
 
   const push = { db, deliver, now, mintKeys }
@@ -238,7 +252,7 @@ export const createApp = async ({
     { post: byEmail, defer: defer ?? emails.defer },
   )
 
-  registerAuthRoutes(app, { db, config, sessions, gate })
+  registerAuthRoutes(app, { db, config, sessions, gate, limits })
   registerPasskeyRoutes(app, { db, config, sessions, now })
   registerAdminRoutes(app, { db, hash })
   registerInstallationRoutes(app, { db })
@@ -274,7 +288,7 @@ export const createApp = async ({
   })
   registerApplicationReviewRoutes(app, { db, config, sessions, mail, now })
   registerInviteRoutes(app, { db, sessions, now })
-  registerRedemptionRoutes(app, { db, config, sessions, now, hash, gate })
+  registerRedemptionRoutes(app, { db, config, sessions, now, hash, gate, throttle: redemptions })
   registerAllergyRoutes(app, { db })
   registerAttendanceRoutes(app, { db, sessions, now, notify: tellAccount })
   registerPostRoutes(app, { db, sessions, now, notify: tellAccount })
