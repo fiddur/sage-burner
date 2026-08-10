@@ -1,3 +1,4 @@
+import { mentionsAsLinks } from '@sage-burner/shared'
 import { Marked } from 'marked'
 
 const escapeHtml = (value: string) =>
@@ -45,4 +46,5 @@ const marked = new Marked({
   },
 })
 
-export const renderMarkdown = (source: string): string => marked.parse(source, { async: false })
+export const renderMarkdown = (source: string): string =>
+  marked.parse(mentionsAsLinks(source), { async: false })

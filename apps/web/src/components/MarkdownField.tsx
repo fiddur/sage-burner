@@ -1,11 +1,14 @@
 import { useId, useState } from 'preact/hooks'
 
 import type { UploadImage } from '../image-upload.ts'
+import type { Mentionable } from '../mentioning.ts'
 
 import { useImageUpload } from '../image-upload.ts'
 import { renderMarkdown } from '../markdown.ts'
+import { useMentioning } from '../mentioning.ts'
 import { rowsFor } from '../textarea.ts'
 import { AddPicture } from './AddPicture.tsx'
+import { MentionMenu } from './MentionMenu.tsx'
 
 export const MarkdownField = ({
   label,
@@ -15,6 +18,7 @@ export const MarkdownField = ({
   accessibleName,
   placeholder,
   upload,
+  people,
   onInput,
 }: {
   label: string
@@ -24,8 +28,10 @@ export const MarkdownField = ({
   accessibleName?: string
   placeholder?: string
   upload?: UploadImage
+  people?: readonly Mentionable[]
   onInput: (value: string) => void
 }) => {
+  const mentioning = useMentioning({ value, people, onInput })
   const [previewing, setPreviewing] = useState(false)
   const fieldId = useId()
   const pictures = useImageUpload({ value, maxLength, onInput, upload })
@@ -76,9 +82,18 @@ export const MarkdownField = ({
             value={value}
             onInput={(inputEvent) => onInput(inputEvent.currentTarget.value)}
             {...pictures.handlers}
+            {...mentioning.noticing}
           />
         )}
       </div>
+
+      {!previewing && (
+        <MentionMenu
+          candidates={mentioning.candidates}
+          subject={accessibleName ?? label}
+          onChoose={mentioning.choose}
+        />
+      )}
 
       {!previewing && <AddPicture pictures={pictures} label={label} />}
     </div>

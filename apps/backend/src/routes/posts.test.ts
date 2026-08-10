@@ -1,7 +1,7 @@
 import type { Thread } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { MAX_POST } from '@sage-burner/shared'
+import { everybodyToken, MAX_POST, mentionToken } from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -204,6 +204,82 @@ describe('announcing something', () => {
     await givenBurn()
 
     expect((await announce(server, '', { title: 'Hello', body: '' })).statusCode).toBe(401)
+  })
+})
+
+describe('naming somebody in an announcement', () => {
+  it('tells whoever was named, and tells them that rather than the announcement', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    await givenComing(ada.id)
+    await givenComing(bea.id)
+    await setOn(server, bea.cookie, ['post_written', 'mentioned'])
+
+    await announce(server, ada.cookie, {
+      title: 'The planning call is Sunday',
+      body: `can you make it ${mentionToken('Bea', bea.id)}?`,
+    })
+
+    expect((await bell(server, bea.cookie)).map((one) => one.category)).toEqual(['mentioned'])
+  })
+
+  it('reaches the whole burn for everybody, which is why the announcement itself stays off', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    await givenComing(ada.id)
+    await givenComing(bea.id)
+
+    await announce(server, ada.cookie, {
+      title: 'The planning call is Sunday',
+      body: `${everybodyToken()} please come`,
+    })
+
+    // `post_written` is off and was never switched on; `mentioned` is on by default.
+    expect((await bell(server, bea.cookie)).map((one) => one.category)).toEqual(['mentioned'])
+  })
+
+  it('still announces to somebody who has turned being named off', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    await givenComing(ada.id)
+    await givenComing(bea.id)
+    // Bea wants announcements and does not want to be named in one.
+    await setOn(server, bea.cookie, ['post_written'])
+
+    await announce(server, ada.cookie, {
+      title: 'The planning call is Sunday',
+      body: `can you make it ${mentionToken('Bea', bea.id)}?`,
+    })
+
+    expect((await bell(server, bea.cookie)).map((one) => one.category)).toEqual(['post_written'])
+  })
+
+  it('tells only whoever a rewording adds', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    const dag = await givenAccount('Dag')
+    await givenComing(ada.id)
+    await givenComing(bea.id)
+    await givenComing(dag.id)
+    const made = await announce(server, ada.cookie, {
+      title: 'Sunday',
+      body: `can you make it ${mentionToken('Bea', bea.id)}?`,
+    })
+
+    await reword(server, ada.cookie, made.json().post.id, {
+      body: `can you make it ${mentionToken('Bea', bea.id)} and ${mentionToken('Dag', dag.id)}?`,
+    })
+
+    expect((await bell(server, dag.cookie)).map((one) => one.category)).toEqual(['mentioned'])
+    expect(await bell(server, bea.cookie)).toHaveLength(1)
   })
 })
 

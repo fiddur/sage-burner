@@ -1,7 +1,7 @@
 import type { Thread } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { MAX_COMMENT } from '@sage-burner/shared'
+import { everybodyToken, MAX_COMMENT, mentionsIn, mentionToken } from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -705,5 +705,123 @@ describe('a conversation about a person', () => {
 
     expect((await bell(server, bea.cookie)).map((one) => one.body)).toEqual(['Ada says who they are.'])
     expect(await bell(server, ada.cookie)).toEqual([])
+  })
+})
+
+describe('naming somebody in a comment', () => {
+  it('tells whoever was named, and tells them that rather than the pile', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    await givenComing(ada.id)
+    await givenComing(bea.id)
+    const { thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+
+    await say(server, bea.cookie, id, `what do you think ${mentionToken('Ada', ada.id)}?`)
+
+    expect((await bell(server, ada.cookie)).map((one) => one.category)).toEqual(['mentioned'])
+  })
+
+  it('reaches the whole burn for everybody, and never the author', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    const dag = await givenAccount('Dag')
+    await givenComing(ada.id)
+    await givenComing(bea.id)
+    await givenComing(dag.id)
+    const { thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+
+    await say(server, bea.cookie, id, `${everybodyToken()} the call is Sunday`)
+
+    expect((await bell(server, dag.cookie)).map((one) => one.category)).toEqual(['mentioned'])
+    expect((await bell(server, ada.cookie)).map((one) => one.category)).toEqual(['mentioned'])
+    expect(await bell(server, bea.cookie)).toEqual([])
+  })
+
+  it('still says what somebody did ask for when they have turned being named off', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    await givenComing(ada.id)
+    await givenComing(bea.id)
+    const { thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+    // Ada wants comments on her own dream and does not want to be named.
+    await setOn(server, ada.cookie, ['dream_comment'])
+
+    await say(server, bea.cookie, id, `what do you think ${mentionToken('Ada', ada.id)}?`)
+
+    expect((await bell(server, ada.cookie)).map((one) => one.category)).toEqual(['dream_comment'])
+  })
+
+  it('drops a name that is not coming to this burn, whatever the composer allowed', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    const elsewhere = await givenAccount('Eve')
+    await givenComing(ada.id)
+    await givenComing(bea.id)
+    const { thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+
+    await say(server, bea.cookie, id, `hello ${mentionToken('Eve', elsewhere.id)}`)
+
+    expect(await bell(server, elsewhere.cookie)).toEqual([])
+  })
+
+  it('tells only whoever was added when a comment is fixed up', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    const dag = await givenAccount('Dag')
+    await givenComing(ada.id)
+    await givenComing(bea.id)
+    await givenComing(dag.id)
+    const { thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+    await say(server, bea.cookie, id, `hello ${mentionToken('Ada', ada.id)}`)
+    const [said] = (await entriesOf(server, bea.cookie, id)).filter((entry) => entry.kind === 'comment')
+
+    await rewrite(
+      server,
+      bea.cookie,
+      said?.id ?? '',
+      `hello ${mentionToken('Ada', ada.id)} and ${mentionToken('Dag', dag.id)}`,
+    )
+
+    expect((await bell(server, dag.cookie)).map((one) => one.category)).toEqual(['mentioned'])
+    // Ada was named before the edit and must not hear about it twice.
+    expect(await bell(server, ada.cookie)).toHaveLength(1)
+  })
+
+  it('shows the name whoever is named goes by now, not the one that was typed', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    await givenComing(ada.id)
+    await givenComing(bea.id)
+    const { thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+    await say(server, bea.cookie, id, `hello ${mentionToken('Ada', ada.id)}`)
+
+    await db().update(account).set({ name: 'Ada B' }).where(eq(account.id, ada.id))
+
+    const [comment] = (await entriesOf(server, bea.cookie, id)).filter((entry) => entry.kind === 'comment')
+    expect(mentionsIn(comment?.body ?? '')).toEqual([{ name: 'Ada B', target: ada.id }])
+  })
+
+  it('keeps what was typed when the account cannot be looked up any more', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const { thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+    await say(server, ada.cookie, id, `hello ${mentionToken('Nobody', 'a-gone')}`)
+
+    const [comment] = (await entriesOf(server, ada.cookie, id)).filter((entry) => entry.kind === 'comment')
+    expect(mentionsIn(comment?.body ?? '')).toEqual([{ name: 'Nobody', target: 'a-gone' }])
   })
 })

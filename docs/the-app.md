@@ -332,6 +332,53 @@ carries no foreign key, and why `event_id` and `title` sit on the thread rather 
 being joined out of a row that may be gone. Retention is still the burn: a thread
 cascades with the event.
 
+#### Naming somebody
+
+**A mention is an id, not a handle** (#439). `account.name` is nullable and not unique — `NAMELESS`
+exists because of it — and there is no username column anywhere, so `@name` as plain text has
+nothing to resolve against. The data-model rule already says what to do: reference by id and
+resolve the name at read time. The token is `@[Ada](mention:a-1)`, which is markdown-ish enough to
+survive `markdown.ts` and tolerable to look at while editing, since the raw body is what the author
+sees.
+
+**Three things make it safe, and each one is the reason for the next.** The name inside the token is
+author-controlled, so `mentionName` strips `[`, `]`, `(`, `)` and newlines — a name that could end
+its own token could put the rest of itself outside. `mentionsAsLinks` then rebuilds the token as
+`[@Ada](/members/a-1)`, so the renderer escapes the name like any other link text rather than
+anything here escaping it. And it runs **inside `renderMarkdown`**, so no call site can forget it:
+a token that somehow reached the page unconverted renders as its own text, because `mention:` is not
+a scheme `isSafeUrl` allows.
+
+**The name is refreshed when a thread is read**, not when it is written. `readThreads` collects the
+ids out of every entry body and every post body it is returning, looks the names up once, and
+rewrites the tokens — so renaming yourself changes what a comment written last year says about you.
+What was typed survives only as the fallback for an id nobody can look up.
+
+**Attendance is the audience, whatever the composer allowed.** `namedBy` intersects the ids in a
+body with the burn's `attendance` rows and drops the rest silently; `@everybody` is that whole set.
+Both minus the author, because nobody is told about their own click (#247).
+
+**Being named is the most specific claim, so it wins.** Somebody named in a comment on their own
+dream would otherwise get `dream_comment` as well; the mention is sent and the pile is not, which is
+what keeps one comment to one notification per person. `mentioned` is `about: 'you'` and **on**,
+which needs no argument: being named is the definition of what happens to you.
+
+**It may only displace what it actually replaces.** Somebody who has switched `mentioned` off would
+otherwise hear _nothing_ about a comment they had asked to hear about, because the mention that
+displaced it was never written either — one notification becoming zero. So the named list is
+filtered by whoever the mention reaches, on the bell or by email, before anybody is taken out of the
+ordinary audience.
+
+**An edit tells only whoever was added.** `tellNewlyNamed` diffs the mention sets before and after,
+so fixing a typo in a comment that names somebody does not name them again. A comment's edit
+notifies nothing else at all, which it did not before either.
+
+**`@everybody` is any approved member's.** The alternative was gating it to admins, and the trust
+model this app replaces is a spreadsheet everybody could edit; at forty-two people the cost of one
+over-eager `@everybody` is small and social pressure is the real rate limiter. It is also the reason
+`post_written` can honestly stay off by default — an author who needs the burn's attention says so
+in the body rather than relying on a category nobody would leave on.
+
 #### An announcement
 
 **A post is the one card that mirrors nothing else** (#438). Everything else on the feed is a

@@ -15,7 +15,9 @@ import {
   dreamPage,
   feedPage,
   INTRODUCTION_EXCERPT,
+  mentionedAccounts,
   profilePage,
+  withMentionNames,
 } from '@sage-burner/shared'
 import { and, asc, count, desc, eq, inArray, max, ne, sql } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
@@ -37,7 +39,7 @@ import {
   threadEntry,
 } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
-import { displayName } from '../push/notify.ts'
+import { displayName, namedBy, wants } from '../push/notify.ts'
 
 export interface NewEntry {
   thread_id: string
@@ -262,11 +264,17 @@ export const readThreads = async (
 
   const byId = new Map(rows.map((row) => [row.id, row]))
 
+  const namesById = await mentionedNames(db, [
+    ...entries.map((row) => row.body),
+    ...rows.map((row) => row.post_body ?? ''),
+  ])
+  const named = (body: string) => withMentionNames(body, (target) => namesById.get(target))
+
   return ids.flatMap((id) => {
     const row = byId.get(id)
     if (row === undefined) return []
 
-    const all = held.get(id) ?? []
+    const all = (held.get(id) ?? []).map((entry) => ({ ...entry, body: named(entry.body) }))
     const shown = newest === undefined ? all : all.slice(Math.max(0, all.length - newest))
     const last = all.at(-1)
 
@@ -277,7 +285,7 @@ export const readThreads = async (
         burn: row.burn,
         entity_type: row.entity_type,
         entity_id: row.entity_id,
-        ...factsFor(row),
+        ...withNamedBody(factsFor(row), named),
         own: authoredBy(row, viewer),
         entry_count: counts?.get(id) ?? all.length,
         last_at: last?.created_at ?? null,
@@ -330,6 +338,24 @@ const postFacts = (row: CardRow): CardFacts => ({
   body: row.post_withdrawn_at === null ? row.post_body : null,
   gone: row.post_withdrawn_at !== null,
 })
+
+const withNamedBody = (facts: CardFacts, named: (body: string) => string): CardFacts =>
+  facts.body === null ? facts : { ...facts, body: named(facts.body) }
+
+export const mentionedNames = async (
+  db: Database,
+  bodies: readonly string[],
+): Promise<Map<string, string>> => {
+  const wanted = [...new Set(bodies.flatMap((body) => mentionedAccounts(body)))]
+  if (wanted.length === 0) return new Map()
+
+  const rows = await db
+    .select({ id: account.id, name: account.name })
+    .from(account)
+    .where(inArray(account.id, wanted))
+
+  return new Map(rows.flatMap((row) => (row.name === null ? [] : [[row.id, row.name] as const])))
+}
 
 const factsFor = (row: CardRow): CardFacts =>
   ({ session: dreamFacts, attendance: personFacts, post: postFacts })[row.entity_type](row)
@@ -451,7 +477,7 @@ export const registerThreadRoutes = (
         now(),
       )
 
-      await tellAbout(found, viewer.account_id)
+      await tellAbout(found, viewer.account_id, body.body)
 
       return await whole(reply, found.id, viewer)
     },
@@ -470,7 +496,7 @@ export const registerThreadRoutes = (
       if (viewer === undefined) return sendError(reply, 401)
 
       const [comment] = await db
-        .select({ id: threadEntry.id, thread_id: threadEntry.thread_id })
+        .select({ id: threadEntry.id, thread_id: threadEntry.thread_id, body: threadEntry.body })
         .from(threadEntry)
         .where(
           and(
@@ -487,6 +513,21 @@ export const registerThreadRoutes = (
         .update(threadEntry)
         .set({ body: body.body, edited_at: now().toISOString() })
         .where(eq(threadEntry.id, comment.id))
+
+      const [on] = await db
+        .select({
+          event_id: thread.event_id,
+          entity_type: thread.entity_type,
+          entity_id: thread.entity_id,
+          title: thread.title,
+        })
+        .from(thread)
+        .where(eq(thread.id, comment.thread_id))
+        .limit(1)
+
+      if (on !== undefined) {
+        await tellNewlyNamed(on, viewer.account_id, comment.body, body.body)
+      }
 
       return await whole(reply, comment.thread_id, viewer)
     },
@@ -562,13 +603,40 @@ export const registerThreadRoutes = (
     post: { mine: 'post_comment', anybody: 'post_comment_any' },
   } as const satisfies Record<ThreadEntityType, { mine: NotificationCategory; anybody: NotificationCategory }>
 
+  // Being named displaces the ordinary category, so it may only displace it for somebody the
+  // mention actually reaches — otherwise switching `mentioned` off silences what they did ask for.
+  const reaching = async (database: Database, named: readonly string[]): Promise<string[]> => {
+    const asked = await Promise.all(
+      named.map(async (accountId) => {
+        const channels = await wants(database, accountId, 'mentioned')
+
+        return channels.bell || channels.email ? [accountId] : []
+      }),
+    )
+
+    return asked.flat()
+  }
+
+  const tellNamed = async (named: readonly string[], who: string, what: string, link: string | null) => {
+    const said = `${who} named you in ${what}`
+
+    await Promise.all(
+      named.map(async (accountId) => await notify(accountId, { category: 'mentioned', body: said, link })),
+    )
+  }
+
   const tellAbout = async (
     found: { id: string; event_id: string; entity_type: ThreadEntityType; entity_id: string; title: string },
     author: string,
+    body: string,
   ) => {
     const { link, what } = await aboutWhat(found)
-    const said = `${await displayName(db, author)} said something about ${what}`
+    const who = await displayName(db, author)
+    const said = `${who} said something about ${what}`
     const { mine, anybody } = commentCategories[found.entity_type]
+
+    const named = await reaching(db, await namedBy(db, body, found.event_id, author))
+    const told = new Set(named)
 
     const people = await participantsOf(db, found)
     people.delete(author)
@@ -579,10 +647,29 @@ export const registerThreadRoutes = (
       .where(and(eq(attendance.event_id, found.event_id), ne(attendance.account_id, author)))
 
     await Promise.all([
-      ...[...people].map(async (accountId) => await notify(accountId, { category: mine, body: said, link })),
+      tellNamed(named, who, what, link),
+      ...[...people]
+        .filter((accountId) => !told.has(accountId))
+        .map(async (accountId) => await notify(accountId, { category: mine, body: said, link })),
       ...attendees
-        .filter((row) => !people.has(row.account_id))
+        .filter((row) => !people.has(row.account_id) && !told.has(row.account_id))
         .map(async (row) => await notify(row.account_id, { category: anybody, body: said, link })),
     ])
+  }
+
+  const tellNewlyNamed = async (
+    found: { event_id: string; entity_type: ThreadEntityType; entity_id: string; title: string },
+    author: string,
+    before: string,
+    after: string,
+  ) => {
+    const named = await reaching(db, await namedBy(db, after, found.event_id, author))
+    const already = new Set(await namedBy(db, before, found.event_id, author))
+    const newly = named.filter((accountId) => !already.has(accountId))
+    if (newly.length === 0) return
+
+    const { link, what } = await aboutWhat(found)
+
+    await tellNamed(newly, await displayName(db, author), what, link)
   }
 }
