@@ -242,6 +242,24 @@ describe('naming somebody in an announcement', () => {
     expect((await bell(server, bea.cookie)).map((one) => one.category)).toEqual(['mentioned'])
   })
 
+  it('still announces to somebody who has turned being named off', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    await givenComing(ada.id)
+    await givenComing(bea.id)
+    // Bea wants announcements and does not want to be named in one.
+    await setOn(server, bea.cookie, ['post_written'])
+
+    await announce(server, ada.cookie, {
+      title: 'The planning call is Sunday',
+      body: `can you make it ${mentionToken('Bea', bea.id)}?`,
+    })
+
+    expect((await bell(server, bea.cookie)).map((one) => one.category)).toEqual(['post_written'])
+  })
+
   it('tells only whoever a rewording adds', async () => {
     const server = await build()
     await givenBurn()

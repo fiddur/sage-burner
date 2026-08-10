@@ -39,7 +39,7 @@ import {
   threadEntry,
 } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
-import { displayName, namedBy } from '../push/notify.ts'
+import { displayName, namedBy, wants } from '../push/notify.ts'
 
 export interface NewEntry {
   thread_id: string
@@ -264,8 +264,6 @@ export const readThreads = async (
 
   const byId = new Map(rows.map((row) => [row.id, row]))
 
-  // A name inside a mention is resolved here, like every other name: the token carries the id,
-  // and what was typed is only the fallback for an account nobody can look up any more.
   const namesById = await mentionedNames(db, [
     ...entries.map((row) => row.body),
     ...rows.map((row) => row.post_body ?? ''),
@@ -605,6 +603,20 @@ export const registerThreadRoutes = (
     post: { mine: 'post_comment', anybody: 'post_comment_any' },
   } as const satisfies Record<ThreadEntityType, { mine: NotificationCategory; anybody: NotificationCategory }>
 
+  // Being named displaces the ordinary category, so it may only displace it for somebody the
+  // mention actually reaches — otherwise switching `mentioned` off silences what they did ask for.
+  const reaching = async (database: Database, named: readonly string[]): Promise<string[]> => {
+    const asked = await Promise.all(
+      named.map(async (accountId) => {
+        const channels = await wants(database, accountId, 'mentioned')
+
+        return channels.bell || channels.email ? [accountId] : []
+      }),
+    )
+
+    return asked.flat()
+  }
+
   const tellNamed = async (named: readonly string[], who: string, what: string, link: string | null) => {
     const said = `${who} named you in ${what}`
 
@@ -623,8 +635,7 @@ export const registerThreadRoutes = (
     const said = `${who} said something about ${what}`
     const { mine, anybody } = commentCategories[found.entity_type]
 
-    // Being named is the most specific claim, so whoever was named hears that and not the pile.
-    const named = await namedBy(db, body, found.event_id, author)
+    const named = await reaching(db, await namedBy(db, body, found.event_id, author))
     const told = new Set(named)
 
     const people = await participantsOf(db, found)
@@ -652,7 +663,7 @@ export const registerThreadRoutes = (
     before: string,
     after: string,
   ) => {
-    const named = await namedBy(db, after, found.event_id, author)
+    const named = await reaching(db, await namedBy(db, after, found.event_id, author))
     const already = new Set(await namedBy(db, before, found.event_id, author))
     const newly = named.filter((accountId) => !already.has(accountId))
     if (newly.length === 0) return

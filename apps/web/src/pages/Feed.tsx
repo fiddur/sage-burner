@@ -112,8 +112,6 @@ export const Feed = ({ api }: { api: FeedApi }) => {
   const selected = useSelectedBurn()
   const eventId = selected?.event.id
 
-  // Whoever is coming to the burn in the bar, for the `@` menu. Two columns and nothing else,
-  // which is what `getEventAttendees` exists to answer.
   const { loaded: coming } = useLoad(
     async (signal) => (eventId === undefined ? [] : (await api.getEventAttendees(eventId, signal)).attendees),
     {
@@ -192,7 +190,7 @@ export const Feed = ({ api }: { api: FeedApi }) => {
                 on={settings?.on}
                 talk={talk}
                 upload={api.uploadImage}
-                people={people}
+                people={item.card.event_id === eventId ? people : []}
                 onToggle={toggle}
               />
             ),

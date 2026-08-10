@@ -218,7 +218,6 @@ describe('naming somebody under a dream', () => {
   })
 
   it('offers them while something already said is being fixed up', () => {
-    // `tellNewlyNamed` exists to tell whoever an edit adds, which nothing could add without this.
     show(aThread([anEntry({ id: 't-1', body: 'mine' })]), { people: PEOPLE })
 
     fireEvent.click(screen.getByRole('button', { name: /Rewrite what you said/ }))

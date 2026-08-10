@@ -720,7 +720,6 @@ describe('naming somebody in a comment', () => {
 
     await say(server, bea.cookie, id, `what do you think ${mentionToken('Ada', ada.id)}?`)
 
-    // Ada offered it, so `dream_comment` would have reached her too — being named wins.
     expect((await bell(server, ada.cookie)).map((one) => one.category)).toEqual(['mentioned'])
   })
 
@@ -740,6 +739,22 @@ describe('naming somebody in a comment', () => {
     expect((await bell(server, dag.cookie)).map((one) => one.category)).toEqual(['mentioned'])
     expect((await bell(server, ada.cookie)).map((one) => one.category)).toEqual(['mentioned'])
     expect(await bell(server, bea.cookie)).toEqual([])
+  })
+
+  it('still says what somebody did ask for when they have turned being named off', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    await givenComing(ada.id)
+    await givenComing(bea.id)
+    const { thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+    // Ada wants comments on her own dream and does not want to be named.
+    await setOn(server, ada.cookie, ['dream_comment'])
+
+    await say(server, bea.cookie, id, `what do you think ${mentionToken('Ada', ada.id)}?`)
+
+    expect((await bell(server, ada.cookie)).map((one) => one.category)).toEqual(['dream_comment'])
   })
 
   it('drops a name that is not coming to this burn, whatever the composer allowed', async () => {

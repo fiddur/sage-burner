@@ -363,6 +363,12 @@ dream would otherwise get `dream_comment` as well; the mention is sent and the p
 what keeps one comment to one notification per person. `mentioned` is `about: 'you'` and **on**,
 which needs no argument: being named is the definition of what happens to you.
 
+**It may only displace what it actually replaces.** Somebody who has switched `mentioned` off would
+otherwise hear _nothing_ about a comment they had asked to hear about, because the mention that
+displaced it was never written either — one notification becoming zero. So the named list is
+filtered by whoever the mention reaches, on the bell or by email, before anybody is taken out of the
+ordinary audience.
+
 **An edit tells only whoever was added.** `tellNewlyNamed` diffs the mention sets before and after,
 so fixing a typo in a comment that names somebody does not name them again. A comment's edit
 notifies nothing else at all, which it did not before either.

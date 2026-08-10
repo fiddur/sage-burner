@@ -161,10 +161,6 @@ export const tellAttendees = async (
   return audience.length
 }
 
-/**
- * Who a body names, bounded by attendance: the composer offers only attendees, and a token
- * pointing anywhere else is dropped rather than refused. `@everybody` is the whole burn.
- */
 export const namedBy = async (
   db: Database,
   body: string,

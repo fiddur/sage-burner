@@ -157,8 +157,6 @@ describe('MarkdownField', () => {
 })
 
 describe('naming somebody in a markdown field', () => {
-  // Driven the way every caller drives it: the value is theirs, so letting it stay `''` types
-  // into a box whose contents never change and the `@` never reaches the value at all.
   const Held = ({ people }: { people?: readonly { account_id: string; name: string | null }[] }) => {
     const [value, setValue] = useState('')
 
@@ -174,9 +172,6 @@ describe('naming somebody in a markdown field', () => {
   }
 
   it('offers nobody at all where the field does not do mentions', () => {
-    // Most fields here are prose nothing reads for names — help text, a welcome page, a dream's
-    // description. An `@everybody` written into one of those notifies nobody while looking as
-    // though it reached the burn, so the menu is absent rather than empty.
     render(<Held />)
 
     type('@', 1)

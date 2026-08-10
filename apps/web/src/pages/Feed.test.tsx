@@ -229,6 +229,31 @@ describe('announcing something on the feed', () => {
     await waitFor(() => expect(getEventAttendees).toHaveBeenCalledWith('e-2', expect.anything()))
   })
 
+  it('offers no names on a card from another burn, since they could not be reached', async () => {
+    // The feed spans burns; the attendee list is the one in the bar. `namedBy` would drop a name
+    // from the wrong burn silently, so the menu must not offer it — `@everybody` still works,
+    // because the server resolves that from the card's own event.
+    renderPage(
+      stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dusk', event_id: 'e-2', burn: 'Autumn burn' })]),
+    )
+
+    const box = await screen.findByLabelText('Say something about Sauna at dusk')
+    fireEvent.input(box, { target: { value: 'ask @Be' } })
+    fireEvent.keyUp(box, { target: { selectionStart: 7 } })
+
+    expect(screen.queryByRole('button', { name: '@Bea' })).toBeNull()
+  })
+
+  it('offers them on a card from the burn in the bar', async () => {
+    renderPage(stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn', event_id: 'e-1' })]))
+
+    const box = await screen.findByLabelText('Say something about Sauna at dawn')
+    fireEvent.input(box, { target: { value: 'ask @Be' } })
+    fireEvent.keyUp(box, { target: { selectionStart: 7 } })
+
+    expect(screen.getByRole('button', { name: '@Bea' })).toBeTruthy()
+  })
+
   it('offers the whole burn as well, which is nobody in the list', async () => {
     renderPage(stub())
 
