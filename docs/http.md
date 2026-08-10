@@ -7,8 +7,12 @@ successful body to its shape.
 
 ## What holds a response to its shape
 
-Every wrapper a route sends has a schema in `packages/shared`, the route `satisfies` it and the
-client asks for the inferred type — so a renamed key stops compiling on both sides at once.
+**The rule for a wrapper is a schema in `packages/shared`, `satisfies` on the route's literal, and
+the inferred type in the client** — so a renamed key stops compiling on both sides at once. It is
+the rule for a new one, and most of the tree follows it, but it is **not** coverage the tree has:
+`{ ride }` in `rides.ts`, `{ item }` in `allergies.ts`, `{ avatar }` in `avatars.ts`, and the
+installation icon, banner and meal-intro wrappers are all still literals with an inline type on the
+client side. Converting them is ordinary work nobody has done yet.
 
 **`reply.send` is not type-checked**, which is the whole reason the `satisfies` habit matters and
 the reason five wrappers had drifted out of it (#149): `attendance`, `place`, `option`, the minted
