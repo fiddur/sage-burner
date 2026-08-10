@@ -1,4 +1,4 @@
-import type { AttendanceUpdate, ProfileResponse } from '@sage-burner/shared'
+import type { AttendanceResponse, AttendanceUpdate, ProfileResponse } from '@sage-burner/shared'
 import type { SQL } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 
@@ -265,7 +265,9 @@ export const registerProfileRoutes = (
       const [first] = updated
 
       if (first !== undefined) {
-        return { attendance: { ...first, helping_option_ids: await helpingIdsFor(db, first.id) } }
+        return {
+          attendance: { ...first, helping_option_ids: await helpingIdsFor(db, first.id) },
+        } satisfies AttendanceResponse
       }
 
       const why = await whyNothingWritten(db, attendance, mine)

@@ -20,6 +20,9 @@ export type EventOption = z.infer<typeof eventOptionSchema>
 export const eventOptionTakenSchema = eventOptionSchema.extend({ taken: z.int().nonnegative() })
 export type EventOptionTaken = z.infer<typeof eventOptionTakenSchema>
 
+export const eventOptionResponseSchema = z.object({ option: eventOptionSchema })
+export type EventOptionResponse = z.infer<typeof eventOptionResponseSchema>
+
 export const eventOptionsResponseSchema = z.object({ options: z.array(eventOptionTakenSchema) })
 export type EventOptionsResponse = z.infer<typeof eventOptionsResponseSchema>
 

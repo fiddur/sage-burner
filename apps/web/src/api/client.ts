@@ -9,7 +9,7 @@ import type {
   ApplicationResponse,
   ApplicationsResponse,
   ApprovedAccountsResponse,
-  Attendance,
+  AttendanceResponse,
   BodyOf,
   CalendarFeedResponse,
   ChangelogResponse,
@@ -18,9 +18,9 @@ import type {
   CopyFrom,
   CopySourcesResponse,
   EventAttendeesResponse,
-  EventOption,
   EventOptionKind,
   EventOptionOrder,
+  EventOptionResponse,
   EventOptionsResponse,
   EventResponse,
   EventsResponse,
@@ -53,8 +53,8 @@ import type {
   OAuthSettingsResponse,
   PasskeysResponse,
   PersonProfileResponse,
-  Place,
   PlaceOrder,
+  PlaceResponse,
   PlacesResponse,
   PostResponse,
   PrivacyResponse,
@@ -723,13 +723,13 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
       request<PlacesResponse>(apiRoutes.getPlaces.path(eventId), { signal, version: 'places' }),
 
     addPlace: (eventId: string, body: BodyOf<'addPlace'>) =>
-      request<{ place: Place }>(apiRoutes.addPlace.path(eventId), {
+      request<PlaceResponse>(apiRoutes.addPlace.path(eventId), {
         method: apiRoutes.addPlace.method,
         body,
       }),
 
     updatePlace: (id: string, body: BodyOf<'updatePlace'>) =>
-      request<{ place: Place }>(apiRoutes.updatePlace.path(id), {
+      request<PlaceResponse>(apiRoutes.updatePlace.path(id), {
         method: apiRoutes.updatePlace.method,
         body,
         version: 'places',
@@ -791,13 +791,13 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
       request<EventOptionsResponse>(apiRoutes.getEventOptions.path(eventId), { signal, version: 'options' }),
 
     addEventOption: (eventId: string, body: BodyOf<'addEventOption'>) =>
-      request<{ option: EventOption }>(apiRoutes.addEventOption.path(eventId), {
+      request<EventOptionResponse>(apiRoutes.addEventOption.path(eventId), {
         method: apiRoutes.addEventOption.method,
         body,
       }),
 
     updateEventOption: (id: string, body: BodyOf<'updateEventOption'>) =>
-      request<{ option: EventOption }>(apiRoutes.updateEventOption.path(id), {
+      request<EventOptionResponse>(apiRoutes.updateEventOption.path(id), {
         method: apiRoutes.updateEventOption.method,
         body,
         version: 'options',
@@ -851,13 +851,13 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
     getMyBurns: (signal?: AbortSignal) => request<MyBurnsResponse>(apiRoutes.getMyBurns.path(), { signal }),
 
     adminAddAttendance: (eventId: string, body: BodyOf<'adminAddAttendance'>) =>
-      request<{ attendance: Attendance }>(apiRoutes.adminAddAttendance.path(eventId), {
+      request<AttendanceResponse>(apiRoutes.adminAddAttendance.path(eventId), {
         method: apiRoutes.adminAddAttendance.method,
         body,
       }),
 
     joinEvent: (eventId: string) =>
-      request<{ attendance: Attendance }>(apiRoutes.joinEvent.path(eventId), {
+      request<AttendanceResponse>(apiRoutes.joinEvent.path(eventId), {
         method: apiRoutes.joinEvent.method,
       }),
 
@@ -906,7 +906,7 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
       }),
 
     updateMyStay: (eventId: string, body: BodyOf<'updateMyStay'>) =>
-      request<{ attendance: Attendance }>(apiRoutes.updateMyStay.path(eventId), {
+      request<AttendanceResponse>(apiRoutes.updateMyStay.path(eventId), {
         method: apiRoutes.updateMyStay.method,
         body,
       }),
@@ -918,7 +918,7 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
       request<MemberRosterResponse>(apiRoutes.getMembers.path(eventId), { signal }),
 
     setPayment: (eventId: string, accountId: string, body: BodyOf<'setPayment'>) =>
-      request<{ attendance: Attendance }>(apiRoutes.setPayment.path(eventId, accountId), {
+      request<AttendanceResponse>(apiRoutes.setPayment.path(eventId, accountId), {
         method: apiRoutes.setPayment.method,
         body,
       }),

@@ -1,4 +1,4 @@
-import type { EventAttendeesResponse, MyBurn, MyBurnsResponse } from '@sage-burner/shared'
+import type { AttendanceResponse, EventAttendeesResponse, MyBurn, MyBurnsResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
 import { apiRoutes, attendanceCreateSchema, placeTransferSchema } from '@sage-burner/shared'
@@ -200,7 +200,9 @@ export const registerAttendanceRoutes = (
         )
       }
 
-      return joined.created ? reply.code(201).send({ attendance: joined.stay }) : { attendance: joined.stay }
+      const answer = { attendance: joined.stay } satisfies AttendanceResponse
+
+      return joined.created ? reply.code(201).send(answer) : answer
     },
   )
 
@@ -295,7 +297,7 @@ export const registerAttendanceRoutes = (
     if (body === undefined) return sendError(reply, 400)
 
     const existing = await joinedRow(request.params.eventId, body.account_id)
-    if (existing !== undefined) return { attendance: existing }
+    if (existing !== undefined) return { attendance: existing } satisfies AttendanceResponse
 
     const [burn] = await db
       .select({ start_date: event.start_date, end_date: event.end_date })
@@ -317,10 +319,17 @@ export const registerAttendanceRoutes = (
       if (isForeignKeyViolation(error)) return sendError(reply, 404)
       if (!isAlreadyJoined(error)) throw error
 
-      return { attendance: await joinedRow(request.params.eventId, body.account_id) }
+      const raced = await joinedRow(request.params.eventId, body.account_id)
+
+      return raced === undefined
+        ? sendError(reply, 409)
+        : ({ attendance: raced } satisfies AttendanceResponse)
     }
 
-    return reply.code(201).send({ attendance: await joinedRow(request.params.eventId, body.account_id) })
+    const made = await joinedRow(request.params.eventId, body.account_id)
+    if (made === undefined) return sendError(reply, 404)
+
+    return reply.code(201).send({ attendance: made } satisfies AttendanceResponse)
   })
 
   app.delete<{ Params: { eventId: string; accountId: string } }>(

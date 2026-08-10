@@ -25,7 +25,7 @@ export const messageForRemoval = (failure: unknown): string => {
 export const outcomeMessage = (outcome: string | null, ref: string | null = null): string | undefined => {
   if (outcome === 'linked') return 'That is linked now — you can sign in with it next time.'
   if (outcome === 'reached') {
-    return 'That is linked now — you can sign in with it next time, and your name there has been added to how people can reach you. Take it off that list if you would rather it was not.'
+    return 'That is linked now — you can sign in with it next time, and your name there has been added to how people can reach you. Remove it from that list if you would rather it was not.'
   }
   if (outcome === 'taken') return 'That account is already linked to somebody here.'
   if (outcome === 'misconfigured') {

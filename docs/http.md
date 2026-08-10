@@ -1,8 +1,28 @@
 # Over the wire
 
-The security headers every response carries, and the shape every error takes.
+The security headers every response carries, the shape every error takes, and what holds a
+successful body to its shape.
 
 [← back to the README](../README.md)
+
+## What holds a response to its shape
+
+**The rule for a wrapper is a schema in `packages/shared`, `satisfies` on the route's literal, and
+the inferred type in the client** — so a renamed key stops compiling on both sides at once. It is
+the rule for a new one, and most of the tree follows it, but it is **not** coverage the tree has:
+`{ ride }` in `rides.ts`, `{ item }` in `allergies.ts`, `{ avatar }` in `avatars.ts`, and the
+installation icon, banner and meal-intro wrappers are all still literals with an inline type on the
+client side. Converting them is ordinary work nobody has done yet.
+
+**`reply.send` is not type-checked**, which is the whole reason the `satisfies` habit matters and
+the reason five wrappers had drifted out of it (#149): `attendance`, `place`, `option`, the minted
+invite and the redemption were literals nothing compared to anything. Adding the `satisfies` found
+a real hole in `adminAddAttendance`, which could send `{ attendance: undefined }` — a `{}` body —
+where the row it had just inserted came back missing.
+
+**Zod stays out of the browser**, so nothing parses a body at runtime there. The runtime half is in
+**backend route tests**, which parse a response through the shared schema — a compile-time contract
+and a runtime one, neither of which the other covers.
 
 ## Security headers
 

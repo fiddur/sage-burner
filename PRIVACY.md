@@ -47,7 +47,7 @@ Only if you choose to link one, and only ever as an extra way in beside your pas
 "your username, avatar and banner", because the smallest thing it lets anyone ask for is your
 profile — there is no way to ask only for an identifier. Facebook's is the same shape. What
 arrives beyond what is listed above, your banner among it, is dropped rather than kept: it is
-read out of the answer for the things named and the rest is never stored, never shown to
+read out of the answer for the three things listed above and the rest is never stored, never shown to
 anybody, and gone when the request finishes.
 
 We ask for nothing beyond that profile. We do not ask for your email address, your friends,

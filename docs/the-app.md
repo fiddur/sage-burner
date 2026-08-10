@@ -11,8 +11,8 @@ The bar carries **one entry per thing, not one per page** (#184). Everything els
 is reached from the page it belongs to, which is where somebody is standing when
 they want it.
 
-Leftmost is the **burn selector**, because everything to the right of it is about
-the burn it names. It lists the burns a member has said they are coming to, and
+The **burn selector** sits after ☰ and the logo, and everything to the right of it is
+about the burn it names. It lists the burns a member has said they are coming to, and
 defaults to the soonest — the list arrives soonest-first, so that is the first
 entry rather than a rule applied twice. **An account holding `admin` sees every
 burn still to come**: one without `member` has no attendance anywhere and would
@@ -904,6 +904,14 @@ on shutdown. Nothing on screen depends on it — the row is written first and al
 so being slow now costs nobody anything, which is what makes serial the right shape
 rather than a bounded pool. Nothing retries; a message that could not be posted is
 logged and gone, the same promise the bell already makes.
+
+**`DRAIN_DEADLINE_MS` is five seconds, and that is sized for a hung relay rather than for a
+full queue** (#383). Serial at a few hundred milliseconds a message means a forty-two-person
+fan-out does not fit inside it, so an ordinary redeploy in the middle of one abandons the tail.
+Deliberate: raising it past a few seconds only trades a lost tail for a container that will not
+stop — docker sends SIGKILL after ten — and nothing retries anyway, which is the promise above.
+So the deadline is what stops shutdown waiting on a relay that will never answer, and the tail
+it drops is the same thing a failed send already drops.
 
 That reverses something the tests relied on: **a route answering no longer means the
 posting has happened.** `createApp` takes `defer` for exactly that reason, so a test

@@ -239,8 +239,12 @@ export interface ConnectionKindInfo {
 
 const dialled = (value: string): string => `+${value.replaceAll(/\D/gu, '')}`
 
+// A stored handle is `@user@authority` with no separator in either half, and a value
+// `connectionValue` could not read a handle out of is kept whole — so a pasted post URL has one
+// `@` too and built a link to host `wren` (#433). Forbidding the separators is what tells them
+// apart, with or without the scheme. Visibly wrong beats confidently wrong: no link at all.
 const mastodonHref = (value: string): string | undefined => {
-  const [, user, instance] = /^@?([^@\s]+)@([^@\s]+)$/u.exec(value.trim()) ?? []
+  const [, user, instance] = /^@?([^@\s/\\]+)@([^@\s/\\]+)$/u.exec(value.trim()) ?? []
   if (user === undefined || instance === undefined) return undefined
 
   return `https://${instance}/@${user}`

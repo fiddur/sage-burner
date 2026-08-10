@@ -1,5 +1,6 @@
 import type { FastifyInstance, LightMyRequestResponse } from 'fastify'
 
+import { attendanceResponseSchema } from '@sage-burner/shared'
 import { and, eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -135,6 +136,7 @@ describe('a member saying they are coming', () => {
     expect(response.json().attendance.payment_status).toBe('unpaid')
     expect(response.json().attendance.event_id).toBe(eventId)
     expect(response.json().attendance.joined_at).toBe(NOW)
+    expect(attendanceResponseSchema.safeParse(response.json()).success).toBe(true)
   })
 
   it('is a no-op said twice, rather than an error or a second row', async () => {

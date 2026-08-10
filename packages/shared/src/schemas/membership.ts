@@ -70,6 +70,9 @@ export const attendanceUpdateSchema = withStayOrder(
 export type Profile = z.infer<typeof profileSchema>
 export type ProfileResponse = z.infer<typeof profileResponseSchema>
 export type Attendance = z.infer<typeof attendanceSchema>
+
+export const attendanceResponseSchema = z.object({ attendance: attendanceSchema })
+export type AttendanceResponse = z.infer<typeof attendanceResponseSchema>
 export type ProfileUpdate = z.infer<typeof profileUpdateSchema>
 export type AttendanceUpdate = z.infer<typeof attendanceUpdateSchema>
 

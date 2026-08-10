@@ -1,4 +1,5 @@
 import type {
+  AttendanceResponse,
   MemberRosterEntry,
   MemberRosterResponse,
   RosterEntry,
@@ -142,7 +143,7 @@ export const registerRosterRoutes = (
         await tellAboutTheWaitingList(db, eventId, notify)
       }
 
-      return { attendance: await withHelping(updated) }
+      return { attendance: await withHelping(updated) } satisfies AttendanceResponse
     },
   )
 

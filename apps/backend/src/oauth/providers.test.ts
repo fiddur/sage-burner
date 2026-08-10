@@ -101,6 +101,16 @@ describe('reading what Facebook answered', () => {
     expect(read?.profile_url).toBeUndefined()
     expect(read?.subject).toBe('app-scoped-1')
   })
+
+  it('offers no way of being reached, since Facebook has a display name and no handle', () => {
+    const read: ProviderProfile | undefined = providerShapes.facebook.read({
+      id: 'app-scoped-1',
+      name: 'Wren',
+      picture: { data: {} },
+    })
+
+    expect(read?.reach).toBeUndefined()
+  })
 })
 
 describe('reading what Discord answered', () => {
@@ -120,15 +130,5 @@ describe('reading what Discord answered', () => {
 
     expect(read?.reach).toBeUndefined()
     expect(read?.subject).toBe('discord-1')
-  })
-
-  it('offers none from Facebook, which has a display name and no handle', () => {
-    const read: ProviderProfile | undefined = providerShapes.facebook.read({
-      id: 'app-scoped-1',
-      name: 'Wren',
-      picture: { data: {} },
-    })
-
-    expect(read?.reach).toBeUndefined()
   })
 })
