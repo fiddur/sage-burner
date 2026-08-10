@@ -156,12 +156,26 @@ describe('MarkdownField', () => {
   })
 })
 
+const NEARLY = 'x'.repeat(24)
+
 describe('naming somebody in a markdown field', () => {
-  const Held = ({ people }: { people?: readonly { account_id: string; name: string | null }[] }) => {
+  const Held = ({
+    people,
+    maxLength = 2000,
+  }: {
+    people?: readonly { account_id: string; name: string | null }[]
+    maxLength?: number
+  }) => {
     const [value, setValue] = useState('')
 
     return (
-      <MarkdownField label="Help text" value={value} maxLength={2000} people={people} onInput={setValue} />
+      <MarkdownField
+        label="Help text"
+        value={value}
+        maxLength={maxLength}
+        people={people}
+        onInput={setValue}
+      />
     )
   }
 
@@ -193,6 +207,26 @@ describe('naming somebody in a markdown field', () => {
 
     type('@', 1)
 
+    expect(screen.getByRole('button', { name: '@everybody' })).toBeTruthy()
+  })
+
+  it('offers nobody whose token would not fit, rather than writing one the API refuses', () => {
+    // `maxlength` does not apply to a programmatic insert, so the menu could write a body over
+    // the limit and the save came back as a generic failure (#457).
+    render(<Held people={[{ account_id: 'a-1', name: 'Ada' }]} maxLength={40} />)
+
+    type(`${NEARLY} @`, NEARLY.length + 2)
+
+    expect(screen.queryByRole('button', { name: '@Ada' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '@everybody' })).toBeNull()
+  })
+
+  it('offers them at the same length where there is room, which is what makes it a bound', () => {
+    render(<Held people={[{ account_id: 'a-1', name: 'Ada' }]} maxLength={80} />)
+
+    type(`${NEARLY} @`, NEARLY.length + 2)
+
+    expect(screen.getByRole('button', { name: '@Ada' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '@everybody' })).toBeTruthy()
   })
 })

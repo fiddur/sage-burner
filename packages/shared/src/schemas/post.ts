@@ -8,7 +8,7 @@ export const postSchema = z.object({
   event_id: idSchema,
   author_account_id: idSchema.nullable(),
   title: nonEmptyText(MAX_TITLE),
-  body: z.string().max(MAX_POST),
+  body: z.string().trim().max(MAX_POST),
   withdrawn_at: dateTimeSchema.nullable(),
   created_at: dateTimeSchema,
 })

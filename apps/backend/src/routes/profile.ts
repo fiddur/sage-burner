@@ -135,13 +135,18 @@ export const registerProfileRoutes = (
       .where(and(eq(attendance.account_id, accountId), gte(event.end_date, todayIso(now))))
 
     for (const stay of stays) {
-      await cardEntry(db, {
+      const written = await cardEntry(db, {
         stay,
         who: { account_id: accountId, name },
         kind: 'introduced',
         body: INTRODUCED,
         at: now(),
       })
+
+      // Only where the card gained a line. Six passes at a paragraph coalesce into one entry and
+      // one bump, and sent six bells before this — the feed and the notification disagreeing
+      // about the same event (#449).
+      if (written === 'coalesced') continue
 
       await tellAttendees(
         db,
@@ -199,7 +204,11 @@ export const registerProfileRoutes = (
 
     const { allergy_item_ids: ticks, ...columns } = body
 
-    const before = await profileFor(viewer.account_id)
+    const [before] = await db
+      .select({ introduction: account.introduction })
+      .from(account)
+      .where(eq(account.id, viewer.account_id))
+      .limit(1)
     if (before === undefined) return sendError(reply, 404)
 
     if (!isEmptyPatch(columns) || ticks !== undefined) {

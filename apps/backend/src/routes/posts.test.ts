@@ -285,8 +285,6 @@ describe('naming somebody in an announcement', () => {
 
 describe('who the card says may change it', () => {
   it('is whoever wrote it, and nobody else — not even an admin', async () => {
-    // `own` is authorship, which is what `PATCH` enforces. Taking back is the wider power,
-    // and the card draws that from the viewer's own admin flag rather than from here.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -364,6 +362,36 @@ describe('rewording an announcement', () => {
 
     const [card] = await cards(server, ada.cookie)
     expect(card?.entries.map((entry) => entry.kind)).toEqual(['posted', 'edited'])
+  })
+
+  it('says nothing for a save that reworded nothing, so the card is not re-topped', async () => {
+    // The web sends both fields whatever was typed, so `isEmptyPatch` never fires from the page:
+    // opening Reword it and pressing Save moved the announcement back to the top of everybody's
+    // feed for nothing (#455).
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const id = await given(server, ada.cookie)
+
+    await reword(server, ada.cookie, id, { title: 'The planning call is Sunday', body: 'Come.' })
+
+    const [card] = await cards(server, ada.cookie)
+    expect(card?.entries.map((entry) => entry.kind)).toEqual(['posted'])
+  })
+
+  it('takes a body of nothing but spaces as no body at all', async () => {
+    // The card drew an empty `markdown-preview` div for it. An introduction gets `null` out of
+    // `excerptOf` instead, which is the behaviour to match (#455).
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+
+    await announce(server, ada.cookie, { title: 'The planning call is Sunday', body: '   ' })
+
+    const [card] = await cards(server, ada.cookie)
+    expect(card?.body).toBeNull()
   })
 })
 

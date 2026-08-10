@@ -116,8 +116,6 @@ const BURN: MyBurn = {
   attendance: null,
 }
 
-// `null` rather than `undefined`, as `Faq.test.tsx` argues: a parameter with a default
-// takes the default from `undefined`, so "no burn chosen" would silently render one.
 const renderPage = (api: FeedApi, viewer: Viewer = ADA, burn: MyBurn | null = BURN) =>
   render(
     <ViewerProvider viewer={viewer}>
@@ -483,9 +481,6 @@ describe('what everyone has been doing', () => {
   })
 
   it('stops showing the expanded copy of a card it has just reworded', async () => {
-    // A comment or a Show-the-whole-thread puts the card in the page's own `whole` map, which
-    // a feed reload does not touch — so without dropping it, the reworded card keeps the old
-    // words on exactly the cards people have been talking on.
     const stale = aCard({
       id: 'c-1',
       title: 'Stale title',
