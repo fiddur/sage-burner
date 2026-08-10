@@ -2,50 +2,14 @@ import type { SubmittedAnswers } from './schemas/application.ts'
 import type { FormQuestion } from './schemas/form-question.ts'
 
 import { tickBoxRequired } from './enums.ts'
-/**
- * Whether a set of answers satisfies the questions asked.
- *
- * Type-only imports, so this module pulls in no Zod and the browser can run it.
- * Both sides need the same verdict — the server refuses a submission on it, the
- * form marks its fields with it — and written twice they drift into a form that
- * says everything is fine against an API that answers 400.
- */
 import { MAX_EMAIL, MAX_PERSON_NAME } from './limits.ts'
 
 export const MAX_ANSWER_LENGTH = 10_000
-/**
- * An applicant is a person, so these are the same facts as `limits.ts` holds — kept
- * under their own names because `answerProblems` reports on them and the form's
- * copy reads better for it.
- */
 export const MAX_APPLICANT_NAME_LENGTH = MAX_PERSON_NAME
 export const MAX_APPLICANT_EMAIL_LENGTH = MAX_EMAIL
 
-/**
- * Whether a string is shaped like an address, for the two callers that cannot use
- * `emailSchema` (#30).
- *
- * The application form marks its own field with this before submitting, because a
- * 400 from the server is a worse way to learn about a typo — and the backend uses it
- * on `applicant_email` rows written while that column was a free-text "how can we
- * reach you", which hold phone numbers and Discord handles.
- *
- * Deliberately loose: neither caller has to *validate* an address, only tell one from
- * something that is plainly not one. `emailSchema` is what actually refuses a
- * submission, and this must not be stricter than it — a rule that rejected a real
- * address would cost somebody their application.
- */
 export const looksLikeEmail = (value: string): boolean => /^[^\s@]+@[^\s@.]+\.[^\s@]+$/u.test(value.trim())
 
-/**
- * How many questions one submission may claim it was shown.
- *
- * The other attacker-controlled fields on the public application route carry
- * ceilings, and this one is a list. Fastify's 1 MB body limit already caps it near
- * 26k ids, so this is not availability — it is the ceiling being stated where the
- * others are rather than inherited from a default somewhere else. Far above any
- * form a person would fill in: the admin editor lists them on one page.
- */
 export const MAX_ASKED_QUESTIONS = 500
 
 export type AnswerProblemReason = 'missing' | 'unchecked' | 'wrong_type' | 'unknown' | 'too_long'
@@ -55,7 +19,6 @@ export interface AnswerProblem {
   reason: AnswerProblemReason
 }
 
-/** Derived rather than listing the types again, so a fifth is added in one place. */
 export const isTickBox = (type: FormQuestion['type']) => tickBoxRequired(type) !== undefined
 
 const problemWith = (
@@ -63,9 +26,6 @@ const problemWith = (
   answer: string | boolean | undefined,
 ): AnswerProblemReason | undefined => {
   if (isTickBox(question.type)) {
-    // A browser omits an untouched box entirely, so absent means unticked.
-    // Reading it as ticked would let an applicant skip an agreement by leaving
-    // the key out.
     if (answer !== undefined && typeof answer !== 'boolean') return 'wrong_type'
     if (question.type === 'agreement' && answer !== true) return 'unchecked'
 
@@ -79,7 +39,6 @@ const problemWith = (
   return undefined
 }
 
-/** Every problem, so the form can mark them together rather than one per submission. */
 export const answerProblems = (questions: FormQuestion[], answers: SubmittedAnswers): AnswerProblem[] => {
   const problems: AnswerProblem[] = []
 

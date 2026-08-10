@@ -13,7 +13,6 @@ import { fromLocalInput, toLocalInput } from '../datetime.ts'
 import { stillUploading } from '../image-upload.ts'
 import { MarkdownField } from './MarkdownField.tsx'
 
-/** What the form edits. A stored `Session` is one; so is a blank one being offered. */
 export interface DreamDraft {
   title: string
   description: string
@@ -24,14 +23,6 @@ export interface DreamDraft {
   time_slot_end: string | null
 }
 
-/**
- * The form for one dream, inside the panel both pages open (#342).
- *
- * `creating` changes two things: the button says so, and every field is emitted
- * rather than only the changed ones. The diff exists to protect a concurrent
- * editor's work, and a dream that does not exist yet has none to protect — while a
- * slot prefilled from the cell somebody clicked would be diffed away as unchanged.
- */
 export const DreamFields = ({
   dream,
   subject,
@@ -44,13 +35,11 @@ export const DreamFields = ({
   onCancel,
 }: {
   dream: DreamDraft
-  /** What the field labels call it, since a dream being offered has no title yet. */
   subject: string
   places: readonly Place[]
   attendees: readonly EventAttendeesResponse['attendees'][number][]
   busy: boolean
   creating?: boolean
-  /** How a picture gets into the description (#379). */
   upload: UploadImage
   onSave: (changes: SessionUpdate) => void
   onCancel: () => void
@@ -73,15 +62,6 @@ export const DreamFields = ({
     repeatable,
   })
 
-  // Only the fields this form actually changed. Sending all of them would carry the
-  // values it loaded at mount, so fixing a typo in the title would put the place
-  // and slot back as they were then, undoing whatever someone else scheduled
-  // meanwhile — the ordinary case on a page several people edit at once.
-  //
-  // Each comparison is in the form's own units. Comparing a round-tripped
-  // timestamp against the stored one instead would call an untouched slot
-  // changed whenever the stored value carries seconds, because the inputs are
-  // minute-precision, and quietly zero them.
   const edits = (): SessionUpdate => ({
     ...(title.trim() === dream.title ? {} : { title: title.trim() }),
     ...(description === dream.description ? {} : { description }),
@@ -126,16 +106,11 @@ export const DreamFields = ({
           onChange={(changeEvent) => setFacilitator(changeEvent.currentTarget.value)}
         >
           <option value="">Nobody yet</option>
-          {facilitator !== '' &&
-            !attendees.some((person) => person.account_id === facilitator) && (
-              // They have withdrawn since being handed this. Named rather than left
-              // out, or the control reads as "Nobody yet" while the id is still stored
-              // — and saving anything else would keep a facilitator the page denies
-              // having. Disabled, so it can be left or changed but not chosen.
-              <option value={facilitator} disabled>
-                Somebody who is no longer coming
-              </option>
-            )}
+          {facilitator !== '' && !attendees.some((person) => person.account_id === facilitator) && (
+            <option value={facilitator} disabled>
+              Somebody who is no longer coming
+            </option>
+          )}
           {attendees.map((person) => (
             <option key={person.account_id} value={person.account_id}>
               {person.name ?? 'Name not filled in yet'}

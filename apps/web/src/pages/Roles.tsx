@@ -39,7 +39,6 @@ export type RolesApi = Pick<
 
 type Person = EventAttendeesResponse['attendees'][number]
 
-/** Null rather than a fourth status: "no burn is open" is data, not a load outcome. */
 type Register = {
   eventId: string
   roles: readonly LeadRole[]
@@ -54,52 +53,20 @@ const EFFORT_LABEL: Record<EffortLevel, string> = {
   high: 'a lot',
 }
 
-/**
- * How many segments a level fills, and how many there are to fill.
- *
- * Both from `effortLevels`, which is in order: the index *is* the count, and `none`
- * fills none. A record of numbers and a hardcoded `[0, 1, 2]` were each one more thing
- * to keep in step with the vocabulary — a fifth level would have filled four of three.
- */
 const segmentsFor = (level: EffortLevel): number => effortLevels.indexOf(level)
 
 const SEGMENTS = effortLevels.slice(1).map((_level, index) => index)
 
-/**
- * The three phases of a burn, as one cell (#307).
- *
- * They had a column each, three headings of two words for one word of content — more
- * width between them than every prose column together, on the page most likely to be
- * read standing up in a field. An icon and a three-segment bar says the same thing in
- * a fraction of the room.
- *
- * The words are still there, in the `title` and for a screen reader: 🌱 is a guess
- * until somebody tells you, and a register nobody can read is not compact, it is
- * broken.
- */
 const PHASES = [
   { key: 'before', icon: '🌱', label: 'before' },
   { key: 'during', icon: '🔥', label: 'during' },
   { key: 'after', icon: '🧹', label: 'after' },
 ] as const
 
-/**
- * The header row, and nothing refers to a heading by name: `RoleRow` writes its cells
- * out in this order and `Roles.test.tsx` is what holds the two to the same count.
- */
 const HEADINGS = ['Title', 'Purpose', 'Who', 'Tasks include', 'Effort'] as const
 
-/** The two halves of `Who`, which the column header can no longer tell apart. */
 const WHO = { lead: 'Lead', team: 'Team' } as const
 
-/**
- * What the icons in the `Effort` column mean, above the table (#317).
- *
- * The only one of the three ways they are labelled that a sighted touch user gets:
- * `title` needs a pointer and `.visually-hidden` needs a screen reader, so on the device
- * the compaction was for, 🌱🔥🧹 sat under a heading reading only "Effort". Above the
- * scrolling wrapper rather than inside it, or it slides out of view with the table.
- */
 const EFFORT_LEGEND = PHASES.map((phase) => `${phase.icon} ${phase.label}`).join(' · ')
 
 const Effort = ({ role }: { role: LeadRole }) => (
@@ -123,14 +90,6 @@ const Effort = ({ role }: { role: LeadRole }) => (
   </span>
 )
 
-/**
- * The lead-roles register — who is looking after what at this burn.
- *
- * Two things here would otherwise look like oversights. **The removal button asks
- * first** because any member may remove any role and nothing undoes it. **"Join the
- * team" is never disabled**, however many are wanted — the lodging list greys out a
- * full option and this deliberately does not, because a pair of hands is not a bed.
- */
 export const Roles = ({ api }: { api: RolesApi }) => {
   const viewer = useViewer()
   const approved = isApproved(viewer)
@@ -336,12 +295,10 @@ const AddRole = ({
   </form>
 )
 
-/** Markdown a member wrote, or an em dash so an empty cell is deliberate. */
 const Prose = ({ markdown }: { markdown: string }) =>
   markdown.trim() === '' ? (
     <span class="form-note">—</span>
   ) : (
-    // Safe by construction: `renderMarkdown` escapes raw HTML rather than filtering it.
     <div class="markdown-preview" dangerouslySetInnerHTML={{ __html: renderMarkdown(markdown) }} />
   )
 
@@ -469,9 +426,6 @@ const RoleFields = ({
   const [after, setAfter] = useState<EffortLevel>(role.effort_after)
   const [wanted, setWanted] = useState(String(role.team_size_wanted))
 
-  // Only the fields this form changed. Sending all seven would carry the values it
-  // loaded at mount, so fixing a typo in the title would put back whatever somebody
-  // else edited meanwhile — the ordinary case on a page several people share.
   const edits = (): LeadRoleUpdate => ({
     ...(title.trim() === role.title ? {} : { title: title.trim() }),
     ...(purpose === role.purpose ? {} : { purpose }),
@@ -479,9 +433,6 @@ const RoleFields = ({
     ...(before === role.effort_before ? {} : { effort_before: before }),
     ...(during === role.effort_during ? {} : { effort_during: during }),
     ...(after === role.effort_after ? {} : { effort_after: after }),
-    // An emptied number input is "I will fill this in later", not zero. `Number('')`
-    // is 0, so sending it saved "nobody wanted" — and the page then rendered that as
-    // "none asked for", which reads as a decision somebody made.
     ...(wanted.trim() === '' || wanted === String(role.team_size_wanted)
       ? {}
       : { team_size_wanted: Number(wanted) }),
@@ -562,9 +513,6 @@ const EffortField = ({
       value={value}
       onChange={(changeEvent) => {
         const chosen = changeEvent.currentTarget.value
-        // The `<option>`s come from `effortLevels`, so this narrows rather than
-        // validates — but a `select`'s value is a plain string, and the alternative
-        // is a cast.
         const found = effortLevels.find((level) => level === chosen)
         if (found !== undefined) onChange(found)
       }}

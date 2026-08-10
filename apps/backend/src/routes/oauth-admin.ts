@@ -15,16 +15,6 @@ export interface OAuthAdminDeps {
   now: () => Date
 }
 
-/**
- * Setting up a provider, for the admin who has an app registered with it (#393).
- *
- * Under `/api/admin/`, so the prefix hook is the only authorization and there is no
- * per-route opt-out to forget. `mail_setting`'s routes are the pattern in every respect,
- * including the one that matters: **the secret never comes back out.** The read answers
- * `has_secret`, and a save that omits the field keeps what is stored — so correcting a typo
- * in the client id does not need the secret typed again, and a form does not hold it in an
- * input on every visit.
- */
 export const registerOauthAdminRoutes = (app: FastifyInstance, { db, now }: OAuthAdminDeps) => {
   const current = async (provider: string): Promise<OAuthSettings | null> => {
     if (!isOAuthProvider(provider)) return null
@@ -32,7 +22,6 @@ export const registerOauthAdminRoutes = (app: FastifyInstance, { db, now }: OAut
     const row = await oauthSettingFor(db, provider)
     if (row === undefined) return null
 
-    // The destructure is the whole mechanism: the secret is not in the object that leaves.
     const { client_secret, ...rest } = row
 
     return { ...rest, has_secret: client_secret !== '' }
@@ -59,9 +48,6 @@ export const registerOauthAdminRoutes = (app: FastifyInstance, { db, now }: OAut
     const row = {
       provider,
       client_id: body.client_id,
-      // Absent keeps what is stored; empty clears it. Written out here rather than
-      // inferred, because "keep" and "clear" being the same value is the mistake this
-      // shape exists to prevent.
       client_secret: body.client_secret ?? held?.client_secret ?? '',
       ask_profile_link: body.ask_profile_link ?? held?.ask_profile_link ?? false,
       updated_at: now().toISOString(),
@@ -82,9 +68,6 @@ export const registerOauthAdminRoutes = (app: FastifyInstance, { db, now }: OAut
 
       await db.delete(oauthSetting).where(eq(oauthSetting.provider, provider))
 
-      // `{ settings: null }` rather than 204, so the page can redraw from the answer —
-      // `removeMailSettings` for the same reason. Turning a provider off takes the button
-      // off the login page, since `social_logins` is what has been configured.
       return { settings: null } satisfies OAuthSettingsResponse
     },
   )

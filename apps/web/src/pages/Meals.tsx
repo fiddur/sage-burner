@@ -35,17 +35,8 @@ export type MealsApi = Pick<
 
 type Person = EventAttendeesResponse['attendees'][number]
 
-/** Null rather than a fourth status: "no burn is selected" is data, not a load outcome. */
 type Plan = (MealsResponse & { eventId: string; attendees: readonly Person[] }) | null
 
-/**
- * The meal plan — who cooks, who helps and who washes up.
- *
- * The spreadsheet tab this replaces was open to everyone, and so is this: any
- * approved member may take a lead, hand one over, stand for a crew, write a food
- * idea, or rewrite the words at the top. The plan itself — which sittings exist —
- * is the admins', under Events.
- */
 export const Meals = ({ api }: { api: MealsApi }) => {
   const viewer = useViewer()
   const burn = useSelectedBurn()
@@ -103,8 +94,6 @@ export const Meals = ({ api }: { api: MealsApi }) => {
               {plan.intro_markdown.trim() === '' ? (
                 <p class="form-note">Nothing said here yet.</p>
               ) : (
-                // Safe by construction: `renderMarkdown` escapes raw HTML rather
-                // than filtering it.
                 <div
                   class="markdown-preview"
                   dangerouslySetInnerHTML={{ __html: renderMarkdown(plan.intro_markdown) }}
@@ -154,13 +143,6 @@ export const Meals = ({ api }: { api: MealsApi }) => {
   )
 }
 
-/**
- * The words above the table — the sheet's orange row.
- *
- * Any approved member, like the burn's welcome text: "everyone take at least 1
- * cooking and 1 cleaning spots" is the kind of thing whoever notices it should be
- * able to write down.
- */
 const IntroEditor = ({
   intro,
   busy,
@@ -176,8 +158,6 @@ const IntroEditor = ({
   onSave: (intro: string) => void
   onCancel: () => void
 }) => {
-  // Seeded once. The page re-reads under a refused save (#274), and taking the
-  // fresh words into the box would throw away the ones being written.
   const [draft, setDraft] = useState(intro)
 
   return (
@@ -219,8 +199,6 @@ const MealTable = ({
   onStand: (id: string, role: 'cleanup' | 'helper', joining: boolean, accountId: string) => void
   onIdea: (id: string, idea: string) => void
 }) => (
-  // Scrolls itself, like the schedule grid: five columns of crew lists are taller
-  // than a phone, and taking the page with them put the header out of reach.
   <div class="meal-table-wrap">
     <table class="meal-table">
       <thead>
@@ -261,8 +239,6 @@ const MealTable = ({
                   label={`${meal.label} on ${meal.date}`}
                   people={meal.lead === null ? [] : [meal.lead]}
                   max={1}
-                  // A chore takes no new lead, so it offers nobody — whoever is still
-                  // on one has their ✕ regardless, which is what the API allows.
                   candidates={meal.kind === 'chore' ? [] : attendees}
                   everyone={attendees}
                   viewerId={viewerId}
@@ -305,7 +281,6 @@ const MealTable = ({
   </div>
 )
 
-/** The sheet's "Food idea?" column: what somebody thought of cooking, if anything. */
 const FoodIdea = ({
   meal,
   busy,
@@ -317,9 +292,6 @@ const FoodIdea = ({
 }) => {
   const [draft, setDraft] = useState(meal.food_idea)
 
-  // Nothing is cooked at a chore, so there is nothing to have an idea about — the
-  // box offered one for a morning cleanup, which is the sheet's column applied to a
-  // row the sheet never had.
   if (meal.kind === 'chore') return <span class="form-note">—</span>
 
   return (
@@ -332,8 +304,6 @@ const FoodIdea = ({
       disabled={busy}
       value={draft}
       onInput={(inputEvent) => setDraft(inputEvent.currentTarget.value)}
-      // On blur rather than on every keystroke: this is a note several people pass
-      // through, and a request per character would be a request per character.
       onBlur={() => {
         if (draft !== meal.food_idea) onIdea(meal.id, draft)
       }}
@@ -355,15 +325,11 @@ const Crew = ({
   attendees: readonly Person[]
   viewerId: string | undefined
   busy: boolean
-  /** False for a chore's cooks: whoever is on it may leave, nobody new may join. */
   joinable: boolean
   onStand: (id: string, role: 'cleanup' | 'helper', joining: boolean, accountId: string) => void
 }) => {
   const crew = role === 'helper' ? meal.helpers : meal.cleanup
 
-  // The lead is already cooking it, so they are not offered as a pair of hands for
-  // the cooking — they may still wash up, which is why this is per role rather than
-  // per meal. Nobody at all may be added to a chore's cooks.
   const offerable = joinable
     ? attendees.filter((who) => role === 'cleanup' || who.account_id !== meal.lead?.account_id)
     : []

@@ -20,29 +20,10 @@ export type OpenedDreamApi = Pick<
   | 'withdrawSupportForSession'
 >
 
-/**
- * What the panel is showing: an existing dream, or a new one being offered.
- *
- * The existing case holds an id rather than the dream, so a reload after a heart or
- * a helper leaves the panel showing what the server now says.
- */
 export type Opened =
   | { kind: 'dream'; id: string; editing: boolean }
   | { kind: 'new'; place_id: string | null; time_slot_start: string | null; time_slot_end: string | null }
 
-/**
- * Every write the panel makes, for both pages that open one (#342).
- *
- * The Dreams page used to swap a row for an edit form of its own, so a dream had two
- * ways to be read and two to be edited — and only one of them had #205's "keep what
- * was typed when the save is refused" and #207's two-step Escape. One set of handlers
- * rather than a second copy that starts a step behind.
- *
- * Each one closes or steps the panel **only once the write has landed**. Closing on
- * the click threw the member's typing away whenever the server said no, and that is
- * an ordinary path rather than a corner: filling Starts and leaving Ends empty is
- * half a slot, which the schema refuses with a 400.
- */
 export const dreamActions = ({
   api,
   run,
@@ -69,8 +50,6 @@ export const dreamActions = ({
     )
   },
 
-  // The panel stays open: taking the spot is not finishing with the dream, and the
-  // reload puts the name into the strip where the click was.
   facilitate: (id: string, accountId: string | null) => {
     run(() => api.updateSession(id, { facilitator_account_id: accountId }), 'Could not save that.')
   },
@@ -92,7 +71,6 @@ export const dreamActions = ({
 
 export type DreamTalkApi = Pick<ApiClient, 'getThread' | 'postComment' | 'updateComment' | 'deleteComment'>
 
-/** The conversation about whichever dream is open, and every way of adding to it. */
 export interface DreamTalk {
   thread: Thread | undefined
   say: (body: string) => void
@@ -100,25 +78,12 @@ export interface DreamTalk {
   remove: (id: string) => void
 }
 
-/** Which conversation the open panel is about, or nothing while none is open. */
 export const threadOf = (
   dreams: readonly Session[],
   opened: Opened | undefined,
 ): string | null | undefined =>
   opened?.kind === 'dream' ? dreams.find((one) => one.id === opened.id)?.thread_id : undefined
 
-/**
- * The thread the open dream carries (#375), for both pages that open one.
- *
- * Fetched here rather than with the dreams: the grid loads every dream for a burn and
- * wants none of this, and a conversation is the one read the service worker deliberately
- * does not keep. Keyed on the thread id, so opening another dream fetches another
- * conversation and closing the panel stops asking for one at all.
- *
- * Every write answers with the whole thread, so this holds what came back rather than
- * reloading — the page's own reload is about the dreams, and a comment changes none of
- * them.
- */
 export const useDreamThread = ({
   api,
   threadId,
@@ -140,9 +105,6 @@ export const useDreamThread = ({
   )
 
   const fetched = loaded.status === 'ready' ? loaded.data : undefined
-  // What came back from a write wins, but only while it is about the thread being shown
-  // — otherwise closing one dream and opening another would show the first one's talk
-  // until the fetch landed.
   const thread = held?.id === fetched?.id && held !== undefined ? held : fetched
 
   const after = (work: () => Promise<{ thread: Thread }>, fallback: string) => {
@@ -161,13 +123,6 @@ export const useDreamThread = ({
   }
 }
 
-/**
- * Whichever dream panel is open, or nothing.
- *
- * Its own component so a page keeps one branch where it had several — the same
- * reason `NoBurn` is one — and shared between the grid and the Dreams page so the
- * two cannot come to show a dream differently.
- */
 export const OpenedDream = ({
   opened,
   dreams,
@@ -193,14 +148,11 @@ export const OpenedDream = ({
   dreams: readonly Session[]
   places: readonly Place[]
   attendees: readonly EventAttendeesResponse['attendees'][number][]
-  /** What has been said about the open dream, and every way of adding to it (#375). */
   talk: DreamTalk
   viewerId: string | undefined
-  /** An admin may take a comment off. Nobody may rewrite somebody else's. */
   admin: boolean
   busy: boolean
   error: string | undefined
-  /** How a picture gets into a dream and into what people say about it (#379). */
   upload: UploadImage
   onEdit: (id: string) => void
   onCancelEdit: (id: string) => void
@@ -209,11 +161,6 @@ export const OpenedDream = ({
   onHelp: (id: string, helping: boolean, accountId: string) => void
   onSupport: (id: string, supporting: boolean) => void
   onSave: (id: string, changes: SessionUpdate) => void
-  /**
-   * Absent on a page that never opens `{ kind: 'new' }`. The Dreams page offers by
-   * name from a form of its own, so wiring it an unreachable handler meant inventing
-   * an event id it does not always have.
-   */
   onOffer?: (fields: SessionUpdate) => void
   onRemove: (id: string) => void
 }) => {
@@ -223,17 +170,7 @@ export const OpenedDream = ({
     if (onOffer === undefined) return null
 
     return (
-      <DreamPanel
-        label="Offer a dream"
-        error={error}
-        onClose={onClose}
-        // Escape and the backdrop take this step instead of closing — and here the
-        // step is nothing. There is no dream behind an offer panel to fall back to,
-        // so a stray press threw away everything typed into the form, which is the
-        // most typing anywhere in the grid. Cancel is the way out, and it is in the
-        // form (#295).
-        onBack={() => undefined}
-      >
+      <DreamPanel label="Offer a dream" error={error} onClose={onClose} onBack={() => undefined}>
         <h2>Offer a dream</h2>
         <DreamFields
           dream={{
@@ -258,8 +195,6 @@ export const OpenedDream = ({
     )
   }
 
-  // Looked up rather than held, so a reload after a heart or a helper leaves the
-  // panel showing what the server now says.
   const dream = dreams.find((candidate) => candidate.id === opened.id)
   if (dream === undefined) return null
 
@@ -274,7 +209,6 @@ export const OpenedDream = ({
         dream.facilitator_account_id === null
           ? undefined
           : // Falling back to the bare id keeps whoever is running it visible — and
-            // removable — if they are no longer among the burn's attendees.
             (facilitating ?? { account_id: dream.facilitator_account_id, name: null })
       }
       talk={talk}

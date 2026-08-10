@@ -16,7 +16,6 @@ import { PendingButton } from './PendingButton.tsx'
 
 export type OauthApi = Pick<ApiClient, 'getOauthSettings' | 'updateOauthSettings' | 'removeOauthSettings'>
 
-/** What the developer console calls itself, so an admin knows where to go. */
 const consoles = {
   discord: {
     where: 'discord.com/developers/applications',
@@ -30,18 +29,6 @@ const consoles = {
   },
 } as const satisfies Record<OAuthProvider, { where: string; cost: string; consent: string }>
 
-/**
- * Setting one provider up (#393).
- *
- * `MailField`'s shape in every respect, including the one that matters: the secret is never
- * read back, so the box is empty with a placeholder saying one is stored, and a save that
- * leaves it empty keeps what is there. Typing nothing into a blank box is not clearing a
- * secret, and treating it as such would wipe one on every unrelated edit.
- *
- * The redirect URI is shown rather than asked for, because the backend builds it and it has to
- * match the provider exactly — an admin pasting a different one into the console is the
- * failure this prevents.
- */
 export const OauthField = ({ api, provider }: { api: OauthApi; provider: OAuthProvider }) => {
   const [stored, setStored] = useState<OAuthSettings | null | undefined>(undefined)
   const [clientId, setClientId] = useState('')
@@ -81,9 +68,6 @@ export const OauthField = ({ api, provider }: { api: OauthApi; provider: OAuthPr
       setClientId(settings?.client_id ?? '')
       setAskProfileLink(settings?.ask_profile_link ?? false)
       setSecret('')
-      // Both halves filled in, which is `configuredProviders`' own rule — and the response
-      // carries exactly the two fields it needs to be judged by. The merge with the other
-      // provider happens in the context, so nothing here reads a list that could be stale.
       setProviderConfigured(provider, settings !== null && settings.client_id !== '' && settings.has_secret)
     } catch {
       setError('Could not save that. Please try again.')
@@ -150,8 +134,6 @@ export const OauthField = ({ api, provider }: { api: OauthApi; provider: OAuthPr
                 await api.updateOauthSettings(provider, {
                   client_id: clientId.trim(),
                   ask_profile_link: askProfileLink,
-                  // Omitted rather than sent empty: empty is a secret being cleared, and typing
-                  // nothing into a box that was already blank is not that.
                   ...(secret === '' ? {} : { client_secret: secret }),
                 }),
             )

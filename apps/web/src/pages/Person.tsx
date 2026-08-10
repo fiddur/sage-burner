@@ -16,20 +16,11 @@ import { isApproved, useViewer } from '../viewer.tsx'
 
 export type PersonApi = Pick<ApiClient, 'getAccountProfile'>
 
-/** What a way of being reached is called: the network, or the name given to a link. */
 export const nameOf = (row: Pick<Connection, 'kind' | 'label'>): string =>
   connectionKindInfo[row.kind].labelled && row.label.trim() !== ''
     ? row.label.trim()
     : connectionKindInfo[row.kind].label
 
-/**
- * One way of being reached.
- *
- * A link where the kind has an address, and something to copy where it does not — Discord
- * has no profile URL at all and a Signal number cannot build one, so an anchor there would
- * go nowhere. That is why `connectionHref` is allowed to answer nothing rather than being
- * made to produce something.
- */
 const Way = ({ row, whose }: { row: Connection; whose: string }) => {
   const href = connectionHref(row.kind, row.value)
   const label = nameOf(row)
@@ -42,9 +33,6 @@ const Way = ({ row, whose }: { row: Connection; whose: string }) => {
         {href === undefined ? (
           <span class="form-note">{row.value}</span>
         ) : (
-          // Named for a screen reader, which would otherwise read a page of "wren" links
-          // with nothing to tell them apart — and the visible text comes first, because a
-          // name that does not contain it cannot be addressed by voice (WCAG 2.5.3).
           <a href={href} aria-label={`${row.value}, ${whose}’s ${label}`}>
             {row.value}
           </a>
@@ -55,24 +43,11 @@ const Way = ({ row, whose }: { row: Connection; whose: string }) => {
   )
 }
 
-/**
- * How the page refers to somebody, in the two grammars it needs.
- *
- * `them` goes in prose — "how to reach them" — and cannot take a possessive: with no name
- * filled in, the copy button read "Copy them’s Discord", and the introduction's empty state
- * read "them has not written anything".
- */
 const namesFor = (name: string | null | undefined) => ({
   them: name ?? 'them',
   whose: name ?? 'this person',
 })
 
-/**
- * The list itself, in the order they put it in, or the fact that there is none.
- *
- * The order is the whole point: the first is where they would rather be tried, which is why
- * the list is one somebody drags around rather than a set.
- */
 const Ways = ({ rows, mine, whose }: { rows: readonly Connection[]; mine: boolean; whose: string }) => {
   if (rows.length === 0) {
     return (
@@ -93,18 +68,6 @@ const Ways = ({ rows, mine, whose }: { rows: readonly Connection[]; mine: boolea
   )
 }
 
-/**
- * What somebody wrote about themselves, or the fact that they have not (#390).
- *
- * Above the ways of reaching them, because it answers the question somebody opening this
- * page has first: who is this. Safe by construction — `renderMarkdown` escapes raw HTML
- * rather than filtering it, which is what makes every member here inside what it defends
- * against.
- *
- * The empty state is worth more than the field on somebody's own page: this only works if
- * people fill it in, and the moment they are most likely to is the one where the app says
- * plainly that nothing is there.
- */
 const Introduction = ({ written, mine, whose }: { written: string; mine: boolean; whose: string }) => {
   if (written !== '') {
     return (
@@ -133,16 +96,6 @@ const Introduction = ({ written, mine, whose }: { written: string; mine: boolean
   )
 }
 
-/**
- * Somebody's page (#389).
- *
- * The answer to the question anybody actually has about a name they have not met: how do I
- * get hold of this person. Their ways of being reached in **their** order, so the first is
- * where they would rather be tried — which is the whole reason the list is orderable.
- *
- * Your own page is this same page with a link to where you change it, rather than a second
- * layout to keep in step with this one.
- */
 export const Person = ({ api, accountId }: { api: PersonApi; accountId: string }) => {
   const viewer = useViewer()
   const { loaded, refreshing } = useLoad<PersonProfile>(
@@ -184,9 +137,6 @@ export const Person = ({ api, accountId }: { api: PersonApi; accountId: string }
           )}
 
           {person.facebook !== null && (
-            // Beside the name rather than in the list below, because it is not a way of
-            // being reached: Messenger is that, and it is a row like any other. Built from
-            // the Messenger handle, never from a linked sign-in (#393).
             <p class="person-elsewhere">
               <a href={person.facebook}>
                 <span aria-hidden="true">📘</span> {them} on Facebook

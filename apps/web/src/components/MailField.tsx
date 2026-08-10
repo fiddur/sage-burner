@@ -22,7 +22,6 @@ export type MailApi = Pick<
   'getMailSettings' | 'removeMailSettings' | 'sendTestEmail' | 'updateMailSettings'
 >
 
-/** What the form holds, which is the settings plus a password box that is usually blank. */
 interface Draft {
   host: string
   port: string
@@ -33,7 +32,6 @@ interface Draft {
   from_name: string
 }
 
-/** 587 with STARTTLS is what almost every provider wants; 465 is the implicit-TLS one. */
 const BLANK: Draft = {
   host: '',
   port: '587',
@@ -49,7 +47,6 @@ const draftFrom = (mail: MailSettings): Draft => ({
   port: String(mail.port),
   secure: mail.secure,
   username: mail.username,
-  // The read never carries it, and blank is how the route is told to keep what it has.
   password: '',
   from_email: mail.from_email,
   from_name: mail.from_name,
@@ -62,23 +59,9 @@ const bodyFrom = (draft: Draft): MailSettingsUpdate => ({
   username: draft.username.trim(),
   from_email: draft.from_email.trim(),
   from_name: draft.from_name.trim(),
-  // Omitted rather than sent empty: empty is a password being cleared, and typing
-  // nothing into a box that was already blank is not that.
   ...(draft.password === '' ? {} : { password: draft.password }),
 })
 
-/**
- * Where this installation posts from (#30).
- *
- * Nothing about this app requires it: with no server set up, no invite is emailed, no
- * notification is, and the email column on the notification settings is not drawn.
- * Which is why the form starts empty rather than pre-filled with a guess — there is
- * no sensible default host, and the whole point of the feature is that it is optional.
- *
- * **Test before trusting it.** A wrong password fails silently otherwise: the next
- * approval posts nothing, the admin sees the invite link as usual, and the applicant
- * waits. The button posts to the admin's own address, so the failure surfaces here.
- */
 export const MailField = ({ api }: { api: MailApi }) => {
   const setSendsEmail = useSetInstallationSendsEmail()
   const [draft, setDraft] = useState<Draft | undefined>(undefined)
@@ -104,9 +87,6 @@ export const MailField = ({ api }: { api: MailApi }) => {
       })
 
     return () => controller.abort()
-    // `setError` is a fresh function on every render, so depending on it would refetch
-    // after each one — and each refetch replaces the draft, throwing away what is
-    // being typed. A read failure gets its own flag for that reason.
   }, [api])
 
   if (draft === undefined) {

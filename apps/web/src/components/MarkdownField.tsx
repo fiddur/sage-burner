@@ -7,14 +7,6 @@ import { renderMarkdown } from '../markdown.ts'
 import { rowsFor } from '../textarea.ts'
 import { AddPicture } from './AddPicture.tsx'
 
-/**
- * Every markdown field in the app.
- *
- * Two `aria-pressed` buttons rather than `role="tab"`: a tab promises a
- * controlled `tabpanel`, a name pointing back at the tab, and roving focus with
- * arrow keys. This is a pair of toggles, and claiming the tab contract without
- * meeting it tells a screen reader something untrue.
- */
 export const MarkdownField = ({
   label,
   value,
@@ -28,18 +20,9 @@ export const MarkdownField = ({
   label: string
   value: string
   maxLength: number
-  /**
-   * How tall the box opens when there is nothing in it. A floor rather than a size:
-   * a field seeded with a page of text opens as a page whatever this says (#338).
-   */
   rows?: number
-  /** For where the visible label is friendlier than it is specific. */
   accessibleName?: string
   placeholder?: string
-  /**
-   * How a picture gets stored, where this field takes them (#379). Passed only by the
-   * fields members read, for the reason in `docs/the-app.md`.
-   */
   upload?: UploadImage
   onInput: (value: string) => void
 }) => {
@@ -59,8 +42,6 @@ export const MarkdownField = ({
           <button
             type="button"
             aria-pressed={!previewing}
-            // Named per field: a page with two markdown fields has two "Preview"
-            // buttons, and "Preview" alone says nothing about which.
             aria-label={`Write ${label}`}
             class={previewing ? 'md-field-tab' : 'md-field-tab is-current'}
             onClick={() => setPreviewing(false)}
@@ -83,13 +64,7 @@ export const MarkdownField = ({
             {value.trim() === '' ? (
               <p class="form-note">Nothing to preview yet.</p>
             ) : (
-              <div
-                class="markdown-preview"
-                // Safe by construction: `renderMarkdown` escapes raw HTML rather
-                // than filtering it, and checks link and image URLs against an
-                // allowlist. `markdown.ts` says why escaping beats a sanitiser here.
-                dangerouslySetInnerHTML={{ __html: renderMarkdown(value) }}
-              />
+              <div class="markdown-preview" dangerouslySetInnerHTML={{ __html: renderMarkdown(value) }} />
             )}
           </div>
         ) : (

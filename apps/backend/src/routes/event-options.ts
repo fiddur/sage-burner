@@ -29,9 +29,6 @@ const optionsFor = async (db: Database, eventId: string): Promise<EventOptionTak
     .where(eq(eventOption.event_id, eventId))
     .orderBy(asc(eventOption.kind), asc(eventOption.order), asc(eventOption.id))
 
-  // One query for every count rather than one per option: at this size the whole
-  // table is a handful of rows, and a loop of selects would be the slower, longer
-  // way to say the same thing.
   const takers = await db
     .select({ option: attendance.lodging_option_id })
     .from(attendance)
@@ -45,18 +42,9 @@ const optionsFor = async (db: Database, eventId: string): Promise<EventOptionTak
   return rows.map((row) => ({ ...row, taken: counts.get(row.id) ?? 0 }))
 }
 
-/**
- * The two lists a member picks from for a given burn.
- *
- * Rows rather than a shared vocabulary, per event rather than per community:
- * what there is to sleep in depends on the site, and what wants doing depends on
- * the year. Reads are public for the same reason the places are — nothing here
- * is about a person.
- */
 export const registerEventOptionRoutes = (app: FastifyInstance, { db, sessions }: GuardDeps) => {
   const { requireApproved } = createGuards({ db, sessions })
 
-  /** The lists, as both the `GET` and the `If-Match` guards see them (#274). */
   const choices = async (eventId: string): Promise<EventOptionsResponse> => ({
     options: await optionsFor(db, eventId),
   })
@@ -79,9 +67,6 @@ export const registerEventOptionRoutes = (app: FastifyInstance, { db, sessions }
       const { eventId } = request.params
       const id = randomUUID()
 
-      // Read and insert together, so "the server assigns `order`" holds rather
-      // than two adds claiming the same position. Per kind: the two lists number
-      // independently.
       let order: number
       try {
         order = db.transaction((tx) => {
@@ -97,8 +82,6 @@ export const registerEventOptionRoutes = (app: FastifyInstance, { db, sessions }
           return next
         })
       } catch (failure) {
-        // No pre-read of the event: the foreign key already rejects a missing
-        // one, and asking first would be a second query saying the same thing.
         if (isForeignKeyViolation(failure)) return sendError(reply, 404)
         throw failure
       }
@@ -126,8 +109,6 @@ export const registerEventOptionRoutes = (app: FastifyInstance, { db, sessions }
 
       if (existing === undefined) return sendError(reply, 404)
 
-      // A no-op PATCH is a read — so it answers with the row rather than writing, and
-      // needs no precondition. See `isEmptyPatch`.
       if (isEmptyPatch(body)) return { option: existing }
 
       if (await refuseIfStale(request, reply, () => choices(existing.event_id))) return reply
@@ -145,10 +126,6 @@ export const registerEventOptionRoutes = (app: FastifyInstance, { db, sessions }
     async (request, reply) => {
       void noStore(reply)
 
-      // Somebody sleeping here holds the row: `attendance.lodging_option_id` has
-      // no `onDelete`, so SQLite refuses rather than quietly unbooking them. A
-      // pre-read would be check-then-act — someone can pick it between the read
-      // and the delete — so the constraint is the authority and this translates.
       let deleted
       try {
         deleted = await db
@@ -180,8 +157,6 @@ export const registerEventOptionRoutes = (app: FastifyInstance, { db, sessions }
 
       if (await refuseIfStale(request, reply, () => choices(eventId))) return reply
 
-      // Exactly this kind's options — the two lists number independently, so the
-      // set is filtered to one kind before `reorder` is asked about it.
       const existing = (await optionsFor(db, eventId)).filter((row) => row.kind === kind)
       if (reorder(db, eventOption, existing, body.ids) === 'mismatch') return sendError(reply, 400)
 

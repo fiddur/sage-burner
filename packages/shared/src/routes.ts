@@ -60,45 +60,18 @@ import type {
 
 export type ApiMethod = 'DELETE' | 'GET' | 'PATCH' | 'POST' | 'PUT'
 
-/**
- * One endpoint, in the one place both halves read it from.
- *
- * `fastify` is how the server registers it; `path` is how a caller builds it. They are
- * two spellings of the same route, which is why they live beside each other — the pair
- * was previously a literal in `client.ts` and another in a route file, with nothing
- * tying them together. `routes.test.ts` asserts every `path(...)` matches its own
- * `fastify`, so the two cannot drift apart unnoticed.
- *
- * Encoding belongs to `path`, not to its callers. It was a per-call-site chore in 61
- * places, which is 61 chances to forget.
- */
 export interface ApiRoute {
   method: ApiMethod
   fastify: string
   path: (...params: string[]) => string
 }
 
-/**
- * Every endpoint the app has.
- *
- * `as const satisfies` rather than a plain annotation: the annotation alone would widen
- * each `path` to the shared signature and lose its arity, so `updateEvent.path()` with
- * no id would compile. This keeps each one's own parameters.
- */
 export const apiRoutes = {
   accountAvatar: {
     method: 'GET',
     fastify: '/api/accounts/:accountId/avatar',
     path: (accountId: string) => `/api/accounts/${encodeURIComponent(accountId)}/avatar`,
   },
-  /**
-   * Somebody, as the rest of the community sees them (#389).
-   *
-   * `requireApproved`, the same guard as the face beside the name and as the attendee
-   * list. A separate route rather than a relaxed roster, for the reason
-   * `/api/events/:eventId/attendees` gives: a route selecting the columns it names cannot
-   * leak one it does not.
-   */
   accountProfile: {
     method: 'GET',
     fastify: '/api/accounts/:accountId/profile',
@@ -119,13 +92,6 @@ export const apiRoutes = {
     fastify: '/api/events/:eventId/roles',
     path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/roles`,
   },
-  /**
-   * The ways somebody can be reached, which are their own to write (#388).
-   *
-   * Beside `/api/me/profile` and outside `/api/admin/`: nobody edits anybody else's,
-   * and the account id comes from the session so there is no id in a body to tamper
-   * with. Reading somebody else's belongs to their profile page, not here.
-   */
   addMyConnection: {
     method: 'POST',
     fastify: '/api/me/connections',
@@ -217,10 +183,6 @@ export const apiRoutes = {
     fastify: '/api/event-options/:id',
     path: (id: string) => `/api/event-options/${encodeURIComponent(id)}`,
   },
-  /**
-   * Taking back what you said, or an admin taking it off. Comments only: a line
-   * describing what the app did is not anybody's to rewrite.
-   */
   deleteComment: {
     method: 'DELETE',
     fastify: '/api/comments/:id',
@@ -266,13 +228,6 @@ export const apiRoutes = {
     fastify: '/api/admin/questions/:id',
     path: (id: string) => `/api/admin/questions/${encodeURIComponent(id)}`,
   },
-  /**
-   * Where a provider sends somebody back (#393).
-   *
-   * One route per provider by the path parameter, which is what gets registered with the
-   * provider as the redirect URI. What the round trip was *for* is not here: the state row
-   * carries it, so a caller cannot claim to be linking when they are signing in.
-   */
   finishOauth: {
     method: 'GET',
     fastify: '/api/auth/oauth/:provider/callback',
@@ -328,19 +283,11 @@ export const apiRoutes = {
     fastify: '/api/installation',
     path: () => '/api/installation',
   },
-  /**
-   * Public for the same reason as the icon, and more so: this is the picture a link
-   * to the homepage shows, and the crawler fetching it carries nobody's session.
-   */
   getInstallationBanner: {
     method: 'GET',
     fastify: '/api/installation/banner',
     path: () => '/api/installation/banner',
   },
-  /**
-   * Public, unlike `accountAvatar`: the browser fetches it for the home screen
-   * without the app's cookies, and it is a logo rather than anybody's face.
-   */
   getInstallationIcon: {
     method: 'GET',
     fastify: '/api/installation/icon',
@@ -361,14 +308,6 @@ export const apiRoutes = {
     fastify: '/api/feed',
     path: () => '/api/feed',
   },
-  /**
-   * One conversation, whole (#375).
-   *
-   * By thread id rather than by the dream's, because a withdrawn dream has no id left
-   * to ask by and its thread is still worth reading. It is also the one read the
-   * service worker keeps out of the offline cache — a key per dream ever opened, kept
-   * until sign-out, is the shape of the problem #311 fixed for the banner.
-   */
   getThread: {
     method: 'GET',
     fastify: '/api/threads/:id',
@@ -394,23 +333,11 @@ export const apiRoutes = {
     fastify: '/api/events/:eventId/roles',
     path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/roles`,
   },
-  /**
-   * How this installation posts, for the admin who set it up (#30).
-   *
-   * Behind the admin prefix, and never carrying the password — `mailSettingsSchema`
-   * says why `has_password` is what comes back instead.
-   */
   getMailSettings: {
     method: 'GET',
     fastify: '/api/admin/installation/mail',
     path: () => '/api/admin/installation/mail',
   },
-  /**
-   * What a provider was set up with, for the admin who set it up (#393).
-   *
-   * Behind the admin prefix, and never carrying the secret — `oauthSettingsSchema` says why
-   * `has_secret` is what comes back instead.
-   */
   getOauthSettings: {
     method: 'GET',
     fastify: '/api/admin/installation/oauth/:provider',
@@ -441,13 +368,11 @@ export const apiRoutes = {
     fastify: '/api/me/connections',
     path: () => '/api/me/connections',
   },
-  /** The ways in somebody has linked, for their own details page. */
   getMyIdentities: {
     method: 'GET',
     fastify: '/api/me/identities',
     path: () => '/api/me/identities',
   },
-  /** The address of one burn's calendar feed, for the member being offered the link (#408). */
   getCalendarToken: {
     method: 'GET',
     fastify: '/api/events/:eventId/calendar',
@@ -458,13 +383,6 @@ export const apiRoutes = {
     fastify: '/api/events/mine',
     path: () => '/api/events/mine',
   },
-  /**
-   * Every picture this account has stored (#392).
-   *
-   * `myImagesResponseSchema` carries why it exists. The ids and the dates, never the
-   * bytes — the list draws each one through `storedImage`, which is the route that
-   * already serves them.
-   */
   getMyImages: {
     method: 'GET',
     fastify: '/api/me/images',
@@ -495,11 +413,6 @@ export const apiRoutes = {
     fastify: '/api/events/:eventId/places/sources',
     path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/places/sources`,
   },
-  /**
-   * Public, like `/api/questions`: a vocabulary of foods, carrying nothing about
-   * anybody. That also lets the invite form offer the ticks without this route
-   * learning to hand out anything new.
-   */
   getAllergyItems: {
     method: 'GET',
     fastify: '/api/allergy-items',
@@ -535,18 +448,11 @@ export const apiRoutes = {
     fastify: '/api/changelog',
     path: () => '/api/changelog',
   },
-  /**
-   * The privacy policy (#402). `privacyResponseSchema` carries the why.
-   *
-   * Beside the changelog because it is the same shape in every respect: prose that ships with
-   * the image, served rather than bundled, and public.
-   */
   getPrivacy: {
     method: 'GET',
     fastify: '/api/privacy',
     path: () => '/api/privacy',
   },
-  /** The terms of service (#419). `termsResponseSchema` carries the why. */
   getTerms: {
     method: 'GET',
     fastify: '/api/terms',
@@ -615,13 +521,6 @@ export const apiRoutes = {
     fastify: '/api/events/:eventId/sessions',
     path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/sessions`,
   },
-  /**
-   * Saying something on a thread.
-   *
-   * Not scoped to a burn still open, unlike every other write here: talking about a
-   * burn is not arranging one, and "that was lovely" is a thing somebody wants to post
-   * on the way home (#375).
-   */
   postComment: {
     method: 'POST',
     fastify: '/api/threads/:id/comments',
@@ -677,7 +576,6 @@ export const apiRoutes = {
     fastify: '/api/me/avatar',
     path: () => '/api/me/avatar',
   },
-  /** Taking one of your own pictures back off, which is what makes the ceiling recoverable. */
   removeMyImage: {
     method: 'DELETE',
     fastify: '/api/me/images/:id',
@@ -719,7 +617,6 @@ export const apiRoutes = {
     fastify: '/api/admin/questions/order',
     path: () => '/api/admin/questions/order',
   },
-  /** A new address for the feed, when the old one has been handed too far (#408). */
   rotateCalendarToken: {
     method: 'POST',
     fastify: '/api/admin/events/:id/calendar',
@@ -730,22 +627,11 @@ export const apiRoutes = {
     fastify: '/api/admin/invites/:id',
     path: (id: string) => `/api/admin/invites/${encodeURIComponent(id)}`,
   },
-  /**
-   * The programme as a calendar subscription (#258), keyed by the burn's feed token and
-   * **not** by its id (#408) — `docs/burns.md` has why.
-   *
-   * Outside `/api` because a calendar client asks for a file, not an API — the web manifest
-   * is the other one.
-   */
   scheduleFeed: {
     method: 'GET',
     fastify: '/calendar/:token/schedule.ics',
     path: (token: string) => `/calendar/${encodeURIComponent(token)}/schedule.ics`,
   },
-  /**
-   * A message to the admin's own address, so a wrong password is found here rather
-   * than by an applicant who never got an invite.
-   */
   sendTestEmail: {
     method: 'POST',
     fastify: '/api/admin/installation/mail/test',
@@ -797,19 +683,11 @@ export const apiRoutes = {
     path: (eventId: string, accountId: string) =>
       `/api/admin/events/${encodeURIComponent(eventId)}/attendance/${encodeURIComponent(accountId)}/payment`,
   },
-  /**
-   * Leaving for a provider to sign in (#393). Answers a redirect, not JSON.
-   *
-   * Unauthenticated by necessity: this is how somebody who is not signed in gets in. It
-   * mints a single-use state row and sends them on; nothing about who they are is known
-   * yet, and nothing here says whether an account exists.
-   */
   startOauthSignIn: {
     method: 'GET',
     fastify: '/api/auth/oauth/:provider',
     path: (provider: string) => `/api/auth/oauth/${encodeURIComponent(provider)}`,
   },
-  /** The same trip, made by somebody already signed in, to add a way in. */
   startOauthLink: {
     method: 'GET',
     fastify: '/api/me/oauth/:provider',
@@ -820,11 +698,6 @@ export const apiRoutes = {
     fastify: '/api/auth/passkey/challenge',
     path: () => '/api/auth/passkey/challenge',
   },
-  /**
-   * A picture somebody wrote into a markdown field (#379). `requireApproved`, for the
-   * reasons in `docs/the-app.md`; the id is unguessable, which is what keeps the URL
-   * from being a list of everything anybody has uploaded.
-   */
   storedImage: {
     method: 'GET',
     fastify: '/api/images/:id',
@@ -866,7 +739,6 @@ export const apiRoutes = {
     fastify: '/api/push/subscriptions',
     path: () => '/api/push/subscriptions',
   },
-  /** Rewriting what you said. The author's own; nobody edits somebody else's words. */
   updateComment: {
     method: 'PATCH',
     fastify: '/api/comments/:id',
@@ -972,7 +844,6 @@ export const apiRoutes = {
     fastify: '/api/events/:id/welcome',
     path: (id: string) => `/api/events/${encodeURIComponent(id)}/welcome`,
   },
-  /** Raw bytes in, an id out, which the field writes into the markdown at the cursor. */
   uploadImage: {
     method: 'POST',
     fastify: '/api/images',
@@ -988,13 +859,6 @@ export const apiRoutes = {
     fastify: '/api/sessions/:id/support/me',
     path: (id: string) => `/api/sessions/${encodeURIComponent(id)}/support/me`,
   },
-  /**
-   * The second endpoint outside `/api`, after the ICS feed, and for the same
-   * reason: a browser looking for a site's manifest looks at the site, not at
-   * its API. `index.html` has to name this path in a `<link>` it cannot import,
-   * so `apps/web`'s `shell.test.ts` reads the HTML and asserts the two spellings
-   * still agree.
-   */
   webManifest: {
     method: 'GET',
     fastify: '/manifest.webmanifest',
@@ -1004,40 +868,12 @@ export const apiRoutes = {
 
 export type RouteKey = keyof typeof apiRoutes
 
-/**
- * The installation's own pictures, with the `?v=` that makes a new one a new URL.
- *
- * Here for the reason the per-segment encoding is: it was a chore at each call site,
- * and the icon's spelling had drifted three times over (#376, #378). Two versioned
- * spellings under one path evict each other in the offline cache, which is what makes
- * a drift here cost something rather than merely look untidy.
- *
- * `null` — or `undefined`, since callers hold both — is "nobody has uploaded one",
- * which the icon route answers with the app's own flame. The bare path is a separate live URL on purpose — the header's mark and the
- * favicon quote it, and nothing about them changes when an admin uploads.
- */
 export const iconSrc = (version: string | null | undefined): string =>
   `${apiRoutes.getInstallationIcon.path()}?v=${encodeURIComponent(version ?? 'default')}`
 
-/** The same for the homepage's banner, which has no default: there is one or there is none. */
 export const bannerSrc = (version: string): string =>
   `${apiRoutes.getInstallationBanner.path()}?v=${encodeURIComponent(version)}`
 
-/**
- * What each write accepts, as a caller sends it.
- *
- * Partial by design, and the criterion is exact: a route is here when it takes a JSON
- * body. Reads and bodiless writes are absent, and so is `setMyAvatar` — it sends image
- * bytes rather than JSON, and a `Blob` is not a shape a schema describes. Asking for a
- * key that is absent is a type error rather than `unknown`.
- *
- * The `Input` variant where a schema has one, since that is the pre-parse shape a
- * client actually sends.
- *
- * This is the half that made #152 worth doing rather than a tidy-up: a body type was
- * previously chosen at each client method by hand, with nothing checking it against
- * the schema the route parses.
- */
 export interface RouteBodies {
   updateOauthSettings: OAuthSettingsUpdate
   addMyConnection: ConnectionCreate
@@ -1103,5 +939,4 @@ export interface RouteBodies {
   updateWelcome: EventWelcomeUpdate
 }
 
-/** The body a route takes, by key. A key with no body is a type error. */
 export type BodyOf<K extends keyof RouteBodies> = RouteBodies[K]

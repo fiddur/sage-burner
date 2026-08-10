@@ -21,19 +21,6 @@ import { useAction, useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
 import { rowsFor } from '../textarea.ts'
 
-/**
- * The public application form.
- *
- * Nothing about the questions is hardcoded here — that is the whole point of
- * #12 storing them as rows. This renders whatever `GET /api/questions` returns,
- * in the order an admin put them in, so adding a question never means a
- * deploy.
- *
- * The form is reachable without a session, because an applicant does not have
- * one yet.
- */
-
-/** Exactly what this page calls, so a test stub is a plain object rather than a cast. */
 export type ApplyApi = Pick<ApiClient, 'getQuestions' | 'submitApplication'>
 
 interface ApplyProps {
@@ -48,7 +35,6 @@ const problemText = (reason: AnswerProblem['reason']) => {
   return 'That answer is not valid.'
 }
 
-/** Mirrors `nonEmptyText(max)`, which trims before it bounds, so both sides agree. */
 const identityProblem = (value: string, max: number) => {
   const trimmed = value.trim()
   if (trimmed === '') return 'blank'
@@ -57,33 +43,9 @@ const identityProblem = (value: string, max: number) => {
   return undefined
 }
 
-/**
- * The same answers for the address, plus the one only it can have.
- *
- * Checked here rather than left to the 400: this is where the invite will be posted,
- * and a typo caught on submit costs a correction where a typo caught by nobody costs
- * an application that silently goes nowhere. `looksLikeEmail` is the shared shape
- * rule, deliberately looser than `emailSchema`, which is what actually refuses one.
- */
 const emailProblem = (value: string) =>
   identityProblem(value, MAX_APPLICANT_EMAIL_LENGTH) ?? (looksLikeEmail(value) ? undefined : 'malformed')
 
-/**
- * The controls below are `aria-required`, not natively `required`, because
- * native validation blocks submission before this page's handler runs — leaving
- * the browser to decide the empty cases and `answerProblems` the rest. The
- * browser is the weaker of the two: it accepts `"   "`, and it does not know an
- * `agreement` must be ticked rather than merely present.
- */
-
-/**
- * What the page says once it has been sent.
- *
- * The copy has to be true either way: with a mail server the invite arrives at the
- * address they typed, and without one it does not, so promising it would be a promise
- * the installation cannot keep (#30). `undefined` is the answer still arriving, and
- * takes the cautious half.
- */
 const Sent = ({ sendsEmail }: { sendsEmail?: boolean }) => (
   <article>
     <h1>Application sent</h1>
@@ -97,7 +59,6 @@ const Sent = ({ sendsEmail }: { sendsEmail?: boolean }) => (
   </article>
 )
 
-/** The problems are `field:reason`, so a field is flagged whatever its reason. */
 const hasProblem = (problems: string[], field: string) =>
   problems.some((problem) => problem.startsWith(`${field}:`))
 
@@ -110,18 +71,12 @@ export const Apply = ({ api }: ApplyProps) => {
   const [identityProblems, setIdentityProblems] = useState<string[]>([])
   const [sent, setSent] = useState(false)
 
-  // Public, so there is no role to wait for — this is the one load in the app that
-  // starts on mount whoever is looking.
-  // No `fallback`: the page has its own wording for a failed load, below.
   const { loaded } = useLoad(async (signal) => (await api.getQuestions(signal)).questions, {})
   const questions: FormQuestion[] | undefined = loaded.status === 'ready' ? loaded.data : undefined
   const loadFailed = loaded.status === 'failed'
 
   const { busy: sending, formError: sendError, setError: setSendError, run } = useAction()
 
-  // Once per load, not once per keystroke: `answer()` sets `answers`, so this
-  // component re-renders on every character typed, and the help text this exists
-  // to render is the longest thing on the form.
   const helpHtml = useMemo(() => {
     const byId = new Map<string, string>()
     for (const question of questions ?? []) {
@@ -142,7 +97,6 @@ export const Apply = ({ api }: ApplyProps) => {
   }, [])
 
   const submit = () => {
-    // Every rule passes vacuously against a list that has not arrived.
     if (questions === undefined) return
 
     const found = answerProblems(questions, answers)
@@ -163,16 +117,10 @@ export const Apply = ({ api }: ApplyProps) => {
           applicant_name: name.trim(),
           applicant_email: email.trim(),
           answers,
-          // What this page put on screen, which is not necessarily what the server
-          // holds now: a question added while it was open is not one the applicant
-          // was asked, and storing an empty answer for it would say otherwise.
           asked: questions.map((question) => question.id),
         })
         setSent(true)
       },
-      // A 400 means the questions changed since this page loaded, so retrying sends
-      // an identical body and fails identically. The answers stay on screen either
-      // way. A function rather than a string, since the wording turns on the status.
       (failure) =>
         isApiError(failure) && failure.status === 400
           ? 'The questions changed while you were filling this in. Please reload the page and send it again.'
@@ -225,8 +173,6 @@ export const Apply = ({ api }: ApplyProps) => {
           <span>Your email address</span>
           <input
             name="applicant_email"
-            // `type="email"` for the keyboard a phone offers, not for the validation:
-            // `aria-required` above says why the browser's own is not what decides.
             type="email"
             maxLength={MAX_APPLICANT_EMAIL_LENGTH}
             autocomplete="email"
@@ -264,8 +210,6 @@ export const Apply = ({ api }: ApplyProps) => {
           const help = helpHtml.get(question.id)
           const helpId = help === undefined ? undefined : `${question.id}-help`
           const errorId = problem === undefined ? undefined : `${question.id}-error`
-          // Both, when both apply: announcing the error by replacing the
-          // description would drop the explanation of how to answer.
           const describedBy = [helpId, errorId].filter((id) => id !== undefined).join(' ')
           const described = describedBy === '' ? undefined : describedBy
           const written = typeof answers[question.id] === 'string' ? String(answers[question.id]) : ''
@@ -281,7 +225,6 @@ export const Apply = ({ api }: ApplyProps) => {
                     aria-invalid={problem !== undefined}
                     aria-describedby={described}
                     checked={answers[question.id] === true}
-                    // A click on a checkbox does not reliably raise `input`.
                     onChange={(event) => answer(question.id, event.currentTarget.checked)}
                   />
                 )}
@@ -319,9 +262,6 @@ export const Apply = ({ api }: ApplyProps) => {
               </label>
 
               {help !== undefined && (
-                // A div, not a p: markdown renders block content, and a list
-                // inside a paragraph is invalid HTML the browser silently
-                // reshapes. Escaped rather than filtered — see `markdown.ts`.
                 <div
                   class="form-note markdown-preview"
                   id={helpId}

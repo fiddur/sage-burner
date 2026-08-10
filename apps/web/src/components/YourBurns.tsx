@@ -23,13 +23,6 @@ export type YourBurnsApi = Pick<
   | 'transferMyPlace'
 >
 
-/**
- * Every status gets its own sentence.
- *
- * A `Record` rather than a conditional, so a third status would be a type error here
- * instead of quietly reading as one of the two — which is what `partial` did: it
- * showed the same ", not yet paid." as having paid nothing.
- */
 const PAYMENT_NOTES: Record<PaymentStatus, string> = {
   unpaid: ', not yet paid.',
   paid: ', and you have paid.',
@@ -38,23 +31,10 @@ const PAYMENT_NOTES: Record<PaymentStatus, string> = {
 type Options = EventOptionsResponse['options']
 type Loaded = { burns: readonly MyBurn[]; past: readonly MyBurn[]; options: Map<string, Options> }
 
-/**
- * The burns on somebody's own page — the one being planned, the ones after it, and
- * their history behind a disclosure.
- *
- * This was a page of its own called "Your burn", singular, from when there was one
- * burn worth showing and it was whichever came next. More than one is planned at a
- * time, so #184 folded it in here: the details above follow you from burn to burn,
- * and each section below is one burn's worth of what does not.
- *
- * The lodging list is only fetched for burns they have actually joined — it is the
- * form's data, and there is no form until then.
- */
 export const YourBurns = ({ api }: { api: YourBurnsApi }) => {
   const [showPast, setShowPast] = useState(false)
   const viewer = useViewer()
 
-  // The bar's own list, which this page is the only thing that changes.
   const { reload: refreshBurns } = useBurns()
   const { loaded, reload } = useLoad<Loaded>(
     async (signal) => {
@@ -74,15 +54,6 @@ export const YourBurns = ({ api }: { api: YourBurnsApi }) => {
 
   const { busy, error, run } = useAction(reload)
 
-  /**
-   * Run something, with words for the statuses that mean it was refused.
-   *
-   * A status map rather than one message for 409, which is what this was and which
-   * left the join path unable to say anything useful: joining a burn that has just
-   * ended answers **404**, deliberately — an ended burn and an id that never existed
-   * get the same answer, so an id cannot be probed for existence. Under a 409-only
-   * rule that member was told to try again, which is advice that cannot help.
-   */
   const act = (change: () => Promise<unknown>, refusals: Readonly<Record<number, string>>) => {
     run(
       change,
@@ -129,10 +100,6 @@ export const YourBurns = ({ api }: { api: YourBurnsApi }) => {
                       act(
                         async () => {
                           await api.joinEvent(burn.event.id)
-                          // The bar's list is fetched once for the session, so without
-                          // this the burn you just joined is not selectable and every
-                          // burn-scoped page says you are not coming to one — until a
-                          // reload, which is not a thing to ask of anybody.
                           refreshBurns()
                         },
                         { 404: 'That burn is over, so you cannot join it now.' },
@@ -163,16 +130,10 @@ export const YourBurns = ({ api }: { api: YourBurnsApi }) => {
                   taken={Object.fromEntries(
                     (loaded.data.options.get(burn.event.id) ?? []).map((option) => [option.id, option.taken]),
                   )}
-                  // Reloaded rather than spliced: the `taken` counts move when a member
-                  // changes where they are sleeping, and a stale map leaves the option
-                  // they just left reading as full — now disabled, since it is no longer
-                  // theirs — which a native select cannot pick back.
                   onSaved={reload}
                 />
 
                 {burn.attendance.payment_status === 'paid' ? (
-                  // The only way off a paid burn: withdrawing is refused once money has
-                  // changed hands, so handing the place on is what replaces it.
                   <HandOverPlace
                     api={api}
                     eventId={burn.event.id}

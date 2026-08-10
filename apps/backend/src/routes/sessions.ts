@@ -46,24 +46,9 @@ import { addEntry, renameThread, threadForSession, threadIdFor } from './threads
 
 export interface SessionDeps extends GuardDeps {
   now: () => Date
-  /**
-   * Told when somebody is put on a dream, or taken off one, by anybody but
-   * themselves. Optional and swallowing its own failures, like the lead-roles
-   * register: offering a pair of hands is the point and the notification is a
-   * courtesy, so a push service being down must not fail the write.
-   */
   notify?: Notifier
 }
 
-/**
- * A dream as the routes handle it: the stored row, with the facilitator resolved
- * back to an account id.
- *
- * The column is an `attendance`, so that leaving a burn empties the spot by foreign
- * key rather than by a route remembering to. Every reader wants the person, though,
- * and the wire field has always been an account id — `dreamColumns` is where the two
- * meet, and it is the only place that knows the difference.
- */
 type DreamRow = Omit<typeof session.$inferSelect, 'facilitator_attendance_id'> & {
   facilitator_account_id: string | null
   thread_id: string | null
@@ -82,7 +67,6 @@ const dreamColumns = {
   thread_id: thread.id,
 }
 
-/** Left, so a dream nobody runs is still a dream — and so is one with no thread yet. */
 const dreamRows = (db: Database, where: SQL) =>
   db
     .select(dreamColumns)
@@ -96,17 +80,10 @@ interface People {
   support: ReadonlyMap<string, { people: Session['supporters']; mine: boolean }>
 }
 
-/**
- * Who is helping with these dreams, and who has given them a ❤️‍🔥.
- *
- * Two queries for the whole list rather than two per dream, like `rolesFor`.
- */
 const peopleFor = async (db: Database, ids: string[], mine: string | undefined): Promise<People> => {
   const helpers = new Map<string, Session['helpers']>()
   const support = new Map<string, { people: Session['supporters']; mine: boolean }>()
 
-  // Two queries that can only answer nothing. Drizzle renders the empty `inArray`
-  // harmlessly — this skips the round trips, it does not prevent an error.
   if (ids.length === 0) return { helpers, support }
 
   const helperRows = await db
@@ -150,13 +127,6 @@ const peopleFor = async (db: Database, ids: string[], mine: string | undefined):
   return { helpers, support }
 }
 
-/**
- * A stored dream as a reader sees it.
- *
- * Field by field rather than a spread of the row, like `asMemberEntry`: a spread is
- * exempt from excess-property checking, so a column added to `session` would reach
- * every reader of the schedule without anybody naming it here.
- */
 const asDream = (row: DreamRow, { helpers, support }: People): Session => ({
   id: row.id,
   event_id: row.event_id,
@@ -170,19 +140,10 @@ const asDream = (row: DreamRow, { helpers, support }: People): Session => ({
   thread_id: row.thread_id,
   helpers: helpers.get(row.id) ?? [],
   supporters: support.get(row.id)?.people ?? [],
-  // Kept beside the list rather than derived by every reader: the grid's chip shows
-  // the number where there is no room for faces.
   support_count: support.get(row.id)?.people.length ?? 0,
   supported_by_me: support.get(row.id)?.mine ?? false,
 })
 
-/**
- * What a scheduling change says, with no clock in it.
- *
- * The server does not know the reader's timezone, so a formatted time written into a
- * stored line would be Saturday in UTC and Sunday morning for somebody east of it. The
- * dream itself says when; this says that somebody moved it.
- */
 const scheduleLine = (before: DreamRow, after: DreamRow): string => {
   if (before.time_slot_start === null && after.time_slot_start !== null) return 'put it in the schedule'
   if (before.time_slot_start !== null && after.time_slot_start === null) return 'took it off the schedule'
@@ -191,10 +152,11 @@ const scheduleLine = (before: DreamRow, after: DreamRow): string => {
 }
 
 const sessionsFor = async (db: Database, eventId: string, mine: string | undefined): Promise<Session[]> => {
-  const rows = await dreamRows(db, eq(session.event_id, eventId))
-    // Unscheduled dreams last, then by when they happen. `asc` puts nulls first
-    // in SQLite, so the null-ness is sorted on explicitly rather than relied on.
-    .orderBy(asc(isNull(session.time_slot_start)), asc(session.time_slot_start), asc(session.title))
+  const rows = await dreamRows(db, eq(session.event_id, eventId)).orderBy(
+    asc(isNull(session.time_slot_start)),
+    asc(session.time_slot_start),
+    asc(session.title),
+  )
 
   const people = await peopleFor(
     db,
@@ -215,9 +177,7 @@ interface Refusal {
 
 interface Arranging {
   dream: DreamRow
-  /** The caller's own attendance, which shapes the answer but gates nothing here. */
   mine: string | undefined
-  /** Who is asking, so a write on somebody else's behalf can tell them. */
   callerId: string | undefined
 }
 
@@ -225,17 +185,6 @@ interface Attending extends Arranging {
   mine: string
 }
 
-/**
- * Whether a place belongs to the burn a dream is on.
- *
- * The foreign key cannot say this: it only knows the place exists, and since #156
- * a place belongs to one burn. Without the check a body could put a dream in
- * another burn's lane — a lane the grid does not draw, so the dream would vanish
- * from the page while still holding a row.
- *
- * `null` is always fine: that is "not scheduled anywhere yet", which is where most
- * dreams sit until close to the burn.
- */
 const placeIsOnThisBurn = async (db: Database, eventId: string, placeId: string | null | undefined) => {
   if (placeId == null) return true
 
@@ -248,13 +197,6 @@ const placeIsOnThisBurn = async (db: Database, eventId: string, placeId: string 
   return found !== undefined
 }
 
-/**
- * The facilitator's place at the burn their dream is at, or a refusal.
- *
- * Somebody who is not there cannot run it. `undefined` means the body did not
- * mention the field and nothing should be written; `null` means a dream nobody runs,
- * which is how most of them start.
- */
 type Spot = { ok: true; attendanceId: string | null | undefined } | { ok: false }
 
 const facilitatorSpot = async (
@@ -270,53 +212,22 @@ const facilitatorSpot = async (
   return found === undefined ? { ok: false } : { ok: true, attendanceId: found }
 }
 
-/**
- * Dreams — the member-offered workshops, ceremonies and happenings.
- *
- * A null time slot means *offered but not yet scheduled*, which is the normal
- * state for most of them right up until the burn, not an error.
- *
- * Open to anyone who is in, not to admins: the schedule is the members' to arrange
- * (#20), including handing a dream to whoever will facilitate it, which is a body
- * field rather than something to prevent.
- *
- * `requireApproved` rather than `requireMember`, so an organiser holding `admin`
- * without `member` is not shut out of the burn they are setting up (#200). The
- * selector already offers them every coming burn, so a `member`-only guard let them
- * choose one and then refused them its timetable — while the lanes, the register and
- * the options next to it were open. Taking a job **yourself** still needs an attendance
- * at that burn, and so does whoever somebody else is put down for (#350); the checks
- * below answer that with a 400, which is a different sentence from "you are not welcome
- * here".
- */
 export const registerSessionRoutes = (
   app: FastifyInstance,
   { db, sessions, now, notify = async () => undefined }: SessionDeps,
 ) => {
   const { requireApproved } = createGuards({ db, sessions })
 
-  /**
-   * The pool, as both the `GET` and the `If-Match` guard see it (#274).
-   *
-   * Per viewer, because `sessionsFor` is: whether a dream is yours changes the row.
-   * That is fine — each browser quotes back the tag it was given.
-   */
   const dreamsOf = async (eventId: string, mine: string | undefined): Promise<SessionsResponse> => ({
     sessions: await sessionsFor(db, eventId, mine),
   })
 
-  /** The caller's attendance at a burn, or nothing if they are not coming to it. */
   const mineAt = async (request: FastifyRequest, eventId: string) => {
     const viewer = await viewerFor(request, { db, sessions })
 
     return viewer === undefined ? undefined : await attendanceFor(db, eventId, viewer.account_id)
   }
 
-  /**
-   * Facilitating is a role somebody else can put you in or take you out of, so it is
-   * told like the rest. Only when the field was sent *and* moved — a PATCH fixing a
-   * typo in the title must not announce anything.
-   */
   const facilitatorMoved = async (
     by: string | undefined,
     before: DreamRow,
@@ -333,16 +244,6 @@ export const registerSessionRoutes = (
     if (line !== undefined) await noteOnDream(before, 'facilitator', by, line)
   }
 
-  /**
-   * The same change, in the third person, for the thread.
-   *
-   * A second wording rather than the notification's: that one is addressed to whoever it
-   * happened to — "You are facilitating" — and a thread is read by everybody else. The
-   * subject's name is written into it where there is one, which is the one name here
-   * that does not come from the account when the line is read. A line about a past
-   * appointment naming somebody's old name is history; the card's title is not, which is
-   * why that one is resolved live.
-   */
   const facilitatorLine = async (by: string | undefined, was: string | null, after: string | null) => {
     if (after === null) {
       if (was === null) return undefined
@@ -357,14 +258,12 @@ export const registerSessionRoutes = (
     return `asked ${await displayName(db, after)} to facilitate`
   }
 
-  /** Tell somebody, unless they did it themselves. Same rule as the register. */
   const tell = async (by: string | undefined, accountId: string, message: string) => {
     if (accountId === by) return
 
     await notify(accountId, { category: 'dream_role', body: message, link: '/dreams' })
   }
 
-  /** A line on the dream's own thread (#375), by whoever is doing it. */
   const noteOnDream = async (
     dream: { id: string; event_id: string; title: string },
     kind: ThreadEntryKind,
@@ -378,14 +277,6 @@ export const registerSessionRoutes = (
     )
   }
 
-  /**
-   * What a save changed, as quiet lines beside the talk.
-   *
-   * One per aspect that actually moved rather than one line trying to say everything: a
-   * rename followed by a move keeps both, while `coalesces` folds an afternoon of drags
-   * into a single scheduling line. A field sent unchanged says nothing — the grid sends
-   * the whole dream on every save.
-   */
   const dreamEdited = async (
     before: DreamRow,
     body: SessionUpdate,
@@ -417,9 +308,6 @@ export const registerSessionRoutes = (
     async (request, reply) => {
       void noStore(reply)
 
-      // Reading a finished burn's dreams is reading its record, so this is not
-      // scoped the way the writes below are. An empty list for an id that names
-      // nothing is the same answer as for a burn nobody offered anything at.
       const mine = await mineAt(request, request.params.eventId)
 
       return withVersion(reply, await dreamsOf(request.params.eventId, mine))
@@ -456,15 +344,6 @@ export const registerSessionRoutes = (
         thread_id: null,
       }
 
-      // Split deliberately. The foreign key is the authority on the place *existing*,
-      // including a concurrent delete a pre-read would miss; `placeIsOnThisBurn` above
-      // decides the pairing, which the key cannot see. That check cannot go stale in
-      // the direction that matters — no route moves a place between burns, since
-      // `placeUpdateSchema` omits `event_id`.
-      //
-      // The thread goes in with it (#375), so nothing later has to decide whether a
-      // dream has one. Both or neither: a dream whose conversation failed to be created
-      // would be a card the feed cannot draw.
       let threadId: string
       try {
         threadId = db.transaction((tx) => {
@@ -495,11 +374,6 @@ export const registerSessionRoutes = (
         now(),
       )
 
-      // After the write, and never to the person who just offered it (#259). Off
-      // unless somebody asked for it, so on most installations this reaches nobody.
-      //
-      // `tellAttendees` rather than `notifyAttendees`: the entry above is what the feed
-      // reads, and a line beside it would put one offer on the page twice.
       await tellAttendees(
         db,
         notify,
@@ -512,8 +386,6 @@ export const registerSessionRoutes = (
         { except: [viewer.account_id] },
       )
 
-      // Built from what was written rather than read back: a new dream has nobody
-      // helping and no hearts by definition.
       const dream: Session = {
         ...row,
         thread_id: threadId,
@@ -538,11 +410,6 @@ export const registerSessionRoutes = (
 
       const [existing] = await dreamRows(db, eq(session.id, request.params.id)).limit(1)
 
-      // Scoped to a burn that has not ended, like every other member-facing write:
-      // a dream from a finished burn is history, and an id noted while it was
-      // current should not still be a way to rewrite it. Not the *active* burn —
-      // the selector offers every burn still to come, and a dream can be offered
-      // for the one after next.
       const open = existing === undefined ? undefined : await openEventNow(db, now, existing.event_id)
       if (existing === undefined || open === undefined) {
         return sendError(reply, 404)
@@ -554,11 +421,6 @@ export const registerSessionRoutes = (
         return { session: await oneDream(db, existing, mine) } satisfies SessionResponse
       }
 
-      // The rule applied to the row as it would be, because a body carrying one
-      // end of the slot cannot be judged on its own — `hasValidTimeSlot` is the
-      // same check the schema makes when both ends are present. Not composed
-      // into the WHERE: these are ISO instants, and comparing them as SQL
-      // strings is wrong when the ends differ in fractional-second precision.
       if (!hasValidTimeSlot({ ...existing, ...body })) {
         return sendError(reply, 400)
       }
@@ -569,8 +431,6 @@ export const registerSessionRoutes = (
       const spot = await facilitatorSpot(db, existing.event_id, body.facilitator_account_id)
       if (!spot.ok) return sendError(reply, 400)
 
-      // Last of the refusals and immediately before the write: a malformed body is
-      // still a 400, and nothing between here and the UPDATE can change the pool.
       if (await refuseIfStale(request, reply, () => dreamsOf(existing.event_id, mine))) return reply
 
       const { facilitator_account_id: _wanted, ...fields } = body
@@ -584,13 +444,8 @@ export const registerSessionRoutes = (
         throw failure
       }
 
-      // Read back rather than returned from the UPDATE: the facilitator leaves this
-      // route as an account id and is stored as an attendance, and one query knowing
-      // that mapping is better than two.
       const [row] = await dreamRows(db, eq(session.id, request.params.id)).limit(1)
 
-      // After the 404, not before: a concurrent withdrawal between the pre-read and
-      // the UPDATE would otherwise announce a change to a dream that no longer exists.
       if (row === undefined) return sendError(reply, 404)
 
       const by = (await viewerFor(request, { db, sessions }))?.account_id
@@ -630,8 +485,6 @@ export const registerSessionRoutes = (
 
       if (deleted.length === 0) return sendError(reply, 404)
 
-      // The thread stays: it holds no foreign key to the dream precisely so that
-      // withdrawing one says so rather than deleting what people said about it (#375).
       const viewer = await viewerFor(request, { db, sessions })
 
       await noteOnDream(
@@ -645,11 +498,6 @@ export const registerSessionRoutes = (
     },
   )
 
-  /**
-   * The dream on a burn still open, and whatever place the caller has at it — which
-   * may be none: somebody organising a burn they are not coming to is coherent, and
-   * appointing people is part of that job (#350).
-   */
   const onOpenBurn = async (
     request: FastifyRequest<{ Params: { id: string } }>,
   ): Promise<Refusal | Arranging> => {
@@ -665,13 +513,6 @@ export const registerSessionRoutes = (
     return { dream, mine, callerId: viewer?.account_id }
   }
 
-  /**
-   * The same, for the writes keyed by the caller's own attendance rather than by
-   * somebody they name — which today is the heart.
-   *
-   * A caller who is not coming to that burn is a **400**, not a 403: they may well
-   * be a member in good standing, and what is wrong is the pairing.
-   */
   const asAttendee = async (
     request: FastifyRequest<{ Params: { id: string } }>,
   ): Promise<Refusal | Attending> => {
@@ -684,19 +525,6 @@ export const registerSessionRoutes = (
     return { ...found, mine }
   }
 
-  /**
-   * Offering a pair of hands, and taking the offer back — yours or somebody
-   * else's (#247).
-   *
-   * It names a person rather than being `/me`, like the lead-roles register: at 42
-   * people who all know each other, "I will put you down for that" is a thing said
-   * out loud, and the register has worked that way from the start. What keeps it
-   * civil is that the person is told, which is what `tell` is for.
-   *
-   * Whoever is **named** has to be coming to the burn — a dream is run by people who
-   * are there. The caller does not (#350): arranging a burn is a job somebody can hold
-   * without attending it, and the lead-roles register has always worked that way.
-   */
   app.post<{ Params: { id: string } }>(
     apiRoutes.helpWithSession.fastify,
     { preHandler: requireApproved },
@@ -718,8 +546,6 @@ export const registerSessionRoutes = (
         .onConflictDoNothing()
         .returning()
 
-      // Only when a row actually went in, like the removal below: a second tab, or a
-      // repeated 👉, would otherwise push the same person the same line twice.
       if (added.length > 0) {
         await tell(found.callerId, body.account_id, `You are helping with ${found.dream.title}`)
         await noteOnDream(
@@ -753,8 +579,6 @@ export const registerSessionRoutes = (
         .where(and(eq(sessionHelper.session_id, found.dream.id), eq(sessionHelper.attendance_id, theirs)))
         .returning()
 
-      // Only when a row actually went: taking somebody off a dream they were never
-      // on would otherwise tell them they had been dropped from it.
       if (gone.length > 0) {
         await tell(
           found.callerId,
@@ -775,12 +599,6 @@ export const registerSessionRoutes = (
     },
   )
 
-  /**
-   * A ❤️‍🔥, and taking it back.
-   *
-   * Nothing is notified: forty hearts arriving as notifications would teach people
-   * to ignore the channel.
-   */
   app.post<{ Params: { id: string } }>(
     apiRoutes.supportSession.fastify,
     { preHandler: requireApproved },

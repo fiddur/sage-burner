@@ -10,13 +10,6 @@ import { ErrorText } from './ErrorText.tsx'
 
 export type IconApi = Pick<ApiClient, 'removeInstallationIcon' | 'setInstallationIcon'>
 
-/**
- * Why the icon did not go up.
- *
- * Split out for the same reason `AvatarField`'s is: `preparedIcon` throws in
- * happy-dom before any request is made, so a component test cannot reach these
- * branches at all.
- */
 export const messageForFailure = (failure: unknown): string => {
   if (!isApiError(failure)) return 'Could not read that image. A PNG or an SVG works best.'
   if (failure.status === 415) return 'That is not an image we can use. A PNG or an SVG works best.'
@@ -28,24 +21,6 @@ export const messageForFailure = (failure: unknown): string => {
   return 'Could not save that icon. Please try again.'
 }
 
-/**
- * Choosing the icon an installed copy of this app wears (#256).
- *
- * Editable rather than configured, for the reason the title beside it is: an
- * installation should be able to look like itself without an operator, a redeploy, or
- * a fork.
- *
- * **An SVG is stored exactly as chosen.** That is a decision rather than an oversight
- * — rasterising a logo is what makes it worth uploading pointless — and it means an
- * admin can upload a file that carries script. The route serves it sandboxed so it
- * cannot execute against this app, and only an admin can put one there.
- *
- * The preview is the live route with a version on it, so saving one shows the new
- * one rather than whatever the browser already had under that URL. The version is the
- * installation's own — the same `?v=` the manifest quotes (#376) — rather than a
- * literal of this page's, which was a second live URL for one picture and evicted the
- * first from the offline cache on every store.
- */
 export const IconField = ({ api }: { api: IconApi }) => {
   const stored = useInstallationIcon()
   const setStored = useSetInstallationIcon()
@@ -112,8 +87,6 @@ export const IconField = ({ api }: { api: IconApi }) => {
             disabled={busy}
             onChange={(changeEvent) => {
               const file = changeEvent.currentTarget.files?.[0]
-              // Cleared, so the same file can be chosen again after a failure —
-              // without this a retry of the identical image fires no change event.
               changeEvent.currentTarget.value = ''
               if (file !== undefined) void choose(file)
             }}

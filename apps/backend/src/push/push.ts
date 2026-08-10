@@ -5,35 +5,23 @@ import type { Database } from '../db/index.ts'
 
 import { installation, INSTALLATION_ID, pushSubscription } from '../db/schema.ts'
 
-/** What a browser hands over when it subscribes. */
 export interface Subscription {
   endpoint: string
   p256dh: string
   auth: string
 }
 
-/** The VAPID pair, as `web-push` spells it. */
 export interface VapidKeys {
   publicKey: string
   privateKey: string
 }
 
-/**
- * One delivery attempt, injected so nothing in the suite reaches a push service.
- *
- * `gone` is the case that matters: a push service answers 404 or 410 for a
- * subscription the browser has thrown away — permissions revoked, profile wiped,
- * the app uninstalled — and the row has to go with it, or every future send
- * retries a dead endpoint forever. Anything else is `failed`: a 500 from Google is
- * not a reason to forget someone's phone.
- */
 export type Delivery = (
   subscription: Subscription,
   payload: string,
   keys: VapidKeys,
 ) => Promise<'sent' | 'gone' | 'failed'>
 
-/** What happened, for a caller that wants to say so in the log. */
 export interface DeliveryCounts {
   sent: number
   failed: number
@@ -47,13 +35,6 @@ export interface PushDeps {
   mintKeys: () => VapidKeys
 }
 
-/**
- * The installation's VAPID pair, minted on first use.
- *
- * Kept rather than derived: the public half is baked into every subscription a
- * browser has made, so a new pair silently orphans all of them. That is also why
- * this reads before it writes rather than upserting.
- */
 export const vapidKeysFor = async ({ db, mintKeys }: PushDeps): Promise<VapidKeys | undefined> => {
   const [row] = await db
     .select({ publicKey: installation.vapid_public_key, privateKey: installation.vapid_private_key })
@@ -66,17 +47,6 @@ export const vapidKeysFor = async ({ db, mintKeys }: PushDeps): Promise<VapidKey
     return { publicKey: row.publicKey, privateKey: row.privateKey }
   }
 
-  // Conditional on the columns still being null, and the loser re-reads rather
-  // than overwriting. Two admins turning notifications on at the same moment would
-  // otherwise both mint and the second write would win — leaving the first one's
-  // browser subscribed against a key the installation no longer holds, and every
-  // send to it failing forever with nothing to say why.
-  //
-  // Untested, and honestly so: `node:sqlite` is synchronous, so two calls in one
-  // process serialise and the second returns at the read above rather than
-  // reaching this. A test written for it passed with the condition removed, which
-  // is no test. Kept because the failure it prevents is silent and permanent, and
-  // the cost is a `WHERE` clause.
   const minted = mintKeys()
   const [claimed] = await db
     .update(installation)
@@ -103,7 +73,6 @@ export const vapidKeysFor = async ({ db, mintKeys }: PushDeps): Promise<VapidKey
     : undefined
 }
 
-/** Store one browser's permission, or refresh what it already had. */
 export const rememberSubscription = async (
   deps: PushDeps,
   accountId: string,
@@ -111,9 +80,6 @@ export const rememberSubscription = async (
 ): Promise<void> => {
   const { db, now = () => new Date() } = deps
 
-  // Re-subscribing from the same browser is ordinary — a reload does it — so the
-  // endpoint's UNIQUE decides, and the keys are refreshed rather than duplicated.
-  // They do change: a browser may rotate them without changing the endpoint.
   await db
     .insert(pushSubscription)
     .values({ id: randomUUID(), account_id: accountId, ...subscription, created_at: now().toISOString() })
@@ -123,20 +89,10 @@ export const rememberSubscription = async (
     })
 }
 
-/** Forget one browser. Silent when it was already forgotten. */
 export const forgetSubscription = async (deps: PushDeps, endpoint: string): Promise<void> => {
   await deps.db.delete(pushSubscription).where(eq(pushSubscription.endpoint, endpoint))
 }
 
-/**
- * Deliver one payload to a set of browsers, forgetting the ones that have gone.
- *
- * Failures do not reach the caller's caller. The callers are routes doing
- * something else — writing an application, handing somebody a role — and none of
- * them should fail because a push service was slow, since the thing being notified
- * about is already written by the time this runs. What comes back is a count of
- * each outcome, for whoever wants to log it; `app.ts` does.
- */
 const notifyRows = async (
   deps: PushDeps,
   rows: readonly { endpoint: string; p256dh: string; auth: string }[],
@@ -146,16 +102,11 @@ const notifyRows = async (
 
   const none = { sent: 0, failed: 0, gone: 0 }
 
-  // Asked for after the subscriptions, not before: an installation nobody has
-  // opted into should not acquire a key as a side effect of someone applying.
   if (rows.length === 0) return none
 
   const keys = await vapidKeysFor(deps)
   if (keys === undefined) return none
 
-  // `allSettled`, so one `Delivery` that rejects cannot skip the cleanup for every
-  // other row in the batch. `deliverWithWebPush` catches everything and never
-  // rejects, but the type permits it and a future implementation might.
   const results = await Promise.allSettled(rows.map((row) => deliver(row, payload, keys)))
   const gone = rows
     .filter((_row, index) => {
@@ -170,27 +121,15 @@ const notifyRows = async (
 
   const sent = results.filter((result) => result.status === 'fulfilled' && result.value === 'sent').length
 
-  // A rejection counts as failed rather than being dropped: `Delivery` may reject,
-  // and "nothing arrived and nothing said so" is the failure mode this whole
-  // feature is most likely to have.
   return { sent, gone: gone.length, failed: results.length - sent - gone.length }
 }
 
-/** The columns a delivery needs, for whichever browsers a caller has selected. */
 const subscriptionColumns = {
   endpoint: pushSubscription.endpoint,
   p256dh: pushSubscription.p256dh,
   auth: pushSubscription.auth,
 }
 
-/**
- * Notify one person, on every browser they opted in from.
- *
- * No role check: what is being notified about is something that happened to *them*
- * — being handed a role, or taken off one — and a subscription only exists because
- * that person asked for it. An account that has lost its roles simply has nothing
- * selecting it any more.
- */
 export const notifyAccount = async (
   deps: PushDeps,
   accountId: string,

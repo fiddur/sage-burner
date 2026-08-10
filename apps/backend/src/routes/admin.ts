@@ -12,34 +12,15 @@ import { bodyOf, noStore, sendError } from '../http.ts'
 
 export interface AdminDeps {
   db: Database
-  /** Injected so the suite never pays for scrypt, the same seam redemption uses. */
   hash?: (password: string) => Promise<string>
 }
 
-/** Thrown to roll the transaction back; never leaves this module. */
 const LAST_ADMIN = new Error('the last admin cannot give up the role')
 
-/**
- * Who exists, and who holds which role.
- *
- * The list is the first thing an admin needs after bootstrapping themselves
- * in: whether anyone else is here yet. Editing the roles is the second — the only
- * way to change a role from inside the app. `admin:create` can grant both to an
- * address that already exists, but that is a shell on the server, not something an
- * admin does.
- */
 export const registerAdminRoutes = (app: FastifyInstance, { db, hash = hashPassword }: AdminDeps) => {
   app.get(apiRoutes.getAdminAccounts.fastify, async (_request, reply) => {
-    // Every account's email address. An admin opening this on a shared
-    // laptop would otherwise leave the whole roster in the browser's on-disk
-    // cache, which outlives the session — logging out clears the cookie, not
-    // the cache entry.
     void noStore(reply)
 
-    // Two queries and a group, rather than a join. A left join would work but
-    // returns one row per role to unpick, and at 42 members the simpler shape
-    // wins. An *inner* join would be wrong outright: it drops accounts with no
-    // role, which is precisely who an admin is looking for.
     const rows = await db
       .select({ id: account.id, email: account.email, created_at: account.created_at })
       .from(account)
@@ -70,12 +51,6 @@ export const registerAdminRoutes = (app: FastifyInstance, { db, hash = hashPassw
 
     const { roles } = body
 
-    // Counted inside the transaction, after the write, so the rule is decided
-    // against the state the write actually produced with nothing in between,
-    // and a `throw` rolls the whole thing back. A count taken beforehand is a
-    // check-then-act; two `inject` requests could not be made to interleave one
-    // here, the same limitation `isAlreadyJoined` in `attendance.ts` records,
-    // so this is ordering that costs nothing rather than a reproduced bug.
     try {
       db.transaction((tx) => {
         tx.delete(accountRole).where(eq(accountRole.account_id, accountId)).run()
@@ -97,28 +72,12 @@ export const registerAdminRoutes = (app: FastifyInstance, { db, hash = hashPassw
     return { account: { ...found, roles } } satisfies AdminAccountResponse
   })
 
-  /**
-   * Setting somebody's password for them.
-   *
-   * No old password, because an admin does not have it — which is the point, and
-   * also what makes this the most powerful route here. Under `/api/admin/`, so the
-   * prefix hook is the only thing that lets it through.
-   *
-   * **It does not end their existing sessions.** Sessions are stateless signed
-   * cookies with a TTL and there is nothing to revoke them against, so a reset locks
-   * nobody out of a browser already signed in. That is fine for the case this exists
-   * for — a password lost or never written down — and not fine for a compromised
-   * account, which wants a session version to bump. Said plainly rather than left
-   * for somebody to discover.
-   */
   app.put<{ Params: { accountId: string } }>(apiRoutes.setAccountPassword.fastify, async (request, reply) => {
     void noStore(reply)
 
     const body = bodyOf(adminPasswordResetSchema, request)
     if (body === undefined) return sendError(reply, 400)
 
-    // Hashed before the row is looked for, so a real account and a made-up one cost
-    // the same. Not much of an oracle behind the admin guard, but it is one line.
     const password_hash = await hash(body.password)
 
     const [updated] = await db
@@ -127,8 +86,6 @@ export const registerAdminRoutes = (app: FastifyInstance, { db, hash = hashPassw
       .where(eq(account.id, request.params.accountId))
       .returning({ id: account.id })
 
-    // Nothing is echoed back: the caller already knows what they set, and a
-    // password in a response body is a password in somebody's network log.
     return updated === undefined ? sendError(reply, 404) : reply.code(204).send()
   })
 }

@@ -12,33 +12,8 @@ import { createGuards } from '../auth/guards.ts'
 import { event } from '../db/schema.ts'
 import { noStore, sendError } from '../http.ts'
 
-/**
- * A new address for a burn's calendar feed.
- *
- * 32 CSPRNG bytes, like an invite token and like an OAuth state: the URL is the only thing
- * protecting the feed, so the whole of its strength is here.
- */
 export const newFeedToken = (): string => randomBytes(32).toString('base64url')
 
-/**
- * What a burn's feed is reachable at, and giving it a new one (#408). "The calendar feed" in
- * `docs/burns.md` has why the id would not do.
- *
- * **A read of its own, not a field on the burn**, since the burn is what the public homepage
- * is answered with.
- *
- * Reading it is `requireApproved`: it is the link the Schedule page offers, and the schedule
- * itself is a member's to read. Rotating it is admin's, and lives under `/api/admin/` where
- * the prefix hook is the only authorization.
- *
- * A burn that has none — one written before the migration by something that skipped it — is
- * given one on read rather than answered with nothing. The column is nullable only because
- * adding it needed no table rebuild, so a null is a gap to close rather than a state to
- * report. That makes the read a write, which two simultaneous first-reads of one token-less
- * burn would race: both mint, and the loser is told a token the row no longer holds. Not
- * worth a lock — the migration backfills every row and `createEvent` is the only insert, so
- * there is nothing left to reach it — and a reload heals it either way.
- */
 export const registerCalendarRoutes = (app: FastifyInstance, { db, sessions }: GuardDeps) => {
   const { requireApproved } = createGuards({ db, sessions })
 
@@ -83,9 +58,6 @@ export const registerCalendarRoutes = (app: FastifyInstance, { db, sessions }: G
 
     if (rotated.length === 0) return sendError(reply, 404)
 
-    // Every calendar already subscribed to the old address stops updating, silently — a
-    // calendar client has nowhere to be told. That is what rotating is *for*, and the page
-    // says so before the button is pressed.
     return { token } satisfies CalendarFeedResponse
   })
 }

@@ -26,12 +26,6 @@ type Loaded =
   | { status: 'ready'; questions: readonly FormQuestion[] }
   | { status: 'failed'; message: string }
 
-/**
- * Built from `formQuestionTypes` through a total `Record`, so adding a fifth type
- * to the vocabulary is a type error here rather than a silent omission from both
- * selects — which is what made the "`formQuestionTypes` is where a fifth type
- * will be added" note below true rather than aspirational.
- */
 const TYPE_LABELS: Record<FormQuestionType, string> = {
   text: 'Short text',
   textarea: 'Long text',
@@ -43,12 +37,6 @@ const TYPES = formQuestionTypes.map((value) => ({ value, label: TYPE_LABELS[valu
 
 const BLANK = { label: '', type: 'textarea' as FormQuestionType, help_text: '', required: true }
 
-/**
- * `required` is decided by the type for the two tick-box types, not by the
- * admin. The rule itself comes from `tickBoxRequired` in the shared package,
- * so this control cannot drift from what the API and the database enforce — which
- * is what happened when the rule was written out separately in each place.
- */
 const requiredFor = (type: FormQuestionType, chosen: boolean) => tickBoxRequired(type) ?? chosen
 
 const isFixed = (type: FormQuestionType) => tickBoxRequired(type) !== undefined
@@ -61,28 +49,9 @@ const requiredNote = (type: FormQuestionType) => {
 
 const messageFor = (failure: unknown, fallback: string) => (isApiError(failure) ? failure.message : fallback)
 
-/**
- * A `<select>` yields `string`, and the shared vocabulary is the only authority
- * on which strings are types. Narrowed with the shared guard rather than cast:
- * the value comes from the DOM, so a cast would be a promise about markup this
- * file does not fully control, and `formQuestionTypes` is where a fifth type
- * will be added.
- */
 const toQuestionType = (value: string, fallback: FormQuestionType) =>
   isFormQuestionType(value) ? value : fallback
 
-/**
- * The application form's questions — one central set, not one per burn.
- *
- * These are rows rather than code precisely so an admin can retune them
- * between burns without a deploy — so everything here writes through the API
- * and re-reads, rather than keeping a clever local model that could disagree
- * with what the public form will actually render.
- *
- * Reordering sends the **whole** list of ids. The API rejects a partial one:
- * moving one question renumbers several, and a half-applied reorder is an order
- * nobody chose.
- */
 export const QuestionEditor = ({ api }: { api: QuestionsApi }) => {
   const [loaded, setLoaded] = useState<Loaded>({ status: 'loading' })
   const [draft, setDraft] = useState(BLANK)
@@ -108,13 +77,6 @@ export const QuestionEditor = ({ api }: { api: QuestionsApi }) => {
     }
   }, [api])
 
-  // Every mutation re-reads rather than patching local state. One extra request
-  // per change, and in exchange what is on screen is what the public form will
-  // render — including the `order` values the server assigned.
-  //
-  // Awaited, which is why this keeps its own loop rather than `useLoad`/`useAction`
-  // (#175): the branches below need to tell "saved, but could not reload" from "the
-  // write failed", and `reload()` resolves either way.
   const refresh = async () => {
     const response = await api.getQuestions()
     setLoaded({ status: 'ready', questions: response.questions })
@@ -126,21 +88,11 @@ export const QuestionEditor = ({ api }: { api: QuestionsApi }) => {
     setError(undefined)
     try {
       await work()
-      // Outside the `catch` below, and with its own message. Inside the `try`
-      // this reported `fallback` — "Could not add the question." — for a question
-      // that was already in the database, with the draft cleared. The exact
-      // inverse of the failure this component is otherwise careful about:
-      // pretending the change *didn't* take.
       await refresh().catch(() => {
         setError('Saved, but the list could not be reloaded.')
       })
     } catch (failure) {
       setError(messageFor(failure, fallback))
-      // Re-read on failure too, or the one error the API deliberately produces
-      // becomes a dead end: another admin adds a question, this list is now
-      // stale, every ↑/↓ rebuilds the same short id list, and `sameSet` answers
-      // 400 forever. Reloading the page was the only way out, and the message
-      // did not say so. One request on an error path buys recovery.
       await refresh().catch(() => undefined)
     } finally {
       setBusy(false)
@@ -153,8 +105,6 @@ export const QuestionEditor = ({ api }: { api: QuestionsApi }) => {
       await api.addQuestion({
         label: draft.label,
         type: draft.type,
-        // The column is nullable and "not set" has exactly one representation,
-        // so an empty box is null rather than an empty string.
         help_text: draft.help_text.trim() === '' ? null : draft.help_text,
         required: requiredFor(draft.type, draft.required),
       })
@@ -292,7 +242,6 @@ export const QuestionEditor = ({ api }: { api: QuestionsApi }) => {
   )
 }
 
-/** The edit form for one existing question. Split out to keep the list readable. */
 const QuestionFields = ({
   question,
   busy,

@@ -17,25 +17,10 @@ export type AdminApi = Pick<ApiClient, 'getAdminAccounts' | 'setAccountRoles' | 
 const withRole = (roles: readonly AccountRole[], role: AccountRole, held: boolean): AccountRole[] =>
   held ? [...new Set([...roles, role])] : roles.filter((entry) => entry !== role)
 
-/**
- * ⚙️ — the admin's landing page, and admin's alone.
- *
- * It used to offer a member the two lists they curate, because it was the only way
- * to reach them. #184 gave those their own way in — Places from Schedule, the
- * lodging list from Your burn — so what is left here is the burn's shape, who gets
- * in, and the installation, none of which a member may touch. The links to those two
- * stay, since an account holding `admin` without `member` has no Your burn to
- * reach the lodging list from.
- *
- * The role check decides what to *render*. It is not the access control:
- * `/api/admin/accounts` refuses a non-admin with a 403 whatever this does.
- */
 export const Admin = ({ api }: { api: AdminApi }) => {
   const viewer = useViewer()
   const admin = isAdmin(viewer)
 
-  // `enabled: admin` rather than a dependency on the viewer: the provider hands out
-  // a new object on every render, so depending on it would refetch continuously.
   const { loaded: roster, reload } = useLoad((signal) => api.getAdminAccounts(signal), {
     enabled: admin,
     fallback: 'Could not load the roster.',
@@ -141,19 +126,6 @@ export const Admin = ({ api }: { api: AdminApi }) => {
   )
 }
 
-/**
- * Setting somebody's password for them.
- *
- * There is no other way to change one: redemption is where a password is chosen,
- * `admin:create` refuses to touch an existing one, and nothing else writes it. So an
- * account whose owner lost the password — or one an admin made and did not write
- * down — had no way back.
- *
- * Its own state per row rather than the page's, so typing in one row does not blank
- * another. Deliberately not a `type="password"` field: an admin is setting a
- * password to read out or paste to somebody, and hiding it from the person choosing
- * it helps nobody.
- */
 const SetPassword = ({
   api,
   email,

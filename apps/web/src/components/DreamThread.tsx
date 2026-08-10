@@ -13,13 +13,6 @@ import { AddPicture } from './AddPicture.tsx'
 import { IconButton } from './IconButton.tsx'
 import { NAMELESS } from './PersonBadge.tsx'
 
-/**
- * What each kind of line wears, and how loudly it is drawn.
- *
- * The quiet ones are what the app did; a comment is what somebody said, and it is the
- * reason anybody opens the thread. One record rather than an icon map beside a weight
- * map: two objects keyed by the same union are two things to keep in step.
- */
 const marks = {
   comment: '',
   offered: '🌱',
@@ -33,13 +26,6 @@ const marks = {
 
 const nameOf = (entry: ThreadEntry) => entry.author?.name ?? (entry.author === null ? 'Somebody' : NAMELESS)
 
-/**
- * Who said it, linked to their page (#389).
- *
- * The name a reader most wants to click: somebody has just said something and you do not
- * know who they are. A deleted author is "Somebody" and stays plain text — there is no page
- * left to point at, and a link to nowhere is worse than none.
- */
 const Who = ({ entry }: { entry: ThreadEntry }) =>
   entry.author === null ? (
     <strong>{nameOf(entry)}</strong>
@@ -49,17 +35,6 @@ const Who = ({ entry }: { entry: ThreadEntry }) =>
     </a>
   )
 
-/**
- * The conversation about a dream (#375), wherever it is being read.
- *
- * The same component on the dream's own panel and on the feed's card, which is what
- * makes a withdrawn dream readable at all: the panel goes with the dream and the card
- * does not.
- *
- * It holds no thread of its own. Whoever renders it owns the fetching and the writes, so
- * a page that already reloads after every write does not gain a second copy of the truth
- * to keep in step.
- */
 export const DreamThread = ({
   thread,
   viewerId,
@@ -74,16 +49,9 @@ export const DreamThread = ({
 }: {
   thread: Thread | undefined
   viewerId: string | undefined
-  /** An admin may take a comment off. Nobody may rewrite somebody else's. */
   admin: boolean
   busy: boolean
-  /** Whether there is more of it than is being shown — the feed's card carries a few. */
   more: boolean
-  /**
-   * How a photograph gets into what somebody says (#379). Required rather than optional:
-   * a thread is the place pictures were wanted most, and a call site that forgot it would
-   * silently be the one field that does not take them.
-   */
   upload: UploadImage
   onSay: (body: string) => void
   onRewrite: (id: string, body: string) => void

@@ -14,14 +14,6 @@ import { configuredProviders } from '../oauth/settings.ts'
 import { bannerVersion } from './banner.ts'
 import { iconVersion } from './pwa.ts'
 
-/**
- * What this deployment calls itself.
- *
- * `Sage Burner` is the software; the installation is "The Burning Sage" or
- * whatever the people running it call their burns. Editable rather than
- * configured, because renaming the thing you are part of should not need an
- * operator, a redeploy, or a fork.
- */
 export const registerInstallationRoutes = (app: FastifyInstance, { db }: { db: Database }) => {
   const current = async (): Promise<InstallationResponse['installation'] | undefined> => {
     const [row] = await db
@@ -32,24 +24,16 @@ export const registerInstallationRoutes = (app: FastifyInstance, { db }: { db: D
 
     if (row === undefined) return undefined
 
-    // Read here rather than by the homepage asking the image route, which would 404
-    // in the ordinary case of nobody having uploaded one.
     return {
       ...row,
       banner_updated_at: (await bannerVersion(db)) ?? null,
       icon_updated_at: (await iconVersion(db))?.updated_at ?? null,
       sends_email: (await mailSettingsFor(db)) !== undefined,
-      // Names only, and only of what is configured: the login page draws the buttons
-      // before anybody is signed in, so it cannot ask an admin route (#393).
       social_logins: await configuredProviders(db),
     }
   }
 
   app.get(apiRoutes.getInstallation.fastify, async (_request, reply) => {
-    // `no-cache` rather than `no-store`: the title is public, but it is in the
-    // header of every page, so a rename sitting invisible in a browser cache
-    // would look exactly like the edit not having worked. Same reasoning as
-    // `/api/events/active`.
     void reply.header('cache-control', 'no-cache')
 
     const found = await current()
@@ -64,8 +48,6 @@ export const registerInstallationRoutes = (app: FastifyInstance, { db }: { db: D
     const body = bodyOf(installationUpdateSchema, request)
     if (body === undefined) return sendError(reply, 400)
 
-    // The write is skipped rather than answered by a read, because the row is a
-    // singleton and is read below either way — see `isEmptyPatch`.
     if (!isEmptyPatch(body)) {
       await db.update(installation).set(body).where(eq(installation.id, INSTALLATION_ID))
     }

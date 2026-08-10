@@ -5,31 +5,23 @@ import type { NavPage } from './Layout.tsx'
 
 import { useOverlay } from '../overlay.ts'
 
-/** The pages the bar has no room for. `docs/the-app.md` has the why, and why
- * dismissal is the backdrop's own rather than a document listener like the bell's. */
 export const Menu = ({ pages }: { pages: readonly NavPage[] }) => {
   const [open, setOpen] = useState(false)
   const button = useRef<HTMLButtonElement>(null)
   const drawer = useRef<HTMLElement>(null)
   const { path } = useLocation()
 
-  // Focus is inside the drawer, and closing unmounts it — so every way out has to hand
-  // focus back rather than let it fall to `<body>`.
   const close = () => {
     setOpen(false)
     button.current?.focus()
   }
 
-  // `pages` as well as `open`: the early return below is what stops rendering, and an
-  // account whose roles fall away — a background 401 — would otherwise leave the page
-  // locked with no drawer on it (#311).
   const showing = open && pages.length > 0
 
   useOverlay(drawer, showing)
 
   useEffect(() => setOpen(false), [path])
 
-  // So it does not spring open again if the roles come back.
   useEffect(() => {
     if (pages.length === 0) setOpen(false)
   }, [pages.length])
@@ -71,8 +63,6 @@ export const Menu = ({ pages }: { pages: readonly NavPage[] }) => {
           <div class="menu-backdrop" onPointerDown={close} />
           <nav id="menu-drawer" ref={drawer} class="menu-drawer" aria-label="More">
             {pages.map((page) => (
-              // Closed here as well as on a route change, since following a link to the
-              // page already open changes no route to react to.
               <a key={page.href} class="menu-entry" href={page.href} onClick={() => setOpen(false)}>
                 <span aria-hidden="true">{page.icon}</span> {page.label}
               </a>

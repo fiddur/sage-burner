@@ -11,19 +11,6 @@ export type PicturesApi = Pick<ApiClient, 'getMyImages' | 'removeMyImage'>
 
 const stored = (iso: string) => new Date(iso).toLocaleDateString()
 
-/**
- * The pictures this account has stored, and taking one back off (#392).
- *
- * It exists because `MAX_IMAGES_PER_ACCOUNT` counts every row ever written and nothing
- * else freed one — deleting the comment that referenced a picture deliberately leaves the
- * row — so an account that reached the ceiling could never upload again by any action the
- * app offered. A cap has to be recoverable from.
- *
- * **A removal is not undone by editing the comment back.** The reference lives in prose
- * that no foreign key can see, so nothing here can say which of these is still being shown
- * somewhere; the note says so, because that is a decision the person has to make rather
- * than one this can make for them.
- */
 export const PicturesField = ({ api }: { api: PicturesApi }) => {
   const { loaded, reload } = useLoad(async (signal) => (await api.getMyImages(signal)).images, {
     fallback: 'Could not load your pictures. Please reload the page.',
@@ -64,9 +51,6 @@ export const PicturesField = ({ api }: { api: PicturesApi }) => {
                 <span class="form-note">{stored(picture.created_at)}</span>
                 <IconButton
                   icon="✕"
-                  // Its position, not its date: a paste session stores several on one day,
-                  // and every ✕ then has the same name — which is what a screen reader
-                  // reads as one control repeated.
                   label={`Take off picture ${at + 1} of ${images.length}, added ${stored(picture.created_at)}`}
                   disabled={busy}
                   busy={busyWith === picture.id}

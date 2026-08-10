@@ -8,12 +8,6 @@ export interface Person {
   name: string | null
 }
 
-/**
- * Somebody's picture, for the badge beside their name (#301).
- *
- * Structural, so an attendee satisfies it without being converted — every caller
- * already has the burn's attendee list in hand, which is where the pictures are.
- */
 export interface Face {
   account_id: string
   avatar: string | null
@@ -21,29 +15,6 @@ export interface Face {
 
 const nameOf = (person: Person) => person.name ?? NAMELESS
 
-/**
- * Everywhere several people put their hands up for the same thing (#247).
- *
- * One control for a dream's helpers, a meal's crew and a lead role's team, because
- * they are one gesture. A vertical list: whoever is on it, then what is still
- * **wanted**, so the vacancies are as visible as the people.
- *
- * The two buttons sit on the **first** empty row only. Slots are interchangeable —
- * there is no sense in which the fourth is a different job from the second — so one
- * pair of controls fills the next free place and the rows below are pure count.
- *
- * 🙋 takes the spot and is always you; 👉 appoints somebody else, and is a step
- * further away because they are told about it. `candidates` is whoever may be
- * appointed, already filtered by the caller — a meal's cooking excludes its lead,
- * a dream's helpers exclude its facilitator — and that same list decides whether 🙋
- * is offered at all, since somebody who could not be appointed cannot volunteer
- * either.
- *
- * A vacancy row always exists even when the count is met, because the offer outlives
- * the count: a pair of hands is not a bed, which is the lodging list's rule and
- * deliberately not this one. That last row carries the buttons without the word
- * "wanted" — nothing more is asked for, but the offer stands.
- */
 export const HelperStrip = ({
   label,
   people,
@@ -56,27 +27,11 @@ export const HelperStrip = ({
   onAdd,
   onRemove,
 }: {
-  /** What this group is called, for the labels a screen reader reads out. */
   label: string
   people: readonly Person[]
-  /** How many are asked for. Absent where nobody counts — a dream's helpers. */
   wanted?: number
-  /**
-   * How many may hold it at once. `1` for a lead or a facilitator, where a filled
-   * spot offers only ✕ — handing over is unassign then assign, two steps, and each
-   * tells the person it happened to. Absent where any number of hands is welcome.
-   */
   max?: number
   candidates: readonly Person[]
-  /**
-   * Where the faces come from: the burn's attendees, with their pictures.
-   *
-   * Separate from `candidates`, which is filtered — a chore offers nobody, a dream's
-   * helpers exclude its facilitator — so somebody already on the list is by
-   * definition absent from it. Required rather than optional: a caller that forgot
-   * would draw initials for people who have a picture, which reads as the picture
-   * failing to load rather than as a lookup nobody wired up.
-   */
   everyone: readonly Face[]
   viewerId: string | undefined
   busy: boolean
@@ -91,9 +46,6 @@ export const HelperStrip = ({
   const canBeMe = !mine && viewerId !== undefined && candidates.some((who) => who.account_id === viewerId)
   const offerable = candidates.filter((who) => !on.has(who.account_id) && who.account_id !== viewerId)
 
-  // At least one, so there is somewhere to put the buttons. The extra one is not
-  // "wanted" — nothing more is asked for there. Where `max` says how many may hold
-  // it, a full spot gets none at all: the only way on is through somebody's ✕.
   const short = Math.max(0, (wanted ?? 0) - people.length)
   const vacancies = max === undefined ? Math.max(short, 1) : Math.max(0, max - people.length)
 
@@ -161,8 +113,6 @@ export const HelperStrip = ({
             {[...offerable]
               .sort((a, b) => nameOf(a).localeCompare(nameOf(b)))
               .map((person) => (
-                // A name alone: an `<option>` cannot hold an image, so the badge
-                // stops at the list and the picker stays text.
                 <option key={person.account_id} value={person.account_id}>
                   {nameOf(person)}
                 </option>

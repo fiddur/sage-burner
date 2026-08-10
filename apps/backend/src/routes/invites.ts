@@ -17,13 +17,6 @@ export interface InviteRouteDeps extends GuardDeps {
   now: () => Date
 }
 
-/**
- * Invites an admin mints directly, for people already known — returning
- * members, partners — who should skip the form.
- *
- * The same token shape approval mints, so both redeem through one path: CSPRNG
- * bytes, digest stored, raw value returned once.
- */
 export const registerInviteRoutes = (app: FastifyInstance, { db, sessions, now }: InviteRouteDeps) => {
   app.get(apiRoutes.getInvites.fastify, async (_request, reply) => {
     void noStore(reply)
@@ -52,8 +45,6 @@ export const registerInviteRoutes = (app: FastifyInstance, { db, sessions, now }
     if (body === undefined) return sendError(reply, 400)
 
     const expires_at = body.expires_at ?? defaultExpiry(now())
-    // An invite that is already dead is a link an admin would send and
-    // nobody could use, so it is refused rather than stored.
     if (Date.parse(expires_at) <= now().getTime()) {
       return sendError(reply, 400)
     }
@@ -71,20 +62,12 @@ export const registerInviteRoutes = (app: FastifyInstance, { db, sessions, now }
       created_by: viewer.account_id,
     })
 
-    // Nothing to post to: a direct invite names nobody, which is what separates it
-    // from an application's (#327). Null rather than a failure — there was no attempt.
     return reply.code(201).send({ invite: { token, expires_at }, delivery: null } satisfies InviteResponse)
   })
 
   app.delete<{ Params: { id: string } }>(apiRoutes.revokeInvite.fastify, async (request, reply) => {
     void noStore(reply)
 
-    // Only an unredeemed direct invite. A redeemed one is the record of how
-    // someone got in and `account` references it; an application's invite is the
-    // only one that application will ever have, so deleting it would leave that
-    // applicant with nothing to redeem. A direct invite still gets them in; what
-    // cannot be recovered is the tie back to what they wrote, which is what #91
-    // would restore by re-issuing against the application.
     const deleted = await db
       .delete(inviteToken)
       .where(

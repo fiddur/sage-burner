@@ -17,11 +17,6 @@ import { IconButton } from './IconButton.tsx'
 import { NAMELESS } from './PersonBadge.tsx'
 import { WithdrawDream } from './WithdrawDream.tsx'
 
-/**
- * One dream — read, edited or withdrawn without leaving the page it was opened from.
- *
- * The grid and the Dreams page both open this, through `OpenedDream` (#342).
- */
 export const DreamDetails = ({
   dream,
   places,
@@ -46,30 +41,18 @@ export const DreamDetails = ({
   dream: Session
   places: readonly Place[]
   attendees: readonly EventAttendeesResponse['attendees'][number][]
-  /** Whoever is running it, resolved to a name by the page. Absent while nobody is. */
   facilitator: Person | undefined
-  /** What has been said about it, and every way of adding to it (#375). */
   talk: DreamTalk
-  /** Who is reading it, so the button can say "I cannot help after all". */
   viewerId: string | undefined
-  /** An admin may take a comment off. Nobody may rewrite somebody else's. */
   admin: boolean
   busy: boolean
   error: string | undefined
-  /**
-   * Owned by the page, not held here: the form must stay open when a save is
-   * refused, and only the page knows whether one was. Closing it on the click
-   * threw away everything the member had typed.
-   */
   editing: boolean
-  /** How a picture gets into the description and into what people say about it (#379). */
   upload: UploadImage
   onEdit: () => void
   onCancelEdit: () => void
   onClose: () => void
-  /** Who is running it now, or `null` to leave it to nobody. */
   onFacilitate: (accountId: string | null) => void
-  /** `true` to offer, `false` to take the offer back. */
   onHelp: (helping: boolean, accountId: string) => void
   onSupport: (supporting: boolean) => void
   onSave: (changes: SessionUpdate) => void
@@ -102,7 +85,6 @@ export const DreamDetails = ({
           <p class="form-note">{whenAndWhere(dream, place)}</p>
 
           {dream.description.trim() !== '' && (
-            // Safe by construction: `renderMarkdown` escapes raw HTML rather than filtering it.
             <div
               class="markdown-preview"
               dangerouslySetInnerHTML={{ __html: renderMarkdown(dream.description) }}
@@ -132,10 +114,6 @@ export const DreamDetails = ({
                   const who = person.name ?? NAMELESS
 
                   return (
-                    // An anchor for the name as much as for the link: `Avatar` draws
-                    // `alt=""` because a name is normally beside it, and in a stack of
-                    // faces there is none — so the hidden span is what a screen reader
-                    // reads, and what gives the link something to be called.
                     <a
                       key={person.account_id}
                       class="dream-supporter"

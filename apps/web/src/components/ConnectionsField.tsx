@@ -29,18 +29,11 @@ export type ConnectionsApi = Pick<
   | 'reorderMyConnections'
 >
 
-/** What a row is called: the network, or the name somebody gave their own link. */
 export const nameOf = (row: Pick<Connection, 'kind' | 'label'>): string =>
   connectionKindInfo[row.kind].labelled && row.label.trim() !== ''
     ? row.label.trim()
     : connectionKindInfo[row.kind].label
 
-/**
- * Why a way of being reached could not be saved.
- *
- * The two 409s carry different codes, which is what `list_full` is for — `errorCodes` has
- * why this page cannot work it out for itself.
- */
 export const messageForFailure = (failure: unknown): string => {
   if (isApiError(failure) && failure.code === 'list_full') {
     return 'That is as many ways as one account may list. Take one off to add another.'
@@ -61,13 +54,6 @@ interface Draft {
 
 const BLANK: Draft = { kind: 'discord', value: '', label: '' }
 
-/**
- * What the form itself refuses, so a save the API would reject is refused at the keyboard.
- *
- * The same two rules as `connectionCreateSchema`, and `isProfileUrl` is the shared
- * function rather than a second regex — a link has to be somewhere a browser should be
- * sent, and it has to say what it is.
- */
 export const problemWith = (draft: Draft): string | undefined => {
   if (draft.value.trim() === '') return 'Fill in how to reach you first.'
   if (draft.kind !== 'link') return undefined
@@ -86,15 +72,7 @@ const Fields = ({
 }: {
   draft: Draft
   busy: boolean
-  /** What the labels say this form is, since a page can hold two of them at once. */
   subject: string
-  /**
-   * The address this account signs in with, for the one-press fill (#388).
-   *
-   * Passed down rather than fetched: it comes from `getMyProfile`, which the page around
-   * this already loads, and `/api/auth/me` deliberately does not carry it. Absent while
-   * that load is in flight or failed, which is why the button is conditional.
-   */
   loginAddress?: string
   onChange: (draft: Draft) => void
 }) => (
@@ -106,8 +84,6 @@ const Fields = ({
         disabled={busy}
         value={draft.kind}
         onChange={(changeEvent) => {
-          // Guarded rather than cast: the options are built from the vocabulary, so this
-          // cannot fail — but a `<select>`'s value is a string as far as the DOM knows.
           const kind = changeEvent.currentTarget.value
           if (isConnectionKind(kind)) onChange({ ...draft, kind })
         }}
@@ -161,21 +137,6 @@ const Fields = ({
   </>
 )
 
-/**
- * The ways somebody says they can be reached, on their own details page (#388).
- *
- * **In the order they put them in**, because the first one is the answer to the question
- * anybody actually has — where do I reach this person — rather than the start of a list of
- * everything they have ever signed up to. The profile page (#389) reads it in that order.
- *
- * Every row here is meant for other members to read, which is what separates the list from
- * the address somebody signs in with: that one stays out of what other members read (#159),
- * and an `email` row is an address the person typed and chose to put up.
- *
- * The note says what the list is *for* rather than who can see it today. Nothing reads
- * somebody else's yet — the page that does is #389 — and people are filling this in now, so
- * the future tense is both true and the safe direction to be wrong in.
- */
 export const ConnectionsField = ({ api, loginAddress }: { api: ConnectionsApi; loginAddress?: string }) => {
   const [draft, setDraft] = useState<Draft>(BLANK)
   const [editing, setEditing] = useState<{ id: string; draft: Draft } | undefined>(undefined)
@@ -198,12 +159,9 @@ export const ConnectionsField = ({ api, loginAddress }: { api: ConnectionsApi; l
     run(async () => {
       await api.addMyConnection({
         kind: draft.kind,
-        // What the server will store, so the row that comes back is what was sent — a
-        // pasted profile URL reduces to the handle either way.
         value: connectionValue(draft.kind, draft.value),
         label: draft.label.trim(),
       })
-      // Inside the work, so a refusal leaves what was typed where it is (#205).
       setDraft(BLANK)
     }, messageForFailure)
   }

@@ -28,7 +28,6 @@ export type PlacesApi = Pick<
   | 'copyPlaces'
 >
 
-/** Null rather than a fourth status: "no burn is open" is data, not a load outcome. */
 type Grid = { eventId: string; places: readonly Place[]; sources: readonly CopySource[] } | null
 
 interface Draft {
@@ -44,16 +43,6 @@ const NEEDS_BOTH = 'A place needs a name and an emoji — both show in the sched
 const isBlank = (fields: { name: string; emoji: string }) =>
   fields.name.trim() === '' || fields.emoji.trim() === ''
 
-/**
- * Where a dream can happen — one grid per burn, the one the bar is pointing at.
- *
- * The role check decides what to render, not what is allowed: the API refuses
- * anyone without a role whatever this does.
- *
- * Per burn since #156, so a summer-only spot is not a lane in the winter grid. The
- * overlap between burns is large, which is why an empty grid offers to copy a
- * previous one rather than only an empty form.
- */
 export const Places = ({ api }: { api: PlacesApi }) => {
   const viewer = useViewer()
   const approved = isApproved(viewer)
@@ -138,9 +127,6 @@ export const Places = ({ api }: { api: PlacesApi }) => {
                 busy={busy}
                 onCancel={() => setEditing(undefined)}
                 onSave={(changes) => {
-                  // The same rule as adding, and the same message. Without it a
-                  // cleared field reaches the server and comes back as a bare
-                  // "Request failed (400)".
                   if (isBlank(changes)) {
                     setError(NEEDS_BOTH)
                     return

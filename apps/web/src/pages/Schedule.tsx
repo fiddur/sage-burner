@@ -66,13 +66,11 @@ type Timetable = {
   places: readonly Place[]
   sessions: readonly Session[]
   attendees: readonly EventAttendeesResponse['attendees'][number][]
-  /** The kitchen's whole content. A burn with none gets no kitchen lane at all. */
   meals: readonly Meal[]
 }
 
 const label = (row: string) => row.slice(11)
 
-/** `18:00–21:00`, or null for a dream with no slot. */
 const span = (dream: Session) =>
   dream.time_slot_start === null || dream.time_slot_end === null
     ? null
@@ -80,29 +78,14 @@ const span = (dream: Session) =>
 
 const dayOf = (row: string) => row.slice(0, 10)
 
-/**
- * The timetable: places across, hours down, and the dreams nobody has placed yet
- * beside it.
- *
- * Dragging is the whole point of the page, and it is also the one interaction a
- * unit test cannot really have — `fireEvent.drop` exercises these handlers, not a
- * browser's drag. The precise route is the panel `OpenedDream` draws, from here or
- * from the Dreams page: a place and two datetime fields, reachable by keyboard,
- * which is what anyone who cannot drag should use.
- */
 export const Schedule = ({ api }: { api: ScheduleApi }) => {
   const viewer = useViewer()
   const approved = isApproved(viewer)
   const [dragged, setDragged] = useState<string | undefined>(undefined)
-  // A meal's block, when that is what is being dragged. Held apart from `dragged` so
-  // a dream cannot be dropped in the kitchen nor a meal in a lane — the kitchen is
-  // for cooking, fetching food and washing up, and that is the whole of it.
   const [draggedMeal, setDraggedMeal] = useState<MealBlock | undefined>(undefined)
   const [opened, setOpenedPanel] = useState<Opened | undefined>(undefined)
   const [openedMeal, setOpenedMealPanel] = useState<string | undefined>(undefined)
 
-  // The burn comes first: since #156 the lanes belong to one, so there is no grid to
-  // ask for until we know which.
   const burn = useSelectedBurn()
   const { loaded, refreshing, reload } = useLoad<Timetable>(
     async (signal) => {
@@ -134,13 +117,6 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
 
   const { busy, error, run, setError } = useAction(reload)
 
-  /**
-   * Every way a panel opens or closes, so none of them can forget the error (#206).
-   *
-   * `useAction` keeps its message until the next write, and the panel shows whatever
-   * it is holding as its own `role="alert"` — so a drag that failed made the next
-   * dream somebody opened announce "Could not move that dream." about itself.
-   */
   const setOpened = (next: Opened | undefined) => {
     setError(undefined)
     setOpenedPanel(next)
@@ -176,7 +152,6 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
   }
 
   const { event, places, sessions, attendees, meals } = loaded.data
-  // By id, because a chip has one and needs the name and the picture for its circle.
   const people = new Map(attendees.map((person) => [person.account_id, person]))
 
   if (event === null) {
@@ -200,9 +175,6 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
 
   const rows = hoursOf(event.start_date, event.end_date, event.start_time, event.end_time)
 
-  // The pool holds whatever the grid does not draw, rather than a guess at which
-  // dreams those are. Missing a time or a place is the common case; a dream timed
-  // outside these days is the one that used to render nowhere at all.
   const drawn = new Set(
     sessions
       .filter((dream) => dream.place_id !== null && rows.includes(hourOf(dream.time_slot_start) ?? ''))
@@ -214,8 +186,6 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
     const dream = sessions.find((candidate) => candidate.id === dragged)
     if (dream === undefined) return
 
-    // Keeps whatever length it already had. Forcing an hour would quietly
-    // shorten a two-hour session just because someone moved it to another lane.
     const placement = {
       place_id: placeId,
       time_slot_start: fromLocalInput(row),
@@ -223,8 +193,6 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
     }
 
     if (dream.repeatable) {
-      // A stamp rather than a thing that moves. The copy is an ordinary dream, or
-      // moving it afterwards would stamp again.
       run(
         () =>
           api.offerSession(event.id, {
@@ -250,14 +218,6 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
     move(dream.id, { time_slot_end: end })
   }
 
-  /**
-   * Exactly one thing is being dragged, so starting either drag ends the other.
-   *
-   * They were two independent states, and nothing cleared either when a drag was
-   * abandoned — dropping outside every target fires no `drop`. So an abandoned dream
-   * drag left `dragged` set, and the next meal dropped in a lane found it and moved
-   * the *dream* there instead. The kitchen's rule held only for a first drag.
-   */
   const dragDream = (id: string) => {
     setDragged(id)
     setDraggedMeal(undefined)
@@ -268,11 +228,6 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
     setDragged(undefined)
   }
 
-  // `dragend` fires on the source whether the drag ended in a drop or was abandoned,
-  // so nothing stale survives to be found by a drop that has nothing to do with it —
-  // text dragged in from elsewhere, say. Bound on each chip rather than on the grid:
-  // it does not reach an ancestor here, which a probe established rather than the
-  // spec, so the placement is load-bearing.
   const endDrag = () => {
     setDragged(undefined)
     setDraggedMeal(undefined)
@@ -284,15 +239,6 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
   const { support, help, facilitate, save, remove } = dreamActions({ api, run, setOpened })
   const talk = useDreamThread({ api, threadId: threadOf(sessions, opened), run })
 
-  /**
-   * The one write that needs a burn to write to, so it stays here where there is one —
-   * `event` is resolved by the time this runs, which is not true on every page that
-   * opens the panel.
-   *
-   * The fallback title is unreachable: the form disables its own button until there is
-   * one, and if that stopped being true an empty title is a 400 the panel reports with
-   * the text still in it.
-   */
   const offer = ({ title = '', ...fields }: SessionUpdate) => {
     run(async () => {
       await api.offerSession(event.id, { ...fields, title })
@@ -302,13 +248,9 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
 
   return (
     <Framed api={api} eventId={event.id} refreshing={refreshing}>
-      {error !== undefined &&
-        opened === undefined &&
-        shownMeal === undefined && (
-          // Only when no panel is open: the overlay covers this, and the panel shows
-          // the same message itself. Two would also be announced twice.
-          <ErrorText message={error} />
-        )}
+      {error !== undefined && opened === undefined && shownMeal === undefined && (
+        <ErrorText message={error} />
+      )}
 
       <div class="schedule">
         <Pool
@@ -324,7 +266,6 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
           onSupport={support}
           onResize={resize}
           onDrop={() => {
-            // Back to the pool is how a dream gets unscheduled.
             if (dragged === undefined) return
             move(dragged, { place_id: null, time_slot_start: null, time_slot_end: null })
             setDragged(undefined)
@@ -405,7 +346,6 @@ const Framed = ({
   children,
 }: {
   api: CalendarFeedApi
-  /** Absent until a burn is selected, which every state above the grid renders before. */
   eventId?: string
   refreshing?: boolean
   children: ComponentChildren
@@ -433,7 +373,6 @@ const Chip = ({
   dream: Session
   people: ReadonlyMap<string, Person>
   busy: boolean
-  /** Only in the grid: there are no rows to pull against in the pool. */
   resizable: boolean
   onDragStart: (id: string) => void
   onDragEnd: () => void
@@ -441,8 +380,6 @@ const Chip = ({
   onSupport: (id: string, supporting: boolean) => void
   onResize: (dream: Session, byRows: number) => void
 }) => {
-  // Google Calendar's rule: the click a drag leaves behind is not a click. Cleared
-  // on the next press rather than on `dragend`, which fires *before* that click.
   const dragging = useRef(false)
   const grabbed = useRef<{ y: number; rowHeight: number } | null>(null)
 
@@ -456,17 +393,11 @@ const Chip = ({
         dragging.current = false
       }}
       onDragStart={(dragEvent) => {
-        // `draggable` is on the chip, so a grab anywhere inside it — the resize
-        // handle included — would otherwise drag the whole dream to another lane.
         if (grabbed.current !== null) {
           dragEvent.preventDefault()
           return
         }
 
-        // Firefox refuses to start a drag whose data store was never written to,
-        // so this is what makes the gesture work at all there. The id is carried
-        // in state rather than read back out of the transfer; this only has to
-        // exist.
         dragging.current = true
         dragEvent.dataTransfer?.setData('text/plain', dream.id)
         onDragStart(dream.id)
@@ -497,9 +428,6 @@ const Chip = ({
           disabled={busy}
           aria-label={`Change how long ${dream.title} is`}
           onPointerDown={(pointerEvent) => {
-            // Measured off the cell rather than from a number the CSS and this
-            // would both have to hold: it spans `rowspan` rows, so its own height
-            // says what a row is worth on this screen.
             const cell = pointerEvent.currentTarget.closest('td')
             const spanned = Math.max(Number(cell?.getAttribute('rowspan') ?? '1'), 1)
             const height = cell?.getBoundingClientRect().height ?? 0
@@ -514,16 +442,11 @@ const Chip = ({
 
             onResize(dream, rowsDragged(pointerEvent.clientY - grab.y, grab.rowHeight))
           }}
-          // Or a lost capture leaves the ref set, and `onDragStart` goes on
-          // cancelling every drag of this chip until the handle is grabbed again.
           onPointerCancel={() => {
             grabbed.current = null
           }}
           onClick={(clickEvent) => clickEvent.stopPropagation()}
           onKeyDown={(keyEvent) => {
-            // The handle is the keyboard route too, like the ⠿ on Places: a
-            // resize nobody can do without a mouse is one half the people here
-            // cannot do.
             const by = keyEvent.key === 'ArrowDown' ? 1 : keyEvent.key === 'ArrowUp' ? -1 : undefined
             if (by === undefined) return
 
@@ -538,12 +461,6 @@ const Chip = ({
   )
 }
 
-/**
- * The ♡ that fills in, with how many people have given one.
- *
- * The click is stopped here rather than bubbling on to the chip: giving a dream a
- * heart is not a request to read about it.
- */
 const Support = ({
   dream,
   busy,
@@ -569,19 +486,6 @@ const Support = ({
   </button>
 )
 
-/**
- * Who is running it, as the initials circle the corner uses.
- *
- * The name is on `title` rather than beside the letters: a chip is an hour tall at
- * best, and two of them in a lane get half that. Nothing when nobody has been handed
- * it — an empty circle would read as somebody whose name is missing.
- *
- * **Deliberately not a link to their page** (#389), where every other face in the app is
- * one: this face sits inside a grid chip whose whole job is to open the dream, and an
- * anchor there would take the click that does it — a nested interactive element inside a
- * clickable cell. The name is a link in the panel the chip opens, which is where somebody
- * reading about a dream can follow it without losing the dream.
- */
 const Facilitator = ({ dream, people }: { dream: Session; people: ReadonlyMap<string, Person> }) => {
   const who = dream.facilitator_account_id
   if (who === null) return null
@@ -705,31 +609,11 @@ const Timetable = ({
     ]),
   )
 
-  // Its own lane, drawn from the meals rather than from a place: nothing can be put
-  // in the kitchen but cooking, fetching food and washing up. A burn with no meals
-  // gets no column at all.
   const kitchen = blocks.length === 0 ? undefined : laneCells(rows, blocks)
   const byId = new Map(blocks.map((block) => [block.id, block]))
 
-  // The lanes plus the kitchen, so the table can be told how narrow it may get before
-  // the wrapper scrolls instead.
   const columns = places.length + (kitchen === undefined ? 0 : 1)
 
-  /**
-   * Pinching to see more of the grid (#284).
-   *
-   * One factor for both axes, handed to the CSS as `--zoom`: the hours' height and
-   * the lanes' floor are both written in terms of it, so fingers apart stretch the
-   * timetable and fingers together squeeze a burn with more places than the phone is
-   * wide until they all fit.
-   *
-   * Not persisted. This is a gesture for reading the grid the way you want it *now*,
-   * and a zoom restored from a previous visit would greet somebody with a timetable
-   * they do not remember setting.
-   *
-   * Touch only, so a desktop pointer is untouched — there is no wheel handler here,
-   * and ctrl+wheel stays the browser's own page zoom.
-   */
   const [zoom, setZoom] = useState(1)
   const pinch = useRef<Pinch | undefined>(undefined)
 
@@ -751,13 +635,6 @@ const Timetable = ({
         const gap = twoFingerGap(touchEvent.touches)
         if (start !== undefined && gap !== undefined) setZoom(pinchedZoom(start, gap))
       }}
-      // Cleared on both, and on any lift rather than only on a cancel: a pinch that
-      // ends with one finger up leaves the other on the glass, and a stale start
-      // would make the next pinch jump from a gap nobody is holding any more.
-      //
-      // Any lift, including a third finger's — which ends the pinch until two are
-      // re-placed. It fails towards doing nothing, and counting the remaining touches
-      // to tell the cases apart is more code than the case is worth (#295).
       onTouchEnd={() => {
         pinch.current = undefined
       }}
@@ -805,8 +682,6 @@ const Timetable = ({
               </th>
               {places.map((place) => {
                 const cell = lanes.get(place.id)?.[index]
-                // A covered row renders no cell at all: the `rowSpan` above is
-                // already occupying it, and adding one here shifts the column.
                 if (cell === undefined || cell.kind === 'covered') return null
 
                 return (
@@ -820,16 +695,10 @@ const Timetable = ({
                       onDrop(row, place.id)
                     }}
                     onClick={() => {
-                      // Only an empty hour. A click that reached an anchor cell went
-                      // past the chip filling it, and offering a second dream on top
-                      // of one somebody just clicked is not what they meant.
                       if (cell.kind === 'empty') onOfferAt(row, place.id)
                     }}
                   >
                     {cell.kind === 'anchor' && (
-                      // Out of flow against the cell, so the block is as tall as the
-                      // hours it spans rather than as tall as its own text. See
-                      // `.dream-stack`.
                       <div class="dream-stack">
                         {cell.dreams.map((dream) => {
                           const full = dreams.find((entry) => entry.id === dream.id)
@@ -874,10 +743,6 @@ const Timetable = ({
   )
 }
 
-/**
- * The meal panel, or nothing — its own component so the page keeps one branch, the
- * same reason `OpenedDream` is one.
- */
 const OpenedMeal = ({
   meal,
   api,
@@ -925,14 +790,6 @@ const OpenedMeal = ({
   )
 }
 
-/**
- * One hour of the kitchen.
- *
- * The same `laneCells` machinery a place's column uses, so a three-hour block of
- * cooking spans three rows the way a dream does. What it does not get is a resize
- * handle: the three blocks come from one time, so there is nothing to make longer —
- * changing the length would mean changing what "cooking" means.
- */
 const KitchenCell = ({
   cell,
   blocks,
@@ -974,7 +831,6 @@ const KitchenCell = ({
                 draggable={!busy}
                 aria-label={`Move ${block.title}`}
                 onDragStart={(dragEvent) => {
-                  // Firefox refuses a drag whose data store was never written to.
                   dragEvent.dataTransfer?.setData('text/plain', block.id)
                   onDragMeal(block)
                 }}

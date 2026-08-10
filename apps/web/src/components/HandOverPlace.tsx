@@ -9,20 +9,6 @@ import { PendingButton } from './PendingButton.tsx'
 
 export type HandOverApi = Pick<ApiClient, 'getMembers' | 'transferMyPlace'>
 
-/**
- * Handing your paid place to somebody on the waiting list (#23).
- *
- * The only way off a burn once you have paid: withdrawing is refused then, because
- * what a refund means is undecided, so before this a paid member who could not come
- * had no way to free their place.
- *
- * The list is fetched when the control is opened rather than with the page. Most
- * people never do this, and a roster per burn on every visit to buy nothing is the
- * wrong trade.
- *
- * Asks before doing it, unlike most controls here: this one takes you off the burn
- * and cannot be undone from either side.
- */
 export const HandOverPlace = ({
   api,
   eventId,
@@ -43,8 +29,6 @@ export const HandOverPlace = ({
   const openPicker = async () => {
     setOpen(true)
     setError(undefined)
-    // Dropped, or *Never mind* then reopening renders the list fetched last time
-    // until this one lands, with whoever has paid since still on it (#263).
     setCandidates(undefined)
     try {
       const { entries } = await api.getMembers(eventId)

@@ -19,18 +19,6 @@ import { isApproved, useViewer } from '../viewer.tsx'
 
 export type MembersApi = Pick<ApiClient, 'getMembers'>
 
-/**
- * Who else is coming, for the people coming with them.
- *
- * The read half of "a member may write their own record, and the burn's shared
- * furniture" (#159). Whoever is cooking needs the allergies, and those live on the
- * account precisely so somebody can read them — which was not true while the only
- * route serving them sat under `/api/admin/`.
- *
- * Read-only, all of it. Somebody else's stay is theirs to edit, and *recording* a
- * payment stays admin's — but whether somebody has paid is shown to everyone, being
- * the definite mark of actually joining.
- */
 export const Members = ({ api }: { api: MembersApi }) => {
   const viewer = useViewer()
   const burn = useSelectedBurn()
@@ -82,18 +70,6 @@ export const Members = ({ api }: { api: MembersApi }) => {
   )
 }
 
-/**
- * How to pay — or, once the burn is paid full, how a place changes hands.
- *
- * Only to whoever has not paid: everybody else has done it, and a standing
- * instruction to pay is noise on a page they read for the allergies. It is the one
- * thing here addressed to the reader rather than about the burn.
- *
- * The count is of **paid** members, not of `waiting`. `withPlaces` sets `waiting` by
- * position alone, so a full list is not a paid-full burn — and while places remain
- * unpaid, paying still secures one, which makes the payment instructions exactly
- * what the people above the line need.
- */
 const HowToPay = ({
   event,
   entries,
@@ -117,13 +93,6 @@ const HowToPay = ({
   )
 }
 
-/**
- * Who is coming, in the order that decides who has a place.
- *
- * Its own component so the page above stays a page — the branching for loading,
- * failure, no burn and no entries is what `Members` is about, and the table's rows
- * were pushing that over the complexity ceiling.
- */
 const RosterTable = ({ entries }: { entries: readonly MemberRosterEntry[] }) => (
   <Table>
     <thead>

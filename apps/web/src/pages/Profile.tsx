@@ -49,11 +49,6 @@ export type ProfileApi = Pick<
 export const ProfilePage = ({ api }: { api: ProfileApi }) => {
   const viewer = useViewer()
   const member = isMember(viewer)
-  // `getMyProfile` is `requireApproved`, so asking before the viewer resolves — or for
-  // somebody who will be shown the refusal instead — is a request for a 403.
-  // `getAllergyItems` is public and rides along on the same flag: the only thing that reads
-  // it is the form above, so fetching a vocabulary for a form nobody will see is waste
-  // rather than a refusal.
   const approved = isApproved(viewer)
   const [name, setName] = useState('')
   const [contact, setContact] = useState('')
@@ -74,9 +69,6 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
     { enabled: approved, fallback: 'Could not load your details. Please reload the page.' },
   )
 
-  // Its own load, and its own failure: the vocabulary is a nicety beside the free
-  // text, so not having it must not cost somebody the page their name is on. No
-  // `fallback` either — nothing reads this one's message.
   const { loaded: vocabulary } = useLoad(async (signal) => (await api.getAllergyItems(signal)).items, {
     enabled: approved,
   })
@@ -84,9 +76,6 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
 
   const { busy: saving, formError, setError, run } = useAction()
 
-  // Read once: the address names the account above the sign-out button and seeds the
-  // one-press fill on the `email` kind, and two ternaries over the same load was what
-  // pushed this component over the complexity ceiling.
   const email = loaded.status === 'ready' ? loaded.data.email : undefined
 
   const save = () => {
@@ -118,8 +107,6 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
           arrive, where you sleep, what you will help with.
         </p>
       ) : (
-        // An account organising without attending: everything above is theirs, and there is
-        // no burn section below to point at (#412).
         <p class="form-note">
           These follow you from burn to burn. Say you are coming to one — under Organise → Accounts — and what
           you bring and where you sleep appear here too.

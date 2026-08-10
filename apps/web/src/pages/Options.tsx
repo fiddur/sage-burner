@@ -21,7 +21,6 @@ export type OptionsApi = Pick<
 
 type Lists = { event: MyBurn['event'] | null; options: readonly EventOption[] }
 
-/** Only lodging runs out; nothing runs short of people willing to tend a sauna. */
 const takesCapacity = (kind: EventOptionKind) => kind === 'lodging'
 
 const HEADING: Record<EventOptionKind, string> = {
@@ -35,14 +34,6 @@ const BLURB: Record<EventOptionKind, string> = {
   helping: 'A member ticks as many as they like, and can write in something you have not thought of.',
 }
 
-/**
- * The two lists for the burn the bar is pointing at.
- *
- * Per event rather than per community, so the page has to be told which — it reads
- * `useSelectedBurn()`, and setting a burn up before it is the next one works because
- * the selector offers every burn still to come, not because of any rule about which
- * is active.
- */
 export const Options = ({ api }: { api: OptionsApi }) => {
   const viewer = useViewer()
   const approved = isApproved(viewer)

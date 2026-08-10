@@ -16,16 +16,6 @@ export interface ImageDeps extends GuardDeps {
   now: () => Date
 }
 
-/**
- * Pictures inside markdown (#379).
- *
- * **Nothing here decodes an image**, which is the rule the avatar, the icon and the
- * banner all state and the one worth keeping hardest here: this is the upload that takes
- * whatever a camera produced. The browser scales it on a canvas before sending, and the
- * server stores the bytes as given. So the content type is what the caller claims and
- * those bytes are served back with it — bounded by a short list of storable types,
- * `X-Content-Type-Options: nosniff`, and `requireApproved` on both ends.
- */
 export const registerImageRoutes = (app: FastifyInstance, { db, sessions, now }: ImageDeps) => {
   const { requireApproved } = createGuards({ db, sessions })
 
@@ -52,9 +42,6 @@ export const registerImageRoutes = (app: FastifyInstance, { db, sessions, now }:
 
       if ((stored?.held ?? 0) >= MAX_IMAGES_PER_ACCOUNT) return sendError(reply, 409)
 
-      // `randomUUID` is CSPRNG, so 122 bits stand between a URL and the next one. That
-      // is defence in depth rather than the guard — `requireApproved` is — but it means
-      // an id leaking out of somebody's prose exposes that picture and no other.
       const id = randomUUID()
 
       await db.insert(image).values({
@@ -69,16 +56,6 @@ export const registerImageRoutes = (app: FastifyInstance, { db, sessions, now }:
     },
   )
 
-  /**
-   * The picture itself.
-   *
-   * `requireApproved`, like the avatar, and what that costs the public-facing fields is
-   * in `docs/the-app.md`.
-   *
-   * Cached hard, and safe because an image is immutable: this id will never answer with
-   * different bytes, so no cache here can go stale. `private` keeps it out of shared
-   * ones, since it is member data.
-   */
   app.get<{ Params: { id: string } }>(
     apiRoutes.storedImage.fastify,
     { preHandler: requireApproved },
@@ -98,13 +75,6 @@ export const registerImageRoutes = (app: FastifyInstance, { db, sessions, now }:
     },
   )
 
-  /**
-   * What this account has stored, newest first (#392).
-   *
-   * Named columns rather than the row: `bytes` is up to two megabytes apiece and a list
-   * of five hundred of them is not a JSON response anybody wants. The page draws each
-   * one through `storedImage`.
-   */
   app.get(apiRoutes.getMyImages.fastify, { preHandler: requireApproved }, async (request, reply) => {
     void noStore(reply)
 
@@ -120,17 +90,6 @@ export const registerImageRoutes = (app: FastifyInstance, { db, sessions, now }:
     return { images: rows } satisfies MyImagesResponse
   })
 
-  /**
-   * Taking one back off (#392), which is what makes `MAX_IMAGES_PER_ACCOUNT` recoverable.
-   *
-   * The account is in the `WHERE`, so somebody else's id is a 404 rather than a write —
-   * the same shape as a connection, and for the same reason.
-   *
-   * **A picture still referenced from prose is deleted anyway**, leaving that markdown
-   * pointing at nothing. Refusing instead would mean knowing every markdown column in the
-   * schema, which is the list `docs/the-app.md` explains why this app does not keep; the
-   * page says plainly what a removal costs before anybody presses it.
-   */
   app.delete<{ Params: { id: string } }>(
     apiRoutes.removeMyImage.fastify,
     { preHandler: requireApproved },

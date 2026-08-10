@@ -24,15 +24,6 @@ export type AdminSettingsApi = BannerApi &
   OauthApi &
   Pick<ApiClient, 'getInstallation' | 'updateInstallation'>
 
-/**
- * The installation's settings, and nothing personal.
- *
- * The push toggle used to be here as well as on Your details, and signing out with it, both
- * because an admin holding `admin` without `member` was refused from that page. Two controls
- * for one thing is the worse problem: which switch is on is a question neither page can
- * answer, and it reads as two different settings. Your details is `approved` since #396, so
- * that account reaches its own settings where everybody else's are.
- */
 export const AdminSettings = ({ api }: { api: AdminSettingsApi }) => {
   const viewer = useViewer()
   const admin = isAdmin(viewer)
@@ -58,8 +49,6 @@ export const AdminSettings = ({ api }: { api: AdminSettingsApi }) => {
     run(async () => {
       const { installation } = await api.updateInstallation({ title: title.trim() })
       setTitle(installation.title)
-      // The bar reads the title from a context rather than from this page, so the
-      // heading everywhere else follows without a reload.
       setInstallationTitle(installation.title)
       setSaved(true)
     }, 'Could not save that. Please try again.')

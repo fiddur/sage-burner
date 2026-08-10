@@ -41,7 +41,6 @@ const placeLabel = (places: readonly Place[], id: string | null) => {
   return found === undefined ? undefined : `${found.emoji} ${found.name}`
 }
 
-/** `Sat 14:30`. The weekday is ours and in English; the clock is the browser's. */
 const when = (dream: Session) => {
   if (dream.time_slot_start === null) return undefined
 
@@ -56,28 +55,12 @@ const when = (dream: Session) => {
   return `${day} ${clock}`
 }
 
-/**
- * Dreams — the workshops, ceremonies and happenings members offer each other.
- *
- * A dream with no time is *offered but not yet scheduled*, which is where most
- * of them sit right up until the burn. Anyone here can arrange the schedule, not
- * only whoever offered a given dream.
- *
- * **A row opens the panel the grid opens** (#342). It used to swap itself for an edit
- * form, so a dream had two ways to be read and two to be edited, and only the grid's
- * had the description, the helpers and the supporters on it — the list showed a title
- * and a time, and nothing said what a dream actually _was_. The row's ✏️ and 🗑️ went
- * with the second form: on a phone they wrapped onto a third line, under a title they
- * no longer sat beside.
- */
 export const Dreams = ({ api }: { api: DreamsApi }) => {
   const viewer = useViewer()
   const approved = isApproved(viewer)
   const [title, setTitle] = useState('')
   const [opened, setOpenedPanel] = useState<Opened | undefined>(undefined)
 
-  // The burn comes first: since #156 the lanes belong to one. With no burn open
-  // there is nothing to offer a dream to either, and `getSessions` says so anyway.
   const burn = useSelectedBurn()
   const { loaded, refreshing, reload } = useLoad(
     async (signal) => {
@@ -102,9 +85,6 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
 
   const { busy, error, setError, run } = useAction(reload)
 
-  // Every way the panel opens or closes, so none of them can forget the error (#206):
-  // `useAction` keeps its message until the next write, and the panel shows whatever
-  // it is holding as its own `role="alert"`.
   const setOpened = (next: Opened | undefined) => {
     setError(undefined)
     setOpenedPanel(next)
@@ -112,10 +92,6 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
 
   const { support, help, facilitate, save, remove } = dreamActions({ api, run, setOpened })
 
-  // A link that names a dream opens it — the feed's cards and the notifications about
-  // them both do (#375). Keyed on the parameter rather than folded into the panel's own
-  // state, so closing it stays closed: following a link is a choice, not a lock. A dream
-  // the burn does not have simply opens nothing, which is what a withdrawn one does.
   const asked: string | undefined = useLocation().query?.[DREAM_PARAM]
 
   useEffect(() => {

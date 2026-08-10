@@ -18,60 +18,28 @@ import {
 } from '../db/schema.ts'
 import { notifyAccount } from './push.ts'
 
-/** What a route says happened. The wording and the page it belongs to. */
 export interface Told {
   category: NotificationCategory
   body: string
-  /** A path in this app. Null for anything with no page of its own. */
   link: string | null
 }
 
 export type Notifier = (accountId: string, told: Told) => Promise<unknown>
 
-/**
- * Posting one notification to somebody who asked for it by email (#30).
- *
- * Injected rather than built here, so `notify.ts` stays free of both the mail
- * settings and the installation's name — and so an installation with no SMTP server
- * passes nothing and this whole branch costs a comparison.
- */
 export type EmailChannel = (accountId: string, told: Told) => Promise<unknown>
 
-/** The email leg: how to post one, and where to put it so nobody waits (#356). */
 export interface Email {
   post: EmailChannel
   defer: EmailQueue['defer']
 }
 
-/**
- * What a push carries, and the one place it is built (#279).
- *
- * The whole of what was told, which is the same thing the bell row holds — there is
- * one sender now that the applications push writes a row like everything else (#326),
- * so a push cannot carry less than the row it copies.
- */
 const pushPayload = ({ body, link, category }: Told): string => JSON.stringify({ body, link, category })
 
-/** Which ways this person wants to hear about one category. */
 export interface Channels {
-  /** The bell, and the push that copies it. */
   bell: boolean
   email: boolean
 }
 
-/**
- * Whether this person wants to hear about this, and how.
- *
- * A stored row is what they said; absence is that they have not said, and the
- * default answers instead. That indirection is the whole reason the table carries
- * `enabled` rather than only listing mutes — seven categories are on unless refused
- * and five are off unless asked for, and "is there a row" cannot mean both (#259).
- *
- * Email needs no such indirection: it is off for every category until somebody asks,
- * so absence and `false` say the same thing (#30). The two channels are independent
- * — somebody may want the burn-wide ones in their inbox and not on their phone —
- * which is why this answers with both rather than with one switch and a channel.
- */
 export const wants = async (
   db: Database,
   accountId: string,
@@ -86,35 +54,11 @@ export const wants = async (
   return { bell: row?.enabled ?? notifiesByDefault(category), email: row?.email ?? false }
 }
 
-/**
- * Tell somebody something happened to them (#248).
- *
- * The row is written first and the push is a copy of it, which is the order that
- * matters: a push service being unreachable must not cost somebody the record, and
- * the bell is the surface that is always there. A member with no subscription gets
- * the bell and nothing else, which is the ordinary case.
- *
- * A category somebody has switched off is not written at all — a bell that fills up
- * with things somebody asked not to hear about is the same noise in a quieter place.
- * That holds for the ones that are off until asked for too: nothing is recorded for
- * somebody who never turned them on (#259).
- *
- * **Email is a channel of its own, not a copy of the bell** (#30). The two switches
- * are independent, so somebody may take the burn-wide ones in their inbox and off
- * their phone — and switching the bell off is then not also an instruction to stop
- * posting. It goes on a queue rather than being awaited here (#356): a request must
- * not wait on SMTP, and the queue runs one message at a time so a burn's fan-out does
- * not dial the relay once per attendee at once.
- */
 export const recordAndPush =
   (deps: PushDeps, now: () => Date, log: (counts: DeliveryCounts) => void, email?: Email): Notifier =>
   async (accountId, told) => {
     const channels = await wants(deps.db, accountId, told.category)
 
-    // Independent of the bell: somebody may want the burn-wide ones in their inbox and
-    // nowhere else, and the write must not fail because a mail server did — the rule
-    // push already follows here (#30). Queued rather than started, so the connection
-    // happens after the request and behind whatever is already posting (#356).
     if (channels.email && email !== undefined) {
       email.defer(async () => await email.post(accountId, told))
     }
@@ -130,22 +74,12 @@ export const recordAndPush =
       created_at: now().toISOString(),
     })
 
-    // The whole of what was told, not just the wording (#279). The row already had
-    // the link and the category; the push carried neither, so the worker had nowhere
-    // to send anybody and hardcoded the one page that existed when it was written.
     const counts = await notifyAccount(deps, accountId, pushPayload(told))
     if (counts.failed > 0 || counts.gone > 0) log(counts)
 
     return counts
   }
 
-/**
- * Every category this account currently has on, per channel, defaults filled in.
- *
- * Computed here rather than left to the client, which would otherwise need its own
- * copy of the defaults to know what an absent row means — and a second copy of a
- * default is a default that drifts.
- */
 export const switchedOn = async (
   db: Database,
   accountId: string,
@@ -165,20 +99,10 @@ export const switchedOn = async (
     on: notificationCategories.filter(
       (category) => said.get(category)?.enabled ?? notifiesByDefault(category),
     ),
-    // No default to fill in: email is off until asked for, so absence is `false`.
     email: notificationCategories.filter((category) => said.get(category)?.email ?? false),
   }
 }
 
-/**
- * Somebody's name, for a notification that is about them.
- *
- * Named rather than anonymised, unlike the applications notification next door: that
- * one hides an applicant because an applicant is not a member yet and their name is
- * theirs until an admin opens the page. These go only to people attending the same
- * burn, who already read each other's names on the Members page and on the attendee
- * list — and "somebody is coming" is not worth switching on.
- */
 export const displayName = async (db: Database, accountId: string): Promise<string> => {
   const [row] = await db
     .select({ name: account.name })
@@ -189,19 +113,6 @@ export const displayName = async (db: Database, accountId: string): Promise<stri
   return row?.name ?? 'Somebody'
 }
 
-/**
- * One line in the feed, for something that happened at a burn (#303).
- *
- * Called from `notifyAttendees` and nowhere else, which is what keeps the feed's line
- * and the bell describing one event the same way — and it runs whether or not anybody
- * has that category on, which is what the page is for. `docs/the-app.md` has the rest.
- *
- * **What has a thread does not come through here** (#375). A dream's news is a
- * `thread_entry` on the dream, so the feed collapses it into one card carrying the live
- * title rather than a line frozen at the wording it was offered under — those routes
- * call `tellAttendees` below, which fans out without recording. `activity` keeps
- * whatever has no conversation to hang on.
- */
 export const recordActivity = async (db: Database, eventId: string, told: Told, at: Date) => {
   await db.insert(activity).values({
     id: randomUUID(),
@@ -213,31 +124,6 @@ export const recordActivity = async (db: Database, eventId: string, told: Told, 
   })
 }
 
-/**
- * Tell everybody coming to a burn that something happened at it (#259), and put it in
- * the feed (#303).
- *
- * **Attendance is the whole audience**, which is what "only for burns you are
- * attending" means: somebody who has not said they are coming hears nothing about
- * that burn, however they have set their switches. A member who leaves stops hearing
- * about it the moment their row goes.
- *
- * `except` is whoever the burn-wide note would be noise for. Whoever did the thing,
- * always — never notifying somebody about their own click is the rule #247 set for
- * the roles, and it applies harder here: offering your own dream and being told you
- * offered a dream is the fastest way to teach somebody the bell is noise. A **list**,
- * because appointing somebody makes them the subject as well, and they already have
- * the personal "You are now Kitchen lead" (#270).
- *
- * **Together rather than one after another**, which it was until #313. Each `notify`
- * writes a row and reaches a push service, and one after another that is one round
- * trip *per attendee* inside a single request.
- *
- * The email leg is no longer among what this waits for (#356): it goes on a queue, so
- * a route's response means the rows are written and the pushes attempted, and says
- * nothing about what has reached a mail server. A test asserting on a posted message
- * has to drain that queue.
- */
 export const notifyAttendees = async (
   db: Database,
   notify: Notifier,
@@ -245,20 +131,11 @@ export const notifyAttendees = async (
   told: Told,
   { except = [], at }: { at: Date; except?: readonly (string | undefined)[] },
 ): Promise<number> => {
-  // Outside the fan-out: one row for the burn, not one per person told.
   await recordActivity(db, eventId, told, at)
 
   return await tellAttendees(db, notify, eventId, told, { except })
 }
 
-/**
- * The same fan-out, for what the feed hears about another way (#375).
- *
- * A dream's news is an entry on its own thread, so recording a line beside it would put
- * the same thing on the feed twice — once as a card and once as a line under it. The
- * bell is unchanged either way: what somebody is told does not depend on where the feed
- * reads it from.
- */
 export const tellAttendees = async (
   db: Database,
   notify: Notifier,
@@ -279,17 +156,6 @@ export const tellAttendees = async (
   return audience.length
 }
 
-/**
- * Tell every admin about something they look after (#326).
- *
- * An application is the one thing notified about that is nobody's personally and not a
- * burn's either: it is a job waiting for whoever reviews applications. The category is
- * `about: 'admin'`, so only an admin is offered the switch — and it is on by default,
- * because an application nobody sees leaves the applicant waiting.
- *
- * Every admin account, not every subscribed admin: the row is the point, and a push is
- * a copy of it. An installation with nobody subscribed still fills the bell.
- */
 export const notifyAdmins = async (db: Database, notify: Notifier, told: Told): Promise<number> => {
   const rows = await db
     .select({ account_id: accountRole.account_id })
@@ -301,14 +167,6 @@ export const notifyAdmins = async (db: Database, notify: Notifier, told: Told): 
   return rows.length
 }
 
-/**
- * Tell everybody, for the one thing that is not about a burn at all.
- *
- * Every account rather than every attendee: a redeploy is the app changing under
- * whoever is using it, and an account holding `admin` without `member` is using it
- * too. The notifier drops the ones who have not asked, which is nearly everybody —
- * the category is off by default.
- */
 export const notifyEveryone = async (db: Database, notify: Notifier, told: Told): Promise<number> => {
   const rows = await db.select({ id: account.id }).from(account)
 
@@ -317,7 +175,6 @@ export const notifyEveryone = async (db: Database, notify: Notifier, told: Told)
   return rows.length
 }
 
-/** The bell's list, newest first, with what the red bubble counts. */
 export const notificationsFor = async (db: Database, accountId: string) => {
   const rows = await db
     .select({
@@ -333,8 +190,6 @@ export const notificationsFor = async (db: Database, accountId: string) => {
     .orderBy(desc(notification.created_at))
     .limit(50)
 
-  // Counted across the whole table rather than the page above, so the bubble stays
-  // right for somebody who has been away long enough to pass the limit.
   const [tally] = await db
     .select({ unseen: count() })
     .from(notification)
@@ -346,13 +201,6 @@ export const notificationsFor = async (db: Database, accountId: string) => {
   }
 }
 
-/**
- * Everything unseen becomes seen.
- *
- * Scoped to what is already unseen rather than stamping the lot, so a row that
- * arrived while the panel was open keeps the date it was actually read at — and so
- * opening the bell twice does not rewrite yesterday's.
- */
 export const markSeen = async (db: Database, accountId: string, at: Date) => {
   await db
     .update(notification)

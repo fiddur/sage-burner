@@ -1,13 +1,5 @@
 import type { Attendance, AttendanceUpdate } from '@sage-burner/shared'
 
-/**
- * The stay details as a form holds them: every field a string or a list, never null.
- *
- * A form's empty is `''` and an attendance's empty is `null`, and the two conversions
- * are the whole of what used to sit inline in `StayForm`. They are here because a
- * second form now asks the same questions — the invite page, where somebody sets up
- * their first burn before they have a page to come back to (#224).
- */
 export interface StayDraft {
   arrival_date: string
   departure_date: string
@@ -17,7 +9,6 @@ export interface StayDraft {
   notes: string
 }
 
-/** What a burn's dates make the obvious starting answer: the whole of it. */
 export const stayForBurn = (start: string, end: string): StayDraft => ({
   arrival_date: start,
   departure_date: end,
@@ -27,7 +18,6 @@ export const stayForBurn = (start: string, end: string): StayDraft => ({
   notes: '',
 })
 
-/** An existing stay, as the form holds it. */
 export const stayFromAttendance = (attendance: Attendance): StayDraft => ({
   arrival_date: attendance.arrival_date ?? '',
   departure_date: attendance.departure_date ?? '',
@@ -39,7 +29,6 @@ export const stayFromAttendance = (attendance: Attendance): StayDraft => ({
 
 const blankToNull = (value: string) => (value.trim() === '' ? null : value.trim())
 
-/** The draft as the API takes it, with the form's empties turned back into nulls. */
 export const stayUpdate = (draft: StayDraft): AttendanceUpdate => ({
   arrival_date: blankToNull(draft.arrival_date),
   departure_date: blankToNull(draft.departure_date),
@@ -49,13 +38,6 @@ export const stayUpdate = (draft: StayDraft): AttendanceUpdate => ({
   notes: blankToNull(draft.notes),
 })
 
-/**
- * What is wrong with the draft, in words, or nothing.
- *
- * Checked here as well as server-side so the message names the problem rather than
- * arriving as a bare 400. Only the pair matters: either date may be missing, and a
- * comparison against a missing one is not a comparison.
- */
 export const stayProblem = (draft: StayDraft): string | undefined =>
   draft.arrival_date !== '' && draft.departure_date !== '' && draft.departure_date < draft.arrival_date
     ? 'Your departure is before your arrival.'
