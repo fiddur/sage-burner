@@ -924,7 +924,8 @@ does not carry it (#388).
 
 **What was typed is what is stored**, and the URL is built at render. A handle is what
 somebody knows about themselves; a network changing its domain is then one line in
-`enums.ts` rather than a data migration.
+`enums.ts` rather than a data migration. A row a linked provider brought in (#442) is stored
+the same way, through the same `connectionValue`, so nothing downstream can tell the two apart.
 
 **Every row is meant to be read by approved members**, and the editor says so. That is what
 separates the list from `account.email`: the address somebody signs in with is the login
@@ -1137,15 +1138,39 @@ Nothing in this process decodes it — the provider is asked for a 256-pixel pic
 must be one of the three `account_avatar`'s CHECK allows, and the length is capped at
 `MAX_AVATAR_BYTES`. A failure costs the picture and never the link.
 
-**Not a way to be reached, and not a page on the profile** — both of which linking did write
-at first, from the id the provider hands over. That was wrong for Facebook: `public_profile`
-answers with an **app-scoped** id, which identifies nobody outside this installation's Meta
-app, so `m.me/<that>` and `facebook.com/profile.php?id=<that>` both point at nobody. Somebody
-signing in with Facebook says nothing about wanting their page shown either.
+**A way to be reached, where the provider has one to give** (#442). Discord answers `username`
+on the `identify` scope already asked for, so linking it writes a `discord` row — and this is
+the general rule rather than a Discord case: `ProviderProfile.reach` is where a provider says
+what it can be reached on, and a provider that has no such thing produces none. The alternative
+was a button offering it, which is what every other rule about contact details would suggest,
+since a row is published to every member and a sign-in is not a request to be. It was decided
+the other way: at this size the extra press mostly costs somebody being reachable, and what
+stands in for the asking is that Your details **says** it happened on the way back, with one
+press to take it off.
 
-So both come from the handle somebody **types** under How people can reach you: the `messenger`
-kind builds the `m.me` link in their list, and the profile page builds `facebook.com/…` from
-the same value. Your details says where to type it, next to the linking.
+Two properties bound it, and both come off `account_connection.from_provider`, which is null
+for everything typed. **A row of that kind already there is left alone**, whatever it holds —
+so nothing anybody wrote is overwritten, and nothing is added twice. **Unlinking deletes only
+what the link wrote**, and a row somebody has since edited is no longer that: `updateMyConnection`
+clears `from_provider`, so touching a row makes it yours and unlinking leaves it. The column
+carries no CHECK on the vocabulary, deliberately — adding one to an existing table means the
+rebuild described under "Adding a network is not free", and only `OAuthProvider` writes it.
+
+**Facebook writes none**, and the reason is the id it hands over: `public_profile` answers with
+an **app-scoped** id, which identifies nobody outside this installation's Meta app, so
+`m.me/<that>` and `facebook.com/profile.php?id=<that>` both point at nobody — and there is no
+Facebook username to reach anybody by at all. So Facebook's comes from the handle somebody
+**types** under How people can reach you: the `messenger` kind builds the `m.me` link in their
+list, and the profile page builds `facebook.com/…` from the same value. Your details says where
+to type it, next to the linking.
+
+**The page on the profile is never taken from that id either**, for the same reason. Where an
+installation has been approved for `user_link` it comes from Facebook's own `link` field (#405),
+and where it has not, from nothing.
+
+**The sign-in address is in the list without any of this**, from the moment an account exists —
+`loginAddressConnection` seeds it on both paths that create one, and a migration backfilled the
+rest. That is why nothing here asks a provider for an email address.
 
 ## Somebody's page
 

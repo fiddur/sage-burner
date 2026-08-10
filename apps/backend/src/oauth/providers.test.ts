@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
+import type { ProviderProfile } from './providers.ts'
+
 import { authorizeUrl, FACEBOOK_GRAPH_VERSION, providerShapes } from './providers.ts'
 
 /**
@@ -98,5 +100,35 @@ describe('reading what Facebook answered', () => {
 
     expect(read?.profile_url).toBeUndefined()
     expect(read?.subject).toBe('app-scoped-1')
+  })
+})
+
+describe('reading what Discord answered', () => {
+  const answer = (over: Record<string, unknown> = {}) => ({
+    id: 'discord-1',
+    username: 'wren',
+    avatar: 'abc',
+    ...over,
+  })
+
+  it('keeps the username as a way of being reached', () => {
+    expect(providerShapes.discord.read(answer())?.reach).toStrictEqual({ kind: 'discord', value: 'wren' })
+  })
+
+  it('keeps none where the answer carries no username, and still signs somebody in', () => {
+    const read = providerShapes.discord.read(answer({ username: undefined }))
+
+    expect(read?.reach).toBeUndefined()
+    expect(read?.subject).toBe('discord-1')
+  })
+
+  it('offers none from Facebook, which has a display name and no handle', () => {
+    const read: ProviderProfile | undefined = providerShapes.facebook.read({
+      id: 'app-scoped-1',
+      name: 'Wren',
+      picture: { data: {} },
+    })
+
+    expect(read?.reach).toBeUndefined()
   })
 })

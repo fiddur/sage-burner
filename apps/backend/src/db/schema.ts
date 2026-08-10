@@ -788,6 +788,7 @@ export const accountConnection = sqliteTable(
     value: text('value').notNull(),
     label: text('label').notNull().default(''),
     order: integer('order').notNull(),
+    from_provider: text('from_provider', { enum: oauthProviders }),
   },
   (table) => [
     primaryKey({ columns: [table.id] }),

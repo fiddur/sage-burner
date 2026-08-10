@@ -123,15 +123,18 @@ describe('the privacy policy', () => {
   })
 
   it('does not claim less than the provider’s own consent screen asks for', async () => {
-    // #429. Discord's screen says "your username, avatar and banner", because `identify` is the
-    // smallest scope it offers and there is no id-only one. The policy listed an identifier and a
-    // picture and then said "nothing else", so a member comparing the two got a smaller number
-    // from us with no explanation — on the one page that exists to be trusted about their data.
     const held = readDocument('PRIVACY.md')
 
     expect(held).toMatch(/screen\s+will\s+name\s+more/i)
-    expect(held).toMatch(/username\s+and\s+your\s+banner/i)
+    expect(held).toMatch(/your\s+banner\s+among\s+it/i)
     expect(held).toMatch(/dropped\s+rather\s+than\s+kept/i)
+  })
+
+  it('accounts for the username that screen names, which linking now keeps', async () => {
+    const held = readDocument('PRIVACY.md')
+
+    expect(held).toMatch(/Discord\s+name,\s+added\s+to\s+how\s+people\s+can\s+reach\s+you/i)
+    expect(held).toMatch(/takes\s+the\s+name\s+it\s+put\s+in\s+your\s+contact\s+list\s+back\s+out/i)
   })
 
   it('is the deletion instructions Meta’s console is pointed at', async () => {

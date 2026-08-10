@@ -1,3 +1,6 @@
+import type { ConnectionKind, OAuthProvider } from '@sage-burner/shared'
+
+import { connectionValue, MAX_CONNECTION_VALUE, MAX_CONNECTIONS } from '@sage-burner/shared'
 import { randomUUID } from 'node:crypto'
 
 export const loginAddressConnection = (accountId: string, email: string) => ({
@@ -8,3 +11,25 @@ export const loginAddressConnection = (accountId: string, email: string) => ({
   label: '',
   order: 0,
 })
+
+export const providerConnection = (
+  accountId: string,
+  provider: OAuthProvider,
+  reach: { kind: ConnectionKind; value: string },
+  held: readonly { kind: ConnectionKind; order: number }[],
+) => {
+  const value = connectionValue(reach.kind, reach.value)
+  if (value === '' || value.length > MAX_CONNECTION_VALUE) return undefined
+  if (held.length >= MAX_CONNECTIONS) return undefined
+  if (held.some((row) => row.kind === reach.kind)) return undefined
+
+  return {
+    id: randomUUID(),
+    account_id: accountId,
+    kind: reach.kind,
+    value,
+    label: '',
+    order: Math.max(0, ...held.map((row) => row.order + 1)),
+    from_provider: provider,
+  }
+}

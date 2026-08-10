@@ -9,6 +9,15 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-10
 
+- **Linking Discord now puts your Discord name in how people can reach you.** That was the one
+  thing linking did not do, so people were linking a sign-in and then typing the same name in by
+  hand. The page says when it has happened, and it is an ordinary row from then on — change it or
+  take it off as you would any other. If you had already put a Discord name there yourself,
+  linking leaves what you wrote alone; and taking the sign-in off takes the name back out, unless
+  you have since edited it, in which case it is yours and it stays. Your sign-in address has been
+  in that list from the start, and Facebook still adds nothing — it gives us a display name and no
+  handle anybody could reach you on.
+
 - **Adding a way to reach you no longer offers one you have already listed.** The **Where** menu
   on Your details used to list all ten every time and start on Discord, so with Discord already
   there the one it opened on was the one guaranteed to be wrong. It now opens on the first kind

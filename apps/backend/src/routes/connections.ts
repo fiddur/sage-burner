@@ -106,14 +106,21 @@ export const registerConnectionRoutes = (app: FastifyInstance, { db, sessions }:
       try {
         const [updated] = await db
           .update(accountConnection)
-          .set({ ...body, value })
+          .set({ ...body, value, from_provider: null })
           .where(
             and(
               eq(accountConnection.id, request.params.id),
               eq(accountConnection.account_id, viewer.account_id),
             ),
           )
-          .returning()
+          .returning({
+            id: accountConnection.id,
+            account_id: accountConnection.account_id,
+            kind: accountConnection.kind,
+            value: accountConnection.value,
+            label: accountConnection.label,
+            order: accountConnection.order,
+          })
 
         if (updated === undefined) return sendError(reply, 404)
 

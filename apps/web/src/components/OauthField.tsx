@@ -21,13 +21,16 @@ const consoles = {
     where: 'discord.com/developers/applications',
     cost: 'An application and a redirect URI. No review.',
     consent: '“your username, avatar and banner” — the least Discord lets any app ask for',
+    keeps:
+      'an identifier, their Discord name as a way other members can reach them, and — if they have no picture here — a copy of theirs',
   },
   facebook: {
     where: 'developers.facebook.com',
     cost: 'An app, the URLs listed below, and app review for public_profile before anybody outside your own account can use it.',
     consent: 'your public profile — the eight fields public_profile covers, of which this app reads three',
+    keeps: 'an identifier and, if they have no picture here, a copy of theirs',
   },
-} as const satisfies Record<OAuthProvider, { where: string; cost: string; consent: string }>
+} as const satisfies Record<OAuthProvider, { where: string; cost: string; consent: string; keeps: string }>
 
 export const OauthField = ({ api, provider }: { api: OauthApi; provider: OAuthProvider }) => {
   const [stored, setStored] = useState<OAuthSettings | null | undefined>(undefined)
@@ -93,11 +96,9 @@ export const OauthField = ({ api, provider }: { api: OauthApi; provider: OAuthPr
       </p>
 
       <p class="form-note">
-        {/* An admin who has not seen the consent screen cannot answer a member who has, and it
-            names more than this app keeps — `PRIVACY.md` is where that is explained (#429). */}
-        Your members will be asked to allow {consoles[provider].consent}. What this app keeps of it is an
-        identifier and, if they have no picture here, a copy of theirs — <a href="/privacy">/privacy</a> says
-        so, and it is the page they can check.
+        Your members will be asked to allow {consoles[provider].consent}. What this app keeps of it is{' '}
+        {consoles[provider].keeps} — <a href="/privacy">/privacy</a> says so, and it is the page they can
+        check.
       </p>
 
       {provider === 'facebook' && (
