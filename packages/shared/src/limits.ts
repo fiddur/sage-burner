@@ -54,6 +54,18 @@ export const MAX_CONNECTION_LABEL = 60
 
 export const MAX_CONNECTIONS = 12
 
+export const MAX_SONG_BODY = 20_000
+
+export const MAX_SONG_LINKS = 8
+
+export const MAX_SONG_LINK_URL = 500
+
+export const MAX_SONG_LINK_LABEL = 60
+
+export const MAX_SONG_CATEGORIES = 8
+
+export const MAX_CAPO = 11
+
 export const MAX_OAUTH_CLIENT_ID = 200
 
 export const MAX_OAUTH_CLIENT_SECRET = 500

@@ -23,6 +23,7 @@ import { AdminInvites } from './pages/AdminInvites.tsx'
 import { AdminQuestions } from './pages/AdminQuestions.tsx'
 import { AdminRoster } from './pages/AdminRoster.tsx'
 import { AdminSettings } from './pages/AdminSettings.tsx'
+import { AdminSongCategories } from './pages/AdminSongCategories.tsx'
 import { Apply } from './pages/Apply.tsx'
 import { Changelog } from './pages/Changelog.tsx'
 import { Dreams } from './pages/Dreams.tsx'
@@ -43,6 +44,8 @@ import { ProfilePage } from './pages/Profile.tsx'
 import { Rides } from './pages/Rides.tsx'
 import { Roles } from './pages/Roles.tsx'
 import { Schedule } from './pages/Schedule.tsx'
+import { SongPage } from './pages/Song.tsx'
+import { Songs } from './pages/Songs.tsx'
 import { Terms } from './pages/Terms.tsx'
 import { createRemembered, RememberedProvider } from './remembered.tsx'
 import { ROUTER_SCOPE } from './router-scope.ts'
@@ -149,6 +152,18 @@ export type RoutesApi = Pick<
   | 'deleteEventOption'
   | 'reorderEventOptions'
   | 'getEventAttendees'
+  | 'getApprovedAccounts'
+  | 'getSongbook'
+  | 'getSong'
+  | 'addSong'
+  | 'updateSong'
+  | 'deleteSong'
+  | 'restoreSong'
+  | 'getSongCategories'
+  | 'addSongCategory'
+  | 'updateSongCategory'
+  | 'deleteSongCategory'
+  | 'reorderSongCategories'
   | 'getLeadRoles'
   | 'getLeadRoleSources'
   | 'addLeadRole'
@@ -219,6 +234,8 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
   const NotificationsRoute = useMemo(() => () => <Notifications api={api} />, [api])
   const DreamsRoute = useMemo(() => () => <Dreams api={api} />, [api])
   const ScheduleRoute = useMemo(() => () => <Schedule api={api} />, [api])
+  const SongsRoute = useMemo(() => () => <Songs api={api} />, [api])
+  const AdminSongCategoriesRoute = useMemo(() => () => <AdminSongCategories api={api} />, [api])
   const RolesRoute = useMemo(() => () => <Roles api={api} />, [api])
   const RidesRoute = useMemo(() => () => <Rides api={api} />, [api])
   const FaqRoute = useMemo(() => () => <Faq api={api} />, [api])
@@ -232,6 +249,11 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
   const PersonRoute = useMemo(
     () =>
       ({ accountId }: { accountId?: string }) => <Person api={api} accountId={accountId ?? ''} />,
+    [api],
+  )
+  const SongRoute = useMemo(
+    () =>
+      ({ songId }: { songId?: string }) => <SongPage api={api} songId={songId ?? ''} />,
     [api],
   )
   const InviteRoute = useMemo(
@@ -252,6 +274,8 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
       <Route path="/meals" component={MealsRoute} />
       <Route path="/dreams" component={DreamsRoute} />
       <Route path="/schedule" component={ScheduleRoute} />
+      <Route path="/songs" component={SongsRoute} />
+      <Route path="/songs/:songId" component={SongRoute} />
       <Route path="/roles" component={RolesRoute} />
       <Route path="/rides" component={RidesRoute} />
       <Route path="/faq" component={FaqRoute} />
@@ -266,6 +290,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
       <Route path="/admin/questions" component={AdminQuestionsRoute} />
       <Route path="/admin/applications" component={AdminApplicationsRoute} />
       <Route path="/admin/invites" component={AdminInvitesRoute} />
+      <Route path="/admin/song-categories" component={AdminSongCategoriesRoute} />
       <Route path="/options" component={OptionsRoute} />
       <Route path="/places" component={PlacesRoute} />
       <Route path="/admin/roster" component={AdminRosterRoute} />

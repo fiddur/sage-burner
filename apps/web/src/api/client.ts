@@ -8,6 +8,7 @@ import type {
   ApplicationDecisionResponse,
   ApplicationResponse,
   ApplicationsResponse,
+  ApprovedAccountsResponse,
   Attendance,
   BodyOf,
   CalendarFeedResponse,
@@ -65,6 +66,10 @@ import type {
   RosterResponse,
   SessionResponse,
   SessionsResponse,
+  SongbookResponse,
+  SongCategoriesResponse,
+  SongCategoryResponse,
+  SongResponse,
   TermsResponse,
   ThreadResponse,
   VersionResponse,
@@ -120,7 +125,15 @@ const failureToReach = (cause: unknown): ApiError =>
     ? apiError(0, 'aborted', 'Request cancelled.')
     : apiError(0, 'network', 'Could not reach the server. Check your connection and try again.')
 
-export type Guarded = 'active-event' | 'faq' | 'lead-roles' | 'meals' | 'options' | 'places' | 'sessions'
+export type Guarded =
+  | 'active-event'
+  | 'faq'
+  | 'lead-roles'
+  | 'meals'
+  | 'options'
+  | 'places'
+  | 'sessions'
+  | 'song'
 
 export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
@@ -581,6 +594,60 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
 
     getEventAttendees: (eventId: string, signal?: AbortSignal) =>
       request<EventAttendeesResponse>(apiRoutes.getEventAttendees.path(eventId), { signal }),
+
+    getApprovedAccounts: (signal?: AbortSignal) =>
+      request<ApprovedAccountsResponse>(apiRoutes.getApprovedAccounts.path(), { signal }),
+
+    getSongbook: (signal?: AbortSignal) =>
+      request<SongbookResponse>(apiRoutes.getSongbook.path(), { signal }),
+
+    getSong: (id: string, signal?: AbortSignal) =>
+      request<SongResponse>(apiRoutes.getSong.path(id), { signal, version: 'song' }),
+
+    addSong: (body: BodyOf<'addSong'>) =>
+      request<SongResponse>(apiRoutes.addSong.path(), { method: apiRoutes.addSong.method, body }),
+
+    updateSong: (id: string, body: BodyOf<'updateSong'>) =>
+      request<SongResponse>(apiRoutes.updateSong.path(id), {
+        method: apiRoutes.updateSong.method,
+        body,
+        version: 'song',
+      }),
+
+    deleteSong: (id: string) =>
+      request<undefined>(apiRoutes.deleteSong.path(id), { method: apiRoutes.deleteSong.method }),
+
+    restoreSong: (id: string) =>
+      request<SongResponse>(apiRoutes.restoreSong.path(id), {
+        method: apiRoutes.restoreSong.method,
+        version: 'song',
+      }),
+
+    getSongCategories: (signal?: AbortSignal) =>
+      request<SongCategoriesResponse>(apiRoutes.getSongCategories.path(), { signal }),
+
+    addSongCategory: (body: BodyOf<'addSongCategory'>) =>
+      request<SongCategoryResponse>(apiRoutes.addSongCategory.path(), {
+        method: apiRoutes.addSongCategory.method,
+        body,
+      }),
+
+    updateSongCategory: (id: string, body: BodyOf<'updateSongCategory'>) =>
+      request<SongCategoryResponse>(apiRoutes.updateSongCategory.path(id), {
+        method: apiRoutes.updateSongCategory.method,
+        body,
+      }),
+
+    deleteSongCategory: (id: string) =>
+      request<undefined>(apiRoutes.deleteSongCategory.path(id), {
+        method: apiRoutes.deleteSongCategory.method,
+      }),
+
+    reorderSongCategories: (ids: readonly string[]) =>
+      request<SongCategoriesResponse>(apiRoutes.reorderSongCategories.path(), {
+        method: apiRoutes.reorderSongCategories.method,
+        body: orderBody(ids) satisfies BodyOf<'reorderSongCategories'>,
+      }),
 
     getLeadRoles: (eventId: string, signal?: AbortSignal) =>
       request<LeadRolesResponse>(apiRoutes.getLeadRoles.path(eventId), { signal, version: 'lead-roles' }),

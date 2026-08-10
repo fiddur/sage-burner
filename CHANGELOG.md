@@ -9,6 +9,19 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-10
 
+- **There is a songbook.** ☰ → 🎵 Songbook: one shared book of what we sing, so whoever has the
+  guitar and whoever has a phone are looking at the same words. A song needs nothing but a title.
+  On its page you can paste the words in — chords on their own lines above them, the way
+  ultimate-guitar writes them, and they are recognised as chords without your marking them up —
+  add links to hear it, say which fret the capo goes on, and file it under Chant, Song or anything
+  an organiser adds to the list. **♭ and ♯ transpose it** while you look, without changing what is
+  stored, and **▶️ scrolls the page for you** at a speed you can set and that is remembered for
+  next time. The book belongs to no one burn: it is the same book every time, and anybody here can
+  add a song and anybody can polish one. Taking a song out is undone from _Recently taken out_ at
+  the foot of the list, so nothing is lost by a slip. A new song gets a card on the feed you can
+  say something under, and there are switches for being told about a new song and about comments —
+  off unless you ask, except comments on a song you put in.
+
 - **You can name somebody in a comment or an announcement.** Type `@` and pick them — everyone
   coming to the burn is offered, and so is **@everybody**, which reaches all of them. Whoever you
   name is told, and told that rather than the general "somebody commented" — one notification per

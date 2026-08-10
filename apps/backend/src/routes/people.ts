@@ -1,18 +1,34 @@
-import type { PersonProfile, PersonProfileResponse } from '@sage-burner/shared'
+import type { ApprovedAccountsResponse, PersonProfile, PersonProfileResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
 import { apiRoutes, facebookProfileUrl } from '@sage-burner/shared'
-import { and, eq } from 'drizzle-orm'
+import { and, asc, eq, inArray } from 'drizzle-orm'
 
 import type { GuardDeps } from '../auth/guards.ts'
 
 import { createGuards } from '../auth/guards.ts'
-import { account, accountAvatar, accountIdentity } from '../db/schema.ts'
+import { account, accountAvatar, accountIdentity, accountRole } from '../db/schema.ts'
 import { noStore, sendError } from '../http.ts'
 import { connectionsFor } from './connections.ts'
 
 export const registerPeopleRoutes = (app: FastifyInstance, { db, sessions }: GuardDeps) => {
   const { requireApproved } = createGuards({ db, sessions })
+
+  // Two columns and a picture, the same reasoning as the attendees route: what the songbook's
+  // composer has to offer somebody to name, for a book that belongs to no burn.
+  app.get(apiRoutes.getApprovedAccounts.fastify, { preHandler: requireApproved }, async (_request, reply) => {
+    void noStore(reply)
+
+    const rows = await db
+      .selectDistinct({ account_id: account.id, name: account.name, avatar: accountAvatar.updated_at })
+      .from(account)
+      .innerJoin(accountRole, eq(accountRole.account_id, account.id))
+      .leftJoin(accountAvatar, eq(accountAvatar.account_id, account.id))
+      .where(inArray(accountRole.role, ['admin', 'member']))
+      .orderBy(asc(account.name), asc(account.id))
+
+    return { accounts: rows } satisfies ApprovedAccountsResponse
+  })
 
   app.get<{ Params: { accountId: string } }>(
     apiRoutes.accountProfile.fastify,

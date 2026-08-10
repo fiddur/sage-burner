@@ -17,6 +17,7 @@ import {
   INTRODUCTION_EXCERPT,
   mentionedAccounts,
   profilePage,
+  songPage,
   withMentionNames,
 } from '@sage-burner/shared'
 import { and, asc, count, desc, eq, inArray, max, ne, sql } from 'drizzle-orm'
@@ -35,11 +36,12 @@ import {
   post,
   session,
   sessionHelper,
+  song,
   thread,
   threadEntry,
 } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
-import { displayName, namedBy, wants } from '../push/notify.ts'
+import { approvedAccounts, displayName, namedBy, wants } from '../push/notify.ts'
 
 export interface NewEntry {
   thread_id: string
@@ -50,7 +52,7 @@ export interface NewEntry {
 
 export const threadIdFor = (
   tx: Database | Transaction,
-  entity: { type: ThreadEntityType; id: string; event_id: string; title: string },
+  entity: { type: ThreadEntityType; id: string; event_id: string | null; title: string },
 ): string => {
   const [made] = tx
     .insert(thread)
@@ -123,7 +125,7 @@ export const addEntry = async (db: Database, entry: NewEntry, at: Date) => {
 export const threadFor = async (
   db: Database,
   type: ThreadEntityType,
-  entity: { id: string; event_id: string; title: string },
+  entity: { id: string; event_id: string | null; title: string },
 ): Promise<string> => {
   const [row] = await db
     .select({ id: thread.id })
@@ -222,13 +224,17 @@ export const readThreads = async (
       post_body: post.body,
       post_withdrawn_at: post.withdrawn_at,
       post_author: post.author_account_id,
+      song_title: song.title,
+      song_deleted_at: song.deleted_at,
+      song_author: song.author_account_id,
     })
     .from(thread)
-    .innerJoin(event, eq(event.id, thread.event_id))
+    .leftJoin(event, eq(event.id, thread.event_id))
     .leftJoin(session, and(eq(thread.entity_type, 'session'), eq(session.id, thread.entity_id)))
     .leftJoin(attendance, and(eq(thread.entity_type, 'attendance'), eq(attendance.id, thread.entity_id)))
     .leftJoin(account, eq(account.id, attendance.account_id))
     .leftJoin(post, and(eq(thread.entity_type, 'post'), eq(post.id, thread.entity_id)))
+    .leftJoin(song, and(eq(thread.entity_type, 'song'), eq(song.id, thread.entity_id)))
     .where(inArray(thread.id, [...ids]))
 
   const entries = await db
@@ -298,10 +304,13 @@ export const readThreads = async (
 type Viewer = { account_id: string; roles: readonly string[] } | undefined
 
 const authoredBy = (row: CardRow, viewer: Viewer): boolean =>
-  viewer !== undefined && row.entity_type === 'post' && row.post_author === viewer.account_id
+  viewer !== undefined &&
+  (row.entity_type === 'post'
+    ? row.post_author === viewer.account_id
+    : row.entity_type === 'song' && row.song_author === viewer.account_id)
 
 interface CardRow {
-  event_id: string
+  event_id: string | null
   entity_type: ThreadEntityType
   entity_id: string
   title: string
@@ -314,13 +323,16 @@ interface CardRow {
   post_body: string | null
   post_withdrawn_at: string | null
   post_author: string | null
+  song_title: string | null
+  song_deleted_at: string | null
+  song_author: string | null
 }
 
 type CardFacts = Pick<Thread, 'title' | 'link' | 'body' | 'gone'>
 
 const dreamFacts = (row: CardRow): CardFacts => ({
   title: row.title,
-  link: row.dream === null ? null : dreamPage(row.event_id, row.entity_id),
+  link: row.dream === null || row.event_id === null ? null : dreamPage(row.event_id, row.entity_id),
   body: null,
   gone: row.dream === null,
 })
@@ -337,6 +349,13 @@ const postFacts = (row: CardRow): CardFacts => ({
   link: null,
   body: row.post_withdrawn_at === null ? row.post_body : null,
   gone: row.post_withdrawn_at !== null,
+})
+
+const songFacts = (row: CardRow): CardFacts => ({
+  title: row.song_title ?? row.title,
+  link: row.song_title === null ? null : songPage(row.entity_id),
+  body: null,
+  gone: row.song_title === null || row.song_deleted_at !== null,
 })
 
 const withNamedBody = (facts: CardFacts, named: (body: string) => string): CardFacts =>
@@ -358,7 +377,7 @@ export const mentionedNames = async (
 }
 
 const factsFor = (row: CardRow): CardFacts =>
-  ({ session: dreamFacts, attendance: personFacts, post: postFacts })[row.entity_type](row)
+  ({ session: dreamFacts, attendance: personFacts, post: postFacts, song: songFacts })[row.entity_type](row)
 
 export const subjectOf = async (
   db: Database,
@@ -397,6 +416,17 @@ export const participantsOf = async (
       .select({ author: post.author_account_id })
       .from(post)
       .where(eq(post.id, found.entity_id))
+      .limit(1)
+    if (row?.author != null) people.add(row.author)
+
+    return people
+  }
+
+  if (found.entity_type === 'song') {
+    const [row] = await db
+      .select({ author: song.author_account_id })
+      .from(song)
+      .where(eq(song.id, found.entity_id))
       .limit(1)
     if (row?.author != null) people.add(row.author)
 
@@ -571,13 +601,26 @@ export const registerThreadRoutes = (
   }
 
   const aboutWhat = async (found: {
-    event_id: string
+    event_id: string | null
     entity_type: ThreadEntityType
     entity_id: string
     title: string
   }): Promise<{ link: string | null; what: string }> => {
     if (found.entity_type === 'session') {
-      return { link: dreamPage(found.event_id, found.entity_id), what: found.title }
+      return {
+        link: found.event_id === null ? null : dreamPage(found.event_id, found.entity_id),
+        what: found.title,
+      }
+    }
+
+    if (found.entity_type === 'song') {
+      const [row] = await db
+        .select({ title: song.title })
+        .from(song)
+        .where(eq(song.id, found.entity_id))
+        .limit(1)
+
+      return { link: songPage(found.entity_id), what: row?.title ?? found.title }
     }
 
     if (found.entity_type === 'post') {
@@ -601,6 +644,7 @@ export const registerThreadRoutes = (
     session: { mine: 'dream_comment', anybody: 'dream_comment_any' },
     attendance: { mine: 'introduction_comment', anybody: 'introduction_comment_any' },
     post: { mine: 'post_comment', anybody: 'post_comment_any' },
+    song: { mine: 'song_comment', anybody: 'song_comment_any' },
   } as const satisfies Record<ThreadEntityType, { mine: NotificationCategory; anybody: NotificationCategory }>
 
   // Being named displaces the ordinary category, so it may only displace it for somebody the
@@ -625,8 +669,26 @@ export const registerThreadRoutes = (
     )
   }
 
+  // Whom "anybody commented" reaches: the burn's attendance, and every approved account for a
+  // thread that belongs to no burn — #259's rule read for something global.
+  const audienceFor = async (eventId: string | null, author: string): Promise<string[]> =>
+    eventId === null
+      ? (await approvedAccounts(db)).filter((accountId) => accountId !== author)
+      : (
+          await db
+            .select({ account_id: attendance.account_id })
+            .from(attendance)
+            .where(and(eq(attendance.event_id, eventId), ne(attendance.account_id, author)))
+        ).map((row) => row.account_id)
+
   const tellAbout = async (
-    found: { id: string; event_id: string; entity_type: ThreadEntityType; entity_id: string; title: string },
+    found: {
+      id: string
+      event_id: string | null
+      entity_type: ThreadEntityType
+      entity_id: string
+      title: string
+    },
     author: string,
     body: string,
   ) => {
@@ -641,24 +703,21 @@ export const registerThreadRoutes = (
     const people = await participantsOf(db, found)
     people.delete(author)
 
-    const attendees = await db
-      .select({ account_id: attendance.account_id })
-      .from(attendance)
-      .where(and(eq(attendance.event_id, found.event_id), ne(attendance.account_id, author)))
+    const listening = await audienceFor(found.event_id, author)
 
     await Promise.all([
       tellNamed(named, who, what, link),
       ...[...people]
         .filter((accountId) => !told.has(accountId))
         .map(async (accountId) => await notify(accountId, { category: mine, body: said, link })),
-      ...attendees
-        .filter((row) => !people.has(row.account_id) && !told.has(row.account_id))
-        .map(async (row) => await notify(row.account_id, { category: anybody, body: said, link })),
+      ...listening
+        .filter((accountId) => !people.has(accountId) && !told.has(accountId))
+        .map(async (accountId) => await notify(accountId, { category: anybody, body: said, link })),
     ])
   }
 
   const tellNewlyNamed = async (
-    found: { event_id: string; entity_type: ThreadEntityType; entity_id: string; title: string },
+    found: { event_id: string | null; entity_type: ThreadEntityType; entity_id: string; title: string },
     author: string,
     before: string,
     after: string,

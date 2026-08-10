@@ -548,12 +548,43 @@ describe('check constraints', () => {
       .prepare('INSERT INTO post (id, event_id, title, created_at) VALUES (?, ?, ?, ?)')
       .run(`p-${title.length}-${Math.random()}`, ids.event, title, NOW)
 
+  const insertSong = (title: string, capo: number | null = null) =>
+    handle.client
+      .prepare('INSERT INTO song (id, title, capo, created_at) VALUES (?, ?, ?, ?)')
+      .run(`s-${Math.random()}`, title, capo, NOW)
+
   it('rejects an announcement with nothing but whitespace for a title', () => {
     expect(() => insertPost('   ')).toThrow()
   })
 
   it('accepts one with a title, so the rejection above is the CHECK and not the statement', () => {
     expect(() => insertPost('The planning call is Sunday')).not.toThrow()
+  })
+
+  it('rejects a song with nothing but whitespace for a title', () => {
+    expect(() => insertSong('  ')).toThrow()
+  })
+
+  it('rejects a capo off the end of the neck, either way', () => {
+    expect(() => insertSong('Fire in the sky', 12)).toThrow()
+    expect(() => insertSong('Fire in the sky', -1)).toThrow()
+  })
+
+  it('accepts a song with a title and a capo on it, so those rejections are the CHECKs', () => {
+    expect(() => insertSong('Fire in the sky', 11)).not.toThrow()
+    expect(() => insertSong('Ashes', 0)).not.toThrow()
+    expect(() => insertSong('Embers')).not.toThrow()
+  })
+
+  it('rejects a song category with no label, or an order below zero', () => {
+    const insertCategory = (label: string, order: number) =>
+      handle.client
+        .prepare('INSERT INTO song_category (id, "order", label) VALUES (?, ?, ?)')
+        .run(`sc-${Math.random()}`, order, label)
+
+    expect(() => insertCategory(' ', 0)).toThrow()
+    expect(() => insertCategory('Round', -1)).toThrow()
+    expect(() => insertCategory('Round', 0)).not.toThrow()
   })
 
   it('rejects a payment status outside the shared vocabulary', () => {

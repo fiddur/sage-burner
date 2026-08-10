@@ -6,7 +6,7 @@ import {
   notificationCategories,
   notifiesByDefault,
 } from '@sage-burner/shared'
-import { and, count, desc, eq, isNull } from 'drizzle-orm'
+import { and, count, desc, eq, inArray, isNull } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { Database } from '../db/index.ts'
@@ -161,23 +161,55 @@ export const tellAttendees = async (
   return audience.length
 }
 
+export const approvedAccounts = async (db: Database): Promise<string[]> => {
+  const rows = await db
+    .selectDistinct({ account_id: accountRole.account_id })
+    .from(accountRole)
+    .where(inArray(accountRole.role, ['admin', 'member']))
+
+  return rows.map((row) => row.account_id)
+}
+
+export const tellApproved = async (
+  db: Database,
+  notify: Notifier,
+  told: Told,
+  { except = [] }: { except?: readonly (string | undefined)[] } = {},
+): Promise<number> => {
+  const silent = new Set(except)
+  const audience = (await approvedAccounts(db)).filter((accountId) => !silent.has(accountId))
+
+  await Promise.all(audience.map(async (accountId) => await notify(accountId, told)))
+
+  return audience.length
+}
+
+/**
+ * The burn's attendance is the audience for a mention, and every approved account is where
+ * there is no burn — the songbook is global, so `@everybody` there cannot mean one gathering.
+ */
 export const namedBy = async (
   db: Database,
   body: string,
-  eventId: string,
+  eventId: string | null,
   author: string,
 ): Promise<string[]> => {
-  const rows = await db
-    .select({ account_id: attendance.account_id })
-    .from(attendance)
-    .where(eq(attendance.event_id, eventId))
+  const reachable =
+    eventId === null
+      ? await approvedAccounts(db)
+      : (
+          await db
+            .select({ account_id: attendance.account_id })
+            .from(attendance)
+            .where(eq(attendance.event_id, eventId))
+        ).map((row) => row.account_id)
 
-  const attending = new Set(rows.map((row) => row.account_id))
-  attending.delete(author)
+  const audience = new Set(reachable)
+  audience.delete(author)
 
-  if (mentionsEverybody(body)) return [...attending]
+  if (mentionsEverybody(body)) return [...audience]
 
-  return mentionedAccounts(body).filter((id) => attending.has(id))
+  return mentionedAccounts(body).filter((id) => audience.has(id))
 }
 
 export const notifyAdmins = async (db: Database, notify: Notifier, told: Told): Promise<number> => {

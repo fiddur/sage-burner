@@ -125,7 +125,7 @@ has been reached from the page it belongs to. That worked until a page belonged 
 other page: the rideshare board is linked from a form that only renders for a burn you
 have already joined, so somebody who has not joined one could not get there at all.
 
-**☰ is where those live**, starting with 🛻 Rideshares. Beside the logo rather than on
+**☰ is where those live** — 🎵 Songbook and 🛻 Rideshares. Beside the logo rather than on
 it: the logo goes home, which is a convention worth more than the space a second target
 costs. **Ahead of the logo**, at the edge its drawer slides in from — a control that
 opens from the left, sitting to the right of something else, reads as belonging to that
@@ -535,9 +535,11 @@ feed that marked itself read would be a second thing to keep in step with them. 
 `requireApproved`, like the roster: everything on it is already readable by an approved
 member, gathered into one place.
 
-**Retention is the burn.** `activity` and `thread` both cascade with `event`, and the
-route reads the newest fifty. An audit log grows without bound; this is bounded by
-something that already ends.
+**Retention is the burn, for everything that has one.** `activity` cascades with `event`
+and so does a `thread` that names one, and the route reads the newest fifty. An audit log
+grows without bound; this is bounded by something that already ends. The songbook is the
+exception and says so below: `thread.event_id` is nullable for it, so a song's
+conversation is kept as long as the song is.
 
 **What the installed app keeps on disk.** The feed is one cache key, replaced in place,
 and it is bounded by construction: fifty things, at most three lines a card, and
@@ -554,6 +556,107 @@ free of a migration, which #426 established by being the second: the column carr
 CHECK listing the vocabulary, so a value added to `enums.ts` alone passes Zod and the type
 checker and then fails the write. `db.integration.test.ts` now checks each vocabulary in
 the database against the one in the code, so the two cannot drift silently again.
+
+## The songbook
+
+The point is singing together: one shared book, so whoever picks up a guitar and whoever
+holds a phone are looking at the same words. A song has a **title** and everything else is
+optional — the words, chords, links, a capo, categories.
+
+**It belongs to no burn** (#316), which makes it the second deliberately global thing here
+after the feed. Songs outlive a date, so there is no `event_id` on `song` and none on its
+thread. That is what made `thread.event_id` nullable, and the nullable column is the whole
+of the change: `readThreads` left-joins `event` instead of inner-joining it, `Thread.burn`
+is nullable, and the card says _Songbook_ where it would name a burn.
+
+**Everybody may write it, and everybody may take from it.** `requireApproved` on every
+route — adding a song, editing any song, taking one out, putting one back. This is
+spreadsheet parity at its purest: a songbook is the least sensitive furniture the app will
+ever hold, and ranking who may correct a chord would cost more than it saves. What stays
+admin's is the **curated category list**, under `/api/admin/song-categories/` — the one
+part of it that is a vocabulary rather than content.
+
+**Shared furniture several people edit is what `if-match.ts` is for.** The song page reads
+`GET /api/songs/:id` with an ETag and every write carries `If-Match`, so two people
+polishing the same verse do not silently overwrite each other. **The version covers the
+song alone**, not the response: the response carries the conversation as well, and a
+comment arriving while somebody has the editor open must not read as a conflict. That is
+`withCollectionVersion` with the payload and the versioned part passed separately.
+
+### Chord lines are detected, not marked up
+
+The body is stored as plain text and a line whose every token parses as a chord **is** a
+chord line. That is the format ultimate-guitar renders, so pasting a song in from there
+just works — which is how most of the book will actually get filled. There is no markdown
+here: a songbook body is preformatted text, and wrapping it would slide every chord off
+its syllable. `white-space: pre` and a monospace face in the editor as well as the page,
+since the columns are typed in one and read in the other.
+
+The detector lives in `songs.ts` in the shared package, outside `schemas/`, because the
+web needs it at runtime and it needs no Zod — the same rule `enums.ts` follows. A line
+needs at least one real chord to count, so a rule of dashes is not one, and the token
+grammar is the test: `Bad`, `Cab` and `Fade` all start with a note letter and none of them
+is a chord.
+
+**Transposing holds the columns.** `transposeLine` rewrites each token and takes the
+difference out of the following run of spaces, never closing a gap altogether — so `Bb`
+becoming `B` does not walk the rest of the line out from under the words above it. The
+result is spelled with flats when the chord was written with one. It is viewer state and
+writes nothing: the stored song stays in the key it was written in.
+
+**The capo is stored, because it is knowledge about the song.** "We play this capo 2" is
+not about whoever is looking, so it is a nullable column, 0–11, and shown beside the
+title. The editor offers `capoSuggestion` — the position that turns the most of the song's
+chords into open shapes, ties going to the lower capo — but what is stored is what
+somebody chose. Nothing derives it on the fly.
+
+**Autoscroll is the phone-on-the-floor case**, a play button and a speed slider, entirely
+in the front end. The speed is remembered in `localStorage` under one key rather than one
+per song: a key per song is a row of cruft per song ever opened, and the last speed
+somebody used is a better first guess than a constant. A storage that refuses — private
+browsing does — falls back to the default rather than throwing.
+
+### Taking a song out is soft
+
+`deleted_at`, nullable. A book everybody can delete from wants an undo, so the list
+excludes deleted rows and a _Recently taken out_ section at the foot of it puts one back.
+There is no purge: songs are text, and keeping them is what makes the regret recoverable
+in both directions. `deleted_at` is worth adopting in more places than this — the songbook
+is its first outing, not a special case, and generalising it is its own issue.
+
+**Links are JSON on the row.** A link has no identity, nothing refers to one, and the only
+operation is "replace the list" — so a table of its own would buy an id, an order column
+and a reorder route for nothing. Only `https://` is allowed, which is `isProfileUrl`, the
+same guard a member's own link field uses. `musicHost` recognises the sites people will
+actually paste and puts an icon beside the link; an unrecognised one is a plain link, and
+the label somebody typed wins over both.
+
+### On the feed, like everything else people make
+
+A song's card is `entity_type: 'song'` and the thread machinery does the rest. Adding one
+opens it, later substance lands as `edited` entries that coalesce per author, and a soft
+delete and a restore are `withdrawn` and `restored` — because a book everybody edits
+should say so where everybody looks. The card links to the song's page and carries the
+title as it is _now_, never the whole lyrics.
+
+**Its card offers no editing**, unlike an announcement's. A song is edited on its own page,
+where the columns and the chord detection are, so the feed condition is `entity_type ===
+'post'` explicitly rather than `own` — `own` still means authorship for a song, and the day
+something else wants it, it is there.
+
+**`song_added` is the first category whose audience is not an attendance.** The book is
+global, so "everybody coming to this burn" is not a thing it could mean; `tellApproved`
+fans out over every account holding `member` or `admin`. It is `about: 'else'` and **off**
+unless asked for, per #259, and never the person who just added the song. The bell is on
+the insert, not on the coalesce (#449). A comment follows the existing shape:
+`song_comment` on for the song's author and whoever has spoken, `song_comment_any` off for
+everybody else.
+
+**A mention on a song thread resolves against every approved account**, which is what
+`namedBy` does when the thread names no burn. The composer needs a list to offer, and the
+burn's attendees are the wrong one for a global book, so `GET /api/accounts` answers ids,
+names and avatars and nothing else — a route selecting three columns cannot leak a fourth,
+the same argument the attendees route makes.
 
 ## What this installation is called
 

@@ -87,6 +87,13 @@ const stub = (over: Partial<FeedApi> = {}, activity: Activity[] = TWO, threads: 
         { account_id: 'a-2', name: 'Bea', avatar: null },
       ],
     }),
+  getApprovedAccounts: () =>
+    Promise.resolve({
+      accounts: [
+        { account_id: 'a-1', name: 'Ada', avatar: null },
+        { account_id: 'a-3', name: 'Cy', avatar: null },
+      ],
+    }),
   updatePost: () => Promise.reject(new Error('updatePost is not stubbed here')),
   deletePost: () => Promise.reject(new Error('deletePost is not stubbed here')),
   uploadImage: () => Promise.reject(new Error('uploadImage is not stubbed here')),
@@ -857,6 +864,42 @@ describe('what everyone has been doing', () => {
     fireEvent.click(chip)
 
     await waitFor(() => expect(update).toHaveBeenCalledWith({ on: [], email: ['meal_role'] }))
+  })
+
+  it('says the songbook where a card belongs to no burn', async () => {
+    renderPage(
+      stub(
+        {},
+        [],
+        [aCard({ id: 'c-1', title: 'Fire in the sky', entity_type: 'song', event_id: null, burn: null })],
+      ),
+    )
+
+    await screen.findByText('Fire in the sky')
+    expect(document.querySelector('.feed-when')?.textContent).toBe('Songbook · 7 Aug')
+  })
+
+  it('offers no rewording on a song card, which is edited on its own page', async () => {
+    renderPage(
+      stub(
+        {},
+        [],
+        [
+          aCard({
+            id: 'c-1',
+            title: 'Fire in the sky',
+            entity_type: 'song',
+            event_id: null,
+            burn: null,
+            own: true,
+          }),
+        ],
+      ),
+    )
+
+    await screen.findByText('Fire in the sky')
+    expect(screen.queryByRole('button', { name: 'Reword it' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Take back/ })).toBeNull()
   })
 
   it('says so when nothing has happened yet', async () => {
