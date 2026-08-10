@@ -904,6 +904,24 @@ address. It is also the only kind whose value is checked rather than merely boun
 `javascript:` is what that has to refuse. Deliberately stricter than `markdown.ts`'s link
 check, which governs prose where a relative path and a `mailto:` are ordinary.
 
+**The editor offers only the kinds not already listed**, and opens on the first of them
+(#418). All ten every time, with a fixed default, meant the option the form opened on was —
+for anybody who had already added that one — the one guaranteed to be refused.
+`kindsToOffer` is what the `<select>` draws from, and the exemption is keyed on `labelled`
+rather than on `link` itself, so a second labelled kind gets it without anybody remembering
+to. That exemption is also what keeps `MAX_CONNECTIONS` meaningful: nine fixed kinds and as
+many links as fit, rather than a ceiling of ten that makes the constant dead. Editing a row
+keeps that row's own kind in the list, or it could not be saved again. **The route still
+takes a second of a kind** — this is a rule about what the form offers, `unique(account_id,
+kind, value)` is unchanged, and an account already holding two Discords renders both and can
+still take one off.
+
+**A load that failed says so rather than drawing an empty list** (#395). "You have not added
+any yet" for a request that never answered invites an Add that then collides with a row
+nobody can see, so the editor tells the two facts apart. The sign-in address the `email` row
+can be filled from comes from the page around the editor, since `/api/auth/me` deliberately
+does not carry it (#388).
+
 **What was typed is what is stored**, and the URL is built at render. A handle is what
 somebody knows about themselves; a network changing its domain is then one line in
 `enums.ts` rather than a data migration.

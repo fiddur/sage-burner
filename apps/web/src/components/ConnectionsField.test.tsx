@@ -1,13 +1,19 @@
 import type { Connection } from '@sage-burner/shared'
 
-import { MAX_CONNECTIONS } from '@sage-burner/shared'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
+import { connectionKinds, MAX_CONNECTIONS } from '@sage-burner/shared'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { ConnectionsApi } from './ConnectionsField.tsx'
 
 import { apiError } from '../api/client.ts'
-import { ConnectionsField, messageForFailure, nameOf, problemWith } from './ConnectionsField.tsx'
+import {
+  ConnectionsField,
+  kindsToOffer,
+  messageForFailure,
+  nameOf,
+  problemWith,
+} from './ConnectionsField.tsx'
 
 afterEach(cleanup)
 
@@ -32,8 +38,6 @@ const stub = (over: Partial<ConnectionsApi> = {}, rows: Connection[] = []): Conn
 describe('what a row is called', () => {
   it('is the network for every kind but one', () => {
     expect(nameOf({ kind: 'discord', label: '' })).toBe('Discord')
-    // A label on a kind that has its own name is ignored rather than trusted: the
-    // network is what the list has to say, and only `link` has nothing else to go on.
     expect(nameOf({ kind: 'instagram', label: 'my photos' })).toBe('Instagram')
   })
 
@@ -69,9 +73,29 @@ describe('what the form refuses before sending', () => {
   })
 })
 
+describe('which kinds are left to offer', () => {
+  it('drops one that is listed, and keeps one that is not', () => {
+    const offered = kindsToOffer([{ kind: 'discord' }])
+
+    expect(offered).not.toContain('discord')
+    expect(offered).toContain('instagram')
+  })
+
+  it('offers a link however many are listed, since a label is what tells them apart', () => {
+    expect(kindsToOffer([{ kind: 'link' }, { kind: 'link' }])).toContain('link')
+  })
+
+  it('keeps the kind of the row being changed, or it could not be saved again', () => {
+    expect(kindsToOffer([{ kind: 'discord' }], 'discord')).toContain('discord')
+  })
+
+  it('is down to the labelled one when every kind is listed', () => {
+    expect(kindsToOffer(connectionKinds.map((kind) => ({ kind })))).toStrictEqual(['link'])
+  })
+})
+
 describe('why it could not be saved', () => {
   it('tells the two 409s apart by their codes, which the status alone does not', () => {
-    // `errorCodes` has why the page cannot infer it (#409).
     expect(messageForFailure(apiError(409, 'conflict', 'conflict'))).toContain('already listed')
     expect(messageForFailure(apiError(409, 'list_full', 'conflict'))).toContain('as many ways')
   })
@@ -89,8 +113,6 @@ describe('the list on your own details page', () => {
   })
 
   it('says a failed load failed, rather than showing an empty list', async () => {
-    // "You have not added any yet" for a request that never answered invites an Add that
-    // then 409s against a row nobody can see (#395).
     render(<ConnectionsField api={stub({ getMyConnections: () => Promise.reject(new Error('offline')) })} />)
 
     expect((await screen.findByRole('alert')).textContent).toContain('Could not load your ways')
@@ -98,8 +120,6 @@ describe('the list on your own details page', () => {
   })
 
   it('keeps what was typed when the save is refused', async () => {
-    // #205: a refusal must not take the form away with it. The 409 here is the duplicate
-    // one, which is exactly the case somebody fixes by editing what is still on screen.
     render(
       <ConnectionsField
         api={stub({ addMyConnection: () => Promise.reject(apiError(409, 'conflict', 'Conflict.')) })}
@@ -115,19 +135,18 @@ describe('the list on your own details page', () => {
   })
 
   it('fills in the sign-in address in one press, for the one kind it is', async () => {
-    // #388 asked for this and it did not land in #394. The address comes from the page
-    // around the field, since `/api/auth/me` deliberately does not carry it.
     render(<ConnectionsField api={stub()} loginAddress="wren@example.org" />)
 
     await waitFor(() => expect(screen.getByText(/have not added any yet/)).toBeTruthy())
     const handle = screen.getByLabelText('Handle for a new way to reach you')
+
+    fireEvent.change(screen.getByLabelText('Kind of a new way to reach you'), { target: { value: 'phone' } })
     expect(screen.queryByRole('button', { name: 'Use my sign-in address' })).toBeNull()
 
     fireEvent.change(screen.getByLabelText('Kind of a new way to reach you'), { target: { value: 'email' } })
     fireEvent.click(screen.getByRole('button', { name: 'Use my sign-in address' }))
 
     expect(handle).toHaveProperty('value', 'wren@example.org')
-    // Gone once it has been used: a button that would do nothing is furniture.
     expect(screen.queryByRole('button', { name: 'Use my sign-in address' })).toBeNull()
   })
 
@@ -152,12 +171,12 @@ describe('the list on your own details page', () => {
 
     await waitFor(() => expect(screen.getByText(/have not added any yet/)).toBeTruthy())
     fireEvent.input(screen.getByLabelText('Handle for a new way to reach you'), {
-      target: { value: ' wren ' },
+      target: { value: ' wren@example.org ' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Add it' }))
 
     await waitFor(() =>
-      expect(addMyConnection).toHaveBeenCalledWith({ kind: 'discord', value: 'wren', label: '' }),
+      expect(addMyConnection).toHaveBeenCalledWith({ kind: 'email', value: 'wren@example.org', label: '' }),
     )
   })
 
@@ -242,11 +261,62 @@ describe('the list on your own details page', () => {
     expect(screen.queryByRole('button', { name: 'Add it' })).toBeNull()
   })
 
+  it('opens on the first kind nobody has listed, rather than on a fixed one', async () => {
+    render(
+      <ConnectionsField
+        api={stub({}, [
+          aRow({ id: 'c-1', kind: 'discord', value: 'wren' }),
+          aRow({ id: 'c-2', kind: 'email', value: 'wren@example.org', order: 1 }),
+        ])}
+      />,
+    )
+
+    await waitFor(() => expect(screen.getByText('Discord')).toBeTruthy())
+    expect(screen.getByLabelText('Kind of a new way to reach you')).toHaveProperty('value', 'phone')
+  })
+
+  it('does not offer a kind that is already listed', async () => {
+    render(<ConnectionsField api={stub({}, [aRow({ id: 'c-1' })])} />)
+
+    await waitFor(() => expect(screen.getByText('Discord')).toBeTruthy())
+    const where = within(screen.getByLabelText('Kind of a new way to reach you'))
+
+    expect(where.queryByRole('option', { name: /Discord/ })).toBeNull()
+    expect(where.queryByRole('option', { name: /Instagram/ })).toBeTruthy()
+  })
+
+  it('goes on offering a link with one already listed', async () => {
+    render(
+      <ConnectionsField
+        api={stub({}, [aRow({ id: 'c-1', kind: 'link', value: 'https://wren.example', label: 'my band' })])}
+      />,
+    )
+
+    await waitFor(() => expect(screen.getByText('my band')).toBeTruthy())
+    const where = within(screen.getByLabelText('Kind of a new way to reach you'))
+
+    expect(where.queryByRole('option', { name: /Somewhere else/ })).toBeTruthy()
+  })
+
+  it('leaves a row its own kind while it is being changed, so it saves unchanged', async () => {
+    const updateMyConnection = vi.fn(() => Promise.resolve({ connection: aRow({ id: 'c-1' }) }))
+    render(<ConnectionsField api={stub({ updateMyConnection }, [aRow({ id: 'c-1' })])} />)
+
+    await waitFor(() => expect(screen.getByText('Discord')).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: 'Change Discord' }))
+
+    const where = screen.getByLabelText('Kind of Discord')
+    expect(where).toHaveProperty('value', 'discord')
+    expect(within(where).queryByRole('option', { name: /Discord/ })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() =>
+      expect(updateMyConnection).toHaveBeenCalledWith('c-1', { kind: 'discord', value: 'wren', label: '' }),
+    )
+  })
+
   it('says what the list is for, and that the sign-in address is not in it', async () => {
-    // The one thing on the page that has to be unambiguous: this list is for other members
-    // to reach somebody on, and `account.email` deliberately is not (#159). Written as what
-    // it is for rather than who can see it today — the page that shows anybody else's is
-    // #389, and people are filling this in now.
     render(<ConnectionsField api={stub()} />)
 
     await waitFor(() => expect(screen.getByText(/how other members will reach you/)).toBeTruthy())

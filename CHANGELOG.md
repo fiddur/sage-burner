@@ -9,6 +9,12 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-10
 
+- **Adding a way to reach you no longer offers one you have already listed.** The **Where** menu
+  on Your details used to list all ten every time and start on Discord, so with Discord already
+  there the one it opened on was the one guaranteed to be wrong. It now opens on the first kind
+  you have not used, and leaves the used ones out — except **Somewhere else**, which is the one
+  meant to be repeated, so you can still list your band and your photos separately.
+
 - **When signing in with Discord or Facebook goes wrong, the page now says what kind of wrong.**
   Either it is not set up correctly here — tell an organiser, and the page gives you a short
   reference to mention, which they can find in the log — or the provider could not be reached, in
