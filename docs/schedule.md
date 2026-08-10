@@ -432,8 +432,9 @@ admin's mistake to see.
 Each chip also carries its own `18:00–21:00`, so the length is readable without
 counting rows.
 
-The page opts out of the site's reading measure — `--measure` is a width for
-prose and squeezes a timetable into a sliver on a wide screen. **That one is not
+The page takes the site's default width, which is unbounded — a timetable in a
+reading measure is a sliver on a wide screen, and `docs/the-app.md` has the three
+tiers. It opts out of nothing now; it simply asks for nothing. **The width is not
 covered by a test**: the suite renders in happy-dom, which applies no CSS, so
 nothing here can tell a styled grid from an unstyled one.
 

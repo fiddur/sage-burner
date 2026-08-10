@@ -10,7 +10,7 @@ import { isApiError } from '../api/client.ts'
 import { FormError, useFormError } from '../components/FormError.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
 import { useSocialLogins } from '../installation.tsx'
-import { useOauthOutcome } from '../outcome.ts'
+import { quoting, useOauthOutcome } from '../outcome.ts'
 import { messageForCeremony, passkeysWork, signInWithPasskey } from '../passkey.ts'
 import { useSetViewer, useViewer } from '../viewer.tsx'
 
@@ -41,7 +41,8 @@ export const Login = ({
   const configured = useSocialLogins()
   const offered = oauthProviders.filter((provider) => configured.includes(provider))
 
-  const outcome = signInOutcome(useOauthOutcome())
+  const { outcome: came, ref } = useOauthOutcome()
+  const outcome = signInOutcome(came, ref)
 
   const inFlight = useRef(false)
 
@@ -193,9 +194,17 @@ export const Login = ({
   )
 }
 
-export const signInOutcome = (outcome: string | null): string | undefined => {
+export const signInOutcome = (outcome: string | null, ref: string | null = null): string | undefined => {
+  const quote = quoting(ref)
+
   if (outcome === 'unlinked') {
     return 'No account here is linked to that. Sign in another way, then link it under Your details.'
+  }
+  if (outcome === 'misconfigured') {
+    return `That provider refused the connection, so it is not set up correctly here. Sign in with your password, and please tell an organiser.${quote}`
+  }
+  if (outcome === 'unreachable') {
+    return `That provider could not be reached. Try again in a moment, or sign in with your password; if it keeps happening, tell an organiser.${quote}`
   }
   if (outcome === 'refused') return 'That did not work. Try again, or sign in with your password.'
 

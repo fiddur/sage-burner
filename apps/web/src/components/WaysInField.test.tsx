@@ -144,3 +144,23 @@ describe('the ways in on your own details page', () => {
     expect(await screen.findByText(/As well as your password/)).toBeTruthy()
   })
 })
+
+describe('what the page says when a provider refuses', () => {
+  it('names a setting an organiser can fix, and what to quote', () => {
+    expect(outcomeMessage('misconfigured', 'req-8s')).toContain('not set up correctly here')
+    expect(outcomeMessage('misconfigured', 'req-8s')).toContain('Mention req-8s.')
+  })
+
+  it('tells somebody to try again when the provider could not be reached', () => {
+    // Distinct from the above on purpose: nothing an organiser changes fixes an outage, and
+    // "tell an organiser" for one teaches people to ignore that sentence.
+    const said = outcomeMessage('unreachable', 'req-8s')
+
+    expect(said).toContain('Try again in a moment')
+    expect(said).toContain('Mention req-8s.')
+  })
+
+  it('quotes nothing when there is nothing to quote', () => {
+    expect(outcomeMessage('misconfigured', null)).not.toContain('Mention')
+  })
+})

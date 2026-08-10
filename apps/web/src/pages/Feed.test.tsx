@@ -366,7 +366,7 @@ describe('what everyone has been doing', () => {
     expect(await screen.findByRole('link', { name: /Log in/ })).toBeTruthy()
   })
 
-  it('is a column, so the cards do not run the width of the window', async () => {
+  it('is a column, so the cards do not run the width of the window', () => {
     const { container } = renderPage(stub())
 
     expect(container.querySelector('section')?.className).toBe('page column')

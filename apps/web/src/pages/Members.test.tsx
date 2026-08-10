@@ -354,7 +354,7 @@ describe('what the allergies column shows', () => {
 })
 
 describe('how wide the page is', () => {
-  it('keeps the full width, because it is a table', async () => {
+  it('keeps the full width, because it is a table', () => {
     const { container } = renderPage(stub())
 
     expect(container.querySelector('section')?.className).toBe('page')

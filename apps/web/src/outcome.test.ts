@@ -17,11 +17,11 @@ describe('the reason a provider round trip left in the URL', () => {
 
     const { result, rerender } = renderHook(() => useOauthOutcome())
 
-    expect(result.current).toBe('linked')
+    expect(result.current.outcome).toBe('linked')
     // The page still says the thing this time; what goes is the parameter behind it.
     expect(window.location.search).toBe('')
     rerender()
-    expect(result.current).toBe('linked')
+    expect(result.current.outcome).toBe('linked')
   })
 
   it('leaves the rest of the query alone', async () => {
@@ -39,7 +39,35 @@ describe('the reason a provider round trip left in the URL', () => {
 
     const { result } = renderHook(() => useOauthOutcome())
 
-    expect(result.current).toBeNull()
+    expect(result.current.outcome).toBeNull()
     expect(window.location.search).toBe('?burn=e-1')
+  })
+
+  it('carries the reference an organiser is asked for, and clears it too', () => {
+    at('/profile?from=misconfigured&ref=req-8s')
+
+    const { result } = renderHook(() => useOauthOutcome())
+
+    expect(result.current).toEqual({ outcome: 'misconfigured', ref: 'req-8s' })
+    expect(window.location.search).toBe('')
+  })
+
+  it('drops a reference that is not the shape the backend produces', () => {
+    // The query string is anybody's to write and this lands in a sentence on the *unauthenticated*
+    // login page, next to advice about the visitor's password. Preact escapes it, so the risk is
+    // not markup — it is a crafted link making the real page give attacker-authored instructions.
+    at('/login?from=misconfigured&ref=req-8.%20Your%20account%20needs%20confirming%20at%20evil.example')
+
+    const { result } = renderHook(() => useOauthOutcome())
+
+    expect(result.current.ref).toBeNull()
+  })
+
+  it('keeps a reference that is', () => {
+    at('/login?from=misconfigured&ref=req-8s')
+
+    const { result } = renderHook(() => useOauthOutcome())
+
+    expect(result.current.ref).toBe('req-8s')
   })
 })

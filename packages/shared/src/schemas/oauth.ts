@@ -18,7 +18,7 @@ export type OAuthSettings = z.infer<typeof oauthSettingsSchema>
 
 export const oauthSettingsUpdateSchema = oauthSettingsFields
   .extend({
-    client_secret: z.string().max(MAX_OAUTH_CLIENT_SECRET).optional(),
+    client_secret: z.string().trim().max(MAX_OAUTH_CLIENT_SECRET).optional(),
     ask_profile_link: z.boolean().optional(),
   })
   .strict()

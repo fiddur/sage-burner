@@ -9,6 +9,16 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-10
 
+- **When signing in with Discord or Facebook goes wrong, the page now says what kind of wrong.**
+  Either it is not set up correctly here — tell an organiser, and the page gives you a short
+  reference to mention, which they can find in the log — or the provider could not be reached, in
+  which case trying again in a moment is the whole of the advice. It used to say "that did not
+  work" for both.
+- **Setting up Discord or Facebook sign-in no longer fails on an invisible character.** A client
+  secret copied out of the developer portal often brings a line break with it, and that was being
+  stored and sent along with it — so the provider refused every sign-in with nothing on screen to
+  say why. It is trimmed now.
+
 - **The pages that are a column no longer hug the left edge of a wide window.** Your details,
   Settings, the feed, somebody's page, notifications, signing in, redeeming an invite and
   applying are all centred now, at a comfortable reading width. The pages that are a table — the members list, the
@@ -20,10 +30,9 @@ under today's heading, and make a new heading when there is none.
   than stored. The settings page tells whoever set it up the same thing, so they can answer it.
 - **The sign-in buttons for Facebook and Discord appear as soon as they are set up**, instead of
   after a reload.
-- **When linking one fails, whoever runs the gathering can now find out why.** It still says only
-  "that did not work" to you — there is nothing you could do about it — but the reason the provider
-  gave is written to the server's log, so a wrong secret or a setting in the wrong place can be
-  fixed rather than guessed at.
+- **When linking one fails, whoever runs the gathering can now find out why.** The reason the
+  provider gave is written to the server's log, so a wrong secret or a setting in the wrong place
+  can be fixed rather than guessed at.
 
 - **Signing in with Facebook or Discord works from the button again.** Clicking it landed on a
   "Nothing here" page instead of going to the provider — both on the login page and on Your

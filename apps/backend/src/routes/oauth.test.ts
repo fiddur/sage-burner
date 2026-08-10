@@ -153,6 +153,7 @@ const mintedState = async () => {
  */
 type LogLine = {
   msg: string
+  reqId?: unknown
   provider?: unknown
   intent?: unknown
   at?: unknown
@@ -498,7 +499,8 @@ describe('signing in from a provider', () => {
     )
     await givenProvider()
 
-    expect((await signInThrough(server)).headers.location).toBe('/login?from=refused')
+    // Classified now rather than generic: a 400 at the token leg is a setting, not an outage.
+    expect((await signInThrough(server)).headers.location).toContain('from=misconfigured')
   })
 })
 
@@ -524,7 +526,7 @@ describe('why a link could not be made', () => {
     const back = await linkThrough(server, wren.cookie, 'facebook')
 
     // The member is told the same as before — none of this is theirs, and none of it actionable.
-    expect(back.headers.location).toBe('/profile?from=refused')
+    expect(back.headers.location).toContain('from=misconfigured')
 
     const line = lastLogLine(logged)
     expect(line?.at).toBe('token')
@@ -532,6 +534,83 @@ describe('why a link could not be made', () => {
     expect(line?.said).toBe('Error validating client secret.')
     expect(line?.provider).toBe('facebook')
     expect(line?.intent).toBe('link')
+  })
+
+  it('tells the member it is misconfigured, with something to quote', async () => {
+    // A small group where the person who can fix it is somebody you know, so the page says which
+    // of the two it is rather than "that did not work". The ref is `reqId` on the log line above.
+    const logged: string[] = []
+    const server = await build(
+      fakeOAuth({
+        identify: () => Promise.resolve({ failed: { at: 'token' as const, status: 401 } }),
+      }),
+      logged,
+    )
+    await givenProvider('discord')
+    const wren = await givenAccount()
+
+    const back = await linkThrough(server, wren.cookie, 'discord')
+    const to = new URL(back.headers.location?.toString() ?? '', 'https://burn.example')
+
+    expect(to.pathname).toBe('/profile')
+    expect(to.searchParams.get('from')).toBe('misconfigured')
+    expect(to.searchParams.get('ref')).toBe(String(lastLogLine(logged)?.reqId ?? ''))
+  })
+
+  it('tells them to try again when nothing arrived', async () => {
+    // The other half: a provider that is down or unreachable is not something an organiser can
+    // fix by changing a setting, and "tell an organiser" for it teaches people to ignore that.
+    const server = await build(
+      fakeOAuth({ identify: () => Promise.resolve({ failed: { at: 'network' as const } }) }),
+    )
+    await givenProvider('discord')
+    const wren = await givenAccount()
+
+    const back = await linkThrough(server, wren.cookie, 'discord')
+
+    expect(back.headers.location).toContain('from=unreachable')
+  })
+
+  it('calls a provider having a bad day unreachable rather than misconfigured', async () => {
+    // A 5xx is the provider's problem, not the installation's.
+    const server = await build(
+      fakeOAuth({
+        identify: () => Promise.resolve({ failed: { at: 'token' as const, status: 503 } }),
+      }),
+    )
+    await givenProvider('discord')
+    const wren = await givenAccount()
+
+    const back = await linkThrough(server, wren.cookie, 'discord')
+
+    expect(back.headers.location).toContain('from=unreachable')
+  })
+
+  it('sends somebody signing in to the login page, not to Your details', async () => {
+    const server = await build(
+      fakeOAuth({
+        identify: () => Promise.resolve({ failed: { at: 'token' as const, status: 401 } }),
+      }),
+    )
+    await givenProvider('discord')
+
+    const back = await signInThrough(server, 'discord')
+
+    expect(back.headers.location).toContain('/login?from=misconfigured')
+  })
+
+  it('calls a rate-limited provider unreachable, since waiting is the fix', async () => {
+    const server = await build(
+      fakeOAuth({
+        identify: () => Promise.resolve({ failed: { at: 'token' as const, status: 429 } }),
+      }),
+    )
+    await givenProvider('discord')
+    const wren = await givenAccount()
+
+    const back = await linkThrough(server, wren.cookie, 'discord')
+
+    expect(back.headers.location).toContain('from=unreachable')
   })
 
   it('writes nothing about somebody who was identified', async () => {
@@ -826,6 +905,34 @@ describe('setting a provider up', () => {
       headers: { cookie },
       payload,
     })
+
+  it('stores the secret without the whitespace a paste brings with it', async () => {
+    // #440. The id was trimmed and the secret was not, so a trailing newline off the developer
+    // portal survived into the token exchange — and only that leg, since authorize uses the id
+    // alone. Discord answers `401 invalid_client`, which is what a wrong secret looks like too,
+    // and re-copying it the same way pastes the same character.
+    const server = await build()
+    const boss = await givenAccount({ roles: ['admin'] })
+
+    await save(server, 'facebook', boss.cookie, {
+      client_id: '  client-1\n',
+      client_secret: '  hunter2\n',
+    })
+
+    const [row] = await db().select().from(oauthSetting)
+    expect(row).toMatchObject({ client_id: 'client-1', client_secret: 'hunter2' })
+  })
+
+  it('leaves a secret with no whitespace exactly as it is', async () => {
+    // The passing sibling: trimming must not be reaching into the value itself.
+    const server = await build()
+    const boss = await givenAccount({ roles: ['admin'] })
+
+    await save(server, 'facebook', boss.cookie, { client_id: 'client-1', client_secret: 'a b-c_d.e' })
+
+    const [row] = await db().select().from(oauthSetting)
+    expect(row?.client_secret).toBe('a b-c_d.e')
+  })
 
   it('answers null before anybody has, which is the ordinary state', async () => {
     const server = await build()
