@@ -576,4 +576,19 @@ describe('Apply', () => {
 
     expect(await screen.findByRole('alert')).toBeTruthy()
   })
+
+  it('is a column before and after sending', async () => {
+    const { container } = render(
+      <Apply api={stub({ submitApplication: () => Promise.resolve({ application: {} as never }) })} />,
+    )
+
+    await ready()
+    expect(container.querySelector('article')?.className).toBe('column')
+
+    identify()
+    send()
+
+    await screen.findByRole('status')
+    expect(container.querySelector('article')?.className).toBe('column')
+  })
 })

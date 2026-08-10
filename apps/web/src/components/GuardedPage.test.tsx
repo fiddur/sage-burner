@@ -10,15 +10,17 @@ import { GuardedPage } from './GuardedPage.tsx'
 
 afterEach(cleanup)
 
-const renderShell = (require: 'admin' | 'approved' | 'member', viewer: Viewer) =>
+const renderShell = (require: 'admin' | 'approved' | 'member', viewer: Viewer, width?: 'column') =>
   render(
     <ViewerProvider viewer={viewer}>
-      <GuardedPage title="Places" require={require}>
+      <GuardedPage title="Places" require={require} {...(width === undefined ? {} : { width })}>
         <h1>Places</h1>
         <p>the content</p>
       </GuardedPage>
     </ViewerProvider>,
   )
+
+const sectionClass = (container: ParentNode) => container.querySelector('section')?.className
 
 const signedInAs = (...roles: AccountRole[]): Viewer => ({
   status: 'signed-in',
@@ -106,5 +108,29 @@ describe('GuardedPage', () => {
     renderShell('member', signedInAs('member'))
 
     expect(screen.getAllByRole('heading', { name: 'Places' })).toHaveLength(1)
+  })
+
+  describe('how wide the page is', () => {
+    it('stays unbounded unless asked, so a roster keeps the room', () => {
+      const { container } = renderShell('approved', signedInAs('member'))
+
+      expect(sectionClass(container)).toBe('page')
+    })
+
+    it('is a column when the page is fields or cards', () => {
+      const { container } = renderShell('approved', signedInAs('member'), 'column')
+
+      expect(sectionClass(container)).toBe('page column')
+    })
+
+    it('is the same width while loading and when refused', () => {
+      const { container: loading } = renderShell('admin', LOADING, 'column')
+      expect(sectionClass(loading)).toBe('page column')
+
+      cleanup()
+
+      const { container: refused } = renderShell('admin', signedInAs('member'), 'column')
+      expect(sectionClass(refused)).toBe('page column')
+    })
   })
 })

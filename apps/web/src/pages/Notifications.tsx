@@ -36,7 +36,7 @@ export const Notifications = ({ api }: { api: NotificationsApi }) => {
   const asRead = items.map((item) => (arrivedNew.current.has(item.id) ? { ...item, seen_at: null } : item))
 
   return (
-    <GuardedPage title="Notifications" require="signed-in">
+    <GuardedPage title="Notifications" require="signed-in" width="column">
       <h1>
         Notifications <Refreshing on={refreshing} />
       </h1>

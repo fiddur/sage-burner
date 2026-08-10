@@ -86,7 +86,7 @@ export const Feed = ({ api }: { api: FeedApi }) => {
   const items = loaded.status === 'ready' ? feedItems(loaded.data) : []
 
   return (
-    <GuardedPage title="Feed" require="approved">
+    <GuardedPage title="Feed" require="approved" width="column">
       <h1>
         Feed <Refreshing on={refreshing} />
       </h1>

@@ -15,28 +15,31 @@ const holds = {
 export const GuardedPage = ({
   title,
   require,
+  width,
   children,
 }: {
   title: string
   require: keyof typeof holds
+  width?: 'column'
   children: ComponentChildren
 }) => {
   const viewer = useViewer()
   const held = holds[require](viewer)
+  const shape = width === 'column' ? 'page column' : 'page'
 
   if (viewer.status === 'loading') {
     return (
-      <section class="page">
+      <section class={shape}>
         <h1>{title}</h1>
         <p class="form-note">One moment…</p>
       </section>
     )
   }
 
-  if (held) return <section class="page">{children}</section>
+  if (held) return <section class={shape}>{children}</section>
 
   return (
-    <section class="page">
+    <section class={shape}>
       <h1>{title}</h1>
       <NotForYou
         signedOut={viewer.status === 'signed-out'}

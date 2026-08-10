@@ -55,7 +55,7 @@ export const AdminSettings = ({ api }: { api: AdminSettingsApi }) => {
   }
 
   return (
-    <GuardedPage title="Settings" require="admin">
+    <GuardedPage title="Settings" require="admin" width="column">
       <h1>Settings</h1>
 
       {loaded.status === 'loading' && <p class="form-note">Loading…</p>}

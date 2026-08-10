@@ -16,9 +16,10 @@
   --muted: #78716c;
   --line: #e0d9cf;
   --radius: 0.5rem;
-  /* A reading width, for the two pages that are actually prose. `em` rather than
-     `rem` so it tracks the text it bounds if that ever changes size. */
+  /* A reading width for prose. `em` rather than `rem` so it tracks the text it bounds
+     if that ever changes size; `--column` is `rem` because a form is not text. */
   --measure: 45em;
+  --column: 40rem;
 
   color-scheme: light dark;
 }
@@ -280,13 +281,17 @@ a:hover {
   padding: clamp(1.5rem, 5vw, 3rem) clamp(1rem, 5vw, 3rem);
 }
 
-/* The homepage's welcome text and the 404 — the only long-form prose here.
-
-   Centred, unlike every other page: the wide ones are grids and rosters that use the
-   room, while this one is paragraphs bounded to a reading measure, and left-aligning
-   that puts a column of text beside an empty half-screen. */
+/* Long-form prose: the homepage's welcome text, the 404, the served markdown pages. */
 .prose {
   max-width: var(--measure);
+  margin-inline: auto;
+}
+
+/* A page that is a column of fields or cards rather than a grid — opt-in, never a default.
+   `.site-main` is unbounded on purpose so the rosters and the schedule use the room, and
+   `.page` is on every guarded page, so putting a width on either squeezes those too. */
+.column {
+  max-width: var(--column);
   margin-inline: auto;
 }
 

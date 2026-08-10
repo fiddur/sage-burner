@@ -95,16 +95,23 @@ burn-scoped page already reads this.
   installation — is admin's. It still links to both lists: they are the burn's shared
   furniture, and ⚙️ is where somebody organising is already standing.
 
-**Pages are full width.** `--measure` is a reading width and only the two pages that
-are actually prose take it — the homepage's welcome text and the 404, through
-`.prose`. Everything else is grids, rosters and registers, which a 38rem column
-squeezed into a sliver with the rest of the screen empty. The schedule used to escape
-that with a `:has()` override, which is the shape of a default that is wrong: one
-page opting out, and the next wide thing having to remember to.
+**Width is three tiers, and only the first is a default.**
 
-`.prose` is also the only thing **centred**. A bounded column of paragraphs pinned to
-the left of a wide screen reads as a page that failed to load the rest of itself,
-which is not a problem the wide pages have — they use the room.
+- **Unbounded**, which `.site-main` is and every page gets unless it says otherwise.
+  The grids, rosters and registers are most of the app, and a reading column squeezed
+  them into a sliver with the rest of the screen empty. The schedule used to escape
+  that with a `:has()` override, which is the shape of a default that is wrong: one
+  page opting out, and the next wide thing having to remember to.
+- **`.prose`**, at `--measure`, for what is actually prose — the homepage's welcome
+  text, the 404, and the served markdown pages.
+- **`.column`**, at `--column`, for a page that is a stack of fields or cards rather
+  than a table: Your details, Settings, notifications, the feed, somebody's page,
+  signing in, redeeming an invite, applying. `GuardedPage` takes `width="column"`; the
+  three that build their own `<section>` take the class directly (#421).
+
+Both bounded tiers are **centred**, and neither is on `.page` — that class is on every
+guarded page, so a width there would take the grids with it, which is the default this
+arrangement exists to avoid.
 
 Hiding a link is presentation. Every page behind these is guarded again server-side,
 and `Layout.test.tsx` asserts each absence by name — a negated `arrayContaining`

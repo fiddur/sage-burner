@@ -9,6 +9,11 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-10
 
+- **The pages that are a column no longer hug the left edge of a wide window.** Your details,
+  Settings, the feed, somebody's page, notifications, signing in, redeeming an invite and
+  applying are all centred now, at a comfortable reading width. The pages that are a table — the members list, the
+  schedule, who is coming — still use the whole window, because that is what they are for.
+
 - **The privacy page now explains why the Discord or Facebook screen asks for more than we keep.**
   Their screens name your username and banner, because a profile is the smallest thing either
   lets an app ask for — and what arrives beyond an identifier and a picture is dropped rather
