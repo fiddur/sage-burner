@@ -72,11 +72,20 @@ export const registerPeopleRoutes = (app: FastifyInstance, { db, sessions }: Gua
        */
       const messenger = connections.find((connection) => connection.kind === 'messenger')
 
-      const [linked] = await db
-        .select({ profile_url: accountIdentity.profile_url })
-        .from(accountIdentity)
-        .where(and(eq(accountIdentity.account_id, accountId), eq(accountIdentity.provider, 'facebook')))
-        .limit(1)
+      // Only when it would be used. A typed handle wins, so on the common path this row is a
+      // query whose result is thrown away.
+      const linked =
+        messenger !== undefined
+          ? undefined
+          : (
+              await db
+                .select({ profile_url: accountIdentity.profile_url })
+                .from(accountIdentity)
+                .where(
+                  and(eq(accountIdentity.account_id, accountId), eq(accountIdentity.provider, 'facebook')),
+                )
+                .limit(1)
+            )[0]
 
       const person: PersonProfile = {
         account_id: row.account_id,

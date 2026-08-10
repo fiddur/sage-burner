@@ -245,6 +245,19 @@ describe('what is stored for a way of being reached', () => {
     expect(connectionValue('link', ' https://wren.example/photos ')).toBe('https://wren.example/photos')
   })
 
+  it('reads a pasted host the way a browser would', () => {
+    // `handleIn`'s share of the same hole. Before this, a backslash let another host end
+    // `.facebook.com`, so `wren` was lifted out of somebody else's URL and stored as though
+    // they had typed it. Kept whole instead, which is this function's stated fallback:
+    // visibly wrong beats storing the wrong thing.
+    expect(connectionValue('messenger', 'https://evil.example\\.facebook.com/wren')).toBe(
+      'https://evil.example\\.facebook.com/wren',
+    )
+    expect(connectionValue('instagram', 'https://evil.example\\.instagram.com/wren')).toBe(
+      'https://evil.example\\.instagram.com/wren',
+    )
+  })
+
   it('does not mistake somebody else’s URL for a handle', () => {
     // A link to an Instagram post is not a profile, and a URL on another host is not
     // Instagram at all — both stay as typed rather than becoming a wrong handle.
@@ -273,6 +286,16 @@ describe('what is stored for a way of being reached', () => {
         'https://facebook.com/profile.php?id=1234567890',
       )
       expect(facebookProfileLink('  https://m.facebook.com/wren  ')).toBe('https://m.facebook.com/wren')
+    })
+
+    it('refuses a host a browser would read differently', () => {
+      // A backslash is the hole: WHATWG treats `\\` as `/` for a special scheme, so a browser
+      // reads `https://evil.example\\.facebook.com/wren` as host `evil.example` and path
+      // `/.facebook.com/wren`, while an authority captured up to the first `/?#` ends
+      // `.facebook.com` and passes a host check. This value lands in an `href` other members
+      // click, so the two readings have to agree.
+      expect(facebookProfileLink('https://evil.example\\.facebook.com/wren')).toBeUndefined()
+      expect(facebookProfileLink('https://evil.example\\@facebook.com/wren')).toBeUndefined()
     })
 
     it('refuses a host that only looks like Facebook', () => {

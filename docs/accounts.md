@@ -1091,7 +1091,8 @@ check it there rather than trusting the constant.
 
 **Your picture, if the account has none**, and — where the installation asked for it — a link to
 your page there. A provider's picture is a better start than initials and never better than one
-somebody chose, so an existing avatar is not even asked about. A silhouette is skipped: replacing initials with a grey placeholder says less, not more.
+somebody chose, so an existing avatar is not even asked about. A silhouette is skipped: replacing
+initials with a grey placeholder says less, not more.
 Nothing in this process decodes it — the provider is asked for a 256-pixel picture, the type
 must be one of the three `account_avatar`'s CHECK allows, and the length is capped at
 `MAX_AVATAR_BYTES`. A failure costs the picture and never the link.

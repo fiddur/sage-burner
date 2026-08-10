@@ -75,8 +75,8 @@ describe('GET /api/changelog', () => {
   })
 
   it("reads the repository's own file when nothing is injected", async () => {
-    // The default is `readChangelog()`, resolved relative to the backend's source, so
-    // the checkout and the container find it in the same place.
+    // The default is `readDocument('CHANGELOG.md')`, resolved relative to the backend's
+    // source, so the checkout and the container find it in the same place.
     await build()
 
     expect((await app.inject({ method: 'GET', url: '/api/changelog' })).json().markdown).toContain(

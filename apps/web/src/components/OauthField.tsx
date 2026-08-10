@@ -114,9 +114,6 @@ export const OauthField = ({ api, provider }: { api: OauthApi; provider: OAuthPr
               Terms of Service — <a href="/terms">/terms</a>
             </li>
             <li>
-              {/* Instructions rather than a deletion callback, which `privacyResponseSchema` says
-                  why of: the callback would have to delete an identity the server refuses to let
-                  go when it is somebody's last way in. */}
               Data Deletion Instructions — <a href="/privacy">/privacy</a> again, which says how to take a
               linked provider off an account
             </li>

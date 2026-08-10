@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { authorizeUrl, providerShapes } from './providers.ts'
+import { authorizeUrl, FACEBOOK_GRAPH_VERSION, providerShapes } from './providers.ts'
 
 /**
  * The pure half of a provider (#393, #405).
@@ -50,6 +50,27 @@ describe('what Facebook is asked for', () => {
     )
 
     expect(to.searchParams.get('scope')).toBe('public_profile,user_link')
+  })
+})
+
+describe('the pinned Graph version', () => {
+  it('is the same one on all three of Facebook’s endpoints', () => {
+    // Not a restatement of the constant: the three URLs interpolate it separately, so bumping
+    // one and missing another is the mistake available here — and a token exchange on a
+    // different version from the authorize step is a failure at sign-in.
+    for (const url of [
+      providerShapes.facebook.authorize,
+      providerShapes.facebook.token,
+      providerShapes.facebook.profile({ profileLink: true }),
+    ]) {
+      expect(url, url).toContain(`/${FACEBOOK_GRAPH_VERSION}/`)
+    }
+  })
+
+  it('is shaped like a version Meta would recognise', () => {
+    // A typo here fails every sign-in at once and nothing else in the suite would notice, since
+    // no test reaches a real endpoint.
+    expect(FACEBOOK_GRAPH_VERSION).toMatch(/^v\d+\.\d+$/u)
   })
 })
 

@@ -407,21 +407,40 @@ const mastodonHref = (value: string): string | undefined => {
 }
 
 /**
+ * An `http(s)` URL split the way a browser splits it, or nothing if it is not one.
+ *
+ * One function because this pattern was written out three times and carried the same defect
+ * in each: **`\\` has to end the authority**, since WHATWG treats it as `/` for a special
+ * scheme. `https://evil.example\\.facebook.com/wren` is host `evil.example` and path
+ * `/.facebook.com/wren` to a browser, while an authority taken up to the first `/?#` ends
+ * `.facebook.com` and passes a host check — so a link to somewhere else read as Facebook's.
+ *
+ * A regex rather than `URL`: this package has no platform in its `lib`, deliberately —
+ * everything in it has to typecheck the same for the backend and for the browser, and `URL`
+ * is in neither. Verified, not assumed: `new URL` here is `TS2304: Cannot find name 'URL'`.
+ */
+const urlParts = (
+  value: string,
+): { scheme: string; hostname: string; path: string; query: string } | undefined => {
+  const [, scheme, hostname, path = '', query = ''] =
+    /^(https?):\/\/([^\s/\\?#]+)(?:[/\\]([^\s?#]*))?(?:\?([^\s#]*))?(?:#.*)?$/iu.exec(value.trim()) ?? []
+
+  return hostname === undefined || scheme === undefined ? undefined : { scheme, hostname, path, query }
+}
+
+/**
  * The handle inside a pasted profile URL, or nothing if that is not what this is.
  *
  * People paste. Autofill pastes, and every "copy link" button hands over a URL rather
  * than a handle — so a value kept whole builds `instagram.com/https://instagram.com/wren`
  * and points at nobody. Only the first path segment is taken, so a link carrying `?hl=en`
  * or a trailing slash reduces to the same handle.
- *
- * A regex rather than `URL`: this package has no platform in its `lib`, deliberately —
- * everything in it has to typecheck the same for the backend and for the browser.
  */
 const handleIn = (value: string, host: RegExp): string | undefined => {
-  const [, hostname, path] = /^https?:\/\/([^\s/?#]+)(?:\/([^\s?#]*))?(?:[?#].*)?$/iu.exec(value.trim()) ?? []
-  if (hostname === undefined || !host.test(hostname)) return undefined
+  const parts = urlParts(value)
+  if (parts === undefined || !host.test(parts.hostname)) return undefined
 
-  const [first] = (path ?? '').split('/').filter((part) => part !== '')
+  const [first] = parts.path.split('/').filter((part) => part !== '')
 
   return first === undefined ? undefined : first.replace(/^@/u, '')
 }
@@ -446,9 +465,9 @@ const NOT_A_HANDLE = new Set(['profile.php', 'people'])
  * `https://evil.example?x=facebook.com/profile.php?id=123` matched as well.
  */
 const facebookNumericId = (value: string): string | undefined => {
-  const [, hostname, path = '', query = ''] =
-    /^https?:\/\/([^\s/?#]+)(?:\/([^\s?#]*))?(?:\?([^\s#]*))?(?:#.*)?$/iu.exec(value.trim()) ?? []
-  if (hostname === undefined || !FACEBOOK_HOST.test(hostname)) return undefined
+  const parts = urlParts(value)
+  if (parts === undefined || !FACEBOOK_HOST.test(parts.hostname)) return undefined
+  const { path, query } = parts
   if (path.toLowerCase() !== 'profile.php') return undefined
 
   const [, id] = /(?:^|&)id=(\d+)(?:&|$)/u.exec(query) ?? []
@@ -523,9 +542,10 @@ export const facebookProfileLink = (value: string | undefined): string | undefin
   if (value === undefined) return undefined
 
   const trimmed = value.trim()
-  const [, hostname] = /^https:\/\/([^\s/?#]+)(?:[/?#]|$)/iu.exec(trimmed) ?? []
+  const parts = urlParts(trimmed)
+  if (parts === undefined || parts.scheme.toLowerCase() !== 'https') return undefined
 
-  return hostname !== undefined && FACEBOOK_HOST.test(hostname) ? trimmed : undefined
+  return FACEBOOK_HOST.test(parts.hostname) ? trimmed : undefined
 }
 
 /**
