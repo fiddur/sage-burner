@@ -1,5 +1,6 @@
 import type { Identity } from '@sage-burner/shared'
 
+import { oauthOutcomes } from '@sage-burner/shared'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -38,10 +39,23 @@ describe('why a way in could not be taken off', () => {
 })
 
 describe('what a round trip that came back says', () => {
-  it('has a sentence for each outcome the routes can send', () => {
+  it('has a sentence for every outcome that can land on this page', () => {
+    for (const outcome of oauthOutcomes.filter((one) => one !== 'unlinked')) {
+      expect(outcomeMessage(outcome), outcome).toBeDefined()
+    }
+  })
+
+  it('says what each one was', () => {
     expect(outcomeMessage('linked')).toContain('linked')
     expect(outcomeMessage('taken')).toContain('already linked to somebody')
     expect(outcomeMessage('refused')).toContain('did not work')
+  })
+
+  it('says so when a link put a handle in the list, since nobody asked it to', () => {
+    const said = outcomeMessage('reached')
+
+    expect(said).toContain('how people can reach you')
+    expect(said).toContain('Take it off')
   })
 
   it('says nothing for an ordinary visit', () => {

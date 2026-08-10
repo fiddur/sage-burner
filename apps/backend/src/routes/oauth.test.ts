@@ -736,12 +736,7 @@ describe('linking a provider to an account', () => {
     expect(await db().select().from(accountIdentity)).toHaveLength(1)
   })
 
-  it('writes no way of being reached from the id a provider hands over', async () => {
-    // It used to write a `messenger` row from `profile.subject`. Facebook answers
-    // `public_profile` with an **app-scoped** id, which identifies nobody outside this
-    // installation's Meta app — so `m.me/<that>` pointed at nobody. A Messenger row still only
-    // ever comes from a handle somebody typed; the profile link may come from `user_link`
-    // (#405), and that is a URL Facebook answered rather than an id.
+  it('never writes a way of being reached from the app-scoped id Facebook hands over', async () => {
     const server = await build()
     await givenProvider('facebook')
     const wren = await givenAccount()
@@ -1075,5 +1070,146 @@ describe('the state row itself', () => {
     await db().delete(account).where(eq(account.id, wren.id))
 
     expect(await db().select().from(oauthState)).toEqual([])
+  })
+})
+
+describe('what a link adds to how people can reach you', () => {
+  const reaching = (over: { value?: string } = {}) =>
+    fakeOAuth({
+      identify: () =>
+        Promise.resolve({
+          profile: { subject: 'discord-1', reach: { kind: 'discord', value: over.value ?? 'wren' } },
+        }),
+    })
+
+  const listed = async (accountId: string) =>
+    await db().select().from(accountConnection).where(eq(accountConnection.account_id, accountId))
+
+  const forget = (server: FastifyInstance, provider: string, cookie: string) =>
+    server.inject({ method: 'DELETE', url: `/api/me/identities/${provider}`, headers: { cookie } })
+
+  it('adds the handle the provider answered, and says that it did', async () => {
+    const server = await build(reaching())
+    await givenProvider('discord')
+    const wren = await givenAccount()
+
+    const back = await linkThrough(server, wren.cookie, 'discord')
+
+    expect(back.headers.location).toBe('/profile?from=reached')
+    expect(await listed(wren.id)).toMatchObject([
+      { kind: 'discord', value: 'wren', label: '', from_provider: 'discord' },
+    ])
+  })
+
+  it('adds nothing for a provider with no handle to offer, and says only that it linked', async () => {
+    const server = await build()
+    await givenProvider('facebook')
+    const wren = await givenAccount()
+
+    const back = await linkThrough(server, wren.cookie, 'facebook')
+
+    expect(back.headers.location).toBe('/profile?from=linked')
+    expect(await listed(wren.id)).toEqual([])
+  })
+
+  it('leaves a row of that kind alone, whatever it holds', async () => {
+    const server = await build(reaching())
+    await givenProvider('discord')
+    const wren = await givenAccount()
+    await db().insert(accountConnection).values({
+      id: 'c-1',
+      account_id: wren.id,
+      kind: 'discord',
+      value: 'typed-by-hand',
+      label: '',
+      order: 0,
+    })
+
+    const back = await linkThrough(server, wren.cookie, 'discord')
+
+    expect(back.headers.location).toBe('/profile?from=linked')
+    expect(await listed(wren.id)).toMatchObject([{ value: 'typed-by-hand', from_provider: null }])
+  })
+
+  it('takes back what it added when the link is taken off', async () => {
+    const server = await build(reaching())
+    await givenProvider('discord')
+    const wren = await givenAccount({ password: 'hashed' })
+    await linkThrough(server, wren.cookie, 'discord')
+
+    expect((await forget(server, 'discord', wren.cookie)).statusCode).toBe(204)
+    expect(await listed(wren.id)).toEqual([])
+  })
+
+  it('leaves what somebody typed themselves when the link is taken off', async () => {
+    const server = await build(reaching())
+    await givenProvider('discord')
+    const wren = await givenAccount({ password: 'hashed' })
+    await db().insert(accountConnection).values({
+      id: 'c-1',
+      account_id: wren.id,
+      kind: 'email',
+      value: 'wren@example.org',
+      label: '',
+      order: 0,
+    })
+    await linkThrough(server, wren.cookie, 'discord')
+
+    await forget(server, 'discord', wren.cookie)
+
+    expect(await listed(wren.id)).toMatchObject([{ kind: 'email', value: 'wren@example.org' }])
+  })
+
+  it('leaves a row behind once somebody has changed it themselves', async () => {
+    const server = await build(reaching())
+    await givenProvider('discord')
+    const wren = await givenAccount({ password: 'hashed' })
+    await linkThrough(server, wren.cookie, 'discord')
+    const [added] = await listed(wren.id)
+
+    const changed = await server.inject({
+      method: 'PATCH',
+      url: `/api/me/connections/${added?.id ?? ''}`,
+      headers: { cookie: wren.cookie },
+      payload: { kind: 'discord', value: 'wren_2', label: '' },
+    })
+    expect(changed.statusCode).toBe(200)
+
+    await forget(server, 'discord', wren.cookie)
+
+    expect(await listed(wren.id)).toMatchObject([{ value: 'wren_2', from_provider: null }])
+  })
+
+  it('keeps the provenance out of the row a change answers with', async () => {
+    const server = await build(reaching())
+    await givenProvider('discord')
+    const wren = await givenAccount()
+    await linkThrough(server, wren.cookie, 'discord')
+    const [added] = await listed(wren.id)
+
+    const changed = await server.inject({
+      method: 'PATCH',
+      url: `/api/me/connections/${added?.id ?? ''}`,
+      headers: { cookie: wren.cookie },
+      payload: { kind: 'discord', value: 'wren_2', label: '' },
+    })
+
+    expect(changed.payload).not.toContain('from_provider')
+  })
+
+  it('keeps the provenance out of what the browser is told', async () => {
+    const server = await build(reaching())
+    await givenProvider('discord')
+    const wren = await givenAccount()
+    await linkThrough(server, wren.cookie, 'discord')
+
+    const mine = await server.inject({
+      method: 'GET',
+      url: '/api/me/connections',
+      headers: { cookie: wren.cookie },
+    })
+
+    expect(mine.json().connections).toMatchObject([{ kind: 'discord', value: 'wren' }])
+    expect(mine.payload).not.toContain('from_provider')
   })
 })

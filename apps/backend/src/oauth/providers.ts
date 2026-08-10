@@ -1,4 +1,4 @@
-import type { OAuthProvider } from '@sage-burner/shared'
+import type { ConnectionKind, OAuthProvider } from '@sage-burner/shared'
 
 import { facebookProfileLink } from '@sage-burner/shared'
 
@@ -14,6 +14,7 @@ export interface ProviderProfile {
   subject: string
   picture?: string
   profile_url?: string
+  reach?: { kind: ConnectionKind; value: string }
 }
 
 export interface ProviderShape {
@@ -48,7 +49,13 @@ export const providerShapes = {
       const subject = stringField(body, 'id')
       if (subject === undefined) return undefined
 
-      return { subject, picture: discordPicture(subject, stringField(body, 'avatar')) }
+      const username = stringField(body, 'username')
+
+      return {
+        subject,
+        picture: discordPicture(subject, stringField(body, 'avatar')),
+        ...(username === undefined ? {} : { reach: { kind: 'discord' as const, value: username } }),
+      }
     },
   },
   facebook: {

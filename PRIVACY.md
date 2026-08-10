@@ -37,22 +37,29 @@ Only if you choose to link one, and only ever as an extra way in beside your pas
   your profile page here, where the other members can follow it. Facebook only opens that link
   for somebody already logged in and already a friend of yours, so it is less of a way to be
   found than the Facebook name you can type in yourself.
+- **Your Discord name, added to how people can reach you** — so the other members can find you
+  there, which is the ordinary reason to be in that list. The page says so when it happens. If
+  you would rather it was not there, remove it as you would any other; and if you had already
+  put a Discord name in that list yourself, linking leaves what you wrote alone. Facebook gives
+  us no equivalent, so linking it adds nothing to that list.
 
 **The provider's own screen will name more than that, and it is right to.** Discord says
 "your username, avatar and banner", because the smallest thing it lets anyone ask for is your
 profile — there is no way to ask only for an identifier. Facebook's is the same shape. What
-arrives beyond what is listed above, your username and your banner among it, is dropped rather
-than kept: it is read out of the answer for the two things named and the rest is never stored,
-never shown to anybody, and gone when the request finishes.
+arrives beyond what is listed above, your banner among it, is dropped rather than kept: it is
+read out of the answer for the things named and the rest is never stored, never shown to
+anybody, and gone when the request finishes.
 
 We ask for nothing beyond that profile. We do not ask for your email address, your friends,
 your posts, or anything you have done anywhere else, and we cannot see any of it.
 
 **Getting rid of it takes one button.** Under **Your details**, beside the provider under
 _Other ways to sign in_, _Take it off_ deletes that identifier and that link straight away and
-for good — after it, nothing from that provider is left. The one thing it does not undo is the
-copied picture, because by then it is an ordinary picture on your account: remove or replace it
-under **Your details** as you would any other. If that link is the only way you have left of signing
+for good, and takes the name it put in your contact list back out with them. Two things it does
+not undo. The copied picture stays, because by then it is an ordinary picture on your account:
+remove or replace it under **Your details** as you would any other. And a contact row you have
+since edited yourself stays too — once you have changed it, it is yours rather than something
+the link put there, so taking the link off leaves it. If that link is the only way you have left of signing
 in, the app says so and keeps it rather than locking you out of your own account — set a
 password or add a passkey first, and then it can go.
 

@@ -1,4 +1,10 @@
-import type { IdentitiesResponse, OAuthIntent, OAuthOutcome, OAuthProvider } from '@sage-burner/shared'
+import type {
+  ConnectionKind,
+  IdentitiesResponse,
+  OAuthIntent,
+  OAuthOutcome,
+  OAuthProvider,
+} from '@sage-burner/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
 import { apiRoutes, detailsPage, isOAuthProvider, loginPage } from '@sage-burner/shared'
@@ -8,10 +14,11 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import type { GuardDeps } from '../auth/guards.ts'
 import type { Config } from '../config.ts'
 import type { IdentifyFailure, OAuthCalls } from '../oauth/client.ts'
-import type { ProviderAsks } from '../oauth/providers.ts'
+import type { ProviderAsks, ProviderProfile } from '../oauth/providers.ts'
 
 import { viewerFor } from '../auth/viewer.ts'
-import { accountAvatar, accountIdentity, oauthState } from '../db/schema.ts'
+import { providerConnection } from '../connections.ts'
+import { accountAvatar, accountConnection, accountIdentity, oauthState } from '../db/schema.ts'
 import { noStore, sendError } from '../http.ts'
 import { anotherWayInSurvives, identitiesFor } from '../oauth/identities.ts'
 import { authorizeUrl } from '../oauth/providers.ts'
@@ -187,11 +194,31 @@ export const registerOauthRoutes = (
     return back(reply, '/')
   }
 
+  const maybeReach = async (
+    accountId: string,
+    provider: OAuthProvider,
+    reach: { kind: ConnectionKind; value: string } | undefined,
+  ): Promise<boolean> => {
+    if (reach === undefined) return false
+
+    const held = await db
+      .select({ kind: accountConnection.kind, order: accountConnection.order })
+      .from(accountConnection)
+      .where(eq(accountConnection.account_id, accountId))
+
+    const row = providerConnection(accountId, provider, reach, held)
+    if (row === undefined) return false
+
+    await db.insert(accountConnection).values(row)
+
+    return true
+  }
+
   const link = async (
     reply: FastifyReply,
     provider: OAuthProvider,
     accountId: string | null,
-    profile: { subject: string; picture?: string; profile_url?: string },
+    profile: ProviderProfile,
   ) => {
     if (accountId === null) return back(reply, detailsPage('refused'))
 
@@ -212,7 +239,12 @@ export const registerOauthRoutes = (
       await maybeAvatar(accountId, profile.picture)
     } catch {}
 
-    return back(reply, detailsPage('linked'))
+    let reached = false
+    try {
+      reached = await maybeReach(accountId, provider, profile.reach)
+    } catch {}
+
+    return back(reply, detailsPage(reached ? 'reached' : 'linked'))
   }
 
   app.get<{ Params: { provider: string }; Querystring: { code?: string; state?: string } }>(
@@ -305,6 +337,15 @@ export const registerOauthRoutes = (
       .returning({ id: accountIdentity.id })
 
     if (gone.length === 0) return sendError(reply, 409)
+
+    await db
+      .delete(accountConnection)
+      .where(
+        and(
+          eq(accountConnection.account_id, viewer.account_id),
+          eq(accountConnection.from_provider, provider),
+        ),
+      )
 
     return reply.code(204).send()
   })

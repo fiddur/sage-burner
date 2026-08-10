@@ -19,6 +19,7 @@ export const oauthOutcomes = [
   'misconfigured',
   'unreachable',
   'linked',
+  'reached',
   'taken',
 ] as const
 
