@@ -1,3 +1,4 @@
+import { apiRoutes } from '@sage-burner/shared'
 import { cleanup, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -308,6 +309,37 @@ describe('routing', () => {
       cleanup()
       const { container } = renderAt(path)
       expect(container.querySelector('.brand-name')?.textContent, path).toBe('The Burning Sage')
+    }
+  })
+
+  it('leaves a link the backend serves to the browser, rather than routing it', async () => {
+    // #422: `LocationProvider` installs one global click handler and claimed every same-origin
+    // anchor, so "Link it" and "Continue with Facebook" both rendered the not-found page and the
+    // redirect never happened. Asserted against the real `App`, because the bug was a missing
+    // prop on the one provider — a test that supplies the scope itself would pass without it.
+    //
+    // The anchor is appended rather than found on a page: the handler is on `window`, so it does
+    // not matter which element the click came from, and this stays true wherever such a link is
+    // added next.
+    renderAt('/')
+    const link = document.createElement('a')
+    link.href = apiRoutes.startOauthLink.path('facebook')
+    link.textContent = 'Link it'
+    document.body.append(link)
+    // Only to stop happy-dom attempting the navigation for real; registered after the
+    // provider's, so it cannot prevent the routing being tested.
+    const swallow = (event: Event) => event.preventDefault()
+    addEventListener('click', swallow)
+
+    try {
+      link.click()
+
+      await waitFor(() =>
+        expect(screen.getByRole('heading', { level: 1 }).textContent).not.toBe('Nothing here'),
+      )
+    } finally {
+      removeEventListener('click', swallow)
+      link.remove()
     }
   })
 
