@@ -9,6 +9,12 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-10
 
+- **A sign-in button for a provider that is not set up now says so.** Pressing one where the
+  client id or secret has gone missing used to answer "that did not work", which is the same
+  sentence as a provider refusing you — it now says it is not set up here, offers your password,
+  and gives an organiser a reference to look up. The settings page also warns that a secret stored
+  before today's trimming fix is still stored with its line break, and has to be pasted again.
+
 - **Linking Discord now puts your Discord name in how people can reach you.** That was the one
   thing linking did not do, so people were linking a sign-in and then typing the same name in by
   hand. The page says when it has happened, and it is an ordinary row from then on — change it or

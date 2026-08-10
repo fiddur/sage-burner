@@ -6,14 +6,9 @@ export interface OauthOutcome {
   ref: string | null
 }
 
-// The reference reaches a sentence on the *unauthenticated* login page, beside advice about the
-// visitor's password, and the query string is anybody's to write. Preact escapes it, so this is
-// not markup — it is a crafted link making the real page give attacker-authored instructions.
-// Only the shape the backend produces gets through: `String(request.id)`, which is `req-N`.
 const quotable = (value: string | null): string | null =>
   value !== null && /^[\w-]{1,32}$/u.test(value) ? value : null
 
-/** What to add so somebody can hand an organiser something to search the log for. */
 export const quoting = (ref: string | null): string => (ref === null ? '' : ` Mention ${ref}.`)
 
 export const useOauthOutcome = (): OauthOutcome => {

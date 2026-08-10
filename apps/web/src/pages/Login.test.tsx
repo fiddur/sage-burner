@@ -61,6 +61,24 @@ describe('what a provider round trip says when it comes back here', () => {
     expect(signInOutcome('refused')).toContain('did not work')
     expect(signInOutcome(null)).toBeUndefined()
   })
+
+  it('offers the password as the way in, which the details page cannot', () => {
+    for (const outcome of ['misconfigured', 'unreachable', 'refused']) {
+      expect(signInOutcome(outcome), outcome).toContain('with your password')
+    }
+  })
+
+  it('tells somebody it is not set up here, with something for an organiser to search for', () => {
+    const message = signInOutcome('misconfigured', 'req-8s')
+
+    expect(message).toContain('not set up correctly here')
+    expect(message).toContain('Mention req-8s.')
+  })
+
+  it('tells somebody to try again when nothing could be reached, and quotes nothing without a ref', () => {
+    expect(signInOutcome('unreachable', 'req-8s')).toContain('Try again in a moment')
+    expect(signInOutcome('unreachable', null)).not.toContain('Mention')
+  })
 })
 
 describe('Login', () => {
