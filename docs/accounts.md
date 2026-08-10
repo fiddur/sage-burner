@@ -1032,6 +1032,18 @@ rather than asking for it.
 which is what `mail/smtp.ts` and `push/web-push.ts` are for theirs. Nothing in it throws: a
 provider that is down or answering nonsense costs a sign-in attempt rather than a stack trace.
 
+**It must not cost the reason as well** (#430). `Identify` answers `{ profile }` or `{ failed }`,
+where the failure names which leg gave up — the token exchange, the profile read, or a request that
+never arrived — with the status and the provider's own words. A bare `undefined` had made a secret
+with a stray space, a redirect URI registered slightly differently, a scope the app was never
+approved for and a container with no outbound HTTPS into one indistinguishable refusal recorded
+nowhere; the person who configured the provider is the person running the installation, so that was
+the difference between a five-minute fix and an unfixable mystery. The route logs it and words the
+refusal exactly as before — none of the detail is the member's, and none of it is actionable by
+them. What the module _sends_ never appears in it, which `client.test.ts` pins as a whole shape
+rather than field by field, because spreading the decoded body straight in is the mistake that was
+made while writing it.
+
 **The URLs Meta's console asks for are routes, not promises.** App review will not take an app
 without a privacy policy at a URL, and Basic Settings asks for terms of service and data deletion
 instructions beside it — so `PRIVACY.md` and `TERMS.md` ship with the image and `/privacy` and

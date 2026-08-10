@@ -46,23 +46,27 @@ const PNG = Buffer.from(
 )
 
 const fakeOAuth = (over: Partial<OAuthCalls> = {}): OAuthCalls => ({
-  identify: () => Promise.resolve({ subject: 'provider-1', picture: 'https://cdn.example/face.png' }),
+  identify: () =>
+    Promise.resolve({ profile: { subject: 'provider-1', picture: 'https://cdn.example/face.png' } }),
   picture: () => Promise.resolve({ bytes: PNG, content_type: 'image/png' }),
   ...over,
 })
 
-const build = async (oauth: OAuthCalls = fakeOAuth()) => {
+const build = async (oauth: OAuthCalls = fakeOAuth(), logged?: string[]) => {
   handle = createDb({ url: ':memory:' })
   runMigrations(handle)
   app = await createApp({
     db: handle.db,
     config: createConfig({
-      LOG_LEVEL: 'silent',
+      // `warn`, not `silent`, only where a test is reading the log: the refusal an admin
+      // diagnoses a provider from is written at that level (#430).
+      LOG_LEVEL: logged === undefined ? 'silent' : 'warn',
       SESSION_SECRET: SECRET,
       PUBLIC_ORIGIN: 'https://burn.example',
     }),
     now: () => clock,
     oauth,
+    ...(logged === undefined ? {} : { logStream: { write: (chunk: string) => void logged.push(chunk) } }),
   })
   return app
 }
@@ -276,7 +280,9 @@ describe('signing in from a provider', () => {
     const server = await build(
       fakeOAuth({
         identify: () =>
-          Promise.resolve({ subject: 'provider-1', profile_url: 'https://www.facebook.com/wren' }),
+          Promise.resolve({
+            profile: { subject: 'provider-1', profile_url: 'https://www.facebook.com/wren' },
+          }),
       }),
     )
     await givenProvider('facebook', { ask_profile_link: true })
@@ -459,10 +465,58 @@ describe('signing in from a provider', () => {
   })
 
   it('refuses when the provider cannot be talked to', async () => {
-    const server = await build(fakeOAuth({ identify: () => Promise.resolve(undefined) }))
+    const server = await build(
+      fakeOAuth({ identify: () => Promise.resolve({ failed: { at: 'token' as const, status: 400 } }) }),
+    )
     await givenProvider()
 
     expect((await signInThrough(server)).headers.location).toBe('/login?from=refused')
+  })
+})
+
+describe('why a link could not be made', () => {
+  it('writes the provider’s reason to the log, where an admin can read it', async () => {
+    // The whole of #430. A wrong secret, a redirect URI registered differently, a scope the app
+    // was never approved for and a container with no outbound HTTPS all end at the same refusal;
+    // the log is the only thing that says which, and the person who configured the provider is
+    // the person running the installation.
+    const logged: string[] = []
+    const server = await build(
+      fakeOAuth({
+        identify: () =>
+          Promise.resolve({
+            failed: { at: 'token' as const, status: 400, said: 'Error validating client secret.' },
+          }),
+      }),
+      logged,
+    )
+    await givenProvider('facebook')
+    const wren = await givenAccount()
+
+    const back = await linkThrough(server, wren.cookie, 'facebook')
+
+    // The member is told the same as before — none of this is theirs, and none of it actionable.
+    expect(back.headers.location).toBe('/profile?from=refused')
+
+    const line = logged.map((chunk) => JSON.parse(chunk) as Record<string, unknown>).at(-1)
+    expect(line?.at).toBe('token')
+    expect(line?.status).toBe(400)
+    expect(line?.said).toBe('Error validating client secret.')
+    expect(line?.provider).toBe('facebook')
+    expect(line?.intent).toBe('link')
+  })
+
+  it('writes nothing about somebody who was identified', async () => {
+    // The passing sibling. A warn on every round trip would bury the one that matters, and a
+    // test that only asserts a line appears is satisfied by logging unconditionally.
+    const logged: string[] = []
+    const server = await build(fakeOAuth(), logged)
+    await givenProvider('facebook')
+    const wren = await givenAccount()
+
+    await linkThrough(server, wren.cookie, 'facebook')
+
+    expect(logged.filter((chunk) => chunk.includes('could not identify'))).toEqual([])
   })
 })
 
@@ -551,7 +605,9 @@ describe('linking a provider to an account', () => {
   it('takes no picture where the provider offers none', async () => {
     // Facebook's silhouette and Discord's default are both "not them", and replacing
     // initials with a grey shape says less rather than more.
-    const server = await build(fakeOAuth({ identify: () => Promise.resolve({ subject: 'provider-1' }) }))
+    const server = await build(
+      fakeOAuth({ identify: () => Promise.resolve({ profile: { subject: 'provider-1' } }) }),
+    )
     await givenProvider()
     const wren = await givenAccount()
 
@@ -592,7 +648,9 @@ describe('linking a provider to an account', () => {
     const server = await build(
       fakeOAuth({
         identify: () =>
-          Promise.resolve({ subject: 'provider-1', profile_url: 'https://www.facebook.com/wren' }),
+          Promise.resolve({
+            profile: { subject: 'provider-1', profile_url: 'https://www.facebook.com/wren' },
+          }),
       }),
     )
     await givenProvider('facebook', { ask_profile_link: true })

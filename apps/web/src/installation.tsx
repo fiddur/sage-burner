@@ -213,3 +213,12 @@ export const useSocialLogins = (): readonly OAuthProvider[] =>
 
 /** For the settings page, which has just turned mail on or off. */
 export const useSetInstallationSendsEmail = () => useContext(InstallationContext).setSendsEmail
+
+/**
+ * For the settings page, which has just configured a provider or taken one off (#428).
+ *
+ * The override existed before anything called it, so saving a client id put no *Link it* row on
+ * Your details and no button on the login page until a reload — a client-side navigation fetches
+ * nothing, and both consumers read this rather than asking.
+ */
+export const useSetInstallationSocialLogins = () => useContext(InstallationContext).setSocialLogins

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { OauthApi } from './OauthField.tsx'
 
+import { InstallationProvider, useSocialLogins } from '../installation.tsx'
 import { OauthField } from './OauthField.tsx'
 
 afterEach(cleanup)
@@ -23,6 +24,23 @@ const stub = (over: Partial<OauthApi> = {}): OauthApi => ({
 })
 
 const show = (api: OauthApi) => render(<OauthField api={api} provider="facebook" />)
+
+/** What a sibling reading `useSocialLogins()` sees — the login page and Your details both do. */
+const Elsewhere = () => <span data-testid="elsewhere">{useSocialLogins().join(',')}</span>
+
+/**
+ * The field inside a real installation context, with a sibling reading the list (#428).
+ *
+ * Asserted through a consumer rather than on a spy, because the property is that the *other*
+ * pages see it: a spy would pass on a setter that wrote somewhere nothing reads.
+ */
+const showWithSiblings = (api: OauthApi, socialLogins: readonly ('discord' | 'facebook')[] = []) =>
+  render(
+    <InstallationProvider socialLogins={socialLogins}>
+      <OauthField api={api} provider="facebook" />
+      <Elsewhere />
+    </InstallationProvider>,
+  )
 
 describe('setting a provider up', () => {
   it('says where the id comes from and what it costs before anybody starts', async () => {
@@ -157,6 +175,60 @@ describe('setting a provider up', () => {
       'checked',
       true,
     )
+  })
+
+  it('puts the provider in front of the other pages without a reload', async () => {
+    // #428: the sign-in links come from `social_logins` on the installation read, fetched once at
+    // app start — so a client-side navigation to Your details showed "not linked" against a
+    // provider that had just been configured.
+    const updateOauthSettings = vi.fn(() => Promise.resolve({ settings: SAVED }))
+    showWithSiblings(stub({ updateOauthSettings }))
+
+    expect((await screen.findByTestId('elsewhere')).textContent).toBe('')
+
+    fireEvent.input(screen.getByLabelText('Facebook client ID'), { target: { value: 'client-1' } })
+    fireEvent.input(screen.getByLabelText('Facebook client secret'), { target: { value: 'hunter2' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(screen.getByTestId('elsewhere').textContent).toBe('facebook'))
+  })
+
+  it('leaves the other provider where it was', async () => {
+    // One field saves one provider. Rebuilding the list must not drop Discord, which this field
+    // knows nothing about.
+    const updateOauthSettings = vi.fn(() => Promise.resolve({ settings: SAVED }))
+    showWithSiblings(stub({ updateOauthSettings }), ['discord'])
+
+    fireEvent.input(await screen.findByLabelText('Facebook client ID'), { target: { value: 'c' } })
+    fireEvent.input(screen.getByLabelText('Facebook client secret'), { target: { value: 'hunter2' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(screen.getByTestId('elsewhere').textContent).toBe('discord,facebook'))
+  })
+
+  it('takes it away again when the provider is removed', async () => {
+    const removeOauthSettings = vi.fn(() => Promise.resolve({ settings: null }))
+    showWithSiblings(
+      stub({ getOauthSettings: () => Promise.resolve({ settings: SAVED }), removeOauthSettings }),
+      ['discord', 'facebook'],
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove' }))
+
+    await waitFor(() => expect(screen.getByTestId('elsewhere').textContent).toBe('discord'))
+  })
+
+  it('draws no link for a client id saved without a secret', async () => {
+    // `configuredProviders` wants both halves — a button that can only end at "that did not work"
+    // reads as a promise, which is the rule the login page already follows.
+    const updateOauthSettings = vi.fn(() => Promise.resolve({ settings: { ...SAVED, has_secret: false } }))
+    showWithSiblings(stub({ updateOauthSettings }))
+
+    fireEvent.input(await screen.findByLabelText('Facebook client ID'), { target: { value: 'c' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(updateOauthSettings).toHaveBeenCalled())
+    expect(screen.getByTestId('elsewhere').textContent).toBe('')
   })
 
   it('offers Remove only once something is stored', async () => {

@@ -13,6 +13,12 @@ under today's heading, and make a new heading when there is none.
   Their screens name your username and banner, because a profile is the smallest thing either
   lets an app ask for — and what arrives beyond an identifier and a picture is dropped rather
   than stored. The settings page tells whoever set it up the same thing, so they can answer it.
+- **The sign-in buttons for Facebook and Discord appear as soon as they are set up**, instead of
+  after a reload.
+- **When linking one fails, whoever runs the gathering can now find out why.** It still says only
+  "that did not work" to you — there is nothing you could do about it — but the reason the provider
+  gave is written to the server's log, so a wrong secret or a setting in the wrong place can be
+  fixed rather than guessed at.
 
 - **Signing in with Facebook or Discord works from the button again.** Clicking it landed on a
   "Nothing here" page instead of going to the provider — both on the login page and on Your

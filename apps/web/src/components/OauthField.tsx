@@ -5,11 +5,13 @@ import {
   MAX_OAUTH_CLIENT_ID,
   MAX_OAUTH_CLIENT_SECRET,
   oauthProviderInfo,
+  oauthProviders,
 } from '@sage-burner/shared'
 import { useEffect, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
+import { useSetInstallationSocialLogins, useSocialLogins } from '../installation.tsx'
 import { ErrorText } from './ErrorText.tsx'
 import { PendingButton } from './PendingButton.tsx'
 
@@ -49,6 +51,9 @@ export const OauthField = ({ api, provider }: { api: OauthApi; provider: OAuthPr
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | undefined>(undefined)
 
+  const configured = useSocialLogins()
+  const setSocialLogins = useSetInstallationSocialLogins()
+
   const info = oauthProviderInfo[provider]
 
   useEffect(() => {
@@ -78,6 +83,15 @@ export const OauthField = ({ api, provider }: { api: OauthApi; provider: OAuthPr
       setClientId(settings?.client_id ?? '')
       setAskProfileLink(settings?.ask_profile_link ?? false)
       setSecret('')
+      // Both halves filled in, which is `configuredProviders`' own rule — and the response
+      // carries exactly the two fields it needs to be judged by. Rebuilt from `oauthProviders`
+      // so this provider takes its new state and the others keep theirs, in a stable order.
+      const usable = settings !== null && settings.client_id !== '' && settings.has_secret
+      setSocialLogins(
+        oauthProviders.filter((candidate) =>
+          candidate === provider ? usable : configured.includes(candidate),
+        ),
+      )
     } catch {
       setError('Could not save that. Please try again.')
     } finally {
