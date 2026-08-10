@@ -9,6 +9,11 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-10
 
+- **Setting up Discord or Facebook sign-in no longer fails on an invisible character.** A client
+  secret copied out of the developer portal often brings a line break with it, and that was being
+  stored and sent along with it — so the provider refused every sign-in with nothing on screen to
+  say why. It is trimmed now.
+
 - **The pages that are a column no longer hug the left edge of a wide window.** Your details,
   Settings, the feed, somebody's page, notifications, signing in, redeeming an invite and
   applying are all centred now, at a comfortable reading width. The pages that are a table — the members list, the

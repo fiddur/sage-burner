@@ -827,6 +827,34 @@ describe('setting a provider up', () => {
       payload,
     })
 
+  it('stores the secret without the whitespace a paste brings with it', async () => {
+    // #440. The id was trimmed and the secret was not, so a trailing newline off the developer
+    // portal survived into the token exchange — and only that leg, since authorize uses the id
+    // alone. Discord answers `401 invalid_client`, which is what a wrong secret looks like too,
+    // and re-copying it the same way pastes the same character.
+    const server = await build()
+    const boss = await givenAccount({ roles: ['admin'] })
+
+    await save(server, 'facebook', boss.cookie, {
+      client_id: '  client-1\n',
+      client_secret: '  hunter2\n',
+    })
+
+    const [row] = await db().select().from(oauthSetting)
+    expect(row).toMatchObject({ client_id: 'client-1', client_secret: 'hunter2' })
+  })
+
+  it('leaves a secret with no whitespace exactly as it is', async () => {
+    // The passing sibling: trimming must not be reaching into the value itself.
+    const server = await build()
+    const boss = await givenAccount({ roles: ['admin'] })
+
+    await save(server, 'facebook', boss.cookie, { client_id: 'client-1', client_secret: 'a b-c_d.e' })
+
+    const [row] = await db().select().from(oauthSetting)
+    expect(row?.client_secret).toBe('a b-c_d.e')
+  })
+
   it('answers null before anybody has, which is the ordinary state', async () => {
     const server = await build()
     const boss = await givenAccount({ roles: ['admin'] })

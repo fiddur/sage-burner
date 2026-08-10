@@ -106,8 +106,9 @@ burn-scoped page already reads this.
   text, the 404, and the served markdown pages.
 - **`.column`**, at `--column`, for a page that is a stack of fields or cards rather
   than a table: Your details, Settings, notifications, the feed, somebody's page,
-  signing in, redeeming an invite, applying. `GuardedPage` takes `width="column"`; the
-  three that build their own `<section>` take the class directly (#421).
+  signing in, redeeming an invite, applying. `GuardedPage` takes `width="column"`;
+  signing in and redeeming an invite carry the class on their own `<section>`, and
+  applying on its `<article>` (#421).
 
 Both bounded tiers are **centred**, and neither is on `.page` — that class is on every
 guarded page, so a width there would take the grids with it, which is the default this

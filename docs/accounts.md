@@ -1095,6 +1095,14 @@ Messenger is still not among what linking gives, and cannot be: `m.me` needs the
 username the profile link would carry, and nothing in `public_profile` or `user_link` answers one
 for an account that has not set it.
 
+The client secret is **trimmed** on the way in, like the client id (#440). A provider's secret is
+an issued token and its surrounding whitespace never means anything, so a newline picked up from a
+copy out of the developer portal is dropped rather than stored — untrimmed it survived into the
+token exchange and only that leg, since authorize uses the id alone, which produced a consent screen
+followed by `401 invalid_client`. Deliberately unlike `mail_setting.password`, which is stored
+exactly as given because SMTP AUTH sends the password itself and a space may be part of it; the two
+should not be made consistent.
+
 `FACEBOOK_GRAPH_VERSION` is the one value here that goes stale on somebody else's schedule.
 Meta pins each app to a version and retires them, so it has to match the developer console —
 check it there rather than trusting the constant.
