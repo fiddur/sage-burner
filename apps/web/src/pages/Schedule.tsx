@@ -643,11 +643,6 @@ const Timetable = ({
       }}
     >
       <table class="schedule-grid" style={{ '--lanes': columns }}>
-        {/*
-          Fixed layout, so the lanes share what is left equally rather than sizing
-          themselves to whichever happens to hold the longest title. The time column's
-          own width is in `.schedule-time-col`, which says what decides it.
-        */}
         <colgroup>
           <col class="schedule-time-col" />
           {Array.from({ length: columns }, (_, at) => (
@@ -672,8 +667,6 @@ const Timetable = ({
         <tbody>
           {rows.map((row, index) => (
             <tr key={row} class={label(row) === '00:00' ? 'schedule-daybreak' : undefined}>
-              {/* The first row too, not only midnights: a burn opens at 16:00, so it
-                  starts a day without starting at one. */}
               <th scope="row">
                 {index === 0 || dayOf(row) !== dayOf(rows[index - 1] ?? row) ? (
                   <span class="schedule-day">{dayName(dayOf(row), 'short')}</span>

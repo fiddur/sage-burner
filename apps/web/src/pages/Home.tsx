@@ -37,9 +37,6 @@ const NoOpenBurn = ({ active, title }: { active: Active; title?: string }) => {
   return (
     <>
       {title !== undefined && <h1>{title}</h1>}
-      {/* Before the first event exists, and again once the last has ended. Says so
-          rather than showing a stale welcome text — see the active-event rule in
-          `docs/burns.md`. */}
       <p class="notice">There is no burn scheduled at the moment. Check back later.</p>
     </>
   )
@@ -99,12 +96,6 @@ export const Home = ({ api }: { api: HomeApi }) => {
             {openEvent.location !== '' && <> · {openEvent.location}</>}
           </p>
 
-          {/*
-            Rendered to everyone, and written by any approved member. `renderMarkdown`
-            escapes raw HTML rather than filtering it, and checks link and image URLs
-            against a scheme allowlist — `markdown.ts` says why escaping is the safer
-            of the two, and why that holds for an author who is not an admin.
-          */}
           {editing === undefined ? (
             <>
               <div
@@ -112,11 +103,6 @@ export const Home = ({ api }: { api: HomeApi }) => {
                 dangerouslySetInnerHTML={{ __html: renderMarkdown(openEvent.welcome_markdown) }}
               />
 
-              {/*
-                Edited where it is read: whoever spots a typo on the homepage is the
-                one likely to fix it. The burn's dates and cap stay admin-only and
-                are edited under Organise, which is why this is not a link to there.
-              */}
               {isApproved(viewer) && (
                 <IconButton
                   busy={opening}
@@ -160,17 +146,6 @@ export const Home = ({ api }: { api: HomeApi }) => {
       )}
 
       <p class="home-actions">
-        {/*
-          Applying is the point of the page, so the link does not wait for the
-          *event* to load — someone who arrived to apply should not sit through
-          that round trip first. It does wait for the viewer, which is a
-          different request and already in flight before this mounts: `isMember`
-          is false while the viewer is `loading`, so without this gate a member
-          would be shown "Apply to join" for the length of `getMe` and then watch
-          it vanish — a layout shift, and an invitation to apply to something
-          they are already in. `Layout` gates its public entry points the same
-          way, for the same reason.
-        */}
         {viewer.status !== 'loading' && !isMember(viewer) && (
           <a class="button" href="/apply">
             Apply to join

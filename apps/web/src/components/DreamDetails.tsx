@@ -102,10 +102,6 @@ export const DreamDetails = ({
             >
               <span aria-hidden="true">{dream.supported_by_me ? '❤️‍🔥' : '♡'}</span> {dream.support_count}
             </button>
-            {/* Faces rather than a number (#251): "2 people want this" is the same
-                sentence whoever they are, and on a page about who is coming, who is
-                the interesting part. The count stays on the button, where a chip in
-                the grid has no room for faces. */}
             {dream.supporters.length === 0 ? (
               <span class="form-note">Nobody has said they want this yet.</span>
             ) : (
@@ -136,12 +132,6 @@ export const DreamDetails = ({
 
           <h3>Facilitating</h3>
 
-          {/* The same control as everywhere else somebody takes a job (#247), rather
-              than a line of prose only the edit form could change.
-
-              The exclusion runs both ways: somebody already helping is not offered as
-              facilitator either, since appointing them would leave them holding both
-              of a pair the strip below treats as exclusive (#295). */}
           <HelperStrip
             label={`${dream.title} as facilitator`}
             people={facilitator === undefined ? [] : [facilitator]}
@@ -158,8 +148,6 @@ export const DreamDetails = ({
 
           <h3>Helping out</h3>
 
-          {/* The facilitator is running it, so they are not offered as a pair of
-              hands for it. The other half of the same rule is above. */}
           <HelperStrip
             label={dream.title}
             people={dream.helpers}
@@ -179,8 +167,6 @@ export const DreamDetails = ({
             </button>
           </p>
 
-          {/* Last, and after the buttons rather than before them: a conversation grows
-              and the ways out of the panel should not move down the page as it does. */}
           <h3>Talk</h3>
 
           <DreamThread

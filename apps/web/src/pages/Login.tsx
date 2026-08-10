@@ -119,13 +119,7 @@ export const Login = ({
     <section class="page column">
       <h1>Log in</h1>
 
-      {/*
-        No `noValidate`: it suppresses constraint validation on submit, which
-        makes the `required` attributes below inert — an empty form would POST
-        `{ email: '', password: '' }`, get a 401, and tell the member their
-        details did not match a form they never filled in. Letting the browser
-        handle it also catches a mistyped address before a round trip.
-      */}
+      {/* No `noValidate`: it would make the `required` attributes below inert. */}
       <form class="form" onSubmit={submit}>
         <label class="field">
           <span>Email</span>
@@ -158,11 +152,7 @@ export const Login = ({
 
       {passkeys && (
         <p class="row">
-          {/*
-            Outside the form on purpose: inside it, a browser that ignores
-            `type="button"` would submit the empty email and password and answer a
-            401 over a ceremony that had not failed.
-          */}
+          {/* Outside the form: inside it, a browser ignoring `type="button"` would submit an empty login. */}
           <button type="button" disabled={submitting} onClick={() => void withPasskey()}>
             Use a passkey
           </button>

@@ -162,8 +162,6 @@ export const Faq = ({ api }: { api: FaqApi }) => {
         }
       </ReorderableList>
 
-      {/* Only once the burn is known: a question belongs to one, so a form rendered
-          before then would take one and have nowhere to put it. */}
       {ready !== undefined && (
         <form
           class="form"

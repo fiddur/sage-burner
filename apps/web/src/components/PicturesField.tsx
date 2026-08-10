@@ -44,9 +44,7 @@ export const PicturesField = ({ api }: { api: PicturesApi }) => {
           <ul class="picture-grid">
             {images.map((picture, at) => (
               <li key={picture.id}>
-                {/* No alt text to give: what a picture is of lives in the prose that
-                    references it, which nothing here can find. Decorative, and the date
-                    beside it is what a screen reader has to work with. */}
+                {/* No alt text to give: what a picture is of lives in prose nothing here can find. */}
                 <img src={apiRoutes.storedImage.path(picture.id)} alt="" loading="lazy" />
                 <span class="form-note">{stored(picture.created_at)}</span>
                 <IconButton

@@ -8,6 +8,7 @@ import type { ScheduleApi } from './Schedule.tsx'
 
 import { apiError } from '../api/client.ts'
 import { BurnProvider } from '../burn.tsx'
+import { NAMELESS } from '../components/PersonBadge.tsx'
 import { ViewerProvider } from '../viewer.tsx'
 import { Schedule } from './Schedule.tsx'
 
@@ -1707,6 +1708,17 @@ describe('facilitating a dream, in the panel', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Open Cacao ceremony' }))
     return screen.findByRole('dialog', { name: 'Cacao ceremony' })
   }
+
+  it('keeps a facilitator who is no longer coming visible, rather than emptying the spot', async () => {
+    renderPage(stub({}, [cacao({ facilitator_account_id: 'a-9' })]))
+
+    await open()
+
+    expect(screen.getByText(NAMELESS)).toBeTruthy()
+    expect(
+      screen.queryByRole('button', { name: 'Take the spot on Cacao ceremony as facilitator' }),
+    ).toBeNull()
+  })
 
   it('offers the spot to whoever is reading, when nobody is facilitating', async () => {
     const updateSession = vi.fn<ScheduleApi['updateSession']>(() =>

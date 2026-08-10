@@ -66,9 +66,6 @@ export const IconField = ({ api }: { api: IconApi }) => {
           height={64}
         />
 
-        {/* The same file with the mask over it. An uploaded icon is offered as
-            maskable, so this is the shape a launcher actually cuts — and the only
-            way to see beforehand what it takes off the corners. */}
         <img
           class="app-icon app-icon-masked"
           src={iconSrc(stored)}

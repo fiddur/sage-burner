@@ -208,8 +208,7 @@ export const OpenedDream = ({
       facilitator={
         dream.facilitator_account_id === null
           ? undefined
-          : // Falling back to the bare id keeps whoever is running it visible — and
-            (facilitating ?? { account_id: dream.facilitator_account_id, name: null })
+          : (facilitating ?? { account_id: dream.facilitator_account_id, name: null })
       }
       talk={talk}
       viewerId={viewerId}

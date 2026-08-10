@@ -197,7 +197,6 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
                 {row.member_cap}
               </p>
 
-              {/* Folded away: set once per burn, and rarely looked at again. */}
               <details>
                 <summary>Meal times</summary>
                 <MealSlots api={api} eventId={row.id} />
@@ -310,8 +309,6 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
                     }}
                   />
 
-                  {/* Shown on the Members page to whoever has not paid, and to
-                      nobody else. */}
                   <MarkdownField
                     label="How to pay (markdown)"
                     value={payment}
@@ -324,9 +321,6 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
                     }}
                   />
 
-                  {/* What replaces the payment instructions once every place is
-                      taken: paying no longer gets anybody in, so what somebody
-                      unpaid needs is how a place changes hands. */}
                   <MarkdownField
                     label="When the burn is full (markdown)"
                     value={transfer}
@@ -442,8 +436,6 @@ export const AdminEvents = ({ api }: { api: EventsApi }) => {
           days of grid rather than three whole ones.
         </p>
 
-        {/* Not required: naming a date and a cap is what creating a burn is, and
-            where it is held is often decided after. */}
         <label class="field">
           <span>Where</span>
           <input

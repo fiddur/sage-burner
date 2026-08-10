@@ -87,7 +87,6 @@ const HowToPay = ({
 
   return (
     <div class="notice">
-      {/* Safe by construction: `renderMarkdown` escapes raw HTML rather than filtering it. */}
       <div class="markdown-preview" dangerouslySetInnerHTML={{ __html: renderMarkdown(info) }} />
     </div>
   )
@@ -110,8 +109,7 @@ const RosterTable = ({ entries }: { entries: readonly MemberRosterEntry[] }) => 
           {startsTheWaitingList(entries, index) && <WaitingListLine columns={5} />}
           <tr class={entry.waiting ? 'waiting' : undefined}>
             <td>
-              {/* No fallback to the email address the way the admin's
-                      list has, because the response does not carry one. */}
+              {/* No fallback to an email address, unlike the admin list: this response carries none. */}
               <a href={profilePage(entry.account_id)}>{entry.name ?? 'Name not filled in yet'}</a>
               {entry.waiting && <span class="form-note"> · waiting</span>}
               <br />
@@ -132,8 +130,6 @@ const RosterTable = ({ entries }: { entries: readonly MemberRosterEntry[] }) => 
                 </>
               )}
             </td>
-            {/* A word, not a tick: a checkbox reads as something to click,
-                    and this is the one column here nobody may change. */}
             <td>{entry.payment_status === 'paid' ? 'yes' : 'not yet'}</td>
           </tr>
         </Fragment>

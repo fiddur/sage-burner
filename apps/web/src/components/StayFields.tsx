@@ -49,9 +49,6 @@ export const StayFields = ({
         />
       </label>
 
-      {/* Beside the dates, which is where somebody is standing when they think about
-          getting there. ☰ carries it as well, for everyone who has not joined a burn
-          and so has no stay to read this from (#26). */}
       {signedInMember && (
         <p class="form-note">
           <a href="/rides">Looking for a lift, or offering one?</a>
@@ -84,10 +81,6 @@ export const StayFields = ({
         </select>
       </label>
 
-      {/* The list itself is the burn's shared furniture, so the way to change it sits
-          beside the question it answers rather than on a page of its own. Offered to
-          everyone signed in, because everyone there may edit it — the page refuses
-          anyone who may not, and so does the API. */}
       {signedInMember && (
         <p class="form-note">
           <a href="/options">(edit lodging alternatives)</a>

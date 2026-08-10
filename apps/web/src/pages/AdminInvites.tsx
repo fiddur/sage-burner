@@ -67,10 +67,7 @@ export const AdminInvites = ({ api }: { api: InvitesApi }) => {
 
       <ErrorText message={error} />
 
-      {/* Keyed on the token so a new mint remounts: `copied` lives in the
-          component, and a button still reading "Copied" after minting a second
-          invite is how someone pastes the first one twice and loses the
-          second for good. */}
+      {/* Keyed on the token so a new mint remounts and "Copied" does not carry over. */}
       <InviteLink key={minted?.token} invite={minted} />
 
       {loaded.status === 'loading' && <p class="form-note">Loading…</p>}

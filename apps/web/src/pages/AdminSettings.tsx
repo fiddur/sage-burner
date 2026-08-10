@@ -99,14 +99,10 @@ export const AdminSettings = ({ api }: { api: AdminSettingsApi }) => {
         </form>
       )}
 
-      {/* Outside the form: they save on choosing a file rather than on submit, and a
-          file input inside a form that posts a title would be two ways to save one
-          page. */}
+      {/* Outside the form: these save on choosing a file, not on submit. */}
       {loaded.status === 'ready' && <IconField api={api} />}
       {loaded.status === 'ready' && <BannerField api={api} />}
       {loaded.status === 'ready' && <MailField api={api} />}
-      {/* One per provider, from the vocabulary, so adding a third is a line in `enums.ts`
-          and a migration rather than a fourth copy of this block. */}
       {loaded.status === 'ready' &&
         oauthProviders.map((provider) => <OauthField key={provider} api={api} provider={provider} />)}
     </GuardedPage>

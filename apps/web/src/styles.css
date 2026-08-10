@@ -588,7 +588,6 @@ a:hover {
   gap: 0.5rem;
 }
 
-/* A markdown field: Write / Preview above one framed box, after aurboda's editor. */
 .md-field {
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -684,7 +683,6 @@ a:hover {
   gap: 0.75rem;
 }
 
-/* One application in the review list. */
 .application {
   margin: 1.5rem 0;
   padding: 1rem 1.2rem;
@@ -724,7 +722,6 @@ a:hover {
   border-top: 2px solid color-mix(in srgb, var(--sage) 45%, transparent);
 }
 
-/* The question builder, on its own admin page. */
 .questions {
   margin-top: 1.5rem;
   padding-top: 1rem;
@@ -1210,7 +1207,6 @@ a.person-badge:focus-visible span:last-child {
   z-index: 3;
 }
 
-/* `Sat 3`, above the time rather than beside it. */
 .schedule-day {
   display: block;
   font-weight: 600;
@@ -2004,7 +2000,6 @@ img.avatar {
   vertical-align: middle;
 }
 
-/* One registered passkey: what it is called, when it arrived, and a way to drop it. */
 .passkey-list {
   list-style: none;
   margin: 0.5rem 0;
@@ -2253,7 +2248,6 @@ img.avatar {
   outline: 2px solid var(--paper);
 }
 
-/* The bell, and what it drops down. */
 .bell-wrap {
   display: inline-flex;
 }

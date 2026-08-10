@@ -149,10 +149,6 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
             />
           </label>
 
-          {/* Above the allergies rather than below them: it is the part of this page
-                other members read, and the part somebody has actually come here to write.
-                `uploadImage` is passed, so it takes a paste, a drop and a photograph from
-                a phone like every other markdown field members read (#379). */}
           <MarkdownField
             label="A little about you"
             placeholder="Who you are, what you are bringing, a picture or two…"
@@ -244,8 +240,6 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
 
       <PushToggle api={api} />
 
-      {/* The burn-shaped half: `joinEvent` is `requireMember`, so somebody organising
-          without attending would be offered a button the API refuses. */}
       {member && <YourBurns api={api} />}
     </GuardedPage>
   )

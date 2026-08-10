@@ -85,11 +85,6 @@ export const NotificationSettingsField = ({
 
       {sections.map((section) => (
         <Table class="notification-settings" key={section.about}>
-          {/* A caption rather than the first column's header (#341). The heading is a
-              sentence and the rows carry their own `<th scope="row">`, so it never was
-              a column header — and as one it could not wrap, which at a larger text
-              size laid "What happens to you" straight over the Here column beside it.
-              A caption spans the table and has nothing to collide with. */}
           <caption>{section.heading}</caption>
           <thead>
             <tr>

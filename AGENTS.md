@@ -127,6 +127,13 @@ by reading Rollup's docs.
   purpose", so one line may. One line, and only where a test cannot say it
   instead.
 
+  **`styles.css` is the one exception, and it is a decided one** (#436). CSS has no
+  types and no tests, and a selector cannot say why a rule is the way it is — why
+  `border-collapse: separate` is load-bearing under a sticky cell, why a size
+  modifier must sit _below_ `.avatar`, why `touch-action: none` is there. There is
+  nowhere to move those claims to, so they stay. What still goes are the labels that
+  only name the block the selector already names.
+
   Most of the tree predates this and is far heavier than it should be. Thin it
   wherever you are editing anyway, and never match the surrounding density.
 

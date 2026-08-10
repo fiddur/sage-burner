@@ -96,8 +96,6 @@ export const DreamFields = ({
         onInput={setDescription}
       />
 
-      {/* Only people coming to this burn: the API refuses anyone else, since
-          somebody who is not there cannot run it. */}
       <label class="field">
         <span>Who is facilitating?</span>
         <select
@@ -157,7 +155,6 @@ export const DreamFields = ({
         />
       </label>
 
-      {/* Placing it in the grid then copies it rather than moving it. */}
       <label class="field-inline">
         <input
           type="checkbox"

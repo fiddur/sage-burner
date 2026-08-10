@@ -259,6 +259,17 @@ describe('leaving for a provider', () => {
     expect(line?.provider).toBe('facebook')
   })
 
+  it('quotes the reference that is on that very log line, or it names nothing', async () => {
+    const logged: string[] = []
+    const server = await build(fakeOAuth(), logged)
+
+    const leaving = await start(server, 'facebook')
+
+    const quoted = /ref=([^&]+)/u.exec(String(leaving.headers.location))?.[1]
+    expect(quoted).toBeDefined()
+    expect(lastLogLine(logged)?.reqId).toBe(quoted)
+  })
+
   it('is a 404 for something that is not a provider at all', async () => {
     const server = await build()
 
@@ -1020,8 +1031,6 @@ describe('setting a provider up', () => {
   })
 
   it('draws no button for a client id saved with no secret', async () => {
-    // A row exists, so selecting on existence listed it — and "Continue with Discord" then
-    // led to `/login?from=refused` after a full trip out and back (#401).
     const server = await build()
     const boss = await givenAccount({ roles: ['admin'] })
     await save(server, 'discord', boss.cookie, { client_id: 'client-1' })

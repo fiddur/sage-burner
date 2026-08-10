@@ -71,9 +71,6 @@ export const HandOverPlace = ({
 
       {candidates === undefined && error === undefined && <p class="form-note">One moment…</p>}
 
-      {/* Not "nobody is waiting": the offer is to everybody here who has not paid,
-          which includes members above the line — an unpaid member is exactly who you
-          might hand a place to, since paying is what secures one (#263). */}
       {candidates?.length === 0 && <p>Everybody at this burn has paid, so there is nobody to hand it to.</p>}
 
       {candidates !== undefined && candidates.length > 0 && (
