@@ -335,6 +335,11 @@ export const apiRoutes = {
     fastify: '/api/installation/icon',
     path: () => '/api/installation/icon',
   },
+  getTouchIcon: {
+    method: 'GET',
+    fastify: '/api/installation/icons/:size',
+    path: (size: string) => `/api/installation/icons/${encodeURIComponent(size)}`,
+  },
   getInviteState: {
     method: 'GET',
     fastify: '/api/invites/:token',

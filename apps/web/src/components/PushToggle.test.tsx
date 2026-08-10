@@ -117,11 +117,25 @@ describe('subscriptionBody', () => {
 })
 
 describe('PushToggle', () => {
-  it('says so when the browser cannot do it at all', () => {
+  it('says installing it is what unlocks this, where the page is in a tab', () => {
     render(<PushToggle api={stub()} browser={undefined} />)
 
-    expect(screen.getByText(/cannot show notifications/)).toBeTruthy()
+    expect(screen.getByText(/add it to your home screen/)).toBeTruthy()
     expect(screen.queryByRole('button')).toBeNull()
+  })
+
+  it('says the browser cannot do it at all once it is the installed copy', () => {
+    // Installed and still unsupported means installing is not the answer, so pointing at it
+    // again would send somebody in a circle.
+    const media = vi.spyOn(globalThis, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList)
+    try {
+      render(<PushToggle api={stub()} browser={undefined} />)
+
+      expect(screen.getByText(/cannot show notifications/)).toBeTruthy()
+      expect(screen.queryByText(/add it to your home screen/)).toBeNull()
+    } finally {
+      media.mockRestore()
+    }
   })
 
   it('offers no button when permission was already refused', async () => {
@@ -455,7 +469,7 @@ describe('PushToggle', () => {
       <PushToggle api={stub()} browser={aBrowser({ register: () => Promise.reject(new Error('nope')) })} />,
     )
 
-    expect(await screen.findByText(/cannot show notifications/)).toBeTruthy()
+    expect(await screen.findByText(/add it to your home screen/)).toBeTruthy()
   })
 })
 
@@ -499,7 +513,7 @@ describe('the two edges before the browser has answered', () => {
 
       await vi.advanceTimersByTimeAsync(ACTIVATION_LIMIT_MS + 1)
 
-      expect(screen.getByText(/cannot show notifications/)).toBeTruthy()
+      expect(screen.getByText(/add it to your home screen/)).toBeTruthy()
     } finally {
       vi.useRealTimers()
     }

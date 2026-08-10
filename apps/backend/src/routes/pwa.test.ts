@@ -13,6 +13,7 @@ import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, accountRole, installation, INSTALLATION_ID } from '../db/schema.ts'
+import { DESCRIPTION } from './pwa.ts'
 
 const SECRET = 's'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
@@ -169,10 +170,11 @@ describe('the web manifest', () => {
     const server = await build()
     const root = await givenAccount()
 
-    // The flame is not offered maskable: it is an emoji in the top left of its box,
-    // and a launcher's circular mask would cut it.
+    // The flame's SVG entry is not maskable: it has no background of its own, and a
+    // launcher fills a maskable icon's box. The drawn PNGs beside it are, being opaque and
+    // keeping a tenth of the tile clear at every edge (#453).
     expect((await getManifest(server)).json().icons.map((icon: { purpose: string }) => icon.purpose)).toEqual(
-      ['any'],
+      ['any', 'maskable', 'maskable', 'maskable'],
     )
 
     expect((await putIcon(server, root.cookie, PNG)).statusCode).toBe(200)
@@ -194,6 +196,126 @@ describe('the web manifest', () => {
     const { icons } = (await getManifest(server)).json()
     expect(icons).toHaveLength(1)
     expect(new Set(icons.map((icon: { src: string }) => icon.src)).size).toBe(1)
+  })
+
+  it('declares a raster PNG at each size Chromium and iOS ask for, where nobody uploaded one', async () => {
+    const server = await build()
+
+    const { icons } = (await getManifest(server)).json()
+
+    expect(
+      icons
+        .filter((icon: { type: string }) => icon.type === 'image/png')
+        .map((icon: { src: string; sizes: string }) => [icon.src, icon.sizes]),
+    ).toEqual([
+      ['/api/installation/icons/180', '180x180'],
+      ['/api/installation/icons/192', '192x192'],
+      ['/api/installation/icons/512', '512x512'],
+    ])
+  })
+
+  it('leaves the drawn flame out once an admin has uploaded a mark of their own', async () => {
+    // Mixing the app's flame in beside somebody's logo would show the wrong one in the
+    // install sheet.
+    const server = await build()
+    const root = await givenAccount()
+
+    expect((await putIcon(server, root.cookie, SVG, 'image/svg+xml')).statusCode).toBe(200)
+
+    const { icons } = (await getManifest(server)).json()
+    expect(icons).toHaveLength(1)
+    expect(icons[0].type).toBe('image/svg+xml')
+  })
+
+  it('carries the identity, the wording and the language a manifest can hold', async () => {
+    const server = await build()
+
+    const manifest = (await getManifest(server)).json()
+
+    expect(manifest.id).toBe('/')
+    expect(manifest.lang).toBe('en')
+    expect(manifest.dir).toBe('ltr')
+    expect(manifest.description).toBe(DESCRIPTION)
+  })
+
+  it('offers a long press the three pages worth going straight to', async () => {
+    const server = await build()
+
+    expect((await getManifest(server)).json().shortcuts).toEqual([
+      { name: 'Schedule', url: '/schedule' },
+      { name: 'Feed', url: '/feed' },
+      { name: 'Songbook', url: '/songs' },
+    ])
+  })
+})
+
+describe('the home-screen tile', () => {
+  it('answers a PNG at each size, whatever is stored', async () => {
+    const server = await build()
+
+    for (const size of [180, 192, 512]) {
+      const response = await server.inject({ method: 'GET', url: `/api/installation/icons/${size}` })
+
+      expect(response.statusCode, String(size)).toBe(200)
+      expect(response.headers['content-type'], String(size)).toBe('image/png')
+      expect(response.rawPayload.subarray(1, 4).toString('ascii'), String(size)).toBe('PNG')
+    }
+  })
+
+  it('draws the tile at the size it was asked for', async () => {
+    const server = await build()
+
+    const response = await server.inject({ method: 'GET', url: '/api/installation/icons/180' })
+
+    expect(response.rawPayload.readUInt32BE(16)).toBe(180)
+    expect(response.rawPayload.readUInt32BE(20)).toBe(180)
+  })
+
+  it('serves an uploaded PNG instead of the flame', async () => {
+    const server = await build()
+    const root = await givenAccount()
+    await putIcon(server, root.cookie, PNG)
+
+    const response = await server.inject({ method: 'GET', url: '/api/installation/icons/180' })
+
+    expect(response.rawPayload).toEqual(PNG)
+  })
+
+  it('falls back to the flame for an SVG upload, which iOS would draw as a gray square', async () => {
+    const server = await build()
+    const root = await givenAccount()
+    await putIcon(server, root.cookie, SVG, 'image/svg+xml')
+
+    const response = await server.inject({ method: 'GET', url: '/api/installation/icons/180' })
+
+    expect(response.headers['content-type']).toBe('image/png')
+    expect(response.rawPayload).not.toEqual(SVG)
+  })
+
+  it('is public, since a browser fetching a tile carries no cookies', async () => {
+    const server = await build()
+
+    expect((await server.inject({ method: 'GET', url: '/api/installation/icons/512' })).statusCode).toBe(200)
+  })
+
+  it('cannot be run as a page, the same as the icon route', async () => {
+    const server = await build()
+
+    const response = await server.inject({ method: 'GET', url: '/api/installation/icons/512' })
+
+    expect(response.headers['content-security-policy']).toBe("default-src 'none'; sandbox")
+    expect(response.headers['x-content-type-options']).toBe('nosniff')
+  })
+
+  it('knows only the sizes it declares, so one tile is one cache key', async () => {
+    const server = await build()
+
+    for (const size of ['181', '0', '180.0', 'big']) {
+      expect(
+        (await server.inject({ method: 'GET', url: `/api/installation/icons/${size}` })).statusCode,
+        size,
+      ).toBe(404)
+    }
   })
 })
 

@@ -11,9 +11,13 @@
       here as a file, because it carries the installation's own name and its icon —
       both database rows an admin can change without a redeploy.
 
-      These three paths are also in `apiRoutes`, which is where the backend registers
+      These four paths are also in `apiRoutes`, which is where the backend registers
       them from. A `<link>` cannot import it, so `shell.test.ts` reads this file and
       asserts the two spellings still agree.
+
+      `apple-touch-icon` points at the touch-icon route, not the icon route: iOS draws
+      no SVG for a home-screen tile, so the icon route's SVG came out a gray square
+      (#453). That route answers a PNG whatever is stored.
 
       The tab icon is declared here rather than only created by `favicon.ts`, so a
       signed-out visitor gets it too — that code runs from the notification bell,
@@ -26,7 +30,7 @@
     -->
     <link rel="manifest" href="/manifest.webmanifest" />
     <link id="app-favicon" rel="icon" href="/api/installation/icon" />
-    <link rel="apple-touch-icon" href="/api/installation/icon" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/api/installation/icons/180" />
     <meta name="theme-color" content="#c2410c" />
   </head>
   <body>

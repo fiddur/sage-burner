@@ -11,14 +11,27 @@ import { IconButton } from '../components/IconButton.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { useAction, useLoad } from '../load.ts'
+import { isApproved, useViewer } from '../viewer.tsx'
 
 export type SongsApi = Pick<ApiClient, 'getSongbook' | 'addSong' | 'restoreSong'>
 
 const labelsFor = (categories: readonly SongCategory[], ids: readonly string[]): string[] =>
   categories.flatMap((category) => (ids.includes(category.id) ? [category.label] : []))
 
+export const RECENTLY_GONE_DAYS = 30
+
+/**
+ * The heading says "recently", so the list has to mean it: without a bound it was every song
+ * ever taken out, for ever. Nothing is purged — an older one is still reachable by its link,
+ * and its page still offers to put it back.
+ */
+export const recentlyGone = (deletedAt: string | null, now: number): boolean =>
+  deletedAt !== null && now - Date.parse(deletedAt) < RECENTLY_GONE_DAYS * 24 * 60 * 60 * 1000
+
 export const Songs = ({ api }: { api: SongsApi }) => {
+  const approved = isApproved(useViewer())
   const { loaded, refreshing, reload } = useLoad(async (signal) => await api.getSongbook(signal), {
+    enabled: approved,
     fallback: 'Could not load the songbook.',
     remember: 'songbook',
   })
@@ -29,7 +42,7 @@ export const Songs = ({ api }: { api: SongsApi }) => {
 
   const book = loaded.status === 'ready' ? loaded.data : { songs: [], categories: [] }
   const living = book.songs.filter((one) => one.deleted_at === null)
-  const gone = book.songs.filter((one) => one.deleted_at !== null)
+  const gone = book.songs.filter((one) => recentlyGone(one.deleted_at, Date.now()))
   const shown = filter === undefined ? living : living.filter((one) => one.category_ids.includes(filter))
 
   const put = () => {

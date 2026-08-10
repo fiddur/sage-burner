@@ -950,15 +950,39 @@ the app offline.
 
 ### Offering to install it
 
-A strip offers a one-tap **Install** where the browser allows one (#281), and says
-nothing where it does not.
+A strip offers a one-tap **Install** where the browser allows one (#281), and **says how by
+hand where it does not** (#452). Three states, one strip: an offer becomes the button;
+no offer becomes the instruction; the installed copy, or a dismissal, becomes nothing.
 
-**Chromium only, deliberately.** `beforeinstallprompt` is the only API that opens a
+**Chromium only for the button.** `beforeinstallprompt` is the only API that opens a
 browser's own install flow; Firefox and Safari have no equivalent, and there is no way
-to open Firefox's "Add to Home screen" or iOS Safari's Share sheet from a page. The
-alternative was written instructions, which means naming a menu item that moves
-between releases and goes stale silently — so those browsers get nothing rather than
-directions that may be wrong.
+to open Firefox's "Add to Home screen" or iOS Safari's Share sheet from a page.
+
+**Saying nothing there was the bug, though.** No browser on iOS fires
+`beforeinstallprompt` — they are all WebKit — so the strip was invisible on exactly the
+platform where installing takes the most convincing, and where the Share sheet is the only
+way in at all. The instruction is **generic on purpose**: an exact menu path moves between
+releases and goes stale silently, so the strip names the shape of the thing ("your browser's
+share or menu") and points at the **FAQ** for a walkthrough, which is admin-editable content
+and fixable the day Chrome moves the button. The link is there **only for an approved
+member**, who is the only one who can read the FAQ — an unconditional link would be a dead
+end for the signed-out visitor who also sees this strip.
+
+**iOS makes it more than convenience.** Web push works there only from an installed app: in
+a browser tab the Notification API is simply absent. So the strip may honestly say installing
+is what lets it notify you, and the notification settings say the same thing rather than
+offering a switch that cannot deliver — `state === 'unsupported'` splits on whether this is
+already the installed copy, because installed-and-still-unsupported means installing is not
+the answer and pointing at it again sends somebody in a circle.
+
+**`isStandalone` checks both spellings.** `matchMedia('(display-mode: standalone)')` is the
+standard one and `navigator.standalone` is all that older iOS answers — and a home screen app
+answering only the legacy one is exactly the reader the instruction strip would otherwise nag
+for having already followed it. One function, used by the strip and by the notification
+settings, so the two cannot disagree.
+
+**One dismissal covers both forms.** `DISMISSED_KEY` is the same either way: whether to be
+nudged about installing is one decision, not one per mechanism.
 
 **Watched from before the first render**, in `main.tsx` rather than in an effect.
 `beforeinstallprompt` fires once, when the browser decides the site qualifies, and
@@ -977,6 +1001,51 @@ Dismissible, remembered in `localStorage`. The event fires on every visit until 
 app is installed, so a nudge with no "not now" is a nudge for ever. Reading that
 store is wrapped: it throws rather than answering when a browser blocks storage, and a
 page that will not render is worse than a nudge dismissed twice.
+
+### The tile a home screen draws
+
+**iOS draws no SVG for `apple-touch-icon`**, and the icon route answers an SVG whenever
+nobody has uploaded a raster one — so whoever fought through Add to Home Screen got a **gray
+square** (#453). `/api/installation/icons/:size` answers a PNG whatever is stored: the upload
+when it is already a PNG, and the app's flame otherwise. An SVG upload falling back to the
+flame is honest rather than clever, and the settings page says so beside the upload.
+
+**The flame became geometry.** It was `<text>🔥</text>`, which draws whatever emoji font the
+reader has and cannot be rasterized without carrying one. `FLAME_SHAPES` in `media.ts` is now
+the single description both renderings come from — `flameIcon` writes it as SVG paths, and
+`pwa/flame.ts` fills the same curves into a PNG. Two renderers, one geometry, so they cannot
+drift.
+
+**Nothing here decodes an image.** The rule uploads live under is intact: the input is a
+hard-coded list of bezier curves, and filling it is arithmetic. That is why there is no build
+step, no committed binary and no native dependency — a scanline fill and a PNG encoder over
+`node:zlib` are about a hundred and fifty lines, and the result is held per size in a closure
+the route owns rather than in a module's variables.
+
+Coverage is **exact along x and sampled along y**: sampling both axes costs sixteen times the
+work for a worse edge, and the shape has no horizontal detail finer than a pixel to lose. The
+tile keeps **a tenth clear at every edge**, because a maskable icon is cropped to the middle of
+what it declares and a flame reaching the corners loses its tip to a circular mask.
+
+**The manifest, completed.** `id: '/'` so a later `start_url` change does not read as a
+different app; `description` matching the shell's; `lang` and `dir`; and `shortcuts` for a
+long press — the schedule, the feed and the songbook. The drawn PNGs are declared at 180, 192
+and 512 **only where nobody has uploaded an icon**: mixing the app's flame in beside somebody's
+logo would show the wrong mark in the install sheet. The flame's own SVG entry stays
+`purpose: 'any'`, because it has no background and a launcher fills a maskable icon's box; the
+PNGs beside it are maskable, being opaque with that margin. An upload keeps the `any maskable`
+it has had since #256, which is a claim about a picture an admin chose rather than one the app
+draws. A raster upload is resized to 512
+in the browser before it is sent, so the `512x512` the manifest has always claimed is true of
+anything uploaded through the page.
+
+The tile lands in the **shell** cache rather than the API one, on the same argument as the icon
+and the banner: it is nobody's data, so a sign-out is not its to take away.
+
+Not done on purpose: a **second upload slot** for the touch icon, for an admin whose logo is an
+SVG and who would rather supply their own raster than fall back to the flame — the fallback
+makes that optional rather than blocking. And **`screenshots`**, which would be pictures of
+_this_ installation and so another upload pipeline for a richer install sheet.
 
 ### Saying how old it is
 

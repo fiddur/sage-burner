@@ -253,7 +253,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
   )
   const SongRoute = useMemo(
     () =>
-      ({ songId }: { songId?: string }) => <SongPage api={api} songId={songId ?? ''} />,
+      ({ songId }: { songId?: string }) => <SongPage key={songId ?? ''} api={api} songId={songId ?? ''} />,
     [api],
   )
   const InviteRoute = useMemo(

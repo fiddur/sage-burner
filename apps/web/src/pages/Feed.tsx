@@ -485,7 +485,6 @@ const goneLabel = {
   song: ' · out of the book',
 } as const satisfies Record<Thread['entity_type'], string>
 
-// The songbook belongs to no burn, so its card says the book rather than nothing at all.
 const whereItBelongs = (card: Thread): string | undefined =>
   card.burn ?? (card.entity_type === 'song' ? 'Songbook' : undefined)
 

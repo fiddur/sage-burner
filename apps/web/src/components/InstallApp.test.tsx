@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { InstallOffer, InstallWatch } from '../install.ts'
 
 import { DISMISSED_KEY } from '../install.ts'
+import { ViewerProvider } from '../viewer.tsx'
 import { InstallApp } from './InstallApp.tsx'
 
 afterEach(() => {
@@ -12,13 +13,14 @@ afterEach(() => {
 })
 
 /** A watch under the test's control, rather than one listening to a real page. */
-const aWatch = (start?: InstallOffer) => {
+const aWatch = (start?: InstallOffer, standalone = false) => {
   let offer = start
   const listeners = new Set<() => void>()
   const prompted = vi.fn(() => Promise.resolve(undefined))
 
   const watch: InstallWatch = {
     offer: () => offer,
+    standalone: () => standalone,
     onChange: (listener) => {
       listeners.add(listener)
       return () => listeners.delete(listener)
@@ -41,11 +43,48 @@ const aWatch = (start?: InstallOffer) => {
 }
 
 describe('offering to install the app', () => {
-  it('says nothing where the browser has made no offer', () => {
-    // Which is Firefox and Safari always, since neither has the API at all.
+  it('says how by hand where the browser has made no offer', () => {
     render(<InstallApp watch={aWatch().watch} />)
 
     expect(screen.queryByRole('button', { name: 'Install' })).toBeNull()
+    expect(screen.getByRole('status').textContent).toContain('Add to Home Screen')
+  })
+
+  it('says nothing to the installed copy, however it answers being asked', () => {
+    render(<InstallApp watch={aWatch(undefined, true).watch} />)
+
+    expect(screen.queryByRole('status')).toBeNull()
+  })
+
+  it('takes no for an answer to the instructions too, which is one decision', async () => {
+    render(<InstallApp watch={aWatch().watch} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Not now' }))
+
+    await act(() => Promise.resolve())
+    expect(screen.queryByRole('status')).toBeNull()
+    expect(globalThis.localStorage.getItem(DISMISSED_KEY)).not.toBeNull()
+  })
+
+  it('points a member at the FAQ, where a walkthrough can be edited without a deploy', () => {
+    render(
+      <ViewerProvider
+        viewer={{
+          status: 'signed-in',
+          account: { id: 'a-1', name: 'Ada', avatar: null, roles: ['member'] },
+        }}
+      >
+        <InstallApp watch={aWatch().watch} />
+      </ViewerProvider>,
+    )
+
+    expect(screen.getByRole('link', { name: 'More in the FAQ.' }).getAttribute('href')).toBe('/faq')
+  })
+
+  it('offers a signed-out visitor no FAQ link, which they could not read', () => {
+    render(<InstallApp watch={aWatch().watch} />)
+
+    expect(screen.queryByRole('link', { name: 'More in the FAQ.' })).toBeNull()
   })
 
   it('says nothing at all in a tree with no watch', () => {
@@ -85,6 +124,7 @@ describe('offering to install the app', () => {
     let asked = 0
     const watch: InstallWatch = {
       offer: () => (++asked === 1 ? undefined : { prompt: () => Promise.resolve(undefined) }),
+      standalone: () => false,
       onChange: () => () => undefined,
       taken: () => undefined,
     }
@@ -104,9 +144,23 @@ describe('offering to install the app', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Install' }))
 
     expect(prompted).toHaveBeenCalledTimes(1)
-    // One prompt per event, so the strip goes rather than offering a second that the
-    // browser would refuse.
     expect(screen.queryByRole('button', { name: 'Install' })).toBeNull()
+  })
+
+  it('goes quiet after the prompt rather than telling somebody to do it by hand', async () => {
+    // The whole strip, not only the button: a spent offer is not "this browser has no API",
+    // and the instructions came up on top of Chromium's own dialog and stayed there — a tab's
+    // display mode is `browser` however that dialog was answered.
+    const { watch, offers } = aWatch()
+    render(<InstallApp watch={watch} />)
+    await act(() => {
+      offers()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Install' }))
+
+    await act(() => Promise.resolve())
+    expect(screen.queryByRole('status')).toBeNull()
   })
 
   it('takes no for an answer, and remembers it', async () => {
@@ -147,6 +201,7 @@ describe('offering to install the app', () => {
     render(<InstallApp watch={watch} />)
 
     expect(screen.queryByRole('button', { name: 'Install' })).toBeNull()
+    expect(screen.queryByRole('status')).toBeNull()
   })
 
   it('goes away when the offer does, which is what installing looks like', async () => {
@@ -161,6 +216,6 @@ describe('offering to install the app', () => {
       watch.taken()
     })
 
-    expect(screen.queryByRole('button', { name: 'Install' })).toBeNull()
+    expect(screen.queryByRole('status')).toBeNull()
   })
 })
