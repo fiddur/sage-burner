@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { OauthApi } from './OauthField.tsx'
@@ -70,15 +70,35 @@ describe('setting a provider up', () => {
     // deletion instructions are the privacy page again rather than a callback.
     show(stub())
 
-    expect(await screen.findByText(/Privacy Policy/)).toBeTruthy()
-    expect(screen.getByText(/Terms of Service/)).toBeTruthy()
-    expect(screen.getByText(/Data Deletion Instructions/)).toBeTruthy()
+    // Each row's own link rather than a count across the page: counting made this fail when an
+    // unrelated `/privacy` link was added elsewhere in the field, which says nothing about
+    // whether the three rows an admin pastes from are right.
+    const linkIn = (row: RegExp) => within(screen.getByText(row)).getByRole('link').getAttribute('href')
 
-    const paths = screen.getAllByRole('link').map((link) => link.getAttribute('href'))
+    expect(linkIn(/Privacy Policy/)).toBe('/privacy')
+    expect(linkIn(/Terms of Service/)).toBe('/terms')
+    // The policy again: the deletion instructions are that page, not a callback.
+    expect(linkIn(/Data Deletion Instructions/)).toBe('/privacy')
+  })
 
-    expect(paths).toContain('/terms')
-    // Twice: the policy is both the privacy URL and what the deletion instructions point at.
-    expect(paths.filter((path) => path === '/privacy')).toHaveLength(2)
+  it('tells the admin what their members will be asked to allow', async () => {
+    // #429: the consent screen names more than this app keeps, and an admin who has not seen it
+    // cannot answer a member who has. Asserted on the container's text because the sentence is
+    // built from an interpolation and a link, so no single element holds it.
+    const { container } = show(stub())
+    await screen.findByLabelText('Facebook client ID')
+
+    expect(container.textContent).toContain('asked to allow')
+    expect(container.textContent).toContain('eight fields public_profile covers')
+  })
+
+  it('uses Discord’s own wording for Discord', async () => {
+    // The two differ, and the point is that it matches what the member is actually shown —
+    // Discord's screen says exactly this, which is what prompted #429.
+    const { container } = render(<OauthField api={stub()} provider="discord" />)
+    await screen.findByLabelText('Discord client ID')
+
+    expect(container.textContent).toContain('username, avatar and banner')
   })
 
   it('seeds the id from what is stored, and never the secret', async () => {

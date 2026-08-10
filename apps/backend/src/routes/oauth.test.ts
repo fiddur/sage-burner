@@ -144,6 +144,34 @@ const mintedState = async () => {
   return row.state
 }
 
+/**
+ * What one captured log line is, narrowed rather than cast.
+ *
+ * `errors.test.ts` makes the argument a few files over: `JSON.parse` answers `any`, so a cast
+ * asserts a shape pino is merely expected to produce and a line that did not match would read as
+ * one that did.
+ */
+type LogLine = {
+  msg: string
+  provider?: unknown
+  intent?: unknown
+  at?: unknown
+  status?: unknown
+  said?: unknown
+}
+
+const isLogLine = (value: unknown): value is LogLine =>
+  typeof value === 'object' && value !== null && 'msg' in value && typeof value.msg === 'string'
+
+const lastLogLine = (chunks: readonly string[]): LogLine | undefined =>
+  chunks
+    .flatMap((chunk) => {
+      const parsed: unknown = JSON.parse(chunk)
+
+      return isLogLine(parsed) ? [parsed] : []
+    })
+    .at(-1)
+
 const signInThrough = async (server: FastifyInstance, provider = 'facebook') => {
   const leaving = await start(server, provider)
   return await callback(server, provider, `code=abc&state=${await mintedState()}`, nonceFrom(leaving))
@@ -498,7 +526,7 @@ describe('why a link could not be made', () => {
     // The member is told the same as before — none of this is theirs, and none of it actionable.
     expect(back.headers.location).toBe('/profile?from=refused')
 
-    const line = logged.map((chunk) => JSON.parse(chunk) as Record<string, unknown>).at(-1)
+    const line = lastLogLine(logged)
     expect(line?.at).toBe('token')
     expect(line?.status).toBe(400)
     expect(line?.said).toBe('Error validating client secret.')

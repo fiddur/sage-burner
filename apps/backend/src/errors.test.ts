@@ -15,8 +15,9 @@ import { frameworkErrorHandler, registerErrorHandler } from './errors.ts'
  * What the error handler writes to the log, as opposed to what it writes to the
  * wire — `app.test.ts` covers the latter.
  *
- * Built on a bare Fastify instance rather than `createApp` so the log stream can
- * be captured: `createApp` builds its logger from config and has no seam for one.
+ * Built on a bare Fastify instance rather than `createApp`, which registers every route in
+ * the app to exercise one handler. `createApp` takes a `logStream` since #430, so capturing
+ * the log is no longer the reason — `registerErrorHandler` in isolation is.
  */
 
 type LogLine = { msg: string; err?: { stack?: unknown } }

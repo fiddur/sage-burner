@@ -1,6 +1,7 @@
 import type { OAuthProvider } from '@sage-burner/shared'
 import type { ComponentChildren } from 'preact'
 
+import { oauthProviders } from '@sage-burner/shared'
 import { createContext } from 'preact'
 import { useContext, useEffect, useState } from 'preact/hooks'
 
@@ -47,7 +48,15 @@ interface InstallationContextValue {
   setBanner: (banner: string | null) => void
   setIcon: (icon: string | null) => void
   setSendsEmail: (sends: boolean) => void
-  setSocialLogins: (providers: readonly OAuthProvider[]) => void
+  /**
+   * One provider's state, merged here rather than by the caller (#431's review).
+   *
+   * A caller passing a whole list has to read the current one first, and with both fields on
+   * the settings page two saves in flight would each rebuild from a list captured before the
+   * other landed — the second to resolve dropping the first. Merged inside the state update,
+   * there is no list to be stale.
+   */
+  setProviderConfigured: (provider: OAuthProvider, configured: boolean) => void
 }
 
 const InstallationContext = createContext<InstallationContextValue>({
@@ -55,7 +64,7 @@ const InstallationContext = createContext<InstallationContextValue>({
   setBanner: () => undefined,
   setIcon: () => undefined,
   setSendsEmail: () => undefined,
-  setSocialLogins: () => undefined,
+  setProviderConfigured: () => undefined,
 })
 
 const Provide = ({
@@ -102,7 +111,16 @@ const Provide = ({
         setBanner: setBannerOverride,
         setIcon: setIconOverride,
         setSendsEmail: setMailOverride,
-        setSocialLogins: setLoginsOverride,
+        setProviderConfigured: (provider, configured) =>
+          setLoginsOverride((held) => {
+            // The effective list, not the override — which is `undefined` until something sets
+            // it, and would otherwise drop whatever the fetch had answered.
+            const effective = held ?? socialLogins ?? []
+
+            return oauthProviders.filter((candidate) =>
+              candidate === provider ? configured : effective.includes(candidate),
+            )
+          }),
       }}
     >
       {children}
@@ -221,4 +239,4 @@ export const useSetInstallationSendsEmail = () => useContext(InstallationContext
  * Your details and no button on the login page until a reload — a client-side navigation fetches
  * nothing, and both consumers read this rather than asking.
  */
-export const useSetInstallationSocialLogins = () => useContext(InstallationContext).setSocialLogins
+export const useSetProviderConfigured = () => useContext(InstallationContext).setProviderConfigured

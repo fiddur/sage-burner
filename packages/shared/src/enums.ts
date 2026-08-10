@@ -407,7 +407,7 @@ const mastodonHref = (value: string): string | undefined => {
 }
 
 /**
- * An `http(s)` URL split the way a browser splits it, or nothing if it is not one.
+ * An `http(s)` URL in its parts, or nothing if it is not one.
  *
  * One function because this pattern was written out three times and carried the same defect
  * in each: **`\\` has to end the authority**, since WHATWG treats it as `/` for a special
@@ -415,17 +415,24 @@ const mastodonHref = (value: string): string | undefined => {
  * `/.facebook.com/wren` to a browser, while an authority taken up to the first `/?#` ends
  * `.facebook.com` and passes a host check — so a link to somewhere else read as Facebook's.
  *
+ * **`authority`, not a hostname**, and named that way because it is not one: userinfo and a
+ * port ride along, so `user@facebook.com` and `facebook.com:443` both fail a host check that
+ * an end-anchored pattern would pass on the host alone. That is the safe direction — a
+ * refusal, never an acceptance — and stripping them here would mean hand-rolling the part of
+ * URL parsing that caused this defect in the first place. Callers wanting a true hostname
+ * should say so and get it right rather than have it implied by a field name.
+ *
  * A regex rather than `URL`: this package has no platform in its `lib`, deliberately —
  * everything in it has to typecheck the same for the backend and for the browser, and `URL`
  * is in neither. Verified, not assumed: `new URL` here is `TS2304: Cannot find name 'URL'`.
  */
 const urlParts = (
   value: string,
-): { scheme: string; hostname: string; path: string; query: string } | undefined => {
-  const [, scheme, hostname, path = '', query = ''] =
+): { scheme: string; authority: string; path: string; query: string } | undefined => {
+  const [, scheme, authority, path = '', query = ''] =
     /^(https?):\/\/([^\s/\\?#]+)(?:[/\\]([^\s?#]*))?(?:\?([^\s#]*))?(?:#.*)?$/iu.exec(value.trim()) ?? []
 
-  return hostname === undefined || scheme === undefined ? undefined : { scheme, hostname, path, query }
+  return authority === undefined || scheme === undefined ? undefined : { scheme, authority, path, query }
 }
 
 /**
@@ -438,9 +445,12 @@ const urlParts = (
  */
 const handleIn = (value: string, host: RegExp): string | undefined => {
   const parts = urlParts(value)
-  if (parts === undefined || !host.test(parts.hostname)) return undefined
+  if (parts === undefined || !host.test(parts.authority)) return undefined
 
-  const [first] = parts.path.split('/').filter((part) => part !== '')
+  // Split on `\` as well, the residue of the same divergence: a browser reads
+  // `instagram.com/a\b/c` as segment `a`, so taking `a\b` as the handle would store one
+  // nobody has.
+  const [first] = parts.path.split(/[/\\]/u).filter((part) => part !== '')
 
   return first === undefined ? undefined : first.replace(/^@/u, '')
 }
@@ -466,13 +476,28 @@ const NOT_A_HANDLE = new Set(['profile.php', 'people'])
  */
 const facebookNumericId = (value: string): string | undefined => {
   const parts = urlParts(value)
-  if (parts === undefined || !FACEBOOK_HOST.test(parts.hostname)) return undefined
+  if (parts === undefined || !FACEBOOK_HOST.test(parts.authority)) return undefined
   const { path, query } = parts
   if (path.toLowerCase() !== 'profile.php') return undefined
 
   const [, id] = /(?:^|&)id=(\d+)(?:&|$)/u.exec(query) ?? []
 
   return id
+}
+
+/**
+ * `@user@instance` out of a pasted Mastodon URL, or nothing if that is not what this is.
+ *
+ * Any instance, so the host cannot be matched against a list — a Mastodon URL is recognised by
+ * its shape instead: one path segment, and that segment an `@handle`. Through `urlParts` like
+ * the other three, so there is one spelling of an authority here rather than a fourth to
+ * remember when the first three are corrected.
+ */
+const mastodonHandle = (value: string): string | undefined => {
+  const parts = urlParts(value)
+  const [, user] = /^@([^\s/\\]+)[/\\]?$/u.exec(parts?.path ?? '') ?? []
+
+  return user === undefined || parts === undefined ? undefined : `@${user}@${parts.authority}`
 }
 
 /**
@@ -503,13 +528,7 @@ export const connectionValue = (kind: ConnectionKind, value: string): string => 
   }
   if (kind === 'instagram') return handleIn(trimmed, /(^|\.)instagram\.com$/iu) ?? trimmed.replace(/^@/u, '')
   if (kind === 'tiktok') return handleIn(trimmed, /(^|\.)tiktok\.com$/iu) ?? trimmed.replace(/^@/u, '')
-  if (kind === 'mastodon') {
-    // Any instance, so the host cannot be matched against a list — a Mastodon URL is
-    // recognised by its shape: one path segment, and that segment an `@handle`.
-    const [, instance, user] = /^https?:\/\/([^\s/]+)\/@([^\s/]+)\/?$/u.exec(trimmed) ?? []
-
-    return user === undefined || instance === undefined ? trimmed : `@${user}@${instance}`
-  }
+  if (kind === 'mastodon') return mastodonHandle(trimmed) ?? trimmed
 
   return trimmed
 }
@@ -545,7 +564,7 @@ export const facebookProfileLink = (value: string | undefined): string | undefin
   const parts = urlParts(trimmed)
   if (parts === undefined || parts.scheme.toLowerCase() !== 'https') return undefined
 
-  return FACEBOOK_HOST.test(parts.hostname) ? trimmed : undefined
+  return FACEBOOK_HOST.test(parts.authority) ? trimmed : undefined
 }
 
 /**
