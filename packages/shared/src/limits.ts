@@ -22,6 +22,8 @@ export const MAX_COMMENT = 2000
 
 export const MAX_INTRODUCTION = 10_000
 
+export const INTRODUCTION_EXCERPT = 280
+
 export const MAX_SLUG = 64
 
 export const MAX_WELCOME_LENGTH = 100_000

@@ -14,9 +14,10 @@ import { viewerFor } from '../auth/viewer.ts'
 import { isForeignKeyViolation, isUniqueViolation } from '../db/errors.ts'
 import { account, accountAvatar, attendance, event } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
-import { displayName, notifyAttendees } from '../push/notify.ts'
+import { displayName, tellAttendees } from '../push/notify.ts'
 import { openEventNow, todayIso } from './events.ts'
 import { helpingFor, helpingIdsFor } from './helping.ts'
+import { cardEntry, JOINED } from './threads.ts'
 
 export const isAlreadyJoined = (error: unknown) => isUniqueViolation(error, 'attendance.event_id')
 
@@ -180,16 +181,22 @@ export const registerAttendanceRoutes = (
       if (joined === undefined) return sendError(reply, 404)
 
       if (joined.created) {
-        await notifyAttendees(
+        const name = await displayName(db, viewer.account_id)
+
+        await cardEntry(db, {
+          stay: joined.stay,
+          who: { account_id: viewer.account_id, name },
+          kind: 'joined',
+          body: JOINED,
+          at: now(),
+        })
+
+        await tellAttendees(
           db,
           notify,
           joined.stay.event_id,
-          {
-            category: 'member_joined',
-            body: `${await displayName(db, viewer.account_id)} is coming.`,
-            link: '/members',
-          },
-          { except: [viewer.account_id], at: now() },
+          { category: 'member_joined', body: `${name} is coming.`, link: '/members' },
+          { except: [viewer.account_id] },
         )
       }
 

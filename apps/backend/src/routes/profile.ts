@@ -2,11 +2,18 @@ import type { AttendanceUpdate, ProfileResponse } from '@sage-burner/shared'
 import type { SQL } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 
-import { apiRoutes, attendanceUpdateSchema, errorResponse, profileUpdateSchema } from '@sage-burner/shared'
-import { and, eq, ne, sql } from 'drizzle-orm'
+import {
+  apiRoutes,
+  attendanceUpdateSchema,
+  errorResponse,
+  profilePage,
+  profileUpdateSchema,
+} from '@sage-burner/shared'
+import { and, eq, gte, ne, sql } from 'drizzle-orm'
 
 import type { GuardDeps } from '../auth/guards.ts'
 import type { Database } from '../db/index.ts'
+import type { Notifier } from '../push/notify.ts'
 
 import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
@@ -14,14 +21,17 @@ import { allOf } from '../db/conditions.ts'
 import { isForeignKeyViolation } from '../db/errors.ts'
 import { isEmptyPatch } from '../db/patch.ts'
 import { whyNothingWritten } from '../db/refusals.ts'
-import { account, attendance, eventOption } from '../db/schema.ts'
+import { account, attendance, event, eventOption } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
+import { displayName, tellAttendees } from '../push/notify.ts'
 import { allergyTickIdsFor, writeAllergyTicks } from './allergy-ticks.ts'
-import { openEventNow } from './events.ts'
+import { openEventNow, todayIso } from './events.ts'
 import { areHelpingOptions, helpingIdsFor, writeHelping } from './helping.ts'
+import { cardEntry, INTRODUCED } from './threads.ts'
 
 export interface ProfileDeps extends GuardDeps {
   now: () => Date
+  notify?: Notifier
 }
 
 const stayOrderCondition = ({ arrival_date, departure_date }: AttendanceUpdate) => {
@@ -109,8 +119,43 @@ export const writeStay = (
     return rows
   })
 
-export const registerProfileRoutes = (app: FastifyInstance, { db, sessions, now }: ProfileDeps) => {
+export const registerProfileRoutes = (
+  app: FastifyInstance,
+  { db, sessions, now, notify = async () => undefined }: ProfileDeps,
+) => {
   const { requireApproved, requireMember } = createGuards({ db, sessions })
+
+  const announceIntroduction = async (accountId: string) => {
+    const name = await displayName(db, accountId)
+
+    const stays = await db
+      .select({ id: attendance.id, event_id: attendance.event_id })
+      .from(attendance)
+      .innerJoin(event, eq(event.id, attendance.event_id))
+      .where(and(eq(attendance.account_id, accountId), gte(event.end_date, todayIso(now))))
+
+    for (const stay of stays) {
+      await cardEntry(db, {
+        stay,
+        who: { account_id: accountId, name },
+        kind: 'introduced',
+        body: INTRODUCED,
+        at: now(),
+      })
+
+      await tellAttendees(
+        db,
+        notify,
+        stay.event_id,
+        {
+          category: 'introduction_written',
+          body: `${name} says who they are.`,
+          link: profilePage(accountId),
+        },
+        { except: [accountId] },
+      )
+    }
+  }
 
   const profileFor = async (accountId: string) => {
     const [row] = await db
@@ -154,6 +199,9 @@ export const registerProfileRoutes = (app: FastifyInstance, { db, sessions, now 
 
     const { allergy_item_ids: ticks, ...columns } = body
 
+    const before = await profileFor(viewer.account_id)
+    if (before === undefined) return sendError(reply, 404)
+
     if (!isEmptyPatch(columns) || ticks !== undefined) {
       try {
         db.transaction((tx) => {
@@ -170,6 +218,10 @@ export const registerProfileRoutes = (app: FastifyInstance, { db, sessions, now 
 
     const profile = await profileFor(viewer.account_id)
     if (profile === undefined) return sendError(reply, 404)
+
+    if (profile.introduction !== before.introduction && (profile.introduction ?? '').trim() !== '') {
+      await announceIntroduction(viewer.account_id)
+    }
 
     return { profile } satisfies ProfileResponse
   })

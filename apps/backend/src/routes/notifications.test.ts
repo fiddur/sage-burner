@@ -236,6 +236,7 @@ describe('what somebody has switched on', () => {
     'waiting_list_near',
     'waiting_list_pushed',
     'dream_comment',
+    'introduction_comment',
     'application',
   ]
 

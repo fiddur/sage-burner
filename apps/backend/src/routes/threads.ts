@@ -7,7 +7,14 @@ import type {
 } from '@sage-burner/shared'
 import type { FastifyInstance, FastifyReply } from 'fastify'
 
-import { apiRoutes, coalesces, commentSchema, dreamPage } from '@sage-burner/shared'
+import {
+  apiRoutes,
+  coalesces,
+  commentSchema,
+  dreamPage,
+  INTRODUCTION_EXCERPT,
+  profilePage,
+} from '@sage-burner/shared'
 import { and, asc, count, desc, eq, inArray, max, ne, sql } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
@@ -113,6 +120,55 @@ export const threadForSession = async (
   return row?.id ?? threadIdFor(db, { type: 'session', ...dream })
 }
 
+export const threadForAttendance = async (
+  db: Database,
+  stay: { id: string; event_id: string; title: string },
+): Promise<string> => {
+  const [row] = await db
+    .select({ id: thread.id })
+    .from(thread)
+    .where(and(eq(thread.entity_type, 'attendance'), eq(thread.entity_id, stay.id)))
+    .limit(1)
+
+  return row?.id ?? threadIdFor(db, { type: 'attendance', ...stay })
+}
+
+export const JOINED = 'is coming'
+
+export const INTRODUCED = 'says who they are'
+
+export const cardEntry = async (
+  db: Database,
+  {
+    stay,
+    who,
+    kind,
+    body,
+    at,
+  }: {
+    stay: { id: string; event_id: string }
+    who: { account_id: string; name: string }
+    kind: ThreadEntryKind
+    body: string
+    at: Date
+  },
+): Promise<void> => {
+  const id = await threadForAttendance(db, { id: stay.id, event_id: stay.event_id, title: who.name })
+
+  await addEntry(db, { thread_id: id, kind, author_account_id: who.account_id, body }, at)
+}
+
+export const excerptOf = (introduction: string | null): string | null => {
+  const whole = introduction?.trim() ?? ''
+  if (whole === '') return null
+  if (whole.length <= INTRODUCTION_EXCERPT) return whole
+
+  const cut = whole.slice(0, INTRODUCTION_EXCERPT)
+  const space = cut.lastIndexOf(' ')
+
+  return `${(space > INTRODUCTION_EXCERPT / 2 ? cut.slice(0, space) : cut).trimEnd()}…`
+}
+
 export const recentThreads = async (
   db: Database,
   limit: number,
@@ -149,10 +205,16 @@ export const readThreads = async (
       entity_id: thread.entity_id,
       title: thread.title,
       dream: session.id,
+      stay: attendance.id,
+      subject: account.id,
+      subject_name: account.name,
+      introduction: account.introduction,
     })
     .from(thread)
     .innerJoin(event, eq(event.id, thread.event_id))
     .leftJoin(session, and(eq(thread.entity_type, 'session'), eq(session.id, thread.entity_id)))
+    .leftJoin(attendance, and(eq(thread.entity_type, 'attendance'), eq(attendance.id, thread.entity_id)))
+    .leftJoin(account, eq(account.id, attendance.account_id))
     .where(inArray(thread.id, [...ids]))
 
   const entries = await db
@@ -196,6 +258,9 @@ export const readThreads = async (
     const shown = newest === undefined ? all : all.slice(Math.max(0, all.length - newest))
     const last = all.at(-1)
 
+    const forDream = row.entity_type === 'session'
+    const gone = forDream ? row.dream === null : row.stay === null
+
     return [
       {
         id: row.id,
@@ -203,14 +268,40 @@ export const readThreads = async (
         burn: row.burn,
         entity_type: row.entity_type,
         entity_id: row.entity_id,
-        title: row.title,
-        gone: row.dream === null,
+        title: forDream ? row.title : (row.subject_name ?? row.title),
+        link: linkTo(row, forDream, gone),
+        introduction: forDream ? null : excerptOf(row.introduction),
+        gone,
         entry_count: counts?.get(id) ?? all.length,
         last_at: last?.created_at ?? null,
         entries: shown,
       } satisfies Thread,
     ]
   })
+}
+
+const linkTo = (
+  row: { event_id: string; entity_id: string; subject: string | null },
+  forDream: boolean,
+  gone: boolean,
+): string | null => {
+  if (forDream) return gone ? null : dreamPage(row.event_id, row.entity_id)
+
+  return row.subject === null ? null : profilePage(row.subject)
+}
+
+export const subjectOf = async (
+  db: Database,
+  attendanceId: string,
+): Promise<{ account_id: string; name: string | null } | undefined> => {
+  const [row] = await db
+    .select({ account_id: attendance.account_id, name: account.name })
+    .from(attendance)
+    .innerJoin(account, eq(account.id, attendance.account_id))
+    .where(eq(attendance.id, attendanceId))
+    .limit(1)
+
+  return row
 }
 
 export const participantsOf = async (
@@ -223,6 +314,13 @@ export const participantsOf = async (
     .where(and(eq(threadEntry.thread_id, found.id), inArray(threadEntry.kind, ['comment', 'offered'])))
 
   const people = new Set(spoke.flatMap((row) => (row.account_id === null ? [] : [row.account_id])))
+
+  if (found.entity_type === 'attendance') {
+    const subject = await subjectOf(db, found.entity_id)
+    if (subject !== undefined) people.add(subject.account_id)
+
+    return people
+  }
 
   const facilitating = await db
     .select({ account_id: attendance.account_id })
@@ -375,12 +473,31 @@ export const registerThreadRoutes = (
     return { thread: found } satisfies ThreadResponse
   }
 
+  const aboutWhat = async (found: {
+    event_id: string
+    entity_type: ThreadEntityType
+    entity_id: string
+    title: string
+  }): Promise<{ link: string | null; what: string }> => {
+    if (found.entity_type === 'session') {
+      return { link: dreamPage(found.event_id, found.entity_id), what: found.title }
+    }
+
+    const subject = await subjectOf(db, found.entity_id)
+
+    return subject === undefined
+      ? { link: null, what: found.title }
+      : { link: profilePage(subject.account_id), what: subject.name ?? found.title }
+  }
+
   const tellAbout = async (
     found: { id: string; event_id: string; entity_type: ThreadEntityType; entity_id: string; title: string },
     author: string,
   ) => {
-    const link = dreamPage(found.event_id, found.entity_id)
-    const said = `${await displayName(db, author)} said something about ${found.title}`
+    const { link, what } = await aboutWhat(found)
+    const said = `${await displayName(db, author)} said something about ${what}`
+    const mine = found.entity_type === 'session' ? 'dream_comment' : 'introduction_comment'
+    const anybody = found.entity_type === 'session' ? 'dream_comment_any' : 'introduction_comment_any'
 
     const people = await participantsOf(db, found)
     people.delete(author)
@@ -391,14 +508,10 @@ export const registerThreadRoutes = (
       .where(and(eq(attendance.event_id, found.event_id), ne(attendance.account_id, author)))
 
     await Promise.all([
-      ...[...people].map(
-        async (accountId) => await notify(accountId, { category: 'dream_comment', body: said, link }),
-      ),
+      ...[...people].map(async (accountId) => await notify(accountId, { category: mine, body: said, link })),
       ...attendees
         .filter((row) => !people.has(row.account_id))
-        .map(
-          async (row) => await notify(row.account_id, { category: 'dream_comment_any', body: said, link }),
-        ),
+        .map(async (row) => await notify(row.account_id, { category: anybody, body: said, link })),
     ])
   }
 }
