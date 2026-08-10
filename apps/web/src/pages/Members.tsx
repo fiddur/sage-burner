@@ -1,6 +1,5 @@
 import type { MemberRosterEntry, MemberRosterResponse } from '@sage-burner/shared'
 
-import { profilePage } from '@sage-burner/shared'
 import { Fragment } from 'preact'
 
 import type { ApiClient } from '../api/client.ts'
@@ -10,6 +9,7 @@ import { useSelectedBurn } from '../burn.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
+import { PersonCell } from '../components/PersonCell.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { Table } from '../components/Table.tsx'
 import { startsTheWaitingList, WaitingListLine } from '../components/WaitingListLine.tsx'
@@ -110,10 +110,13 @@ const RosterTable = ({ entries }: { entries: readonly MemberRosterEntry[] }) => 
           <tr class={entry.waiting ? 'waiting' : undefined}>
             <td>
               {/* No fallback to an email address, unlike the admin list: this response carries none. */}
-              <a href={profilePage(entry.account_id)}>{entry.name ?? 'Name not filled in yet'}</a>
-              {entry.waiting && <span class="form-note"> · waiting</span>}
-              <br />
-              <span class="form-note">{entry.contact ?? 'no contact given'}</span>
+              <PersonCell
+                accountId={entry.account_id}
+                name={entry.name ?? 'Name not filled in yet'}
+                avatar={entry.avatar}
+                waiting={entry.waiting}
+                under={entry.contact ?? 'no contact given'}
+              />
             </td>
             <td>{allergiesOf(entry)}</td>
             <td>

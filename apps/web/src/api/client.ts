@@ -96,6 +96,7 @@ export const isApiError = (value: unknown): value is ApiError =>
   value instanceof Error && 'status' in value && 'code' in value
 
 export const inAWhile = (seconds: number): string => {
+  if (seconds === 1) return 'a second'
   if (seconds <= 90) return `${seconds} seconds`
 
   const minutes = Math.ceil(seconds / 60)

@@ -66,7 +66,6 @@ describe('bounding how often one key may try', () => {
   })
 
   it('holds no more keys than it is allowed, however many ask', () => {
-    // An unbounded map is the exhaustion the limiter exists to prevent, one key per address.
     const clock = aClock()
     const throttle = createThrottle({ attempts: 5, windowMs: 60_000, now: clock.now, keys: 8 })
 

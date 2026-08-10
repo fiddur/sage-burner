@@ -1026,8 +1026,6 @@ describe('an introduction on the burns somebody is coming to', () => {
   })
 
   it('tells the burn once for however many passes at one paragraph', async () => {
-    // The card bumps once, which is what the changelog promises — and the bell used to go per
-    // save, so the two disagreed about the same event (#449).
     const server = await build()
     const member = await givenMember({ name: 'Ada' })
     const other = await givenMember({ name: 'Bea' })

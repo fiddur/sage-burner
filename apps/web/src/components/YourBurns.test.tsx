@@ -227,6 +227,7 @@ describe('handing on a place that has been paid for', () => {
   })
 
   const waiting = (over: Partial<MemberRosterEntry> = {}): MemberRosterEntry => ({
+    avatar: null,
     id: 'att-2',
     event_id: 'e-1',
     account_id: 'a-2',

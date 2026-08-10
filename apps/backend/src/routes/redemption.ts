@@ -63,8 +63,6 @@ export const registerRedemptionRoutes = (
   app.post<{ Params: { token: string } }>(apiRoutes.redeemInvite.fastify, async (request, reply) => {
     void noStore(reply)
 
-    // An unguessable token is only unguessable if you cannot try quickly (#57). Keyed on the
-    // address rather than the token, which is what somebody guessing would be cycling.
     const room = throttle.take(request.ip)
     if (!room.ok) {
       void reply.header('retry-after', String(room.retryAfterSeconds))

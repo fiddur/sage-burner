@@ -57,9 +57,6 @@ export const registerAuthRoutes = (
       return reply.code(401).send(errorResponse('invalid_credentials'))
     }
 
-    // Keyed on what was sent, not on whether it names an account: a bound that only counted
-    // known addresses would answer differently for one that exists, which is the enumeration
-    // oracle the constant-time verify was added to close (#57).
     const attempt = limits.byAddress.take(parsed.data.email)
     if (!attempt.ok) return refuse(reply, attempt.retryAfterSeconds)
 
@@ -103,8 +100,6 @@ export const registerAuthRoutes = (
   app.post(apiRoutes.login.fastify, async (request, reply) => {
     void noStore(reply)
 
-    // Ahead of the slot claim, or two sustained anonymous requests hold the gate's whole
-    // capacity and every member's login answers 429 for as long as they keep them open.
     const room = limits.byIp.take(request.ip)
     if (!room.ok) {
       request.log.warn({ status: 429 }, 'login throttled')

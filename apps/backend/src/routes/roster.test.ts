@@ -11,7 +11,15 @@ import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, attendance, attendanceHelping, event, eventOption } from '../db/schema.ts'
+import {
+  account,
+  accountAvatar,
+  accountRole,
+  attendance,
+  attendanceHelping,
+  event,
+  eventOption,
+} from '../db/schema.ts'
 
 /**
  * The admin's list of who is coming, and recording that they have paid.
@@ -546,6 +554,40 @@ describe('the same list as a member sees it', () => {
     expect(Object.keys(entry)).not.toContain('email')
     expect(JSON.stringify(entry)).not.toContain('@example.org')
     expect(JSON.stringify(entry)).not.toContain('2026-06-30')
+  })
+
+  it('carries the face, which the attendees route already gives anybody approved', async () => {
+    // A projection change rather than a permissions one (#305): every member can read every
+    // attendee's avatar through `GET /api/events/:eventId/attendees` already.
+    const server = await build()
+    const eventId = await givenEvent()
+    const ana = await givenAccount('Ana')
+    const reader = await givenAccount('Reader')
+    await givenComing(eventId, ana.id, '2026-07-01T00:00:00Z')
+    await db()
+      .insert(accountAvatar)
+      .values({
+        account_id: ana.id,
+        image: Buffer.from([1, 2, 3]),
+        content_type: 'image/webp',
+        updated_at: '2026-07-02T00:00:00.000Z',
+      })
+
+    const [entry] = (await members(server, reader.cookie, eventId)).json().entries
+
+    expect(entry.avatar).toBe('2026-07-02T00:00:00.000Z')
+  })
+
+  it('says the face is missing rather than omitting it, for somebody who has not set one', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    const ana = await givenAccount('Ana')
+    const reader = await givenAccount('Reader')
+    await givenComing(eventId, ana.id, '2026-07-01T00:00:00Z')
+
+    const [entry] = (await members(server, reader.cookie, eventId)).json().entries
+
+    expect(entry.avatar).toBeNull()
   })
 
   it('still says who has a place and who is waiting', async () => {

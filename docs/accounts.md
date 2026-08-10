@@ -84,7 +84,21 @@ Thirty is deliberately generous, because everybody at a gathering shares one pub
 — a bound tight enough to stop a determined guesser from one machine would lock out a camp.
 What it does bound is the CPU one client can ask for, which is the actual exposure.
 
-Both are one `Map` of counters with an injected clock, bounded at four thousand keys: the
+**The per-address bound is a lockout, and it can be aimed.** Ten wrong guesses at a known
+member's address refuses **them** for a quarter of an hour, correct password included — and
+because the refusal is free, one origin can hold a handful of known addresses locked out
+indefinitely without ever filling its own bucket. Keying on `(origin, address)` instead would
+weaken exactly the guessing bound this exists for, so it is not done; a passkey and a linked
+provider both stay open as ways in, and an admin can reset a password. It is the conventional
+trade and it is stated here rather than left to be discovered.
+
+**`GET /api/invites/:token` is deliberately not bounded**, though the POST beside it is. It
+answers whether a token is outstanding and the applicant's name, so it is a cheaper oracle than
+the redemption — against 32 random bytes, cheap enough not to matter. What a bound there would
+reach first is a camp arriving on one public address, where every redemption is a read and then
+a write.
+
+Both bounds are one `Map` of counters with an injected clock, bounded at four thousand keys: the
 expired ones are reclaimed first, and if every bucket is live the one closest to expiry is
 forgotten to make room. Forgetting rather than refusing, because a limiter that runs out of
 memory to be a limiter with is an outage.
@@ -1241,8 +1255,8 @@ with its own reason — `MAX_NOTES`' 2000 is less than what is being asked for a
 `MAX_DESCRIPTION`'s 20 000 is a dream's whole plan.
 
 **Null rather than empty** for an account that has written none, which is what lets the page
-say different things to somebody who has not written one and to the person whose page it is.
-`optionalText` turning `''` into null is load-bearing here rather than tidy.
+tell "has not written one" from "wrote one and cleared it". `optionalText` turning `''` into
+null is load-bearing here rather than tidy.
 
 This paragraph is the home for all of that: the migration, `schema.ts`, `membership.ts` and
 `person.ts` point here rather than arguing it again. Six copies is what the first version of
@@ -1391,7 +1405,15 @@ when somebody names it there, and one removed from the member schema stops compi
 rather than quietly still being sent. Both views run the same `rosterFor`, so the
 order — which decides who has a place — cannot come out differently on the two pages.
 
-The admin's roster keeps its own route, its payment control and its CSV.
+**`avatar` was added to it deliberately** (#305), which is what naming every field is for: it
+is a projection change rather than a permissions one, since an approved member can already read
+any attendee's avatar through `GET /api/events/:eventId/attendees`. Both roster tables draw a
+face beside the name now, through one `PersonCell` — so the two cannot come to disagree about
+what a person looks like in a table row.
+
+The admin's roster keeps its own route, its payment control and its CSV. The CSV's columns are
+typed `keyof RosterEntry` (#148), so renaming a field stops compiling instead of exporting a
+column of empty cells.
 
 What a member reads elsewhere, more narrowly, is **who is coming, by name**:
 `GET /api/events/:eventId/attendees` returns account ids and display names and

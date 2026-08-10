@@ -440,8 +440,6 @@ describe('the feed', () => {
   })
 
   it('calls a place with no time a place rather than a move in the schedule', async () => {
-    // A dream that is in no time slot is not in the schedule, so it cannot have moved in one
-    // (#387). Giving it a lane says where it will be.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -620,9 +618,6 @@ describe('somebody’s own card', () => {
   })
 
   it('refreshes a name written into an introduction, as it does in a comment', async () => {
-    // `readThreads` collected mention ids from entry bodies and post bodies only, so a token in
-    // an introduction kept whatever name was typed (#457). Nothing offers mentions there yet,
-    // which is what made it latent rather than broken.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')

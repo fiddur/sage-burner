@@ -222,10 +222,6 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
         </form>
       )}
 
-      <p class="form-note">
-        Signed in as {email ?? 'you'}. Changing that address is not possible yet — ask someone with admin.
-      </p>
-
       <AvatarField api={api} />
 
       <ConnectionsField api={api} loginAddress={email} />
@@ -235,6 +231,10 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
       <PasskeysField api={api} />
 
       <WaysInField api={api} />
+
+      <p class="form-note">
+        Signed in as {email ?? 'you'}. Changing that address is not possible yet — ask someone with admin.
+      </p>
 
       <LogOutButton api={api} />
 

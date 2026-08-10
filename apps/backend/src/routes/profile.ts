@@ -143,9 +143,6 @@ export const registerProfileRoutes = (
         at: now(),
       })
 
-      // Only where the card gained a line. Six passes at a paragraph coalesce into one entry and
-      // one bump, and sent six bells before this — the feed and the notification disagreeing
-      // about the same event (#449).
       if (written === 'coalesced') continue
 
       await tellAttendees(

@@ -114,6 +114,7 @@ export type EventAttendeesResponse = z.infer<typeof eventAttendeesResponseSchema
 export const rosterEntrySchema = attendanceFields.extend({
   email: emailSchema,
   name: profileFields.shape.name.nullable(),
+  avatar: z.string().nullable(),
   contact: profileFields.shape.contact.nullable(),
   allergies_notes: profileFields.shape.allergies_notes,
   allergy_items: z.array(z.string()),

@@ -62,7 +62,8 @@ burn-scoped page already reads this.
   same activity, and two entries for it is what the restructure undid.
 - **Places** is reached from Schedule too: the lanes are what the grid draws.
 - **Signing out** is on the details page, and nowhere else, under the line naming the
-  account it ends. Every entry in the bar is a _place_; this is an action, and it was the
+  account it ends — the line moved down to the button rather than the claim being dropped
+  (#417), since it is the sentence the button is an answer to. Every entry in the bar is a _place_; this is an action, and it was the
   only one there. It was on ⚙️ → Settings as well (#195), for the admin that page refused —
   a second copy of one control, which is exactly what the push toggle was taken off that
   page for. #396 made the details page `approved` instead, so the copy could go.

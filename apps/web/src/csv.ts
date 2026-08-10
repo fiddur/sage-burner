@@ -8,7 +8,7 @@ const escape = (value: unknown) => {
   return `"${defuse(String(value)).replaceAll('"', '""')}"`
 }
 
-export const toCsv = (columns: readonly string[], rows: readonly Record<string, unknown>[]) =>
+export const toCsv = <Row extends object>(columns: readonly (keyof Row & string)[], rows: readonly Row[]) =>
   [
     columns.map(escape).join(','),
     ...rows.map((row) => columns.map((column) => escape(row[column])).join(',')),

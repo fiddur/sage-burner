@@ -35,7 +35,14 @@ const TYPE_LABELS: Record<FormQuestionType, string> = {
 
 const TYPES = formQuestionTypes.map((value) => ({ value, label: TYPE_LABELS[value] }))
 
-const BLANK = { label: '', type: 'textarea' as FormQuestionType, help_text: '', required: true }
+interface Draft {
+  label: string
+  type: FormQuestionType
+  help_text: string
+  required: boolean
+}
+
+const BLANK: Draft = { label: '', type: 'textarea', help_text: '', required: true }
 
 const requiredFor = (type: FormQuestionType, chosen: boolean) => tickBoxRequired(type) ?? chosen
 

@@ -19,8 +19,6 @@ describe('cutting an introduction down to a card', () => {
   })
 
   it('cuts on a line break too, which a written-out list is all of', () => {
-    // Breaking on `' '` alone found none in a list of one-word lines, so it fell back to the
-    // hard cut and split the word the cut landed in (#449).
     const cut = excerptOf('abcdefghij\n'.repeat(30))
 
     expect(cut?.endsWith('abcdefghij…')).toBe(true)
@@ -41,8 +39,6 @@ describe('cutting an introduction down to a card', () => {
   })
 
   it('never cuts a character in half', () => {
-    // A hard cut landing between the halves of a surrogate pair renders as a replacement
-    // character, which is worse than one emoji fewer.
     const cut = excerptOf(`${'x'.repeat(INTRODUCTION_EXCERPT - 1)}🔥more`)
 
     expect(cut).not.toContain('�')

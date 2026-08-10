@@ -147,12 +147,6 @@ export const threadFor = async (
   return row?.id ?? threadIdFor(db, { type, ...entity })
 }
 
-/**
- * The card for one person at one burn, found by the person rather than by the stay — and
- * re-pointed at the current stay when they left and came back. Keyed on the attendance id
- * alone it opened a second card on a rejoin and left the first saying "no longer coming"
- * about somebody who is (#449).
- */
 export const cardFor = async (
   db: Database,
   stay: { id: string; event_id: string },
@@ -300,9 +294,6 @@ export const readThreads = async (
     .leftJoin(song, and(eq(thread.entity_type, 'song'), eq(song.id, thread.entity_id)))
     .where(inArray(thread.id, [...ids]))
 
-  // Ranked rather than read whole: the feed asks for the newest few of up to fifty threads, and
-  // reading every entry of each to slice three off was the one read here that grew with how
-  // talkative a burn had been (#387).
   const ranked = db
     .select({
       id: threadEntry.id,
