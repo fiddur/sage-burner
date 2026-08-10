@@ -24,6 +24,7 @@ const aThread = (entries: ThreadEntry[]): Thread => ({
   title: 'Sauna at dawn',
   link: '/dreams?burn=e-1&dream=s-1',
   body: null,
+  own: false,
   gone: false,
   entry_count: entries.length,
   last_at: '2026-08-07T18:00:00.000Z',

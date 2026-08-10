@@ -806,7 +806,6 @@ export const post = sqliteTable(
     event_id: text('event_id')
       .notNull()
       .references(() => event.id, { onDelete: 'cascade' }),
-    // Kept when the account goes, so a burn's announcements survive somebody leaving.
     author_account_id: text('author_account_id').references(() => account.id, { onDelete: 'set null' }),
     title: text('title').notNull(),
     body: text('body').notNull().default(''),

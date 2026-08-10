@@ -543,6 +543,19 @@ describe('check constraints', () => {
       )
       .run(ids.attendance, ids.event, ids.account, NOW, paymentStatus)
 
+  const insertPost = (title: string) =>
+    handle.client
+      .prepare('INSERT INTO post (id, event_id, title, created_at) VALUES (?, ?, ?, ?)')
+      .run(`p-${title.length}-${Math.random()}`, ids.event, title, NOW)
+
+  it('rejects an announcement with nothing but whitespace for a title', () => {
+    expect(() => insertPost('   ')).toThrow()
+  })
+
+  it('accepts one with a title, so the rejection above is the CHECK and not the statement', () => {
+    expect(() => insertPost('The planning call is Sunday')).not.toThrow()
+  })
+
   it('rejects a payment status outside the shared vocabulary', () => {
     expect(() => insertAttendance('refunded')).toThrow()
   })

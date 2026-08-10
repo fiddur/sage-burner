@@ -7,6 +7,7 @@ import { desc, eq } from 'drizzle-orm'
 import type { GuardDeps } from '../auth/guards.ts'
 
 import { createGuards } from '../auth/guards.ts'
+import { viewerFor } from '../auth/viewer.ts'
 import { activity, event } from '../db/schema.ts'
 import { noStore } from '../http.ts'
 import { readThreads, recentThreads } from './threads.ts'
@@ -18,8 +19,10 @@ export const CARD_ENTRIES = 3
 export const registerFeedRoutes = (app: FastifyInstance, { db, sessions }: GuardDeps) => {
   const { requireApproved } = createGuards({ db, sessions })
 
-  app.get(apiRoutes.getFeed.fastify, { preHandler: requireApproved }, async (_request, reply) => {
+  app.get(apiRoutes.getFeed.fastify, { preHandler: requireApproved }, async (request, reply) => {
     void noStore(reply)
+
+    const viewer = await viewerFor(request, { db, sessions })
 
     const lines = await db
       .select({
@@ -53,7 +56,7 @@ export const registerFeedRoutes = (app: FastifyInstance, { db, sessions }: Guard
     const threads = await readThreads(
       db,
       recent.filter((one) => kept.has(one.id)).map((one) => one.id),
-      { newest: CARD_ENTRIES, counts: new Map(recent.map((one) => [one.id, one.entry_count])) },
+      { newest: CARD_ENTRIES, counts: new Map(recent.map((one) => [one.id, one.entry_count])), viewer },
     )
 
     return { activity: lines.filter((line) => kept.has(line.id)), threads } satisfies FeedResponse

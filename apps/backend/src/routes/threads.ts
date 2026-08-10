@@ -203,7 +203,15 @@ export const recentThreads = async (
 export const readThreads = async (
   db: Database,
   ids: readonly string[],
-  { newest, counts }: { newest?: number; counts?: ReadonlyMap<string, number> } = {},
+  {
+    newest,
+    counts,
+    viewer,
+  }: {
+    newest?: number
+    counts?: ReadonlyMap<string, number>
+    viewer?: { account_id: string; roles: readonly string[] }
+  } = {},
 ): Promise<Thread[]> => {
   if (ids.length === 0) return []
 
@@ -223,6 +231,7 @@ export const readThreads = async (
       post_title: post.title,
       post_body: post.body,
       post_withdrawn_at: post.withdrawn_at,
+      post_author: post.author_account_id,
     })
     .from(thread)
     .innerJoin(event, eq(event.id, thread.event_id))
@@ -281,12 +290,24 @@ export const readThreads = async (
         entity_type: row.entity_type,
         entity_id: row.entity_id,
         ...factsFor(row),
+        own: mayChange(row, viewer),
         entry_count: counts?.get(id) ?? all.length,
         last_at: last?.created_at ?? null,
         entries: shown,
       } satisfies Thread,
     ]
   })
+}
+
+type Viewer = { account_id: string; roles: readonly string[] } | undefined
+
+const mayChange = (row: CardRow, viewer: Viewer): boolean => {
+  if (viewer === undefined) return false
+  if (row.entity_type === 'post') {
+    return row.post_author === viewer.account_id || viewer.roles.includes('admin')
+  }
+
+  return false
 }
 
 interface CardRow {
@@ -302,6 +323,7 @@ interface CardRow {
   post_title: string | null
   post_body: string | null
   post_withdrawn_at: string | null
+  post_author: string | null
 }
 
 type CardFacts = Pick<Thread, 'title' | 'link' | 'body' | 'gone'>
@@ -320,7 +342,6 @@ const personFacts = (row: CardRow): CardFacts => ({
   gone: row.stay === null,
 })
 
-// A post has no page of its own: the card is the post, so its title links nowhere.
 const postFacts = (row: CardRow): CardFacts => ({
   title: row.post_title ?? row.title,
   link: null,
@@ -408,7 +429,8 @@ export const registerThreadRoutes = (
     async (request, reply) => {
       void noStore(reply)
 
-      const [found] = await readThreads(db, [request.params.id])
+      const viewer = await viewerFor(request, { db, sessions })
+      const [found] = await readThreads(db, [request.params.id], { viewer })
       if (found === undefined) return sendError(reply, 404)
 
       return { thread: found } satisfies ThreadResponse
@@ -449,7 +471,7 @@ export const registerThreadRoutes = (
 
       await tellAbout(found, viewer.account_id)
 
-      return await whole(reply, found.id)
+      return await whole(reply, found.id, viewer)
     },
   )
 
@@ -484,7 +506,7 @@ export const registerThreadRoutes = (
         .set({ body: body.body, edited_at: now().toISOString() })
         .where(eq(threadEntry.id, comment.id))
 
-      return await whole(reply, comment.thread_id)
+      return await whole(reply, comment.thread_id, viewer)
     },
   )
 
@@ -514,12 +536,12 @@ export const registerThreadRoutes = (
 
       await db.delete(threadEntry).where(eq(threadEntry.id, comment.id))
 
-      return await whole(reply, comment.thread_id)
+      return await whole(reply, comment.thread_id, viewer)
     },
   )
 
-  const whole = async (reply: FastifyReply, threadId: string) => {
-    const [found] = await readThreads(db, [threadId])
+  const whole = async (reply: FastifyReply, threadId: string, viewer?: Viewer) => {
+    const [found] = await readThreads(db, [threadId], { viewer })
     if (found === undefined) return sendError(reply, 404)
 
     return { thread: found } satisfies ThreadResponse

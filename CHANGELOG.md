@@ -12,7 +12,8 @@ under today's heading, and make a new heading when there is none.
 - **You can announce something on the feed.** _Announce something_, above the feed — a line saying
   what it is and as much or as little as you want to add, pictures included. Everyone coming to the
   burn you have chosen sees it, and can say something under it, the same as on a dream. Rewording
-  it brings the card back to the top once however many passes you make at it. Taking it back leaves
+  it brings the card back to the top, and leaves one line saying you reworded it however many
+  passes you make at it. Taking it back leaves
   the title and what people said, and takes the words away; your own to take back, or an
   organiser's. There is a new switch for being told when somebody announces something, and one for
   comments on yours — off unless you ask, except comments on your own, which are on.

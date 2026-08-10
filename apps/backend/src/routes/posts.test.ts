@@ -199,6 +199,40 @@ describe('announcing something', () => {
   })
 })
 
+describe('who the card says may change it', () => {
+  it('is the author, an admin, and nobody else', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    const boss = await givenAccount('Cai', ['admin'])
+    await givenComing(ada.id)
+    await givenComing(bea.id)
+    await givenComing(boss.id)
+
+    await announce(server, ada.cookie, { title: 'The planning call is Sunday', body: '' })
+
+    expect((await cards(server, ada.cookie))[0]?.own).toBe(true)
+    expect((await cards(server, bea.cookie))[0]?.own).toBe(false)
+    expect((await cards(server, boss.cookie))[0]?.own).toBe(true)
+  })
+
+  it('is nobody, for a card that is not an announcement', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    await server.inject({
+      method: 'POST',
+      url: `/api/events/${BURN}/sessions`,
+      headers: { cookie: ada.cookie },
+      payload: { title: 'Sauna at dawn' },
+    })
+
+    expect((await cards(server, ada.cookie))[0]?.own).toBe(false)
+  })
+})
+
 describe('rewording an announcement', () => {
   const given = async (server: FastifyInstance, cookie: string) => {
     const made = await announce(server, cookie, { title: 'The planning call is Sunday', body: 'Come.' })

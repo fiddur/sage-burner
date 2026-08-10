@@ -345,7 +345,8 @@ worse: it forces `MAX_COMMENT` on an announcement and makes "edit the post" mean
 seq 0". `MAX_POST` is 8,000 — longer than a comment, shorter than a welcome page — and the
 card reads it at query time, so a rewording cannot leave the feed quoting the old wording.
 `posted` is the entry that opens the card and `edited` the one a rewording adds, which
-coalesces, so six passes bump the card once.
+coalesces — so six passes leave one line rather than six, and each of them still brings the card
+back to the top, because coalescing rewrites the entry's `created_at`.
 
 **Its card links nowhere, because the card is the post.** A dream's card links to its panel
 and a person's to their page; an announcement has no elsewhere to be. The notification about a

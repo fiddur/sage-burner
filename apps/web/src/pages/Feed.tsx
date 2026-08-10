@@ -28,6 +28,8 @@ export type FeedApi = Pick<
   | 'deleteComment'
   | 'uploadImage'
   | 'addPost'
+  | 'updatePost'
+  | 'deletePost'
 >
 
 interface Happening {
@@ -85,6 +87,16 @@ export const Feed = ({ api }: { api: FeedApi }) => {
     showAll: (id: string) => {
       run(async () => held((await api.getThread(id)).thread), 'Could not load the rest of it.')
     },
+    reword: (id: string, title: string, body: string) => {
+      run(async () => {
+        await api.updatePost(id, { title, body })
+      }, 'Could not save that. Please try again.')
+    },
+    takeBack: (id: string) => {
+      run(async () => {
+        await api.deletePost(id)
+      }, 'Could not take that back. Please try again.')
+    },
   }
 
   const items = loaded.status === 'ready' ? feedItems(loaded.data) : []
@@ -108,12 +120,13 @@ export const Feed = ({ api }: { api: FeedApi }) => {
         burn={selected?.event}
         busy={busy}
         upload={api.uploadImage}
-        onAnnounce={(title, body) => {
+        onAnnounce={(title, body, done) => {
           const eventId = selected?.event.id
           if (eventId === undefined) return
 
           run(async () => {
             await api.addPost(eventId, { title, body })
+            done()
           }, 'Could not announce that. Please try again.')
         }}
       />
@@ -167,6 +180,88 @@ export const Feed = ({ api }: { api: FeedApi }) => {
   )
 }
 
+const Mine = ({
+  card,
+  busy,
+  upload,
+  onReword,
+  onTakeBack,
+}: {
+  card: Thread
+  busy: boolean
+  upload: UploadImage
+  onReword: (title: string, body: string) => void
+  onTakeBack: () => void
+}) => {
+  const [editing, setEditing] = useState<{ title: string; body: string } | undefined>(undefined)
+
+  if (editing === undefined) {
+    return (
+      <p class="row">
+        <button
+          type="button"
+          class="link-button"
+          disabled={busy}
+          onClick={() => setEditing({ title: card.title, body: card.body ?? '' })}
+        >
+          Reword it
+        </button>
+        <button
+          type="button"
+          class="link-button"
+          disabled={busy}
+          aria-label={`Take back ${card.title}`}
+          onClick={onTakeBack}
+        >
+          Take it back
+        </button>
+      </p>
+    )
+  }
+
+  return (
+    <div class="form">
+      <label class="field">
+        <span>What is it</span>
+        <input
+          type="text"
+          aria-label={`What ${card.title} is`}
+          maxLength={MAX_TITLE}
+          disabled={busy}
+          value={editing.title}
+          onInput={(inputEvent) => setEditing({ ...editing, title: inputEvent.currentTarget.value })}
+        />
+      </label>
+
+      <MarkdownField
+        label="Anything more"
+        accessibleName={`What you want to say about ${card.title}`}
+        value={editing.body}
+        maxLength={MAX_POST}
+        rows={4}
+        upload={upload}
+        onInput={(body) => setEditing({ ...editing, body })}
+      />
+
+      <p class="row">
+        <button
+          type="button"
+          disabled={busy || editing.title.trim() === ''}
+          onClick={() => {
+            onReword(editing.title.trim(), editing.body.trim())
+            setEditing(undefined)
+          }}
+        >
+          Save
+        </button>
+        <button type="button" class="link-button" disabled={busy} onClick={() => setEditing(undefined)}>
+          Cancel
+        </button>
+      </p>
+    </div>
+  )
+}
+
 const Announce = ({
   burn,
   busy,
@@ -176,7 +271,7 @@ const Announce = ({
   burn: { id: string; name: string } | undefined
   busy: boolean
   upload: UploadImage
-  onAnnounce: (title: string, body: string) => void
+  onAnnounce: (title: string, body: string, done: () => void) => void
 }) => {
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('')
@@ -201,10 +296,12 @@ const Announce = ({
         submitEvent.preventDefault()
         if (title.trim() === '') return
 
-        onAnnounce(title.trim(), body.trim())
-        setTitle('')
-        setBody('')
-        setOpen(false)
+        // Cleared inside the work `run` awaits, so a refusal keeps the draft on screen.
+        onAnnounce(title.trim(), body.trim(), () => {
+          setTitle('')
+          setBody('')
+          setOpen(false)
+        })
       }}
     >
       <label class="field">
@@ -272,6 +369,8 @@ const Card = ({
     rewrite: (id: string, body: string) => void
     remove: (id: string) => void
     showAll: (id: string) => void
+    reword: (id: string, title: string, body: string) => void
+    takeBack: (id: string) => void
   }
   upload: UploadImage
   onToggle: (category: NotificationCategory) => void
@@ -286,13 +385,23 @@ const Card = ({
       <p class="feed-when">
         {card.burn}
         {card.last_at !== null && ` · ${localDay(card.last_at)}`}
-        {card.gone && (card.entity_type === 'session' ? ' · withdrawn' : ' · no longer coming')}
+        {card.gone && goneLabel[card.entity_type]}
       </p>
 
       {card.body !== null && (
         <div
           class="markdown-preview feed-card-about"
           dangerouslySetInnerHTML={{ __html: renderMarkdown(card.body) }}
+        />
+      )}
+
+      {card.own && !card.gone && (
+        <Mine
+          card={card}
+          busy={busy}
+          upload={upload}
+          onReword={(title, body) => talk.reword(card.entity_id, title, body)}
+          onTakeBack={() => talk.takeBack(card.entity_id)}
         />
       )}
 
@@ -320,6 +429,12 @@ const Card = ({
     </li>
   )
 }
+
+const goneLabel = {
+  session: ' · withdrawn',
+  attendance: ' · no longer coming',
+  post: ' · taken back',
+} as const satisfies Record<Thread['entity_type'], string>
 
 const chipFor = (card: Thread): NotificationCategory | undefined =>
   card.entries.reduceRight<NotificationCategory | undefined>(
