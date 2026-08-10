@@ -98,7 +98,7 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
   }
 
   return (
-    <GuardedPage title="Your details" require="approved">
+    <GuardedPage title="Your details" require="approved" width="column">
       <h1>Your details</h1>
 
       {member ? (

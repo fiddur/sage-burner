@@ -113,7 +113,7 @@ export const Person = ({ api, accountId }: { api: PersonApi; accountId: string }
   const { them, whose } = namesFor(person?.name)
 
   return (
-    <GuardedPage title="Somebody" require="approved">
+    <GuardedPage title="Somebody" require="approved" width="column">
       {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
       {loaded.status === 'failed' && <ErrorText message={loaded.message} />}
 

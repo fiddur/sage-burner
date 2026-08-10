@@ -47,7 +47,7 @@ export const Login = ({
 
   if (viewer.status === 'loading') {
     return (
-      <section class="page">
+      <section class="page column">
         <h1>Log in</h1>
         <p class="form-note">One moment…</p>
       </section>
@@ -56,7 +56,7 @@ export const Login = ({
 
   if (viewer.status === 'signed-in') {
     return (
-      <section class="page">
+      <section class="page column">
         <h1>You are signed in</h1>
         <p>
           <a href="/">Go to the homepage</a>.
@@ -115,7 +115,7 @@ export const Login = ({
   }
 
   return (
-    <section class="page">
+    <section class="page column">
       <h1>Log in</h1>
 
       {/*

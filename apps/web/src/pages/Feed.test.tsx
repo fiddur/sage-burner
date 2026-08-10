@@ -365,4 +365,13 @@ describe('what everyone has been doing', () => {
 
     expect(await screen.findByRole('link', { name: /Log in/ })).toBeTruthy()
   })
+
+  it('is a column, so the cards do not run the width of the window', async () => {
+    // #421: the cards stretched the whole window while the intro above them sat at reading
+    // width. The pair with `Members.test.tsx`, which asserts the opposite for a page that is
+    // a table — a default either way would be wrong for half the app.
+    const { container } = renderPage(stub())
+
+    expect(container.querySelector('section')?.className).toBe('page column')
+  })
 })

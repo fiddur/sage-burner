@@ -131,7 +131,7 @@ export const Apply = ({ api }: ApplyProps) => {
   if (sent) return <Sent sendsEmail={sendsEmail} />
 
   return (
-    <article>
+    <article class="column">
       <h1>Apply to join</h1>
 
       <form

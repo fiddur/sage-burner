@@ -177,7 +177,7 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
 
   if (done !== undefined) {
     return (
-      <section class="page">
+      <section class="page column">
         <h1>Welcome</h1>
         <p role="status">
           {done === 'joined'
@@ -198,7 +198,7 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
 
   if (viewer.status === 'signed-in') {
     return (
-      <section class="page">
+      <section class="page column">
         <h1>You are already signed in</h1>
         <p>
           Log out first if you meant to redeem this invite for a different person, or{' '}
@@ -210,7 +210,7 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
 
   if (loaded.status === 'loading') {
     return (
-      <section class="page">
+      <section class="page column">
         <h1>Your invitation</h1>
         <p class="form-note">One moment…</p>
       </section>
@@ -219,7 +219,7 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
 
   if (loaded.status === 'failed') {
     return (
-      <section class="page">
+      <section class="page column">
         <h1>Your invitation</h1>
         <ErrorText message="Could not check this invitation. Please reload the page." />
       </section>
@@ -234,7 +234,7 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
     }[loaded.data.state.status]
 
     return (
-      <section class="page">
+      <section class="page column">
         <h1>Your invitation</h1>
         <ErrorText message={explanation} />
         <p class="home-actions">
@@ -246,7 +246,7 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
   }
 
   return (
-    <section class="page">
+    <section class="page column">
       <h1>Welcome — let us set you up</h1>
 
       <p class="form-note">
