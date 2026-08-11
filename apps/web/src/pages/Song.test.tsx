@@ -140,7 +140,7 @@ describe('a song’s page', () => {
   it('has an icon for a site it does not know, rather than no link', async () => {
     renderPage(stub({}, aSong({ links: [{ url: 'https://example.org/a' }] })))
 
-    expect((await screen.findByRole('link', { name: 'Listen on elsewhere' })).textContent).toBe('🎶')
+    expect((await screen.findByRole('link', { name: 'Listen elsewhere' })).textContent).toBe('🎶')
   })
 
   it('transposes the chords and leaves the words where they are', async () => {

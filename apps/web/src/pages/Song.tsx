@@ -185,7 +185,10 @@ export const SongPage = ({ api, songId }: { api: SongApi; songId: string }) => {
   )
 }
 
-const ELSEWHERE = { label: 'elsewhere', icon: '🎶' } satisfies MusicHost
+const ELSEWHERE = '🎶'
+
+const listenAt = (host: MusicHost | undefined): string =>
+  host === undefined ? 'Listen elsewhere' : `Listen on ${host.label}`
 
 const Links = ({ links }: { links: readonly SongLink[] }) => {
   if (links.length === 0) return null
@@ -193,7 +196,8 @@ const Links = ({ links }: { links: readonly SongLink[] }) => {
   return (
     <p class="song-links">
       {links.map((link) => {
-        const host = musicHost(link.url) ?? ELSEWHERE
+        const host = musicHost(link.url)
+        const said = listenAt(host)
 
         return (
           <a
@@ -202,10 +206,10 @@ const Links = ({ links }: { links: readonly SongLink[] }) => {
             href={link.url}
             rel="noreferrer noopener"
             target="_blank"
-            title={`Listen on ${host.label}`}
-            aria-label={`Listen on ${host.label}`}
+            title={said}
+            aria-label={said}
           >
-            {host.icon}
+            {host?.icon ?? ELSEWHERE}
           </a>
         )
       })}
