@@ -1,4 +1,5 @@
-import type { MusicHost, Song, SongCategory, SongLink, Thread } from '@sage-burner/shared'
+import type { Song, SongCategory, SongLink, Thread } from '@sage-burner/shared'
+import type { RefObject } from 'preact'
 
 import {
   capoSuggestion,
@@ -11,6 +12,7 @@ import {
   musicHost,
   songbookPage,
 } from '@sage-burner/shared'
+import { Fragment } from 'preact'
 import { useEffect, useRef, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -22,20 +24,23 @@ import { Faces } from '../components/Faces.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { Heart } from '../components/Heart.tsx'
 import { IconButton } from '../components/IconButton.tsx'
+import { MusicIcon } from '../components/MusicIcon.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { useAction, useLoad } from '../load.ts'
 import {
+  columnsFitting,
   DEFAULT_SPEED,
   MAX_SPEED,
   MIN_SPEED,
   MOST_SEMITONES,
-  pixelsPerTick,
   rememberedSpeed,
   rememberSpeed,
+  scrollStep,
   shifted,
-  songLines,
+  songRows,
   TICK_MS,
+  wrappedRows,
 } from '../songbook.ts'
 import { rowsFor } from '../textarea.ts'
 import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
@@ -189,11 +194,6 @@ export const SongPage = ({ api, songId }: { api: SongApi; songId: string }) => {
   )
 }
 
-const ELSEWHERE = '🎶'
-
-const listenAt = (host: MusicHost | undefined): string =>
-  host === undefined ? 'Listen elsewhere' : `Listen on ${host.label}`
-
 const Links = ({ links }: { links: readonly SongLink[] }) => {
   if (links.length === 0) return null
 
@@ -201,7 +201,7 @@ const Links = ({ links }: { links: readonly SongLink[] }) => {
     <p class="song-links">
       {links.map((link) => {
         const host = musicHost(link.url)
-        const said = listenAt(host)
+        const said = host === undefined ? 'Listen elsewhere' : `Listen on ${host.label}`
 
         return (
           <a
@@ -213,7 +213,7 @@ const Links = ({ links }: { links: readonly SongLink[] }) => {
             title={said}
             aria-label={said}
           >
-            {host?.icon ?? ELSEWHERE}
+            <MusicIcon mark={host?.mark ?? 'elsewhere'} />
           </a>
         )
       })}
@@ -251,11 +251,37 @@ const TakeItOut = ({ title, busy, onTakeOut }: { title: string; busy: boolean; o
   )
 }
 
+const useColumns = (box: RefObject<HTMLElement | null>, ruler: RefObject<HTMLElement | null>): number => {
+  const [columns, setColumns] = useState(Number.POSITIVE_INFINITY)
+
+  useEffect(() => {
+    const measure = () =>
+      setColumns(
+        columnsFitting(box.current?.clientWidth ?? 0, ruler.current?.getBoundingClientRect().width ?? 0),
+      )
+
+    measure()
+
+    const watched = box.current
+    if (watched === null || typeof ResizeObserver === 'undefined') return undefined
+
+    const watching = new ResizeObserver(measure)
+    watching.observe(watched)
+
+    return () => watching.disconnect()
+  }, [box, ruler])
+
+  return columns
+}
+
 const Words = ({ body }: { body: string }) => {
   const [semitones, setSemitones] = useState(0)
   const [speed, setSpeed] = useState(DEFAULT_SPEED)
   const [rolling, setRolling] = useState(false)
   const seeded = useRef(false)
+  const box = useRef<HTMLPreElement | null>(null)
+  const ruler = useRef<HTMLSpanElement | null>(null)
+  const columns = useColumns(box, ruler)
 
   useEffect(() => {
     if (seeded.current) return
@@ -266,8 +292,12 @@ const Words = ({ body }: { body: string }) => {
   useEffect(() => {
     if (!rolling) return undefined
 
+    let tenths = 0
+
     const timer = setInterval(() => {
-      globalThis.scrollBy({ top: pixelsPerTick(speed) })
+      const step = scrollStep(tenths, speed)
+      tenths = step.tenths
+      if (step.move > 0) globalThis.scrollBy({ top: step.move })
     }, TICK_MS)
 
     return () => clearInterval(timer)
@@ -277,8 +307,8 @@ const Words = ({ body }: { body: string }) => {
     return <p class="form-note">No words yet. Paste them in — chords on their own lines above the words.</p>
   }
 
-  const lines = songLines(body, semitones)
-  const anyChords = lines.some((line) => line.chords)
+  const rows = wrappedRows(songRows(body, semitones), columns)
+  const anyChords = rows.some((row) => row.chords !== null)
 
   return (
     <>
@@ -306,13 +336,24 @@ const Words = ({ body }: { body: string }) => {
         </p>
       )}
 
-      <pre class="song-body">
-        {lines.map((line, index) => (
-          // eslint-disable-next-line react/no-array-index-key -- a line has nothing else to be keyed by
-          <span key={index} class={line.chords ? 'song-line is-chords' : 'song-line'}>
-            {line.text}
-            {'\n'}
-          </span>
+      <pre class="song-body" ref={box}>
+        <span class="song-ruler" aria-hidden="true" ref={ruler} />
+        {rows.map((row, index) => (
+          // eslint-disable-next-line react/no-array-index-key -- a row has nothing else to be keyed by
+          <Fragment key={index}>
+            {row.chords !== null && (
+              <span class="song-line is-chords">
+                {row.chords}
+                {'\n'}
+              </span>
+            )}
+            {row.words !== null && (
+              <span class="song-line">
+                {row.words}
+                {'\n'}
+              </span>
+            )}
+          </Fragment>
         ))}
       </pre>
 

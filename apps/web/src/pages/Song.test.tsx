@@ -144,12 +144,12 @@ describe('a song’s page', () => {
     expect(await screen.findByText('Chant')).toBeTruthy()
   })
 
-  it('shows a link as the icon of the site it goes to, named for whoever cannot see it', async () => {
+  it('shows a link as the mark of the site it goes to, named for whoever cannot see it', async () => {
     renderPage(stub({}, aSong({ links: [{ url: 'https://open.spotify.com/track/1' }] })))
 
     const link = await screen.findByRole('link', { name: 'Listen on Spotify' })
     expect(link.getAttribute('href')).toBe('https://open.spotify.com/track/1')
-    expect(link.textContent).toBe('🎧')
+    expect(link.querySelector('svg.music-mark.is-spotify')).toBeTruthy()
   })
 
   it('has an icon for a site it does not know, rather than no link', async () => {

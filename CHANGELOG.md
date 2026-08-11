@@ -9,6 +9,20 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-12
 
+- **A song fits the phone you are holding.** A line too wide for the screen used to run off the
+  right edge, and reaching the end of it meant dragging the words sideways one-handed. It now
+  breaks onto the next line together with its chord line, so every chord stays over the syllable
+  it belongs to — and a chord standing in a gap goes down with the words it heads rather than
+  being left behind on the line above.
+
+- **The slow half of the scroll slider works.** On a laptop the words stood completely still until
+  the slider was about a third of the way along. Every setting now moves, and the same setting
+  moves at the same pace on a phone as on a laptop.
+
+- **A link to a song shows where it goes.** Spotify, YouTube, YouTube Music, Apple Music,
+  SoundCloud, Bandcamp, Deezer, TIDAL and Genius each show their own mark instead of a stand-in
+  emoji, and links to TIDAL, Deezer and YouTube Music are now recognised at all.
+
 - **Applying starts with an account now.** You sign up first — with Discord or Facebook, or with
   an address and a password — and then answer the questions. Your application has a page of its
   own that says where it stands, and you can turn notifications on there while you wait.

@@ -729,9 +729,34 @@ comment arriving while somebody has the editor open must not read as a conflict.
 The body is stored as plain text and a line whose every token parses as a chord **is** a
 chord line. That is the format ultimate-guitar renders, so pasting a song in from there
 just works — which is how most of the book will actually get filled. There is no markdown
-here: a songbook body is preformatted text, and wrapping it would slide every chord off
-its syllable. `white-space: pre` and a monospace face in the editor as well as the page,
-since the columns are typed in one and read in the other.
+here: a songbook body is preformatted text, and letting the browser wrap it would slide
+every chord off its syllable. `white-space: pre` and a monospace face in the editor as
+well as the page, since the columns are typed in one and read in the other.
+
+**So the app wraps it instead** (#491), because a line wider than a phone otherwise runs off
+the side, and reaching the end of it means dragging the words sideways with a guitar in the
+other hand. `songRows` pairs a chord line with the words under it — one row, not two lines —
+and `wrappedRows` breaks that pair at a **single column, blank in both**, so no chord and no
+word is ever split. The continuation then loses the whitespace the two halves share, which is
+what puts the words back at the left edge with the chords still over them.
+
+One rule beyond "blank in both" earns its complexity: a chord standing in a gap heads the words
+that **follow** it, so a break may not fall between the two. Without it, `Em` over the space
+before `while` is stranded at the end of the line above, pointing at nothing. It is why
+`breakColumn` looks at where the chord tokens start rather than only at what is blank.
+
+How many columns fit is measured, not assumed: `.song-ruler` is an empty `1ch` box inside the
+body, so the count is the content width over its width, watched with a `ResizeObserver`.
+Unmeasured means `Infinity`, which is what the tests and any render before layout see — so
+nothing wraps until something has measured, rather than wrapping wrongly.
+
+**A link shows the platform's own mark** (#492), the paths taken from Simple Icons, which are
+CC0. `musicHost` names the platform and the web decides how it looks — an emoji stood in for a
+logo and read as decoration, and 🎧 for Spotify looked like a generic "audio" glyph rather than
+a detection that had worked. Brand colour is what makes one recognisable at that size, so it is
+set per mark in `styles.css`; TIDAL's black and Genius' pale yellow each disappear into one of
+the two themes, and those two keep `currentColor`. Ultimate Guitar has no mark in the set and
+keeps its emoji.
 
 The detector lives in `songs.ts` in the shared package, outside `schemas/`, because the
 web needs it at runtime and it needs no Zod — the same rule `enums.ts` follows. A line
@@ -766,6 +791,15 @@ in the front end. The speed is remembered in `localStorage` under one key rather
 per song: a key per song is a row of cruft per song ever opened, and the last speed
 somebody used is a better first guess than a constant. A storage that refuses — private
 browsing does — falls back to the default rather than throwing.
+
+**What it owes is counted in tenths of a pixel** (#490). The slider is 1–20 and a tick is 50ms,
+so the slow end asks for a tenth of a pixel a tick — and a browser snaps a scroll offset to a
+device pixel, so on a 1× display every one of those calls rounded to nothing and the fraction
+was thrown away. Below about 7 of 20 the page stood completely still, while a 3× phone could
+express a third of a pixel and moved at every setting. `scrollStep` carries the remainder and
+scrolls whole pixels, in integers rather than fractions of one: ten sequential additions of
+`0.1` come to `0.9999999999999999`, so the pixel that is owed after ten ticks would never be
+paid.
 
 ### Taking a song out is soft
 
