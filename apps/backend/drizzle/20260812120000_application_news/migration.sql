@@ -15,7 +15,7 @@ CREATE TABLE `__new_notification` (
 	`created_at` text NOT NULL,
 	`seen_at` text,
 	CONSTRAINT `fk_notification_account_id_account_id_fk` FOREIGN KEY (`account_id`) REFERENCES `account`(`id`) ON DELETE CASCADE,
-	CONSTRAINT "notification_category_check" CHECK("category" in ('meal_role', 'dream_role', 'lead_role', 'payment', 'waiting_list_near', 'waiting_list_pushed', 'dream_offered', 'dream_comment', 'dream_comment_any', 'member_joined', 'introduction_written', 'introduction_comment', 'introduction_comment_any', 'post_written', 'post_comment', 'post_comment_any', 'song_added', 'song_comment', 'song_comment_any', 'mentioned', 'lead_role_added', 'lead_role_filled', 'new_version', 'application', 'application_decided'))
+	CONSTRAINT "notification_category_check" CHECK("category" in ('meal_role', 'dream_role', 'lead_role', 'payment', 'waiting_list_near', 'waiting_list_pushed', 'dream_offered', 'dream_comment', 'dream_comment_any', 'member_joined', 'introduction_written', 'introduction_comment', 'introduction_comment_any', 'post_written', 'post_comment', 'post_comment_any', 'song_added', 'song_comment', 'song_comment_any', 'mentioned', 'lead_role_added', 'lead_role_filled', 'new_version', 'application', 'application_news'))
 );
 --> statement-breakpoint
 INSERT INTO `__new_notification` (`id`, `account_id`, `category`, `body`, `link`, `created_at`, `seen_at`)
@@ -31,7 +31,7 @@ CREATE TABLE `__new_notification_setting` (
 	`email` integer DEFAULT false NOT NULL,
 	CONSTRAINT `notification_setting_pk` PRIMARY KEY(`account_id`, `category`),
 	CONSTRAINT `fk_notification_setting_account_id_account_id_fk` FOREIGN KEY (`account_id`) REFERENCES `account`(`id`) ON DELETE CASCADE,
-	CONSTRAINT "notification_setting_category_check" CHECK("category" in ('meal_role', 'dream_role', 'lead_role', 'payment', 'waiting_list_near', 'waiting_list_pushed', 'dream_offered', 'dream_comment', 'dream_comment_any', 'member_joined', 'introduction_written', 'introduction_comment', 'introduction_comment_any', 'post_written', 'post_comment', 'post_comment_any', 'song_added', 'song_comment', 'song_comment_any', 'mentioned', 'lead_role_added', 'lead_role_filled', 'new_version', 'application', 'application_decided'))
+	CONSTRAINT "notification_setting_category_check" CHECK("category" in ('meal_role', 'dream_role', 'lead_role', 'payment', 'waiting_list_near', 'waiting_list_pushed', 'dream_offered', 'dream_comment', 'dream_comment_any', 'member_joined', 'introduction_written', 'introduction_comment', 'introduction_comment_any', 'post_written', 'post_comment', 'post_comment_any', 'song_added', 'song_comment', 'song_comment_any', 'mentioned', 'lead_role_added', 'lead_role_filled', 'new_version', 'application', 'application_news'))
 );
 --> statement-breakpoint
 INSERT INTO `__new_notification_setting` (`account_id`, `category`, `enabled`, `email`)
@@ -48,7 +48,7 @@ CREATE TABLE `__new_activity` (
 	`created_at` text NOT NULL,
 	CONSTRAINT `activity_pk` PRIMARY KEY(`id`),
 	CONSTRAINT `activity_event_fk` FOREIGN KEY (`event_id`) REFERENCES `event`(`id`) ON DELETE cascade,
-	CONSTRAINT "activity_category_check" CHECK("category" in ('meal_role', 'dream_role', 'lead_role', 'payment', 'waiting_list_near', 'waiting_list_pushed', 'dream_offered', 'dream_comment', 'dream_comment_any', 'member_joined', 'introduction_written', 'introduction_comment', 'introduction_comment_any', 'post_written', 'post_comment', 'post_comment_any', 'song_added', 'song_comment', 'song_comment_any', 'mentioned', 'lead_role_added', 'lead_role_filled', 'new_version', 'application', 'application_decided'))
+	CONSTRAINT "activity_category_check" CHECK("category" in ('meal_role', 'dream_role', 'lead_role', 'payment', 'waiting_list_near', 'waiting_list_pushed', 'dream_offered', 'dream_comment', 'dream_comment_any', 'member_joined', 'introduction_written', 'introduction_comment', 'introduction_comment_any', 'post_written', 'post_comment', 'post_comment_any', 'song_added', 'song_comment', 'song_comment_any', 'mentioned', 'lead_role_added', 'lead_role_filled', 'new_version', 'application', 'application_news'))
 );
 --> statement-breakpoint
 INSERT INTO `__new_activity` (`id`, `event_id`, `category`, `body`, `link`, `created_at`)

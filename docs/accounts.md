@@ -189,6 +189,31 @@ already holds** is refused too, and pointedly — matching accounts by address i
 the moment a provider hands over one it has not verified. The path is signing in the other way and
 linking under Your details, and that is the sentence the login page shows.
 
+### Talking to an applicant
+
+An application that raises a question had two buttons, and one of them was a silent no. There is
+a third thing now (#477): **a private thread on the application**, so "who are you coming with?"
+can replace a rejection.
+
+**Not the feed's thread machinery**, deliberately. A feed thread is member-visible by design, and
+this is the one conversation that must not be — it runs before there is a membership at all.
+`application_message` is the whole model: the application, the author, the body, the time.
+
+**Two parties and no more.** An admin reads and writes any, through
+`/api/admin/applications/:id/messages` and therefore the admin prefix. The applicant writes to
+`/api/me/application/messages`, which takes **no id** — an id in the path would be a way to ask
+about somebody else's — and reads theirs as part of `GET /api/me/application`. Both are behind
+`requireSignedIn`, because the applicant has no role by design.
+
+**Both directions ring a bell.** The applicant hears `application_news`, which is the same
+category the decision uses: one switch for news about your application, whether that news is an
+answer or a question. Admins hear `application`, the category a new application already used, so
+a reply lands where a submission does.
+
+**A thread does not change the status.** Pending stays pending while the conversation runs;
+approve and reject remain the same explicit actions, and a thread on a rejected application stays
+readable — which is what the status page's "ask the organisers" posture is for.
+
 ## Applying
 
 `POST /api/applications` is behind `requireSignedIn` since #476 — it was the only public write in

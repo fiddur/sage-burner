@@ -47,8 +47,9 @@ const question = (over: Partial<FormQuestion> & Pick<FormQuestion, 'id' | 'type'
 const stub = (over: Partial<ApplyApi> = {}): ApplyApi => ({
   getQuestions: () => Promise.resolve({ questions: [] }),
   submitApplication: () => Promise.reject(new Error('submitApplication is not stubbed here')),
-  getMyApplication: () => Promise.resolve({ mine: { application: null, organisers: [] } }),
+  getMyApplication: () => Promise.resolve({ mine: { application: null, messages: [], organisers: [] } }),
   signUp: () => Promise.reject(new Error('signUp is not stubbed here')),
+  sendMyApplicationMessage: () => Promise.reject(new Error('sendMyApplicationMessage is not stubbed here')),
   getPushKey: () => Promise.resolve({ public_key: null }),
   subscribeToPush: () => Promise.reject(new Error('subscribeToPush is not stubbed here')),
   unsubscribeFromPush: () => Promise.reject(new Error('unsubscribeFromPush is not stubbed here')),
@@ -649,7 +650,7 @@ describe('where an application already stands', () => {
     renderPage(
       stub({
         getMyApplication: () =>
-          Promise.resolve({ mine: { application: anApplication('pending'), organisers: [] } }),
+          Promise.resolve({ mine: { application: anApplication('pending'), messages: [], organisers: [] } }),
       }),
     )
 
@@ -661,7 +662,7 @@ describe('where an application already stands', () => {
     renderPage(
       stub({
         getMyApplication: () =>
-          Promise.resolve({ mine: { application: anApplication('approved'), organisers: [] } }),
+          Promise.resolve({ mine: { application: anApplication('approved'), messages: [], organisers: [] } }),
       }),
     )
 
@@ -677,6 +678,7 @@ describe('where an application already stands', () => {
           Promise.resolve({
             mine: {
               application: anApplication('rejected'),
+              messages: [],
               organisers: [{ account_id: 'a-9', name: 'Ada', contact: 'ada on discord' }],
             },
           }),

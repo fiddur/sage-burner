@@ -6,6 +6,7 @@ import type {
   AllergyItemOrder,
   AllergyItemUpdate,
   ApplicationCreate,
+  ApplicationMessageInput,
   AttendanceCreate,
   AttendanceUpdate,
   CommentInput,
@@ -315,6 +316,21 @@ export const apiRoutes = {
     method: 'GET',
     fastify: '/api/me/application',
     path: () => '/api/me/application',
+  },
+  getApplicationMessages: {
+    method: 'GET',
+    fastify: '/api/admin/applications/:id/messages',
+    path: (id: string) => `/api/admin/applications/${encodeURIComponent(id)}/messages`,
+  },
+  sendApplicationMessage: {
+    method: 'POST',
+    fastify: '/api/admin/applications/:id/messages',
+    path: (id: string) => `/api/admin/applications/${encodeURIComponent(id)}/messages`,
+  },
+  sendMyApplicationMessage: {
+    method: 'POST',
+    fastify: '/api/me/application/messages',
+    path: () => '/api/me/application/messages',
   },
   getEventAttendees: {
     method: 'GET',
@@ -1048,6 +1064,8 @@ export interface RouteBodies {
   setPayment: PaymentUpdate
   submitApplication: ApplicationCreate
   signUp: SignUpRequest
+  sendApplicationMessage: ApplicationMessageInput
+  sendMyApplicationMessage: ApplicationMessageInput
   subscribeToPush: PushSubscriptionCreate
   transferMyPlace: PlaceTransfer
   unsubscribeFromPush: Pick<PushSubscriptionCreate, 'endpoint'>

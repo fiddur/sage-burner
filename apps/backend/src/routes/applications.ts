@@ -1,27 +1,38 @@
 import type {
   Application,
+  ApplicationMessage,
+  ApplicationMessagesResponse,
   ApplicationResponse,
   MyApplicationResponse,
   StoredAnswers,
 } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { answerProblems, apiRoutes, applicationCreateSchema, isTickBox } from '@sage-burner/shared'
-import { desc, eq, inArray } from 'drizzle-orm'
+import {
+  answerProblems,
+  apiRoutes,
+  applicationCreateSchema,
+  applicationMessageInputSchema,
+  isTickBox,
+} from '@sage-burner/shared'
+import { asc, desc, eq, inArray } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
+import type { Notifier } from '../push/notify.ts'
 
 import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
 import { isUniqueViolation } from '../db/errors.ts'
-import { account, accountRole, application } from '../db/schema.ts'
+import { account, accountRole, application, applicationMessage } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
+import { notifyAdmins } from '../push/notify.ts'
 import { questionsFor } from './questions.ts'
 
 export interface ApplicationRouteDeps extends GuardDeps {
   now: () => Date
   notify?: (message: string) => Promise<unknown>
+  notifyOne?: Notifier
 }
 
 /**
@@ -50,9 +61,46 @@ const organisersFor = async (db: GuardDeps['db']) => {
     .orderBy(account.name)
 }
 
+export const messagesOn = async (
+  db: GuardDeps['db'],
+  applicationId: string,
+  viewer: { account_id: string },
+): Promise<ApplicationMessage[]> => {
+  const rows = await db
+    .select({
+      id: applicationMessage.id,
+      author_account_id: applicationMessage.author_account_id,
+      author_name: account.name,
+      body: applicationMessage.body,
+      created_at: applicationMessage.created_at,
+    })
+    .from(applicationMessage)
+    .innerJoin(account, eq(account.id, applicationMessage.author_account_id))
+    .where(eq(applicationMessage.application_id, applicationId))
+    .orderBy(asc(applicationMessage.created_at), asc(applicationMessage.id))
+
+  return rows.map((row) => ({ ...row, mine: row.author_account_id === viewer.account_id }))
+}
+
+export const sayOnApplication = async (
+  db: GuardDeps['db'],
+  applicationId: string,
+  authorId: string,
+  body: string,
+  at: Date,
+): Promise<void> => {
+  await db.insert(applicationMessage).values({
+    id: randomUUID(),
+    application_id: applicationId,
+    author_account_id: authorId,
+    body,
+    created_at: at.toISOString(),
+  })
+}
+
 export const registerApplicationRoutes = (
   app: FastifyInstance,
-  { db, sessions, now, notify }: ApplicationRouteDeps,
+  { db, sessions, now, notify, notifyOne = async () => undefined }: ApplicationRouteDeps,
 ) => {
   const { requireSignedIn } = createGuards({ db, sessions })
 
@@ -70,9 +118,51 @@ export const registerApplicationRoutes = (
       .limit(1)
 
     return {
-      mine: { application: mine ?? null, organisers: await organisersFor(db) },
+      mine: {
+        application: mine ?? null,
+        messages: mine === undefined ? [] : await messagesOn(db, mine.id, viewer),
+        organisers: await organisersFor(db),
+      },
     } satisfies MyApplicationResponse
   })
+
+  /**
+   * The applicant's own end of the thread. Theirs alone, and only on the application that is
+   * theirs — an id in the path would be a way to ask about somebody else's.
+   */
+  app.post(
+    apiRoutes.sendMyApplicationMessage.fastify,
+    { preHandler: requireSignedIn },
+    async (request, reply) => {
+      void noStore(reply)
+
+      const viewer = await viewerFor(request, { db, sessions })
+      if (viewer === undefined) return sendError(reply, 401)
+
+      const body = bodyOf(applicationMessageInputSchema, request)
+      if (body === undefined) return sendError(reply, 400)
+
+      const [mine] = await db
+        .select({ id: application.id })
+        .from(application)
+        .where(eq(application.account_id, viewer.account_id))
+        .limit(1)
+
+      if (mine === undefined) return sendError(reply, 404)
+
+      await sayOnApplication(db, mine.id, viewer.account_id, body.body, now())
+
+      await notifyAdmins(db, notifyOne, {
+        category: 'application',
+        body: 'An applicant has replied.',
+        link: '/admin/applications',
+      }).catch((failure: unknown) => {
+        request.log.error({ err: failure }, 'telling the organisers of a reply')
+      })
+
+      return { messages: await messagesOn(db, mine.id, viewer) } satisfies ApplicationMessagesResponse
+    },
+  )
 
   app.post(apiRoutes.submitApplication.fastify, { preHandler: requireSignedIn }, async (request, reply) => {
     void noStore(reply)

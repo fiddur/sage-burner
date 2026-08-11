@@ -34,6 +34,12 @@ const clientWith = (
   getMe: () => Promise.reject(new Error('getMe is not stubbed in this file')),
   getMapLink: () => Promise.reject(new Error('getMapLink is not stubbed in this file')),
   signUp: () => Promise.reject(new Error('signUp is not stubbed in this file')),
+  sendMyApplicationMessage: () =>
+    Promise.reject(new Error('sendMyApplicationMessage is not stubbed in this file')),
+  getApplicationMessages: () =>
+    Promise.reject(new Error('getApplicationMessages is not stubbed in this file')),
+  sendApplicationMessage: () =>
+    Promise.reject(new Error('sendApplicationMessage is not stubbed in this file')),
   getMyApplication: () => Promise.reject(new Error('getMyApplication is not stubbed in this file')),
   setThreadFollow: () => Promise.reject(new Error('setThreadFollow is not stubbed in this file')),
   supportThread: () => Promise.reject(new Error('supportThread is not stubbed in this file')),

@@ -1,4 +1,10 @@
-import type { AnswerProblem, FormQuestion, MyApplication, SubmittedAnswers } from '@sage-burner/shared'
+import type {
+  AnswerProblem,
+  ApplicationMessage,
+  FormQuestion,
+  MyApplication,
+  SubmittedAnswers,
+} from '@sage-burner/shared'
 
 import {
   answerProblems,
@@ -15,6 +21,7 @@ import type { PushApi } from '../components/PushToggle.tsx'
 import type { SignUpApi } from '../components/SignUpForm.tsx'
 
 import { isApiError } from '../api/client.ts'
+import { ApplicationThread } from '../components/ApplicationThread.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { FormError } from '../components/FormError.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
@@ -27,7 +34,10 @@ import { useOauthOutcome } from '../outcome.ts'
 import { rowsFor } from '../textarea.ts'
 import { useSetViewer, useViewer } from '../viewer.tsx'
 
-export type ApplyApi = Pick<ApiClient, 'getQuestions' | 'submitApplication' | 'getMyApplication'> &
+export type ApplyApi = Pick<
+  ApiClient,
+  'getQuestions' | 'submitApplication' | 'getMyApplication' | 'sendMyApplicationMessage'
+> &
   PushApi &
   SignUpApi
 
@@ -67,6 +77,26 @@ const Waiting = ({ sendsEmail, api }: { sendsEmail?: boolean; api: PushApi }) =>
     <PushToggle api={api} />
   </>
 )
+
+const Talk = ({ api, messages }: { api: ApplyApi; messages: readonly ApplicationMessage[] }) => {
+  const [said, setSaid] = useState<readonly ApplicationMessage[] | undefined>(undefined)
+  const { busy, error, run } = useAction()
+
+  return (
+    <ApplicationThread
+      messages={said ?? messages}
+      busy={busy}
+      error={error}
+      subject="the organisers"
+      onSay={(body) =>
+        run(
+          async () => setSaid((await api.sendMyApplicationMessage({ body })).messages),
+          'Could not send that. Please try again.',
+        )
+      }
+    />
+  )
+}
 
 const Answered = ({
   approved,
@@ -156,6 +186,7 @@ export const Apply = ({ api }: ApplyProps) => {
     return (
       <article class="column">
         <Answered approved={mine.application.status === 'approved'} organisers={mine.organisers} />
+        <Talk api={api} messages={mine.messages} />
       </article>
     )
   }
@@ -164,6 +195,7 @@ export const Apply = ({ api }: ApplyProps) => {
     return (
       <article class="column">
         <Waiting sendsEmail={sendsEmail} api={api} />
+        {mine !== undefined && <Talk api={api} messages={mine.messages} />}
       </article>
     )
   }

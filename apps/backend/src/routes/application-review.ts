@@ -1,12 +1,13 @@
 import type {
   ApplicationDecisionResponse,
+  ApplicationMessagesResponse,
   ApplicationsResponse,
   InviteDelivery,
   InviteResponse,
 } from '@sage-burner/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
-import { apiRoutes, errorResponse, looksLikeEmail } from '@sage-burner/shared'
+import { apiRoutes, applicationMessageInputSchema, errorResponse, looksLikeEmail } from '@sage-burner/shared'
 import { and, desc, eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
@@ -18,11 +19,12 @@ import type { Notifier } from '../push/notify.ts'
 import { viewerFor } from '../auth/viewer.ts'
 import { whyNothingWritten } from '../db/refusals.ts'
 import { accountRole, application, installation, INSTALLATION_ID, inviteToken } from '../db/schema.ts'
-import { noStore, sendError } from '../http.ts'
+import { bodyOf, noStore, sendError } from '../http.ts'
 import { defaultExpiry, mintToken } from '../invites.ts'
 import { NO_ORIGIN, post } from '../mail/mail.ts'
 import { decisionMessage, inviteMessage } from '../mail/messages.ts'
 import { originOf } from '../shell.ts'
+import { messagesOn, sayOnApplication } from './applications.ts'
 import { announceJoined, joinBurn } from './attendance.ts'
 import { activeEventNow } from './events.ts'
 
@@ -111,7 +113,7 @@ export const registerApplicationReviewRoutes = (
     if (account_id === null) return
 
     await notify(account_id, {
-      category: 'application_decided',
+      category: 'application_news',
       body: approved ? 'You are in. Welcome!' : 'Your application has been answered.',
       link: approved ? '/' : '/apply',
     }).catch((failure: unknown) => {
@@ -219,6 +221,47 @@ export const registerApplicationReviewRoutes = (
         delivery,
       } satisfies ApplicationDecisionResponse
     }
+
+  app.get<{ Params: { id: string } }>(apiRoutes.getApplicationMessages.fastify, async (request, reply) => {
+    void noStore(reply)
+
+    const viewer = await viewerFor(request, { db, sessions })
+    if (viewer === undefined) return sendError(reply, 401)
+
+    return { messages: await messagesOn(db, request.params.id, viewer) } satisfies ApplicationMessagesResponse
+  })
+
+  app.post<{ Params: { id: string } }>(apiRoutes.sendApplicationMessage.fastify, async (request, reply) => {
+    void noStore(reply)
+
+    const viewer = await viewerFor(request, { db, sessions })
+    if (viewer === undefined) return sendError(reply, 401)
+
+    const body = bodyOf(applicationMessageInputSchema, request)
+    if (body === undefined) return sendError(reply, 400)
+
+    const [found] = await db
+      .select({ id: application.id, account_id: application.account_id })
+      .from(application)
+      .where(eq(application.id, request.params.id))
+      .limit(1)
+
+    if (found === undefined) return sendError(reply, 404)
+
+    await sayOnApplication(db, found.id, viewer.account_id, body.body, now())
+
+    if (found.account_id !== null) {
+      await notify(found.account_id, {
+        category: 'application_news',
+        body: 'The organisers replied to your application.',
+        link: '/apply',
+      }).catch((failure: unknown) => {
+        request.log.error({ err: failure }, 'telling an applicant of a reply')
+      })
+    }
+
+    return { messages: await messagesOn(db, found.id, viewer) } satisfies ApplicationMessagesResponse
+  })
 
   app.post<{ Params: { id: string } }>(apiRoutes.approveApplication.fastify, settle('approved'))
 

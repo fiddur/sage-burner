@@ -1,10 +1,11 @@
-import type { Invite, InviteDelivery } from '@sage-burner/shared'
+import type { ApplicationMessage, Invite, InviteDelivery } from '@sage-burner/shared'
 
 import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
+import { ApplicationThread } from '../components/ApplicationThread.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { InviteLink } from '../components/InviteLink.tsx'
@@ -13,7 +14,12 @@ import { isAdmin, useViewer } from '../viewer.tsx'
 
 export type ApplicationsApi = Pick<
   ApiClient,
-  'getApplications' | 'approveApplication' | 'rejectApplication' | 'reissueInvite'
+  | 'getApplications'
+  | 'approveApplication'
+  | 'rejectApplication'
+  | 'reissueInvite'
+  | 'getApplicationMessages'
+  | 'sendApplicationMessage'
 >
 
 const answerText = (value: string | boolean) => {
@@ -139,8 +145,40 @@ export const AdminApplications = ({ api }: { api: ApplicationsApi }) => {
             )}
 
             <InviteLink invite={invites[entry.id]?.invite} delivery={invites[entry.id]?.delivery} />
+
+            {entry.account_id !== null && <Conversation api={api} application={entry.id} />}
           </article>
         ))}
     </GuardedPage>
+  )
+}
+
+/**
+ * The private thread with one applicant (#477). Only where the application has an account to
+ * address — the ones from before that have nobody on the other end.
+ */
+const Conversation = ({ api, application }: { api: ApplicationsApi; application: string }) => {
+  const [said, setSaid] = useState<readonly ApplicationMessage[] | undefined>(undefined)
+  const { loaded } = useLoad(
+    async (signal) => (await api.getApplicationMessages(application, signal)).messages,
+    { key: application, fallback: 'Could not load what has been said.' },
+  )
+  const { busy, error, run } = useAction()
+
+  if (loaded.status !== 'ready') return null
+
+  return (
+    <ApplicationThread
+      messages={said ?? loaded.data}
+      busy={busy}
+      error={error}
+      subject="this applicant"
+      onSay={(body) =>
+        run(
+          async () => setSaid((await api.sendApplicationMessage(application, { body })).messages),
+          'Could not send that. Please try again.',
+        )
+      }
+    />
   )
 }

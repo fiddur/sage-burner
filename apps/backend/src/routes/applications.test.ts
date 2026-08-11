@@ -13,7 +13,14 @@ import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, application, formQuestion, pushSubscription } from '../db/schema.ts'
+import {
+  account,
+  accountRole,
+  application,
+  formQuestion,
+  notification,
+  pushSubscription,
+} from '../db/schema.ts'
 
 /**
  * Submitting the application form.
@@ -488,5 +495,141 @@ describe('telling the admins', () => {
       link: '/admin/applications',
       category: 'application',
     })
+  })
+})
+
+describe('talking to an applicant', () => {
+  const sayAsApplicant = (server: FastifyInstance, cookie: string, body: string) =>
+    server.inject({
+      method: 'POST',
+      url: '/api/me/application/messages',
+      headers: { cookie },
+      payload: { body },
+    })
+
+  const sayAsAdmin = (server: FastifyInstance, cookie: string, id: string, body: string) =>
+    server.inject({
+      method: 'POST',
+      url: `/api/admin/applications/${id}/messages`,
+      headers: { cookie },
+      payload: { body },
+    })
+
+  const mine = (server: FastifyInstance, cookie: string) =>
+    server.inject({ method: 'GET', url: '/api/me/application', headers: { cookie } })
+
+  const givenAdmin = async () => {
+    const id = randomUUID()
+    await db()
+      .insert(account)
+      .values({ id, email: `${id}@example.org`, name: 'Ada', password_hash: null, created_at: NOW })
+    await db().insert(accountRole).values({ account_id: id, role: 'admin' })
+
+    const sessions = createSessions({ secret: SECRET, now: () => new Date(), ttlSeconds: 3600 })
+    return { id, cookie: `${SESSION_COOKIE}=${sessions.issue(id)}` }
+  }
+
+  const givenSent = async (server: FastifyInstance) => {
+    const sent = await submit(server, { ...applicant, answers: {} })
+
+    return sent.json().application.id as string
+  }
+
+  it('carries what the organisers said on the applicant’s own page', async () => {
+    const server = await build()
+    const id = await givenSent(server)
+    const ada = await givenAdmin()
+
+    await sayAsAdmin(server, ada.cookie, id, 'Who are you coming with?')
+
+    const said = mine(server, applicantCookie())
+    expect((await said).json().mine.messages.map((one: { body: string }) => one.body)).toEqual([
+      'Who are you coming with?',
+    ])
+  })
+
+  it('says whose each message is, so the two sides read apart', async () => {
+    const server = await build()
+    const id = await givenSent(server)
+    const ada = await givenAdmin()
+    await sayAsAdmin(server, ada.cookie, id, 'Who are you coming with?')
+
+    const answered = await sayAsApplicant(server, applicantCookie(), 'My neighbour Bea.')
+
+    expect(answered.json().messages.map((one: { mine: boolean; author_name: string }) => one.mine)).toEqual([
+      false,
+      true,
+    ])
+    expect(answered.json().messages[0].author_name).toBe('Ada')
+  })
+
+  it('is refused to somebody who is not signed in', async () => {
+    const server = await build()
+    const id = await givenSent(server)
+
+    expect(
+      (
+        await server.inject({
+          method: 'POST',
+          url: '/api/me/application/messages',
+          payload: { body: 'hello' },
+        })
+      ).statusCode,
+    ).toBe(401)
+    expect(
+      (await server.inject({ method: 'GET', url: `/api/admin/applications/${id}/messages` })).statusCode,
+    ).toBe(401)
+  })
+
+  it('is nobody else’s to read, however they ask', async () => {
+    // The one conversation that is not member-visible: an applicant sees their own and no other,
+    // and the route takes no id for exactly that reason.
+    const server = await build()
+    await givenSent(server)
+    const stranger = await givenApplicant()
+
+    expect((await mine(server, stranger.cookie)).json().mine.messages).toEqual([])
+    expect((await sayAsApplicant(server, stranger.cookie, 'hello')).statusCode).toBe(404)
+  })
+
+  it('is refused to a member who is not an organiser', async () => {
+    const server = await build()
+    const id = await givenSent(server)
+    const member = await givenApplicant()
+    await db().insert(accountRole).values({ account_id: member.id, role: 'member' })
+
+    expect((await sayAsAdmin(server, member.cookie, id, 'hello')).statusCode).toBe(403)
+  })
+
+  it('refuses a message that says nothing', async () => {
+    const server = await build()
+    await givenSent(server)
+
+    expect((await sayAsApplicant(server, applicantCookie(), '   ')).statusCode).toBe(400)
+  })
+
+  it('tells the applicant when the organisers write', async () => {
+    const server = await build()
+    const id = await givenSent(server)
+    const ada = await givenAdmin()
+    const waiting = applicantAccount?.id ?? ''
+
+    await sayAsAdmin(server, ada.cookie, id, 'Who are you coming with?')
+
+    const told = await db().select().from(notification).where(eq(notification.account_id, waiting))
+    expect(told.map((one) => [one.category, one.body])).toEqual([
+      ['application_news', 'The organisers replied to your application.'],
+    ])
+  })
+
+  it('tells the organisers when the applicant does', async () => {
+    const server = await build()
+    await givenSent(server)
+    const ada = await givenAdmin()
+
+    await sayAsApplicant(server, applicantCookie(), 'My neighbour Bea.')
+
+    const told = await db().select().from(notification).where(eq(notification.account_id, ada.id))
+    expect(told.map((one) => one.body)).toEqual(['An applicant has replied.'])
   })
 })

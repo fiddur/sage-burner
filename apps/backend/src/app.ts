@@ -280,6 +280,7 @@ export const createApp = async ({
     db,
     sessions,
     now,
+    notifyOne: tellAccount,
     notify: async (message) =>
       await notifyAdmins(db, tellAccount, {
         category: 'application',

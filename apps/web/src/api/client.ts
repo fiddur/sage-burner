@@ -6,6 +6,7 @@ import type {
   AllergyItem,
   AllergyItemsResponse,
   ApplicationDecisionResponse,
+  ApplicationMessagesResponse,
   ApplicationResponse,
   ApplicationsResponse,
   ApprovedAccountsResponse,
@@ -534,6 +535,21 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
     withdrawSupportForThread: (id: string) =>
       request<ThreadResponse>(apiRoutes.withdrawSupportForThread.path(id), {
         method: apiRoutes.withdrawSupportForThread.method,
+      }),
+
+    getApplicationMessages: (id: string, signal?: AbortSignal) =>
+      request<ApplicationMessagesResponse>(apiRoutes.getApplicationMessages.path(id), { signal }),
+
+    sendApplicationMessage: (id: string, body: BodyOf<'sendApplicationMessage'>) =>
+      request<ApplicationMessagesResponse>(apiRoutes.sendApplicationMessage.path(id), {
+        method: apiRoutes.sendApplicationMessage.method,
+        body,
+      }),
+
+    sendMyApplicationMessage: (body: BodyOf<'sendMyApplicationMessage'>) =>
+      request<ApplicationMessagesResponse>(apiRoutes.sendMyApplicationMessage.path(), {
+        method: apiRoutes.sendMyApplicationMessage.method,
+        body,
       }),
 
     signUp: (body: BodyOf<'signUp'>) =>

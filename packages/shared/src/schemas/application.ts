@@ -7,7 +7,7 @@ import {
   MAX_ASKED_QUESTIONS,
 } from '../answers.ts'
 import { applicationStatuses, formQuestionTypes } from '../enums.ts'
-import { MAX_QUESTION_LABEL } from '../limits.ts'
+import { MAX_COMMENT, MAX_QUESTION_LABEL } from '../limits.ts'
 import { emailSchema } from './auth.ts'
 import { dateTimeSchema, idSchema, nonEmptyText } from './common.ts'
 import { mailTestResponseSchema } from './mail.ts'
@@ -36,9 +36,28 @@ export const applicationSchema = z.object({
   decided_at: dateTimeSchema.nullable(),
 })
 
+export const applicationMessageSchema = z.object({
+  id: idSchema,
+  author_account_id: idSchema,
+  author_name: z.string().nullable(),
+  mine: z.boolean(),
+  body: z.string(),
+  created_at: dateTimeSchema,
+})
+export type ApplicationMessage = z.infer<typeof applicationMessageSchema>
+
+export const applicationMessageInputSchema = z.object({ body: nonEmptyText(MAX_COMMENT) }).strict()
+export type ApplicationMessageInput = z.infer<typeof applicationMessageInputSchema>
+
+export const applicationMessagesResponseSchema = z.object({
+  messages: z.array(applicationMessageSchema),
+})
+export type ApplicationMessagesResponse = z.infer<typeof applicationMessagesResponseSchema>
+
 /** What somebody with no roles yet sees of their own: their standing, and who to ask about it. */
 export const myApplicationSchema = z.object({
   application: applicationSchema.nullable(),
+  messages: z.array(applicationMessageSchema),
   organisers: z.array(
     z.object({
       account_id: idSchema,

@@ -717,7 +717,7 @@ describe('approving somebody who signed up first', () => {
     await decide(server, approver.cookie, wren.application, 'approve')
 
     const told = await db().select().from(notification).where(eq(notification.account_id, wren.id))
-    expect(told.map((one) => one.category)).toEqual(['application_decided'])
+    expect(told.map((one) => one.category)).toEqual(['application_news'])
   })
 
   it('tells them a rejection too, which used to send nothing at all', async () => {
@@ -728,7 +728,7 @@ describe('approving somebody who signed up first', () => {
     await decide(server, approver.cookie, wren.application, 'reject')
 
     const told = await db().select().from(notification).where(eq(notification.account_id, wren.id))
-    expect(told.map((one) => one.category)).toEqual(['application_decided'])
+    expect(told.map((one) => one.category)).toEqual(['application_news'])
     expect(await db().select().from(accountRole).where(eq(accountRole.account_id, wren.id))).toEqual([])
   })
 

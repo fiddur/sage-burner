@@ -141,6 +141,14 @@ const givenAccount = async ({
 const login = (server: FastifyInstance, email: string, password: string) =>
   server.inject({ method: 'POST', url: '/api/auth/login', payload: { email, password } })
 
+/**
+ * The seconds left in a throttle window, which is a real clock minus however long the attempts
+ * before it took — and each of those is a real scrypt. Asserting the window exactly reads as a
+ * bound and is a stopwatch: it fails the moment the suite is loaded enough to spend a second.
+ */
+const retryAfter = (response: { headers: Record<string, unknown> }): number =>
+  Number(response.headers['retry-after'])
+
 const cookieFrom = (response: { headers: Record<string, unknown> }) => {
   const header = response.headers['set-cookie']
   return typeof header === 'string' ? header : undefined
@@ -637,7 +645,8 @@ describe('how often one client may try', () => {
     const refused = await login(server, 'ada@example.org', 'wrong passphrase')
     expect(refused.statusCode).toBe(429)
     expect(refused.json()).toEqual({ error: 'rate_limited' })
-    expect(refused.headers['retry-after']).toBe('60')
+    expect(retryAfter(refused)).toBeGreaterThan(50)
+    expect(retryAfter(refused)).toBeLessThanOrEqual(60)
   })
 
   it('counts an address with no account the same, so nothing here says who exists', async () => {
@@ -694,7 +703,8 @@ describe('how often one client may try', () => {
 
     const refused = await login(server, 'ada@example.org', 'a good long passphrase')
     expect(refused.statusCode).toBe(429)
-    expect(refused.headers['retry-after']).toBe('60')
+    expect(retryAfter(refused)).toBeGreaterThan(50)
+    expect(retryAfter(refused)).toBeLessThanOrEqual(60)
   })
 
   it('does the expensive work only for an attempt it admitted', async () => {
@@ -968,6 +978,6 @@ describe('signing up', () => {
 
     const refused = await signUp(server, { ...NEW, email: 'three@example.org' })
     expect(refused.statusCode).toBe(429)
-    expect(refused.headers['retry-after']).toBe('60')
+    expect(retryAfter(refused)).toBeGreaterThan(50)
   })
 })

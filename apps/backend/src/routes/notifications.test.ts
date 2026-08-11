@@ -241,7 +241,7 @@ describe('what somebody has switched on', () => {
     'song_comment',
     'mentioned',
     'application',
-    'application_decided',
+    'application_news',
   ]
 
   const setOn = (server: FastifyInstance, cookie: string, on: string[], email: string[] = []) =>

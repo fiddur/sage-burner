@@ -24,6 +24,8 @@ const anApplication = (over: Partial<Application> = {}): Application => ({
 })
 
 const stub = (over: Partial<ApplicationsApi> = {}): ApplicationsApi => ({
+  getApplicationMessages: () => Promise.resolve({ messages: [] }),
+  sendApplicationMessage: () => Promise.reject(new Error('sendApplicationMessage is not stubbed here')),
   getApplications: () => Promise.resolve({ applications: [anApplication()] }),
   approveApplication: () => Promise.reject(new Error('approveApplication is not stubbed here')),
   rejectApplication: () => Promise.reject(new Error('rejectApplication is not stubbed here')),

@@ -310,6 +310,30 @@ export const application = sqliteTable(
   ],
 )
 
+/**
+ * Not the feed's thread machinery, deliberately (#477): a feed thread is member-visible by design
+ * and this is the one conversation that must not be — it is the applicant and the admins, before
+ * there is a membership at all.
+ */
+export const applicationMessage = sqliteTable(
+  'application_message',
+  {
+    id: text('id').notNull(),
+    application_id: text('application_id')
+      .notNull()
+      .references(() => application.id, { onDelete: 'cascade' }),
+    author_account_id: text('author_account_id')
+      .notNull()
+      .references(() => account.id, { onDelete: 'cascade' }),
+    body: text('body').notNull(),
+    created_at: text('created_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    index('application_message_idx').on(table.application_id, table.created_at),
+  ],
+)
+
 export const account = sqliteTable(
   'account',
   {
