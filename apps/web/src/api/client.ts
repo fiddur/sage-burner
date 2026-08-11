@@ -42,6 +42,7 @@ import type {
   LeadRoleTeam,
   MailSettingsResponse,
   MailTestResponse,
+  MapLinkResponse,
   MealResponse,
   MealSlotsResponse,
   MealsResponse,
@@ -516,6 +517,14 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
     sendTestEmail: () =>
       request<MailTestResponse>(apiRoutes.sendTestEmail.path(), {
         method: apiRoutes.sendTestEmail.method,
+      }),
+
+    getMapLink: (signal?: AbortSignal) => request<MapLinkResponse>(apiRoutes.getMapLink.path(), { signal }),
+
+    setMapLink: (body: BodyOf<'setMapLink'>) =>
+      request<MapLinkResponse>(apiRoutes.setMapLink.path(), {
+        method: apiRoutes.setMapLink.method,
+        body,
       }),
 
     getFeed: (kinds: readonly FeedKind[], signal?: AbortSignal) =>

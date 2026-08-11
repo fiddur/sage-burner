@@ -32,6 +32,8 @@ const clientWith = (
 ): AppApi => ({
   logout,
   getMe: () => Promise.reject(new Error('getMe is not stubbed in this file')),
+  getMapLink: () => Promise.reject(new Error('getMapLink is not stubbed in this file')),
+  setMapLink: () => Promise.reject(new Error('setMapLink is not stubbed in this file')),
   getThread: () => Promise.reject(new Error('getThread is not stubbed in this file')),
   getApprovedAccounts: () => Promise.reject(new Error('getApprovedAccounts is not stubbed in this file')),
   getSongbook: () => Promise.reject(new Error('getSongbook is not stubbed in this file')),

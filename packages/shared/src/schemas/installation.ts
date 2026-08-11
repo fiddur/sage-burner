@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
-import { oauthProviders } from '../enums.ts'
-import { MAX_TITLE } from '../limits.ts'
+import { isProfileUrl, oauthProviders } from '../enums.ts'
+import { MAX_MAP_URL, MAX_TITLE } from '../limits.ts'
 import { dateTimeSchema, nonEmptyText } from './common.ts'
 
 export const installationSchema = z.object({
@@ -24,3 +24,28 @@ export const installationUpdateSchema = installationSchema
 export type Installation = z.infer<typeof installationSchema>
 export type InstallationResponse = z.infer<typeof installationResponseSchema>
 export type InstallationUpdate = z.infer<typeof installationUpdateSchema>
+
+/**
+ * Deliberately not on `installationSchema`: that one answers a public, unauthenticated route, and
+ * where the gathering physically is not something a visitor may read.
+ */
+export const mapLinkSchema = z.object({ url: z.string().max(MAX_MAP_URL).nullable() })
+
+export const mapLinkResponseSchema = z.object({ map: mapLinkSchema })
+
+export const mapLinkUpdateSchema = z
+  .object({
+    url: z
+      .string()
+      .trim()
+      .max(MAX_MAP_URL)
+      .nullable()
+      .refine((url) => url === null || isProfileUrl(url), {
+        error: 'a map link must be an https:// address',
+      }),
+  })
+  .strict()
+
+export type MapLink = z.infer<typeof mapLinkSchema>
+export type MapLinkResponse = z.infer<typeof mapLinkResponseSchema>
+export type MapLinkUpdate = z.infer<typeof mapLinkUpdateSchema>

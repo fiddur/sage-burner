@@ -61,6 +61,8 @@ export type RoutesApi = Pick<
   | 'deleteQuestion'
   | 'getActiveEvent'
   | 'getFeed'
+  | 'getMapLink'
+  | 'setMapLink'
   | 'getThread'
   | 'postComment'
   | 'updateComment'

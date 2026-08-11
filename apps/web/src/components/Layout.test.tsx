@@ -5,6 +5,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Viewer } from '../viewer.tsx'
+import type { LayoutApi } from './Layout.tsx'
 
 import { BurnProvider } from '../burn.tsx'
 import { initials } from '../initials.ts'
@@ -16,11 +17,11 @@ import { Layout } from './Layout.tsx'
 afterEach(cleanup)
 afterEach(onADesktop)
 
-const renderNav = (viewer: Viewer) =>
+const renderNav = (viewer: Viewer, api: LayoutApi = noBell) =>
   render(
     <InstallationProvider title="Sage Burner">
       <ViewerProvider viewer={viewer}>
-        <Layout api={noBell}>
+        <Layout api={api}>
           <p>the page</p>
         </Layout>
       </ViewerProvider>
@@ -53,9 +54,10 @@ const expectLinks = (present: string[], absent: string[]) => {
  * The bell asks on mount wherever the layout is drawn. Resolving with nothing keeps
  * these tests about the nav rather than about what has happened to anybody.
  */
-const noBell = {
+const noBell: LayoutApi = {
   getMyNotifications: () => Promise.resolve({ notifications: [], unseen: 0 }),
   markNotificationsSeen: () => Promise.reject(new Error('markNotificationsSeen is not stubbed here')),
+  getMapLink: () => Promise.resolve({ map: { url: null } }),
 }
 
 describe('the nav', () => {
@@ -203,6 +205,52 @@ describe('the menu at the edge of the bar', () => {
     renderNav({ status: 'signed-out' })
 
     expect(screen.queryByRole('button', { name: 'Menu' })).toBeNull()
+  })
+})
+
+describe('the link to the map of the area', () => {
+  const MAP = 'https://maps.example.org/the-field'
+
+  const withMapLink = (url: string | null): LayoutApi => ({
+    ...noBell,
+    getMapLink: () => Promise.resolve({ map: { url } }),
+  })
+
+  it('is in the menu, opening where the map lives', async () => {
+    renderNav(signedInAs('member'), withMapLink(MAP))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }))
+
+    const link = await screen.findByRole('link', { name: /Map of area/ })
+    expect(link.getAttribute('href')).toBe(MAP)
+    expect(link.getAttribute('target')).toBe('_blank')
+    expect(link.getAttribute('rel')).toBe('noreferrer noopener')
+  })
+
+  it('says it leaves the app, since nothing else in the drawer does', async () => {
+    renderNav(signedInAs('member'), withMapLink(MAP))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }))
+
+    expect((await screen.findByRole('link', { name: /Map of area/ })).textContent).toContain('↗')
+  })
+
+  it('is not there at all where nobody has set one', async () => {
+    renderNav(signedInAs('member'), withMapLink(null))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }))
+
+    await screen.findByRole('link', { name: /Rideshares/ })
+    expect(screen.queryByRole('link', { name: /Map of area/ })).toBeNull()
+  })
+
+  it('is asked for only where somebody may read it', () => {
+    // The route is `requireApproved`, so a signed-out visitor's read would be a 401 on
+    // every page load.
+    const getMapLink = vi.fn<LayoutApi['getMapLink']>(() => Promise.resolve({ map: { url: MAP } }))
+    renderNav({ status: 'signed-out' }, { ...noBell, getMapLink })
+
+    expect(getMapLink).not.toHaveBeenCalled()
   })
 })
 

@@ -29,6 +29,8 @@ const stub = (over: Partial<AdminSettingsApi> = {}): AdminSettingsApi => ({
     }),
   // The mail form mounted here has its own tests; this keeps it from reaching the API
   // when the page under test is about the title.
+  getMapLink: () => Promise.resolve({ map: { url: null } }),
+  setMapLink: () => Promise.reject(new Error('setMapLink is not stubbed here')),
   getMailSettings: () => Promise.resolve({ mail: null }),
   getOauthSettings: () => Promise.resolve({ settings: null }),
   updateOauthSettings: () => Promise.reject(new Error('updateOauthSettings is not stubbed here')),

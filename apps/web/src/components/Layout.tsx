@@ -3,10 +3,12 @@ import type { ComponentChildren } from 'preact'
 import { apiRoutes } from '@sage-burner/shared'
 import { useLocation } from 'preact-iso'
 
+import type { ApiClient } from '../api/client.ts'
 import type { BellApi } from './NotificationBell.tsx'
 
 import { useBurns } from '../burn.tsx'
 import { useInstallationTitle } from '../installation.tsx'
+import { useLoad } from '../load.ts'
 import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
 import { useHidingBar, usePhone } from '../viewport.ts'
 import { Avatar } from './Avatar.tsx'
@@ -17,6 +19,7 @@ export interface NavPage {
   href: string
   label: string
   icon: string
+  away?: boolean
 }
 
 const memberPages: readonly NavPage[] = [
@@ -33,7 +36,9 @@ const menuPages: readonly NavPage[] = [
   { href: '/rides', label: 'Rideshares', icon: '🛻' },
 ]
 
-export const Layout = ({ api, children }: { api: BellApi; children: ComponentChildren }) => {
+export type LayoutApi = BellApi & Pick<ApiClient, 'getMapLink'>
+
+export const Layout = ({ api, children }: { api: LayoutApi; children: ComponentChildren }) => {
   const viewer = useViewer()
   const { burns, selected, select } = useBurns()
   const title = useInstallationTitle()
@@ -41,13 +46,18 @@ export const Layout = ({ api, children }: { api: BellApi; children: ComponentChi
 
   const approved = isApproved(viewer)
   const pages = approved ? memberPages : []
+  const { loaded: map } = useLoad(async (signal) => (await api.getMapLink(signal)).map.url, {
+    enabled: approved,
+    fallback: 'Could not load the map link.',
+  })
+  const mapUrl = map.status === 'ready' ? map.data : null
   const bottomBar = phone && pages.length > 0
   const hidden = useHidingBar(bottomBar)
 
   return (
     <div class={bottomBar ? 'layout has-bottom-bar' : 'layout'}>
       <header class="site-header">
-        <Menu pages={approved ? menuPages : []} />
+        <Menu pages={approved ? withMap(menuPages, mapUrl) : []} />
 
         <a class="brand" href="/">
           <img class="brand-mark" src={apiRoutes.getInstallationIcon.path()} alt="" />
@@ -85,6 +95,10 @@ export const Layout = ({ api, children }: { api: BellApi; children: ComponentChi
     </div>
   )
 }
+
+/** Nothing to point at is nothing to offer, so an installation that has set no map has no entry. */
+export const withMap = (pages: readonly NavPage[], url: string | null): readonly NavPage[] =>
+  url === null ? pages : [...pages, { href: url, label: 'Map of area', icon: '🗺️', away: true }]
 
 const TopNav = ({ api, pages }: { api: BellApi; pages: readonly NavPage[] }) => {
   const viewer = useViewer()

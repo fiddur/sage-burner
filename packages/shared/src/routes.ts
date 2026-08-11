@@ -34,6 +34,7 @@ import type {
   LeadRoleUpdate,
   LoginRequest,
   MailSettingsUpdate,
+  MapLinkUpdate,
   MealCreateInput,
   MealIdeaUpdate,
   MealIntroUpdate,
@@ -327,6 +328,16 @@ export const apiRoutes = {
     method: 'GET',
     fastify: '/api/installation',
     path: () => '/api/installation',
+  },
+  getMapLink: {
+    method: 'GET',
+    fastify: '/api/map',
+    path: () => '/api/map',
+  },
+  setMapLink: {
+    method: 'PUT',
+    fastify: '/api/admin/map',
+    path: () => '/api/admin/map',
   },
   getInstallationBanner: {
     method: 'GET',
@@ -1016,6 +1027,7 @@ export interface RouteBodies {
   updateEvent: EventUpdate
   updateEventOption: EventOptionUpdate
   updateInstallation: InstallationUpdate
+  setMapLink: MapLinkUpdate
   updateMailSettings: MailSettingsUpdate
   updateFaqEntry: FaqUpdate
   updateLeadRole: LeadRoleUpdate

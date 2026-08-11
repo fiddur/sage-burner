@@ -64,6 +64,8 @@ export const MAX_SONG_CATEGORIES = 8
 
 export const MAX_CAPO = 11
 
+export const MAX_MAP_URL = 500
+
 export const MAX_OAUTH_CLIENT_ID = 200
 
 export const MAX_OAUTH_CLIENT_SECRET = 500
