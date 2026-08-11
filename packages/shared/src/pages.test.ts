@@ -1,0 +1,33 @@
+import { describe, expect, it } from 'vitest'
+
+import { applyPage, linkingOutcomes, loginPage, oauthOutcomes, signingInOutcomes } from './pages.ts'
+
+describe('where an outcome can land', () => {
+  it('files every one under at least one page, so neither list can go stale silently', () => {
+    for (const outcome of oauthOutcomes) {
+      const filed =
+        signingInOutcomes.some((one) => one === outcome) || linkingOutcomes.some((one) => one === outcome)
+
+      expect(filed, outcome).toBe(true)
+    }
+  })
+
+  it('files what goes wrong at the provider under both, since it lands where it started', () => {
+    for (const outcome of ['refused', 'misconfigured', 'unreachable'] as const) {
+      expect(signingInOutcomes).toContain(outcome)
+      expect(linkingOutcomes).toContain(outcome)
+    }
+  })
+})
+
+describe('the pages a round trip comes back to', () => {
+  it('carries the outcome, and the request to quote where there is one', () => {
+    expect(loginPage('refused')).toBe('/login?from=refused')
+    expect(applyPage('no-address', 'req-8s')).toBe('/apply?from=no-address&ref=req-8s')
+  })
+
+  it('is the bare page for an ordinary visit', () => {
+    expect(loginPage()).toBe('/login')
+    expect(applyPage()).toBe('/apply')
+  })
+})

@@ -7,7 +7,7 @@ import type {
 } from '@sage-burner/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
-import { apiRoutes, detailsPage, isOAuthProvider, loginPage } from '@sage-burner/shared'
+import { apiRoutes, applyPage, detailsPage, isOAuthProvider, loginPage } from '@sage-burner/shared'
 import { and, eq, gt, lt } from 'drizzle-orm'
 import { randomBytes, randomUUID } from 'node:crypto'
 
@@ -17,8 +17,8 @@ import type { IdentifyFailure, OAuthCalls } from '../oauth/client.ts'
 import type { ProviderAsks, ProviderProfile } from '../oauth/providers.ts'
 
 import { viewerFor } from '../auth/viewer.ts'
-import { providerConnection } from '../connections.ts'
-import { accountAvatar, accountConnection, accountIdentity, oauthState } from '../db/schema.ts'
+import { loginAddressConnection, providerConnection } from '../connections.ts'
+import { account, accountAvatar, accountConnection, accountIdentity, oauthState } from '../db/schema.ts'
 import { noStore, sendError } from '../http.ts'
 import { anotherWayInSurvives, identitiesFor } from '../oauth/identities.ts'
 import { authorizeUrl } from '../oauth/providers.ts'
@@ -171,18 +171,76 @@ export const registerOauthRoutes = (
     })
   }
 
-  const signIn = async (
-    reply: FastifyReply,
-    provider: OAuthProvider,
-    profile: { subject: string; profile_url?: string },
-  ) => {
+  /**
+   * An identity nobody has yet is a new account, not a dead end (#476): sign-up and sign-in
+   * converge here, since asking somebody to pick which they are doing is asking them to know.
+   *
+   * The address has to come from the provider, because it is what an account is keyed by, and it
+   * has to be one nobody else holds — linking a stranger's identity onto an existing account by
+   * matching addresses is account takeover if the provider ever hands over an unverified one.
+   */
+  const signUpThrough = async (reply: FastifyReply, provider: OAuthProvider, profile: ProviderProfile) => {
+    if (profile.email === undefined) return back(reply, applyPage('no-address'))
+
+    const [taken] = await db
+      .select({ id: account.id })
+      .from(account)
+      .where(eq(account.email, profile.email))
+      .limit(1)
+
+    if (taken !== undefined) return back(reply, loginPage('address-taken'))
+
+    const accountId = randomUUID()
+
+    try {
+      db.transaction((tx) => {
+        tx.insert(account)
+          .values({ id: accountId, email: profile.email ?? '', created_at: now().toISOString() })
+          .run()
+
+        tx.insert(accountConnection)
+          .values(loginAddressConnection(accountId, profile.email ?? ''))
+          .run()
+
+        tx.insert(accountIdentity)
+          .values({
+            id: randomUUID(),
+            account_id: accountId,
+            provider,
+            subject: profile.subject,
+            profile_url: profile.profile_url ?? null,
+            created_at: now().toISOString(),
+          })
+          .run()
+      })
+    } catch {
+      return back(reply, loginPage('address-taken'))
+    }
+
+    try {
+      await maybeAvatar(accountId, profile.picture)
+    } catch {} // swallowed: a CDN having a bad day must not undo an account already made
+
+    try {
+      await maybeReach(accountId, provider, profile.reach)
+    } catch {} // swallowed, for the same reason
+
+    void reply.header(
+      'set-cookie',
+      cookieHeader(sessions.issue(accountId), config, config.session_ttl_seconds),
+    )
+
+    return back(reply, applyPage())
+  }
+
+  const signIn = async (reply: FastifyReply, provider: OAuthProvider, profile: ProviderProfile) => {
     const [identity] = await db
       .select({ id: accountIdentity.id, account_id: accountIdentity.account_id })
       .from(accountIdentity)
       .where(and(eq(accountIdentity.provider, provider), eq(accountIdentity.subject, profile.subject)))
       .limit(1)
 
-    if (identity === undefined) return back(reply, loginPage('unlinked'))
+    if (identity === undefined) return await signUpThrough(reply, provider, profile)
 
     if (profile.profile_url !== undefined) {
       try {

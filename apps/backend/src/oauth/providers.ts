@@ -80,8 +80,7 @@ export const providerShapes = {
         'picture.width(256).height(256)',
         ...(profileLink ? ['link'] : []),
       ].join(',')}`,
-    scope: ({ profileLink }) =>
-      profileLink ? 'public_profile,email,user_link' : 'public_profile,email',
+    scope: ({ profileLink }) => (profileLink ? 'public_profile,email,user_link' : 'public_profile,email'),
     read: (body) => {
       const subject = stringField(body, 'id')
       if (subject === undefined) return undefined

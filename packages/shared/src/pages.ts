@@ -40,6 +40,29 @@ export const oauthOutcomes = [
   'address-taken',
 ] as const
 
+/**
+ * Which page an outcome can land on, so each page's copy can be exhaustive over its own half
+ * rather than over a list it has to remember to filter. Anything that goes wrong at the provider
+ * lands wherever the round trip started, so three appear in both.
+ */
+export const signingInOutcomes = [
+  'refused',
+  'misconfigured',
+  'unreachable',
+  'unlinked',
+  'no-address',
+  'address-taken',
+] as const
+
+export const linkingOutcomes = [
+  'refused',
+  'misconfigured',
+  'unreachable',
+  'linked',
+  'reached',
+  'taken',
+] as const
+
 export type OAuthOutcome = (typeof oauthOutcomes)[number]
 
 // Built by hand rather than with `URLSearchParams`, which this package has no `lib` for — the

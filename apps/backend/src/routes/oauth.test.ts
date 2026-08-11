@@ -37,6 +37,7 @@ afterEach(async () => {
   app = undefined
   handle = undefined
   clock = NOW
+  identified = {}
 })
 
 /** A tiny but real PNG, so the bytes a provider "answers" mean something. */
@@ -45,9 +46,14 @@ const PNG = Buffer.from(
   'base64',
 )
 
+/** What the fake provider answers next, which `signInThrough` sets. */
+let identified: { email?: string } = {}
+
 const fakeOAuth = (over: Partial<OAuthCalls> = {}): OAuthCalls => ({
   identify: () =>
-    Promise.resolve({ profile: { subject: 'provider-1', picture: 'https://cdn.example/face.png' } }),
+    Promise.resolve({
+      profile: { subject: 'provider-1', picture: 'https://cdn.example/face.png', ...identified },
+    }),
   picture: () => Promise.resolve({ bytes: PNG, content_type: 'image/png' }),
   ...over,
 })
@@ -173,8 +179,14 @@ const lastLogLine = (chunks: readonly string[]): LogLine | undefined =>
     })
     .at(-1)
 
-const signInThrough = async (server: FastifyInstance, provider = 'facebook') => {
+const signInThrough = async (
+  server: FastifyInstance,
+  provider = 'facebook',
+  profile: { email?: string } = {},
+) => {
+  identified = profile
   const leaving = await start(server, provider)
+
   return await callback(server, provider, `code=abc&state=${await mintedState()}`, nonceFrom(leaving))
 }
 
@@ -195,19 +207,21 @@ describe('leaving for a provider', () => {
     expect(to.origin + to.pathname).toBe('https://discord.com/oauth2/authorize')
     expect(to.searchParams.get('client_id')).toBe('client-1')
     expect(to.searchParams.get('redirect_uri')).toBe('https://burn.example/api/auth/oauth/discord/callback')
-    expect(to.searchParams.get('scope')).toBe('identify')
+    expect(to.searchParams.get('scope')).toBe('identify email')
     expect(to.searchParams.get('state')).toBe(await mintedState())
   })
 
-  it('asks for nothing that would tell it an email address', async () => {
-    // Nothing here matches on an address, so asking for one would collect what it must
-    // not use — and Facebook's `email` needs review of its own.
+  it('asks for an address, which is what an account is keyed by', async () => {
+    // It deliberately asked for none until #476: nothing here matched on an address, so
+    // collecting one bought nothing. Signing up *is* signing in now, and an identity with no
+    // address to offer cannot make an account — so both providers are asked, and the sign-up
+    // page asks the person where the provider says nothing.
     const server = await build()
     await givenProvider('facebook')
 
     const to = new URL((await start(server, 'facebook')).headers.location?.toString() ?? '')
 
-    expect(to.searchParams.get('scope')).toBe('public_profile')
+    expect(to.searchParams.get('scope')).toBe('public_profile,email')
   })
 
   it('asks for the profile link only where the app has been approved for it', async () => {
@@ -219,14 +233,14 @@ describe('leaving for a provider', () => {
 
     const asking = new URL((await start(server, 'facebook')).headers.location?.toString() ?? '')
 
-    expect(asking.searchParams.get('scope')).toBe('public_profile,user_link')
+    expect(asking.searchParams.get('scope')).toBe('public_profile,email,user_link')
 
     await db().delete(oauthSetting)
     await givenProvider('facebook', { ask_profile_link: false })
 
     const not = new URL((await start(server, 'facebook')).headers.location?.toString() ?? '')
 
-    expect(not.searchParams.get('scope')).toBe('public_profile')
+    expect(not.searchParams.get('scope')).toBe('public_profile,email')
   })
 
   it('calls a provider nobody has set up misconfigured, rather than sending somebody nowhere', async () => {
@@ -382,18 +396,69 @@ describe('signing in from a provider', () => {
     expect(held?.profile_url).toBe('https://www.facebook.com/wren')
   })
 
-  it('creates no account for a provider nobody has linked, and says nothing either way', async () => {
-    // The whole membership gate: accounts come from an invite. And `unlinked` has to be the
-    // same answer whether or not an account exists for whatever address the provider holds.
+  it('makes an account for an identity nobody has yet, with no roles on it', async () => {
+    // Sign-up and sign-in converge here (#476): asking somebody to say which one they are doing
+    // is asking them to know. No roles is what "not a member yet" already means everywhere.
+    const server = await build()
+    await givenProvider()
+
+    const back = await signInThrough(server, 'facebook', { email: 'wren@example.org' })
+
+    expect(back.headers.location).toBe('/apply')
+    expect(cookiesOn(back)).toContain(`${SESSION_COOKIE}=`)
+    const [made] = await db().select().from(account)
+    expect(made?.email).toBe('wren@example.org')
+    expect(await db().select().from(accountRole)).toEqual([])
+  })
+
+  it('signs the same identity back into the account it made, rather than making a second', async () => {
+    const server = await build()
+    await givenProvider()
+    await signInThrough(server, 'facebook', { email: 'wren@example.org' })
+
+    const again = await signInThrough(server, 'facebook', { email: 'wren@example.org' })
+
+    expect(again.headers.location).toBe('/')
+    expect(await db().select().from(account)).toHaveLength(1)
+  })
+
+  it('puts the address in the contact list, as every other way in does', async () => {
+    const server = await build()
+    await givenProvider()
+
+    await signInThrough(server, 'facebook', { email: 'wren@example.org' })
+
+    const rows = await db().select().from(accountConnection)
+    expect(rows.map((row) => [row.kind, row.value])).toContainEqual(['email', 'wren@example.org'])
+  })
+
+  it('makes no account where the provider offers no address, and says where to go instead', async () => {
+    // An account is keyed by an address. Facebook often answers none, and Discord answers an
+    // unverified one as nothing — so the sign-up page asks the person.
     const server = await build()
     await givenProvider()
 
     const back = await signInThrough(server)
 
-    expect(back.headers.location).toBe('/login?from=unlinked')
-    // The nonce is cleared either way; what must not be here is a session.
+    expect(back.headers.location).toBe('/apply?from=no-address')
     expect(cookiesOn(back)).not.toContain(`${SESSION_COOKIE}=`)
     expect(await db().select().from(account)).toEqual([])
+  })
+
+  it('refuses an address somebody already holds, rather than linking a stranger onto it', async () => {
+    // Matching accounts by address would be account takeover the moment a provider hands over
+    // one it has not verified. Signing in the other way and linking under Your details is the
+    // path, and it is the one this sentence points at.
+    const server = await build()
+    await givenProvider()
+    const wren = await givenAccount()
+    const [held] = await db().select().from(account).where(eq(account.id, wren.id))
+
+    const back = await signInThrough(server, 'facebook', { email: held?.email ?? '' })
+
+    expect(back.headers.location).toBe('/login?from=address-taken')
+    expect(cookiesOn(back)).not.toContain(`${SESSION_COOKIE}=`)
+    expect(await db().select().from(accountIdentity)).toEqual([])
   })
 
   it('spends the state, so the same callback cannot be replayed', async () => {

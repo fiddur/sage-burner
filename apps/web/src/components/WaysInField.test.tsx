@@ -1,6 +1,6 @@
 import type { Identity } from '@sage-burner/shared'
 
-import { oauthOutcomes } from '@sage-burner/shared'
+import { linkingOutcomes } from '@sage-burner/shared'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -40,7 +40,7 @@ describe('why a way in could not be taken off', () => {
 
 describe('what a round trip that came back says', () => {
   it('has a sentence for every outcome that can land on this page', () => {
-    for (const outcome of oauthOutcomes.filter((one) => one !== 'unlinked')) {
+    for (const outcome of linkingOutcomes) {
       expect(outcomeMessage(outcome), outcome).toBeDefined()
     }
   })
