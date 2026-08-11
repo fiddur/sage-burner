@@ -190,7 +190,14 @@ so a provider answering `Wren@Example.org` taken as given would miss the row it 
 then fail the write, reporting an address conflict to somebody who has no account.
 
 **No address, no account**: the sign-up page says so and asks for one, and an address that is not
-one is the same answer. **An address somebody
+one is the same answer.
+
+**The name comes with it where the provider gives one** — Discord's display name or username,
+Facebook's `name` — because `account` carries the person, and without one `displayName` answers
+"Somebody" on the feed card, in the `member_joined` push to every attendee, and in the Members
+list. Where a provider gives none, submitting the application fills it in from the name the form
+asked for: `updateMyProfile` is behind `requireApproved`, so an applicant cannot do it themselves
+while they wait. **An address somebody
 already holds** is refused too, and pointedly — matching accounts by address is account takeover
 the moment a provider hands over one it has not verified. The path is signing in the other way and
 linking under Your details, and that is the sentence the login page shows.

@@ -12,6 +12,7 @@ export interface ProviderAsks {
 
 export interface ProviderProfile {
   subject: string
+  name?: string
   email?: string
   picture?: string
   profile_url?: string
@@ -62,6 +63,7 @@ export const providerShapes = {
 
       return {
         subject,
+        name: stringField(body, 'global_name') ?? username,
         email: verifiedEmail(body),
         picture: discordPicture(subject, stringField(body, 'avatar')),
         ...(username === undefined ? {} : { reach: { kind: 'discord' as const, value: username } }),
@@ -76,6 +78,7 @@ export const providerShapes = {
     profile: ({ profileLink }) =>
       `https://graph.facebook.com/${FACEBOOK_GRAPH_VERSION}/me?fields=${[
         'id',
+        'name',
         'email',
         'picture.width(256).height(256)',
         ...(profileLink ? ['link'] : []),
@@ -90,6 +93,7 @@ export const providerShapes = {
 
       return {
         subject,
+        name: stringField(body, 'name'),
         email: stringField(body, 'email'),
         picture: own ? stringField(data, 'url') : undefined,
         profile_url: facebookProfileLink(stringField(body, 'link')),

@@ -128,7 +128,9 @@ export const AdminApplications = ({ api }: { api: ApplicationsApi }) => {
               </p>
             )}
 
-            {entry.status === 'approved' && (
+            {/* Only an application from before #476 has a link to re-send; approving one since
+                grants the role outright, so the route refuses it and the button would be dead. */}
+            {entry.status === 'approved' && entry.account_id === null && (
               <p class="row">
                 <button
                   type="button"

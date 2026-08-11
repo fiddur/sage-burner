@@ -23,6 +23,7 @@ import {
   mailSetting,
   notification,
   thread,
+  threadEntry,
 } from '../db/schema.ts'
 import { NO_ORIGIN, NOT_CONFIGURED } from '../mail/mail.ts'
 
@@ -730,6 +731,20 @@ describe('approving somebody who signed up first', () => {
     const told = await db().select().from(notification).where(eq(notification.account_id, wren.id))
     expect(told.map((one) => one.category)).toEqual(['application_news'])
     expect(await db().select().from(accountRole).where(eq(accountRole.account_id, wren.id))).toEqual([])
+  })
+
+  it('names them on the card, rather than calling every provider sign-up Somebody', async () => {
+    const server = await build()
+    const approver = await givenAdmin()
+    await givenBurn()
+    const wren = await givenApplicant('Wren')
+
+    await decide(server, approver.cookie, wren.application, 'approve')
+
+    const [entry] = await db().select().from(threadEntry)
+    expect(entry?.author_account_id).toBe(wren.id)
+    const [card] = await db().select().from(thread)
+    expect(card?.title).toBe('Wren')
   })
 
   it('still mints a token for an application from before there were accounts', async () => {

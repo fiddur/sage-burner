@@ -208,7 +208,14 @@ export const registerOauthRoutes = (
 
     try {
       db.transaction((tx) => {
-        tx.insert(account).values({ id: accountId, email, created_at: now().toISOString() }).run()
+        tx.insert(account)
+          .values({
+            id: accountId,
+            email,
+            name: profile.name ?? null,
+            created_at: now().toISOString(),
+          })
+          .run()
 
         tx.insert(accountConnection).values(loginAddressConnection(accountId, email)).run()
 

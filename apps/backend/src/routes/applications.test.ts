@@ -633,3 +633,35 @@ describe('talking to an applicant', () => {
     expect(told.map((one) => one.body)).toEqual(['An applicant has replied.'])
   })
 })
+
+describe('the name an application carries', () => {
+  it('fills in an account that came in with none, which a provider often leaves', async () => {
+    // `updateMyProfile` is behind `requireApproved`, so an applicant cannot fill it in while
+    // they wait — and without it every card and every push about them says "Somebody".
+    const server = await build()
+
+    await submit(server, { ...applicant, answers: {} })
+
+    const [row] = await db()
+      .select()
+      .from(account)
+      .where(eq(account.id, applicantAccount?.id ?? ''))
+    expect(row?.name).toBe('Fredrik')
+  })
+
+  it('leaves a name somebody already gave alone', async () => {
+    const server = await build()
+    await db()
+      .update(account)
+      .set({ name: 'Wren' })
+      .where(eq(account.id, applicantAccount?.id ?? ''))
+
+    await submit(server, { ...applicant, answers: {} })
+
+    const [row] = await db()
+      .select()
+      .from(account)
+      .where(eq(account.id, applicantAccount?.id ?? ''))
+    expect(row?.name).toBe('Wren')
+  })
+})

@@ -47,7 +47,7 @@ const PNG = Buffer.from(
 )
 
 /** What the fake provider answers next, which `signInThrough` sets. */
-let identified: { email?: string } = {}
+let identified: { email?: string; name?: string } = {}
 
 const fakeOAuth = (over: Partial<OAuthCalls> = {}): OAuthCalls => ({
   identify: () =>
@@ -182,7 +182,7 @@ const lastLogLine = (chunks: readonly string[]): LogLine | undefined =>
 const signInThrough = async (
   server: FastifyInstance,
   provider = 'facebook',
-  profile: { email?: string } = {},
+  profile: { email?: string; name?: string } = {},
 ) => {
   identified = profile
   const leaving = await start(server, provider)
@@ -443,6 +443,18 @@ describe('signing in from a provider', () => {
     expect(back.headers.location).toBe('/apply?from=no-address')
     expect(cookiesOn(back)).not.toContain(`${SESSION_COOKIE}=`)
     expect(await db().select().from(account)).toEqual([])
+  })
+
+  it('takes the name the provider gives, since the account carries the person', async () => {
+    // Without one, `displayName` answers 'Somebody' — on the feed card, in the push to every
+    // attendee, and in the Members list, for every account that came in this way.
+    const server = await build()
+    await givenProvider()
+
+    await signInThrough(server, 'facebook', { email: 'wren@example.org', name: 'Wren' })
+
+    const [made] = await db().select().from(account)
+    expect(made?.name).toBe('Wren')
   })
 
   it('folds the case of the address, as every other way in does', async () => {

@@ -31,7 +31,7 @@ describe('what Facebook is asked for', () => {
     // an installation that never turns it on keeps the sign-in it had.
     for (const asks of [ASKED, NOT_ASKED]) {
       expect(providerShapes.facebook.profile(asks)).toContain(
-        'fields=id,email,picture.width(256).height(256)',
+        'fields=id,name,email,picture.width(256).height(256)',
       )
     }
   })

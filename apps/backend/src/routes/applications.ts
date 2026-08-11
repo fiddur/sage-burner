@@ -15,7 +15,7 @@ import {
   applicationMessageInputSchema,
   isTickBox,
 } from '@sage-burner/shared'
-import { asc, desc, eq, inArray } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -210,6 +210,14 @@ export const registerApplicationRoutes = (
       if (isUniqueViolation(error, 'application.account_id')) return sendError(reply, 409)
       throw error
     }
+
+    // The account carries the person, and a provider that answered no name leaves one without.
+    // The form has just asked for it, and nothing else will: `updateMyProfile` is behind
+    // `requireApproved`, so an applicant cannot fill it in while they wait.
+    await db
+      .update(account)
+      .set({ name: body.applicant_name })
+      .where(and(eq(account.id, viewer.account_id), isNull(account.name)))
 
     if (notify !== undefined) {
       void notify('Someone has applied to join.').catch((failure: unknown) => {
