@@ -445,6 +445,40 @@ describe('signing in from a provider', () => {
     expect(await db().select().from(account)).toEqual([])
   })
 
+  it('folds the case of the address, as every other way in does', async () => {
+    // `account.email` carries a lowercase CHECK, so an address taken as given would miss the row
+    // it collides with and then fail the write — reporting a conflict to somebody with no account.
+    const server = await build()
+    await givenProvider()
+
+    await signInThrough(server, 'facebook', { email: '  Wren@Example.org  ' })
+
+    const [made] = await db().select().from(account)
+    expect(made?.email).toBe('wren@example.org')
+  })
+
+  it('recognises an existing address however the provider spelled it', async () => {
+    const server = await build()
+    await givenProvider()
+    await signInThrough(server, 'facebook', { email: 'wren@example.org' })
+    await db().delete(accountIdentity)
+
+    const back = await signInThrough(server, 'facebook', { email: 'WREN@example.org' })
+
+    expect(back.headers.location).toBe('/login?from=address-taken')
+    expect(await db().select().from(account)).toHaveLength(1)
+  })
+
+  it('asks for an address where the provider gave something that is not one', async () => {
+    const server = await build()
+    await givenProvider()
+
+    const back = await signInThrough(server, 'facebook', { email: 'not-an-address' })
+
+    expect(back.headers.location).toBe('/apply?from=no-address')
+    expect(await db().select().from(account)).toEqual([])
+  })
+
   it('refuses an address somebody already holds, rather than linking a stranger onto it', async () => {
     // Matching accounts by address would be account takeover the moment a provider hands over
     // one it has not verified. Signing in the other way and linking under Your details is the

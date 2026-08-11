@@ -181,8 +181,7 @@ export const Login = ({
       )}
 
       <p class="form-note">
-        Accounts are created by invitation, so there is nothing to sign up for here. If you have lost your
-        password, ask someone with admin — this app cannot send you a reset link.
+        If you have lost your password, ask someone with admin — this app cannot send you a reset link.
       </p>
     </section>
   )

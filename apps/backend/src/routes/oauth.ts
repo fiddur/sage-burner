@@ -7,7 +7,14 @@ import type {
 } from '@sage-burner/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
-import { apiRoutes, applyPage, detailsPage, isOAuthProvider, loginPage } from '@sage-burner/shared'
+import {
+  apiRoutes,
+  applyPage,
+  detailsPage,
+  emailSchema,
+  isOAuthProvider,
+  loginPage,
+} from '@sage-burner/shared'
 import { and, eq, gt, lt } from 'drizzle-orm'
 import { randomBytes, randomUUID } from 'node:crypto'
 
@@ -179,14 +186,21 @@ export const registerOauthRoutes = (
    * has to be one nobody else holds — linking a stranger's identity onto an existing account by
    * matching addresses is account takeover if the provider ever hands over an unverified one.
    */
-  const signUpThrough = async (reply: FastifyReply, provider: OAuthProvider, profile: ProviderProfile) => {
-    if (profile.email === undefined) return back(reply, applyPage('no-address'))
+  const signUpThrough = async (
+    request: FastifyRequest,
+    reply: FastifyReply,
+    provider: OAuthProvider,
+    profile: ProviderProfile,
+  ) => {
+    // Through the same schema every other way in uses: `account.email` carries a lowercase CHECK,
+    // so `Wren@Example.org` taken as given would miss the row it collides with and then fail the
+    // write — reporting an address conflict to somebody who has no account.
+    const parsed = emailSchema.safeParse(profile.email)
+    if (!parsed.success) return back(reply, applyPage('no-address'))
 
-    const [taken] = await db
-      .select({ id: account.id })
-      .from(account)
-      .where(eq(account.email, profile.email))
-      .limit(1)
+    const email = parsed.data
+
+    const [taken] = await db.select({ id: account.id }).from(account).where(eq(account.email, email)).limit(1)
 
     if (taken !== undefined) return back(reply, loginPage('address-taken'))
 
@@ -194,13 +208,9 @@ export const registerOauthRoutes = (
 
     try {
       db.transaction((tx) => {
-        tx.insert(account)
-          .values({ id: accountId, email: profile.email ?? '', created_at: now().toISOString() })
-          .run()
+        tx.insert(account).values({ id: accountId, email, created_at: now().toISOString() }).run()
 
-        tx.insert(accountConnection)
-          .values(loginAddressConnection(accountId, profile.email ?? ''))
-          .run()
+        tx.insert(accountConnection).values(loginAddressConnection(accountId, email)).run()
 
         tx.insert(accountIdentity)
           .values({
@@ -213,7 +223,9 @@ export const registerOauthRoutes = (
           })
           .run()
       })
-    } catch {
+    } catch (failure) {
+      request.log.warn({ err: failure, provider }, 'could not make an account for a new identity')
+
       return back(reply, loginPage('address-taken'))
     }
 
@@ -233,14 +245,19 @@ export const registerOauthRoutes = (
     return back(reply, applyPage())
   }
 
-  const signIn = async (reply: FastifyReply, provider: OAuthProvider, profile: ProviderProfile) => {
+  const signIn = async (
+    request: FastifyRequest,
+    reply: FastifyReply,
+    provider: OAuthProvider,
+    profile: ProviderProfile,
+  ) => {
     const [identity] = await db
       .select({ id: accountIdentity.id, account_id: accountIdentity.account_id })
       .from(accountIdentity)
       .where(and(eq(accountIdentity.provider, provider), eq(accountIdentity.subject, profile.subject)))
       .limit(1)
 
-    if (identity === undefined) return await signUpThrough(reply, provider, profile)
+    if (identity === undefined) return await signUpThrough(request, reply, provider, profile)
 
     if (profile.profile_url !== undefined) {
       try {
@@ -365,7 +382,7 @@ export const registerOauthRoutes = (
       }
 
       return spent.intent === 'sign-in'
-        ? await signIn(reply, provider, identified.profile)
+        ? await signIn(request, reply, provider, identified.profile)
         : await link(reply, provider, spent.account_id, identified.profile)
     },
   )

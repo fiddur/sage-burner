@@ -184,7 +184,13 @@ somebody typed into the provider, and taking it as a login identity would let a 
 address they do not hold. Facebook offers no such signal and often no address at all, so its is
 taken as given or not at all.
 
-**No address, no account**: the sign-up page says so and asks for one. **An address somebody
+**The address goes through `emailSchema`**, like every other way one enters the app — trimmed,
+lowercased, bounded and checked that it is one at all. `account.email` carries a lowercase CHECK,
+so a provider answering `Wren@Example.org` taken as given would miss the row it collides with and
+then fail the write, reporting an address conflict to somebody who has no account.
+
+**No address, no account**: the sign-up page says so and asks for one, and an address that is not
+one is the same answer. **An address somebody
 already holds** is refused too, and pointedly — matching accounts by address is account takeover
 the moment a provider hands over one it has not verified. The path is signing in the other way and
 linking under Your details, and that is the sentence the login page shows.

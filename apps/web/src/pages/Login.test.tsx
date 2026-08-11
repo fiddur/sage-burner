@@ -237,14 +237,14 @@ describe('Login', () => {
     expect(screen.queryByRole('button', { name: 'Log in' })).toBeNull()
   })
 
-  it('says why there is no sign-up or password reset', async () => {
-    // Both are absent by design — accounts come from invites (#17) and there is
-    // no reset flow at all — #30 gave the app a mail server and nothing that sends
-    // a reset through it. A dead link would be worse than saying so.
+  it('says why there is no password reset, and where to go with no account', async () => {
+    // There is no reset flow at all: #30 gave the app a mail server and nothing that sends a
+    // reset through it, and a dead link would be worse than saying so. Sign-up is not absent
+    // any more (#476), so the sentence that said accounts come from invites had to go with it.
     renderLogin(vi.fn(() => Promise.resolve({ viewer: null })))
 
-    const note = await screen.findByText(/Accounts are created by invitation/)
-    expect(note.textContent).toContain('ask someone with admin')
+    expect((await screen.findByText(/lost your password/)).textContent).toContain('ask someone with admin')
+    expect(screen.getByRole('link', { name: 'Apply to join' }).getAttribute('href')).toBe('/apply')
   })
 })
 
