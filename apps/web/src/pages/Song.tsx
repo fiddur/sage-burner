@@ -120,7 +120,7 @@ export const SongPage = ({ api, songId }: { api: SongApi; songId: string }) => {
       <p class="song-marks">
         {song.capo !== null && <span class="song-capo">capo {song.capo}</span>}
         {filed.map((category) => (
-          <span key={category.id} class="song-chip is-on">
+          <span key={category.id} class="chip is-on">
             {category.label}
           </span>
         ))}

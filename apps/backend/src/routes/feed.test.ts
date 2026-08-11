@@ -1,7 +1,7 @@
-import type { Thread } from '@sage-burner/shared'
+import type { FeedKind, Thread } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { INTRODUCTION_EXCERPT, mentionToken } from '@sage-burner/shared'
+import { feedPath, INTRODUCTION_EXCERPT, mentionToken } from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -108,11 +108,19 @@ const givenComing = async (accountId: string, eventId = BURN) => {
     .values({ id: randomUUID(), event_id: eventId, account_id: accountId, joined_at: NOW })
 }
 
-const feed = (server: FastifyInstance, cookie?: string) =>
-  server.inject({ method: 'GET', url: '/api/feed', ...(cookie === undefined ? {} : { headers: { cookie } }) })
+const feed = (server: FastifyInstance, cookie?: string, kinds: readonly FeedKind[] = []) =>
+  server.inject({
+    method: 'GET',
+    url: feedPath(kinds),
+    ...(cookie === undefined ? {} : { headers: { cookie } }),
+  })
 
-const lines = async (server: FastifyInstance, cookie: string): Promise<string[]> =>
-  (await feed(server, cookie)).json().activity.map((one: { body: string }) => one.body)
+const lines = async (
+  server: FastifyInstance,
+  cookie: string,
+  kinds: readonly FeedKind[] = [],
+): Promise<string[]> =>
+  (await feed(server, cookie, kinds)).json().activity.map((one: { body: string }) => one.body)
 
 /** A line written straight into the table, for the cases a frozen clock cannot stage. */
 const givenLine = async (body: string, created_at: string, eventId = BURN, id = randomUUID()) => {
@@ -143,8 +151,11 @@ const addLeadRole = (server: FastifyInstance, cookie: string, title: string, eve
     payload: { title },
   })
 
-const cards = async (server: FastifyInstance, cookie: string): Promise<Thread[]> =>
-  (await feed(server, cookie)).json().threads
+const cards = async (
+  server: FastifyInstance,
+  cookie: string,
+  kinds: readonly FeedKind[] = [],
+): Promise<Thread[]> => (await feed(server, cookie, kinds)).json().threads
 
 const say = (server: FastifyInstance, cookie: string, threadId: string, body: string) =>
   server.inject({
@@ -456,6 +467,24 @@ describe('the feed', () => {
     expect(card?.entries.at(-1)?.body).toBe('said where it would be')
   })
 
+  it('calls clearing that place taking it off rather than saying where it would be', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const dream = await offerDream(server, ada.cookie, 'Sauna at dawn')
+    const lane = randomUUID()
+    await db()
+      .insert(place)
+      .values({ id: lane, event_id: BURN, order: 0, name: 'The sauna', emoji: '🔥', color: 'red' })
+    await editDream(server, ada.cookie, dream, { place_id: lane })
+
+    await editDream(server, ada.cookie, dream, { place_id: null })
+
+    const [card] = await cards(server, ada.cookie)
+    expect(card?.entries.at(-1)?.body).toBe('took the place off it')
+  })
+
   it('keeps a rename and a move apart', async () => {
     // Why these are three kinds rather than one `edited`: coalescing is per aspect, so a
     // later move must not overwrite the rename that came before it.
@@ -710,5 +739,136 @@ describe('somebody’s own card', () => {
     expect(mine).toHaveLength(1)
     expect(mine[0]?.gone).toBe(false)
     expect(mine[0]?.entries.map((entry) => entry.kind)).toEqual(['joined', 'comment', 'joined'])
+  })
+})
+
+describe('the kinds a viewer asks for', () => {
+  /**
+   * Filling the songbook makes the whole page songs for a week; a scheduling run makes it
+   * dreams for an evening. The lens is the server's because the page reads the newest fifty:
+   * during a spree all fifty are one kind, so hiding them in the browser would show an empty
+   * Dreams while dream cards sat just past the window (#472).
+   */
+
+  const givenDreamCard = async (title: string, created_at: string) => {
+    const id = randomUUID()
+    await db().insert(thread).values({
+      id,
+      event_id: BURN,
+      entity_type: 'session',
+      entity_id: randomUUID(),
+      subject_account_id: null,
+      title,
+    })
+    await db().insert(threadEntry).values({
+      id: randomUUID(),
+      thread_id: id,
+      kind: 'offered',
+      seq: 1,
+      author_account_id: null,
+      body: 'offered this dream',
+      created_at,
+      edited_at: null,
+    })
+  }
+
+  const staged = async (server: FastifyInstance, cookie: string) => {
+    await offerDream(server, cookie, 'Sauna at dawn')
+    await joinBurn(server, cookie)
+    await addLeadRole(server, cookie, 'Fire lead')
+  }
+
+  it('answers with everything when it is asked for nothing', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada', ['admin', 'member'])
+
+    await staged(server, ada.cookie)
+
+    expect((await cards(server, ada.cookie)).map((card) => card.entity_type).toSorted()).toEqual([
+      'attendance',
+      'session',
+    ])
+    expect(await lines(server, ada.cookie)).toEqual(['A new lead role: Fire lead'])
+  })
+
+  it('answers with one kind of card and no burn news when one card kind is asked for', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada', ['admin', 'member'])
+
+    await staged(server, ada.cookie)
+
+    expect((await cards(server, ada.cookie, ['session'])).map((card) => card.entity_type)).toEqual([
+      'session',
+    ])
+    expect(await lines(server, ada.cookie, ['session'])).toEqual([])
+  })
+
+  it('answers with the burn news and no cards when only that is asked for', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada', ['admin', 'member'])
+
+    await staged(server, ada.cookie)
+
+    expect(await lines(server, ada.cookie, ['activity'])).toEqual(['A new lead role: Fire lead'])
+    expect(await cards(server, ada.cookie, ['activity'])).toEqual([])
+  })
+
+  it('answers with two kinds at once, which is what taking one chip off leaves', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada', ['admin', 'member'])
+
+    await staged(server, ada.cookie)
+
+    expect(
+      (await cards(server, ada.cookie, ['session', 'attendance'])).map((card) => card.entity_type).toSorted(),
+    ).toEqual(['attendance', 'session'])
+    expect(await lines(server, ada.cookie, ['session', 'attendance'])).toEqual([])
+  })
+
+  it('loses a person’s card behind a run of dreams when nothing is filtered', async () => {
+    // The premise the filter exists for, and it has to hold for the next test to say anything.
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await joinBurn(server, ada.cookie)
+    for (let index = 0; index < FEED_LIMIT; index += 1) {
+      await givenDreamCard(`Dream ${index}`, `2026-07-03T10:${String(index).padStart(2, '0')}:00.000Z`)
+    }
+
+    expect((await cards(server, ada.cookie)).map((card) => card.entity_type)).not.toContain('attendance')
+  })
+
+  it('finds that card when only people are asked for, because the cut comes after the filter', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await joinBurn(server, ada.cookie)
+    for (let index = 0; index < FEED_LIMIT; index += 1) {
+      await givenDreamCard(`Dream ${index}`, `2026-07-03T10:${String(index).padStart(2, '0')}:00.000Z`)
+    }
+
+    expect((await cards(server, ada.cookie, ['attendance'])).map((card) => card.title)).toEqual(['Ada'])
+  })
+
+  it('ignores a kind it does not know, rather than failing the read', async () => {
+    // A stale link shows more than asked for and never an error page — `feedKindsFrom`'s rule,
+    // asserted through the route because that is where a rejected query would show.
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await offerDream(server, ada.cookie, 'Sauna at dawn')
+
+    const answered = await server.inject({
+      method: 'GET',
+      url: '/api/feed?kinds=dremas',
+      headers: { cookie: ada.cookie },
+    })
+
+    expect(answered.statusCode).toBe(200)
+    expect(answered.json().threads).toHaveLength(1)
   })
 })

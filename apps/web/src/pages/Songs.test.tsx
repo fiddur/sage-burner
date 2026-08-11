@@ -95,6 +95,23 @@ describe('the songbook', () => {
     expect(screen.getByRole('link', { name: 'Zephyr' })).toBeTruthy()
   })
 
+  it('shows a song filed under either category while either chip is lit', async () => {
+    // The rule the row is shared on (#472): show what matches *any* lit chip. A card on the
+    // feed has one kind, so this is the half only the songbook exercises.
+    renderPage(
+      stub({}, [
+        aSong({ id: 's-1', title: 'Ashes', category_ids: ['c-1', 'c-2'] }),
+        aSong({ id: 's-2', title: 'Zephyr', category_ids: ['c-2'] }),
+      ]),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Chant' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Song' }))
+
+    expect(screen.getByRole('link', { name: 'Ashes' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Zephyr' })).toBeTruthy()
+  })
+
   it('says the book is empty rather than leaving a gap', async () => {
     renderPage(stub())
 

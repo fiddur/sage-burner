@@ -26,6 +26,7 @@ import type {
   EventsResponse,
   FaqListResponse,
   FaqResponse,
+  FeedKind,
   FeedResponse,
   FormQuestionOrder,
   FormQuestionResponse,
@@ -79,7 +80,7 @@ import type {
   PublicKeyCredentialRequestOptionsJSON,
 } from '@simplewebauthn/browser'
 
-import { apiRoutes } from '@sage-burner/shared'
+import { apiRoutes, feedPath } from '@sage-burner/shared'
 
 export interface ApiError extends Error {
   status: number
@@ -517,7 +518,8 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
         method: apiRoutes.sendTestEmail.method,
       }),
 
-    getFeed: (signal?: AbortSignal) => request<FeedResponse>(apiRoutes.getFeed.path(), { signal }),
+    getFeed: (kinds: readonly FeedKind[], signal?: AbortSignal) =>
+      request<FeedResponse>(feedPath(kinds), { signal }),
 
     getFaq: (eventId: string, signal?: AbortSignal) =>
       request<FaqListResponse>(apiRoutes.getFaq.path(eventId), { signal, version: 'faq' }),

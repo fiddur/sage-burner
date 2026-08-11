@@ -1,6 +1,18 @@
 import type { Activity, NotificationCategory, NotificationSettings, Thread } from '@sage-burner/shared'
 
-import { BURN_PARAM, entryCategory, MAX_POST, MAX_TITLE, notificationCategoryInfo } from '@sage-burner/shared'
+import {
+  BURN_PARAM,
+  entryCategory,
+  feedKindLabel,
+  feedKinds,
+  feedKindsFrom,
+  feedPage,
+  KINDS_PARAM,
+  MAX_POST,
+  MAX_TITLE,
+  notificationCategoryInfo,
+} from '@sage-burner/shared'
+import { useLocation } from 'preact-iso'
 import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -8,6 +20,7 @@ import type { UploadImage } from '../image-upload.ts'
 import type { Mentionable } from '../mentioning.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
+import { ChipRow } from '../components/ChipRow.tsx'
 import { DreamThread } from '../components/DreamThread.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
@@ -46,13 +59,19 @@ type Item = { at: string; id: string } & ({ line: Activity } | { card: Thread })
 export const Feed = ({ api }: { api: FeedApi }) => {
   const viewer = useViewer()
   const approved = isApproved(viewer)
+  const { query, route } = useLocation()
+  const asked: string | undefined = query?.[KINDS_PARAM]
+  const lit = feedKindsFrom(asked)
   const { loaded, refreshing, reload } = useLoad<Happening>(
     async (signal) => {
-      const [feed, settings] = await Promise.all([api.getFeed(signal), api.getMyNotificationSettings(signal)])
+      const [feed, settings] = await Promise.all([
+        api.getFeed(lit, signal),
+        api.getMyNotificationSettings(signal),
+      ])
 
       return { activity: feed.activity, threads: feed.threads, settings }
     },
-    { enabled: approved, fallback: 'Could not load what has been going on.' },
+    { enabled: approved, key: lit.join(','), fallback: 'Could not load what has been going on.' },
   )
 
   const { busy, error, run } = useAction(reload)
@@ -148,6 +167,13 @@ export const Feed = ({ api }: { api: FeedApi }) => {
         the top. Tap what a line is about to be told about the next one at a burn you are coming to — the same
         switch as the one on <a href="/profile">your details</a>.
       </p>
+
+      <ChipRow
+        chips={feedKinds.map((kind) => ({ id: kind, label: feedKindLabel[kind] }))}
+        lit={lit}
+        subject="What to show"
+        onChange={(wanted) => route(feedPage(wanted))}
+      />
 
       <ErrorText message={error} />
 
@@ -516,7 +542,7 @@ const Chip = ({
 }) => (
   <button
     type="button"
-    class={on ? 'feed-chip is-on' : 'feed-chip'}
+    class={on ? 'chip is-on' : 'chip'}
     aria-pressed={on}
     disabled={busy}
     title={on ? 'You are told about these. Tap to stop.' : 'Tell me about these'}

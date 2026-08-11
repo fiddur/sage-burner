@@ -149,6 +149,32 @@ export type ThreadEntityType = (typeof threadEntityTypes)[number]
 export const isThreadEntityType = (value: unknown): value is ThreadEntityType =>
   isOneOf(threadEntityTypes, value)
 
+export const feedKinds = ['activity', ...threadEntityTypes] as const
+export type FeedKind = (typeof feedKinds)[number]
+export const isFeedKind = (value: unknown): value is FeedKind => isOneOf(feedKinds, value)
+
+export const feedKindLabel = {
+  activity: 'Burns',
+  session: 'Dreams',
+  attendance: 'People',
+  post: 'Posts',
+  song: 'Songs',
+} as const satisfies Record<FeedKind, string>
+
+export const KINDS_PARAM = 'kinds'
+
+export const feedKindsFrom = (raw: string | undefined): FeedKind[] => [
+  ...new Set((raw ?? '').split(',').filter(isFeedKind)),
+]
+
+export const feedKindsQuery = (kinds: readonly FeedKind[]): string => {
+  const asked = [...new Set(kinds)]
+
+  return asked.length === 0 || asked.length === feedKinds.length
+    ? ''
+    : `?${KINDS_PARAM}=${asked.map((kind) => encodeURIComponent(kind)).join(',')}`
+}
+
 export const threadEntryKinds = [
   'comment',
   'offered',

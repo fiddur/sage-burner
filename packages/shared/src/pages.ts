@@ -1,3 +1,7 @@
+import type { FeedKind } from './enums.ts'
+
+import { feedKindsQuery } from './enums.ts'
+
 export const BURN_PARAM = 'burn'
 
 export const DREAM_PARAM = 'dream'
@@ -7,7 +11,7 @@ export const dreamPage = (eventId: string, dreamId: string): string =>
 
 export const profilePage = (accountId: string): string => `/members/${encodeURIComponent(accountId)}`
 
-export const feedPage = (): string => '/feed'
+export const feedPage = (kinds: readonly FeedKind[] = []): string => `/feed${feedKindsQuery(kinds)}`
 
 export const songbookPage = (): string => '/songs'
 

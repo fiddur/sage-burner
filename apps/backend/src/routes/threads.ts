@@ -18,6 +18,7 @@ import {
   mentionedAccounts,
   profilePage,
   songPage,
+  threadEntityTypes,
   withMentionNames,
 } from '@sage-burner/shared'
 import { and, asc, count, desc, eq, inArray, lte, max, ne, sql } from 'drizzle-orm'
@@ -232,6 +233,7 @@ export const excerptOf = (whole_text: string | null): string | null => {
 export const recentThreads = async (
   db: Database,
   limit: number,
+  entities: readonly ThreadEntityType[] = threadEntityTypes,
 ): Promise<{ id: string; last_at: string; entry_count: number }[]> => {
   const rows = await db
     .select({
@@ -240,6 +242,8 @@ export const recentThreads = async (
       entry_count: count(),
     })
     .from(threadEntry)
+    .innerJoin(thread, eq(thread.id, threadEntry.thread_id))
+    .where(inArray(thread.entity_type, [...entities]))
     .groupBy(threadEntry.thread_id)
     .orderBy(desc(max(threadEntry.created_at)), desc(threadEntry.thread_id))
     .limit(limit)
@@ -456,23 +460,24 @@ export const mentionedNames = async (
 const factsFor = (row: CardRow): CardFacts =>
   ({ session: dreamFacts, attendance: personFacts, post: postFacts, song: songFacts })[row.entity_type](row)
 
-export const subjectOf = async (
-  db: Database,
-  attendanceId: string,
-): Promise<{ account_id: string; name: string | null } | undefined> => {
+export const nameOf = async (db: Database, accountId: string): Promise<string | null> => {
   const [row] = await db
-    .select({ account_id: attendance.account_id, name: account.name })
-    .from(attendance)
-    .innerJoin(account, eq(account.id, attendance.account_id))
-    .where(eq(attendance.id, attendanceId))
+    .select({ name: account.name })
+    .from(account)
+    .where(eq(account.id, accountId))
     .limit(1)
 
-  return row
+  return row?.name ?? null
 }
 
 export const participantsOf = async (
   db: Database,
-  found: { id: string; entity_type: ThreadEntityType; entity_id: string },
+  found: {
+    id: string
+    entity_type: ThreadEntityType
+    entity_id: string
+    subject_account_id: string | null
+  },
 ): Promise<Set<string>> => {
   const spoke = await db
     .selectDistinct({ account_id: threadEntry.author_account_id })
@@ -482,8 +487,7 @@ export const participantsOf = async (
   const people = new Set(spoke.flatMap((row) => (row.account_id === null ? [] : [row.account_id])))
 
   if (found.entity_type === 'attendance') {
-    const subject = await subjectOf(db, found.entity_id)
-    if (subject !== undefined) people.add(subject.account_id)
+    if (found.subject_account_id !== null) people.add(found.subject_account_id)
 
     return people
   }
@@ -570,6 +574,7 @@ export const registerThreadRoutes = (
           event_id: thread.event_id,
           entity_type: thread.entity_type,
           entity_id: thread.entity_id,
+          subject_account_id: thread.subject_account_id,
           title: thread.title,
         })
         .from(thread)
@@ -626,6 +631,7 @@ export const registerThreadRoutes = (
           event_id: thread.event_id,
           entity_type: thread.entity_type,
           entity_id: thread.entity_id,
+          subject_account_id: thread.subject_account_id,
           title: thread.title,
         })
         .from(thread)
@@ -681,6 +687,7 @@ export const registerThreadRoutes = (
     event_id: string | null
     entity_type: ThreadEntityType
     entity_id: string
+    subject_account_id: string | null
     title: string
   }): Promise<{ link: string | null; what: string }> => {
     if (found.entity_type === 'session') {
@@ -710,11 +717,10 @@ export const registerThreadRoutes = (
       return { link: feedPage(), what: row?.title ?? found.title }
     }
 
-    const subject = await subjectOf(db, found.entity_id)
+    const subject = found.subject_account_id
+    if (subject === null) return { link: null, what: found.title }
 
-    return subject === undefined
-      ? { link: null, what: found.title }
-      : { link: profilePage(subject.account_id), what: subject.name ?? found.title }
+    return { link: profilePage(subject), what: (await nameOf(db, subject)) ?? found.title }
   }
 
   const commentCategories = {
@@ -764,6 +770,7 @@ export const registerThreadRoutes = (
       event_id: string | null
       entity_type: ThreadEntityType
       entity_id: string
+      subject_account_id: string | null
       title: string
     },
     author: string,
@@ -794,7 +801,13 @@ export const registerThreadRoutes = (
   }
 
   const tellNewlyNamed = async (
-    found: { event_id: string | null; entity_type: ThreadEntityType; entity_id: string; title: string },
+    found: {
+      event_id: string | null
+      entity_type: ThreadEntityType
+      entity_id: string
+      subject_account_id: string | null
+      title: string
+    },
     author: string,
     before: string,
     after: string,

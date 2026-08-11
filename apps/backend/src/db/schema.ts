@@ -731,7 +731,7 @@ export const thread = sqliteTable(
     primaryKey({ columns: [table.id] }),
     uniqueIndex('thread_entity_idx').on(table.entity_type, table.entity_id),
     index('thread_event_idx').on(table.event_id),
-    index('thread_subject_idx').on(table.subject_account_id, table.event_id),
+    uniqueIndex('thread_subject_idx').on(table.subject_account_id, table.event_id),
     check('thread_entity_type_check', oneOf(table.entity_type, threadEntityTypes)),
   ],
 )
