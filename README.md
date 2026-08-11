@@ -4,8 +4,8 @@ Membership, application, and scheduling platform for small "burner"-style
 mini-events — up to ~42 members, a few times a year.
 
 It replaces the spreadsheet-plus-Discord workflow that these gatherings
-otherwise run on: people apply through a public form, admins approve them
-and hand out invite links, members fill in their own camp details, admins
+otherwise run on: people sign up and apply, admins approve them and answer
+their questions, members fill in their own camp details, admins
 track payment, and the co-created programme of "dreams" (workshops, ceremonies,
 happenings) is scheduled and published as a calendar feed anyone can subscribe
 to.
@@ -104,7 +104,7 @@ does it that way rather than the obvious other way — live in `docs/`:
 | ------------------------------------------- | ------------------------------------------------------------------------------------ |
 | [configuration.md](./docs/configuration.md) | Every environment variable, the database file, migrations                            |
 | [deploying.md](./docs/deploying.md)         | Running it for real: proxy, backups, restore, fail2ban, upgrades                     |
-| [accounts.md](./docs/accounts.md)           | Applying, invites, sessions, passwords, passkeys, roles                              |
+| [accounts.md](./docs/accounts.md)           | Signing up, applying, invites, sessions, passwords, passkeys, roles                  |
 | [the-app.md](./docs/the-app.md)             | Getting around, what the installation calls itself, installing it, avatars, markdown |
 | [burns.md](./docs/burns.md)                 | Events, attendance, lodging, helping out, the calendar feed                          |
 | [schedule.md](./docs/schedule.md)           | Meals, dreams, the lead roles register, places and the grid                          |

@@ -48,6 +48,7 @@ import type {
   MealsResponse,
   MemberRosterResponse,
   MeResponse,
+  MyApplicationResponse,
   MyBurnsResponse,
   MyImagesResponse,
   NotificationSettings,
@@ -534,6 +535,12 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
       request<ThreadResponse>(apiRoutes.withdrawSupportForThread.path(id), {
         method: apiRoutes.withdrawSupportForThread.method,
       }),
+
+    signUp: (body: BodyOf<'signUp'>) =>
+      request<MeResponse>(apiRoutes.signUp.path(), { method: apiRoutes.signUp.method, body }),
+
+    getMyApplication: (signal?: AbortSignal) =>
+      request<MyApplicationResponse>(apiRoutes.getMyApplication.path(), { signal }),
 
     getMapLink: (signal?: AbortSignal) => request<MapLinkResponse>(apiRoutes.getMapLink.path(), { signal }),
 

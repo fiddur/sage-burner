@@ -1,4 +1,4 @@
-import type { AnswerProblem, FormQuestion, SubmittedAnswers } from '@sage-burner/shared'
+import type { AnswerProblem, FormQuestion, MyApplication, SubmittedAnswers } from '@sage-burner/shared'
 
 import {
   answerProblems,
@@ -11,17 +11,25 @@ import {
 import { useCallback, useMemo, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
+import type { PushApi } from '../components/PushToggle.tsx'
+import type { SignUpApi } from '../components/SignUpForm.tsx'
 
 import { isApiError } from '../api/client.ts'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { FormError } from '../components/FormError.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
+import { PushToggle } from '../components/PushToggle.tsx'
+import { SignUpForm } from '../components/SignUpForm.tsx'
 import { useInstallationSendsEmail } from '../installation.tsx'
 import { useAction, useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
+import { useOauthOutcome } from '../outcome.ts'
 import { rowsFor } from '../textarea.ts'
+import { useSetViewer, useViewer } from '../viewer.tsx'
 
-export type ApplyApi = Pick<ApiClient, 'getQuestions' | 'submitApplication'>
+export type ApplyApi = Pick<ApiClient, 'getQuestions' | 'submitApplication' | 'getMyApplication'> &
+  PushApi &
+  SignUpApi
 
 interface ApplyProps {
   api: ApplyApi
@@ -46,30 +54,129 @@ const identityProblem = (value: string, max: number) => {
 const emailProblem = (value: string) =>
   identityProblem(value, MAX_APPLICANT_EMAIL_LENGTH) ?? (looksLikeEmail(value) ? undefined : 'malformed')
 
-const Sent = ({ sendsEmail }: { sendsEmail?: boolean }) => (
-  <article class="column">
+const Waiting = ({ sendsEmail, api }: { sendsEmail?: boolean; api: PushApi }) => (
+  <>
     <h1>Application sent</h1>
     <p role="status">
-      Thank you — we have your application. We read them together before each burn.{' '}
+      Thank you — we have your application. Approval is normally handled within 24 hours.{' '}
       {sendsEmail === true
-        ? 'If you are accepted, your invite arrives at the address you gave us.'
-        : 'Someone will get back to you at the address you gave us.'}{' '}
-      Nothing else will arrive in your inbox in the meantime.
+        ? 'If you do not get a notification or an email, you can check back here.'
+        : 'If you do not get a notification, you can check back here.'}
     </p>
-  </article>
+
+    <PushToggle api={api} />
+  </>
 )
+
+const Answered = ({
+  approved,
+  organisers,
+}: {
+  approved: boolean
+  organisers: MyApplication['organisers']
+}) =>
+  approved ? (
+    <>
+      <h1>You are in</h1>
+      <p role="status">
+        Welcome. You are a member, and you are on the list for the burn that is coming —{' '}
+        <a href="/">have a look around</a>.
+      </p>
+    </>
+  ) : (
+    <>
+      <h1>Your application</h1>
+      <p role="status">
+        This one has not been accepted. If you would like to know more, the organisers are the people to ask.
+      </p>
+
+      {organisers.length > 0 && (
+        <ul class="plain-list">
+          {organisers.map((who) => (
+            <li key={who.account_id}>
+              {who.name ?? 'An organiser'}
+              {who.contact !== null && who.contact !== '' && ` — ${who.contact}`}
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  )
 
 const hasProblem = (problems: string[], field: string) =>
   problems.some((problem) => problem.startsWith(`${field}:`))
 
+/**
+ * Which of the four things somebody sees, which is the whole of what account-first changed here
+ * (#476): sign up, fill the form in, wait, or read the answer.
+ */
 export const Apply = ({ api }: ApplyProps) => {
+  const viewer = useViewer()
+  const setViewer = useSetViewer()
   const sendsEmail = useInstallationSendsEmail()
+  const { outcome } = useOauthOutcome()
+  const [sent, setSent] = useState(false)
+
+  const { loaded: standing } = useLoad(async (signal) => (await api.getMyApplication(signal)).mine, {
+    enabled: viewer.status === 'signed-in',
+    fallback: 'Could not load your application.',
+  })
+  const mine = standing.status === 'ready' ? standing.data : undefined
+
+  if (viewer.status === 'loading') return <article class="column" />
+
+  if (viewer.status === 'signed-out') {
+    return (
+      <article class="column">
+        <h1>Apply to join</h1>
+        {outcome === 'no-address' && (
+          <p class="form-note" role="alert">
+            That provider did not give us an email address, and an account needs one. Sign up with an address
+            and a password instead — you can link the provider afterwards under Your details.
+          </p>
+        )}
+        <SignUpForm
+          api={api}
+          arrive={(signedIn) => {
+            if (signedIn === null) return
+
+            setViewer({
+              id: signedIn.account_id,
+              name: signedIn.name,
+              avatar: signedIn.avatar,
+              roles: signedIn.roles,
+            })
+          }}
+        />
+      </article>
+    )
+  }
+
+  if (mine?.application != null && mine.application.status !== 'pending') {
+    return (
+      <article class="column">
+        <Answered approved={mine.application.status === 'approved'} organisers={mine.organisers} />
+      </article>
+    )
+  }
+
+  if (sent || mine?.application != null) {
+    return (
+      <article class="column">
+        <Waiting sendsEmail={sendsEmail} api={api} />
+      </article>
+    )
+  }
+
+  return <ApplicationForm api={api} onSent={() => setSent(true)} />
+}
+
+const ApplicationForm = ({ api, onSent }: { api: ApplyApi; onSent: () => void }) => {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [answers, setAnswers] = useState<SubmittedAnswers>({})
   const [problems, setProblems] = useState<AnswerProblem[]>([])
   const [identityProblems, setIdentityProblems] = useState<string[]>([])
-  const [sent, setSent] = useState(false)
 
   const { loaded } = useLoad(async (signal) => (await api.getQuestions(signal)).questions, {})
   const questions: FormQuestion[] | undefined = loaded.status === 'ready' ? loaded.data : undefined
@@ -119,7 +226,7 @@ export const Apply = ({ api }: ApplyProps) => {
           answers,
           asked: questions.map((question) => question.id),
         })
-        setSent(true)
+        onSent()
       },
       (failure) =>
         isApiError(failure) && failure.status === 400
@@ -127,8 +234,6 @@ export const Apply = ({ api }: ApplyProps) => {
           : 'Could not send your application. Please check your connection and try again.',
     )
   }
-
-  if (sent) return <Sent sendsEmail={sendsEmail} />
 
   return (
     <article class="column">

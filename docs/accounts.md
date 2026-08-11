@@ -1,12 +1,30 @@
 # Accounts and sessions
 
-Applying, being invited, redeeming an invite, signing in, passkeys, roles, and what
-a session is.
+Signing up, applying, being invited, redeeming an invite, signing in, passkeys, roles, and
+what a session is.
 
 [← back to the README](../README.md)
 
-There is **no open sign-up**. Accounts are created only by redeeming an invite
-([#17]); `/login` says so rather than offering a dead link.
+**The account comes first, the application second, and approval grants membership** (#476).
+Sign-up is open: `/apply` makes an account — through Discord or Facebook, or with an address and
+a password — and then asks the questions. There was no open sign-up until this: accounts came only
+from redeeming an invite ([#17]), the applicant held nothing between submitting and maybe
+receiving that mail, and a rejection sent nothing at all.
+
+**A new account holds no roles**, and that state already means "not a member": `requireApproved`
+gates the rest of the app, so somebody signed up and waiting reaches their own application, their
+own bell, and nothing else. No account-status column was added for a fact the roles already carry.
+`requireSignedIn` is the guard for that state — being signed in at all — and it is what the
+application routes and `/api/push/*` sit behind.
+
+**Approval is one action**: grant `member`, join the burn that is coming, open the feed card and
+ring the bell every other arrival gets, and tell the applicant. No token is minted, because there
+is nothing left to claim. A rejection tells them too, and the page names the organisers to ask.
+
+**The invite machinery stays** for the case it was always shaped for — an admin minting a link for
+somebody specific. Applications submitted before this have no account, so approving one of those
+still mints a token: the link is all such an application can offer. Re-issuing for an
+account-first application is refused, since it would be a second account for somebody who has one.
 
 - `POST /api/auth/login` — `{ email, password }`. 200 with `{ viewer }` and a
   session cookie, or 401 `invalid_credentials`.
@@ -153,11 +171,29 @@ minutes after a merge.
 [#17]: https://github.com/fiddur/sage-burner/issues/17
 [#58]: https://github.com/fiddur/sage-burner/issues/58
 
+### Signing up through a provider
+
+Sign-up and sign-in converge on one handler, because asking somebody to say which one they are
+doing is asking them to know. An identity nobody has yet makes an account rather than bouncing to
+`unlinked`.
+
+**That needs an address**, since an account is keyed by one — so both providers are now asked for
+`email`, which neither was before: nothing here matched on an address, so collecting one bought
+nothing. Discord's counts only where Discord says it is **verified**; an unverified one is a string
+somebody typed into the provider, and taking it as a login identity would let a stranger claim an
+address they do not hold. Facebook offers no such signal and often no address at all, so its is
+taken as given or not at all.
+
+**No address, no account**: the sign-up page says so and asks for one. **An address somebody
+already holds** is refused too, and pointedly — matching accounts by address is account takeover
+the moment a provider hands over one it has not verified. The path is signing in the other way and
+linking under Your details, and that is the sentence the login page shows.
+
 ## Applying
 
-`POST /api/applications` is the only public write in the app, and that is the
-point — an applicant has no account yet. Everything in the body is therefore
-attacker-controlled, so two things are true by construction:
+`POST /api/applications` is behind `requireSignedIn` since #476 — it was the only public write in
+the app, and the account it now needs is one anybody can make in the step before. Everything in
+the body is still attacker-controlled, so two things are true by construction:
 
 - **The submitter names their answers and which questions they were shown, and
   nothing else.** `id`, `status` and the timestamps are the server's. The schema
@@ -283,7 +319,12 @@ double-clicked Approve mints one invite, not two. `invite_token_application_idx`
 is the backstop underneath that, and the page tells the admin to reload
 rather than to try again, since retrying cannot help.
 
-**Approval mints the invite.** 32 CSPRNG bytes, base64url, valid 30 days. Only
+**Approval mints an invite only for an application from before #476** — one with no `account_id`,
+where a link is the only thing there is to offer. For everything since, approval grants the role
+outright and mints nothing. What follows describes that older path, which the two outstanding
+invites still ride.
+
+32 CSPRNG bytes, base64url, valid 30 days. Only
 the SHA-256 digest is stored, so the raw token exists in that one response and
 nowhere else — a leaked backup or a stray copy of the volume hands out no
 invites.

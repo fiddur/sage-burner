@@ -2,13 +2,16 @@ import type { FormQuestion } from '@sage-burner/shared'
 
 import { MAX_ANSWER_LENGTH, MAX_APPLICANT_EMAIL_LENGTH, MAX_APPLICANT_NAME_LENGTH } from '@sage-burner/shared'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
+import { LocationProvider } from 'preact-iso'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { renderMarkdown as realRenderMarkdown } from '../markdown.ts'
+import type { Viewer } from '../viewer.tsx'
 import type { ApplyApi } from './Apply.tsx'
 
 import { apiError } from '../api/client.ts'
 import { InstallationProvider } from '../installation.tsx'
+import { ViewerProvider } from '../viewer.tsx'
 
 // Counts calls while still rendering for real, so the markdown assertions below
 // stay assertions about markdown.
@@ -44,8 +47,29 @@ const question = (over: Partial<FormQuestion> & Pick<FormQuestion, 'id' | 'type'
 const stub = (over: Partial<ApplyApi> = {}): ApplyApi => ({
   getQuestions: () => Promise.resolve({ questions: [] }),
   submitApplication: () => Promise.reject(new Error('submitApplication is not stubbed here')),
+  getMyApplication: () => Promise.resolve({ mine: { application: null, organisers: [] } }),
+  signUp: () => Promise.reject(new Error('signUp is not stubbed here')),
+  getPushKey: () => Promise.resolve({ public_key: null }),
+  subscribeToPush: () => Promise.reject(new Error('subscribeToPush is not stubbed here')),
+  unsubscribeFromPush: () => Promise.reject(new Error('unsubscribeFromPush is not stubbed here')),
+  getMyNotificationSettings: () => Promise.resolve({ on: [], email: [] }),
+  updateMyNotificationSettings: () =>
+    Promise.reject(new Error('updateMyNotificationSettings is not stubbed here')),
   ...over,
 })
+
+/** Somebody who has signed up and not yet applied, which is who the form is for since #476. */
+const APPLICANT: Viewer = {
+  status: 'signed-in',
+  account: { id: 'a-1', name: 'Fredrik', avatar: null, roles: [] },
+}
+
+const renderPage = (api: ApplyApi, viewer: Viewer = APPLICANT) =>
+  render(
+    <ViewerProvider viewer={viewer}>
+      <Apply api={api} />
+    </ViewerProvider>,
+  )
 
 /**
  * Fields are found by label prefix, because a required question's accessible
@@ -89,18 +113,16 @@ const send = () => screen.getByRole('button', { name: 'Send application' }).clic
 
 describe('Apply', () => {
   it('renders whatever questions the API returns', async () => {
-    render(
-      <Apply
-        api={stub({
-          getQuestions: () =>
-            Promise.resolve({
-              questions: [
-                question({ id: 'q-1', type: 'text', label: 'What is your name in the dust?' }),
-                question({ id: 'q-2', type: 'textarea', label: 'Why do you want to come?' }),
-              ],
-            }),
-        })}
-      />,
+    renderPage(
+      stub({
+        getQuestions: () =>
+          Promise.resolve({
+            questions: [
+              question({ id: 'q-1', type: 'text', label: 'What is your name in the dust?' }),
+              question({ id: 'q-2', type: 'textarea', label: 'Why do you want to come?' }),
+            ],
+          }),
+      }),
     )
 
     expect(await screen.findByLabelText('What is your name in the dust?')).toBeTruthy()
@@ -111,18 +133,16 @@ describe('Apply', () => {
     // Not re-sorted here: `GET /api/questions` already serves display order, and
     // a second ordering rule on this side is one that can disagree with the one
     // the stored answers use. The backend test pins the order itself.
-    render(
-      <Apply
-        api={stub({
-          getQuestions: () =>
-            Promise.resolve({
-              questions: [
-                question({ id: 'q-2', type: 'text', label: 'Second', order: 1 }),
-                question({ id: 'q-1', type: 'text', label: 'First', order: 0 }),
-              ],
-            }),
-        })}
-      />,
+    renderPage(
+      stub({
+        getQuestions: () =>
+          Promise.resolve({
+            questions: [
+              question({ id: 'q-2', type: 'text', label: 'Second', order: 1 }),
+              question({ id: 'q-1', type: 'text', label: 'First', order: 0 }),
+            ],
+          }),
+      }),
     )
 
     // Arrival order deliberately contradicts `order`: a fixture where the two
@@ -137,17 +157,15 @@ describe('Apply', () => {
   })
 
   it('shows help text when the question has it', async () => {
-    render(
-      <Apply
-        api={stub({
-          getQuestions: () =>
-            Promise.resolve({
-              questions: [
-                question({ id: 'q-1', type: 'text', label: 'Allergies?', help_text: 'We cook together.' }),
-              ],
-            }),
-        })}
-      />,
+    renderPage(
+      stub({
+        getQuestions: () =>
+          Promise.resolve({
+            questions: [
+              question({ id: 'q-1', type: 'text', label: 'Allergies?', help_text: 'We cook together.' }),
+            ],
+          }),
+      }),
     )
 
     expect(await screen.findByText('We cook together.')).toBeTruthy()
@@ -156,23 +174,21 @@ describe('Apply', () => {
   it('renders help text as markdown, so a list of principles reads as a list', async () => {
     // The 10+1 principles are a list, and an applicant should see one rather
     // than a run of literal dashes.
-    render(
-      <Apply
-        api={stub({
-          getQuestions: () =>
-            Promise.resolve({
-              questions: [
-                question({
-                  id: 'q-1',
-                  type: 'agreement',
-                  label: 'I agree to the principles',
-                  required: true,
-                  help_text: '- Radical inclusion\n- Leave no trace',
-                }),
-              ],
-            }),
-        })}
-      />,
+    renderPage(
+      stub({
+        getQuestions: () =>
+          Promise.resolve({
+            questions: [
+              question({
+                id: 'q-1',
+                type: 'agreement',
+                label: 'I agree to the principles',
+                required: true,
+                help_text: '- Radical inclusion\n- Leave no trace',
+              }),
+            ],
+          }),
+      }),
     )
 
     await ready()
@@ -186,15 +202,13 @@ describe('Apply', () => {
     // `answer()` sets `answers`, so this component re-renders on every character
     // typed, and the help text is the longest thing on the form.
     renderMarkdown.mockClear()
-    render(
-      <Apply
-        api={stub({
-          getQuestions: () =>
-            Promise.resolve({
-              questions: [question({ id: 'q-1', type: 'text', label: 'Why?', help_text: 'Tell us.' })],
-            }),
-        })}
-      />,
+    renderPage(
+      stub({
+        getQuestions: () =>
+          Promise.resolve({
+            questions: [question({ id: 'q-1', type: 'text', label: 'Why?', help_text: 'Tell us.' })],
+          }),
+      }),
     )
 
     await ready()
@@ -209,19 +223,17 @@ describe('Apply', () => {
 
   it('sends the answers keyed by question id', async () => {
     const submitApplication = vi.fn(() => Promise.resolve({ application: {} as never }))
-    render(
-      <Apply
-        api={stub({
-          submitApplication,
-          getQuestions: () =>
-            Promise.resolve({
-              questions: [
-                question({ id: 'q-1', type: 'text', label: 'Your dust name', required: true }),
-                question({ id: 'q-2', type: 'agreement', label: 'I agree', required: true, order: 1 }),
-              ],
-            }),
-        })}
-      />,
+    renderPage(
+      stub({
+        submitApplication,
+        getQuestions: () =>
+          Promise.resolve({
+            questions: [
+              question({ id: 'q-1', type: 'text', label: 'Your dust name', required: true }),
+              question({ id: 'q-2', type: 'agreement', label: 'I agree', required: true, order: 1 }),
+            ],
+          }),
+      }),
     )
 
     await ready()
@@ -245,19 +257,17 @@ describe('Apply', () => {
     // skipped was still asked, and has to be told apart from one added after this
     // page loaded — which they never saw.
     const submitApplication = vi.fn(() => Promise.resolve({ application: {} as never }))
-    render(
-      <Apply
-        api={stub({
-          submitApplication,
-          getQuestions: () =>
-            Promise.resolve({
-              questions: [
-                question({ id: 'q-1', type: 'text', label: 'Your dust name', required: true }),
-                question({ id: 'q-2', type: 'text', label: 'Allergies?', required: false, order: 1 }),
-              ],
-            }),
-        })}
-      />,
+    renderPage(
+      stub({
+        submitApplication,
+        getQuestions: () =>
+          Promise.resolve({
+            questions: [
+              question({ id: 'q-1', type: 'text', label: 'Your dust name', required: true }),
+              question({ id: 'q-2', type: 'text', label: 'Allergies?', required: false, order: 1 }),
+            ],
+          }),
+      }),
     )
 
     await ready()
@@ -274,16 +284,14 @@ describe('Apply', () => {
 
   it('refuses to send while a required question is unanswered', async () => {
     const submitApplication = vi.fn(() => Promise.resolve({ application: {} as never }))
-    render(
-      <Apply
-        api={stub({
-          submitApplication,
-          getQuestions: () =>
-            Promise.resolve({
-              questions: [question({ id: 'q-1', type: 'text', label: 'Your dust name', required: true })],
-            }),
-        })}
-      />,
+    renderPage(
+      stub({
+        submitApplication,
+        getQuestions: () =>
+          Promise.resolve({
+            questions: [question({ id: 'q-1', type: 'text', label: 'Your dust name', required: true })],
+          }),
+      }),
     )
 
     await ready()
@@ -296,16 +304,14 @@ describe('Apply', () => {
 
   it('refuses to send while an agreement is unticked', async () => {
     const submitApplication = vi.fn(() => Promise.resolve({ application: {} as never }))
-    render(
-      <Apply
-        api={stub({
-          submitApplication,
-          getQuestions: () =>
-            Promise.resolve({
-              questions: [question({ id: 'q-1', type: 'agreement', label: 'I agree', required: true })],
-            }),
-        })}
-      />,
+    renderPage(
+      stub({
+        submitApplication,
+        getQuestions: () =>
+          Promise.resolve({
+            questions: [question({ id: 'q-1', type: 'agreement', label: 'I agree', required: true })],
+          }),
+      }),
     )
 
     await ready()
@@ -317,7 +323,7 @@ describe('Apply', () => {
   })
 
   it('confirms after submitting, and says what happens next', async () => {
-    render(<Apply api={stub({ submitApplication: () => Promise.resolve({ application: {} as never }) })} />)
+    renderPage(stub({ submitApplication: () => Promise.resolve({ application: {} as never }) }))
 
     await ready()
     identify()
@@ -328,12 +334,15 @@ describe('Apply', () => {
     expect(screen.queryByRole('button', { name: 'Send application' })).toBeNull()
   })
 
-  it('promises the invite by email only where the installation posts', async () => {
-    // The copy has to be true either way: with no mail server nothing arrives, and
-    // saying otherwise is a promise the installation cannot keep (#30).
+  it('names email as a way of hearing only where the installation posts', async () => {
+    // The copy has to be true either way: with no mail server nothing arrives, and saying
+    // otherwise is a promise the installation cannot keep (#30). It promised an invite until
+    // #476 — there is no invite now, only the answer.
     render(
       <InstallationProvider sendsEmail>
-        <Apply api={stub({ submitApplication: () => Promise.resolve({ application: {} as never }) })} />
+        <ViewerProvider viewer={APPLICANT}>
+          <Apply api={stub({ submitApplication: () => Promise.resolve({ application: {} as never }) })} />
+        </ViewerProvider>
       </InstallationProvider>,
     )
 
@@ -341,13 +350,15 @@ describe('Apply', () => {
     identify()
     send()
 
-    expect((await screen.findByRole('status')).textContent).toContain('your invite arrives')
+    expect((await screen.findByRole('status')).textContent).toContain('or an email')
   })
 
-  it('says somebody will get back to you where it does not', async () => {
+  it('names only the notification where it does not', async () => {
     render(
       <InstallationProvider sendsEmail={false}>
-        <Apply api={stub({ submitApplication: () => Promise.resolve({ application: {} as never }) })} />
+        <ViewerProvider viewer={APPLICANT}>
+          <Apply api={stub({ submitApplication: () => Promise.resolve({ application: {} as never }) })} />
+        </ViewerProvider>
       </InstallationProvider>,
     )
 
@@ -356,19 +367,17 @@ describe('Apply', () => {
     send()
 
     const confirmation = await screen.findByRole('status')
-    expect(confirmation.textContent).toContain('Someone will get back to you')
-    expect(confirmation.textContent).not.toContain('your invite arrives')
+    expect(confirmation.textContent).toContain('If you do not get a notification')
+    expect(confirmation.textContent).not.toContain('email')
   })
 
   it('keeps the answers on screen when the request fails', async () => {
-    render(
-      <Apply
-        api={stub({
-          submitApplication: () => Promise.reject(new TypeError('Failed to fetch')),
-          getQuestions: () =>
-            Promise.resolve({ questions: [question({ id: 'q-1', type: 'textarea', label: 'Why?' })] }),
-        })}
-      />,
+    renderPage(
+      stub({
+        submitApplication: () => Promise.reject(new TypeError('Failed to fetch')),
+        getQuestions: () =>
+          Promise.resolve({ questions: [question({ id: 'q-1', type: 'textarea', label: 'Why?' })] }),
+      }),
     )
 
     await ready()
@@ -381,7 +390,7 @@ describe('Apply', () => {
   })
 
   it('says so when the form has no questions yet', async () => {
-    render(<Apply api={stub()} />)
+    renderPage(stub())
 
     await ready()
     expect(screen.getByText(/no questions on the form yet/)).toBeTruthy()
@@ -391,7 +400,7 @@ describe('Apply', () => {
   it('links the privacy policy beside the button', async () => {
     // The one page where somebody hands over contact details before having an account, so
     // it is where the policy has to be reachable before the click rather than after it.
-    render(<Apply api={stub()} />)
+    renderPage(stub())
 
     await ready()
     expect(screen.getByRole('link', { name: 'privacy policy' }).getAttribute('href')).toBe('/privacy')
@@ -399,7 +408,7 @@ describe('Apply', () => {
 
   it('refuses a name of only spaces, rather than letting the server say no', async () => {
     const submitApplication = vi.fn(() => Promise.resolve({ application: {} as never }))
-    render(<Apply api={stub({ submitApplication })} />)
+    renderPage(stub({ submitApplication }))
 
     await ready()
     fill('Your name', '   ')
@@ -421,18 +430,16 @@ describe('Apply', () => {
     // never reached rather than being caught afterwards. `answerProblems` also
     // carries a `too_long` rule, which keeps the two sides agreeing if a
     // submission ever arrives from somewhere other than this form.
-    render(
-      <Apply
-        api={stub({
-          getQuestions: () =>
-            Promise.resolve({
-              questions: [
-                question({ id: 'q-1', type: 'textarea', label: 'Why?' }),
-                question({ id: 'q-2', type: 'text', label: 'Dust name', order: 1 }),
-              ],
-            }),
-        })}
-      />,
+    renderPage(
+      stub({
+        getQuestions: () =>
+          Promise.resolve({
+            questions: [
+              question({ id: 'q-1', type: 'textarea', label: 'Why?' }),
+              question({ id: 'q-2', type: 'text', label: 'Dust name', order: 1 }),
+            ],
+          }),
+      }),
     )
 
     await ready()
@@ -444,7 +451,7 @@ describe('Apply', () => {
 
   it('sends the name and address trimmed, which is what the server stores', async () => {
     const submitApplication = vi.fn(() => Promise.resolve({ application: {} as never }))
-    render(<Apply api={stub({ submitApplication })} />)
+    renderPage(stub({ submitApplication }))
 
     await ready()
     fill('Your name', '  Fredrik  ')
@@ -465,9 +472,7 @@ describe('Apply', () => {
     // A 400 means the questions changed since the page loaded, so both sides ran
     // the same rules against different lists. "Try again" is false advice there:
     // the identical body fails identically.
-    render(
-      <Apply api={stub({ submitApplication: () => Promise.reject(apiError(400, 'bad_request', 'nope')) })} />,
-    )
+    renderPage(stub({ submitApplication: () => Promise.reject(apiError(400, 'bad_request', 'nope')) }))
 
     await ready()
     identify()
@@ -477,9 +482,7 @@ describe('Apply', () => {
   })
 
   it('says a transport failure is worth retrying, unlike a rejection', async () => {
-    render(
-      <Apply api={stub({ submitApplication: () => Promise.reject(new TypeError('Failed to fetch')) })} />,
-    )
+    renderPage(stub({ submitApplication: () => Promise.reject(new TypeError('Failed to fetch')) }))
 
     await ready()
     identify()
@@ -489,18 +492,16 @@ describe('Apply', () => {
   })
 
   it('marks which questions are required', async () => {
-    render(
-      <Apply
-        api={stub({
-          getQuestions: () =>
-            Promise.resolve({
-              questions: [
-                question({ id: 'q-1', type: 'text', label: 'Needed', required: true }),
-                question({ id: 'q-2', type: 'text', label: 'Optional', order: 1 }),
-              ],
-            }),
-        })}
-      />,
+    renderPage(
+      stub({
+        getQuestions: () =>
+          Promise.resolve({
+            questions: [
+              question({ id: 'q-1', type: 'text', label: 'Needed', required: true }),
+              question({ id: 'q-2', type: 'text', label: 'Optional', order: 1 }),
+            ],
+          }),
+      }),
     )
 
     expect((await screen.findByText(/Needed/)).textContent).toContain('required')
@@ -508,15 +509,13 @@ describe('Apply', () => {
   })
 
   it('links the error to the field it belongs to', async () => {
-    render(
-      <Apply
-        api={stub({
-          getQuestions: () =>
-            Promise.resolve({
-              questions: [question({ id: 'q-1', type: 'text', label: 'Needed', required: true })],
-            }),
-        })}
-      />,
+    renderPage(
+      stub({
+        getQuestions: () =>
+          Promise.resolve({
+            questions: [question({ id: 'q-1', type: 'text', label: 'Needed', required: true })],
+          }),
+      }),
     )
 
     await ready()
@@ -530,23 +529,21 @@ describe('Apply', () => {
   })
 
   it('keeps the help text reachable when the field also has an error', async () => {
-    render(
-      <Apply
-        api={stub({
-          getQuestions: () =>
-            Promise.resolve({
-              questions: [
-                question({
-                  id: 'q-1',
-                  type: 'text',
-                  label: 'Needed',
-                  required: true,
-                  help_text: 'Any name works.',
-                }),
-              ],
-            }),
-        })}
-      />,
+    renderPage(
+      stub({
+        getQuestions: () =>
+          Promise.resolve({
+            questions: [
+              question({
+                id: 'q-1',
+                type: 'text',
+                label: 'Needed',
+                required: true,
+                help_text: 'Any name works.',
+              }),
+            ],
+          }),
+      }),
     )
 
     await ready()
@@ -561,7 +558,7 @@ describe('Apply', () => {
 
   it('will not send before the questions have loaded', async () => {
     const submitApplication = vi.fn(() => Promise.resolve({ application: {} as never }))
-    render(<Apply api={stub({ submitApplication, getQuestions: () => new Promise(() => undefined) })} />)
+    renderPage(stub({ submitApplication, getQuestions: () => new Promise(() => undefined) }))
 
     identify()
     const button = screen.getByRole('button', { name: 'Send application' })
@@ -572,14 +569,14 @@ describe('Apply', () => {
   })
 
   it('surfaces a failure to load the questions rather than showing an empty form', async () => {
-    render(<Apply api={stub({ getQuestions: () => Promise.reject(new Error('nope')) })} />)
+    renderPage(stub({ getQuestions: () => Promise.reject(new Error('nope')) }))
 
     expect(await screen.findByRole('alert')).toBeTruthy()
   })
 
   it('is a column before and after sending', async () => {
-    const { container } = render(
-      <Apply api={stub({ submitApplication: () => Promise.resolve({ application: {} as never }) })} />,
+    const { container } = renderPage(
+      stub({ submitApplication: () => Promise.resolve({ application: {} as never }) }),
     )
 
     await ready()
@@ -590,5 +587,120 @@ describe('Apply', () => {
 
     await screen.findByRole('status')
     expect(container.querySelector('article')?.className).toBe('column')
+  })
+})
+
+describe('the way in, before the form', () => {
+  it('offers to make an account, since applying starts with one', async () => {
+    renderPage(stub(), { status: 'signed-out' })
+
+    expect(await screen.findByRole('button', { name: 'Sign up' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Send application' })).toBeNull()
+  })
+
+  it('signs somebody up and shows them the form', async () => {
+    const signUp = vi.fn<ApplyApi['signUp']>(() =>
+      Promise.resolve({ viewer: { account_id: 'a-1', name: 'Fredrik', avatar: null, roles: [] } }),
+    )
+    renderPage(stub({ signUp }), { status: 'signed-out' })
+
+    fill('Your name', 'Fredrik')
+    fill('Your email address', 'fredrik@example.org')
+    fill('A password', 'a-long-enough-password')
+    fireEvent.click(await screen.findByRole('button', { name: 'Sign up' }))
+
+    await waitFor(() =>
+      expect(signUp).toHaveBeenCalledWith({
+        name: 'Fredrik',
+        email: 'fredrik@example.org',
+        password: 'a-long-enough-password',
+      }),
+    )
+    expect(await screen.findByRole('button', { name: 'Send application' })).toBeTruthy()
+  })
+
+  it('says an address already in use is one, rather than "that did not work"', async () => {
+    renderPage(stub({ signUp: () => Promise.reject(apiError(409, 'conflict', 'conflict')) }), {
+      status: 'signed-out',
+    })
+
+    fill('Your name', 'Fredrik')
+    fill('Your email address', 'fredrik@example.org')
+    fill('A password', 'a-long-enough-password')
+    fireEvent.click(await screen.findByRole('button', { name: 'Sign up' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('already an account')
+  })
+})
+
+describe('where an application already stands', () => {
+  const anApplication = (status: 'pending' | 'approved' | 'rejected') => ({
+    id: 'app-1',
+    account_id: 'a-1',
+    answers: [],
+    status,
+    applicant_name: 'Fredrik',
+    applicant_email: 'fredrik@example.org',
+    submitted_at: '2026-07-02T00:00:00Z',
+    decided_at: null,
+  })
+
+  it('shows the wait rather than the form once one has been sent', async () => {
+    renderPage(
+      stub({
+        getMyApplication: () =>
+          Promise.resolve({ mine: { application: anApplication('pending'), organisers: [] } }),
+      }),
+    )
+
+    expect((await screen.findByRole('status')).textContent).toContain('within 24 hours')
+    expect(screen.queryByRole('button', { name: 'Send application' })).toBeNull()
+  })
+
+  it('says so once it has been accepted', async () => {
+    renderPage(
+      stub({
+        getMyApplication: () =>
+          Promise.resolve({ mine: { application: anApplication('approved'), organisers: [] } }),
+      }),
+    )
+
+    expect((await screen.findByRole('status')).textContent).toContain('You are a member')
+  })
+
+  it('says who to ask once it has not been', async () => {
+    // A rejection with no recourse is a door closing in silence, so the page names the
+    // organisers and how to reach them.
+    renderPage(
+      stub({
+        getMyApplication: () =>
+          Promise.resolve({
+            mine: {
+              application: anApplication('rejected'),
+              organisers: [{ account_id: 'a-9', name: 'Ada', contact: 'ada on discord' }],
+            },
+          }),
+      }),
+    )
+
+    expect((await screen.findByRole('status')).textContent).toContain('not been accepted')
+    expect(screen.getByText(/Ada — ada on discord/)).toBeTruthy()
+  })
+})
+
+describe('coming back from a provider that gave no address', () => {
+  it('says why, and points at the way that works', async () => {
+    history.replaceState(null, '', '/apply?from=no-address')
+
+    render(
+      <LocationProvider>
+        <ViewerProvider viewer={{ status: 'signed-out' }}>
+          <Apply api={stub()} />
+        </ViewerProvider>
+      </LocationProvider>,
+    )
+
+    expect((await screen.findByRole('alert')).textContent).toContain('did not give us an email address')
+    expect(screen.getByRole('button', { name: 'Sign up' })).toBeTruthy()
   })
 })
