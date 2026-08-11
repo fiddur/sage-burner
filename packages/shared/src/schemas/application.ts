@@ -27,6 +27,7 @@ export const storedAnswersSchema = z.array(storedAnswerSchema)
 
 export const applicationSchema = z.object({
   id: idSchema,
+  account_id: idSchema.nullable(),
   answers: storedAnswersSchema,
   status: z.enum(applicationStatuses),
   applicant_name: nonEmptyText(MAX_APPLICANT_NAME_LENGTH),
@@ -34,6 +35,21 @@ export const applicationSchema = z.object({
   submitted_at: dateTimeSchema,
   decided_at: dateTimeSchema.nullable(),
 })
+
+/** What somebody with no roles yet sees of their own: their standing, and who to ask about it. */
+export const myApplicationSchema = z.object({
+  application: applicationSchema.nullable(),
+  organisers: z.array(
+    z.object({
+      account_id: idSchema,
+      name: z.string().nullable(),
+      contact: z.string().nullable(),
+    }),
+  ),
+})
+export const myApplicationResponseSchema = z.object({ mine: myApplicationSchema })
+export type MyApplication = z.infer<typeof myApplicationSchema>
+export type MyApplicationResponse = z.infer<typeof myApplicationResponseSchema>
 
 export const applicationCreateSchema = z
   .object({

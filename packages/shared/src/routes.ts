@@ -60,6 +60,7 @@ import type {
   RideUpdate,
   SessionCreateInput,
   SessionUpdate,
+  SignUpRequest,
   SongCategoryCreateInput,
   SongCategoryOrder,
   SongCategoryUpdate,
@@ -308,6 +309,11 @@ export const apiRoutes = {
     method: 'GET',
     fastify: '/api/admin/applications',
     path: () => '/api/admin/applications',
+  },
+  getMyApplication: {
+    method: 'GET',
+    fastify: '/api/me/application',
+    path: () => '/api/me/application',
   },
   getEventAttendees: {
     method: 'GET',
@@ -805,6 +811,11 @@ export const apiRoutes = {
     fastify: '/api/applications',
     path: () => '/api/applications',
   },
+  signUp: {
+    method: 'POST',
+    fastify: '/api/auth/sign-up',
+    path: () => '/api/auth/sign-up',
+  },
   subscribeToPush: {
     method: 'POST',
     fastify: '/api/push/subscriptions',
@@ -1020,6 +1031,7 @@ export interface RouteBodies {
   setMealLead: MealLead
   setPayment: PaymentUpdate
   submitApplication: ApplicationCreate
+  signUp: SignUpRequest
   subscribeToPush: PushSubscriptionCreate
   transferMyPlace: PlaceTransfer
   unsubscribeFromPush: Pick<PushSubscriptionCreate, 'endpoint'>

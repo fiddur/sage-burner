@@ -9,17 +9,19 @@ import type { DbHandle } from '../db/index.ts'
 import type { Delivery } from '../push/push.ts'
 
 import { createApp } from '../app.ts'
+import { createSessions } from '../auth/session.ts'
+import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, accountRole, application, formQuestion, pushSubscription } from '../db/schema.ts'
 
 /**
- * Submitting the public application form.
+ * Submitting the application form.
  *
- * Unauthenticated by design — this is how someone who is not yet a member gets
- * in touch — so everything it accepts is attacker-controlled, and the two rules
- * worth proving are that the questions are honoured (a required one cannot be
- * skipped, an agreement cannot be left unticked) and that nothing the submitter
+ * Behind being signed in since #476 — the account comes first and the application second — but
+ * a role-less account is what anybody off the street can make, so everything it accepts is still
+ * attacker-controlled. The rules worth proving are that the questions are honoured (a required
+ * one cannot be skipped, an agreement cannot be left unticked) and that nothing the submitter
  * sends decides their own status.
  */
 
@@ -34,6 +36,7 @@ afterEach(async () => {
   handle?.close()
   app = undefined
   handle = undefined
+  applicantAccount = undefined
 })
 
 const build = async (deliver: Delivery = () => Promise.resolve('sent')) => {
@@ -45,6 +48,8 @@ const build = async (deliver: Delivery = () => Promise.resolve('sent')) => {
     deliver,
     mintKeys: () => ({ publicKey: 'a-public-key', privateKey: 'a-private-key' }),
   })
+  await givenApplicant()
+
   return app
 }
 
@@ -110,12 +115,41 @@ const answerKeys = (answers: unknown): string[] =>
  * not about it would bury the thing each one is asserting. Tests that care pass
  * it explicitly.
  */
-const submit = (server: FastifyInstance, payload: Record<string, unknown>): Promise<LightMyRequestResponse> =>
+const submit = (
+  server: FastifyInstance,
+  payload: Record<string, unknown>,
+  cookie?: string,
+): Promise<LightMyRequestResponse> =>
   server.inject({
     method: 'POST',
     url: '/api/applications',
+    headers: { cookie: cookie ?? applicantCookie() },
     payload: { asked: answerKeys(payload.answers), ...payload },
   })
+
+/**
+ * The account an applicant has before they have a role, made on the way in. Held in a module
+ * variable rather than threaded through every test: the tests here are about the form, and the
+ * account is furniture the flow now requires.
+ */
+let applicantAccount: { id: string; cookie: string } | undefined
+
+const applicantCookie = () => {
+  if (applicantAccount === undefined) throw new Error('givenApplicant() first')
+  return applicantAccount.cookie
+}
+
+const givenApplicant = async () => {
+  const id = randomUUID()
+  await db()
+    .insert(account)
+    .values({ id, email: `${id}@example.org`, password_hash: null, created_at: NOW })
+
+  const sessions = createSessions({ secret: SECRET, now: () => new Date(), ttlSeconds: 3600 })
+  applicantAccount = { id, cookie: `${SESSION_COOKIE}=${sessions.issue(id)}` }
+
+  return applicantAccount
+}
 
 const applicant = { applicant_name: 'Fredrik', applicant_email: 'fredrik@example.org' }
 

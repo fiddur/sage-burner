@@ -13,6 +13,7 @@ afterEach(cleanup)
 
 const anApplication = (over: Partial<Application> = {}): Application => ({
   id: 'app-1',
+  account_id: null,
   answers: [{ question_id: 'q-1', label: 'Why do you want to come?', type: 'text', value: 'the fire' }],
   status: 'pending',
   applicant_name: 'Fredrik',

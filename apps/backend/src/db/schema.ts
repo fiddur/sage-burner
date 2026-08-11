@@ -296,6 +296,7 @@ export const application = sqliteTable(
     id: text('id').notNull(),
     answers: text('answers', { mode: 'json' }).$type<StoredAnswers>().notNull(),
     status: text('status', { enum: applicationStatuses }).notNull().default('pending'),
+    account_id: text('account_id').references(() => account.id, { onDelete: 'cascade' }),
     applicant_name: text('applicant_name').notNull(),
     applicant_email: text('applicant_email').notNull(),
     submitted_at: text('submitted_at').notNull(),
@@ -304,6 +305,7 @@ export const application = sqliteTable(
   (table) => [
     primaryKey({ columns: [table.id] }),
     index('application_status_idx').on(table.status),
+    uniqueIndex('application_account_idx').on(table.account_id),
     check('application_status_check', oneOf(table.status, applicationStatuses)),
   ],
 )

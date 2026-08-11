@@ -278,6 +278,7 @@ export const createApp = async ({
 
   registerApplicationRoutes(app, {
     db,
+    sessions,
     now,
     notify: async (message) =>
       await notifyAdmins(db, tellAccount, {
