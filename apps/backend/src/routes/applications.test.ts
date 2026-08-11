@@ -665,3 +665,71 @@ describe('the name an application carries', () => {
     expect(row?.name).toBe('Wren')
   })
 })
+
+describe('who an applicant is told to ask', () => {
+  const mine = (server: FastifyInstance, cookie: string) =>
+    server.inject({ method: 'GET', url: '/api/me/application', headers: { cookie } })
+
+  const givenOrganiser = async () => {
+    const id = randomUUID()
+    await db()
+      .insert(account)
+      .values({
+        id,
+        email: `${id}@example.org`,
+        name: 'Ada',
+        contact: 'ada on discord',
+        password_hash: null,
+        created_at: NOW,
+      })
+    await db().insert(accountRole).values({ account_id: id, role: 'admin' })
+
+    return id
+  }
+
+  const decided = async (status: 'approved' | 'rejected') => {
+    await db()
+      .update(application)
+      .set({ status, decided_at: NOW })
+      .where(eq(application.account_id, applicantAccount?.id ?? ''))
+  }
+
+  it('names them where the answer was no, which is what recourse means', async () => {
+    const server = await build()
+    await givenOrganiser()
+    await submit(server, { ...applicant, answers: {} })
+    await decided('rejected')
+
+    const said = await mine(server, applicantCookie())
+
+    expect(said.json().mine.organisers.map((one: { name: string; contact: string }) => one.contact)).toEqual([
+      'ada on discord',
+    ])
+  })
+
+  it('names nobody to an account that has not applied at all', async () => {
+    // Sign-up is open, so this route is reachable by anybody who can make an account — and the
+    // admins' contact details are a members-only read everywhere else.
+    const server = await build()
+    await givenOrganiser()
+
+    expect((await mine(server, applicantCookie())).json().mine.organisers).toEqual([])
+  })
+
+  it('names nobody while an application is still waiting', async () => {
+    const server = await build()
+    await givenOrganiser()
+    await submit(server, { ...applicant, answers: {} })
+
+    expect((await mine(server, applicantCookie())).json().mine.organisers).toEqual([])
+  })
+
+  it('names nobody where the answer was yes, since they are in and can read the roster', async () => {
+    const server = await build()
+    await givenOrganiser()
+    await submit(server, { ...applicant, answers: {} })
+    await decided('approved')
+
+    expect((await mine(server, applicantCookie())).json().mine.organisers).toEqual([])
+  })
+})

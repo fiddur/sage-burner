@@ -35,12 +35,6 @@ export interface ApplicationRouteDeps extends GuardDeps {
   notifyOne?: Notifier
 }
 
-/**
- * Whom a rejected applicant is told to ask. Names and contact details of the admins, which every
- * approved member can already read on the Members page — this is the one thing an account with no
- * roles may read about somebody else, and it exists because a rejection with no recourse is a
- * door closing in silence (#476).
- */
 const organisersFor = async (db: GuardDeps['db']) => {
   const admins = await db
     .select({ account_id: accountRole.account_id })
@@ -121,7 +115,10 @@ export const registerApplicationRoutes = (
       mine: {
         application: mine ?? null,
         messages: mine === undefined ? [] : await messagesOn(db, mine.id, viewer),
-        organisers: await organisersFor(db),
+        // Only where the answer was no. Sign-up is open, so anybody at all can reach this route,
+        // and the admins' contact details are a members-only read everywhere else — the recourse
+        // this exists for belongs to somebody who has been turned down, not to a fresh account.
+        organisers: mine?.status === 'rejected' ? await organisersFor(db) : [],
       },
     } satisfies MyApplicationResponse
   })

@@ -19,7 +19,10 @@ application routes and `/api/push/*` sit behind.
 
 **Approval is one action**: grant `member`, join the burn that is coming, open the feed card and
 ring the bell every other arrival gets, and tell the applicant. No token is minted, because there
-is nothing left to claim. A rejection tells them too, and the page names the organisers to ask.
+is nothing left to claim. A rejection tells them too, and the page names the organisers to ask —
+**only where the answer was no**, since sign-up is open and that route is reachable by anybody who
+can make an account, while the admins' contact details are a members-only read everywhere else.
+Somebody still waiting has the thread below for a question; somebody accepted has the Members page.
 
 **The invite machinery stays** for the case it was always shaped for — an admin minting a link for
 somebody specific. Applications submitted before this have no account, so approving one of those
