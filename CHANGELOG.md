@@ -9,6 +9,21 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-11
 
+- **Writing anything now has a small toolbar: bold, italic, a link, a list.** It writes the
+  markdown for you, so nobody has to know what `**` means — and if you never press any of it, plain
+  words are still plain words. `Ctrl`+`B` and `Ctrl`+`I` do the same on a keyboard. The Write and
+  Preview tabs are gone: what you write shows below the box as it will read, and only once there is
+  anything to show. A picture you paste, drop or choose is added at the end of what you have
+  written, the way it works elsewhere.
+
+- **The song page's tidy-up.** The words box can now be dragged wider as well as taller, for chord
+  sheets that are wide. Links to hear a song are icons under the title rather than a line of raw
+  address, and adding one is a box and a button — no name to invent. _Edit it_ and _Take it out_
+  are the pencil and the trashcan the rest of the app uses, and taking a song out asks first, and
+  says where it goes. The transposing controls say _Transpose_, and Scroll it and Speed stay at the
+  bottom of the screen where you can reach them mid-song. The songbook list no longer marks every
+  song with its capo.
+
 - **The feed has a row of chips for choosing what to show.** Filling the songbook or laying out
   the schedule used to make the whole page one kind of thing for a while. Tap _Dreams_ and you get
   dreams only; tap another chip and you get both; _Everything_ puts it back. The choice is in the

@@ -66,15 +66,22 @@ describe('the songbook', () => {
     expect((await screen.findByRole('link', { name: 'Ashes' })).getAttribute('href')).toBe('/songs/s-1')
   })
 
-  it('says the capo and that there is somewhere to hear it', async () => {
+  it('says there is somewhere to hear it', async () => {
     renderPage(
-      stub({}, [
-        aSong({ id: 's-1', title: 'Ashes', capo: 3, links: [{ url: 'https://example.org/a', label: '' }] }),
-      ]),
+      stub({}, [aSong({ id: 's-1', title: 'Ashes', capo: 3, links: [{ url: 'https://example.org/a' }] })]),
     )
 
-    expect(await screen.findByText('capo 3')).toBeTruthy()
+    await screen.findByRole('link', { name: 'Ashes' })
     expect(screen.getByTitle('There is somewhere to hear it')).toBeTruthy()
+  })
+
+  it('says nothing about the capo, which is knowledge for once the song is open', async () => {
+    // A chip per row is noise at the length a songbook grows to (#474); the song's own page
+    // still shows it.
+    renderPage(stub({}, [aSong({ id: 's-1', title: 'Ashes', capo: 3 })]))
+
+    await screen.findByRole('link', { name: 'Ashes' })
+    expect(screen.queryByText('capo 3')).toBeNull()
   })
 
   it('filters by a category, and back to everything', async () => {

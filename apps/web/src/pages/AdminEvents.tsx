@@ -33,25 +33,20 @@ type Editable = Pick<
   | 'transfer_info_markdown'
 >
 
-const EDITABLE_KEYS = [
-  'name',
-  'start_date',
-  'end_date',
-  'start_time',
-  'end_time',
-  'location',
-  'member_cap',
-  'welcome_markdown',
-  'payment_info_markdown',
-  'transfer_info_markdown',
-] as const satisfies readonly (keyof Editable)[]
-
+/**
+ * Both properties, and neither is the type's: `satisfies readonly (keyof Editable)[]` on a list
+ * checks that every entry is a key and not that every key is an entry, so a field added to
+ * `Editable` compiled while an edit silently stopped sending it. Iterating what `now` carries
+ * has nothing to keep in step, because `Editable` is exactly the editable fields.
+ */
 export const changedFields = (before: Editable | undefined, now: Editable): Partial<Editable> => {
   if (before === undefined) return now
 
+  const was = new Map(Object.entries(before))
   const changed: Partial<Editable> = {}
-  for (const key of EDITABLE_KEYS) {
-    if (now[key] !== before[key]) Object.assign(changed, { [key]: now[key] })
+
+  for (const [key, value] of Object.entries(now)) {
+    if (value !== was.get(key)) Object.assign(changed, { [key]: value })
   }
 
   return changed

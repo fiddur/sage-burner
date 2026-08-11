@@ -129,20 +129,18 @@ describe('a song’s page', () => {
     expect(await screen.findByText('Chant')).toBeTruthy()
   })
 
-  it('shows a link by the name of the site it goes to when nobody labelled it', async () => {
-    renderPage(stub({}, aSong({ links: [{ url: 'https://open.spotify.com/track/1', label: '' }] })))
+  it('shows a link as the icon of the site it goes to, named for whoever cannot see it', async () => {
+    renderPage(stub({}, aSong({ links: [{ url: 'https://open.spotify.com/track/1' }] })))
 
-    expect((await screen.findByRole('link', { name: 'Spotify' })).getAttribute('href')).toBe(
-      'https://open.spotify.com/track/1',
-    )
+    const link = await screen.findByRole('link', { name: 'Listen on Spotify' })
+    expect(link.getAttribute('href')).toBe('https://open.spotify.com/track/1')
+    expect(link.textContent).toBe('🎧')
   })
 
-  it('shows the label somebody gave a link instead of the site', async () => {
-    renderPage(
-      stub({}, aSong({ links: [{ url: 'https://open.spotify.com/track/1', label: 'The 1972 one' }] })),
-    )
+  it('has an icon for a site it does not know, rather than no link', async () => {
+    renderPage(stub({}, aSong({ links: [{ url: 'https://example.org/a' }] })))
 
-    expect(await screen.findByRole('link', { name: 'The 1972 one' })).toBeTruthy()
+    expect((await screen.findByRole('link', { name: 'Listen on elsewhere' })).textContent).toBe('🎶')
   })
 
   it('transposes the chords and leaves the words where they are', async () => {
@@ -163,7 +161,7 @@ describe('a song’s page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Back to how it is written' }))
 
     expect(container.querySelector('.song-body')?.textContent).toBe(`${CHORUS}\n`)
-    expect(screen.getByText('as written')).toBeTruthy()
+    expect(screen.getByText('0')).toBeTruthy()
   })
 
   it('offers no transposing for a song with no chords in it', async () => {
@@ -200,7 +198,7 @@ describe('a song’s page', () => {
     const updateSong = vi.fn<SongApi['updateSong']>(() => Promise.resolve({ song: aSong(), thread: null }))
     renderPage(stub({ updateSong }))
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit it' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Fire in the sky' }))
     fireEvent.input(screen.getByLabelText('What it is called'), { target: { value: 'Fire on the water' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
@@ -219,7 +217,7 @@ describe('a song’s page', () => {
     const updateSong = vi.fn<SongApi['updateSong']>(() => Promise.resolve({ song: aSong(), thread: null }))
     renderPage(stub({ updateSong }))
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit it' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Fire in the sky' }))
     fireEvent.click(screen.getByLabelText('Chant'))
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
@@ -232,7 +230,7 @@ describe('a song’s page', () => {
     const updateSong = vi.fn<SongApi['updateSong']>(() => Promise.resolve({ song: aSong(), thread: null }))
     renderPage(stub({ updateSong }))
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit it' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Fire in the sky' }))
     fireEvent.input(screen.getByLabelText('A link to this song'), {
       target: { value: 'https://youtu.be/abc' },
     })
@@ -242,7 +240,7 @@ describe('a song’s page', () => {
     await waitFor(() =>
       expect(updateSong).toHaveBeenCalledWith(
         's-1',
-        expect.objectContaining({ links: [{ url: 'https://youtu.be/abc', label: '' }] }),
+        expect.objectContaining({ links: [{ url: 'https://youtu.be/abc' }] }),
       ),
     )
   })
@@ -251,7 +249,7 @@ describe('a song’s page', () => {
     const updateSong = vi.fn<SongApi['updateSong']>(() => Promise.resolve({ song: aSong(), thread: null }))
     renderPage(stub({ updateSong }, aSong({ body: 'Bb   Eb   F' })))
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit it' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Fire in the sky' }))
 
     expect(screen.getByText(/Capo 1 would play as A D E/)).toBeTruthy()
 
@@ -261,13 +259,37 @@ describe('a song’s page', () => {
     await waitFor(() => expect(updateSong).toHaveBeenCalledWith('s-1', expect.objectContaining({ capo: 1 })))
   })
 
-  it('takes a song out of the book, and offers it back once it is out', async () => {
+  it('asks before taking a song out, and says where it goes', async () => {
+    // One tap soft-deleted it with no question asked, which reads as data loss to anybody
+    // who does not know about the trash at the foot of the songbook (#474).
     const deleteSong = vi.fn<SongApi['deleteSong']>(() => Promise.resolve(undefined))
     renderPage(stub({ deleteSong }))
 
     fireEvent.click(await screen.findByRole('button', { name: 'Take Fire in the sky out of the book' }))
 
+    expect(screen.getByText(/Recently taken out/)).toBeTruthy()
+    expect(deleteSong).not.toHaveBeenCalled()
+  })
+
+  it('takes it out once that is answered', async () => {
+    const deleteSong = vi.fn<SongApi['deleteSong']>(() => Promise.resolve(undefined))
+    renderPage(stub({ deleteSong }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Take Fire in the sky out of the book' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Really take Fire in the sky out' }))
+
     await waitFor(() => expect(deleteSong).toHaveBeenCalledWith('s-1'))
+  })
+
+  it('keeps it where the question is answered the other way', async () => {
+    const deleteSong = vi.fn<SongApi['deleteSong']>(() => Promise.resolve(undefined))
+    renderPage(stub({ deleteSong }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Take Fire in the sky out of the book' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Keep it' }))
+
+    expect(deleteSong).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Take Fire in the sky out of the book' })).toBeTruthy()
   })
 
   it('offers no editing of one that is out, only putting it back', async () => {
@@ -275,7 +297,7 @@ describe('a song’s page', () => {
     renderPage(stub({ restoreSong }, aSong({ deleted_at: '2026-07-03T00:00:00.000Z' })))
 
     expect(await screen.findByText(/has been taken out of the book/)).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Edit it' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Edit Fire in the sky' })).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'Put it back' }))
 

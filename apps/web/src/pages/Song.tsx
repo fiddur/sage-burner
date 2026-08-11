@@ -1,11 +1,10 @@
-import type { Song, SongCategory, SongLink, Thread } from '@sage-burner/shared'
+import type { MusicHost, Song, SongCategory, SongLink, Thread } from '@sage-burner/shared'
 
 import {
   capoSuggestion,
   isProfileUrl,
   MAX_CAPO,
   MAX_SONG_BODY,
-  MAX_SONG_LINK_LABEL,
   MAX_SONG_LINK_URL,
   MAX_SONG_LINKS,
   MAX_TITLE,
@@ -28,6 +27,7 @@ import {
   DEFAULT_SPEED,
   MAX_SPEED,
   MIN_SPEED,
+  MOST_SEMITONES,
   pixelsPerTick,
   rememberedSpeed,
   rememberSpeed,
@@ -37,6 +37,7 @@ import {
 } from '../songbook.ts'
 import { rowsFor } from '../textarea.ts'
 import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
+import { RECENTLY_GONE_DAYS } from './Songs.tsx'
 
 export type SongApi = Pick<
   ApiClient,
@@ -118,7 +119,7 @@ export const SongPage = ({ api, songId }: { api: SongApi; songId: string }) => {
       </h1>
 
       <p class="song-marks">
-        {song.capo !== null && <span class="song-capo">capo {song.capo}</span>}
+        {song.capo !== null && song.capo > 0 && <span class="song-capo">capo {song.capo}</span>}
         {filed.map((category) => (
           <span key={category.id} class="chip is-on">
             {category.label}
@@ -163,18 +164,17 @@ export const SongPage = ({ api, songId }: { api: SongApi; songId: string }) => {
 
           {song.deleted_at === null && (
             <p class="row">
-              <button type="button" class="link-button" disabled={busy} onClick={() => setEditing(true)}>
-                Edit it
-              </button>
-              <button
-                type="button"
-                class="link-button"
+              <IconButton
+                icon="✏️"
+                label={`Edit ${song.title}`}
                 disabled={busy}
-                aria-label={`Take ${song.title} out of the book`}
-                onClick={() => run(() => api.deleteSong(song.id), 'Could not take that out.')}
-              >
-                Take it out
-              </button>
+                onClick={() => setEditing(true)}
+              />
+              <TakeItOut
+                title={song.title}
+                busy={busy}
+                onTakeOut={() => run(() => api.deleteSong(song.id), 'Could not take that out.')}
+              />
             </p>
           )}
         </>
@@ -185,24 +185,61 @@ export const SongPage = ({ api, songId }: { api: SongApi; songId: string }) => {
   )
 }
 
+const ELSEWHERE = { label: 'elsewhere', icon: '🎶' } satisfies MusicHost
+
 const Links = ({ links }: { links: readonly SongLink[] }) => {
   if (links.length === 0) return null
 
   return (
-    <ul class="song-links">
+    <p class="song-links">
       {links.map((link) => {
-        const host = musicHost(link.url)
+        const host = musicHost(link.url) ?? ELSEWHERE
 
         return (
-          <li key={link.url}>
-            {host !== undefined && <span aria-hidden="true">{host.icon} </span>}
-            <a href={link.url} rel="noreferrer noopener" target="_blank">
-              {link.label === '' ? (host?.label ?? link.url) : link.label}
-            </a>
-          </li>
+          <a
+            key={link.url}
+            class="song-link"
+            href={link.url}
+            rel="noreferrer noopener"
+            target="_blank"
+            title={`Listen on ${host.label}`}
+            aria-label={`Listen on ${host.label}`}
+          >
+            {host.icon}
+          </a>
         )
       })}
-    </ul>
+    </p>
+  )
+}
+
+const TakeItOut = ({ title, busy, onTakeOut }: { title: string; busy: boolean; onTakeOut: () => void }) => {
+  const [asking, setAsking] = useState(false)
+
+  if (!asking) {
+    return (
+      <IconButton
+        icon="🗑️"
+        label={`Take ${title} out of the book`}
+        disabled={busy}
+        onClick={() => setAsking(true)}
+      />
+    )
+  }
+
+  return (
+    <>
+      <span class="form-note">
+        Take it out? It goes to <em>Recently taken out</em> at the foot of the songbook, where anybody can put
+        it back for {RECENTLY_GONE_DAYS} days.
+      </span>
+      <button type="button" disabled={busy} aria-label={`Really take ${title} out`} onClick={onTakeOut}>
+        Take it out
+      </button>
+      <button type="button" class="link-button" disabled={busy} onClick={() => setAsking(false)}>
+        Keep it
+      </button>
+    </>
   )
 }
 
@@ -237,32 +274,41 @@ const Words = ({ body }: { body: string }) => {
 
   return (
     <>
-      <p class="song-aids">
-        {anyChords && (
-          <>
-            <IconButton
-              icon="♭"
-              label="A semitone down"
-              disabled={semitones <= -11}
-              onClick={() => setSemitones(shifted(semitones, -1))}
-            />
-            <span class="song-key">
-              {semitones === 0 ? 'as written' : `${semitones > 0 ? '+' : ''}${semitones}`}
-            </span>
-            <IconButton
-              icon="♯"
-              label="A semitone up"
-              disabled={semitones >= 11}
-              onClick={() => setSemitones(shifted(semitones, 1))}
-            />
-            {semitones !== 0 && (
-              <button type="button" class="link-button" onClick={() => setSemitones(0)}>
-                Back to how it is written
-              </button>
-            )}
-          </>
-        )}
+      {anyChords && (
+        <p class="song-aids">
+          <span class="song-key-label">Transpose</span>
+          <IconButton
+            icon="♭"
+            label="A semitone down"
+            disabled={semitones <= -MOST_SEMITONES}
+            onClick={() => setSemitones(shifted(semitones, -1))}
+          />
+          <span class="song-key">{semitones > 0 ? `+${semitones}` : semitones}</span>
+          <IconButton
+            icon="♯"
+            label="A semitone up"
+            disabled={semitones >= MOST_SEMITONES}
+            onClick={() => setSemitones(shifted(semitones, 1))}
+          />
+          {semitones !== 0 && (
+            <button type="button" class="link-button" onClick={() => setSemitones(0)}>
+              Back to how it is written
+            </button>
+          )}
+        </p>
+      )}
 
+      <pre class="song-body">
+        {lines.map((line, index) => (
+          // eslint-disable-next-line react/no-array-index-key -- a line has nothing else to be keyed by
+          <span key={index} class={line.chords ? 'song-line is-chords' : 'song-line'}>
+            {line.text}
+            {'\n'}
+          </span>
+        ))}
+      </pre>
+
+      <p class="song-play">
         <button type="button" class="link-button" aria-pressed={rolling} onClick={() => setRolling(!rolling)}>
           {rolling ? '⏸ Stop scrolling' : '▶️ Scroll it'}
         </button>
@@ -282,16 +328,6 @@ const Words = ({ body }: { body: string }) => {
           />
         </label>
       </p>
-
-      <pre class="song-body">
-        {lines.map((line, index) => (
-          // eslint-disable-next-line react/no-array-index-key -- a line has nothing else to be keyed by
-          <span key={index} class={line.chords ? 'song-line is-chords' : 'song-line'}>
-            {line.text}
-            {'\n'}
-          </span>
-        ))}
-      </pre>
     </>
   )
 }
@@ -321,14 +357,13 @@ const Fields = ({
   const [links, setLinks] = useState<SongLink[]>([...song.links])
   const [filed, setFiled] = useState<string[]>([...song.category_ids])
   const [url, setUrl] = useState('')
-  const [label, setLabel] = useState('')
 
   const suggested = capoSuggestion(body)
   const linkable = isProfileUrl(url) && !links.some((one) => one.url === url.trim())
 
   return (
     <form
-      class="form"
+      class="form song-form"
       onSubmit={(submitted) => {
         submitted.preventDefault()
         if (title.trim() === '') return
@@ -411,10 +446,10 @@ const Fields = ({
         <legend>Somewhere to hear it</legend>
 
         {links.length > 0 && (
-          <ul class="song-links">
+          <ul class="song-links-edit">
             {links.map((link) => (
               <li key={link.url}>
-                {link.label === '' ? link.url : `${link.label} — ${link.url}`}
+                {link.url}
                 <IconButton
                   icon="🗑️"
                   label={`Take off the link to ${link.url}`}
@@ -435,21 +470,12 @@ const Fields = ({
               value={url}
               onInput={(typed) => setUrl(typed.currentTarget.value)}
             />
-            <input
-              type="text"
-              aria-label="What to call that link"
-              placeholder="What to call it"
-              maxLength={MAX_SONG_LINK_LABEL}
-              value={label}
-              onInput={(typed) => setLabel(typed.currentTarget.value)}
-            />
             <button
               type="button"
               disabled={!linkable}
               onClick={() => {
-                setLinks([...links, { url: url.trim(), label: label.trim() }])
+                setLinks([...links, { url: url.trim() }])
                 setUrl('')
-                setLabel('')
               }}
             >
               Add the link

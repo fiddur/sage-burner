@@ -36,7 +36,6 @@ describe('the HTML shell', () => {
   })
 
   it('points the home-screen tile at the touch-icon route, which answers a PNG', () => {
-    // One tag carrying both, for the reason the favicon assertion gives.
     expect(shell).toMatch(
       new RegExp(`<link[^>]*rel="apple-touch-icon"[^>]*href="${apiRoutes.getTouchIcon.path('180')}"`),
     )

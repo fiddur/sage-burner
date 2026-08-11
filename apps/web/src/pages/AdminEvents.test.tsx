@@ -7,7 +7,7 @@ import type { EventsApi } from './AdminEvents.tsx'
 
 import { apiError } from '../api/client.ts'
 import { ViewerProvider } from '../viewer.tsx'
-import { AdminEvents } from './AdminEvents.tsx'
+import { AdminEvents, changedFields } from './AdminEvents.tsx'
 
 afterEach(cleanup)
 
@@ -219,7 +219,6 @@ describe('AdminEvents', () => {
     await screen.findByLabelText('Welcome text (markdown)')
 
     fill('Welcome text (markdown)', '# Bring water')
-    screen.getByRole('button', { name: 'Preview Welcome text (markdown)' }).click()
 
     await waitFor(() => {
       // Level 2, matching what the public page renders — the preview is only
@@ -233,8 +232,7 @@ describe('AdminEvents', () => {
     ;(await screen.findByRole('button', { name: 'Edit event' })).click()
     await screen.findByLabelText('Welcome text (markdown)')
 
-    fill('Welcome text (markdown)', '<script>alert(1)</script>')
-    screen.getByRole('button', { name: 'Preview Welcome text (markdown)' }).click()
+    fill('Welcome text (markdown)', '# Bring water\n<script>alert(1)</script>')
 
     await waitFor(() => {
       expect(screen.getByText(/<script>alert\(1\)<\/script>/)).toBeTruthy()
@@ -418,5 +416,44 @@ describe('AdminEvents', () => {
 
     expect(await screen.findByText(/for admins/)).toBeTruthy()
     expect(getEvents).not.toHaveBeenCalled()
+  })
+})
+
+describe('what an edit sends', () => {
+  const editable = {
+    name: 'Summer Burn 2026',
+    start_date: '2026-08-01',
+    end_date: '2026-08-05',
+    start_time: '00:00',
+    end_time: '23:59',
+    location: '',
+    member_cap: 42,
+    welcome_markdown: '# Hello',
+    payment_info_markdown: '',
+    transfer_info_markdown: '',
+  }
+
+  it('sends only what moved', () => {
+    expect(changedFields(editable, { ...editable, member_cap: 30 })).toEqual({ member_cap: 30 })
+  })
+
+  it('sends nothing at all where nothing moved', () => {
+    expect(changedFields(editable, { ...editable })).toEqual({})
+  })
+
+  it('sends every field of a burn being created, which has no before to compare with', () => {
+    expect(changedFields(undefined, editable)).toEqual(editable)
+  })
+
+  it('sends a field cleared, which is a change to the empty string and not an absence', () => {
+    expect(changedFields(editable, { ...editable, welcome_markdown: '' })).toEqual({
+      welcome_markdown: '',
+    })
+  })
+
+  it('walks the fields it is given, so one added to the form cannot be left behind', () => {
+    // The defect this replaced (#469): the list it iterated checked that every entry was a key
+    // and not that every key was an entry, so a new field silently stopped being sent on an edit.
+    expect(Object.keys(changedFields(undefined, editable))).toEqual(Object.keys(editable))
   })
 })

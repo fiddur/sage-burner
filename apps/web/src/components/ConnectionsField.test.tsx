@@ -120,8 +120,6 @@ describe('the list on your own details page', () => {
   })
 
   it('offers no add form until the list has been read', async () => {
-    // While it was loading, `kindsToOffer([])` offered all ten and the form opened on Email —
-    // so somebody who already had an email row could add a second and get a 409 (#445).
     let answer = (_rows: { connections: Connection[] }) => undefined as unknown as void
     const held = new Promise<{ connections: Connection[] }>((resolve) => {
       answer = resolve

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
+import { cleanup, fireEvent, render, screen } from '@testing-library/preact'
 import { useState } from 'preact/hooks'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -26,46 +26,32 @@ describe('MarkdownField', () => {
     expect(onInput).toHaveBeenCalledWith(PRINCIPLES)
   })
 
-  it('renders the markdown under Preview', async () => {
+  it('renders the markdown quietly below the field, with no mode to switch into', async () => {
     render(<MarkdownField label="Help text" value={PRINCIPLES} maxLength={2000} onInput={vi.fn()} />)
-
-    screen.getByRole('button', { name: 'Preview Help text' }).click()
 
     expect((await screen.findAllByRole('listitem')).map((item) => item.textContent)).toEqual([
       'Radical inclusion',
       'Leave no trace',
     ])
+    expect(screen.getByLabelText('Help text')).toHaveProperty('value', PRINCIPLES)
+    expect(screen.queryByRole('button', { name: /Preview/ })).toBeNull()
   })
 
-  it('goes back to writing', async () => {
-    render(<MarkdownField label="Help text" value={PRINCIPLES} maxLength={2000} onInput={vi.fn()} />)
+  it('shows no preview of plain words, which is what most people write', () => {
+    render(<MarkdownField label="Help text" value="Bringing a pot." maxLength={2000} onInput={vi.fn()} />)
 
-    screen.getByRole('button', { name: 'Preview Help text' }).click()
-    await screen.findAllByRole('listitem')
-    screen.getByRole('button', { name: 'Write Help text' }).click()
-
-    expect(await screen.findByLabelText('Help text')).toHaveProperty('value', PRINCIPLES)
-  })
-
-  it('says there is nothing to preview rather than showing a blank pane', async () => {
-    render(<MarkdownField label="Help text" value="   " maxLength={2000} onInput={vi.fn()} />)
-
-    screen.getByRole('button', { name: 'Preview Help text' }).click()
-
-    expect(await screen.findByText('Nothing to preview yet.')).toBeTruthy()
+    expect(screen.queryByText('How it will read')).toBeNull()
   })
 
   it('escapes raw HTML in the preview, so it shows what an applicant gets', async () => {
     render(
       <MarkdownField
         label="Help text"
-        value="<script>alert(1)</script>"
+        value="# Heading\n<script>alert(1)</script>"
         maxLength={2000}
         onInput={vi.fn()}
       />,
     )
-
-    screen.getByRole('button', { name: 'Preview Help text' }).click()
 
     expect(await screen.findByText(/alert\(1\)/)).toBeTruthy()
     expect(document.querySelector('script')).toBeNull()
@@ -87,33 +73,26 @@ describe('MarkdownField', () => {
     expect(field.getAttribute('aria-label')).toBeNull()
   })
 
-  it('drops the label association while previewing, when there is no field to name', async () => {
-    render(<MarkdownField label="Help text" value="x" maxLength={2000} onInput={vi.fn()} />)
+  it('writes the syntax rather than talking about it, wherever the field appears', () => {
+    render(<MarkdownField label="Help text" value="" maxLength={2000} onInput={vi.fn()} />)
 
-    screen.getByRole('button', { name: 'Preview Help text' }).click()
-
-    await waitFor(() => expect(screen.queryByLabelText('Help text')).toBeNull())
-    expect(document.querySelector('label')?.getAttribute('for')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Bold in Help text' })).toBeTruthy()
   })
 
-  it('says which view is showing without claiming to be a tab widget', async () => {
-    // `role="tab"` promises a controlled panel and roving focus; these are
-    // toggles, so they say so.
-    render(<MarkdownField label="Help text" value="x" maxLength={2000} onInput={vi.fn()} />)
-
-    expect(screen.queryAllByRole('tab')).toHaveLength(0)
-    expect(screen.getByRole('button', { name: 'Write Help text' }).getAttribute('aria-pressed')).toBe('true')
-    expect(screen.getByRole('button', { name: 'Preview Help text' }).getAttribute('aria-pressed')).toBe(
-      'false',
+  it('names the toolbar after what the field is for where the label is not that', () => {
+    render(
+      <MarkdownField
+        label="Anything more"
+        accessibleName="What you want to say about Sauna at dawn"
+        value=""
+        maxLength={2000}
+        onInput={vi.fn()}
+      />,
     )
 
-    screen.getByRole('button', { name: 'Preview Help text' }).click()
-
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Preview Help text' }).getAttribute('aria-pressed')).toBe(
-        'true',
-      ),
-    )
+    expect(
+      screen.getByRole('button', { name: 'Bold in What you want to say about Sauna at dawn' }),
+    ).toBeTruthy()
   })
 
   it('opens as tall as the text it holds', () => {

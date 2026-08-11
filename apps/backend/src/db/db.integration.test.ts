@@ -1172,6 +1172,8 @@ const FACILITATOR_ATTENDANCE = '20260806150000_facilitator_attendance'
 
 const THREAD_SUBJECT_UNIQUE = '20260811120000_thread_subject_unique'
 
+const SONG_LINK_URL_ONLY = '20260811140000_song_link_url_only'
+
 describe('the facilitator-is-an-attendance migration', () => {
   /**
    * Staged the same way as the places rebuild above, and for the same reason: this
@@ -1648,6 +1650,46 @@ describe('the one-card-per-person-per-burn backfill', () => {
       expect(subjectOf(fresh, 't-song')).toBeNull()
       expect(subjectOf(fresh, 't-other-song')).toBeNull()
       expect(entriesOn(fresh, 't-song')).toEqual(['x-song-1@1'])
+    } finally {
+      fresh.close()
+    }
+  })
+})
+
+describe('the song-link name nothing reads any more', () => {
+  it('leaves each stored link its address and nothing else', () => {
+    const fresh = createDb({ url: ':memory:' })
+    const { staged, kept } = stagedThrough(SONG_LINK_URL_ONLY)
+
+    try {
+      expect(kept).not.toContain(SONG_LINK_URL_ONLY)
+      runMigrations(fresh, staged)
+
+      const aSong = fresh.client.prepare(
+        'insert into song (id, title, body, links, created_at) values (?, ?, ?, ?, ?)',
+      )
+      aSong.run(
+        's-named',
+        'Ashes',
+        '',
+        JSON.stringify([
+          { url: 'https://open.spotify.com/track/1', label: 'Spotify' },
+          { url: 'https://youtu.be/2', label: '' },
+        ]),
+        NOW,
+      )
+      aSong.run('s-bare', 'Zephyr', '', '[]', NOW)
+
+      runMigrations(fresh, migrationsFolder)
+
+      const linksOf = (id: string) =>
+        String(fresh.client.prepare('select links from song where id = ?').get(id)?.links)
+
+      expect(JSON.parse(linksOf('s-named'))).toEqual([
+        { url: 'https://open.spotify.com/track/1' },
+        { url: 'https://youtu.be/2' },
+      ])
+      expect(JSON.parse(linksOf('s-bare'))).toEqual([])
     } finally {
       fresh.close()
     }

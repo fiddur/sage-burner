@@ -152,7 +152,6 @@ const Marks = ({ song, categories }: { song: SongSummary; categories: readonly S
 
   return (
     <span class="song-marks">
-      {song.capo !== null && <span class="song-capo">capo {song.capo}</span>}
       {song.links.length > 0 && (
         <span class="song-has-links" title="There is somewhere to hear it">
           🎧

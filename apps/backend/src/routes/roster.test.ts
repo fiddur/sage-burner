@@ -557,8 +557,6 @@ describe('the same list as a member sees it', () => {
   })
 
   it('carries the face, which the attendees route already gives anybody approved', async () => {
-    // A projection change rather than a permissions one (#305): every member can read every
-    // attendee's avatar through `GET /api/events/:eventId/attendees` already.
     const server = await build()
     const eventId = await givenEvent()
     const ana = await givenAccount('Ana')

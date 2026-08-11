@@ -102,7 +102,7 @@ export const useImageUpload = ({
     }
   }
 
-  const take = (files: readonly File[], at?: number) => {
+  const take = (files: readonly File[]) => {
     if (upload === undefined || files.length === 0) return
 
     setError(undefined)
@@ -111,7 +111,7 @@ export const useImageUpload = ({
     if (usable.length < files.length) setError(NOT_A_PICTURE)
     if (usable.length === 0) return
 
-    let cursor = at ?? latest.current.length
+    let cursor = latest.current.length
     const started: { file: File; placeholder: string }[] = []
 
     for (const file of usable) {
@@ -137,9 +137,6 @@ export const useImageUpload = ({
     })
   }
 
-  const at = (target: EventTarget | null) =>
-    target instanceof HTMLTextAreaElement ? target.selectionStart : undefined
-
   return {
     enabled: upload !== undefined,
     handlers: {
@@ -148,14 +145,14 @@ export const useImageUpload = ({
         if (pictures.length === 0) return
 
         event.preventDefault()
-        take(pictures, at(event.currentTarget))
+        take(pictures)
       },
       onDrop: (event) => {
         const pictures = upload === undefined ? [] : imagesIn(event.dataTransfer?.files)
         if (pictures.length === 0) return
 
         event.preventDefault()
-        take(pictures, at(event.currentTarget))
+        take(pictures)
       },
       onDragOver: (event) => {
         if (upload === undefined) return

@@ -9,7 +9,7 @@ export const AddPicture = ({ pictures, label }: { pictures: ImageUpload; label: 
     <>
       {/* A `div`, not a `p`: `ErrorText` is a paragraph and one mount point is a row wrapper. */}
       <div class="row">
-        <label class="link-button">
+        <label class="link-button add-picture">
           Add a picture
           <input
             type="file"

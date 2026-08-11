@@ -185,7 +185,7 @@ describe('putting a song in the book', () => {
 
     const made = await add(server, ada.cookie, {
       title: 'Fire',
-      links: [{ url: 'javascript:alert(1)', label: 'Listen' }],
+      links: [{ url: 'javascript:alert(1)' }],
     })
 
     expect(made.statusCode).toBe(400)
@@ -197,11 +197,23 @@ describe('putting a song in the book', () => {
 
     const made = await add(server, ada.cookie, {
       title: 'Fire',
-      links: [{ url: 'https://open.spotify.com/track/1', label: '' }],
+      links: [{ url: 'https://open.spotify.com/track/1' }],
     })
 
     expect(made.statusCode).toBe(201)
-    expect(made.json().song.links).toEqual([{ url: 'https://open.spotify.com/track/1', label: '' }])
+    expect(made.json().song.links).toEqual([{ url: 'https://open.spotify.com/track/1' }])
+  })
+
+  it('refuses a name for a link, which nothing shows any more', async () => {
+    const server = await build()
+    const ada = await givenAccount('Ada')
+
+    const made = await add(server, ada.cookie, {
+      title: 'Fire',
+      links: [{ url: 'https://open.spotify.com/track/1', label: 'The 1972 one' }],
+    })
+
+    expect(made.statusCode).toBe(400)
   })
 
   it('refuses a capo off the neck', async () => {

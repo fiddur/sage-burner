@@ -273,12 +273,7 @@ a:hover {
   gap: 0.5rem;
 }
 
-/* Below `.avatar`, which sets the same properties at equal specificity: above it, the size
-   would lose to the base rule. */
 .person-cell-face {
-  width: 2rem;
-  height: 2rem;
-  font-size: 0.8rem;
   flex: none;
 }
 
@@ -611,35 +606,40 @@ a:hover {
   overflow: hidden;
 }
 
-.md-field-tabs {
+/* Where the Write/Preview tabs were. A mode switch is the chrome that reads as a technical
+   tool (#473); what sits here now writes the syntax rather than talking about it. */
+.syntax-row {
   display: flex;
+}
+
+/* The strip only reads as one inside the bordered box; over a comment box it is four buttons. */
+.md-field > .syntax-row {
   border-bottom: 1px solid var(--line);
   background: color-mix(in srgb, var(--ink) 4%, transparent);
 }
 
-.md-field-tab {
-  padding: 0.4rem 0.9rem;
+.syntax-button {
+  min-width: 2.2rem;
+  padding: 0.3rem 0.6rem;
   border: 0;
-  /* Transparent rather than absent, so the current tab's accent adds no shift. */
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
   background: none;
   color: var(--muted);
-  font: inherit;
-  font-size: 0.85rem;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.9rem;
+  line-height: 1.4;
   cursor: pointer;
 }
 
-.md-field-tab:hover {
+.syntax-button:hover {
   color: var(--ink);
 }
 
-/* Weight as well as colour: colour alone is the signal some readers do not get. */
-.md-field-tab.is-current {
-  color: var(--ember);
-  border-bottom-color: var(--ember);
-  background: var(--paper);
-  font-weight: 600;
+.syntax-button.is-bold {
+  font-weight: 700;
+}
+
+.syntax-button.is-italic {
+  font-style: italic;
 }
 
 .md-field-write {
@@ -666,22 +666,26 @@ a:hover {
   outline-offset: -2px;
 }
 
-/* A floor, so switching to an empty preview does not collapse the box. */
-.md-field-body {
-  padding: 0.6rem 0.75rem;
-  min-height: 5rem;
+/* Quiet, and only there once the text has syntax in it: a preview of plain words beside the
+   plain words is noise, and it is the tab that made this read as a tool (#473). */
+.md-field-preview {
+  border-left: 2px solid var(--line);
+  padding-left: 0.75rem;
 }
 
-.md-field-body > .form-note {
-  margin: 0;
+.md-field-preview .markdown-preview > :first-child {
+  margin-top: 0.2rem;
 }
 
-.md-field-body .markdown-preview > :first-child {
-  margin-top: 0;
-}
-
-.md-field-body .markdown-preview > :last-child {
+.md-field-preview .markdown-preview > :last-child {
   margin-bottom: 0;
+}
+
+/* Furniture of the field it belongs to, not a section of the page. The body font is a serif
+   at full size, which put it above the card title it sat under (#473). */
+.add-picture {
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.85rem;
 }
 
 /* Was a class hook with no rules, so "Apply to join" and "Log in" touched. */
@@ -2418,6 +2422,15 @@ img.avatar {
   line-height: 1.45;
   white-space: pre;
   overflow-wrap: normal;
+  /* Chord sheets are wide, and a pasted one wraps mid-line in a column-width box (#474). */
+  resize: both;
+  max-width: none;
+}
+
+/* `.form` is 26rem, which is the column the widened box would overflow. Wide is what a chord
+   sheet is, and the song page has the room the form was not taking. */
+.song-form {
+  max-width: 100%;
 }
 
 .song-list {
@@ -2466,7 +2479,24 @@ img.avatar {
   margin: 0.5rem 0;
 }
 
+/* Icons and nothing else (#474): the URL as text said nothing anybody needed, and the name the
+   form used to ask for was a name nobody had. The host is what says where it goes, and the
+   `aria-label` is what says it to a reader who cannot see the icon. */
 .song-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+}
+
+.song-link {
+  font-size: 1.4rem;
+  line-height: 1;
+  text-decoration: none;
+}
+
+/* Still a list in the edit form, where the URL has to be readable to be removable. */
+.song-links-edit {
   list-style: none;
   margin: 0.5rem 0;
   padding: 0;
@@ -2483,10 +2513,44 @@ img.avatar {
   font-size: 0.9rem;
 }
 
-.song-key {
-  min-width: 5.5rem;
+.song-key-label {
   color: var(--muted);
   font-size: 0.85rem;
+}
+
+.song-key {
+  min-width: 2.5rem;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/*
+  Reached for mid-song, guitar in one hand, which is exactly when it has scrolled away (#474).
+
+  Sticky rather than fixed: it keeps its place in the flow, so the last lines of a song end
+  above it and the page needs no bottom padding to compensate. The phone's own nav is fixed at
+  `bottom: 0` with a higher stacking order, so this sits above its height there.
+*/
+.song-play {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0.5rem 0 calc(0.5rem + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  background: var(--paper);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 45rem) {
+  /* Clear of `.bottom-tab`'s 3.5rem, which is fixed over everything down here. */
+  .song-play {
+    bottom: calc(3.5rem + env(safe-area-inset-bottom));
+  }
 }
 
 .song-speed {
