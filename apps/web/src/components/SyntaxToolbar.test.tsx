@@ -78,7 +78,6 @@ describe('the toolbar over a composer', () => {
   })
 
   it('refuses to write past the length the API accepts', () => {
-    // `maxlength` bounds typing and not a programmatic insert — the #457 rule again.
     render(<Held initial={'x'.repeat(19)} maxLength={20} />)
     select(0, 19)
 

@@ -452,8 +452,6 @@ describe('what an edit sends', () => {
   })
 
   it('walks the fields it is given, so one added to the form cannot be left behind', () => {
-    // The defect this replaced (#469): the list it iterated checked that every entry was a key
-    // and not that every key was an entry, so a new field silently stopped being sent on an edit.
     expect(Object.keys(changedFields(undefined, editable))).toEqual(Object.keys(editable))
   })
 })

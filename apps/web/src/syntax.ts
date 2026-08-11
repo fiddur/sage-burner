@@ -14,10 +14,6 @@ const fits = (value: string, added: number, maxLength: number | undefined): bool
 
 const BOLD = '**'
 
-/**
- * Underscores rather than a single asterisk. `*` around a selection inside `**bold**` reads as
- * the unwrap below and turns bold into italic, and the two markers render the same.
- */
 const ITALIC = '_'
 
 const withWrappedSelection = (

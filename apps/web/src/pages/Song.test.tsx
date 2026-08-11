@@ -260,8 +260,6 @@ describe('a song’s page', () => {
   })
 
   it('asks before taking a song out, and says where it goes', async () => {
-    // One tap soft-deleted it with no question asked, which reads as data loss to anybody
-    // who does not know about the trash at the foot of the songbook (#474).
     const deleteSong = vi.fn<SongApi['deleteSong']>(() => Promise.resolve(undefined))
     renderPage(stub({ deleteSong }))
 

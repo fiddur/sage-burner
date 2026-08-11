@@ -76,8 +76,6 @@ describe('the songbook', () => {
   })
 
   it('says nothing about the capo, which is knowledge for once the song is open', async () => {
-    // A chip per row is noise at the length a songbook grows to (#474); the song's own page
-    // still shows it.
     renderPage(stub({}, [aSong({ id: 's-1', title: 'Ashes', capo: 3 })]))
 
     await screen.findByRole('link', { name: 'Ashes' })
