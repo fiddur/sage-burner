@@ -24,6 +24,7 @@ import { ChipRow } from '../components/ChipRow.tsx'
 import { DreamThread } from '../components/DreamThread.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
+import { Heart } from '../components/Heart.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { localDay } from '../datetime.ts'
@@ -46,6 +47,8 @@ export type FeedApi = Pick<
   | 'deletePost'
   | 'getEventAttendees'
   | 'getApprovedAccounts'
+  | 'supportThread'
+  | 'withdrawSupportForThread'
 >
 
 interface Happening {
@@ -112,6 +115,13 @@ export const Feed = ({ api }: { api: FeedApi }) => {
     },
     showAll: (id: string) => {
       run(async () => held((await api.getThread(id)).thread), 'Could not load the rest of it.')
+    },
+    heart: (id: string, hearting: boolean) => {
+      run(
+        async () =>
+          held((hearting ? await api.supportThread(id) : await api.withdrawSupportForThread(id)).thread),
+        'Could not do that just now.',
+      )
     },
     reword: (threadId: string, id: string, title: string, body: string, done: () => void) => {
       run(async () => {
@@ -440,6 +450,7 @@ const Card = ({
     showAll: (id: string) => void
     reword: (threadId: string, id: string, title: string, body: string, done: () => void) => void
     takeBack: (threadId: string, id: string) => void
+    heart: (id: string, hearting: boolean) => void
   }
   upload: UploadImage
   people: readonly Mentionable[]
@@ -492,14 +503,24 @@ const Card = ({
         onShowAll={() => talk.showAll(card.id)}
       />
 
-      {category !== undefined && (
-        <Chip
-          category={category}
-          on={on?.includes(category) ?? false}
+      <p class="feed-card-foot">
+        <Heart
+          what={card.title}
+          hearted={card.supported_by_me}
+          count={card.support_count}
           busy={busy}
-          onToggle={() => onToggle(category)}
+          onHeart={(hearting) => talk.heart(card.id, hearting)}
         />
-      )}
+
+        {category !== undefined && (
+          <Chip
+            category={category}
+            on={on?.includes(category) ?? false}
+            busy={busy}
+            onToggle={() => onToggle(category)}
+          />
+        )}
+      </p>
     </li>
   )
 }

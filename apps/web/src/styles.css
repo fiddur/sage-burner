@@ -1695,6 +1695,15 @@ a.person-badge:focus-visible span:last-child {
   padding: 0.5rem 0.75rem;
 }
 
+/* The heart and the notification chip, which used to sit loose at the tail of the card. */
+.feed-card-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.5rem 0 0;
+}
+
 .feed-card-head {
   margin: 0;
   font-weight: 600;
@@ -2273,8 +2282,8 @@ img.avatar {
   }
 }
 
-/* The faces of whoever gave a dream a ❤️‍🔥. Overlapped, like every stack of avatars. */
-.dream-supporters {
+/* The faces of whoever gave something a ❤️‍🔥. Overlapped, like every stack of avatars. */
+.faces {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
@@ -2284,26 +2293,26 @@ img.avatar {
    body copy, and an underline through one looks like a mistake. Only a visually-hidden
    span is inside it today, so nothing underlines — which is why this was the one link
    that escaped. */
-.dream-supporter {
+.face {
   display: inline-flex;
   margin-inline-start: -0.35rem;
   color: inherit;
   text-decoration: none;
 }
 
-.dream-supporter:first-child {
+.face:first-child {
   margin-inline-start: 0;
 }
 
 /* `.dream-facilitator`'s own gap separates a face from the chip text beside it in the
    grid. In a stack there is no text, and it cancelled the overlap above exactly — so
    the faces sat in a row while the rule said they were overlapped. */
-.dream-supporter .dream-facilitator {
+.face .dream-facilitator {
   margin-inline-start: 0;
 }
 
 /* So an overlapped circle reads as in front of the one behind it, not merged. */
-.dream-supporter .avatar {
+.face .avatar {
   outline: 2px solid var(--paper);
 }
 
@@ -2524,6 +2533,15 @@ img.avatar {
   gap: 0.5rem;
   margin: 0.5rem 0 0;
   font-size: 0.9rem;
+}
+
+/* The heart and whoever gave one, above the talk about the song (#479). */
+.song-hearts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 1rem 0 0;
 }
 
 .song-key-label {

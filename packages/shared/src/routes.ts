@@ -815,6 +815,11 @@ export const apiRoutes = {
     fastify: '/api/sessions/:id/support/me',
     path: (id: string) => `/api/sessions/${encodeURIComponent(id)}/support/me`,
   },
+  supportThread: {
+    method: 'POST',
+    fastify: '/api/threads/:id/support/me',
+    path: (id: string) => `/api/threads/${encodeURIComponent(id)}/support/me`,
+  },
   transferMyPlace: {
     method: 'POST',
     fastify: '/api/events/:eventId/attendance/me/transfer',
@@ -959,6 +964,11 @@ export const apiRoutes = {
     method: 'DELETE',
     fastify: '/api/sessions/:id/support/me',
     path: (id: string) => `/api/sessions/${encodeURIComponent(id)}/support/me`,
+  },
+  withdrawSupportForThread: {
+    method: 'DELETE',
+    fastify: '/api/threads/:id/support/me',
+    path: (id: string) => `/api/threads/${encodeURIComponent(id)}/support/me`,
   },
   webManifest: {
     method: 'GET',

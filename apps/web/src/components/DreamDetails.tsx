@@ -1,20 +1,17 @@
 import type { EventAttendeesResponse, Place, Session, SessionUpdate } from '@sage-burner/shared'
 
-import { profilePage } from '@sage-burner/shared'
-
 import type { UploadImage } from '../image-upload.ts'
 import type { Person } from './HelperStrip.tsx'
 import type { DreamTalk } from './OpenedDream.tsx'
 
 import { toLocalInput } from '../datetime.ts'
 import { renderMarkdown } from '../markdown.ts'
-import { Avatar } from './Avatar.tsx'
 import { DreamFields } from './DreamFields.tsx'
 import { DreamPanel } from './DreamPanel.tsx'
 import { DreamThread } from './DreamThread.tsx'
+import { Faces } from './Faces.tsx'
 import { HelperStrip } from './HelperStrip.tsx'
 import { IconButton } from './IconButton.tsx'
-import { NAMELESS } from './PersonBadge.tsx'
 import { WithdrawDream } from './WithdrawDream.tsx'
 
 export const DreamDetails = ({
@@ -105,28 +102,7 @@ export const DreamDetails = ({
             {dream.supporters.length === 0 ? (
               <span class="form-note">Nobody has said they want this yet.</span>
             ) : (
-              <span class="dream-supporters">
-                {dream.supporters.map((person) => {
-                  const who = person.name ?? NAMELESS
-
-                  return (
-                    <a
-                      key={person.account_id}
-                      class="dream-supporter"
-                      title={who}
-                      href={profilePage(person.account_id)}
-                    >
-                      <Avatar
-                        accountId={person.account_id}
-                        name={person.name}
-                        avatar={person.avatar}
-                        size="dream-facilitator"
-                      />
-                      <span class="visually-hidden">{who}</span>
-                    </a>
-                  )
-                })}
-              </span>
+              <Faces people={dream.supporters} />
             )}
           </p>
 

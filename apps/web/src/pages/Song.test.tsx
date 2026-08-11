@@ -46,6 +46,9 @@ const aThread = (over: Partial<Thread> = {}): Thread => ({
   own: true,
   gone: false,
   entry_count: 1,
+  supporters: [],
+  support_count: 0,
+  supported_by_me: false,
   last_at: '2026-07-02T00:00:00.000Z',
   entries: [
     {
@@ -63,15 +66,19 @@ const aThread = (over: Partial<Thread> = {}): Thread => ({
 const stub = (
   over: Partial<SongApi> = {},
   song: Song = aSong(),
+  thread: Partial<Thread> = {},
   categories: SongCategory[] = [CHANT],
 ): SongApi => ({
-  getSong: () => Promise.resolve({ song, thread: aThread() }),
+  getSong: () => Promise.resolve({ song, thread: aThread(thread) }),
   getSongCategories: () => Promise.resolve({ categories }),
   getApprovedAccounts: () => Promise.resolve({ accounts: [{ account_id: 'a-2', name: 'Bo', avatar: null }] }),
   updateSong: () => Promise.reject(new Error('updateSong is not stubbed here')),
   deleteSong: () => Promise.reject(new Error('deleteSong is not stubbed here')),
   restoreSong: () => Promise.reject(new Error('restoreSong is not stubbed here')),
   getThread: () => Promise.reject(new Error('getThread is not stubbed here')),
+  supportThread: () => Promise.reject(new Error('supportThread is not stubbed here')),
+  withdrawSupportForThread: () => Promise.reject(new Error('withdrawSupportForThread is not stubbed here')),
+
   postComment: () => Promise.reject(new Error('postComment is not stubbed here')),
   updateComment: () => Promise.reject(new Error('updateComment is not stubbed here')),
   deleteComment: () => Promise.reject(new Error('deleteComment is not stubbed here')),
@@ -300,6 +307,33 @@ describe('a song’s page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Put it back' }))
 
     await waitFor(() => expect(restoreSong).toHaveBeenCalledWith('s-1'))
+  })
+
+  it('offers a heart on the song, with whoever has given one', async () => {
+    renderPage(
+      stub({}, aSong(), {
+        support_count: 2,
+        supported_by_me: true,
+        supporters: [
+          { account_id: 'a-1', name: 'Ada', avatar: null },
+          { account_id: 'a-2', name: 'Bea', avatar: null },
+        ],
+      }),
+    )
+
+    const heart = await screen.findByRole('button', { name: 'Take back your heart for Fire in the sky' })
+    expect(heart.getAttribute('aria-pressed')).toBe('true')
+    expect(heart.textContent).toContain('2')
+    expect(screen.getByRole('link', { name: 'Ada' })).toBeTruthy()
+  })
+
+  it('gives one', async () => {
+    const supportThread = vi.fn<SongApi['supportThread']>(() => Promise.resolve({ thread: aThread() }))
+    renderPage(stub({ supportThread }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Give a heart to Fire in the sky' }))
+
+    await waitFor(() => expect(supportThread).toHaveBeenCalledWith('t-1'))
   })
 
   it('draws the conversation the song came with, and says something on it', async () => {

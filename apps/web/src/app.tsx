@@ -62,6 +62,8 @@ export type RoutesApi = Pick<
   | 'getActiveEvent'
   | 'getFeed'
   | 'getMapLink'
+  | 'supportThread'
+  | 'withdrawSupportForThread'
   | 'setMapLink'
   | 'getThread'
   | 'postComment'

@@ -18,7 +18,9 @@ import type { Mentionable } from '../mentioning.ts'
 
 import { DreamThread } from '../components/DreamThread.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
+import { Faces } from '../components/Faces.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
+import { Heart } from '../components/Heart.tsx'
 import { IconButton } from '../components/IconButton.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
@@ -52,6 +54,8 @@ export type SongApi = Pick<
   | 'deleteComment'
   | 'uploadImage'
   | 'getApprovedAccounts'
+  | 'supportThread'
+  | 'withdrawSupportForThread'
 >
 
 interface Held {
@@ -531,6 +535,26 @@ const Talk = ({
 
   return (
     <section>
+      <p class="song-hearts">
+        <Heart
+          what={held.title}
+          hearted={held.supported_by_me}
+          count={held.support_count}
+          busy={busy}
+          onHeart={(hearting) =>
+            run(
+              async () =>
+                setThread(
+                  (hearting ? await api.supportThread(held.id) : await api.withdrawSupportForThread(held.id))
+                    .thread,
+                ),
+              'Could not do that just now.',
+            )
+          }
+        />
+        <Faces people={held.supporters} />
+      </p>
+
       <h2>What people say</h2>
       <ErrorText message={error} />
 

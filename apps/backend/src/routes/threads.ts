@@ -1,12 +1,13 @@
 import type {
   NotificationCategory,
+  Supporter,
   Thread,
   ThreadEntityType,
   ThreadEntry,
   ThreadEntryKind,
   ThreadResponse,
 } from '@sage-burner/shared'
-import type { FastifyInstance, FastifyReply } from 'fastify'
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
 import {
   apiRoutes,
@@ -27,18 +28,22 @@ import type { GuardDeps } from '../auth/guards.ts'
 import type { Database, Transaction } from '../db/index.ts'
 import type { Notifier } from '../push/notify.ts'
 
+import { attendanceFor } from '../attendances.ts'
 import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
 import {
   account,
+  accountAvatar,
   attendance,
   event,
   post,
   session,
   sessionHelper,
+  sessionSupport,
   song,
   thread,
   threadEntry,
+  threadSupport,
 } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { approvedAccounts, displayName, namedBy, wants } from '../push/notify.ts'
@@ -229,6 +234,53 @@ export const recentThreads = async (
   )
 }
 
+type Hearts = ReadonlyMap<string, Supporter[]>
+
+/**
+ * A dream's heart stays `session_support` — the heart on its card and the heart on its schedule
+ * chip are one heart, and two like-buttons with different meanings on one dream would be worse
+ * than none (#479). Everything else is account-keyed `thread_support`.
+ */
+const heartsFor = async (db: Database, ids: readonly string[]): Promise<Hearts> => {
+  const rows = await db
+    .select({
+      thread_id: threadSupport.thread_id,
+      account_id: account.id,
+      name: account.name,
+      avatar: accountAvatar.updated_at,
+    })
+    .from(threadSupport)
+    .innerJoin(account, eq(account.id, threadSupport.account_id))
+    .leftJoin(accountAvatar, eq(accountAvatar.account_id, account.id))
+    .where(inArray(threadSupport.thread_id, [...ids]))
+    .orderBy(asc(account.name), asc(account.id))
+
+  const dreams = await db
+    .select({
+      thread_id: thread.id,
+      account_id: account.id,
+      name: account.name,
+      avatar: accountAvatar.updated_at,
+    })
+    .from(thread)
+    .innerJoin(sessionSupport, eq(sessionSupport.session_id, thread.entity_id))
+    .innerJoin(attendance, eq(attendance.id, sessionSupport.attendance_id))
+    .innerJoin(account, eq(account.id, attendance.account_id))
+    .leftJoin(accountAvatar, eq(accountAvatar.account_id, account.id))
+    .where(and(inArray(thread.id, [...ids]), eq(thread.entity_type, 'session')))
+    .orderBy(asc(account.name), asc(account.id))
+
+  const held = new Map<string, Supporter[]>()
+  for (const row of [...rows, ...dreams]) {
+    held.set(row.thread_id, [
+      ...(held.get(row.thread_id) ?? []),
+      { account_id: row.account_id, name: row.name, avatar: row.avatar },
+    ])
+  }
+
+  return held
+}
+
 export const readThreads = async (
   db: Database,
   ids: readonly string[],
@@ -325,6 +377,7 @@ export const readThreads = async (
   }
 
   const byId = new Map(rows.map((row) => [row.id, row]))
+  const hearts = await heartsFor(db, ids)
 
   const namesById = await mentionedNames(db, [
     ...entries.map((row) => row.body),
@@ -351,6 +404,9 @@ export const readThreads = async (
         entry_count: counts?.get(id) ?? shown.length,
         last_at: last?.created_at ?? null,
         entries: shown,
+        supporters: hearts.get(id) ?? [],
+        support_count: (hearts.get(id) ?? []).length,
+        supported_by_me: (hearts.get(id) ?? []).some((person) => person.account_id === viewer?.account_id),
       } satisfies Thread,
     ]
   })
@@ -650,6 +706,75 @@ export const registerThreadRoutes = (
 
       return await whole(reply, comment.thread_id, viewer)
     },
+  )
+
+  /**
+   * One route for every kind of card, dispatching on what backs the heart, so the web has one
+   * call and a dream's card cannot come to mean something different from its chip (#479).
+   * Attending is what a dream's heart asks for; everything else asks only to be approved.
+   */
+  const heart = async (
+    request: FastifyRequest<{ Params: { id: string } }>,
+    reply: FastifyReply,
+    put: boolean,
+  ) => {
+    void noStore(reply)
+
+    const viewer = await viewerFor(request, { db, sessions })
+    if (viewer === undefined) return sendError(reply, 401)
+
+    const [found] = await db
+      .select({
+        id: thread.id,
+        event_id: thread.event_id,
+        entity_type: thread.entity_type,
+        entity_id: thread.entity_id,
+      })
+      .from(thread)
+      .where(eq(thread.id, request.params.id))
+      .limit(1)
+
+    if (found === undefined) return sendError(reply, 404)
+
+    if (found.entity_type === 'session') {
+      const mine =
+        found.event_id === null ? undefined : await attendanceFor(db, found.event_id, viewer.account_id)
+      if (mine === undefined) return sendError(reply, 403)
+
+      if (put) {
+        await db
+          .insert(sessionSupport)
+          .values({ session_id: found.entity_id, attendance_id: mine })
+          .onConflictDoNothing()
+      } else {
+        await db
+          .delete(sessionSupport)
+          .where(and(eq(sessionSupport.session_id, found.entity_id), eq(sessionSupport.attendance_id, mine)))
+      }
+    } else if (put) {
+      await db
+        .insert(threadSupport)
+        .values({ thread_id: found.id, account_id: viewer.account_id })
+        .onConflictDoNothing()
+    } else {
+      await db
+        .delete(threadSupport)
+        .where(and(eq(threadSupport.thread_id, found.id), eq(threadSupport.account_id, viewer.account_id)))
+    }
+
+    return await whole(reply, found.id, viewer)
+  }
+
+  app.post<{ Params: { id: string } }>(
+    apiRoutes.supportThread.fastify,
+    { preHandler: requireApproved },
+    async (request, reply) => await heart(request, reply, true),
+  )
+
+  app.delete<{ Params: { id: string } }>(
+    apiRoutes.withdrawSupportForThread.fastify,
+    { preHandler: requireApproved },
+    async (request, reply) => await heart(request, reply, false),
   )
 
   const whole = async (reply: FastifyReply, threadId: string, viewer?: Viewer) => {

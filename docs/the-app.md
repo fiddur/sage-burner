@@ -543,6 +543,23 @@ deletes their own, and an admin may delete any.
 hand up or down, renamed, moved, edited, withdrawn. A ❤️‍🔥 does not — the faces are on
 the dream already, and twenty hearts is twenty lines nobody reads.
 
+**A heart on every card** (#479), and it stays that quiet everywhere: no notification, no
+`activity` row, no entry, no bump up the feed. A heart is for the next reader to see, not a bell
+for the author.
+
+**Two tables behind one button.** A dream's heart is `session_support`, unchanged — the heart on
+its card and the heart on its schedule chip are one heart, and two like-buttons meaning different
+things on one dream would be worse than none. Everything else is `thread_support (thread_id,
+account_id)`, account-keyed rather than attendance-keyed because the songbook belongs to no burn
+and so has no attendance to hang one on. The count is derived at read, never stored, and the
+insert is `onConflictDoNothing`, so pressing twice cannot inflate it.
+
+**One route pair over both**, `POST`/`DELETE /api/threads/:id/support/me`, dispatching on
+`entity_type` — so the web has one call for every card, and a dream's rule travels with it:
+hearting one still asks for an attendance at that burn, which is what `asAttendee` asks on the
+dream's own route. The song page shows the faces as well as the count, through the same overlapped
+row the dream panel uses — now `Faces`, since it has a second caller.
+
 **Coalescing happens on the write.** Laying out the grid is a drag every few seconds, so
 a second line of the same kind by the same person with nothing in between rewrites the
 first rather than adding to it. On the write and not the read, so nothing accumulates and

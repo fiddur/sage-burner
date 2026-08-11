@@ -58,6 +58,9 @@ const aCard = (over: Partial<Thread> & Pick<Thread, 'id' | 'title'>): Thread => 
   own: false,
   gone: false,
   entry_count: 1,
+  supporters: [],
+  support_count: 0,
+  supported_by_me: false,
   last_at: '2026-08-07T18:00:00.000Z',
   entries: [anEntry({ id: 't-1', body: 'offered this dream', kind: 'offered' })],
   ...over,
@@ -80,6 +83,8 @@ const stub = (over: Partial<FeedApi> = {}, activity: Activity[] = TWO, threads: 
   getMyNotificationSettings: () => Promise.resolve({ on: [...DEFAULTS], email: [] }),
   updateMyNotificationSettings: () => Promise.resolve({ on: [...DEFAULTS], email: [] }),
   getThread: () => Promise.reject(new Error('getThread is not stubbed here')),
+  supportThread: () => Promise.reject(new Error('supportThread is not stubbed here')),
+  withdrawSupportForThread: () => Promise.reject(new Error('withdrawSupportForThread is not stubbed here')),
   addPost: () => Promise.reject(new Error('addPost is not stubbed here')),
   getEventAttendees: () =>
     Promise.resolve({
@@ -187,6 +192,66 @@ describe('the chip row over the feed', () => {
     for (const name of ['Burns', 'Dreams', 'People', 'Posts', 'Songs']) {
       expect(await screen.findByRole('button', { name })).toBeTruthy()
     }
+  })
+})
+
+describe('the heart on a card', () => {
+  it('is offered on every kind of card, not only on a dream', async () => {
+    renderPage(
+      stub({}, [], [aCard({ id: 'c-1', title: 'The planning call is Sunday', entity_type: 'post' })]),
+    )
+
+    expect(
+      await screen.findByRole('button', { name: 'Give a heart to The planning call is Sunday' }),
+    ).toBeTruthy()
+  })
+
+  it('shows the count and that it is yours', async () => {
+    renderPage(
+      stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn', support_count: 3, supported_by_me: true })]),
+    )
+
+    const heart = await screen.findByRole('button', { name: 'Take back your heart for Sauna at dawn' })
+    expect(heart.getAttribute('aria-pressed')).toBe('true')
+    expect(heart.textContent).toContain('3')
+  })
+
+  it('gives one', async () => {
+    const supportThread = vi.fn<FeedApi['supportThread']>(() =>
+      Promise.resolve({
+        thread: aCard({ id: 'c-1', title: 'Sauna at dawn', support_count: 1, supported_by_me: true }),
+      }),
+    )
+    renderPage(stub({ supportThread }, [], [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Give a heart to Sauna at dawn' }))
+
+    await waitFor(() => expect(supportThread).toHaveBeenCalledWith('c-1'))
+  })
+
+  it('takes it back', async () => {
+    const withdrawSupportForThread = vi.fn<FeedApi['withdrawSupportForThread']>(() =>
+      Promise.resolve({ thread: aCard({ id: 'c-1', title: 'Sauna at dawn' }) }),
+    )
+    renderPage(
+      stub(
+        { withdrawSupportForThread },
+        [],
+        [aCard({ id: 'c-1', title: 'Sauna at dawn', support_count: 1, supported_by_me: true })],
+      ),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Take back your heart for Sauna at dawn' }))
+
+    await waitFor(() => expect(withdrawSupportForThread).toHaveBeenCalledWith('c-1'))
+  })
+
+  it('says no number where nobody has given one', async () => {
+    renderPage(stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
+
+    expect((await screen.findByRole('button', { name: 'Give a heart to Sauna at dawn' })).textContent).toBe(
+      '♡',
+    )
   })
 })
 

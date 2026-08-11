@@ -519,6 +519,16 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
         method: apiRoutes.sendTestEmail.method,
       }),
 
+    supportThread: (id: string) =>
+      request<ThreadResponse>(apiRoutes.supportThread.path(id), {
+        method: apiRoutes.supportThread.method,
+      }),
+
+    withdrawSupportForThread: (id: string) =>
+      request<ThreadResponse>(apiRoutes.withdrawSupportForThread.path(id), {
+        method: apiRoutes.withdrawSupportForThread.method,
+      }),
+
     getMapLink: (signal?: AbortSignal) => request<MapLinkResponse>(apiRoutes.getMapLink.path(), { signal }),
 
     setMapLink: (body: BodyOf<'setMapLink'>) =>

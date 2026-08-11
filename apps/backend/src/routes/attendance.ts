@@ -31,16 +31,6 @@ export const stayAt = async (db: Database, eventId: string, accountId: string) =
   return row === undefined ? undefined : { ...row, helping_option_ids: await helpingIdsFor(db, row.id) }
 }
 
-export const accountForAttendance = async (db: Database, attendanceId: string) => {
-  const [row] = await db
-    .select({ account_id: attendance.account_id })
-    .from(attendance)
-    .where(eq(attendance.id, attendanceId))
-    .limit(1)
-
-  return row?.account_id
-}
-
 export const joinBurn = async (db: Database, eventId: string, accountId: string, now: () => Date) => {
   const found = await openEventNow(db, now, eventId)
   if (found === undefined) return undefined
@@ -67,16 +57,6 @@ export const joinBurn = async (db: Database, eventId: string, accountId: string,
 
   const made = await stayAt(db, found.id, accountId)
   return made === undefined ? undefined : { stay: made, created: true }
-}
-
-export const attendanceFor = async (db: Database, eventId: string, accountId: string) => {
-  const [row] = await db
-    .select({ id: attendance.id })
-    .from(attendance)
-    .where(and(eq(attendance.event_id, eventId), eq(attendance.account_id, accountId)))
-    .limit(1)
-
-  return row?.id
 }
 
 export const handOverPlace = (

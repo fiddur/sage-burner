@@ -14,6 +14,13 @@ export const threadEntrySchema = z.object({
 })
 export type ThreadEntry = z.infer<typeof threadEntrySchema>
 
+export const supporterSchema = z.object({
+  account_id: idSchema,
+  name: z.string().nullable(),
+  avatar: dateTimeSchema.nullable(),
+})
+export type Supporter = z.infer<typeof supporterSchema>
+
 export const threadSchema = z.object({
   id: idSchema,
   event_id: idSchema.nullable(),
@@ -28,6 +35,9 @@ export const threadSchema = z.object({
   entry_count: z.int().min(0),
   last_at: dateTimeSchema.nullable(),
   entries: z.array(threadEntrySchema),
+  supporters: z.array(supporterSchema),
+  support_count: z.int().min(0),
+  supported_by_me: z.boolean(),
 })
 export type Thread = z.infer<typeof threadSchema>
 

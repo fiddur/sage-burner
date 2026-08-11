@@ -27,6 +27,9 @@ const aThread = (entries: ThreadEntry[]): Thread => ({
   own: false,
   gone: false,
   entry_count: entries.length,
+  supporters: [],
+  support_count: 0,
+  supported_by_me: false,
   last_at: '2026-08-07T18:00:00.000Z',
   entries,
 })
