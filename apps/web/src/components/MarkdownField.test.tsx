@@ -47,7 +47,7 @@ describe('MarkdownField', () => {
     render(
       <MarkdownField
         label="Help text"
-        value="# Heading\n<script>alert(1)</script>"
+        value={'# Heading\n<script>alert(1)</script>'}
         maxLength={2000}
         onInput={vi.fn()}
       />,

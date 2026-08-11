@@ -28,13 +28,10 @@ describe('writing bold', () => {
   })
 
   it('wraps a selection at the very start, where there is nothing before it to read', () => {
-    // `slice` with a negative start reads from the end of the string, so the unwrap check
-    // has to refuse the boundary rather than ask what is before the first character.
     expect(written('bold', 'sauna', at('', 0, 5)).value).toBe('**sauna**')
   })
 
   it('refuses when the markers would not fit, which the field cannot refuse for it', () => {
-    // `maxlength` does not apply to a programmatic insert — the #457 rule.
     const value = 'x'.repeat(19)
 
     expect(written('bold', value, at('', 0, 19), 20).value).toBe(value)

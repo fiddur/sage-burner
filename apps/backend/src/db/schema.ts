@@ -762,6 +762,43 @@ export const threadEntry = sqliteTable(
   ],
 )
 
+/**
+ * Account-keyed, unlike `session_support`: the songbook belongs to no burn, so there is no
+ * attendance to hang a heart on, and nothing about liking a post or welcoming somebody needs
+ * scoping to one. A dream's heart stays `session_support` — one heart, one table (#479).
+ */
+export const threadSupport = sqliteTable(
+  'thread_support',
+  {
+    thread_id: text('thread_id')
+      .notNull()
+      .references(() => thread.id, { onDelete: 'cascade' }),
+    account_id: text('account_id')
+      .notNull()
+      .references(() => account.id, { onDelete: 'cascade' }),
+  },
+  (table) => [primaryKey({ columns: [table.thread_id, table.account_id] })],
+)
+
+/**
+ * Absence means the default, the way `notification_setting` already works: no row and the
+ * participants logic decides, `enabled` follows a card without having spoken on it, and disabled
+ * mutes one you would otherwise be a participant of (#480).
+ */
+export const threadFollow = sqliteTable(
+  'thread_follow',
+  {
+    thread_id: text('thread_id')
+      .notNull()
+      .references(() => thread.id, { onDelete: 'cascade' }),
+    account_id: text('account_id')
+      .notNull()
+      .references(() => account.id, { onDelete: 'cascade' }),
+    enabled: integer('enabled', { mode: 'boolean' }).notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.thread_id, table.account_id] })],
+)
+
 export const image = sqliteTable(
   'image',
   {

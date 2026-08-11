@@ -468,6 +468,12 @@ category everybody would have had to switch off.
 
 #### Somebody's own card
 
+**Every way in opens it** (#478). The join button was the only path that wrote the card, and
+redeeming an invite called `joinBurn` straight past it — so the arrival that most deserved one, a
+brand new member's, was the silent one. `announceJoined` is the card and the bell together, called
+from both, and a migration mints the cards for the stays that arrived before it. Their entries are
+dated from the stay rather than from the deploy, so the feed's order stays honest.
+
 **One card per (person, burn), and joining opens it** (#426). Saying you are coming and
 saying who you are are the same card: `entity_type: 'attendance'` with the attendance id,
 which `thread.event_id` files under the right burn and gives the same retention.
@@ -499,12 +505,17 @@ cannot be created at all, which is asserted rather than assumed.
 `aboutWhat` and `participantsOf` read the column too, so a comment on a card whose stay is gone
 still has somebody to tell and somewhere to point.
 
-**The introduction is resolved and clamped, not stored on the entry.** `readThreads` reads
-`account.introduction` and `excerptOf` cuts it at `INTRODUCTION_EXCERPT` on a word
-boundary; the entry itself is a bump. Two reasons: rewriting a paragraph must not leave
-the feed quoting the old one, and `MAX_INTRODUCTION` is 10,000 against a card's budget of
-fifty-in-one-cache-key. The whole of it is on the person's page, which the card's title
-links to.
+**The introduction is resolved, not stored on the entry.** `readThreads` reads
+`account.introduction` and the entry itself is a bump, so rewriting a paragraph cannot leave the
+feed quoting the old one.
+
+**And the card carries the whole of it** (#478). It was cut at 280 characters with an ellipsis,
+which is the rule that keeps a post or a dream from swallowing the page — and the wrong rule for
+the one card whose entire job is to be read. `MAX_INTRODUCTION` is 10,000, so fifty of those is
+the worst a page can weigh; introductions are a paragraph in practice, and the excerpt was buying
+a bound against a case nobody has hit at the cost of truncating every case they have. `excerptOf`
+had no other caller and is gone with it, mention-token-safe truncation and all — git has it if a
+future card needs one.
 
 **Rewriting bumps once, and tells the burn once.** `introduced` coalesces, so six passes at a
 paragraph move one card up the feed rather than leaving six lines — the argument `renamed`,
@@ -531,6 +542,31 @@ deletes their own, and an admin may delete any.
 **What leaves a quiet line, and what does not.** Offered, facilitated, handed over, a
 hand up or down, renamed, moved, edited, withdrawn. A ❤️‍🔥 does not — the faces are on
 the dream already, and twenty hearts is twenty lines nobody reads.
+
+**A heart on every card** (#479), and it stays that quiet everywhere: no notification, no
+`activity` row, no entry, no bump up the feed. A heart is for the next reader to see, not a bell
+for the author.
+
+**Two tables behind one button.** A dream's heart is `session_support`, unchanged — the heart on
+its card and the heart on its schedule chip are one heart, and two like-buttons meaning different
+things on one dream would be worse than none. Everything else is `thread_support (thread_id,
+account_id)`, account-keyed rather than attendance-keyed because the songbook belongs to no burn
+and so has no attendance to hang one on. The count is derived at read, never stored, and the
+insert is `onConflictDoNothing`, so pressing twice cannot inflate it.
+
+**One route pair over both**, `POST`/`DELETE /api/threads/:id/support/me`, dispatching on
+`entity_type` — so the web has one call for every card, and a dream's rule travels with it:
+hearting one asks for an attendance at that burn, as `asAttendee` does on the dream's own route.
+Not for an **open** burn, though — the dream's own route goes through `onOpenBurn` and this does
+not, which puts a heart with the comment box rather than with the writes: "that was lovely" is a
+thing somebody presses on the way home.
+
+**A withdrawn dream's card refuses the heart.** `thread.entity_id` deliberately carries no foreign
+key so the conversation outlives the dream — but `session_support.session_id` does carry one, so
+the insert would dangle and answer 500 rather than refusing. The route looks the dream up and
+answers 404; the card hides the button, which is the nicer half but not the sufficient one, since
+the route is reachable directly. The song page shows the faces as well as the count, through the same overlapped
+row the dream panel uses — now `Faces`, since it has a second caller.
 
 **Coalescing happens on the write.** Laying out the grid is a drag every few seconds, so
 a second line of the same kind by the same person with nothing in between rewrites the
@@ -562,13 +598,21 @@ that is not scoped to an open burn. Talking about a burn is not arranging one, a
 was lovely" is a thing somebody posts on the way home. Every other dream write stays on
 `openEvent`.
 
+**The bell is a menu in the card's corner** (#480). It was a chip at the tail reading
+"A song goes into the songbook 🔔", which is opaque unless you already know it is a setting —
+it reads as a label. The menu is titled _Notification settings_ and holds the two switches that
+exist for one card: this kind of thing, and this card. It is the app's first dropdown, so it sets
+the pattern — a real button with `aria-haspopup`, `aria-expanded`, and closing on outside-press and
+Escape. The activity **lines** keep their inline chip: a bell-menu per one-liner is more chrome
+than line.
+
 **A pair of categories per kind of card, split the way every other pair here is** (#259).
 A comment on a thread you are part of is `about: 'you'` and **on**; a comment on any card
 of that kind at a burn you are coming to is `about: 'else'` and **off**. So
 `dream_comment`/`dream_comment_any` for a dream and
 `introduction_comment`/`introduction_comment_any` for a person, and `entryCategory` takes
-the entity type as well as the kind — without that, the chip under a person's card would
-offer to switch on comments about every dream. The audiences are disjoint so nobody is
+the entity type as well as the kind — without that, the switch under a person's card would
+offer to turn on comments about every dream. The audiences are disjoint so nobody is
 told twice, and never the person who just wrote it (#247). Who is "part of it" is whoever
 has spoken on the thread, plus — for a dream — the facilitator and the helpers, and for a
 person, the person it is about. Appointing somebody writes a line authored by whoever
@@ -578,6 +622,19 @@ hear a question about it.
 Neither writes an `activity` row: the entry is the record, and a line beside it would put
 one comment on the page twice. That is what `tellAttendees` is for beside
 `notifyAttendees`.
+
+**And one card can be followed or muted** (#480). `thread_follow (thread_id, account_id,
+enabled)` is the absence-means-default pattern `notification_setting` already uses: no row and
+the participants rule above decides; `enabled` puts somebody in the reply audience without their
+having spoken; disabled takes them out of it though they would otherwise be in — which is the
+escape hatch for a commenter drowning in a lively thread, and falls out of the same column for
+free. `tellAbout`'s audience becomes (participants ∪ followers) − muted − author. Mentions and the
+wider `_any` audience are untouched: those are what the category switches govern.
+
+**The checkbox shows the effective state**, so what it says is always what will happen — which
+means `readThreads` has to compute participant-or-follower for a page of fifty cards. Three
+queries do it (spoken on, facilitating, helping) and the rest reads off columns the card query
+already selects, rather than `participantsOf`'s several queries per card.
 
 **The author is an `account`, not an `attendance`** — deliberately unlike
 `session_helper`. Leaving a burn empties your spots and must not delete what you said; a

@@ -1,12 +1,13 @@
 import type {
   NotificationCategory,
+  Supporter,
   Thread,
   ThreadEntityType,
   ThreadEntry,
   ThreadEntryKind,
   ThreadResponse,
 } from '@sage-burner/shared'
-import type { FastifyInstance, FastifyReply } from 'fastify'
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
 import {
   apiRoutes,
@@ -14,11 +15,10 @@ import {
   commentSchema,
   dreamPage,
   feedPage,
-  INTRODUCTION_EXCERPT,
+  followSchema,
   mentionedAccounts,
   profilePage,
   songPage,
-  threadEntityTypes,
   withMentionNames,
 } from '@sage-burner/shared'
 import { and, asc, count, desc, eq, inArray, lte, max, ne, sql } from 'drizzle-orm'
@@ -28,18 +28,23 @@ import type { GuardDeps } from '../auth/guards.ts'
 import type { Database, Transaction } from '../db/index.ts'
 import type { Notifier } from '../push/notify.ts'
 
+import { attendanceFor } from '../attendances.ts'
 import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
 import {
   account,
+  accountAvatar,
   attendance,
   event,
   post,
   session,
   sessionHelper,
+  sessionSupport,
   song,
   thread,
   threadEntry,
+  threadFollow,
+  threadSupport,
 } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { approvedAccounts, displayName, namedBy, wants } from '../push/notify.ts'
@@ -207,33 +212,10 @@ export const cardEntry = async (
   return await addEntry(db, { thread_id: id, kind, author_account_id: who.account_id, body }, at)
 }
 
-/**
- * A hard cut can land inside a `@[Ada](mention:a-1)` token, which then renders as its own raw
- * text on the card, and inside a surrogate pair, which renders as a replacement character. So
- * the fall-back cut backs off to the last whole character, and to before a token it opened.
- */
-const wholeCharacters = (cut: string): string => {
-  const back = /[\uD800-\uDBFF]$/u.test(cut) ? cut.slice(0, -1) : cut
-  const opened = back.lastIndexOf('@[')
-
-  return opened !== -1 && !back.slice(opened).includes(')') ? back.slice(0, opened) : back
-}
-
-export const excerptOf = (whole_text: string | null): string | null => {
-  const whole = whole_text?.trim() ?? ''
-  if (whole === '') return null
-  if (whole.length <= INTRODUCTION_EXCERPT) return whole
-
-  const cut = wholeCharacters(whole.slice(0, INTRODUCTION_EXCERPT))
-  const gap = Math.max(cut.lastIndexOf(' '), cut.lastIndexOf('\n'))
-
-  return `${(gap > INTRODUCTION_EXCERPT / 2 ? cut.slice(0, gap) : cut).trimEnd()}…`
-}
-
 export const recentThreads = async (
   db: Database,
   limit: number,
-  entities: readonly ThreadEntityType[] = threadEntityTypes,
+  entities: readonly ThreadEntityType[],
 ): Promise<{ id: string; last_at: string; entry_count: number }[]> => {
   const rows = await db
     .select({
@@ -251,6 +233,111 @@ export const recentThreads = async (
   return rows.flatMap((row) =>
     row.last_at === null ? [] : [{ id: row.id, last_at: row.last_at, entry_count: row.entry_count }],
   )
+}
+
+type Hearts = ReadonlyMap<string, Supporter[]>
+
+const heartsFor = async (db: Database, ids: readonly string[]): Promise<Hearts> => {
+  const rows = await db
+    .select({
+      thread_id: threadSupport.thread_id,
+      account_id: account.id,
+      name: account.name,
+      avatar: accountAvatar.updated_at,
+    })
+    .from(threadSupport)
+    .innerJoin(account, eq(account.id, threadSupport.account_id))
+    .leftJoin(accountAvatar, eq(accountAvatar.account_id, account.id))
+    .where(inArray(threadSupport.thread_id, [...ids]))
+    .orderBy(asc(account.name), asc(account.id))
+
+  const dreams = await db
+    .select({
+      thread_id: thread.id,
+      account_id: account.id,
+      name: account.name,
+      avatar: accountAvatar.updated_at,
+    })
+    .from(thread)
+    .innerJoin(sessionSupport, eq(sessionSupport.session_id, thread.entity_id))
+    .innerJoin(attendance, eq(attendance.id, sessionSupport.attendance_id))
+    .innerJoin(account, eq(account.id, attendance.account_id))
+    .leftJoin(accountAvatar, eq(accountAvatar.account_id, account.id))
+    .where(and(inArray(thread.id, [...ids]), eq(thread.entity_type, 'session')))
+    .orderBy(asc(account.name), asc(account.id))
+
+  const held = new Map<string, Supporter[]>()
+  for (const row of [...rows, ...dreams]) {
+    held.set(row.thread_id, [
+      ...(held.get(row.thread_id) ?? []),
+      { account_id: row.account_id, name: row.name, avatar: row.avatar },
+    ])
+  }
+
+  return held
+}
+
+const participantThreads = async (
+  db: Database,
+  ids: readonly string[],
+  viewer: { account_id: string } | undefined,
+): Promise<ReadonlySet<string>> => {
+  if (viewer === undefined) return new Set()
+
+  const spoke = await db
+    .selectDistinct({ thread_id: threadEntry.thread_id })
+    .from(threadEntry)
+    .where(
+      and(
+        inArray(threadEntry.thread_id, [...ids]),
+        eq(threadEntry.author_account_id, viewer.account_id),
+        inArray(threadEntry.kind, ['comment', 'offered']),
+      ),
+    )
+
+  const facilitating = await db
+    .select({ thread_id: thread.id })
+    .from(thread)
+    .innerJoin(session, and(eq(thread.entity_type, 'session'), eq(session.id, thread.entity_id)))
+    .innerJoin(attendance, eq(attendance.id, session.facilitator_attendance_id))
+    .where(and(inArray(thread.id, [...ids]), eq(attendance.account_id, viewer.account_id)))
+
+  const helping = await db
+    .select({ thread_id: thread.id })
+    .from(thread)
+    .innerJoin(sessionHelper, eq(sessionHelper.session_id, thread.entity_id))
+    .innerJoin(attendance, eq(attendance.id, sessionHelper.attendance_id))
+    .where(
+      and(
+        inArray(thread.id, [...ids]),
+        eq(thread.entity_type, 'session'),
+        eq(attendance.account_id, viewer.account_id),
+      ),
+    )
+
+  return new Set([...spoke, ...facilitating, ...helping].map((row) => row.thread_id))
+}
+
+const partOf = (row: CardRow, already: ReadonlySet<string>, viewer: Viewer): boolean =>
+  viewer !== undefined &&
+  (already.has(row.id) ||
+    row.subject === viewer.account_id ||
+    row.post_author === viewer.account_id ||
+    row.song_author === viewer.account_id)
+
+const followsFor = async (
+  db: Database,
+  ids: readonly string[],
+  viewer: { account_id: string } | undefined,
+): Promise<ReadonlyMap<string, boolean>> => {
+  if (viewer === undefined) return new Map()
+
+  const rows = await db
+    .select({ thread_id: threadFollow.thread_id, enabled: threadFollow.enabled })
+    .from(threadFollow)
+    .where(and(inArray(threadFollow.thread_id, [...ids]), eq(threadFollow.account_id, viewer.account_id)))
+
+  return new Map(rows.map((row) => [row.thread_id, row.enabled]))
 }
 
 export const readThreads = async (
@@ -349,6 +436,9 @@ export const readThreads = async (
   }
 
   const byId = new Map(rows.map((row) => [row.id, row]))
+  const hearts = await heartsFor(db, ids)
+  const said = await followsFor(db, ids, viewer)
+  const already = await participantThreads(db, ids, viewer)
 
   const namesById = await mentionedNames(db, [
     ...entries.map((row) => row.body),
@@ -375,6 +465,10 @@ export const readThreads = async (
         entry_count: counts?.get(id) ?? shown.length,
         last_at: last?.created_at ?? null,
         entries: shown,
+        supporters: hearts.get(id) ?? [],
+        support_count: (hearts.get(id) ?? []).length,
+        supported_by_me: (hearts.get(id) ?? []).some((person) => person.account_id === viewer?.account_id),
+        followed_by_me: said.get(id) ?? partOf(row, already, viewer),
       } satisfies Thread,
     ]
   })
@@ -389,6 +483,7 @@ const authoredBy = (row: CardRow, viewer: Viewer): boolean =>
     : row.entity_type === 'song' && row.song_author === viewer.account_id)
 
 interface CardRow {
+  id: string
   event_id: string | null
   entity_type: ThreadEntityType
   entity_id: string
@@ -409,6 +504,8 @@ interface CardRow {
 
 type CardFacts = Pick<Thread, 'title' | 'link' | 'body' | 'gone'>
 
+const written = (body: string | null): string | null => (body?.trim() === '' ? null : body)
+
 const dreamFacts = (row: CardRow): CardFacts => ({
   title: row.title,
   link: row.dream === null || row.event_id === null ? null : dreamPage(row.event_id, row.entity_id),
@@ -419,11 +516,9 @@ const dreamFacts = (row: CardRow): CardFacts => ({
 const personFacts = (row: CardRow): CardFacts => ({
   title: row.subject_name ?? row.title,
   link: row.subject === null ? null : profilePage(row.subject),
-  body: excerptOf(row.introduction),
+  body: written(row.introduction),
   gone: row.stay === null,
 })
-
-const written = (body: string | null): string | null => (body?.trim() === '' ? null : body)
 
 const postFacts = (row: CardRow): CardFacts => ({
   title: row.post_title ?? row.title,
@@ -469,6 +564,21 @@ export const nameOf = async (db: Database, accountId: string): Promise<string | 
 
   return row?.name ?? null
 }
+
+const saidAbout = async (db: Database, threadId: string, enabled: boolean): Promise<string[]> => {
+  const rows = await db
+    .select({ account_id: threadFollow.account_id })
+    .from(threadFollow)
+    .where(and(eq(threadFollow.thread_id, threadId), eq(threadFollow.enabled, enabled)))
+
+  return rows.map((row) => row.account_id)
+}
+
+export const following = async (db: Database, threadId: string): Promise<string[]> =>
+  await saidAbout(db, threadId, true)
+
+export const muting = async (db: Database, threadId: string): Promise<string[]> =>
+  await saidAbout(db, threadId, false)
 
 export const participantsOf = async (
   db: Database,
@@ -676,6 +786,113 @@ export const registerThreadRoutes = (
     },
   )
 
+  const heart = async (
+    request: FastifyRequest<{ Params: { id: string } }>,
+    reply: FastifyReply,
+    put: boolean,
+  ) => {
+    void noStore(reply)
+
+    const viewer = await viewerFor(request, { db, sessions })
+    if (viewer === undefined) return sendError(reply, 401)
+
+    const [found] = await db
+      .select({
+        id: thread.id,
+        event_id: thread.event_id,
+        entity_type: thread.entity_type,
+        entity_id: thread.entity_id,
+      })
+      .from(thread)
+      .where(eq(thread.id, request.params.id))
+      .limit(1)
+
+    if (found === undefined) return sendError(reply, 404)
+
+    if (found.entity_type === 'session') {
+      // `thread.entity_id` deliberately carries no foreign key, so a withdrawn dream's card
+      // outlives the row — but `session_support.session_id` does, so hearting one would be a
+      // dangling insert and a 500 rather than a refusal.
+      const [dream] = await db
+        .select({ id: session.id })
+        .from(session)
+        .where(eq(session.id, found.entity_id))
+        .limit(1)
+
+      if (dream === undefined) return sendError(reply, 404)
+
+      const mine =
+        found.event_id === null ? undefined : await attendanceFor(db, found.event_id, viewer.account_id)
+      if (mine === undefined) return sendError(reply, 403)
+
+      if (put) {
+        await db
+          .insert(sessionSupport)
+          .values({ session_id: found.entity_id, attendance_id: mine })
+          .onConflictDoNothing()
+      } else {
+        await db
+          .delete(sessionSupport)
+          .where(and(eq(sessionSupport.session_id, found.entity_id), eq(sessionSupport.attendance_id, mine)))
+      }
+    } else if (put) {
+      await db
+        .insert(threadSupport)
+        .values({ thread_id: found.id, account_id: viewer.account_id })
+        .onConflictDoNothing()
+    } else {
+      await db
+        .delete(threadSupport)
+        .where(and(eq(threadSupport.thread_id, found.id), eq(threadSupport.account_id, viewer.account_id)))
+    }
+
+    return await whole(reply, found.id, viewer)
+  }
+
+  app.put<{ Params: { id: string } }>(
+    apiRoutes.setThreadFollow.fastify,
+    { preHandler: requireApproved },
+    async (request, reply) => {
+      void noStore(reply)
+
+      const body = bodyOf(followSchema, request)
+      if (body === undefined) return sendError(reply, 400)
+
+      const viewer = await viewerFor(request, { db, sessions })
+      if (viewer === undefined) return sendError(reply, 401)
+
+      const [found] = await db
+        .select({ id: thread.id })
+        .from(thread)
+        .where(eq(thread.id, request.params.id))
+        .limit(1)
+
+      if (found === undefined) return sendError(reply, 404)
+
+      await db
+        .insert(threadFollow)
+        .values({ thread_id: found.id, account_id: viewer.account_id, enabled: body.following })
+        .onConflictDoUpdate({
+          target: [threadFollow.thread_id, threadFollow.account_id],
+          set: { enabled: body.following },
+        })
+
+      return await whole(reply, found.id, viewer)
+    },
+  )
+
+  app.post<{ Params: { id: string } }>(
+    apiRoutes.supportThread.fastify,
+    { preHandler: requireApproved },
+    async (request, reply) => await heart(request, reply, true),
+  )
+
+  app.delete<{ Params: { id: string } }>(
+    apiRoutes.withdrawSupportForThread.fastify,
+    { preHandler: requireApproved },
+    async (request, reply) => await heart(request, reply, false),
+  )
+
   const whole = async (reply: FastifyReply, threadId: string, viewer?: Viewer) => {
     const [found] = await readThreads(db, [threadId], { viewer })
     if (found === undefined) return sendError(reply, 404)
@@ -785,6 +1002,8 @@ export const registerThreadRoutes = (
     const told = new Set(named)
 
     const people = await participantsOf(db, found)
+    for (const accountId of await following(db, found.id)) people.add(accountId)
+    for (const accountId of await muting(db, found.id)) people.delete(accountId)
     people.delete(author)
 
     const listening = await audienceFor(found.event_id, author)

@@ -96,8 +96,7 @@ export const Layout = ({ api, children }: { api: LayoutApi; children: ComponentC
   )
 }
 
-/** Nothing to point at is nothing to offer, so an installation that has set no map has no entry. */
-export const withMap = (pages: readonly NavPage[], url: string | null): readonly NavPage[] =>
+const withMap = (pages: readonly NavPage[], url: string | null): readonly NavPage[] =>
   url === null ? pages : [...pages, { href: url, label: 'Map of area', icon: '🗺️', away: true }]
 
 const TopNav = ({ api, pages }: { api: BellApi; pages: readonly NavPage[] }) => {

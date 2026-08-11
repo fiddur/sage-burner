@@ -14,6 +14,13 @@ export const threadEntrySchema = z.object({
 })
 export type ThreadEntry = z.infer<typeof threadEntrySchema>
 
+export const supporterSchema = z.object({
+  account_id: idSchema,
+  name: z.string().nullable(),
+  avatar: dateTimeSchema.nullable(),
+})
+export type Supporter = z.infer<typeof supporterSchema>
+
 export const threadSchema = z.object({
   id: idSchema,
   event_id: idSchema.nullable(),
@@ -28,6 +35,10 @@ export const threadSchema = z.object({
   entry_count: z.int().min(0),
   last_at: dateTimeSchema.nullable(),
   entries: z.array(threadEntrySchema),
+  supporters: z.array(supporterSchema),
+  support_count: z.int().min(0),
+  supported_by_me: z.boolean(),
+  followed_by_me: z.boolean(),
 })
 export type Thread = z.infer<typeof threadSchema>
 
@@ -36,3 +47,7 @@ export type ThreadResponse = z.infer<typeof threadResponseSchema>
 
 export const commentSchema = z.object({ body: nonEmptyText(MAX_COMMENT) }).strict()
 export type CommentInput = z.infer<typeof commentSchema>
+
+/** What the checkbox shows and sets: the effective state, so what it says is what will happen. */
+export const followSchema = z.object({ following: z.boolean() }).strict()
+export type FollowInput = z.infer<typeof followSchema>

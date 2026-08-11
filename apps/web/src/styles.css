@@ -1668,7 +1668,7 @@ a.person-badge:focus-visible span:last-child {
 
 /* A chip, not a button-shaped button: it is a label that happens to be pressable, and
    it sits under a sentence rather than in a row of controls. Dashed until it is on, so
-   the row itself says what is being filtered — which is #472's whole signal. */
+   the row itself says what is being filtered. */
 .chip {
   border: 1px dashed var(--line);
   border-radius: 1rem;
@@ -1690,9 +1690,60 @@ a.person-badge:focus-visible span:last-child {
    its own history and everything said about it, and it is the only place a withdrawn
    dream's thread can be read. */
 .feed-card {
+  position: relative;
   border: 1px solid var(--line);
   border-radius: 0.5rem;
   padding: 0.5rem 0.75rem;
+}
+
+/* The bell sits in the card's corner, so `.feed-card` is what it is positioned against. */
+.card-bell {
+  position: absolute;
+  inset-block-start: 0.3rem;
+  inset-inline-end: 0.4rem;
+}
+
+.card-bell-button {
+  padding: 0.2rem 0.3rem;
+  border: 0;
+  background: none;
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* The app's first dropdown, so this is the pattern the next one copies. */
+.card-bell-menu {
+  position: absolute;
+  inset-block-start: 100%;
+  inset-inline-end: 0;
+  z-index: 30;
+  width: max-content;
+  max-width: min(20rem, 80vw);
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+  box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 15%);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.85rem;
+}
+
+.card-bell-title {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+/* The heart, which used to sit loose at the tail of the card beside the chip. */
+.feed-card-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.5rem 0 0;
 }
 
 .feed-card-head {
@@ -2273,8 +2324,8 @@ img.avatar {
   }
 }
 
-/* The faces of whoever gave a dream a ❤️‍🔥. Overlapped, like every stack of avatars. */
-.dream-supporters {
+/* The faces of whoever gave something a ❤️‍🔥. Overlapped, like every stack of avatars. */
+.faces {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
@@ -2284,26 +2335,26 @@ img.avatar {
    body copy, and an underline through one looks like a mistake. Only a visually-hidden
    span is inside it today, so nothing underlines — which is why this was the one link
    that escaped. */
-.dream-supporter {
+.face {
   display: inline-flex;
   margin-inline-start: -0.35rem;
   color: inherit;
   text-decoration: none;
 }
 
-.dream-supporter:first-child {
+.face:first-child {
   margin-inline-start: 0;
 }
 
 /* `.dream-facilitator`'s own gap separates a face from the chip text beside it in the
    grid. In a stack there is no text, and it cancelled the overlap above exactly — so
    the faces sat in a row while the rule said they were overlapped. */
-.dream-supporter .dream-facilitator {
+.face .dream-facilitator {
   margin-inline-start: 0;
 }
 
 /* So an overlapped circle reads as in front of the one behind it, not merged. */
-.dream-supporter .avatar {
+.face .avatar {
   outline: 2px solid var(--paper);
 }
 
@@ -2524,6 +2575,15 @@ img.avatar {
   gap: 0.5rem;
   margin: 0.5rem 0 0;
   font-size: 0.9rem;
+}
+
+/* The heart and whoever gave one, above the talk about the song (#479). */
+.song-hearts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 1rem 0 0;
 }
 
 .song-key-label {

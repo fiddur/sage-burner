@@ -10,6 +10,7 @@ import type { Sessions } from '../auth/session.ts'
 import type { Throttle } from '../auth/throttle.ts'
 import type { Config } from '../config.ts'
 import type { Database } from '../db/index.ts'
+import type { Notifier } from '../push/notify.ts'
 
 import { hashPassword } from '../auth/password.ts'
 import { loginAddressConnection } from '../connections.ts'
@@ -17,7 +18,7 @@ import { isUniqueViolation } from '../db/errors.ts'
 import { account, accountConnection, accountRole, application, inviteToken } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { digestOf } from '../invites.ts'
-import { joinBurn } from './attendance.ts'
+import { announceJoined, joinBurn } from './attendance.ts'
 import { cookieHeader } from './auth.ts'
 
 export interface RedemptionDeps {
@@ -28,13 +29,23 @@ export interface RedemptionDeps {
   hash?: (password: string) => Promise<string>
   gate: Gate
   throttle: Throttle
+  notify?: Notifier
 }
 
 const isEmailConflict = (error: unknown) => isUniqueViolation(error, 'account.email')
 
 export const registerRedemptionRoutes = (
   app: FastifyInstance,
-  { db, config, sessions, now, hash = hashPassword, gate, throttle }: RedemptionDeps,
+  {
+    db,
+    config,
+    sessions,
+    now,
+    hash = hashPassword,
+    gate,
+    throttle,
+    notify = async () => undefined,
+  }: RedemptionDeps,
 ) => {
   app.get<{ Params: { token: string } }>(apiRoutes.getInviteState.fastify, async (request, reply) => {
     void noStore(reply)
@@ -158,6 +169,14 @@ export const registerRedemptionRoutes = (
 
             return undefined
           })
+
+    if (joined?.created === true) {
+      await announceJoined(db, notify, { stay: joined.stay, account_id: accountId }, now).catch(
+        (failure: unknown) => {
+          request.log.error({ err: failure }, 'joined but could not announce it')
+        },
+      )
+    }
 
     return reply.code(201).send({
       viewer: {

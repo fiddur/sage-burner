@@ -9,6 +9,20 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-11
 
+- **A heart on every card in the feed.** ♡ fills to ❤️‍🔥, the way it already did on a dream — and
+  a dream's heart is the same heart wherever you press it. A song's page shows who gave one.
+  Hearts stay quiet: nobody is notified, and nothing moves up the feed because of one.
+
+- **The bell moved into the card's corner, and opens a small menu.** It was a chip at the tail
+  that read like a label rather than a switch. The menu holds two things: whether you hear about
+  this kind of thing, and — new — whether you hear about replies to _this_ card. Following one you
+  have not spoken on works, and so does muting one you have.
+
+- **New members show up in the feed.** Somebody joining by an invite link opened no card, so the
+  feed said nothing about the one arrival most worth saying something about. The cards missing for
+  people who already arrived that way have been made, dated from when they actually joined. And a
+  person's card now shows their whole introduction rather than the first few lines.
+
 - **A link to the map of the area, in the ☰ menu.** Whoever organises pastes the address of the
   map they already keep under ⚙️ → Settings, and everybody signed in finds _Map of area_ in the
   menu; it opens where the map lives. With nothing pasted there is no entry at all.

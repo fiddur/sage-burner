@@ -31,16 +31,6 @@ export const stayAt = async (db: Database, eventId: string, accountId: string) =
   return row === undefined ? undefined : { ...row, helping_option_ids: await helpingIdsFor(db, row.id) }
 }
 
-export const accountForAttendance = async (db: Database, attendanceId: string) => {
-  const [row] = await db
-    .select({ account_id: attendance.account_id })
-    .from(attendance)
-    .where(eq(attendance.id, attendanceId))
-    .limit(1)
-
-  return row?.account_id
-}
-
 export const joinBurn = async (db: Database, eventId: string, accountId: string, now: () => Date) => {
   const found = await openEventNow(db, now, eventId)
   if (found === undefined) return undefined
@@ -67,16 +57,6 @@ export const joinBurn = async (db: Database, eventId: string, accountId: string,
 
   const made = await stayAt(db, found.id, accountId)
   return made === undefined ? undefined : { stay: made, created: true }
-}
-
-export const attendanceFor = async (db: Database, eventId: string, accountId: string) => {
-  const [row] = await db
-    .select({ id: attendance.id })
-    .from(attendance)
-    .where(and(eq(attendance.event_id, eventId), eq(attendance.account_id, accountId)))
-    .limit(1)
-
-  return row?.id
 }
 
 export const handOverPlace = (
@@ -112,6 +92,36 @@ export const handOverPlace = (
 export interface AttendanceDeps extends GuardDeps {
   now: () => Date
   notify?: Notifier
+}
+
+/**
+ * The card and the bell a new arrival earns. Exported because the join route is not the only
+ * path in: redeeming an invite joins too, and the one join that most deserves a card — a brand
+ * new member's — was the silent one (#478).
+ */
+export const announceJoined = async (
+  db: Database,
+  notify: Notifier,
+  joined: { stay: { id: string; event_id: string }; account_id: string },
+  now: () => Date,
+): Promise<void> => {
+  const name = await displayName(db, joined.account_id)
+
+  await cardEntry(db, {
+    stay: joined.stay,
+    who: { account_id: joined.account_id, name },
+    kind: 'joined',
+    body: JOINED,
+    at: now(),
+  })
+
+  await tellAttendees(
+    db,
+    notify,
+    joined.stay.event_id,
+    { category: 'member_joined', body: `${name} is coming.`, link: '/members' },
+    { except: [joined.account_id] },
+  )
 }
 
 export const registerAttendanceRoutes = (
@@ -181,23 +191,7 @@ export const registerAttendanceRoutes = (
       if (joined === undefined) return sendError(reply, 404)
 
       if (joined.created) {
-        const name = await displayName(db, viewer.account_id)
-
-        await cardEntry(db, {
-          stay: joined.stay,
-          who: { account_id: viewer.account_id, name },
-          kind: 'joined',
-          body: JOINED,
-          at: now(),
-        })
-
-        await tellAttendees(
-          db,
-          notify,
-          joined.stay.event_id,
-          { category: 'member_joined', body: `${name} is coming.`, link: '/members' },
-          { except: [viewer.account_id] },
-        )
+        await announceJoined(db, notify, { stay: joined.stay, account_id: viewer.account_id }, now)
       }
 
       const answer = { attendance: joined.stay } satisfies AttendanceResponse
