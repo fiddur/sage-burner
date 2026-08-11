@@ -60,8 +60,6 @@ export const MAX_SONG_LINKS = 8
 
 export const MAX_SONG_LINK_URL = 500
 
-export const MAX_SONG_LINK_LABEL = 60
-
 export const MAX_SONG_CATEGORIES = 8
 
 export const MAX_CAPO = 11

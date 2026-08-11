@@ -933,6 +933,14 @@ makes omitting it a compile error — so what `enums.test.ts` is for is the part
 say: that every href any kind builds, from anything anybody types, carries a scheme worth
 sending a browser to.
 
+**A handle is a handle with or without its scheme** (#433). A stored Mastodon address is
+`@user@authority` with no separator in either half, and `connectionValue` keeps whole anything it
+could not read a handle out of — so a pasted post URL reaches `mastodonHref` with an `@` in it too,
+and matching on the `@` alone built a link to host `wren`. Forbidding `/` and `\` inside either
+half is what tells the two apart, and dropping the scheme first would not have: `chaos.social/@wren`
+is no more a handle than the URL it came from. Where it cannot tell, there is no link at all —
+visibly wrong beats confidently wrong.
+
 `link` is the escape hatch: a label and a URL somebody types. A labelled URL rather than a
 free-text _kind_, because a kind nothing knows about could produce neither an icon nor an
 address. It is also the only kind whose value is checked rather than merely bounded —
@@ -954,7 +962,10 @@ still take one off.
 
 **A load that failed says so rather than drawing an empty list** (#395). "You have not added
 any yet" for a request that never answered invites an Add that then collides with a row
-nobody can see, so the editor tells the two facts apart. The sign-in address the `email` row
+nobody can see, so the editor tells the two facts apart. What it offers is read from the list
+itself and never from an empty stand-in (#445): before the fix, both while loading and after a
+failed load, `kindsToOffer([])` offered all ten kinds and the form opened on Email — so somebody
+who already had an email row could press _Use my sign-in address_ and collide with it. The sign-in address the `email` row
 can be filled from comes from the page around the editor, since `/api/auth/me` deliberately
 does not carry it (#388).
 
@@ -1205,6 +1216,12 @@ what the link wrote**, and a row somebody has since edited is no longer that: `u
 clears `from_provider`, so touching a row makes it yours and unlinking leaves it. The column
 carries no CHECK on the vocabulary, deliberately — adding one to an existing table means the
 rebuild described under "Adding a network is not free", and only `OAuthProvider` writes it.
+
+**A failed contact delete is swallowed and logged, and answers 204 anyway** — the rule the linking
+side already follows, so an unlink cannot leave the identity in place because a second statement
+failed. It does slightly outrun what `PRIVACY.md` promises about the name going back out with the
+link: only with a misbehaving database, and the member can take the row off themselves. Making the
+two deletes one transaction is what would close it, and is the reason to (#471).
 
 **Facebook writes none**, and the reason is the id it hands over: `public_profile` answers with
 an **app-scoped** id, which identifies nobody outside this installation's Meta app, so

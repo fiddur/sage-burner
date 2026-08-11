@@ -20,6 +20,12 @@ invite and the redemption were literals nothing compared to anything. Adding the
 a real hole in `adminAddAttendance`, which could send `{ attendance: undefined }` — a `{}` body —
 where the row it had just inserted came back missing.
 
+**Its two re-reads answer 404 and 409 and neither has a test** (#471), deliberately: both need a
+delete interleaved between this request's own insert and the read after it, and there is no seam
+to stage that through — a hook to open one would be more machinery than the branch is worth for a
+gathering of forty-two. What they hold is that the route never answers a body with nothing in it:
+whichever way the race falls, the answer is a status, not `{}`.
+
 **Zod stays out of the browser**, so nothing parses a body at runtime there. The runtime half is in
 **backend route tests**, which parse a response through the shared schema — a compile-time contract
 and a runtime one, neither of which the other covers.

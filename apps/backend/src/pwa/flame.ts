@@ -19,8 +19,6 @@ const at = (from: number, c1: number, c2: number, to: number, t: number): number
   return u * u * u * from + 3 * u * u * t * c1 + 3 * u * t * t * c2 + t * t * t * to
 }
 
-// A tenth of the tile at each edge: a maskable icon is cropped to the middle of what it
-// declares, and a flame that reaches the corners loses its tip to a circular mask.
 const MARGIN = 0.1
 
 const outline = ({ from, curves }: FlameShape, size: number): Point[] => {
@@ -71,11 +69,6 @@ const crossingsAt = (points: readonly Point[], y: number): Crossing[] => {
   return found.sort((one, other) => one.x - other.x)
 }
 
-/**
- * Coverage per pixel, 0–1: exact along x and sampled along y. Both axes sampled would need
- * sixteen times the work for a worse edge, and the shape has no horizontal detail finer than
- * a pixel to lose.
- */
 export const coverageOf = (shape: FlameShape, size: number): Float32Array => {
   const points = outline(shape, size)
   const cover = new Float32Array(size * size)

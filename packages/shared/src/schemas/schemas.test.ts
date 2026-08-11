@@ -787,8 +787,7 @@ describe('a song', () => {
   })
 
   it('takes only an https link, so a rendered one cannot carry a script', () => {
-    const withLink = (url: string) =>
-      songCreateSchema.safeParse(aSong({ links: [{ url, label: '' }] })).success
+    const withLink = (url: string) => songCreateSchema.safeParse(aSong({ links: [{ url }] })).success
 
     expect(withLink('https://open.spotify.com/track/1')).toBe(true)
     expect(withLink('http://open.spotify.com/track/1')).toBe(false)
@@ -799,7 +798,6 @@ describe('a song', () => {
   it('bounds how many links and categories one song carries', () => {
     const links = Array.from({ length: MAX_SONG_LINKS + 1 }, (_unused, at) => ({
       url: `https://example.org/${at}`,
-      label: '',
     }))
 
     expect(songCreateSchema.safeParse(aSong({ links: links.slice(1) })).success).toBe(true)

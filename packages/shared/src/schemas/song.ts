@@ -6,7 +6,6 @@ import {
   MAX_OPTION_LABEL,
   MAX_SONG_BODY,
   MAX_SONG_CATEGORIES,
-  MAX_SONG_LINK_LABEL,
   MAX_SONG_LINK_URL,
   MAX_SONG_LINKS,
   MAX_TITLE,
@@ -19,7 +18,6 @@ export const songLinkSchema = z
     url: nonEmptyText(MAX_SONG_LINK_URL).refine((url) => isProfileUrl(url), {
       error: 'a link must be an https:// address',
     }),
-    label: z.string().trim().max(MAX_SONG_LINK_LABEL),
   })
   .strict()
 export type SongLink = z.infer<typeof songLinkSchema>

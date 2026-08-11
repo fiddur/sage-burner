@@ -217,8 +217,6 @@ describe('the places a dream can happen at', () => {
     expect(response.statusCode).toBe(201)
     expect(response.json().place).toMatchObject({ ...TEMPLE, order: 0, event_id: eventId })
     expect(response.json().place.id).toEqual(expect.any(String))
-    // The wire shape at runtime, not only at compile time: `reply.send` is not type-checked, so
-    // `satisfies` on the literal is the only other thing holding it (#149).
     expect(placeResponseSchema.safeParse(response.json()).success).toBe(true)
   })
 

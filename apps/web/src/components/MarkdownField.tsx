@@ -1,4 +1,4 @@
-import { useId, useState } from 'preact/hooks'
+import { useId } from 'preact/hooks'
 
 import type { UploadImage } from '../image-upload.ts'
 import type { Mentionable } from '../mentioning.ts'
@@ -6,9 +6,11 @@ import type { Mentionable } from '../mentioning.ts'
 import { useImageUpload } from '../image-upload.ts'
 import { renderMarkdown } from '../markdown.ts'
 import { useMentioning } from '../mentioning.ts'
+import { hasMarkdown } from '../syntax.ts'
 import { rowsFor } from '../textarea.ts'
 import { AddPicture } from './AddPicture.tsx'
 import { MentionMenu } from './MentionMenu.tsx'
+import { SyntaxToolbar, useSyntax } from './SyntaxToolbar.tsx'
 
 export const MarkdownField = ({
   label,
@@ -32,70 +34,47 @@ export const MarkdownField = ({
   onInput: (value: string) => void
 }) => {
   const mentioning = useMentioning({ value, people, maxLength, onInput })
-  const [previewing, setPreviewing] = useState(false)
   const fieldId = useId()
   const pictures = useImageUpload({ value, maxLength, onInput, upload })
+  const syntax = useSyntax({ value, maxLength, onInput })
 
   return (
     <div class="field">
-      {/* No `for` while previewing: the textarea it would name is unmounted. */}
-      <label for={previewing ? undefined : fieldId}>{label}</label>
+      <label for={fieldId}>{label}</label>
 
       <div class="md-field">
-        <div class="md-field-tabs">
-          <button
-            type="button"
-            aria-pressed={!previewing}
-            aria-label={`Write ${label}`}
-            class={previewing ? 'md-field-tab' : 'md-field-tab is-current'}
-            onClick={() => setPreviewing(false)}
-          >
-            Write
-          </button>
-          <button
-            type="button"
-            aria-pressed={previewing}
-            aria-label={`Preview ${label}`}
-            class={previewing ? 'md-field-tab is-current' : 'md-field-tab'}
-            onClick={() => setPreviewing(true)}
-          >
-            Preview
-          </button>
-        </div>
+        <SyntaxToolbar syntax={syntax} subject={accessibleName ?? label} />
 
-        {previewing ? (
-          <div class="md-field-body">
-            {value.trim() === '' ? (
-              <p class="form-note">Nothing to preview yet.</p>
-            ) : (
-              <div class="markdown-preview" dangerouslySetInnerHTML={{ __html: renderMarkdown(value) }} />
-            )}
-          </div>
-        ) : (
-          <textarea
-            id={fieldId}
-            class="md-field-write"
-            maxLength={maxLength}
-            rows={rowsFor(value, rows)}
-            aria-label={accessibleName}
-            placeholder={placeholder}
-            value={value}
-            onInput={(inputEvent) => onInput(inputEvent.currentTarget.value)}
-            {...pictures.handlers}
-            {...mentioning.noticing}
-          />
-        )}
+        <textarea
+          id={fieldId}
+          class="md-field-write"
+          ref={syntax.ref}
+          maxLength={maxLength}
+          rows={rowsFor(value, rows)}
+          aria-label={accessibleName}
+          placeholder={placeholder}
+          value={value}
+          onInput={(inputEvent) => onInput(inputEvent.currentTarget.value)}
+          {...syntax.handlers}
+          {...pictures.handlers}
+          {...mentioning.noticing}
+        />
       </div>
 
-      {!previewing && (
-        <MentionMenu
-          candidates={mentioning.candidates}
-          subject={accessibleName ?? label}
-          onChoose={mentioning.choose}
-        />
-      )}
+      <MentionMenu
+        candidates={mentioning.candidates}
+        subject={accessibleName ?? label}
+        onChoose={mentioning.choose}
+      />
 
-      {!previewing && <AddPicture pictures={pictures} label={label} />}
+      <AddPicture pictures={pictures} label={label} />
+
+      {hasMarkdown(value) && (
+        <div class="md-field-preview">
+          <span class="form-note">How it will read</span>
+          <div class="markdown-preview" dangerouslySetInnerHTML={{ __html: renderMarkdown(value) }} />
+        </div>
+      )}
     </div>
   )
 }

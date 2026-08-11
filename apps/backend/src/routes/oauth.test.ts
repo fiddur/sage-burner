@@ -1130,9 +1130,6 @@ describe('what a link adds to how people can reach you', () => {
   })
 
   it('publishes none of it for somebody signing in rather than linking', async () => {
-    // `signIn` ignores `profile.reach`, which is a privacy choice with nothing failing if
-    // somebody later threads it through (#447). The test above answers the same handle from the
-    // same fake, so this is a claim about the sign-in path rather than about the fake.
     const server = await build(reaching())
     await givenProvider('discord')
     const wren = await givenAccount()

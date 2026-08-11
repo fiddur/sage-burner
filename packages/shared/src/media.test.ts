@@ -3,7 +3,17 @@ import { describe, expect, it } from 'vitest'
 import { FLAME_BOX, FLAME_SHAPES, flameIcon, flamePath } from './media.ts'
 
 describe('the app’s own mark', () => {
-  it('draws the shapes, and only the shapes', () => {
+  it('draws each shape as the curve it is, rather than as the expression that built it', () => {
+    // Written out, because building the expected string from `FLAME_SHAPES` and `flamePath` is
+    // the same expression `flameIcon` uses: it pins the wrapper and cannot fail on a defect
+    // inside `flamePath` (#461).
+    expect(FLAME_SHAPES.map((shape) => flamePath(shape))).toEqual([
+      'M33 2C37 14 49 20 49 35C49 49 41 60 32 60C23 60 15 49 15 36C15 24 28 20 33 2Z',
+      'M32 25C35 31 41 36 41 44C41 51 37 55 32 55C27 55 23 51 23 44C23 36 29 31 32 25Z',
+    ])
+  })
+
+  it('wraps them in one svg of its own box, and nothing else', () => {
     expect(flameIcon()).toBe(
       `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${FLAME_BOX} ${FLAME_BOX}">` +
         FLAME_SHAPES.map((shape) => `<path d="${flamePath(shape)}" fill="${shape.fill}"/>`).join('') +

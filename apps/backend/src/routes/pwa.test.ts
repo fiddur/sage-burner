@@ -215,8 +215,6 @@ describe('the web manifest', () => {
   })
 
   it('leaves the drawn flame out once an admin has uploaded a mark of their own', async () => {
-    // Mixing the app's flame in beside somebody's logo would show the wrong one in the
-    // install sheet.
     const server = await build()
     const root = await givenAccount()
 

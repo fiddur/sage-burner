@@ -15,6 +15,7 @@ import { AddPicture } from './AddPicture.tsx'
 import { IconButton } from './IconButton.tsx'
 import { MentionMenu } from './MentionMenu.tsx'
 import { NAMELESS } from './PersonBadge.tsx'
+import { SyntaxToolbar, useSyntax } from './SyntaxToolbar.tsx'
 
 const marks = {
   comment: '',
@@ -80,6 +81,8 @@ export const DreamThread = ({
 
   const naming = useMentioning({ value: saying, people, maxLength: MAX_COMMENT, onInput: setSaying })
 
+  const sayingSyntax = useSyntax({ value: saying, maxLength: MAX_COMMENT, onInput: setSaying })
+
   const renaming = useMentioning({
     value: editing?.body ?? '',
     people,
@@ -92,6 +95,12 @@ export const DreamThread = ({
     maxLength: MAX_COMMENT,
     onInput: (body) => setEditing((current) => (current === undefined ? current : { ...current, body })),
     upload,
+  })
+
+  const editingSyntax = useSyntax({
+    value: editing?.body ?? '',
+    maxLength: MAX_COMMENT,
+    onInput: (body) => setEditing((current) => (current === undefined ? current : { ...current, body })),
   })
 
   if (thread === undefined) return null
@@ -126,37 +135,42 @@ export const DreamThread = ({
               </p>
 
               {editing?.id === entry.id ? (
-                <div class="thread-editing">
-                  <textarea
-                    class="thread-box"
-                    aria-label="Rewrite what you said"
-                    maxLength={MAX_COMMENT}
-                    rows={rowsFor(editing.body, 2)}
-                    value={editing.body}
-                    onInput={(event) => setEditing({ id: entry.id, body: event.currentTarget.value })}
-                    {...editingPictures.handlers}
-                    {...renaming.noticing}
-                  />
-                  <MentionMenu
-                    candidates={renaming.candidates}
-                    subject="what you said"
-                    onChoose={renaming.choose}
-                  />
-                  <AddPicture pictures={editingPictures} label="what you said" />
-                  <button
-                    type="button"
-                    disabled={busy || stillUploading(editing.body) || editing.body.trim() === ''}
-                    onClick={() => {
-                      onRewrite(entry.id, editing.body.trim())
-                      setEditing(undefined)
-                    }}
-                  >
-                    Save
-                  </button>
-                  <button type="button" class="link-button" onClick={() => setEditing(undefined)}>
-                    Cancel
-                  </button>
-                </div>
+                <>
+                  <SyntaxToolbar syntax={editingSyntax} subject="what you said" />
+                  <div class="thread-editing">
+                    <textarea
+                      class="thread-box"
+                      aria-label="Rewrite what you said"
+                      ref={editingSyntax.ref}
+                      maxLength={MAX_COMMENT}
+                      rows={rowsFor(editing.body, 2)}
+                      value={editing.body}
+                      onInput={(event) => setEditing({ id: entry.id, body: event.currentTarget.value })}
+                      {...editingSyntax.handlers}
+                      {...editingPictures.handlers}
+                      {...renaming.noticing}
+                    />
+                    <MentionMenu
+                      candidates={renaming.candidates}
+                      subject="what you said"
+                      onChoose={renaming.choose}
+                    />
+                    <AddPicture pictures={editingPictures} label="what you said" />
+                    <button
+                      type="button"
+                      disabled={busy || stillUploading(editing.body) || editing.body.trim() === ''}
+                      onClick={() => {
+                        onRewrite(entry.id, editing.body.trim())
+                        setEditing(undefined)
+                      }}
+                    >
+                      Save
+                    </button>
+                    <button type="button" class="link-button" onClick={() => setEditing(undefined)}>
+                      Cancel
+                    </button>
+                  </div>
+                </>
               ) : (
                 <>
                   {/* `renderMarkdown` escapes raw HTML rather than filtering it, which is what makes this safe. */}
@@ -194,15 +208,19 @@ export const DreamThread = ({
         )}
       </ol>
 
+      <SyntaxToolbar syntax={sayingSyntax} subject={`what you say about ${thread.title}`} />
+
       <p class="thread-say">
         <textarea
           class="thread-box"
           aria-label={`Say something about ${thread.title}`}
           placeholder="Say something…"
+          ref={sayingSyntax.ref}
           maxLength={MAX_COMMENT}
           rows={rowsFor(saying, 2)}
           value={saying}
           onInput={(event) => setSaying(event.currentTarget.value)}
+          {...sayingSyntax.handlers}
           {...sayingPictures.handlers}
           {...naming.noticing}
         />

@@ -86,9 +86,6 @@ describe('the stylesheet', () => {
     // already moved to the bottom bar, and the installation's name is what shortens.
     expect(phone).toMatch(/\.site-header\s*\{[^}]*flex-wrap:\s*nowrap/)
     expect(rules.find((rule) => rule.selector === '.brand-name')?.body).toMatch(/text-overflow:\s*ellipsis/)
-    // The load-bearing half, and the one the ellipsis reads as covering: a flex item's floor is
-    // its own content, so without `min-width: 0` on both the name and the link around it a long
-    // installation name pushes the corner off a 360px screen rather than shortening (#385).
     expect(rules.find((rule) => rule.selector === '.brand-name')?.body).toMatch(/min-width:\s*0/)
     expect(rules.find((rule) => rule.selector === '.brand')?.body).toMatch(/min-width:\s*0/)
   })

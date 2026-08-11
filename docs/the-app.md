@@ -690,9 +690,19 @@ writes nothing: the stored song stays in the key it was written in.
 
 **The capo is stored, because it is knowledge about the song.** "We play this capo 2" is
 not about whoever is looking, so it is a nullable column, 0–11, and shown beside the
-title. The editor offers `capoSuggestion` — the position that turns the most of the song's
+title — on the song's own page only, and only where there is one: a chip per row is noise at the
+length a songbook grows to, and a stored **0** means "no capo", which is an absence rather than
+something to label (#474). The editor offers `capoSuggestion` — the position that turns the most of the song's
 chords into open shapes, ties going to the lower capo — but what is stored is what
 somebody chose. Nothing derives it on the fly.
+
+**The playing controls say what they do, and stay where they are needed** (#474). `♭ 0 ♯` reads as
+decoration until somebody presses one, so the group is labelled _Transpose_ — the word explains and
+the middle keeps showing the offset. Scroll and speed are reached for while scrolled down, mid-song
+and one-handed, so they are `position: sticky` at the foot of the viewport rather than at the top
+of the page: sticky and not fixed, so the bar keeps its place in the flow and the last lines of a
+song end above it instead of under it. Transposing stays at the top, being a before-you-start
+choice.
 
 **Autoscroll is the phone-on-the-floor case**, a play button and a speed slider, entirely
 in the front end. The speed is remembered in `localStorage` under one key rather than one
@@ -703,7 +713,10 @@ browsing does — falls back to the default rather than throwing.
 ### Taking a song out is soft
 
 `deleted_at`, nullable. A book everybody can delete from wants an undo, so the list
-excludes deleted rows and a _Recently taken out_ section at the foot of it puts one back.
+excludes deleted rows and a _Recently taken out_ section at the foot of it puts one back. Taking
+one out **asks first**, and the question says where the song goes (#474): the undo is only
+reassuring to somebody who knows it is there, and one tap that makes a song vanish reads as data
+loss to everybody else.
 There is no purge: songs are text, and keeping them is what makes the regret recoverable
 in both directions. `deleted_at` is worth adopting in more places than this — the songbook
 is its first outing, not a special case, and generalising it is its own issue.
@@ -711,9 +724,15 @@ is its first outing, not a special case, and generalising it is its own issue.
 **Links are JSON on the row.** A link has no identity, nothing refers to one, and the only
 operation is "replace the list" — so a table of its own would buy an id, an order column
 and a reorder route for nothing. Only `https://` is allowed, which is `isProfileUrl`, the
-same guard a member's own link field uses. `musicHost` recognises the sites people will
-actually paste and puts an icon beside the link; an unrecognised one is a plain link, and
-the label somebody typed wins over both.
+same guard a member's own link field uses.
+
+**They are icons and nothing else** (#474), stacked under the title: `musicHost` recognises the
+sites people will actually paste and an unrecognised one gets 🎶, with the host's name in the
+`title` and the `aria-label` since there is no visible text left to say it. The URL as text said
+nothing anybody needed, and the name the form used to ask for — _What to call it_ — was unclear in
+practice and read by nothing once the icons carried the meaning, so `label` came off the schema and
+out of the stored JSON. The edit form still lists the URL in words, because that is what makes a
+link identifiable enough to remove.
 
 ### On the feed, like everything else people make
 
@@ -1323,6 +1342,45 @@ cost, and that account is the one about to delete something.
 before anybody presses ✕. Refusing instead would mean knowing every markdown column in
 the schema, which is exactly the list this design does not keep — so the honest version
 is to tell the person what it costs and let them decide.
+
+## The composer
+
+Markdown is what is stored and what is rendered; what changed in #473 is only the surface. Most
+members are not technical, and a field with a **Write / Preview** mode switch reads as a technical
+tool. The alternative is not WYSIWYG: inline bold means `contenteditable`, which at production
+quality means a Lexical/ProseMirror-class dependency larger than this whole bundle — and it changes
+what is stored, reopening everything "Markdown is escaped, not filtered" below settles.
+
+Discord's shape is the right one, so the surface got humbler and the format stayed put. Markdown
+already degrades: somebody who never types a `*` writes plain text and gets plain text, which is
+why the simple experience needs no setting to switch into. A setting would fork the editing
+experience people help each other with at a gathering, and both halves would still have to exist
+and be tested.
+
+**A toolbar that writes the syntax**, four buttons wide: bold, italic, link, list. `syntax.ts`
+holds the grammar as pure functions with the tests, in the spirit of `withMentionAt`: wrapping a
+selection, unwrapping one already wrapped, opening an empty pair with the caret inside it when
+nothing is selected, and refusing when the insert would pass the field's `maxLength` — `maxlength`
+bounds typing and not a programmatic insert, which is #457's rule. `C-b` and `C-i` do the same for
+whoever has a keyboard; on a phone, where most members are, the toolbar is the whole affordance.
+
+**Italic is `_`, not `*`.** With asterisks, italic on a selection inside `**bold**` matches the
+unwrap check and turns bold into italic. The two render identically, so the ambiguity buys nothing.
+
+**The preview is not a tab.** It renders quietly below the field, and only once the text has any
+markdown syntax in it — a preview of plain words beside the plain words is noise, and the mode
+switch was the chrome that read as a tool. `hasMarkdown` is what decides, and it is a list of
+patterns rather than a render-and-compare, because rendering plain text also changes it.
+
+**A picture is appended at the end of the body**, wherever it was pasted, dropped or chosen. That
+is the Facebook and Discord feel — words then pictures — and it costs no data-model change, since
+storage stays a markdown token that anybody who wants one mid-text can still move.
+
+**Every composer gets it**: `MarkdownField` for introductions, posts, dream descriptions and
+welcome text, and the two comment boxes in `DreamThread`, which are plain textareas rather than
+a `MarkdownField`. `useSyntax` + `SyntaxToolbar` is the same hook-and-component pair as
+`useImageUpload` + `AddPicture` and `useMentioning` + `MentionMenu`, so a third composer wires it
+the way it wires those.
 
 ## Markdown is escaped, not filtered
 
