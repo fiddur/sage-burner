@@ -82,6 +82,15 @@ describe('the feed filter carried in a URL', () => {
     expect(feedKindsFrom('')).toEqual([])
   })
 
+  it('reads a parameter repeated in the URL as nothing, rather than throwing', () => {
+    // `?kinds=a&kinds=b` reaches a Fastify route as a `string[]`, whatever the route's generic
+    // says — and `.split` on that is a TypeError, which is a 500 for a URL nobody can be
+    // stopped from typing (#482).
+    expect(feedKindsFrom(['session', 'song'])).toEqual([])
+    expect(feedKindsFrom(null)).toEqual([])
+    expect(feedKindsFrom(7)).toEqual([])
+  })
+
   it('drops a kind it does not know, so a stale link shows more rather than failing', () => {
     expect(feedKindsFrom('session,dremas')).toEqual(['session'])
     expect(feedKindsFrom('dremas')).toEqual([])

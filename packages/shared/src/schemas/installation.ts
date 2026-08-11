@@ -25,10 +25,6 @@ export type Installation = z.infer<typeof installationSchema>
 export type InstallationResponse = z.infer<typeof installationResponseSchema>
 export type InstallationUpdate = z.infer<typeof installationUpdateSchema>
 
-/**
- * Deliberately not on `installationSchema`: that one answers a public, unauthenticated route, and
- * where the gathering physically is not something a visitor may read.
- */
 export const mapLinkSchema = z.object({ url: z.string().max(MAX_MAP_URL).nullable() })
 
 export const mapLinkResponseSchema = z.object({ map: mapLinkSchema })

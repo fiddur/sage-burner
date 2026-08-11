@@ -103,10 +103,10 @@ export const AdminSettings = ({ api }: { api: AdminSettingsApi }) => {
       )}
 
       {/* Outside the form: these save on choosing a file, not on submit. */}
-      {loaded.status === 'ready' && <MapField api={api} />}
       {loaded.status === 'ready' && <IconField api={api} />}
       {loaded.status === 'ready' && <BannerField api={api} />}
       {loaded.status === 'ready' && <MailField api={api} />}
+      {loaded.status === 'ready' && <MapField api={api} />}
       {loaded.status === 'ready' &&
         oauthProviders.map((provider) => <OauthField key={provider} api={api} provider={provider} />)}
     </GuardedPage>

@@ -21,6 +21,7 @@ import type {
   EventWelcomeUpdate,
   FaqCreateInput,
   FaqUpdate,
+  FollowInput,
   FormQuestionCreateInput,
   FormQuestionOrder,
   FormQuestionUpdate,
@@ -826,6 +827,16 @@ export const apiRoutes = {
     fastify: '/api/sessions/:id/support/me',
     path: (id: string) => `/api/sessions/${encodeURIComponent(id)}/support/me`,
   },
+  supportThread: {
+    method: 'POST',
+    fastify: '/api/threads/:id/support/me',
+    path: (id: string) => `/api/threads/${encodeURIComponent(id)}/support/me`,
+  },
+  setThreadFollow: {
+    method: 'PUT',
+    fastify: '/api/threads/:id/follow/me',
+    path: (id: string) => `/api/threads/${encodeURIComponent(id)}/follow/me`,
+  },
   transferMyPlace: {
     method: 'POST',
     fastify: '/api/events/:eventId/attendance/me/transfer',
@@ -971,6 +982,11 @@ export const apiRoutes = {
     fastify: '/api/sessions/:id/support/me',
     path: (id: string) => `/api/sessions/${encodeURIComponent(id)}/support/me`,
   },
+  withdrawSupportForThread: {
+    method: 'DELETE',
+    fastify: '/api/threads/:id/support/me',
+    path: (id: string) => `/api/threads/${encodeURIComponent(id)}/support/me`,
+  },
   webManifest: {
     method: 'GET',
     fastify: '/manifest.webmanifest',
@@ -1040,6 +1056,7 @@ export interface RouteBodies {
   updateEventOption: EventOptionUpdate
   updateInstallation: InstallationUpdate
   setMapLink: MapLinkUpdate
+  setThreadFollow: FollowInput
   updateMailSettings: MailSettingsUpdate
   updateFaqEntry: FaqUpdate
   updateLeadRole: LeadRoleUpdate

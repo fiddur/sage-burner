@@ -33,12 +33,6 @@ type Editable = Pick<
   | 'transfer_info_markdown'
 >
 
-/**
- * Both properties, and neither is the type's: `satisfies readonly (keyof Editable)[]` on a list
- * checks that every entry is a key and not that every key is an entry, so a field added to
- * `Editable` compiled while an edit silently stopped sending it. Iterating what `now` carries
- * has nothing to keep in step, because `Editable` is exactly the editable fields.
- */
 export const changedFields = (before: Editable | undefined, now: Editable): Partial<Editable> => {
   if (before === undefined) return now
 

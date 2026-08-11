@@ -20,10 +20,12 @@ import type { UploadImage } from '../image-upload.ts'
 import type { Mentionable } from '../mentioning.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
+import { CardBell } from '../components/CardBell.tsx'
 import { ChipRow } from '../components/ChipRow.tsx'
 import { DreamThread } from '../components/DreamThread.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
+import { Heart } from '../components/Heart.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { localDay } from '../datetime.ts'
@@ -46,6 +48,9 @@ export type FeedApi = Pick<
   | 'deletePost'
   | 'getEventAttendees'
   | 'getApprovedAccounts'
+  | 'supportThread'
+  | 'withdrawSupportForThread'
+  | 'setThreadFollow'
 >
 
 interface Happening {
@@ -113,6 +118,19 @@ export const Feed = ({ api }: { api: FeedApi }) => {
     showAll: (id: string) => {
       run(async () => held((await api.getThread(id)).thread), 'Could not load the rest of it.')
     },
+    follow: (id: string, following: boolean) => {
+      run(
+        async () => held((await api.setThreadFollow(id, { following })).thread),
+        'Could not change that. Please try again.',
+      )
+    },
+    heart: (id: string, hearting: boolean) => {
+      run(
+        async () =>
+          held((hearting ? await api.supportThread(id) : await api.withdrawSupportForThread(id)).thread),
+        'Could not do that just now.',
+      )
+    },
     reword: (threadId: string, id: string, title: string, body: string, done: () => void) => {
       run(async () => {
         await api.updatePost(id, { title, body })
@@ -172,7 +190,7 @@ export const Feed = ({ api }: { api: FeedApi }) => {
         chips={feedKinds.map((kind) => ({ id: kind, label: feedKindLabel[kind] }))}
         lit={lit}
         subject="What to show"
-        onChange={(wanted) => route(feedPage(wanted))}
+        onChange={(wanted) => route(feedPage(wanted, query?.[BURN_PARAM]))}
       />
 
       <ErrorText message={error} />
@@ -440,6 +458,8 @@ const Card = ({
     showAll: (id: string) => void
     reword: (threadId: string, id: string, title: string, body: string, done: () => void) => void
     takeBack: (threadId: string, id: string) => void
+    heart: (id: string, hearting: boolean) => void
+    follow: (id: string, following: boolean) => void
   }
   upload: UploadImage
   people: readonly Mentionable[]
@@ -449,6 +469,16 @@ const Card = ({
 
   return (
     <li class="feed-card">
+      <CardBell
+        what={card.title}
+        category={category}
+        on={category !== undefined && (on?.includes(category) ?? false)}
+        following={card.followed_by_me}
+        busy={busy}
+        onToggle={() => category !== undefined && onToggle(category)}
+        onFollow={(following) => talk.follow(card.id, following)}
+      />
+
       <p class="feed-card-head">
         {card.link === null ? <span>{card.title}</span> : <a href={card.link}>{card.title}</a>}
       </p>
@@ -492,13 +522,16 @@ const Card = ({
         onShowAll={() => talk.showAll(card.id)}
       />
 
-      {category !== undefined && (
-        <Chip
-          category={category}
-          on={on?.includes(category) ?? false}
-          busy={busy}
-          onToggle={() => onToggle(category)}
-        />
+      {!card.gone && (
+        <p class="feed-card-foot">
+          <Heart
+            what={card.title}
+            hearted={card.supported_by_me}
+            count={card.support_count}
+            busy={busy}
+            onHeart={(hearting) => talk.heart(card.id, hearting)}
+          />
+        </p>
       )}
     </li>
   )

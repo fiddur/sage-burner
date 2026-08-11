@@ -11,7 +11,12 @@ export const dreamPage = (eventId: string, dreamId: string): string =>
 
 export const profilePage = (accountId: string): string => `/members/${encodeURIComponent(accountId)}`
 
-export const feedPage = (kinds: readonly FeedKind[] = []): string => `/feed${feedKindsQuery(kinds)}`
+export const feedPage = (kinds: readonly FeedKind[] = [], burn?: string): string => {
+  const filter = feedKindsQuery(kinds)
+  if (burn === undefined) return `/feed${filter}`
+
+  return `/feed${filter}${filter === '' ? '?' : '&'}${BURN_PARAM}=${encodeURIComponent(burn)}`
+}
 
 export const songbookPage = (): string => '/songs'
 

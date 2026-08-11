@@ -70,15 +70,7 @@ const BUTTONS: readonly { kind: SyntaxKind; label: string; face: string; class: 
   { kind: 'list', label: 'List', face: '☰', class: 'syntax-button' },
 ]
 
-export const SyntaxToolbar = ({
-  syntax,
-  subject,
-  disabled = false,
-}: {
-  syntax: Syntax
-  subject: string
-  disabled?: boolean
-}) => (
+export const SyntaxToolbar = ({ syntax, subject }: { syntax: Syntax; subject: string }) => (
   <div class="syntax-row">
     {BUTTONS.map((button) => (
       <button
@@ -87,7 +79,6 @@ export const SyntaxToolbar = ({
         class={button.class}
         aria-label={`${button.label} in ${subject}`}
         title={button.label}
-        disabled={disabled}
         onClick={() => syntax.apply(button.kind)}
       >
         {button.face}

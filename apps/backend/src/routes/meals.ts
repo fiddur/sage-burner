@@ -19,13 +19,13 @@ import type { GuardDeps } from '../auth/guards.ts'
 import type { Database } from '../db/index.ts'
 import type { Notifier } from '../push/notify.ts'
 
+import { accountForAttendance, attendanceFor } from '../attendances.ts'
 import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
 import { isForeignKeyViolation, isUniqueViolation } from '../db/errors.ts'
 import { account, attendance, event, meal, mealRole, mealSlot } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { refuseIfStale, withCollectionVersion, withVersion } from '../if-match.ts'
-import { accountForAttendance, attendanceFor } from './attendance.ts'
 import { openEventNow } from './events.ts'
 
 export interface MealDeps extends GuardDeps {
