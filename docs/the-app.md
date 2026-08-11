@@ -590,13 +590,21 @@ that is not scoped to an open burn. Talking about a burn is not arranging one, a
 was lovely" is a thing somebody posts on the way home. Every other dream write stays on
 `openEvent`.
 
+**The bell is a menu in the card's corner** (#480). It was a chip at the tail reading
+"A song goes into the songbook 🔔", which is opaque unless you already know it is a setting —
+it reads as a label. The menu is titled _Notification settings_ and holds the two switches that
+exist for one card: this kind of thing, and this card. It is the app's first dropdown, so it sets
+the pattern — a real button with `aria-haspopup`, `aria-expanded`, and closing on outside-press and
+Escape. The activity **lines** keep their inline chip: a bell-menu per one-liner is more chrome
+than line.
+
 **A pair of categories per kind of card, split the way every other pair here is** (#259).
 A comment on a thread you are part of is `about: 'you'` and **on**; a comment on any card
 of that kind at a burn you are coming to is `about: 'else'` and **off**. So
 `dream_comment`/`dream_comment_any` for a dream and
 `introduction_comment`/`introduction_comment_any` for a person, and `entryCategory` takes
-the entity type as well as the kind — without that, the chip under a person's card would
-offer to switch on comments about every dream. The audiences are disjoint so nobody is
+the entity type as well as the kind — without that, the switch under a person's card would
+offer to turn on comments about every dream. The audiences are disjoint so nobody is
 told twice, and never the person who just wrote it (#247). Who is "part of it" is whoever
 has spoken on the thread, plus — for a dream — the facilitator and the helpers, and for a
 person, the person it is about. Appointing somebody writes a line authored by whoever
@@ -606,6 +614,19 @@ hear a question about it.
 Neither writes an `activity` row: the entry is the record, and a line beside it would put
 one comment on the page twice. That is what `tellAttendees` is for beside
 `notifyAttendees`.
+
+**And one card can be followed or muted** (#480). `thread_follow (thread_id, account_id,
+enabled)` is the absence-means-default pattern `notification_setting` already uses: no row and
+the participants rule above decides; `enabled` puts somebody in the reply audience without their
+having spoken; disabled takes them out of it though they would otherwise be in — which is the
+escape hatch for a commenter drowning in a lively thread, and falls out of the same column for
+free. `tellAbout`'s audience becomes (participants ∪ followers) − muted − author. Mentions and the
+wider `_any` audience are untouched: those are what the category switches govern.
+
+**The checkbox shows the effective state**, so what it says is always what will happen — which
+means `readThreads` has to compute participant-or-follower for a page of fifty cards. Three
+queries do it (spoken on, facilitating, helping) and the rest reads off columns the card query
+already selects, rather than `participantsOf`'s several queries per card.
 
 **The author is an `account`, not an `attendance`** — deliberately unlike
 `session_helper`. Leaving a burn empties your spots and must not delete what you said; a

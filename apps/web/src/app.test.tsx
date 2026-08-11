@@ -33,6 +33,7 @@ const clientWith = (
   logout,
   getMe: () => Promise.reject(new Error('getMe is not stubbed in this file')),
   getMapLink: () => Promise.reject(new Error('getMapLink is not stubbed in this file')),
+  setThreadFollow: () => Promise.reject(new Error('setThreadFollow is not stubbed in this file')),
   supportThread: () => Promise.reject(new Error('supportThread is not stubbed in this file')),
   withdrawSupportForThread: () =>
     Promise.reject(new Error('withdrawSupportForThread is not stubbed in this file')),

@@ -61,6 +61,7 @@ const aCard = (over: Partial<Thread> & Pick<Thread, 'id' | 'title'>): Thread => 
   supporters: [],
   support_count: 0,
   supported_by_me: false,
+  followed_by_me: false,
   last_at: '2026-08-07T18:00:00.000Z',
   entries: [anEntry({ id: 't-1', body: 'offered this dream', kind: 'offered' })],
   ...over,
@@ -83,6 +84,7 @@ const stub = (over: Partial<FeedApi> = {}, activity: Activity[] = TWO, threads: 
   getMyNotificationSettings: () => Promise.resolve({ on: [...DEFAULTS], email: [] }),
   updateMyNotificationSettings: () => Promise.resolve({ on: [...DEFAULTS], email: [] }),
   getThread: () => Promise.reject(new Error('getThread is not stubbed here')),
+  setThreadFollow: () => Promise.reject(new Error('setThreadFollow is not stubbed here')),
   supportThread: () => Promise.reject(new Error('supportThread is not stubbed here')),
   withdrawSupportForThread: () => Promise.reject(new Error('withdrawSupportForThread is not stubbed here')),
   addPost: () => Promise.reject(new Error('addPost is not stubbed here')),
@@ -192,6 +194,85 @@ describe('the chip row over the feed', () => {
     for (const name of ['Burns', 'Dreams', 'People', 'Posts', 'Songs']) {
       expect(await screen.findByRole('button', { name })).toBeTruthy()
     }
+  })
+})
+
+describe('the bell in a card’s corner', () => {
+  const bellOn = async (what: string) => {
+    fireEvent.click(await screen.findByRole('button', { name: `Notification settings for ${what}` }))
+  }
+
+  it('opens on a press and closes on Escape', async () => {
+    renderPage(stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
+
+    await bellOn('Sauna at dawn')
+    expect(screen.getByText('Notification settings')).toBeTruthy()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    await waitFor(() => expect(screen.queryByText('Notification settings')).toBeNull())
+  })
+
+  it('closes when something outside it is pressed', async () => {
+    renderPage(stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
+
+    await bellOn('Sauna at dawn')
+    fireEvent.pointerDown(document.body)
+
+    await waitFor(() => expect(screen.queryByText('Notification settings')).toBeNull())
+  })
+
+  it('says whether it is open, since it is a menu and not a toggle', async () => {
+    renderPage(stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
+
+    const bell = await screen.findByRole('button', { name: 'Notification settings for Sauna at dawn' })
+    expect(bell.getAttribute('aria-expanded')).toBe('false')
+    expect(bell.getAttribute('aria-haspopup')).toBe('menu')
+
+    fireEvent.click(bell)
+
+    await waitFor(() => expect(bell.getAttribute('aria-expanded')).toBe('true'))
+  })
+
+  it('follows a card, and stops following it', async () => {
+    const setThreadFollow = vi.fn<FeedApi['setThreadFollow']>(() =>
+      Promise.resolve({ thread: aCard({ id: 'c-1', title: 'Sauna at dawn', followed_by_me: true }) }),
+    )
+    renderPage(stub({ setThreadFollow }, [], [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
+
+    await bellOn('Sauna at dawn')
+    fireEvent.click(screen.getByLabelText('Notify on replies'))
+
+    await waitFor(() => expect(setThreadFollow).toHaveBeenCalledWith('c-1', { following: true }))
+  })
+
+  it('shows the effective state, so what it says is what will happen', async () => {
+    renderPage(stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn', followed_by_me: true })]))
+
+    await bellOn('Sauna at dawn')
+
+    expect(screen.getByLabelText('Notify on replies')).toHaveProperty('checked', true)
+  })
+
+  it('offers following on a card whose news maps to no category at all', async () => {
+    renderPage(
+      stub(
+        {},
+        [],
+        [
+          aCard({
+            id: 'c-1',
+            title: 'Sauna at dawn',
+            entries: [anEntry({ id: 't-1', body: 'moved it in the schedule', kind: 'scheduled' })],
+          }),
+        ],
+      ),
+    )
+
+    await bellOn('Sauna at dawn')
+
+    expect(screen.getByLabelText('Notify on replies')).toBeTruthy()
+    expect(screen.queryByLabelText(/Notify me on similar/)).toBeNull()
   })
 })
 
@@ -763,8 +844,12 @@ describe('what everyone has been doing', () => {
       ),
     )
 
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Notification settings for The planning call is Sunday' }),
+    )
+
     expect(
-      await screen.findByRole('button', { name: notificationCategoryInfo.post_comment_any.label }),
+      screen.getByLabelText(`Notify me on similar (${notificationCategoryInfo.post_comment_any.label})`),
     ).toBeTruthy()
   })
 
@@ -785,8 +870,12 @@ describe('what everyone has been doing', () => {
       ),
     )
 
+    fireEvent.click(await screen.findByRole('button', { name: 'Notification settings for Ada' }))
+
     expect(
-      await screen.findByRole('button', { name: notificationCategoryInfo.introduction_comment_any.label }),
+      screen.getByLabelText(
+        `Notify me on similar (${notificationCategoryInfo.introduction_comment_any.label})`,
+      ),
     ).toBeTruthy()
   })
 
@@ -870,9 +959,9 @@ describe('what everyone has been doing', () => {
   })
 
   it('offers the switch that would tell somebody about a card like this one', async () => {
-    // The chip names the top of the card, and only where a category exists to name: a
-    // dream being moved sends nothing, so a card whose latest news is a move offers no
-    // switch rather than one that would change nothing.
+    // The menu names the top of the card, and only where a category exists to name: a
+    // dream being moved sends nothing, so a card whose latest news is a move offers
+    // following alone rather than a switch that would change nothing.
     renderPage(
       stub(
         {},
@@ -894,8 +983,12 @@ describe('what everyone has been doing', () => {
       ),
     )
 
-    expect(await screen.findByRole('button', { name: /Somebody comments on any dream/ })).toBeTruthy()
-    expect(document.querySelectorAll('.feed-card .chip')).toHaveLength(1)
+    fireEvent.click(await screen.findByRole('button', { name: 'Notification settings for Cacao ceremony' }))
+    expect(screen.getByLabelText(/Notify me on similar \(Somebody comments on any dream/)).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Notification settings for Sauna at dawn' }))
+    expect(screen.getAllByLabelText(/Notify me on similar/)).toHaveLength(1)
+    expect(screen.getAllByLabelText('Notify on replies')).toHaveLength(2)
   })
 
   it('names the burn each line belongs to, because the page spans them', async () => {

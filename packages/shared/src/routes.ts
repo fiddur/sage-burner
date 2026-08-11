@@ -21,6 +21,7 @@ import type {
   EventWelcomeUpdate,
   FaqCreateInput,
   FaqUpdate,
+  FollowInput,
   FormQuestionCreateInput,
   FormQuestionOrder,
   FormQuestionUpdate,
@@ -820,6 +821,11 @@ export const apiRoutes = {
     fastify: '/api/threads/:id/support/me',
     path: (id: string) => `/api/threads/${encodeURIComponent(id)}/support/me`,
   },
+  setThreadFollow: {
+    method: 'PUT',
+    fastify: '/api/threads/:id/follow/me',
+    path: (id: string) => `/api/threads/${encodeURIComponent(id)}/follow/me`,
+  },
   transferMyPlace: {
     method: 'POST',
     fastify: '/api/events/:eventId/attendance/me/transfer',
@@ -1038,6 +1044,7 @@ export interface RouteBodies {
   updateEventOption: EventOptionUpdate
   updateInstallation: InstallationUpdate
   setMapLink: MapLinkUpdate
+  setThreadFollow: FollowInput
   updateMailSettings: MailSettingsUpdate
   updateFaqEntry: FaqUpdate
   updateLeadRole: LeadRoleUpdate

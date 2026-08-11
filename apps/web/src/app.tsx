@@ -63,6 +63,7 @@ export type RoutesApi = Pick<
   | 'getFeed'
   | 'getMapLink'
   | 'supportThread'
+  | 'setThreadFollow'
   | 'withdrawSupportForThread'
   | 'setMapLink'
   | 'getThread'

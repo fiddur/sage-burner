@@ -1004,3 +1004,99 @@ describe('the heart on a card', () => {
     expect((await heart(server, ada.cookie, randomUUID())).statusCode).toBe(404)
   })
 })
+
+describe('following a card, and muting one', () => {
+  const follow = (server: FastifyInstance, cookie: string, id: string, following: boolean) =>
+    server.inject({
+      method: 'PUT',
+      url: `/api/threads/${id}/follow/me`,
+      headers: { cookie },
+      payload: { following },
+    })
+
+  it('reaches somebody who followed without ever saying anything', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    const cai = await givenAccount('Cai')
+    for (const who of [ada, bea, cai]) await givenComing(who.id)
+    const { thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+
+    await follow(server, cai.cookie, id, true)
+    await say(server, bea.cookie, id, 'is one person enough?')
+
+    expect((await bell(server, cai.cookie)).map((one) => one.category)).toEqual(['dream_comment'])
+  })
+
+  it('leaves somebody who muted it out, though they would otherwise be part of it', async () => {
+    // The escape hatch for a commenter drowning in a lively thread, and it falls out of the
+    // same column for free.
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    await givenComing(ada.id)
+    await givenComing(bea.id)
+    const { thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+
+    await follow(server, ada.cookie, id, false)
+    await say(server, bea.cookie, id, 'is one person enough?')
+
+    expect(await bell(server, ada.cookie)).toEqual([])
+  })
+
+  it('says the effective state back, so the checkbox cannot claim one thing and do another', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const { thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+
+    // Ada offered it, so she is a participant and the box is ticked before she touches it.
+    expect((await read(server, id, ada.cookie)).json().thread.followed_by_me).toBe(true)
+    expect((await follow(server, ada.cookie, id, false)).json().thread.followed_by_me).toBe(false)
+    expect((await follow(server, ada.cookie, id, true)).json().thread.followed_by_me).toBe(true)
+  })
+
+  it('is unticked for somebody with nothing to do with the card', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const cai = await givenAccount('Cai')
+    await givenComing(ada.id)
+    await givenComing(cai.id)
+    const { thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+
+    expect((await read(server, id, cai.cookie)).json().thread.followed_by_me).toBe(false)
+  })
+
+  it('says nothing about following to somebody who is not asking', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const { thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+
+    expect((await follow(server, ada.cookie, randomUUID(), true)).statusCode).toBe(404)
+    expect(
+      (
+        await server.inject({
+          method: 'PUT',
+          url: `/api/threads/${id}/follow/me`,
+          payload: { following: true },
+        })
+      ).statusCode,
+    ).toBe(401)
+  })
+
+  it('refuses a body that is not the one thing it takes', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const { thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+
+    expect((await follow(server, ada.cookie, id, 'yes' as unknown as boolean)).statusCode).toBe(400)
+  })
+})

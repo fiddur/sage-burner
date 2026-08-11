@@ -15,6 +15,7 @@ import {
   commentSchema,
   dreamPage,
   feedPage,
+  followSchema,
   mentionedAccounts,
   profilePage,
   songPage,
@@ -43,6 +44,7 @@ import {
   song,
   thread,
   threadEntry,
+  threadFollow,
   threadSupport,
 } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
@@ -281,6 +283,75 @@ const heartsFor = async (db: Database, ids: readonly string[]): Promise<Hearts> 
   return held
 }
 
+/**
+ * The threads the viewer is already a participant of, by the same rules `participantsOf` uses one
+ * thread at a time — so the checkbox that shows the effective state cannot say one thing while
+ * `tellAbout` does another (#480). Three queries for a page rather than three per card; the rest
+ * of the rules read off columns `readThreads` has already selected.
+ */
+const participantThreads = async (
+  db: Database,
+  ids: readonly string[],
+  viewer: { account_id: string } | undefined,
+): Promise<ReadonlySet<string>> => {
+  if (viewer === undefined) return new Set()
+
+  const spoke = await db
+    .selectDistinct({ thread_id: threadEntry.thread_id })
+    .from(threadEntry)
+    .where(
+      and(
+        inArray(threadEntry.thread_id, [...ids]),
+        eq(threadEntry.author_account_id, viewer.account_id),
+        inArray(threadEntry.kind, ['comment', 'offered']),
+      ),
+    )
+
+  const facilitating = await db
+    .select({ thread_id: thread.id })
+    .from(thread)
+    .innerJoin(session, and(eq(thread.entity_type, 'session'), eq(session.id, thread.entity_id)))
+    .innerJoin(attendance, eq(attendance.id, session.facilitator_attendance_id))
+    .where(and(inArray(thread.id, [...ids]), eq(attendance.account_id, viewer.account_id)))
+
+  const helping = await db
+    .select({ thread_id: thread.id })
+    .from(thread)
+    .innerJoin(sessionHelper, eq(sessionHelper.session_id, thread.entity_id))
+    .innerJoin(attendance, eq(attendance.id, sessionHelper.attendance_id))
+    .where(
+      and(
+        inArray(thread.id, [...ids]),
+        eq(thread.entity_type, 'session'),
+        eq(attendance.account_id, viewer.account_id),
+      ),
+    )
+
+  return new Set([...spoke, ...facilitating, ...helping].map((row) => row.thread_id))
+}
+
+const partOf = (row: CardRow, already: ReadonlySet<string>, viewer: Viewer): boolean =>
+  viewer !== undefined &&
+  (already.has(row.id) ||
+    row.subject === viewer.account_id ||
+    row.post_author === viewer.account_id ||
+    row.song_author === viewer.account_id)
+
+const followsFor = async (
+  db: Database,
+  ids: readonly string[],
+  viewer: { account_id: string } | undefined,
+): Promise<ReadonlyMap<string, boolean>> => {
+  if (viewer === undefined) return new Map()
+
+  const rows = await db
+    .select({ thread_id: threadFollow.thread_id, enabled: threadFollow.enabled })
+    .from(threadFollow)
+    .where(and(inArray(threadFollow.thread_id, [...ids]), eq(threadFollow.account_id, viewer.account_id)))
+
+  return new Map(rows.map((row) => [row.thread_id, row.enabled]))
+}
+
 export const readThreads = async (
   db: Database,
   ids: readonly string[],
@@ -378,6 +449,8 @@ export const readThreads = async (
 
   const byId = new Map(rows.map((row) => [row.id, row]))
   const hearts = await heartsFor(db, ids)
+  const said = await followsFor(db, ids, viewer)
+  const already = await participantThreads(db, ids, viewer)
 
   const namesById = await mentionedNames(db, [
     ...entries.map((row) => row.body),
@@ -407,6 +480,7 @@ export const readThreads = async (
         supporters: hearts.get(id) ?? [],
         support_count: (hearts.get(id) ?? []).length,
         supported_by_me: (hearts.get(id) ?? []).some((person) => person.account_id === viewer?.account_id),
+        followed_by_me: said.get(id) ?? partOf(row, already, viewer),
       } satisfies Thread,
     ]
   })
@@ -421,6 +495,7 @@ const authoredBy = (row: CardRow, viewer: Viewer): boolean =>
     : row.entity_type === 'song' && row.song_author === viewer.account_id)
 
 interface CardRow {
+  id: string
   event_id: string | null
   entity_type: ThreadEntityType
   entity_id: string
@@ -501,6 +576,21 @@ export const nameOf = async (db: Database, accountId: string): Promise<string | 
 
   return row?.name ?? null
 }
+
+const saidAbout = async (db: Database, threadId: string, enabled: boolean): Promise<string[]> => {
+  const rows = await db
+    .select({ account_id: threadFollow.account_id })
+    .from(threadFollow)
+    .where(and(eq(threadFollow.thread_id, threadId), eq(threadFollow.enabled, enabled)))
+
+  return rows.map((row) => row.account_id)
+}
+
+export const following = async (db: Database, threadId: string): Promise<string[]> =>
+  await saidAbout(db, threadId, true)
+
+export const muting = async (db: Database, threadId: string): Promise<string[]> =>
+  await saidAbout(db, threadId, false)
 
 export const participantsOf = async (
   db: Database,
@@ -765,6 +855,38 @@ export const registerThreadRoutes = (
     return await whole(reply, found.id, viewer)
   }
 
+  app.put<{ Params: { id: string } }>(
+    apiRoutes.setThreadFollow.fastify,
+    { preHandler: requireApproved },
+    async (request, reply) => {
+      void noStore(reply)
+
+      const body = bodyOf(followSchema, request)
+      if (body === undefined) return sendError(reply, 400)
+
+      const viewer = await viewerFor(request, { db, sessions })
+      if (viewer === undefined) return sendError(reply, 401)
+
+      const [found] = await db
+        .select({ id: thread.id })
+        .from(thread)
+        .where(eq(thread.id, request.params.id))
+        .limit(1)
+
+      if (found === undefined) return sendError(reply, 404)
+
+      await db
+        .insert(threadFollow)
+        .values({ thread_id: found.id, account_id: viewer.account_id, enabled: body.following })
+        .onConflictDoUpdate({
+          target: [threadFollow.thread_id, threadFollow.account_id],
+          set: { enabled: body.following },
+        })
+
+      return await whole(reply, found.id, viewer)
+    },
+  )
+
   app.post<{ Params: { id: string } }>(
     apiRoutes.supportThread.fastify,
     { preHandler: requireApproved },
@@ -886,6 +1008,8 @@ export const registerThreadRoutes = (
     const told = new Set(named)
 
     const people = await participantsOf(db, found)
+    for (const accountId of await following(db, found.id)) people.add(accountId)
+    for (const accountId of await muting(db, found.id)) people.delete(accountId)
     people.delete(author)
 
     const listening = await audienceFor(found.event_id, author)

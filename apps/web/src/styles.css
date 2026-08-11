@@ -1690,12 +1690,54 @@ a.person-badge:focus-visible span:last-child {
    its own history and everything said about it, and it is the only place a withdrawn
    dream's thread can be read. */
 .feed-card {
+  position: relative;
   border: 1px solid var(--line);
   border-radius: 0.5rem;
   padding: 0.5rem 0.75rem;
 }
 
-/* The heart and the notification chip, which used to sit loose at the tail of the card. */
+/* The bell sits in the card's corner, so `.feed-card` is what it is positioned against. */
+.card-bell {
+  position: absolute;
+  inset-block-start: 0.3rem;
+  inset-inline-end: 0.4rem;
+}
+
+.card-bell-button {
+  padding: 0.2rem 0.3rem;
+  border: 0;
+  background: none;
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* The app's first dropdown, so this is the pattern the next one copies. */
+.card-bell-menu {
+  position: absolute;
+  inset-block-start: 100%;
+  inset-inline-end: 0;
+  z-index: 30;
+  width: max-content;
+  max-width: min(20rem, 80vw);
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+  box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 15%);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.85rem;
+}
+
+.card-bell-title {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+/* The heart, which used to sit loose at the tail of the card beside the chip. */
 .feed-card-foot {
   display: flex;
   flex-wrap: wrap;

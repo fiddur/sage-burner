@@ -519,6 +519,12 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
         method: apiRoutes.sendTestEmail.method,
       }),
 
+    setThreadFollow: (id: string, body: BodyOf<'setThreadFollow'>) =>
+      request<ThreadResponse>(apiRoutes.setThreadFollow.path(id), {
+        method: apiRoutes.setThreadFollow.method,
+        body,
+      }),
+
     supportThread: (id: string) =>
       request<ThreadResponse>(apiRoutes.supportThread.path(id), {
         method: apiRoutes.supportThread.method,

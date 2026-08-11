@@ -49,6 +49,7 @@ const aThread = (over: Partial<Thread> = {}): Thread => ({
   supporters: [],
   support_count: 0,
   supported_by_me: false,
+  followed_by_me: false,
   last_at: '2026-07-02T00:00:00.000Z',
   entries: [
     {
