@@ -287,7 +287,7 @@ export const createApp = async ({
         link: '/admin/applications',
       }),
   })
-  registerApplicationReviewRoutes(app, { db, config, sessions, mail, now })
+  registerApplicationReviewRoutes(app, { db, config, sessions, mail, now, notify: tellAccount })
   registerInviteRoutes(app, { db, sessions, now })
   registerRedemptionRoutes(app, {
     db,

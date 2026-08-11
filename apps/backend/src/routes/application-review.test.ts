@@ -12,7 +12,18 @@ import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, application, INSTALLATION_ID, inviteToken, mailSetting } from '../db/schema.ts'
+import {
+  account,
+  accountRole,
+  application,
+  attendance,
+  event,
+  INSTALLATION_ID,
+  inviteToken,
+  mailSetting,
+  notification,
+  thread,
+} from '../db/schema.ts'
 import { NO_ORIGIN, NOT_CONFIGURED } from '../mail/mail.ts'
 
 const SECRET = 's'.repeat(40)
@@ -91,12 +102,13 @@ const givenMember = async () => {
   return { id, cookie: `${SESSION_COOKIE}=${sessions.issue(id)}` }
 }
 
-const givenApplication = async (name = 'Someone') => {
+const givenApplication = async (name = 'Someone', account_id: string | null = null) => {
   const id = randomUUID()
   await db()
     .insert(application)
     .values({
       id,
+      account_id,
       answers: [{ question_id: randomUUID(), label: 'Why?', type: 'text', value: 'because' }],
       status: 'pending',
       applicant_name: name,
@@ -104,6 +116,33 @@ const givenApplication = async (name = 'Someone') => {
       submitted_at: '2026-07-02T00:00:00Z',
       decided_at: null,
     })
+  return id
+}
+
+/** Somebody who signed up and applied, which is every application since #476. */
+const givenApplicant = async (name = 'Wren') => {
+  const id = randomUUID()
+  await db()
+    .insert(account)
+    .values({ id, email: `${id}@example.org`, name, password_hash: null, created_at: NOW })
+
+  return { id, application: await givenApplication(name, id) }
+}
+
+const givenBurn = async (over: { start_date?: string; end_date?: string } = {}) => {
+  const id = randomUUID()
+  await db()
+    .insert(event)
+    .values({
+      id,
+      name: 'Summer burn',
+      slug: `summer-${id}`,
+      start_date: over.start_date ?? '2026-08-01',
+      end_date: over.end_date ?? '2026-08-03',
+      member_cap: 42,
+      created_at: NOW,
+    })
+
   return id
 }
 
@@ -617,5 +656,91 @@ describe('the invite in the applicant’s inbox', () => {
 
     expect(posted).toHaveLength(2)
     expect(posted[1]?.text).toContain(`http://burn.example.org/invite/${fresh.json().invite.token}`)
+  })
+})
+
+describe('approving somebody who signed up first', () => {
+  it('makes them a member, which is what approval now is', async () => {
+    // No token is minted: the account already exists, so there is nothing left to claim (#476).
+    const server = await build()
+    const approver = await givenAdmin()
+    const wren = await givenApplicant()
+
+    const decided = await decide(server, approver.cookie, wren.application, 'approve')
+
+    expect(decided.statusCode).toBe(200)
+    expect(decided.json().invite).toBeNull()
+    const roles = await db().select().from(accountRole).where(eq(accountRole.account_id, wren.id))
+    expect(roles.map((row) => row.role)).toEqual(['member'])
+    expect(await db().select().from(inviteToken)).toEqual([])
+  })
+
+  it('puts them on the list for the burn that is coming', async () => {
+    // Applying means wanting to come; the member changes arrival and lodging on their next visit.
+    const server = await build()
+    const approver = await givenAdmin()
+    const burn = await givenBurn()
+    const wren = await givenApplicant()
+
+    await decide(server, approver.cookie, wren.application, 'approve')
+
+    const [stay] = await db().select().from(attendance)
+    expect(stay).toMatchObject({ event_id: burn, account_id: wren.id, payment_status: 'unpaid' })
+  })
+
+  it('opens their card on the feed, the same as every other arrival', async () => {
+    const server = await build()
+    const approver = await givenAdmin()
+    await givenBurn()
+    const wren = await givenApplicant()
+
+    await decide(server, approver.cookie, wren.application, 'approve')
+
+    const [card] = await db().select().from(thread)
+    expect(card).toMatchObject({ entity_type: 'attendance', subject_account_id: wren.id })
+  })
+
+  it('approves where no burn is planned yet, rather than refusing', async () => {
+    const server = await build()
+    const approver = await givenAdmin()
+    const wren = await givenApplicant()
+
+    expect((await decide(server, approver.cookie, wren.application, 'approve')).statusCode).toBe(200)
+    expect(await db().select().from(attendance)).toEqual([])
+  })
+
+  it('tells them, which is what the wait was for', async () => {
+    const server = await build()
+    const approver = await givenAdmin()
+    const wren = await givenApplicant()
+
+    await decide(server, approver.cookie, wren.application, 'approve')
+
+    const told = await db().select().from(notification).where(eq(notification.account_id, wren.id))
+    expect(told.map((one) => one.category)).toEqual(['application_decided'])
+  })
+
+  it('tells them a rejection too, which used to send nothing at all', async () => {
+    const server = await build()
+    const approver = await givenAdmin()
+    const wren = await givenApplicant()
+
+    await decide(server, approver.cookie, wren.application, 'reject')
+
+    const told = await db().select().from(notification).where(eq(notification.account_id, wren.id))
+    expect(told.map((one) => one.category)).toEqual(['application_decided'])
+    expect(await db().select().from(accountRole).where(eq(accountRole.account_id, wren.id))).toEqual([])
+  })
+
+  it('still mints a token for an application from before there were accounts', async () => {
+    // The two outstanding ones keep working: the link is all such an application can offer.
+    const server = await build()
+    const approver = await givenAdmin()
+    const old = await givenApplication()
+
+    const decided = await decide(server, approver.cookie, old, 'approve')
+
+    expect(decided.json().invite).not.toBeNull()
+    expect(await db().select().from(inviteToken)).toHaveLength(1)
   })
 })

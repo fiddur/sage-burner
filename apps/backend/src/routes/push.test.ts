@@ -133,16 +133,17 @@ describe('the VAPID key a browser subscribes with', () => {
     expect(response.json()).toEqual({ public_key: 'pub-key' })
   })
 
-  it('is offered to any approved member, and refused to a stranger', async () => {
-    // These moved out from under `/api/admin/` when being handed a lead role
-    // started notifying the person it was handed to (#184). An account with
-    // neither role is still refused: nothing would notify them.
+  it('is offered to anybody signed in, and refused to a stranger', async () => {
+    // These moved out from under `/api/admin/` when being handed a lead role started notifying
+    // the person it was handed to (#184), and out from under `requireApproved` when the account
+    // came before the application (#476): waiting on a decision is exactly when somebody has a
+    // live reason to allow notifications, and there is a decision to tell them about.
     const server = await build()
     const member = await givenAccount(['member'])
     const applicant = await givenAccount([])
 
     expect((await key(server, member.cookie)).statusCode).toBe(200)
-    expect((await key(server, applicant.cookie)).statusCode).toBe(403)
+    expect((await key(server, applicant.cookie)).statusCode).toBe(200)
     expect((await key(server)).statusCode).toBe(401)
   })
 })
@@ -193,15 +194,28 @@ describe('subscribing a browser', () => {
     expect(await db().select().from(pushSubscription)).toEqual([])
   })
 
-  it('takes a member, and refuses an account still waiting on a decision', async () => {
+  it('takes a member and an account still waiting on a decision, and nobody signed out', async () => {
+    // A subscription is keyed by account and a push only carries what is addressed to you, so
+    // there is nothing an applicant could hear that is not theirs (#476).
     const server = await build()
     const member = await givenAccount(['member'])
     const applicant = await givenAccount([])
 
     expect((await subscribe(server, member.cookie)).statusCode).toBe(204)
-    expect((await subscribe(server, applicant.cookie)).statusCode).toBe(403)
+    // Their own browser, since a subscription is keyed by endpoint: the same one twice is one
+    // browser changing hands, which is a different thing and already covered below.
+    expect(
+      (
+        await subscribe(server, applicant.cookie, {
+          ...A_SUBSCRIPTION,
+          endpoint: 'https://push.example/browser-two',
+        })
+      ).statusCode,
+    ).toBe(204)
     expect((await subscribe(server, undefined)).statusCode).toBe(401)
-    expect((await db().select().from(pushSubscription)).map((row) => row.account_id)).toEqual([member.id])
+    expect((await db().select().from(pushSubscription)).map((row) => row.account_id).toSorted()).toEqual(
+      [member.id, applicant.id].toSorted(),
+    )
   })
 
   it('unsubscribes by endpoint, and is quiet about one it never had', async () => {
