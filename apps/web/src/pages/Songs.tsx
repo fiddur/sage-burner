@@ -5,6 +5,7 @@ import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
+import { ChipRow } from '../components/ChipRow.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { IconButton } from '../components/IconButton.tsx'
@@ -33,12 +34,13 @@ export const Songs = ({ api }: { api: SongsApi }) => {
   const { busy, error, setError, run } = useAction(reload)
 
   const [title, setTitle] = useState('')
-  const [filter, setFilter] = useState<string | undefined>(undefined)
+  const [filed, setFiled] = useState<readonly string[]>([])
 
   const book = loaded.status === 'ready' ? loaded.data : { songs: [], categories: [] }
   const living = book.songs.filter((one) => one.deleted_at === null)
   const gone = book.songs.filter((one) => recentlyGone(one.deleted_at, Date.now()))
-  const shown = filter === undefined ? living : living.filter((one) => one.category_ids.includes(filter))
+  const shown =
+    filed.length === 0 ? living : living.filter((one) => one.category_ids.some((id) => filed.includes(id)))
 
   const put = () => {
     if (title.trim() === '') {
@@ -68,28 +70,13 @@ export const Songs = ({ api }: { api: SongsApi }) => {
       {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
       {loaded.status === 'failed' && <ErrorText message={loaded.message} />}
 
-      {loaded.status === 'ready' && book.categories.length > 0 && (
-        <p class="chip-row">
-          <button
-            type="button"
-            class={filter === undefined ? 'song-chip is-on' : 'song-chip'}
-            aria-pressed={filter === undefined}
-            onClick={() => setFilter(undefined)}
-          >
-            Everything
-          </button>
-          {book.categories.map((category) => (
-            <button
-              key={category.id}
-              type="button"
-              class={filter === category.id ? 'song-chip is-on' : 'song-chip'}
-              aria-pressed={filter === category.id}
-              onClick={() => setFilter(filter === category.id ? undefined : category.id)}
-            >
-              {category.label}
-            </button>
-          ))}
-        </p>
+      {loaded.status === 'ready' && (
+        <ChipRow
+          chips={book.categories.map((category) => ({ id: category.id, label: category.label }))}
+          lit={filed}
+          subject="What to show"
+          onChange={setFiled}
+        />
       )}
 
       {loaded.status === 'ready' && shown.length === 0 && (

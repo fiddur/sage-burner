@@ -1170,6 +1170,8 @@ describe('the repeatable-dream column', () => {
 
 const FACILITATOR_ATTENDANCE = '20260806150000_facilitator_attendance'
 
+const THREAD_SUBJECT_UNIQUE = '20260811120000_thread_subject_unique'
+
 describe('the facilitator-is-an-attendance migration', () => {
   /**
    * Staged the same way as the places rebuild above, and for the same reason: this
@@ -1496,6 +1498,156 @@ describe('the login-address backfill', () => {
       // by any of them, whatever the address.
       expect(listFor('a-2')).toEqual(['email:ada.at.work@example.org@0'])
       expect(listFor('a-3')).toEqual(['email:cai@example.org@0'])
+    } finally {
+      fresh.close()
+    }
+  })
+})
+
+describe('the one-card-per-person-per-burn backfill', () => {
+  const seed = (db: DbHandle) => {
+    anEvent(db, 'e-1', 'a-burn', '2026-01-01T00:00:00Z')
+
+    for (const [id, email, name] of [
+      ['a-ada', 'ada@example.org', 'Ada'],
+      ['a-bea', 'bea@example.org', 'Bea'],
+      ['a-cai', 'cai@example.org', 'Cai'],
+    ] as [string, string, string][]) {
+      db.client
+        .prepare('insert into account (id, email, name, created_at) values (?, ?, ?, ?)')
+        .run(id, email, name, NOW)
+    }
+
+    // Only Bea and Cai are still coming: Ada's stay is gone, which is what left her card
+    // with nothing to resolve her from.
+    for (const [id, accountId] of [
+      ['att-bea-again', 'a-bea'],
+      ['att-cai', 'a-cai'],
+    ] as [string, string][]) {
+      db.client
+        .prepare('insert into attendance (id, event_id, account_id, joined_at) values (?, ?, ?, ?)')
+        .run(id, 'e-1', accountId, NOW)
+    }
+
+    const aCard = db.client.prepare(
+      'insert into thread (id, event_id, entity_type, entity_id, subject_account_id, title) values (?, ?, ?, ?, ?, ?)',
+    )
+    aCard.run('t-ada', 'e-1', 'attendance', 'att-ada-gone', null, 'Ada')
+    aCard.run('t-bea-left', 'e-1', 'attendance', 'att-bea-gone', null, 'Bea')
+    aCard.run('t-bea-back', 'e-1', 'attendance', 'att-bea-again', 'a-bea', 'Bea')
+    aCard.run('t-cai', 'e-1', 'attendance', 'att-cai', 'a-cai', 'Cai')
+    aCard.run('t-song', null, 'song', 'song-1', null, 'Fire in the sky')
+    aCard.run('t-other-song', null, 'song', 'song-2', null, 'Dust in my boots')
+
+    const anEntry = db.client.prepare(
+      'insert into thread_entry (id, thread_id, kind, seq, author_account_id, body, created_at) values (?, ?, ?, ?, ?, ?, ?)',
+    )
+    anEntry.run('x-ada-1', 't-ada', 'joined', 1, 'a-ada', 'is coming', '2026-07-01T10:00:00Z')
+    anEntry.run('x-ada-2', 't-ada', 'comment', 2, 'a-cai', 'good to hear', '2026-07-02T10:00:00Z')
+    anEntry.run('x-bea-1', 't-bea-left', 'joined', 1, 'a-bea', 'is coming', '2026-07-03T10:00:00Z')
+    anEntry.run('x-bea-2', 't-bea-left', 'comment', 2, 'a-cai', 'see you there', '2026-07-04T10:00:00Z')
+    anEntry.run('x-bea-3', 't-bea-back', 'joined', 1, 'a-bea', 'is coming', '2026-07-05T10:00:00Z')
+    anEntry.run('x-bea-4', 't-bea-back', 'comment', 2, 'a-cai', 'again!', '2026-07-06T10:00:00Z')
+    anEntry.run('x-cai-1', 't-cai', 'joined', 1, 'a-cai', 'is coming', '2026-07-07T10:00:00Z')
+    anEntry.run('x-song-1', 't-song', 'added', 1, 'a-cai', 'put it in the book', '2026-07-08T10:00:00Z')
+  }
+
+  const beforeTheUniqueIndex = () => {
+    const fresh = createDb({ url: ':memory:' })
+    const { staged, kept } = stagedThrough(THREAD_SUBJECT_UNIQUE)
+
+    expect(kept).not.toContain(THREAD_SUBJECT_UNIQUE)
+    expect(kept.length).toBeGreaterThan(0)
+
+    runMigrations(fresh, staged)
+    expect(columnsOf(fresh, 'thread')).toContain('subject_account_id')
+
+    return fresh
+  }
+
+  const subjectOf = (db: DbHandle, id: string) =>
+    db.client.prepare('select subject_account_id as who from thread where id = ?').get(id)?.who
+
+  const entriesOn = (db: DbHandle, id: string) =>
+    db.client
+      .prepare('select id, seq from thread_entry where thread_id = ? order by seq')
+      .all(id)
+      .map((row) => `${String(row.id)}@${String(row.seq)}`)
+
+  it('recovers the person from the card’s first entry when their stay is already gone', () => {
+    const fresh = beforeTheUniqueIndex()
+    try {
+      seed(fresh)
+
+      runMigrations(fresh, migrationsFolder)
+
+      expect(subjectOf(fresh, 't-ada')).toBe('a-ada')
+    } finally {
+      fresh.close()
+    }
+  })
+
+  it('leaves a card that already knew whose it is alone, entries and numbering included', () => {
+    const fresh = beforeTheUniqueIndex()
+    try {
+      seed(fresh)
+
+      runMigrations(fresh, migrationsFolder)
+
+      expect(subjectOf(fresh, 't-cai')).toBe('a-cai')
+      expect(entriesOn(fresh, 't-cai')).toEqual(['x-cai-1@1'])
+    } finally {
+      fresh.close()
+    }
+  })
+
+  it('merges the pair a leaving and rejoining left, onto the card whose stay still exists', () => {
+    const fresh = beforeTheUniqueIndex()
+    try {
+      seed(fresh)
+
+      runMigrations(fresh, migrationsFolder)
+
+      expect(entriesOn(fresh, 't-bea-back')).toEqual(['x-bea-1@1', 'x-bea-2@2', 'x-bea-3@3', 'x-bea-4@4'])
+      expect(fresh.client.prepare('select count(*) as n from thread where id = ?').get('t-bea-left')?.n).toBe(
+        0,
+      )
+    } finally {
+      fresh.close()
+    }
+  })
+
+  it('refuses a second card for one person at one burn, which nothing but `cardFor` held before', () => {
+    const fresh = beforeTheUniqueIndex()
+    try {
+      seed(fresh)
+
+      runMigrations(fresh, migrationsFolder)
+
+      expect(() =>
+        fresh.client
+          .prepare(
+            'insert into thread (id, event_id, entity_type, entity_id, subject_account_id, title) values (?, ?, ?, ?, ?, ?)',
+          )
+          .run('t-cai-again', 'e-1', 'attendance', 'att-cai-2', 'a-cai', 'Cai'),
+      ).toThrow(/UNIQUE/u)
+    } finally {
+      fresh.close()
+    }
+  })
+
+  it('leaves every thread that is nobody’s in particular, however many there are', () => {
+    // NULLs stay distinct in a SQLite unique index, which is what lets the songbook's
+    // threads — and a card no person could be recovered for — coexist under it.
+    const fresh = beforeTheUniqueIndex()
+    try {
+      seed(fresh)
+
+      runMigrations(fresh, migrationsFolder)
+
+      expect(subjectOf(fresh, 't-song')).toBeNull()
+      expect(subjectOf(fresh, 't-other-song')).toBeNull()
+      expect(entriesOn(fresh, 't-song')).toEqual(['x-song-1@1'])
     } finally {
       fresh.close()
     }

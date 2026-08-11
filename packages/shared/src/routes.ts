@@ -1,3 +1,4 @@
+import type { FeedKind } from './enums.ts'
 import type {
   AccountRolesUpdate,
   AdminPasswordReset,
@@ -64,6 +65,8 @@ import type {
   SongCreateInput,
   SongUpdate,
 } from './index.ts'
+
+import { feedKindsQuery } from './enums.ts'
 
 export type ApiMethod = 'DELETE' | 'GET' | 'PATCH' | 'POST' | 'PUT'
 
@@ -954,6 +957,9 @@ export const apiRoutes = {
 } as const satisfies Record<string, ApiRoute>
 
 export type RouteKey = keyof typeof apiRoutes
+
+export const feedPath = (kinds: readonly FeedKind[] = []): string =>
+  `${apiRoutes.getFeed.path()}${feedKindsQuery(kinds)}`
 
 export const iconSrc = (version: string | null | undefined): string =>
   `${apiRoutes.getInstallationIcon.path()}?v=${encodeURIComponent(version ?? 'default')}`

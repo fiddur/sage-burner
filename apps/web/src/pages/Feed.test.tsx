@@ -2,6 +2,7 @@ import type { Activity, MyBurn, Thread, ThreadEntry } from '@sage-burner/shared'
 
 import { mentionsIn, mentionToken, notificationCategoryInfo } from '@sage-burner/shared'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
+import { LocationProvider } from 'preact-iso'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Viewer } from '../viewer.tsx'
@@ -126,6 +127,68 @@ const renderPage = (api: FeedApi, viewer: Viewer = ADA, burn: MyBurn | null = BU
       </BurnProvider>
     </ViewerProvider>,
   )
+
+/**
+ * The same, under the router — which is where the chip row's filter is read from and
+ * written to (#472).
+ *
+ * `LocationProvider` reads `location` on mount, so the address is set first.
+ */
+const renderPageAt = (at: string, api: FeedApi) => {
+  history.replaceState(null, '', at)
+
+  return render(
+    <LocationProvider>
+      <ViewerProvider viewer={ADA}>
+        <BurnProvider value={{ status: 'ready', burns: [BURN], selected: BURN }}>
+          <Feed api={api} />
+        </BurnProvider>
+      </ViewerProvider>
+    </LocationProvider>,
+  )
+}
+
+describe('the chip row over the feed', () => {
+  it('asks the server for nothing in particular until somebody taps a chip', async () => {
+    const getFeed = vi.fn<FeedApi['getFeed']>(() => Promise.resolve({ activity: TWO, threads: [] }))
+    renderPageAt('/feed', stub({ getFeed }))
+
+    await screen.findByRole('button', { name: 'Everything' })
+    expect(getFeed).toHaveBeenCalledWith([], expect.anything())
+  })
+
+  it('puts what a chip means in the address, so the filter is shareable and back undoes it', async () => {
+    renderPageAt('/feed', stub())
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Dreams' }))
+
+    await waitFor(() => expect(location.search).toBe('?kinds=session'))
+  })
+
+  it('asks the server for what the address says, since the page reads only the newest fifty', async () => {
+    const getFeed = vi.fn<FeedApi['getFeed']>(() => Promise.resolve({ activity: [], threads: [] }))
+    renderPageAt('/feed?kinds=song', stub({ getFeed }))
+
+    await screen.findByRole('button', { name: 'Songs' })
+    expect(getFeed).toHaveBeenCalledWith(['song'], expect.anything())
+  })
+
+  it('lights only what is asked for, so the row itself says the page is filtered', async () => {
+    renderPageAt('/feed?kinds=song', stub())
+
+    expect((await screen.findByRole('button', { name: 'Songs' })).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Dreams' }).getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getByRole('button', { name: 'Everything' }).getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it('has a chip for the burn news beside the ones for cards', async () => {
+    renderPageAt('/feed', stub())
+
+    for (const name of ['Burns', 'Dreams', 'People', 'Posts', 'Songs']) {
+      expect(await screen.findByRole('button', { name })).toBeTruthy()
+    }
+  })
+})
 
 describe('announcing something on the feed', () => {
   it('sends the title and the body to the burn the bar has chosen', async () => {
@@ -767,7 +830,7 @@ describe('what everyone has been doing', () => {
     )
 
     expect(await screen.findByRole('button', { name: /Somebody comments on any dream/ })).toBeTruthy()
-    expect(document.querySelectorAll('.feed-chip')).toHaveLength(1)
+    expect(document.querySelectorAll('.feed-card .chip')).toHaveLength(1)
   })
 
   it('names the burn each line belongs to, because the page spans them', async () => {

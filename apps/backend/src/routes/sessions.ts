@@ -147,7 +147,9 @@ const asDream = (row: DreamRow, { helpers, support }: People): Session => ({
 const scheduleLine = (before: DreamRow, after: DreamRow): string => {
   if (before.time_slot_start === null && after.time_slot_start !== null) return 'put it in the schedule'
   if (before.time_slot_start !== null && after.time_slot_start === null) return 'took it off the schedule'
-  if (before.time_slot_start === null && after.time_slot_start === null) return 'said where it would be'
+  if (before.time_slot_start === null && after.time_slot_start === null) {
+    return after.place_id === null ? 'took the place off it' : 'said where it would be'
+  }
 
   return 'moved it in the schedule'
 }

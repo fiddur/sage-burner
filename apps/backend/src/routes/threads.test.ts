@@ -140,7 +140,10 @@ const setOn = (server: FastifyInstance, cookie: string, on: string[]) =>
     payload: { on, email: [] },
   })
 
-const bell = async (server: FastifyInstance, cookie: string): Promise<{ category: string; body: string }[]> =>
+const bell = async (
+  server: FastifyInstance,
+  cookie: string,
+): Promise<{ category: string; body: string; link: string | null }[]> =>
   (await server.inject({ method: 'GET', url: '/api/me/notifications', headers: { cookie } })).json()
     .notifications
 
@@ -654,6 +657,30 @@ describe('a conversation about a person', () => {
     await say(server, bea.cookie, card.id, 'good to have you')
 
     expect((await bell(server, dag.cookie)).map((one) => one.category)).toEqual(['introduction_comment_any'])
+  })
+
+  it('tells them and links to their page after they have stopped coming', async () => {
+    // The card is found by the person now (#449), so a comment on one whose stay is gone has
+    // somebody to tell and somewhere to point — it read `attendance` by `entity_id` until #464
+    // and so did neither.
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    await givenComing(bea.id)
+    await joinBurn(server, ada.cookie)
+    const card = await cardOf(server, ada.cookie)
+    await server.inject({
+      method: 'DELETE',
+      url: `/api/events/${BURN}/attendance/me`,
+      headers: { cookie: ada.cookie },
+    })
+
+    await say(server, bea.cookie, card.id, 'sorry you cannot make it')
+
+    const [told] = await bell(server, ada.cookie)
+    expect(told?.body).toBe('Bea said something about Ada')
+    expect(told?.link).toBe(`/members/${ada.id}`)
   })
 
   it('names the person rather than the title stored when they joined', async () => {

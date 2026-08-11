@@ -289,6 +289,44 @@ The server merges both halves by time and cuts them to fifty **against each othe
 burn full of talk cannot push its news off the page and a quiet one does not leave the
 page half empty.
 
+### The chip row
+
+Filling the songbook makes the page songs for a week; a scheduling run makes it dreams for
+an evening. The floods are bursty and temporary, so the answer is a viewer-side lens rather
+than collapsing (#472) — a rollup hides cards that are each individually worth having, and
+needs an answer for a comment landing inside the pile. Coalescing already tempers the flood
+one level down: ten edits to one song are one card. What it cannot help with is thirty
+genuine happenings of one kind drowning the other kinds.
+
+**The filter is the server's**, because the page reads the newest fifty: during exactly the
+sprees above all fifty are one kind, so hiding them in the browser would show an empty
+_Dreams_ while dream cards sat just past the window. `kinds` is a query parameter on the
+feed read and the limit is applied after it, so fifty means fifty of the kinds asked for.
+
+**One chip per kind of thing on the page**, derived from `threadEntityTypes` plus one for
+the lines, so a future card kind gets its chip by construction rather than by somebody
+remembering a list — `feedKindLabel` is exhaustive over the vocabulary and will not compile
+without it.
+
+**An empty lit-set means everything**, and that one rule is the whole interaction: the first
+tap from there solos a chip, which is the scheduling-run case in one tap; taps after that
+toggle one by one, which is the hide-the-flooding-kind case in one tap; and taking the last
+one off lands back on everything rather than on an empty page. `Everything` is lit only when
+nothing is filtered, so the row itself is the "you are filtered right now" signal. Every
+chip lit is normalised back to the empty set, so two spellings cannot both mean everything.
+
+**Carried in the URL, never in storage.** A filter somebody set during a scheduling run in
+March must not still be eating the songbook news in June, so every visit starts at
+everything; the address makes it shareable and lets back undo it. An unknown kind in a
+stale link is dropped rather than refused — that shows more than was asked for, never an
+error page.
+
+**The songbook's category chips are the same row** (#316, #472), so the app teaches the
+interaction once. The rule that serves both is _show what matches any lit chip_: a card has
+exactly one kind so it degenerates to the obvious thing, while a song carries several
+categories and stays visible while either is lit. The songbook keeps its lit-set in the page
+rather than in the address, because there is nothing there to link somebody to.
+
 ### The lines
 
 **The burn-wide notifications, shown to everybody.** Somebody saying they are coming, a
@@ -447,6 +485,20 @@ still carries their name and their page.
 An `account`-keyed `entity_id` was the other way out and cannot work: `thread_entity_idx` is
 unique on `(entity_type, entity_id)`, so it would mean one thread per person across every burn.
 
+**The database holds that invariant now, not one function** (#464). `thread_subject_idx` was a
+plain index and `cardFor` reads with `limit(1)` and no order, so a second row would have left it
+picking arbitrarily; it is unique on `(subject_account_id, event_id)`, and NULLs stay distinct in
+a SQLite unique index so every thread that is nobody's is unaffected. Making it unique needed the
+rows #449's own backfill could not reach: it read `attendance` by `entity_id`, so somebody who had
+**already** left kept a NULL subject and the frozen title. The person is recoverable from whoever
+wrote the card's first entry, which for a card is the arrival itself — and where somebody had left
+and rejoined that produces two cards for one burn, so the migration merges the pair onto the one
+whose stay still exists, renumbering the merged entries by time. Without the merge the unique index
+cannot be created at all, which is asserted rather than assumed.
+
+`aboutWhat` and `participantsOf` read the column too, so a comment on a card whose stay is gone
+still has somebody to tell and somewhere to point.
+
 **The introduction is resolved and clamped, not stored on the entry.** `readThreads` reads
 `account.introduction` and `excerptOf` cuts it at `INTRODUCTION_EXCERPT` on a word
 boundary; the entry itself is a bump. Two reasons: rewriting a paragraph must not leave
@@ -571,8 +623,10 @@ grows without bound; this is bounded by something that already ends. The songboo
 exception and says so below: `thread.event_id` is nullable for it, so a song's
 conversation is kept as long as the song is.
 
-**What the installed app keeps on disk.** The feed is one cache key, replaced in place,
-and it is bounded by construction: fifty things, at most three lines a card, and
+**What the installed app keeps on disk.** The feed is at most two cache keys, each replaced
+in place: the unfiltered read, and the newest filtered one — `trim` keeps only the newest
+query string per path, so a chip row tapped all afternoon does not accumulate a key per
+combination. Each is bounded by construction: fifty things, at most three lines a card, and
 `MAX_COMMENT` is 2000. The whole thread is a read of its own and is **never cached** —
 that would be a key per dream ever opened, kept until sign-out, which is the shape of the
 problem #311 fixed for the banner. Offline you get the card's newest lines; the rest of

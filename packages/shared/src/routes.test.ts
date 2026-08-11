@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { ApiRoute, RouteKey } from './routes.ts'
 
-import { apiRoutes, bannerSrc, iconSrc } from './routes.ts'
+import { apiRoutes, bannerSrc, feedPath, iconSrc } from './routes.ts'
 
 const keys = Object.keys(apiRoutes) as RouteKey[]
 
@@ -72,6 +72,17 @@ describe('the route manifest', () => {
       expect(seen.has(pair), pair).toBe(false)
       seen.add(pair)
     }
+  })
+})
+
+describe('the feed read, which carries what the chip row is showing', () => {
+  it('asks for nothing when nothing is filtered, so the plain read is the plain URL', () => {
+    expect(feedPath()).toBe('/api/feed')
+    expect(feedPath([])).toBe('/api/feed')
+  })
+
+  it('names the kinds asked for', () => {
+    expect(feedPath(['session', 'song'])).toBe('/api/feed?kinds=session,song')
   })
 })
 

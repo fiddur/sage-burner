@@ -1,7 +1,7 @@
 import type { FeedResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { apiRoutes } from '@sage-burner/shared'
+import { apiRoutes, feedKindsFrom, threadEntityTypes } from '@sage-burner/shared'
 import { desc, eq } from 'drizzle-orm'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -19,46 +19,57 @@ export const CARD_ENTRIES = 3
 export const registerFeedRoutes = (app: FastifyInstance, { db, sessions }: GuardDeps) => {
   const { requireApproved } = createGuards({ db, sessions })
 
-  app.get(apiRoutes.getFeed.fastify, { preHandler: requireApproved }, async (request, reply) => {
-    void noStore(reply)
+  app.get<{ Querystring: { kinds?: string } }>(
+    apiRoutes.getFeed.fastify,
+    { preHandler: requireApproved },
+    async (request, reply) => {
+      void noStore(reply)
 
-    const viewer = await viewerFor(request, { db, sessions })
+      const viewer = await viewerFor(request, { db, sessions })
 
-    const lines = await db
-      .select({
-        id: activity.id,
-        event_id: activity.event_id,
-        burn: event.name,
-        category: activity.category,
-        body: activity.body,
-        link: activity.link,
-        created_at: activity.created_at,
-      })
-      .from(activity)
-      .innerJoin(event, eq(event.id, activity.event_id))
-      .orderBy(desc(activity.created_at), desc(activity.id))
-      .limit(FEED_LIMIT)
+      const asked = feedKindsFrom(request.query.kinds)
+      const everything = asked.length === 0
+      const entities = threadEntityTypes.filter((type) => everything || asked.includes(type))
 
-    const recent = await recentThreads(db, FEED_LIMIT)
+      const lines =
+        everything || asked.includes('activity')
+          ? await db
+              .select({
+                id: activity.id,
+                event_id: activity.event_id,
+                burn: event.name,
+                category: activity.category,
+                body: activity.body,
+                link: activity.link,
+                created_at: activity.created_at,
+              })
+              .from(activity)
+              .innerJoin(event, eq(event.id, activity.event_id))
+              .orderBy(desc(activity.created_at), desc(activity.id))
+              .limit(FEED_LIMIT)
+          : []
 
-    const kept = new Set(
-      [
-        ...lines.map((line) => ({ id: line.id, at: line.created_at })),
-        ...recent.map((one) => ({ id: one.id, at: one.last_at })),
-      ]
-        .sort((one, other) =>
-          one.at === other.at ? other.id.localeCompare(one.id) : other.at.localeCompare(one.at),
-        )
-        .slice(0, FEED_LIMIT)
-        .map((one) => one.id),
-    )
+      const recent = entities.length === 0 ? [] : await recentThreads(db, FEED_LIMIT, entities)
 
-    const threads = await readThreads(
-      db,
-      recent.filter((one) => kept.has(one.id)).map((one) => one.id),
-      { newest: CARD_ENTRIES, counts: new Map(recent.map((one) => [one.id, one.entry_count])), viewer },
-    )
+      const kept = new Set(
+        [
+          ...lines.map((line) => ({ id: line.id, at: line.created_at })),
+          ...recent.map((one) => ({ id: one.id, at: one.last_at })),
+        ]
+          .sort((one, other) =>
+            one.at === other.at ? other.id.localeCompare(one.id) : other.at.localeCompare(one.at),
+          )
+          .slice(0, FEED_LIMIT)
+          .map((one) => one.id),
+      )
 
-    return { activity: lines.filter((line) => kept.has(line.id)), threads } satisfies FeedResponse
-  })
+      const threads = await readThreads(
+        db,
+        recent.filter((one) => kept.has(one.id)).map((one) => one.id),
+        { newest: CARD_ENTRIES, counts: new Map(recent.map((one) => [one.id, one.entry_count])), viewer },
+      )
+
+      return { activity: lines.filter((line) => kept.has(line.id)), threads } satisfies FeedResponse
+    },
+  )
 }

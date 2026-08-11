@@ -265,6 +265,21 @@ describe('keeping the asset cache from growing forever', () => {
     ])
   })
 
+  it('keeps the unfiltered feed and the newest filtered one, and no key per chip combination', async () => {
+    // The chip row puts its lit-set in the query (#472), so an afternoon of tapping would
+    // otherwise leave a key per combination. The one-per-path rule already covers it, and
+    // the unfiltered read carries no query so it survives beside the newest filtered one.
+    const cache = fakeCache([
+      '/api/feed',
+      '/api/feed?kinds=session',
+      '/api/feed?kinds=song',
+      '/api/feed?kinds=attendance,post',
+    ])
+
+    expect(await trim(cache, ASSET_LIMIT)).toBe(2)
+    expect(cache.kept()).toEqual(['/api/feed', '/api/feed?kinds=attendance,post'])
+  })
+
   it('leaves the shell alone however many times it has been stored', async () => {
     // One entry per pathname is what makes the rule above safe: the shell has exactly
     // one, so no number of re-puts can bring it near an eviction.

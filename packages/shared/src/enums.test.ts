@@ -10,6 +10,9 @@ import {
   effortLevels,
   eventOptionKinds,
   facebookProfileLink,
+  feedKinds,
+  feedKindsFrom,
+  feedKindsQuery,
   formQuestionTypes,
   inviteStatuses,
   inviteStatusOf,
@@ -17,12 +20,14 @@ import {
   isApplicationStatus,
   isEffortLevel,
   isEventOptionKind,
+  isFeedKind,
   isFormQuestionType,
   isInviteStatus,
   isPaymentStatus,
   isPlaceColor,
   paymentStatuses,
   placeColors,
+  threadEntityTypes,
 } from './enums.ts'
 
 describe('enum type guards', () => {
@@ -35,6 +40,7 @@ describe('enum type guards', () => {
     { name: 'effort level', values: effortLevels, guard: isEffortLevel },
     { name: 'event option kind', values: eventOptionKinds, guard: isEventOptionKind },
     { name: 'place colour', values: placeColors, guard: isPlaceColor },
+    { name: 'feed kind', values: feedKinds, guard: isFeedKind },
   ]
 
   for (const { name, values, guard } of cases) {
@@ -58,6 +64,48 @@ describe('enum type guards', () => {
     expect(isAccountRole('admin')).toBe(true)
     expect(isAccountRole('Admin')).toBe(false)
     expect(isAccountRole('superuser')).toBe(false)
+  })
+})
+
+describe('the feed filter carried in a URL', () => {
+  it('has a chip for every kind of card, and one for the burn news', () => {
+    expect(feedKinds).toContain('activity')
+    for (const type of threadEntityTypes) expect(feedKinds).toContain(type)
+  })
+
+  it('reads the kinds a URL asks for', () => {
+    expect(feedKindsFrom('session,song')).toEqual(['session', 'song'])
+  })
+
+  it('reads nothing as everything, so an absent parameter filters nothing', () => {
+    expect(feedKindsFrom(undefined)).toEqual([])
+    expect(feedKindsFrom('')).toEqual([])
+  })
+
+  it('drops a kind it does not know, so a stale link shows more rather than failing', () => {
+    expect(feedKindsFrom('session,dremas')).toEqual(['session'])
+    expect(feedKindsFrom('dremas')).toEqual([])
+  })
+
+  it('says each kind once, however often a URL repeats it', () => {
+    expect(feedKindsFrom('song,song')).toEqual(['song'])
+    expect(feedKindsQuery(['song', 'song'])).toBe('?kinds=song')
+  })
+
+  it('writes the kinds asked for', () => {
+    expect(feedKindsQuery(['session', 'song'])).toBe('?kinds=session,song')
+  })
+
+  it('writes no parameter for everything, whether that is said as nothing or as every kind', () => {
+    expect(feedKindsQuery([])).toBe('')
+    expect(feedKindsQuery(feedKinds)).toBe('')
+  })
+
+  it('round-trips what it writes', () => {
+    expect(feedKindsFrom(feedKindsQuery(['attendance', 'post']).slice('?kinds='.length))).toEqual([
+      'attendance',
+      'post',
+    ])
   })
 })
 

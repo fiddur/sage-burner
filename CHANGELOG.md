@@ -7,6 +7,24 @@ There are no version numbers: every merge to `develop` builds an image and the s
 picks it up within a few minutes, so a date can hold several deploys. Add your line
 under today's heading, and make a new heading when there is none.
 
+# 2026-08-11
+
+- **The feed has a row of chips for choosing what to show.** Filling the songbook or laying out
+  the schedule used to make the whole page one kind of thing for a while. Tap _Dreams_ and you get
+  dreams only; tap another chip and you get both; _Everything_ puts it back. The choice is in the
+  address, so you can share the link and Back undoes it — and it never sticks: every visit starts
+  at everything. The songbook's categories are the same row, so it works the same way in both
+  places.
+
+- **A card for somebody who left before the app knew how to keep it no longer sits there frozen.**
+  Those cards showed a name that never updated and linked nowhere, and rejoining opened a second
+  one beside them. They now know whose they are, a pair left by a leave-and-rejoin is merged into
+  one with everything said under it kept, and commenting on one tells the person and links to
+  their page.
+
+- **Clearing where a dream would be now says so.** The feed said "said where it would be" when
+  somebody took the place off a dream that has no time yet.
+
 # 2026-08-10
 
 - **A pasted Mastodon post link no longer offers a link that goes nowhere.** If what you put in

@@ -1650,8 +1650,9 @@ a.person-badge:focus-visible span:last-child {
 }
 
 /* A chip, not a button-shaped button: it is a label that happens to be pressable, and
-   it sits under a sentence rather than in a row of controls. */
-.feed-chip {
+   it sits under a sentence rather than in a row of controls. Dashed until it is on, so
+   the row itself says what is being filtered — which is #472's whole signal. */
+.chip {
   border: 1px dashed var(--line);
   border-radius: 1rem;
   background: none;
@@ -1662,7 +1663,7 @@ a.person-badge:focus-visible span:last-child {
   cursor: pointer;
 }
 
-.feed-chip.is-on {
+.chip.is-on {
   border-style: solid;
   border-color: var(--ember);
   color: var(--ink);
@@ -2456,23 +2457,6 @@ img.avatar {
   padding: 0.05rem 0.5rem;
   font-size: 0.8rem;
   color: var(--sage);
-}
-
-.song-chip {
-  border: 1px dashed var(--line);
-  border-radius: 1rem;
-  background: none;
-  color: var(--muted);
-  font: inherit;
-  font-size: 0.8rem;
-  padding: 0.1rem 0.6rem;
-  cursor: pointer;
-}
-
-.song-chip.is-on {
-  border-style: solid;
-  border-color: var(--ember);
-  color: var(--ink);
 }
 
 .chip-row {
