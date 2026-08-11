@@ -130,10 +130,23 @@ describe('suggesting a capo', () => {
 
 describe('recognising where a link goes', () => {
   it('names the music sites it knows', () => {
-    expect(musicHost('https://open.spotify.com/track/1')?.label).toBe('Spotify')
+    expect(musicHost('https://open.spotify.com/track/1')).toEqual({ label: 'Spotify', mark: 'spotify' })
     expect(musicHost('https://youtu.be/abc')?.label).toBe('YouTube')
     expect(musicHost('https://www.youtube.com/watch?v=abc')?.label).toBe('YouTube')
+    expect(musicHost('https://soundcloud.com/a/b')?.label).toBe('SoundCloud')
+    expect(musicHost('https://an.bandcamp.com/track/b')?.label).toBe('Bandcamp')
+    expect(musicHost('https://music.apple.com/album/1')?.label).toBe('Apple Music')
+    expect(musicHost('https://www.deezer.com/track/1')?.label).toBe('Deezer')
+    expect(musicHost('https://tidal.com/browse/track/1')?.label).toBe('TIDAL')
+    expect(musicHost('https://genius.com/a-song-lyrics')?.label).toBe('Genius')
     expect(musicHost('https://tabs.ultimate-guitar.com/tab/1')?.label).toBe('Ultimate Guitar')
+  })
+
+  it('takes music.youtube.com for YouTube Music, which the YouTube pattern also matches', () => {
+    expect(musicHost('https://music.youtube.com/watch?v=abc')).toEqual({
+      label: 'YouTube Music',
+      mark: 'youtube-music',
+    })
   })
 
   it('says nothing about a site it does not know, or a thing that is not a link', () => {

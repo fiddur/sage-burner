@@ -2462,9 +2462,10 @@ img.avatar {
 
 /* The songbook (#316). A song's body is preformatted text, not prose: the chord lines sit
    above the words they belong to, so `white-space: pre` and a monospace face are what make
-   the layout the author typed survive — wrapping would slide every chord off its syllable.
-   `overflow-x: auto` on the block rather than the page, since a wide tab must not make the
-   whole page scroll sideways. */
+   the layout the author typed survive — letting the browser wrap it would slide every chord
+   off its syllable, which is why `songbook.ts` breaks a chord line and its words together
+   instead (#491). `overflow-x: auto` for what is too wide to break at all, on the block
+   rather than the page, since one long line must not make the whole page scroll sideways. */
 .song-body {
   position: relative;
   margin: 1rem 0;
@@ -2480,6 +2481,17 @@ img.avatar {
 .song-line.is-chords {
   color: var(--ember);
   font-weight: 600;
+}
+
+/* What the wrapping measures against: `1ch` is the advance of `0` in the body's own face,
+   so the columns that fit are the content width over this box's width. Out of flow and
+   `visibility: hidden` so it neither takes room nor lands in a selection, but still has a
+   width to read — `display: none` would report zero. */
+.song-ruler {
+  position: absolute;
+  visibility: hidden;
+  width: 1ch;
+  height: 0;
 }
 
 /* Same face and size as `.song-body`: the editor is where the columns are typed, so a
@@ -2562,9 +2574,46 @@ img.avatar {
 }
 
 .song-link {
+  display: flex;
+  align-items: center;
   font-size: 1.4rem;
   line-height: 1;
   text-decoration: none;
+}
+
+/* The platform's own mark rather than an emoji standing in for it (#492) — the paths are
+   Simple Icons', which are CC0. Brand colour is what makes one recognisable at this size,
+   so it is set per mark below; TIDAL's black and Genius' pale yellow each vanish into one
+   of the two themes, and those two keep `currentColor`. */
+.music-mark {
+  width: 1.4rem;
+  height: 1.4rem;
+  fill: currentColor;
+}
+
+.music-mark.is-spotify {
+  fill: #1db954;
+}
+
+.music-mark.is-youtube,
+.music-mark.is-youtube-music {
+  fill: #f00;
+}
+
+.music-mark.is-soundcloud {
+  fill: #f50;
+}
+
+.music-mark.is-bandcamp {
+  fill: #408294;
+}
+
+.music-mark.is-apple-music {
+  fill: #fa243c;
+}
+
+.music-mark.is-deezer {
+  fill: #a238ff;
 }
 
 /* Still a list in the edit form, where the URL has to be readable to be removable. */

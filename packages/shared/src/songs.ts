@@ -144,19 +144,35 @@ export const capoSuggestion = (body: string): CapoSuggestion | undefined => {
   return { capo: best.capo, shapes: [...new Set(best.shapes)] }
 }
 
+export type MusicMark =
+  | 'apple-music'
+  | 'bandcamp'
+  | 'deezer'
+  | 'elsewhere'
+  | 'genius'
+  | 'soundcloud'
+  | 'spotify'
+  | 'tidal'
+  | 'ultimate-guitar'
+  | 'youtube'
+  | 'youtube-music'
+
 export interface MusicHost {
   label: string
-  icon: string
+  mark: MusicMark
 }
 
 const MUSIC_HOSTS: readonly { host: RegExp; info: MusicHost }[] = [
-  { host: /(^|\.)spotify\.com$/iu, info: { label: 'Spotify', icon: '🎧' } },
-  { host: /(^|\.)(?:youtube\.com|youtu\.be)$/iu, info: { label: 'YouTube', icon: '▶️' } },
-  { host: /(^|\.)soundcloud\.com$/iu, info: { label: 'SoundCloud', icon: '☁️' } },
-  { host: /(^|\.)bandcamp\.com$/iu, info: { label: 'Bandcamp', icon: '🥁' } },
-  { host: /(^|\.)music\.apple\.com$/iu, info: { label: 'Apple Music', icon: '🍏' } },
-  { host: /(^|\.)ultimate-guitar\.com$/iu, info: { label: 'Ultimate Guitar', icon: '🎸' } },
-  { host: /(^|\.)genius\.com$/iu, info: { label: 'Genius', icon: '📝' } },
+  { host: /^music\.youtube\.com$/iu, info: { label: 'YouTube Music', mark: 'youtube-music' } },
+  { host: /(^|\.)spotify\.com$/iu, info: { label: 'Spotify', mark: 'spotify' } },
+  { host: /(^|\.)(?:youtube\.com|youtu\.be)$/iu, info: { label: 'YouTube', mark: 'youtube' } },
+  { host: /(^|\.)soundcloud\.com$/iu, info: { label: 'SoundCloud', mark: 'soundcloud' } },
+  { host: /(^|\.)bandcamp\.com$/iu, info: { label: 'Bandcamp', mark: 'bandcamp' } },
+  { host: /(^|\.)music\.apple\.com$/iu, info: { label: 'Apple Music', mark: 'apple-music' } },
+  { host: /(^|\.)deezer\.com$/iu, info: { label: 'Deezer', mark: 'deezer' } },
+  { host: /(^|\.)tidal\.com$/iu, info: { label: 'TIDAL', mark: 'tidal' } },
+  { host: /(^|\.)ultimate-guitar\.com$/iu, info: { label: 'Ultimate Guitar', mark: 'ultimate-guitar' } },
+  { host: /(^|\.)genius\.com$/iu, info: { label: 'Genius', mark: 'genius' } },
 ]
 
 const authorityOf = (url: string): string | undefined => {
