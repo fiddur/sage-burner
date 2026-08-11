@@ -556,8 +556,16 @@ insert is `onConflictDoNothing`, so pressing twice cannot inflate it.
 
 **One route pair over both**, `POST`/`DELETE /api/threads/:id/support/me`, dispatching on
 `entity_type` — so the web has one call for every card, and a dream's rule travels with it:
-hearting one still asks for an attendance at that burn, which is what `asAttendee` asks on the
-dream's own route. The song page shows the faces as well as the count, through the same overlapped
+hearting one asks for an attendance at that burn, as `asAttendee` does on the dream's own route.
+Not for an **open** burn, though — the dream's own route goes through `onOpenBurn` and this does
+not, which puts a heart with the comment box rather than with the writes: "that was lovely" is a
+thing somebody presses on the way home.
+
+**A withdrawn dream's card refuses the heart.** `thread.entity_id` deliberately carries no foreign
+key so the conversation outlives the dream — but `session_support.session_id` does carry one, so
+the insert would dangle and answer 500 rather than refusing. The route looks the dream up and
+answers 404; the card hides the button, which is the nicer half but not the sufficient one, since
+the route is reachable directly. The song page shows the faces as well as the count, through the same overlapped
 row the dream panel uses — now `Faces`, since it has a second caller.
 
 **Coalescing happens on the write.** Laying out the grid is a drag every few seconds, so

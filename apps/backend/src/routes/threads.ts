@@ -810,6 +810,17 @@ export const registerThreadRoutes = (
     if (found === undefined) return sendError(reply, 404)
 
     if (found.entity_type === 'session') {
+      // `thread.entity_id` deliberately carries no foreign key, so a withdrawn dream's card
+      // outlives the row — but `session_support.session_id` does, so hearting one would be a
+      // dangling insert and a 500 rather than a refusal.
+      const [dream] = await db
+        .select({ id: session.id })
+        .from(session)
+        .where(eq(session.id, found.entity_id))
+        .limit(1)
+
+      if (dream === undefined) return sendError(reply, 404)
+
       const mine =
         found.event_id === null ? undefined : await attendanceFor(db, found.event_id, viewer.account_id)
       if (mine === undefined) return sendError(reply, 403)

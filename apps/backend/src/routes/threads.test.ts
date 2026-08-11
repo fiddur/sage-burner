@@ -954,6 +954,26 @@ describe('the heart on a card', () => {
     })
   })
 
+  it('refuses a withdrawn dream rather than writing a heart with nothing behind it', async () => {
+    // The card outlives the dream on purpose, and `thread.entity_id` carries no foreign key for
+    // exactly that reason — but `session_support.session_id` does, so this insert would be a
+    // dangling one and a 500.
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const { dream, thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+    await sendGuarded((headers) =>
+      server.inject({
+        method: 'DELETE',
+        url: `/api/sessions/${dream}`,
+        headers: { cookie: ada.cookie, ...headers },
+      }),
+    )
+
+    expect((await heart(server, ada.cookie, id)).statusCode).toBe(404)
+  })
+
   it('refuses a dream to somebody not coming to that burn, as the dream’s own route does', async () => {
     const server = await build()
     await givenBurn()

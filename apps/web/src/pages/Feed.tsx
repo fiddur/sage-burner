@@ -522,15 +522,17 @@ const Card = ({
         onShowAll={() => talk.showAll(card.id)}
       />
 
-      <p class="feed-card-foot">
-        <Heart
-          what={card.title}
-          hearted={card.supported_by_me}
-          count={card.support_count}
-          busy={busy}
-          onHeart={(hearting) => talk.heart(card.id, hearting)}
-        />
-      </p>
+      {!card.gone && (
+        <p class="feed-card-foot">
+          <Heart
+            what={card.title}
+            hearted={card.supported_by_me}
+            count={card.support_count}
+            busy={busy}
+            onHeart={(hearting) => talk.heart(card.id, hearting)}
+          />
+        </p>
+      )}
     </li>
   )
 }

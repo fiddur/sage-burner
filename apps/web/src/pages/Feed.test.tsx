@@ -327,6 +327,13 @@ describe('the heart on a card', () => {
     await waitFor(() => expect(withdrawSupportForThread).toHaveBeenCalledWith('c-1'))
   })
 
+  it('offers none on a card whose thing is gone, which the route refuses anyway', async () => {
+    renderPage(stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn', gone: true })]))
+
+    await screen.findByText(/withdrawn/)
+    expect(screen.queryByRole('button', { name: /heart/ })).toBeNull()
+  })
+
   it('says no number where nobody has given one', async () => {
     renderPage(stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
 
