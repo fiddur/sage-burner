@@ -1174,6 +1174,8 @@ const THREAD_SUBJECT_UNIQUE = '20260811120000_thread_subject_unique'
 
 const SONG_LINK_URL_ONLY = '20260811140000_song_link_url_only'
 
+const JOINED_CARDS = '20260811180000_joined_cards'
+
 describe('the facilitator-is-an-attendance migration', () => {
   /**
    * Staged the same way as the places rebuild above, and for the same reason: this
@@ -1690,6 +1692,130 @@ describe('the song-link name nothing reads any more', () => {
         { url: 'https://youtu.be/2' },
       ])
       expect(JSON.parse(linksOf('s-bare'))).toEqual([])
+    } finally {
+      fresh.close()
+    }
+  })
+})
+
+describe('the cards a redeemed invite never opened', () => {
+  const seed = (db: DbHandle) => {
+    anEvent(db, 'e-1', 'a-burn', '2026-01-01T00:00:00Z')
+
+    for (const [id, name] of [
+      ['a-ada', 'Ada'],
+      ['a-bea', 'Bea'],
+      ['a-nameless', null],
+    ] as [string, string | null][]) {
+      db.client
+        .prepare('insert into account (id, email, name, created_at) values (?, ?, ?, ?)')
+        .run(id, `${id}@example.org`, name, NOW)
+    }
+
+    const aStay = db.client.prepare(
+      'insert into attendance (id, event_id, account_id, joined_at) values (?, ?, ?, ?)',
+    )
+    aStay.run('att-ada', 'e-1', 'a-ada', '2026-07-01T10:00:00Z')
+    aStay.run('att-bea', 'e-1', 'a-bea', '2026-07-02T10:00:00Z')
+    aStay.run('att-nameless', 'e-1', 'a-nameless', '2026-07-03T10:00:00Z')
+
+    // Bea joined through the button, so her card is already there and must be left alone.
+    db.client
+      .prepare(
+        'insert into thread (id, event_id, entity_type, entity_id, subject_account_id, title) values (?, ?, ?, ?, ?, ?)',
+      )
+      .run('t-bea', 'e-1', 'attendance', 'att-bea', 'a-bea', 'Bea')
+    db.client
+      .prepare(
+        'insert into thread_entry (id, thread_id, kind, seq, author_account_id, body, created_at) values (?, ?, ?, ?, ?, ?, ?)',
+      )
+      .run('x-bea', 't-bea', 'joined', 1, 'a-bea', 'is coming', '2026-07-02T10:00:00Z')
+  }
+
+  const beforeTheBackfill = () => {
+    const fresh = createDb({ url: ':memory:' })
+    const { staged, kept } = stagedThrough(JOINED_CARDS)
+
+    expect(kept).not.toContain(JOINED_CARDS)
+    expect(kept.length).toBeGreaterThan(0)
+
+    runMigrations(fresh, staged)
+
+    return fresh
+  }
+
+  const cardFor = (db: DbHandle, accountId: string) =>
+    db.client
+      .prepare(
+        `select thread.id as id, thread.entity_id as stay, thread.title as title,
+                thread_entry.kind as kind, thread_entry.body as body,
+                thread_entry.created_at as at, thread_entry.seq as seq
+         from thread left join thread_entry on thread_entry.thread_id = thread.id
+         where thread.entity_type = 'attendance' and thread.subject_account_id = ?`,
+      )
+      .all(accountId)
+
+  it('opens one for a stay that has none, dated from the stay rather than from the deploy', () => {
+    const fresh = beforeTheBackfill()
+    try {
+      seed(fresh)
+
+      runMigrations(fresh, migrationsFolder)
+
+      const [card, ...rest] = cardFor(fresh, 'a-ada')
+      expect(rest).toEqual([])
+      expect(card?.stay).toBe('att-ada')
+      expect(card?.title).toBe('Ada')
+      expect([card?.kind, card?.body, card?.at, card?.seq]).toEqual([
+        'joined',
+        'is coming',
+        '2026-07-01T10:00:00Z',
+        1,
+      ])
+    } finally {
+      fresh.close()
+    }
+  })
+
+  it('gives it an id of the shape everything else on the wire has', () => {
+    // `thread.id` is read as `idSchema`, which is `z.uuid()`.
+    const fresh = beforeTheBackfill()
+    try {
+      seed(fresh)
+
+      runMigrations(fresh, migrationsFolder)
+
+      expect(String(cardFor(fresh, 'a-ada')[0]?.id)).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
+      )
+    } finally {
+      fresh.close()
+    }
+  })
+
+  it('leaves a card that already exists exactly as it was', () => {
+    const fresh = beforeTheBackfill()
+    try {
+      seed(fresh)
+
+      runMigrations(fresh, migrationsFolder)
+
+      const held = cardFor(fresh, 'a-bea')
+      expect(held).toHaveLength(1)
+      expect(held[0]?.id).toBe('t-bea')
+    } finally {
+      fresh.close()
+    }
+  })
+
+  it('opens one for somebody who never said what they are called', () => {
+    const fresh = beforeTheBackfill()
+    try {
+      seed(fresh)
+
+      runMigrations(fresh, migrationsFolder)
+
+      expect(cardFor(fresh, 'a-nameless')[0]?.title).toBe('Somebody')
     } finally {
       fresh.close()
     }

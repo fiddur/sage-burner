@@ -1,7 +1,7 @@
 import type { FeedKind, Thread } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { feedPath, INTRODUCTION_EXCERPT, mentionToken } from '@sage-burner/shared'
+import { feedPath, mentionToken } from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -660,17 +660,19 @@ describe('somebody’s own card', () => {
     expect(card?.body).toContain(mentionToken('Bea', bea.id))
   })
 
-  it('clamps a long introduction rather than putting the whole of it in the feed', async () => {
+  it('carries the whole introduction, because that card is the person’s presentation', async () => {
+    // It was cut at 280 characters with an ellipsis (#478). The excerpt rules exist to stop a
+    // post or a dream swallowing the feed, not to truncate the one thing whose whole job is to
+    // be read — and `MAX_INTRODUCTION` already bounds it.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
     await joinBurn(server, ada.cookie)
+    const whole = `${'word '.repeat(200)}end`
 
-    await introduce(server, ada.cookie, `${'word '.repeat(200)}end`)
+    await introduce(server, ada.cookie, whole)
 
-    const card = await cardOf(server, ada.cookie, 'Ada')
-    expect(card?.body?.length).toBeLessThanOrEqual(INTRODUCTION_EXCERPT + 1)
-    expect(card?.body?.endsWith('…')).toBe(true)
+    expect((await cardOf(server, ada.cookie, 'Ada'))?.body).toBe(whole)
   })
 
   it('carries no body for a dream, whose content is its title and its entries', async () => {

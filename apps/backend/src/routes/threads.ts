@@ -14,7 +14,6 @@ import {
   commentSchema,
   dreamPage,
   feedPage,
-  INTRODUCTION_EXCERPT,
   mentionedAccounts,
   profilePage,
   songPage,
@@ -207,29 +206,6 @@ export const cardEntry = async (
   return await addEntry(db, { thread_id: id, kind, author_account_id: who.account_id, body }, at)
 }
 
-/**
- * A hard cut can land inside a `@[Ada](mention:a-1)` token, which then renders as its own raw
- * text on the card, and inside a surrogate pair, which renders as a replacement character. So
- * the fall-back cut backs off to the last whole character, and to before a token it opened.
- */
-const wholeCharacters = (cut: string): string => {
-  const back = /[\uD800-\uDBFF]$/u.test(cut) ? cut.slice(0, -1) : cut
-  const opened = back.lastIndexOf('@[')
-
-  return opened !== -1 && !back.slice(opened).includes(')') ? back.slice(0, opened) : back
-}
-
-export const excerptOf = (whole_text: string | null): string | null => {
-  const whole = whole_text?.trim() ?? ''
-  if (whole === '') return null
-  if (whole.length <= INTRODUCTION_EXCERPT) return whole
-
-  const cut = wholeCharacters(whole.slice(0, INTRODUCTION_EXCERPT))
-  const gap = Math.max(cut.lastIndexOf(' '), cut.lastIndexOf('\n'))
-
-  return `${(gap > INTRODUCTION_EXCERPT / 2 ? cut.slice(0, gap) : cut).trimEnd()}…`
-}
-
 export const recentThreads = async (
   db: Database,
   limit: number,
@@ -409,6 +385,8 @@ interface CardRow {
 
 type CardFacts = Pick<Thread, 'title' | 'link' | 'body' | 'gone'>
 
+const written = (body: string | null): string | null => (body?.trim() === '' ? null : body)
+
 const dreamFacts = (row: CardRow): CardFacts => ({
   title: row.title,
   link: row.dream === null || row.event_id === null ? null : dreamPage(row.event_id, row.entity_id),
@@ -419,11 +397,9 @@ const dreamFacts = (row: CardRow): CardFacts => ({
 const personFacts = (row: CardRow): CardFacts => ({
   title: row.subject_name ?? row.title,
   link: row.subject === null ? null : profilePage(row.subject),
-  body: excerptOf(row.introduction),
+  body: written(row.introduction),
   gone: row.stay === null,
 })
-
-const written = (body: string | null): string | null => (body?.trim() === '' ? null : body)
 
 const postFacts = (row: CardRow): CardFacts => ({
   title: row.post_title ?? row.title,

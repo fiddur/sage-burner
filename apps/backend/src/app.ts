@@ -288,7 +288,16 @@ export const createApp = async ({
   })
   registerApplicationReviewRoutes(app, { db, config, sessions, mail, now })
   registerInviteRoutes(app, { db, sessions, now })
-  registerRedemptionRoutes(app, { db, config, sessions, now, hash, gate, throttle: redemptions })
+  registerRedemptionRoutes(app, {
+    db,
+    config,
+    sessions,
+    now,
+    hash,
+    gate,
+    throttle: redemptions,
+    notify: tellAccount,
+  })
   registerAllergyRoutes(app, { db })
   registerAttendanceRoutes(app, { db, sessions, now, notify: tellAccount })
   registerPostRoutes(app, { db, sessions, now, notify: tellAccount })

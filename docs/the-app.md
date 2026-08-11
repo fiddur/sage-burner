@@ -468,6 +468,12 @@ category everybody would have had to switch off.
 
 #### Somebody's own card
 
+**Every way in opens it** (#478). The join button was the only path that wrote the card, and
+redeeming an invite called `joinBurn` straight past it — so the arrival that most deserved one, a
+brand new member's, was the silent one. `announceJoined` is the card and the bell together, called
+from both, and a migration mints the cards for the stays that arrived before it. Their entries are
+dated from the stay rather than from the deploy, so the feed's order stays honest.
+
 **One card per (person, burn), and joining opens it** (#426). Saying you are coming and
 saying who you are are the same card: `entity_type: 'attendance'` with the attendance id,
 which `thread.event_id` files under the right burn and gives the same retention.
@@ -499,12 +505,17 @@ cannot be created at all, which is asserted rather than assumed.
 `aboutWhat` and `participantsOf` read the column too, so a comment on a card whose stay is gone
 still has somebody to tell and somewhere to point.
 
-**The introduction is resolved and clamped, not stored on the entry.** `readThreads` reads
-`account.introduction` and `excerptOf` cuts it at `INTRODUCTION_EXCERPT` on a word
-boundary; the entry itself is a bump. Two reasons: rewriting a paragraph must not leave
-the feed quoting the old one, and `MAX_INTRODUCTION` is 10,000 against a card's budget of
-fifty-in-one-cache-key. The whole of it is on the person's page, which the card's title
-links to.
+**The introduction is resolved, not stored on the entry.** `readThreads` reads
+`account.introduction` and the entry itself is a bump, so rewriting a paragraph cannot leave the
+feed quoting the old one.
+
+**And the card carries the whole of it** (#478). It was cut at 280 characters with an ellipsis,
+which is the rule that keeps a post or a dream from swallowing the page — and the wrong rule for
+the one card whose entire job is to be read. `MAX_INTRODUCTION` is 10,000, so fifty of those is
+the worst a page can weigh; introductions are a paragraph in practice, and the excerpt was buying
+a bound against a case nobody has hit at the cost of truncating every case they have. `excerptOf`
+had no other caller and is gone with it, mention-token-safe truncation and all — git has it if a
+future card needs one.
 
 **Rewriting bumps once, and tells the burn once.** `introduced` coalesces, so six passes at a
 paragraph move one card up the feed rather than leaving six lines — the argument `renamed`,

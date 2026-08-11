@@ -14,7 +14,18 @@ import { verifyPassword } from '../auth/password.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountConnection, application, attendance, event, inviteToken } from '../db/schema.ts'
+import {
+  account,
+  accountConnection,
+  application,
+  attendance,
+  event,
+  inviteToken,
+  notification,
+  notificationSetting,
+  thread,
+  threadEntry,
+} from '../db/schema.ts'
 
 /**
  * Redeeming an invite: the single funnel both membership paths converge on.
@@ -126,6 +137,20 @@ const givenBurn = async (over: { end_date?: string; start_date?: string } = {}) 
       member_cap: 42,
       created_at: NOW,
     })
+  return id
+}
+
+/** Somebody already at the burn, who has asked to hear about the category under test. */
+const givenMemberComing = async (eventId: string, category: 'member_joined') => {
+  const id = randomUUID()
+  await db()
+    .insert(account)
+    .values({ id, email: `${id}@example.org`, name: 'Bea', password_hash: null, created_at: NOW })
+  await db()
+    .insert(attendance)
+    .values({ id: randomUUID(), event_id: eventId, account_id: id, joined_at: NOW })
+  await db().insert(notificationSetting).values({ account_id: id, category, enabled: true })
+
   return id
 }
 
@@ -647,6 +672,38 @@ describe('joining the ticked burn while redeeming', () => {
       arrival_date: '2026-08-01',
       departure_date: '2026-08-03',
     })
+  })
+
+  it('opens their card on the feed, which the join button has always done', async () => {
+    // The machinery was never missing: `attendance.ts` writes the card and rings the bell on an
+    // ordinary join, and redemption called `joinBurn` straight past it — so the one arrival that
+    // most deserves a card, a brand new member's, was the silent one (#478).
+    const server = await build()
+    const burn = await givenBurn()
+    const token = await givenInvite()
+
+    await redeem(server, token, { ...applicant, join_event_id: burn })
+
+    const [card] = await db().select().from(thread)
+    expect(card?.entity_type).toBe('attendance')
+    expect(card?.event_id).toBe(burn)
+    expect((await db().select().from(threadEntry)).map((entry) => [entry.kind, entry.body])).toEqual([
+      ['joined', 'is coming'],
+    ])
+  })
+
+  it('tells whoever asked to hear about an arrival, and never the arrival', async () => {
+    const server = await build()
+    const burn = await givenBurn()
+    const token = await givenInvite()
+    const waiting = await givenMemberComing(burn, 'member_joined')
+
+    await redeem(server, token, { ...applicant, join_event_id: burn })
+
+    const told = await db().select().from(notification)
+    expect(told.map((one) => [one.account_id, one.category, one.body])).toEqual([
+      [waiting, 'member_joined', 'Fredrik is coming.'],
+    ])
   })
 
   it('still makes the account when the burn ended while the form was open', async () => {

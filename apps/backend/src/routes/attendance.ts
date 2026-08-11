@@ -114,6 +114,36 @@ export interface AttendanceDeps extends GuardDeps {
   notify?: Notifier
 }
 
+/**
+ * The card and the bell a new arrival earns. Exported because the join route is not the only
+ * path in: redeeming an invite joins too, and the one join that most deserves a card — a brand
+ * new member's — was the silent one (#478).
+ */
+export const announceJoined = async (
+  db: Database,
+  notify: Notifier,
+  joined: { stay: { id: string; event_id: string }; account_id: string },
+  now: () => Date,
+): Promise<void> => {
+  const name = await displayName(db, joined.account_id)
+
+  await cardEntry(db, {
+    stay: joined.stay,
+    who: { account_id: joined.account_id, name },
+    kind: 'joined',
+    body: JOINED,
+    at: now(),
+  })
+
+  await tellAttendees(
+    db,
+    notify,
+    joined.stay.event_id,
+    { category: 'member_joined', body: `${name} is coming.`, link: '/members' },
+    { except: [joined.account_id] },
+  )
+}
+
 export const registerAttendanceRoutes = (
   app: FastifyInstance,
   { db, sessions, now, notify = async () => undefined }: AttendanceDeps,
@@ -181,23 +211,7 @@ export const registerAttendanceRoutes = (
       if (joined === undefined) return sendError(reply, 404)
 
       if (joined.created) {
-        const name = await displayName(db, viewer.account_id)
-
-        await cardEntry(db, {
-          stay: joined.stay,
-          who: { account_id: viewer.account_id, name },
-          kind: 'joined',
-          body: JOINED,
-          at: now(),
-        })
-
-        await tellAttendees(
-          db,
-          notify,
-          joined.stay.event_id,
-          { category: 'member_joined', body: `${name} is coming.`, link: '/members' },
-          { except: [viewer.account_id] },
-        )
+        await announceJoined(db, notify, { stay: joined.stay, account_id: viewer.account_id }, now)
       }
 
       const answer = { attendance: joined.stay } satisfies AttendanceResponse

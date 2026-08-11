@@ -381,8 +381,7 @@ describe('rewording an announcement', () => {
   })
 
   it('takes a body of nothing but spaces as no body at all', async () => {
-    // The card drew an empty `markdown-preview` div for it. An introduction gets `null` out of
-    // `excerptOf` instead, which is the behaviour to match (#455).
+    // The card drew an empty `markdown-preview` div for it (#455).
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
