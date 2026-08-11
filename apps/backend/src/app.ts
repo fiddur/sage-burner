@@ -252,7 +252,7 @@ export const createApp = async ({
     { post: byEmail, defer: defer ?? emails.defer },
   )
 
-  registerAuthRoutes(app, { db, config, sessions, gate, limits })
+  registerAuthRoutes(app, { db, config, sessions, gate, limits, now })
   registerPasskeyRoutes(app, { db, config, sessions, now })
   registerAdminRoutes(app, { db, hash })
   registerInstallationRoutes(app, { db, sessions })

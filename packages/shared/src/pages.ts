@@ -31,6 +31,8 @@ export const oauthOutcomes = [
   'linked',
   'reached',
   'taken',
+  'no-address',
+  'address-taken',
 ] as const
 
 export type OAuthOutcome = (typeof oauthOutcomes)[number]
@@ -44,6 +46,9 @@ const outcomeQuery = (outcome?: OAuthOutcome, ref?: string): string => {
 
   return `?${OAUTH_OUTCOME_PARAM}=${outcome}${quoted}`
 }
+
+export const applyPage = (outcome?: OAuthOutcome, ref?: string): string =>
+  `/apply${outcomeQuery(outcome, ref)}`
 
 export const loginPage = (outcome?: OAuthOutcome, ref?: string): string =>
   `/login${outcomeQuery(outcome, ref)}`

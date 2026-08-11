@@ -12,6 +12,7 @@ export interface ProviderAsks {
 
 export interface ProviderProfile {
   subject: string
+  email?: string
   picture?: string
   profile_url?: string
   reach?: { kind: ConnectionKind; value: string }
@@ -36,6 +37,12 @@ export const stringField = (body: unknown, name: string): string | undefined => 
   return typeof held === 'string' && held !== '' ? held : undefined
 }
 
+// An unverified address is one somebody typed into the provider, so taking it as a login identity
+// would let a stranger claim an address they do not hold. Absent is better than wrong: the sign-up
+// page asks for one instead.
+const verifiedEmail = (body: unknown): string | undefined =>
+  field(body, 'verified') === true ? stringField(body, 'email') : undefined
+
 const discordPicture = (id: string, avatar: string | undefined): string | undefined =>
   avatar === undefined ? undefined : `https://cdn.discordapp.com/avatars/${id}/${avatar}.png?size=256`
 
@@ -44,7 +51,9 @@ export const providerShapes = {
     authorize: 'https://discord.com/oauth2/authorize',
     token: 'https://discord.com/api/oauth2/token',
     profile: () => 'https://discord.com/api/users/@me',
-    scope: () => 'identify',
+    // `email` because signing up *is* signing in now (#476), and an account is keyed by an
+    // address. Discord answers a verified one; Facebook is asked the same and often does not.
+    scope: () => 'identify email',
     read: (body) => {
       const subject = stringField(body, 'id')
       if (subject === undefined) return undefined
@@ -53,6 +62,7 @@ export const providerShapes = {
 
       return {
         subject,
+        email: verifiedEmail(body),
         picture: discordPicture(subject, stringField(body, 'avatar')),
         ...(username === undefined ? {} : { reach: { kind: 'discord' as const, value: username } }),
       }
@@ -66,10 +76,12 @@ export const providerShapes = {
     profile: ({ profileLink }) =>
       `https://graph.facebook.com/${FACEBOOK_GRAPH_VERSION}/me?fields=${[
         'id',
+        'email',
         'picture.width(256).height(256)',
         ...(profileLink ? ['link'] : []),
       ].join(',')}`,
-    scope: ({ profileLink }) => (profileLink ? 'public_profile,user_link' : 'public_profile'),
+    scope: ({ profileLink }) =>
+      profileLink ? 'public_profile,email,user_link' : 'public_profile,email',
     read: (body) => {
       const subject = stringField(body, 'id')
       if (subject === undefined) return undefined
@@ -79,6 +91,7 @@ export const providerShapes = {
 
       return {
         subject,
+        email: stringField(body, 'email'),
         picture: own ? stringField(data, 'url') : undefined,
         profile_url: facebookProfileLink(stringField(body, 'link')),
       }

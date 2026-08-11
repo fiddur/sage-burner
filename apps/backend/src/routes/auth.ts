@@ -1,8 +1,9 @@
 import type { MeResponse } from '@sage-burner/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
-import { apiRoutes, errorResponse, loginRequestSchema } from '@sage-burner/shared'
+import { apiRoutes, errorResponse, loginRequestSchema, signUpRequestSchema } from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
+import { randomUUID } from 'node:crypto'
 
 import type { Gate } from '../auth/gate.ts'
 import type { Sessions } from '../auth/session.ts'
@@ -12,8 +13,10 @@ import type { Database } from '../db/index.ts'
 
 import { hashPassword, needsRehash, verifyPassword } from '../auth/password.ts'
 import { SESSION_COOKIE, viewerFor, viewerOf } from '../auth/viewer.ts'
-import { account } from '../db/schema.ts'
-import { noStore, sendError } from '../http.ts'
+import { loginAddressConnection } from '../connections.ts'
+import { isUniqueViolation } from '../db/errors.ts'
+import { account, accountConnection } from '../db/schema.ts'
+import { bodyOf, noStore, sendError } from '../http.ts'
 
 export const cookieHeader = (token: string, config: Config, maxAgeSeconds: number): string => {
   const parts = [
@@ -33,6 +36,7 @@ export interface LoginLimits {
 }
 
 export interface AuthRouteDeps {
+  now: () => Date
   db: Database
   config: Config
   sessions: Sessions
@@ -48,7 +52,7 @@ const refuse = (reply: FastifyReply, retryAfterSeconds: number) => {
 
 export const registerAuthRoutes = (
   app: FastifyInstance,
-  { db, config, sessions, gate, limits }: AuthRouteDeps,
+  { db, config, sessions, gate, limits, now }: AuthRouteDeps,
 ) => {
   const handleLogin = async (request: FastifyRequest, reply: FastifyReply) => {
     const parsed = loginRequestSchema.safeParse(request.body)
@@ -120,6 +124,74 @@ export const registerAuthRoutes = (
     } finally {
       admission.release()
     }
+  })
+
+  /**
+   * Open sign-up (#476), which the app deliberately did not have until the account came before
+   * the application. A new account holds **no roles**, and that state already means "not a
+   * member" everywhere — `requireApproved` gates the rest of the app, so what a junk account can
+   * reach is its own application and nothing else. The IP throttle redemption already had is
+   * what bounds how many of them one client can make.
+   */
+  app.post(apiRoutes.signUp.fastify, async (request, reply) => {
+    void noStore(reply)
+
+    const room = limits.byIp.take(request.ip)
+    if (!room.ok) {
+      request.log.warn({ status: 429 }, 'sign-up throttled')
+
+      return refuse(reply, room.retryAfterSeconds)
+    }
+
+    const body = bodyOf(signUpRequestSchema, request)
+    if (body === undefined) return sendError(reply, 400)
+
+    const admission = await gate.enter()
+    if (!admission.ok) {
+      void reply.header('retry-after', gate.retryAfter(admission.reason))
+      request.log.warn({ ...gate.stats(), reason: admission.reason }, 'sign-up shed')
+
+      return sendError(reply, 429)
+    }
+
+    let password_hash: string
+    try {
+      password_hash = await hashPassword(body.password)
+    } finally {
+      admission.release()
+    }
+
+    const accountId = randomUUID()
+
+    try {
+      db.transaction((tx) => {
+        tx.insert(account)
+          .values({
+            id: accountId,
+            email: body.email,
+            password_hash,
+            name: body.name,
+            created_at: now().toISOString(),
+          })
+          .run()
+
+        tx.insert(accountConnection).values(loginAddressConnection(accountId, body.email)).run()
+      })
+    } catch (error) {
+      // The same answer as an address already in use, because it is one: saying which would tell
+      // a stranger whether somebody has an account here, and the membership is the private part.
+      if (isUniqueViolation(error, 'account.email')) return sendError(reply, 409)
+      throw error
+    }
+
+    void reply.header(
+      'set-cookie',
+      cookieHeader(sessions.issue(accountId), config, config.session_ttl_seconds),
+    )
+
+    return reply.code(201).send({
+      viewer: { account_id: accountId, name: body.name, avatar: null, roles: [] },
+    } satisfies MeResponse)
   })
 
   app.post(apiRoutes.logout.fastify, async (_request, reply: FastifyReply) => {

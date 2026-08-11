@@ -106,10 +106,13 @@ const settle = async () => {
   await new Promise((resolve) => setTimeout(resolve, 0))
 }
 
-const apply = (server: FastifyInstance) =>
-  server.inject({
+const apply = async (server: FastifyInstance) => {
+  const applicant = await givenAccount([])
+
+  return await server.inject({
     method: 'POST',
     url: '/api/applications',
+    headers: { cookie: applicant.cookie },
     payload: {
       applicant_name: 'Fredrik',
       applicant_email: 'fredrik@example.org',
@@ -117,6 +120,7 @@ const apply = (server: FastifyInstance) =>
       asked: [],
     },
   })
+}
 
 describe('the VAPID key a browser subscribes with', () => {
   it('is minted the first time an admin asks', async () => {
