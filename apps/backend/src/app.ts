@@ -252,7 +252,7 @@ export const createApp = async ({
     { post: byEmail, defer: defer ?? emails.defer },
   )
 
-  registerAuthRoutes(app, { db, config, sessions, gate, limits })
+  registerAuthRoutes(app, { db, config, sessions, gate, limits, now })
   registerPasskeyRoutes(app, { db, config, sessions, now })
   registerAdminRoutes(app, { db, hash })
   registerInstallationRoutes(app, { db, sessions })
@@ -278,7 +278,9 @@ export const createApp = async ({
 
   registerApplicationRoutes(app, {
     db,
+    sessions,
     now,
+    notifyOne: tellAccount,
     notify: async (message) =>
       await notifyAdmins(db, tellAccount, {
         category: 'application',
@@ -286,7 +288,7 @@ export const createApp = async ({
         link: '/admin/applications',
       }),
   })
-  registerApplicationReviewRoutes(app, { db, config, sessions, mail, now })
+  registerApplicationReviewRoutes(app, { db, config, sessions, mail, now, notify: tellAccount })
   registerInviteRoutes(app, { db, sessions, now })
   registerRedemptionRoutes(app, {
     db,

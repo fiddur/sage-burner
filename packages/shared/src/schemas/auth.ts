@@ -1,8 +1,8 @@
 import { z } from 'zod'
 
 import { accountRoles } from '../enums.ts'
-import { MAX_EMAIL } from '../limits.ts'
-import { idSchema } from './common.ts'
+import { MAX_EMAIL, MAX_PERSON_NAME } from '../limits.ts'
+import { idSchema, nonEmptyText } from './common.ts'
 
 export const emailSchema = z.string().trim().toLowerCase().pipe(z.email().max(MAX_EMAIL))
 
@@ -15,6 +15,15 @@ export const loginRequestSchema = z.object({
   password: loginPasswordSchema,
 })
 export type LoginRequest = z.infer<typeof loginRequestSchema>
+
+export const signUpRequestSchema = z
+  .object({
+    email: emailSchema,
+    password: newPasswordSchema,
+    name: nonEmptyText(MAX_PERSON_NAME),
+  })
+  .strict()
+export type SignUpRequest = z.infer<typeof signUpRequestSchema>
 
 export const viewerSchema = z.object({
   account_id: idSchema,

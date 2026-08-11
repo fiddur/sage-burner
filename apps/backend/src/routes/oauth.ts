@@ -7,7 +7,14 @@ import type {
 } from '@sage-burner/shared'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
-import { apiRoutes, detailsPage, isOAuthProvider, loginPage } from '@sage-burner/shared'
+import {
+  apiRoutes,
+  applyPage,
+  detailsPage,
+  emailSchema,
+  isOAuthProvider,
+  loginPage,
+} from '@sage-burner/shared'
 import { and, eq, gt, lt } from 'drizzle-orm'
 import { randomBytes, randomUUID } from 'node:crypto'
 
@@ -17,8 +24,8 @@ import type { IdentifyFailure, OAuthCalls } from '../oauth/client.ts'
 import type { ProviderAsks, ProviderProfile } from '../oauth/providers.ts'
 
 import { viewerFor } from '../auth/viewer.ts'
-import { providerConnection } from '../connections.ts'
-import { accountAvatar, accountConnection, accountIdentity, oauthState } from '../db/schema.ts'
+import { loginAddressConnection, providerConnection } from '../connections.ts'
+import { account, accountAvatar, accountConnection, accountIdentity, oauthState } from '../db/schema.ts'
 import { noStore, sendError } from '../http.ts'
 import { anotherWayInSurvives, identitiesFor } from '../oauth/identities.ts'
 import { authorizeUrl } from '../oauth/providers.ts'
@@ -171,10 +178,85 @@ export const registerOauthRoutes = (
     })
   }
 
-  const signIn = async (
+  /**
+   * An identity nobody has yet is a new account, not a dead end (#476): sign-up and sign-in
+   * converge here, since asking somebody to pick which they are doing is asking them to know.
+   *
+   * The address has to come from the provider, because it is what an account is keyed by, and it
+   * has to be one nobody else holds — linking a stranger's identity onto an existing account by
+   * matching addresses is account takeover if the provider ever hands over an unverified one.
+   */
+  const signUpThrough = async (
+    request: FastifyRequest,
     reply: FastifyReply,
     provider: OAuthProvider,
-    profile: { subject: string; profile_url?: string },
+    profile: ProviderProfile,
+  ) => {
+    // Through the same schema every other way in uses: `account.email` carries a lowercase CHECK,
+    // so `Wren@Example.org` taken as given would miss the row it collides with and then fail the
+    // write — reporting an address conflict to somebody who has no account.
+    const parsed = emailSchema.safeParse(profile.email)
+    if (!parsed.success) return back(reply, applyPage('no-address'))
+
+    const email = parsed.data
+
+    const [taken] = await db.select({ id: account.id }).from(account).where(eq(account.email, email)).limit(1)
+
+    if (taken !== undefined) return back(reply, loginPage('address-taken'))
+
+    const accountId = randomUUID()
+
+    try {
+      db.transaction((tx) => {
+        tx.insert(account)
+          .values({
+            id: accountId,
+            email,
+            name: profile.name ?? null,
+            created_at: now().toISOString(),
+          })
+          .run()
+
+        tx.insert(accountConnection).values(loginAddressConnection(accountId, email)).run()
+
+        tx.insert(accountIdentity)
+          .values({
+            id: randomUUID(),
+            account_id: accountId,
+            provider,
+            subject: profile.subject,
+            profile_url: profile.profile_url ?? null,
+            created_at: now().toISOString(),
+          })
+          .run()
+      })
+    } catch (failure) {
+      request.log.warn({ err: failure, provider }, 'could not make an account for a new identity')
+
+      return back(reply, loginPage('address-taken'))
+    }
+
+    try {
+      await maybeAvatar(accountId, profile.picture)
+    } catch {} // swallowed: a CDN having a bad day must not undo an account already made
+
+    try {
+      await maybeReach(accountId, provider, profile.reach)
+    } catch {} // swallowed, for the same reason
+
+    void reply.header(
+      'set-cookie',
+      cookieHeader(sessions.issue(accountId), config, config.session_ttl_seconds),
+    )
+
+    return back(reply, applyPage())
+  }
+
+  const signIn = async (
+    request: FastifyRequest,
+    reply: FastifyReply,
+    provider: OAuthProvider,
+    profile: ProviderProfile,
   ) => {
     const [identity] = await db
       .select({ id: accountIdentity.id, account_id: accountIdentity.account_id })
@@ -182,7 +264,7 @@ export const registerOauthRoutes = (
       .where(and(eq(accountIdentity.provider, provider), eq(accountIdentity.subject, profile.subject)))
       .limit(1)
 
-    if (identity === undefined) return back(reply, loginPage('unlinked'))
+    if (identity === undefined) return await signUpThrough(request, reply, provider, profile)
 
     if (profile.profile_url !== undefined) {
       try {
@@ -307,7 +389,7 @@ export const registerOauthRoutes = (
       }
 
       return spent.intent === 'sign-in'
-        ? await signIn(reply, provider, identified.profile)
+        ? await signIn(request, reply, provider, identified.profile)
         : await link(reply, provider, spent.account_id, identified.profile)
     },
   )

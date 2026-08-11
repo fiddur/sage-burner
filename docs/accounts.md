@@ -1,12 +1,33 @@
 # Accounts and sessions
 
-Applying, being invited, redeeming an invite, signing in, passkeys, roles, and what
-a session is.
+Signing up, applying, being invited, redeeming an invite, signing in, passkeys, roles, and
+what a session is.
 
 [← back to the README](../README.md)
 
-There is **no open sign-up**. Accounts are created only by redeeming an invite
-([#17]); `/login` says so rather than offering a dead link.
+**The account comes first, the application second, and approval grants membership** (#476).
+Sign-up is open: `/apply` makes an account — through Discord or Facebook, or with an address and
+a password — and then asks the questions. There was no open sign-up until this: accounts came only
+from redeeming an invite ([#17]), the applicant held nothing between submitting and maybe
+receiving that mail, and a rejection sent nothing at all.
+
+**A new account holds no roles**, and that state already means "not a member": `requireApproved`
+gates the rest of the app, so somebody signed up and waiting reaches their own application, their
+own bell, and nothing else. No account-status column was added for a fact the roles already carry.
+`requireSignedIn` is the guard for that state — being signed in at all — and it is what the
+application routes and `/api/push/*` sit behind.
+
+**Approval is one action**: grant `member`, join the burn that is coming, open the feed card and
+ring the bell every other arrival gets, and tell the applicant. No token is minted, because there
+is nothing left to claim. A rejection tells them too, and the page names the organisers to ask —
+**only where the answer was no**, since sign-up is open and that route is reachable by anybody who
+can make an account, while the admins' contact details are a members-only read everywhere else.
+Somebody still waiting has the thread below for a question; somebody accepted has the Members page.
+
+**The invite machinery stays** for the case it was always shaped for — an admin minting a link for
+somebody specific. Applications submitted before this have no account, so approving one of those
+still mints a token: the link is all such an application can offer. Re-issuing for an
+account-first application is refused, since it would be a second account for somebody who has one.
 
 - `POST /api/auth/login` — `{ email, password }`. 200 with `{ viewer }` and a
   session cookie, or 401 `invalid_credentials`.
@@ -153,11 +174,67 @@ minutes after a merge.
 [#17]: https://github.com/fiddur/sage-burner/issues/17
 [#58]: https://github.com/fiddur/sage-burner/issues/58
 
+### Signing up through a provider
+
+Sign-up and sign-in converge on one handler, because asking somebody to say which one they are
+doing is asking them to know. An identity nobody has yet makes an account rather than bouncing to
+`unlinked`.
+
+**That needs an address**, since an account is keyed by one — so both providers are now asked for
+`email`, which neither was before: nothing here matched on an address, so collecting one bought
+nothing. Discord's counts only where Discord says it is **verified**; an unverified one is a string
+somebody typed into the provider, and taking it as a login identity would let a stranger claim an
+address they do not hold. Facebook offers no such signal and often no address at all, so its is
+taken as given or not at all.
+
+**The address goes through `emailSchema`**, like every other way one enters the app — trimmed,
+lowercased, bounded and checked that it is one at all. `account.email` carries a lowercase CHECK,
+so a provider answering `Wren@Example.org` taken as given would miss the row it collides with and
+then fail the write, reporting an address conflict to somebody who has no account.
+
+**No address, no account**: the sign-up page says so and asks for one, and an address that is not
+one is the same answer.
+
+**The name comes with it where the provider gives one** — Discord's display name or username,
+Facebook's `name` — because `account` carries the person, and without one `displayName` answers
+"Somebody" on the feed card, in the `member_joined` push to every attendee, and in the Members
+list. Where a provider gives none, submitting the application fills it in from the name the form
+asked for: `updateMyProfile` is behind `requireApproved`, so an applicant cannot do it themselves
+while they wait. **An address somebody
+already holds** is refused too, and pointedly — matching accounts by address is account takeover
+the moment a provider hands over one it has not verified. The path is signing in the other way and
+linking under Your details, and that is the sentence the login page shows.
+
+### Talking to an applicant
+
+An application that raises a question had two buttons, and one of them was a silent no. There is
+a third thing now (#477): **a private thread on the application**, so "who are you coming with?"
+can replace a rejection.
+
+**Not the feed's thread machinery**, deliberately. A feed thread is member-visible by design, and
+this is the one conversation that must not be — it runs before there is a membership at all.
+`application_message` is the whole model: the application, the author, the body, the time.
+
+**Two parties and no more.** An admin reads and writes any, through
+`/api/admin/applications/:id/messages` and therefore the admin prefix. The applicant writes to
+`/api/me/application/messages`, which takes **no id** — an id in the path would be a way to ask
+about somebody else's — and reads theirs as part of `GET /api/me/application`. Both are behind
+`requireSignedIn`, because the applicant has no role by design.
+
+**Both directions ring a bell.** The applicant hears `application_news`, which is the same
+category the decision uses: one switch for news about your application, whether that news is an
+answer or a question. Admins hear `application`, the category a new application already used, so
+a reply lands where a submission does.
+
+**A thread does not change the status.** Pending stays pending while the conversation runs;
+approve and reject remain the same explicit actions, and a thread on a rejected application stays
+readable — which is what the status page's "ask the organisers" posture is for.
+
 ## Applying
 
-`POST /api/applications` is the only public write in the app, and that is the
-point — an applicant has no account yet. Everything in the body is therefore
-attacker-controlled, so two things are true by construction:
+`POST /api/applications` is behind `requireSignedIn` since #476 — it was the only public write in
+the app, and the account it now needs is one anybody can make in the step before. Everything in
+the body is still attacker-controlled, so two things are true by construction:
 
 - **The submitter names their answers and which questions they were shown, and
   nothing else.** `id`, `status` and the timestamps are the server's. The schema
@@ -283,7 +360,12 @@ double-clicked Approve mints one invite, not two. `invite_token_application_idx`
 is the backstop underneath that, and the page tells the admin to reload
 rather than to try again, since retrying cannot help.
 
-**Approval mints the invite.** 32 CSPRNG bytes, base64url, valid 30 days. Only
+**Approval mints an invite only for an application from before #476** — one with no `account_id`,
+where a link is the only thing there is to offer. For everything since, approval grants the role
+outright and mints nothing. What follows describes that older path, which the two outstanding
+invites still ride.
+
+32 CSPRNG bytes, base64url, valid 30 days. Only
 the SHA-256 digest is stored, so the raw token exists in that one response and
 nowhere else — a leaked backup or a stray copy of the volume hands out no
 invites.

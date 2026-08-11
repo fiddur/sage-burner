@@ -13,6 +13,7 @@ afterEach(cleanup)
 
 const anApplication = (over: Partial<Application> = {}): Application => ({
   id: 'app-1',
+  account_id: null,
   answers: [{ question_id: 'q-1', label: 'Why do you want to come?', type: 'text', value: 'the fire' }],
   status: 'pending',
   applicant_name: 'Fredrik',
@@ -23,6 +24,8 @@ const anApplication = (over: Partial<Application> = {}): Application => ({
 })
 
 const stub = (over: Partial<ApplicationsApi> = {}): ApplicationsApi => ({
+  getApplicationMessages: () => Promise.resolve({ messages: [] }),
+  sendApplicationMessage: () => Promise.reject(new Error('sendApplicationMessage is not stubbed here')),
   getApplications: () => Promise.resolve({ applications: [anApplication()] }),
   approveApplication: () => Promise.reject(new Error('approveApplication is not stubbed here')),
   rejectApplication: () => Promise.reject(new Error('rejectApplication is not stubbed here')),

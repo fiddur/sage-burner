@@ -6,6 +6,7 @@ import type {
   AllergyItemOrder,
   AllergyItemUpdate,
   ApplicationCreate,
+  ApplicationMessageInput,
   AttendanceCreate,
   AttendanceUpdate,
   CommentInput,
@@ -61,6 +62,7 @@ import type {
   RideUpdate,
   SessionCreateInput,
   SessionUpdate,
+  SignUpRequest,
   SongCategoryCreateInput,
   SongCategoryOrder,
   SongCategoryUpdate,
@@ -309,6 +311,26 @@ export const apiRoutes = {
     method: 'GET',
     fastify: '/api/admin/applications',
     path: () => '/api/admin/applications',
+  },
+  getMyApplication: {
+    method: 'GET',
+    fastify: '/api/me/application',
+    path: () => '/api/me/application',
+  },
+  getApplicationMessages: {
+    method: 'GET',
+    fastify: '/api/admin/applications/:id/messages',
+    path: (id: string) => `/api/admin/applications/${encodeURIComponent(id)}/messages`,
+  },
+  sendApplicationMessage: {
+    method: 'POST',
+    fastify: '/api/admin/applications/:id/messages',
+    path: (id: string) => `/api/admin/applications/${encodeURIComponent(id)}/messages`,
+  },
+  sendMyApplicationMessage: {
+    method: 'POST',
+    fastify: '/api/me/application/messages',
+    path: () => '/api/me/application/messages',
   },
   getEventAttendees: {
     method: 'GET',
@@ -806,6 +828,11 @@ export const apiRoutes = {
     fastify: '/api/applications',
     path: () => '/api/applications',
   },
+  signUp: {
+    method: 'POST',
+    fastify: '/api/auth/sign-up',
+    path: () => '/api/auth/sign-up',
+  },
   subscribeToPush: {
     method: 'POST',
     fastify: '/api/push/subscriptions',
@@ -1036,6 +1063,9 @@ export interface RouteBodies {
   setMealLead: MealLead
   setPayment: PaymentUpdate
   submitApplication: ApplicationCreate
+  signUp: SignUpRequest
+  sendApplicationMessage: ApplicationMessageInput
+  sendMyApplicationMessage: ApplicationMessageInput
   subscribeToPush: PushSubscriptionCreate
   transferMyPlace: PlaceTransfer
   unsubscribeFromPush: Pick<PushSubscriptionCreate, 'endpoint'>

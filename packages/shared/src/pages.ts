@@ -36,6 +36,31 @@ export const oauthOutcomes = [
   'linked',
   'reached',
   'taken',
+  'no-address',
+  'address-taken',
+] as const
+
+/**
+ * Which page an outcome can land on, so each page's copy can be exhaustive over its own half
+ * rather than over a list it has to remember to filter. Anything that goes wrong at the provider
+ * lands wherever the round trip started, so three appear in both.
+ */
+export const signingInOutcomes = [
+  'refused',
+  'misconfigured',
+  'unreachable',
+  'unlinked',
+  'no-address',
+  'address-taken',
+] as const
+
+export const linkingOutcomes = [
+  'refused',
+  'misconfigured',
+  'unreachable',
+  'linked',
+  'reached',
+  'taken',
 ] as const
 
 export type OAuthOutcome = (typeof oauthOutcomes)[number]
@@ -49,6 +74,9 @@ const outcomeQuery = (outcome?: OAuthOutcome, ref?: string): string => {
 
   return `?${OAUTH_OUTCOME_PARAM}=${outcome}${quoted}`
 }
+
+export const applyPage = (outcome?: OAuthOutcome, ref?: string): string =>
+  `/apply${outcomeQuery(outcome, ref)}`
 
 export const loginPage = (outcome?: OAuthOutcome, ref?: string): string =>
   `/login${outcomeQuery(outcome, ref)}`

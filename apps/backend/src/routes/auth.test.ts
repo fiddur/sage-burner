@@ -13,7 +13,7 @@ import { defaultScryptParams, hashPassword, needsRehash, verifyPassword } from '
 import { readSessionCookie, SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole } from '../db/schema.ts'
+import { account, accountConnection, accountRole } from '../db/schema.ts'
 
 /**
  * The auth routes against a real database and a real session signer.
@@ -140,6 +140,14 @@ const givenAccount = async ({
 
 const login = (server: FastifyInstance, email: string, password: string) =>
   server.inject({ method: 'POST', url: '/api/auth/login', payload: { email, password } })
+
+/**
+ * The seconds left in a throttle window, which is a real clock minus however long the attempts
+ * before it took — and each of those is a real scrypt. Asserting the window exactly reads as a
+ * bound and is a stopwatch: it fails the moment the suite is loaded enough to spend a second.
+ */
+const retryAfter = (response: { headers: Record<string, unknown> }): number =>
+  Number(response.headers['retry-after'])
 
 const cookieFrom = (response: { headers: Record<string, unknown> }) => {
   const header = response.headers['set-cookie']
@@ -637,7 +645,8 @@ describe('how often one client may try', () => {
     const refused = await login(server, 'ada@example.org', 'wrong passphrase')
     expect(refused.statusCode).toBe(429)
     expect(refused.json()).toEqual({ error: 'rate_limited' })
-    expect(refused.headers['retry-after']).toBe('60')
+    expect(retryAfter(refused)).toBeGreaterThan(50)
+    expect(retryAfter(refused)).toBeLessThanOrEqual(60)
   })
 
   it('counts an address with no account the same, so nothing here says who exists', async () => {
@@ -694,7 +703,8 @@ describe('how often one client may try', () => {
 
     const refused = await login(server, 'ada@example.org', 'a good long passphrase')
     expect(refused.statusCode).toBe(429)
-    expect(refused.headers['retry-after']).toBe('60')
+    expect(retryAfter(refused)).toBeGreaterThan(50)
+    expect(retryAfter(refused)).toBeLessThanOrEqual(60)
   })
 
   it('does the expensive work only for an attempt it admitted', async () => {
@@ -874,5 +884,100 @@ describe('readSessionCookie', () => {
   it('does not match a cookie whose name merely ends with ours', () => {
     // `not_sage_session=…` must not be read as the session.
     expect(readSessionCookie(`not_${SESSION_COOKIE}=abc.def`)).toBeUndefined()
+  })
+})
+
+describe('signing up', () => {
+  const signUp = (server: FastifyInstance, payload: Record<string, unknown>) =>
+    server.inject({ method: 'POST', url: '/api/auth/sign-up', payload })
+
+  const NEW = { email: 'wren@example.org', password: 'a-long-enough-password', name: 'Wren' }
+
+  const held = () => {
+    const found = handle?.db
+    if (found === undefined) throw new Error('build() first')
+    return found
+  }
+
+  it('makes an account with no roles at all, and signs them in', async () => {
+    // No roles is what "not a member" already means everywhere, so a fresh account can reach
+    // its own application and nothing else — no new status column for the same fact (#476).
+    const server = await build()
+
+    const made = await signUp(server, NEW)
+
+    expect(made.statusCode).toBe(201)
+    expect(made.json().viewer).toMatchObject({ name: 'Wren', roles: [] })
+    expect(cookieFrom(made)).toContain(SESSION_COOKIE)
+  })
+
+  it('is who the app answers as from then on', async () => {
+    const server = await build()
+    const made = await signUp(server, NEW)
+
+    const me = await server.inject({
+      method: 'GET',
+      url: '/api/auth/me',
+      headers: { cookie: cookieFrom(made) ?? '' },
+    })
+
+    expect(me.json().viewer).toMatchObject({ name: 'Wren', roles: [] })
+  })
+
+  it('can sign in again with the password it was given', async () => {
+    const server = await build()
+    await signUp(server, NEW)
+
+    const back = await server.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { email: NEW.email, password: NEW.password },
+    })
+
+    expect(back.statusCode).toBe(200)
+  })
+
+  it('puts the address in their contact list, as redeeming an invite does', async () => {
+    const server = await build()
+
+    await signUp(server, NEW)
+
+    const rows = await held().select().from(accountConnection)
+    expect(rows.map((row) => [row.kind, row.value])).toEqual([['email', NEW.email]])
+  })
+
+  it('refuses an address already in use, and says no more than that', async () => {
+    // Saying which would tell a stranger whether somebody has an account here, and on a
+    // membership app the membership is the private part.
+    const server = await build()
+    await signUp(server, NEW)
+
+    const again = await signUp(server, { ...NEW, name: 'Somebody else' })
+
+    expect(again.statusCode).toBe(409)
+    expect(again.json()).toEqual({ error: 'conflict' })
+  })
+
+  it('refuses a body that is not one', async () => {
+    const server = await build()
+
+    expect((await signUp(server, { email: 'not-an-address', password: 'x', name: 'Wren' })).statusCode).toBe(
+      400,
+    )
+    expect((await signUp(server, { email: NEW.email, password: '', name: 'Wren' })).statusCode).toBe(400)
+    expect((await signUp(server, { email: NEW.email, password: NEW.password, name: ' ' })).statusCode).toBe(
+      400,
+    )
+  })
+
+  it('runs out of tries, on the count logging in already has', async () => {
+    const server = await build({}, { bounds: { login: { attempts: 2, windowMs: 60_000 } } })
+
+    await signUp(server, NEW)
+    await signUp(server, { ...NEW, email: 'two@example.org' })
+
+    const refused = await signUp(server, { ...NEW, email: 'three@example.org' })
+    expect(refused.statusCode).toBe(429)
+    expect(retryAfter(refused)).toBeGreaterThan(50)
   })
 })

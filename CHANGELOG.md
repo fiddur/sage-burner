@@ -7,6 +7,20 @@ There are no version numbers: every merge to `develop` builds an image and the s
 picks it up within a few minutes, so a date can hold several deploys. Add your line
 under today's heading, and make a new heading when there is none.
 
+# 2026-08-12
+
+- **Applying starts with an account now.** You sign up first — with Discord or Facebook, or with
+  an address and a password — and then answer the questions. Your application has a page of its
+  own that says where it stands, and you can turn notifications on there while you wait.
+
+- **The organisers can ask you something before deciding.** There is a private note thread on your
+  application — only you and they can read it — so a question can take the place of a no. It is on
+  your application page, and both of you are told when the other writes.
+
+- **You hear the answer.** Being accepted makes you a member and puts you on the list for the burn
+  that is coming, and tells you so — no invite link to wait for and no email to lose. A no is
+  answered too, with the organisers' names and how to reach them, which used to be silence.
+
 # 2026-08-11
 
 - **A heart on every card in the feed.** ♡ fills to ❤️‍🔥, the way it already did on a dream — and

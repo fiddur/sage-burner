@@ -9,17 +9,26 @@ import type { DbHandle } from '../db/index.ts'
 import type { Delivery } from '../push/push.ts'
 
 import { createApp } from '../app.ts'
+import { createSessions } from '../auth/session.ts'
+import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, application, formQuestion, pushSubscription } from '../db/schema.ts'
+import {
+  account,
+  accountRole,
+  application,
+  formQuestion,
+  notification,
+  pushSubscription,
+} from '../db/schema.ts'
 
 /**
- * Submitting the public application form.
+ * Submitting the application form.
  *
- * Unauthenticated by design — this is how someone who is not yet a member gets
- * in touch — so everything it accepts is attacker-controlled, and the two rules
- * worth proving are that the questions are honoured (a required one cannot be
- * skipped, an agreement cannot be left unticked) and that nothing the submitter
+ * Behind being signed in since #476 — the account comes first and the application second — but
+ * a role-less account is what anybody off the street can make, so everything it accepts is still
+ * attacker-controlled. The rules worth proving are that the questions are honoured (a required
+ * one cannot be skipped, an agreement cannot be left unticked) and that nothing the submitter
  * sends decides their own status.
  */
 
@@ -34,6 +43,7 @@ afterEach(async () => {
   handle?.close()
   app = undefined
   handle = undefined
+  applicantAccount = undefined
 })
 
 const build = async (deliver: Delivery = () => Promise.resolve('sent')) => {
@@ -45,6 +55,8 @@ const build = async (deliver: Delivery = () => Promise.resolve('sent')) => {
     deliver,
     mintKeys: () => ({ publicKey: 'a-public-key', privateKey: 'a-private-key' }),
   })
+  await givenApplicant()
+
   return app
 }
 
@@ -110,12 +122,41 @@ const answerKeys = (answers: unknown): string[] =>
  * not about it would bury the thing each one is asserting. Tests that care pass
  * it explicitly.
  */
-const submit = (server: FastifyInstance, payload: Record<string, unknown>): Promise<LightMyRequestResponse> =>
+const submit = (
+  server: FastifyInstance,
+  payload: Record<string, unknown>,
+  cookie?: string,
+): Promise<LightMyRequestResponse> =>
   server.inject({
     method: 'POST',
     url: '/api/applications',
+    headers: { cookie: cookie ?? applicantCookie() },
     payload: { asked: answerKeys(payload.answers), ...payload },
   })
+
+/**
+ * The account an applicant has before they have a role, made on the way in. Held in a module
+ * variable rather than threaded through every test: the tests here are about the form, and the
+ * account is furniture the flow now requires.
+ */
+let applicantAccount: { id: string; cookie: string } | undefined
+
+const applicantCookie = () => {
+  if (applicantAccount === undefined) throw new Error('givenApplicant() first')
+  return applicantAccount.cookie
+}
+
+const givenApplicant = async () => {
+  const id = randomUUID()
+  await db()
+    .insert(account)
+    .values({ id, email: `${id}@example.org`, password_hash: null, created_at: NOW })
+
+  const sessions = createSessions({ secret: SECRET, now: () => new Date(), ttlSeconds: 3600 })
+  applicantAccount = { id, cookie: `${SESSION_COOKIE}=${sessions.issue(id)}` }
+
+  return applicantAccount
+}
 
 const applicant = { applicant_name: 'Fredrik', applicant_email: 'fredrik@example.org' }
 
@@ -454,5 +495,241 @@ describe('telling the admins', () => {
       link: '/admin/applications',
       category: 'application',
     })
+  })
+})
+
+describe('talking to an applicant', () => {
+  const sayAsApplicant = (server: FastifyInstance, cookie: string, body: string) =>
+    server.inject({
+      method: 'POST',
+      url: '/api/me/application/messages',
+      headers: { cookie },
+      payload: { body },
+    })
+
+  const sayAsAdmin = (server: FastifyInstance, cookie: string, id: string, body: string) =>
+    server.inject({
+      method: 'POST',
+      url: `/api/admin/applications/${id}/messages`,
+      headers: { cookie },
+      payload: { body },
+    })
+
+  const mine = (server: FastifyInstance, cookie: string) =>
+    server.inject({ method: 'GET', url: '/api/me/application', headers: { cookie } })
+
+  const givenAdmin = async () => {
+    const id = randomUUID()
+    await db()
+      .insert(account)
+      .values({ id, email: `${id}@example.org`, name: 'Ada', password_hash: null, created_at: NOW })
+    await db().insert(accountRole).values({ account_id: id, role: 'admin' })
+
+    const sessions = createSessions({ secret: SECRET, now: () => new Date(), ttlSeconds: 3600 })
+    return { id, cookie: `${SESSION_COOKIE}=${sessions.issue(id)}` }
+  }
+
+  const givenSent = async (server: FastifyInstance) => {
+    const sent = await submit(server, { ...applicant, answers: {} })
+
+    return sent.json().application.id as string
+  }
+
+  it('carries what the organisers said on the applicant’s own page', async () => {
+    const server = await build()
+    const id = await givenSent(server)
+    const ada = await givenAdmin()
+
+    await sayAsAdmin(server, ada.cookie, id, 'Who are you coming with?')
+
+    const said = mine(server, applicantCookie())
+    expect((await said).json().mine.messages.map((one: { body: string }) => one.body)).toEqual([
+      'Who are you coming with?',
+    ])
+  })
+
+  it('says whose each message is, so the two sides read apart', async () => {
+    const server = await build()
+    const id = await givenSent(server)
+    const ada = await givenAdmin()
+    await sayAsAdmin(server, ada.cookie, id, 'Who are you coming with?')
+
+    const answered = await sayAsApplicant(server, applicantCookie(), 'My neighbour Bea.')
+
+    expect(answered.json().messages.map((one: { mine: boolean; author_name: string }) => one.mine)).toEqual([
+      false,
+      true,
+    ])
+    expect(answered.json().messages[0].author_name).toBe('Ada')
+  })
+
+  it('is refused to somebody who is not signed in', async () => {
+    const server = await build()
+    const id = await givenSent(server)
+
+    expect(
+      (
+        await server.inject({
+          method: 'POST',
+          url: '/api/me/application/messages',
+          payload: { body: 'hello' },
+        })
+      ).statusCode,
+    ).toBe(401)
+    expect(
+      (await server.inject({ method: 'GET', url: `/api/admin/applications/${id}/messages` })).statusCode,
+    ).toBe(401)
+  })
+
+  it('is nobody else’s to read, however they ask', async () => {
+    // The one conversation that is not member-visible: an applicant sees their own and no other,
+    // and the route takes no id for exactly that reason.
+    const server = await build()
+    await givenSent(server)
+    const stranger = await givenApplicant()
+
+    expect((await mine(server, stranger.cookie)).json().mine.messages).toEqual([])
+    expect((await sayAsApplicant(server, stranger.cookie, 'hello')).statusCode).toBe(404)
+  })
+
+  it('is refused to a member who is not an organiser', async () => {
+    const server = await build()
+    const id = await givenSent(server)
+    const member = await givenApplicant()
+    await db().insert(accountRole).values({ account_id: member.id, role: 'member' })
+
+    expect((await sayAsAdmin(server, member.cookie, id, 'hello')).statusCode).toBe(403)
+  })
+
+  it('refuses a message that says nothing', async () => {
+    const server = await build()
+    await givenSent(server)
+
+    expect((await sayAsApplicant(server, applicantCookie(), '   ')).statusCode).toBe(400)
+  })
+
+  it('tells the applicant when the organisers write', async () => {
+    const server = await build()
+    const id = await givenSent(server)
+    const ada = await givenAdmin()
+    const waiting = applicantAccount?.id ?? ''
+
+    await sayAsAdmin(server, ada.cookie, id, 'Who are you coming with?')
+
+    const told = await db().select().from(notification).where(eq(notification.account_id, waiting))
+    expect(told.map((one) => [one.category, one.body])).toEqual([
+      ['application_news', 'The organisers replied to your application.'],
+    ])
+  })
+
+  it('tells the organisers when the applicant does', async () => {
+    const server = await build()
+    await givenSent(server)
+    const ada = await givenAdmin()
+
+    await sayAsApplicant(server, applicantCookie(), 'My neighbour Bea.')
+
+    const told = await db().select().from(notification).where(eq(notification.account_id, ada.id))
+    expect(told.map((one) => one.body)).toEqual(['An applicant has replied.'])
+  })
+})
+
+describe('the name an application carries', () => {
+  it('fills in an account that came in with none, which a provider often leaves', async () => {
+    // `updateMyProfile` is behind `requireApproved`, so an applicant cannot fill it in while
+    // they wait — and without it every card and every push about them says "Somebody".
+    const server = await build()
+
+    await submit(server, { ...applicant, answers: {} })
+
+    const [row] = await db()
+      .select()
+      .from(account)
+      .where(eq(account.id, applicantAccount?.id ?? ''))
+    expect(row?.name).toBe('Fredrik')
+  })
+
+  it('leaves a name somebody already gave alone', async () => {
+    const server = await build()
+    await db()
+      .update(account)
+      .set({ name: 'Wren' })
+      .where(eq(account.id, applicantAccount?.id ?? ''))
+
+    await submit(server, { ...applicant, answers: {} })
+
+    const [row] = await db()
+      .select()
+      .from(account)
+      .where(eq(account.id, applicantAccount?.id ?? ''))
+    expect(row?.name).toBe('Wren')
+  })
+})
+
+describe('who an applicant is told to ask', () => {
+  const mine = (server: FastifyInstance, cookie: string) =>
+    server.inject({ method: 'GET', url: '/api/me/application', headers: { cookie } })
+
+  const givenOrganiser = async () => {
+    const id = randomUUID()
+    await db()
+      .insert(account)
+      .values({
+        id,
+        email: `${id}@example.org`,
+        name: 'Ada',
+        contact: 'ada on discord',
+        password_hash: null,
+        created_at: NOW,
+      })
+    await db().insert(accountRole).values({ account_id: id, role: 'admin' })
+
+    return id
+  }
+
+  const decided = async (status: 'approved' | 'rejected') => {
+    await db()
+      .update(application)
+      .set({ status, decided_at: NOW })
+      .where(eq(application.account_id, applicantAccount?.id ?? ''))
+  }
+
+  it('names them where the answer was no, which is what recourse means', async () => {
+    const server = await build()
+    await givenOrganiser()
+    await submit(server, { ...applicant, answers: {} })
+    await decided('rejected')
+
+    const said = await mine(server, applicantCookie())
+
+    expect(said.json().mine.organisers.map((one: { name: string; contact: string }) => one.contact)).toEqual([
+      'ada on discord',
+    ])
+  })
+
+  it('names nobody to an account that has not applied at all', async () => {
+    // Sign-up is open, so this route is reachable by anybody who can make an account — and the
+    // admins' contact details are a members-only read everywhere else.
+    const server = await build()
+    await givenOrganiser()
+
+    expect((await mine(server, applicantCookie())).json().mine.organisers).toEqual([])
+  })
+
+  it('names nobody while an application is still waiting', async () => {
+    const server = await build()
+    await givenOrganiser()
+    await submit(server, { ...applicant, answers: {} })
+
+    expect((await mine(server, applicantCookie())).json().mine.organisers).toEqual([])
+  })
+
+  it('names nobody where the answer was yes, since they are in and can read the roster', async () => {
+    const server = await build()
+    await givenOrganiser()
+    await submit(server, { ...applicant, answers: {} })
+    await decided('approved')
+
+    expect((await mine(server, applicantCookie())).json().mine.organisers).toEqual([])
   })
 })

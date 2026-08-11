@@ -363,12 +363,16 @@ describe('somebody applies to join', () => {
    * screen costs the applicant the wait. It pushed and wrote no row at all until
    * #326 — an admin found an empty bell after being told.
    */
-  const apply = (server: FastifyInstance) =>
-    server.inject({
+  const apply = async (server: FastifyInstance) => {
+    const wren = await givenAccount('Wren', [])
+
+    return await server.inject({
       method: 'POST',
       url: '/api/applications',
+      headers: { cookie: wren.cookie },
       payload: { applicant_name: 'Wren', applicant_email: 'wren@example.org', answers: {}, asked: [] },
     })
+  }
 
   it('fills every admin bell, without being asked for', async () => {
     const server = await build()

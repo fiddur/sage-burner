@@ -296,6 +296,7 @@ export const application = sqliteTable(
     id: text('id').notNull(),
     answers: text('answers', { mode: 'json' }).$type<StoredAnswers>().notNull(),
     status: text('status', { enum: applicationStatuses }).notNull().default('pending'),
+    account_id: text('account_id').references(() => account.id, { onDelete: 'cascade' }),
     applicant_name: text('applicant_name').notNull(),
     applicant_email: text('applicant_email').notNull(),
     submitted_at: text('submitted_at').notNull(),
@@ -304,7 +305,32 @@ export const application = sqliteTable(
   (table) => [
     primaryKey({ columns: [table.id] }),
     index('application_status_idx').on(table.status),
+    uniqueIndex('application_account_idx').on(table.account_id),
     check('application_status_check', oneOf(table.status, applicationStatuses)),
+  ],
+)
+
+/**
+ * Not the feed's thread machinery, deliberately (#477): a feed thread is member-visible by design
+ * and this is the one conversation that must not be — it is the applicant and the admins, before
+ * there is a membership at all.
+ */
+export const applicationMessage = sqliteTable(
+  'application_message',
+  {
+    id: text('id').notNull(),
+    application_id: text('application_id')
+      .notNull()
+      .references(() => application.id, { onDelete: 'cascade' }),
+    author_account_id: text('author_account_id')
+      .notNull()
+      .references(() => account.id, { onDelete: 'cascade' }),
+    body: text('body').notNull(),
+    created_at: text('created_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    index('application_message_idx').on(table.application_id, table.created_at),
   ],
 )
 

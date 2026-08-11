@@ -16,9 +16,12 @@ export interface PushRouteDeps extends GuardDeps {
 }
 
 export const registerPushRoutes = (app: FastifyInstance, { db, sessions, push }: PushRouteDeps) => {
-  const { requireApproved } = createGuards({ db, sessions })
+  // Signed in rather than approved (#476): the moment somebody has a live reason to allow
+  // notifications is while they are waiting on their application, and a subscription is keyed by
+  // account — a push only ever carries what is addressed to you.
+  const { requireSignedIn } = createGuards({ db, sessions })
 
-  app.get(apiRoutes.getPushKey.fastify, { preHandler: requireApproved }, async (_request, reply) => {
+  app.get(apiRoutes.getPushKey.fastify, { preHandler: requireSignedIn }, async (_request, reply) => {
     void noStore(reply)
 
     const keys = await vapidKeysFor(push)
@@ -26,7 +29,7 @@ export const registerPushRoutes = (app: FastifyInstance, { db, sessions, push }:
     return { public_key: keys?.publicKey ?? null } satisfies PushKeyResponse
   })
 
-  app.post(apiRoutes.subscribeToPush.fastify, { preHandler: requireApproved }, async (request, reply) => {
+  app.post(apiRoutes.subscribeToPush.fastify, { preHandler: requireSignedIn }, async (request, reply) => {
     void noStore(reply)
 
     const body = bodyOf(pushSubscriptionCreateSchema, request)
@@ -42,7 +45,7 @@ export const registerPushRoutes = (app: FastifyInstance, { db, sessions, push }:
 
   app.delete(
     apiRoutes.unsubscribeFromPush.fastify,
-    { preHandler: requireApproved },
+    { preHandler: requireSignedIn },
     async (request, reply) => {
       void noStore(reply)
 

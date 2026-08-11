@@ -177,6 +177,7 @@ describe('applicationSchema', () => {
 
   const anApplication = {
     id: ID,
+    account_id: null,
     answers: [anAnswer],
     status: 'pending',
     applicant_name: 'Someone',

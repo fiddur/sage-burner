@@ -35,6 +35,45 @@ export const inviteMessage = ({
   ].join('\n'),
 })
 
+export const decisionMessage = ({
+  installation,
+  to,
+  name,
+  approved,
+  link,
+}: {
+  installation: string
+  to: string
+  name: string
+  approved: boolean
+  link: string
+}): Message => ({
+  to,
+  subject: approved ? `You are in at ${installation}` : `About your application to ${installation}`,
+  text: approved
+    ? [
+        `Hello ${name},`,
+        '',
+        `Your application has been accepted — you are a member of ${installation},`,
+        'and you are on the list for the next burn.',
+        '',
+        link,
+        '',
+        installation,
+      ].join('\n')
+    : [
+        `Hello ${name},`,
+        '',
+        'Your application has not been accepted this time. If you would like to',
+        'know more, the organisers are the people to ask — their names and how to',
+        'reach them are on your page:',
+        '',
+        link,
+        '',
+        installation,
+      ].join('\n'),
+})
+
 export const notificationMessage = ({
   installation,
   to,

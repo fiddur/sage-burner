@@ -7,7 +7,7 @@ import {
   MAX_ASKED_QUESTIONS,
 } from '../answers.ts'
 import { applicationStatuses, formQuestionTypes } from '../enums.ts'
-import { MAX_QUESTION_LABEL } from '../limits.ts'
+import { MAX_COMMENT, MAX_QUESTION_LABEL } from '../limits.ts'
 import { emailSchema } from './auth.ts'
 import { dateTimeSchema, idSchema, nonEmptyText } from './common.ts'
 import { mailTestResponseSchema } from './mail.ts'
@@ -27,6 +27,7 @@ export const storedAnswersSchema = z.array(storedAnswerSchema)
 
 export const applicationSchema = z.object({
   id: idSchema,
+  account_id: idSchema.nullable(),
   answers: storedAnswersSchema,
   status: z.enum(applicationStatuses),
   applicant_name: nonEmptyText(MAX_APPLICANT_NAME_LENGTH),
@@ -34,6 +35,40 @@ export const applicationSchema = z.object({
   submitted_at: dateTimeSchema,
   decided_at: dateTimeSchema.nullable(),
 })
+
+export const applicationMessageSchema = z.object({
+  id: idSchema,
+  author_account_id: idSchema,
+  author_name: z.string().nullable(),
+  mine: z.boolean(),
+  body: z.string(),
+  created_at: dateTimeSchema,
+})
+export type ApplicationMessage = z.infer<typeof applicationMessageSchema>
+
+export const applicationMessageInputSchema = z.object({ body: nonEmptyText(MAX_COMMENT) }).strict()
+export type ApplicationMessageInput = z.infer<typeof applicationMessageInputSchema>
+
+export const applicationMessagesResponseSchema = z.object({
+  messages: z.array(applicationMessageSchema),
+})
+export type ApplicationMessagesResponse = z.infer<typeof applicationMessagesResponseSchema>
+
+/** What somebody with no roles yet sees of their own: their standing, and who to ask about it. */
+export const myApplicationSchema = z.object({
+  application: applicationSchema.nullable(),
+  messages: z.array(applicationMessageSchema),
+  organisers: z.array(
+    z.object({
+      account_id: idSchema,
+      name: z.string().nullable(),
+      contact: z.string().nullable(),
+    }),
+  ),
+})
+export const myApplicationResponseSchema = z.object({ mine: myApplicationSchema })
+export type MyApplication = z.infer<typeof myApplicationSchema>
+export type MyApplicationResponse = z.infer<typeof myApplicationResponseSchema>
 
 export const applicationCreateSchema = z
   .object({

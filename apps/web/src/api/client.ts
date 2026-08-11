@@ -6,6 +6,7 @@ import type {
   AllergyItem,
   AllergyItemsResponse,
   ApplicationDecisionResponse,
+  ApplicationMessagesResponse,
   ApplicationResponse,
   ApplicationsResponse,
   ApprovedAccountsResponse,
@@ -48,6 +49,7 @@ import type {
   MealsResponse,
   MemberRosterResponse,
   MeResponse,
+  MyApplicationResponse,
   MyBurnsResponse,
   MyImagesResponse,
   NotificationSettings,
@@ -534,6 +536,27 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
       request<ThreadResponse>(apiRoutes.withdrawSupportForThread.path(id), {
         method: apiRoutes.withdrawSupportForThread.method,
       }),
+
+    getApplicationMessages: (id: string, signal?: AbortSignal) =>
+      request<ApplicationMessagesResponse>(apiRoutes.getApplicationMessages.path(id), { signal }),
+
+    sendApplicationMessage: (id: string, body: BodyOf<'sendApplicationMessage'>) =>
+      request<ApplicationMessagesResponse>(apiRoutes.sendApplicationMessage.path(id), {
+        method: apiRoutes.sendApplicationMessage.method,
+        body,
+      }),
+
+    sendMyApplicationMessage: (body: BodyOf<'sendMyApplicationMessage'>) =>
+      request<ApplicationMessagesResponse>(apiRoutes.sendMyApplicationMessage.path(), {
+        method: apiRoutes.sendMyApplicationMessage.method,
+        body,
+      }),
+
+    signUp: (body: BodyOf<'signUp'>) =>
+      request<MeResponse>(apiRoutes.signUp.path(), { method: apiRoutes.signUp.method, body }),
+
+    getMyApplication: (signal?: AbortSignal) =>
+      request<MyApplicationResponse>(apiRoutes.getMyApplication.path(), { signal }),
 
     getMapLink: (signal?: AbortSignal) => request<MapLinkResponse>(apiRoutes.getMapLink.path(), { signal }),
 

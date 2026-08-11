@@ -160,6 +160,10 @@ export const Login = ({
         </p>
       )}
 
+      <p class="form-note">
+        No account yet? <a href="/apply">Apply to join</a>.
+      </p>
+
       {offered.length > 0 && (
         <p class="row">
           {offered.map((provider) => (
@@ -177,8 +181,7 @@ export const Login = ({
       )}
 
       <p class="form-note">
-        Accounts are created by invitation, so there is nothing to sign up for here. If you have lost your
-        password, ask someone with admin — this app cannot send you a reset link.
+        If you have lost your password, ask someone with admin — this app cannot send you a reset link.
       </p>
     </section>
   )
@@ -189,6 +192,9 @@ export const signInOutcome = (outcome: string | null, ref: string | null = null)
 
   if (outcome === 'unlinked') {
     return 'No account here is linked to that. Sign in another way, then link it under Your details.'
+  }
+  if (outcome === 'address-taken') {
+    return 'There is already an account with that address. Sign in with your password, then link that provider under Your details.'
   }
   if (outcome === 'misconfigured') {
     return `That sign-in is not set up correctly here. Sign in with your password, and please tell an organiser.${quote}`

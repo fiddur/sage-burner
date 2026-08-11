@@ -20,25 +20,54 @@ describe('what Facebook is asked for', () => {
     // or refused, and which one is not answerable without an unapproved app to try — so the
     // question is kept out of a sign-in entirely by never naming one unasked.
     expect(providerShapes.facebook.profile(ASKED)).toContain('link')
-    expect(providerShapes.facebook.scope(ASKED)).toBe('public_profile,user_link')
+    expect(providerShapes.facebook.scope(ASKED)).toBe('public_profile,email,user_link')
 
     expect(providerShapes.facebook.profile(NOT_ASKED)).not.toContain('link')
-    expect(providerShapes.facebook.scope(NOT_ASKED)).toBe('public_profile')
+    expect(providerShapes.facebook.scope(NOT_ASKED)).toBe('public_profile,email')
   })
 
   it('asks for the id and the picture either way', () => {
     // The passing sibling: the setting adds a field rather than replacing what was there, and
     // an installation that never turns it on keeps the sign-in it had.
     for (const asks of [ASKED, NOT_ASKED]) {
-      expect(providerShapes.facebook.profile(asks)).toContain('fields=id,picture.width(256).height(256)')
+      expect(providerShapes.facebook.profile(asks)).toContain(
+        'fields=id,name,email,picture.width(256).height(256)',
+      )
     }
   })
 
   it('leaves Discord with nothing to be asked, since it has no profile URL to answer', () => {
     // Its two take no argument at all, and `satisfies ProviderShape` keeps that a compile error
     // rather than a runtime shrug — so a flag cannot quietly start meaning something here.
-    expect(providerShapes.discord.scope()).toBe('identify')
+    expect(providerShapes.discord.scope()).toBe('identify email')
     expect(providerShapes.discord.profile()).toBe('https://discord.com/api/users/@me')
+  })
+
+  it('asks both for an address, since signing up is signing in now', () => {
+    // An account is keyed by one, so an identity with no address to offer cannot make one.
+    expect(providerShapes.discord.scope()).toContain('email')
+    expect(providerShapes.facebook.scope(NOT_ASKED)).toContain('email')
+    expect(providerShapes.facebook.profile(NOT_ASKED)).toContain('email')
+  })
+
+  it('takes Discord’s address only where Discord says it is verified', () => {
+    // An unverified one is a string somebody typed into the provider, and taking it as a login
+    // identity would let a stranger claim an address they do not hold.
+    expect(
+      providerShapes.discord.read({ id: '1', username: 'wren', email: 'wren@example.org', verified: true }),
+    ).toMatchObject({ email: 'wren@example.org' })
+    expect(
+      providerShapes.discord.read({ id: '1', username: 'wren', email: 'wren@example.org', verified: false })
+        ?.email,
+    ).toBeUndefined()
+    expect(providerShapes.discord.read({ id: '1', username: 'wren' })?.email).toBeUndefined()
+  })
+
+  it('takes Facebook’s address as given, which is the only signal it offers', () => {
+    expect(providerShapes.facebook.read({ id: '1', email: 'wren@example.org' })).toMatchObject({
+      email: 'wren@example.org',
+    })
+    expect(providerShapes.facebook.read({ id: '1' })?.email).toBeUndefined()
   })
 
   it('puts the scope it was given into the authorize URL', () => {
@@ -51,7 +80,7 @@ describe('what Facebook is asked for', () => {
       }),
     )
 
-    expect(to.searchParams.get('scope')).toBe('public_profile,user_link')
+    expect(to.searchParams.get('scope')).toBe('public_profile,email,user_link')
   })
 })
 

@@ -88,6 +88,7 @@ export const notificationCategories = [
   'lead_role_filled',
   'new_version',
   'application',
+  'application_news',
 ] as const
 export type NotificationCategory = (typeof notificationCategories)[number]
 
@@ -130,6 +131,7 @@ export const notificationCategoryInfo = {
   lead_role_filled: { label: 'Somebody takes the lead of a role', on: false, about: 'else' },
   new_version: { label: 'A new version of the app is out', on: false, about: 'else' },
   application: { label: 'Somebody applies to join', on: true, about: 'admin' },
+  application_news: { label: 'News about your application', on: true, about: 'you' },
 } as const satisfies Record<NotificationCategory, NotificationCategoryInfo>
 
 export const notifiesByDefault = (category: NotificationCategory): boolean =>
