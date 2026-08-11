@@ -66,6 +66,7 @@ export const installation = sqliteTable(
   {
     id: text('id').notNull(),
     title: text('title').notNull(),
+    map_url: text('map_url'),
     vapid_public_key: text('vapid_public_key'),
     vapid_private_key: text('vapid_private_key'),
     last_build_sha: text('last_build_sha'),

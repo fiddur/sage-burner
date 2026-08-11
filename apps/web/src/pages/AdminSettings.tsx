@@ -5,6 +5,7 @@ import type { ApiClient } from '../api/client.ts'
 import type { BannerApi } from '../components/BannerField.tsx'
 import type { IconApi } from '../components/IconField.tsx'
 import type { MailApi } from '../components/MailField.tsx'
+import type { MapApi } from '../components/MapField.tsx'
 import type { OauthApi } from '../components/OauthField.tsx'
 
 import { BannerField } from '../components/BannerField.tsx'
@@ -12,6 +13,7 @@ import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { IconField } from '../components/IconField.tsx'
 import { MailField } from '../components/MailField.tsx'
+import { MapField } from '../components/MapField.tsx'
 import { OauthField } from '../components/OauthField.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
 import { useSetInstallationTitle } from '../installation.tsx'
@@ -21,6 +23,7 @@ import { isAdmin, useViewer } from '../viewer.tsx'
 export type AdminSettingsApi = BannerApi &
   IconApi &
   MailApi &
+  MapApi &
   OauthApi &
   Pick<ApiClient, 'getInstallation' | 'updateInstallation'>
 
@@ -100,6 +103,7 @@ export const AdminSettings = ({ api }: { api: AdminSettingsApi }) => {
       )}
 
       {/* Outside the form: these save on choosing a file, not on submit. */}
+      {loaded.status === 'ready' && <MapField api={api} />}
       {loaded.status === 'ready' && <IconField api={api} />}
       {loaded.status === 'ready' && <BannerField api={api} />}
       {loaded.status === 'ready' && <MailField api={api} />}

@@ -9,6 +9,10 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-11
 
+- **A link to the map of the area, in the ☰ menu.** Whoever organises pastes the address of the
+  map they already keep under ⚙️ → Settings, and everybody signed in finds _Map of area_ in the
+  menu; it opens where the map lives. With nothing pasted there is no entry at all.
+
 - **Writing anything now has a small toolbar: bold, italic, a link, a list.** It writes the
   markdown for you, so nobody has to know what `**` means — and if you never press any of it, plain
   words are still plain words. `Ctrl`+`B` and `Ctrl`+`I` do the same on a keyboard. The Write and

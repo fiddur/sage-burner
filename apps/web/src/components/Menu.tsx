@@ -61,8 +61,19 @@ export const Menu = ({ pages }: { pages: readonly NavPage[] }) => {
           <div class="menu-backdrop" onPointerDown={close} />
           <nav id="menu-drawer" ref={drawer} class="menu-drawer" aria-label="More">
             {pages.map((page) => (
-              <a key={page.href} class="menu-entry" href={page.href} onClick={() => setOpen(false)}>
+              <a
+                key={page.href}
+                class="menu-entry"
+                href={page.href}
+                {...(page.away === true ? { rel: 'noreferrer noopener', target: '_blank' } : {})}
+                onClick={() => setOpen(false)}
+              >
                 <span aria-hidden="true">{page.icon}</span> {page.label}
+                {page.away === true && (
+                  <span class="menu-away" aria-label="opens elsewhere">
+                    ↗
+                  </span>
+                )}
               </a>
             ))}
 

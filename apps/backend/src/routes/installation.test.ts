@@ -175,3 +175,92 @@ describe('what this installation calls itself', () => {
     ).toThrow()
   })
 })
+
+describe('the link to the map of the area', () => {
+  const readMap = (server: FastifyInstance, cookie?: string) =>
+    server.inject({ method: 'GET', url: '/api/map', headers: cookie === undefined ? {} : { cookie } })
+
+  const setMap = (server: FastifyInstance, cookie: string | undefined, payload: Record<string, unknown>) =>
+    server.inject({
+      method: 'PUT',
+      url: '/api/admin/map',
+      headers: cookie === undefined ? {} : { cookie },
+      payload,
+    })
+
+  const MAP = 'https://maps.example.org/the-field'
+
+  it('is nothing until an admin sets one', async () => {
+    const server = await build()
+    const member = await givenAccount(['member'])
+
+    expect((await readMap(server, member.cookie)).json().map.url).toBeNull()
+  })
+
+  it('is set by an admin and read by any approved member', async () => {
+    const server = await build()
+    const admin = await givenAccount(['admin'])
+    const member = await givenAccount(['member'])
+
+    const written = await setMap(server, admin.cookie, { url: MAP })
+
+    expect(written.statusCode).toBe(200)
+    expect(written.json().map.url).toBe(MAP)
+    expect((await readMap(server, member.cookie)).json().map.url).toBe(MAP)
+  })
+
+  it('is not on the public read, because where the gathering is is not a visitor’s to know', async () => {
+    const server = await build()
+    const admin = await givenAccount(['admin'])
+    await setMap(server, admin.cookie, { url: MAP })
+
+    const public_read = await readTitle(server)
+
+    expect(public_read.statusCode).toBe(200)
+    expect(JSON.stringify(public_read.json())).not.toContain('maps.example.org')
+  })
+
+  it('is refused to somebody signed out and to somebody with no role', async () => {
+    const server = await build()
+    const nobody = await givenAccount([])
+
+    expect((await readMap(server)).statusCode).toBe(401)
+    expect((await readMap(server, nobody.cookie)).statusCode).toBe(403)
+  })
+
+  it('is an admin’s to set, and nobody else’s', async () => {
+    const server = await build()
+    const member = await givenAccount(['member'])
+
+    expect((await setMap(server, undefined, { url: MAP })).statusCode).toBe(401)
+    expect((await setMap(server, member.cookie, { url: MAP })).statusCode).toBe(403)
+  })
+
+  it('takes it away again when the address is cleared', async () => {
+    const server = await build()
+    const admin = await givenAccount(['admin'])
+    await setMap(server, admin.cookie, { url: MAP })
+
+    const cleared = await setMap(server, admin.cookie, { url: null })
+
+    expect(cleared.json().map.url).toBeNull()
+  })
+
+  it('refuses anything a browser should not be sent to', async () => {
+    const server = await build()
+    const admin = await givenAccount(['admin'])
+
+    for (const url of ['javascript:alert(1)', 'http://maps.example.org', 'maps.example.org', '']) {
+      expect((await setMap(server, admin.cookie, { url })).statusCode, url).toBe(400)
+    }
+  })
+
+  it('trims the address rather than storing the spaces', async () => {
+    const server = await build()
+    const admin = await givenAccount(['admin'])
+
+    await setMap(server, admin.cookie, { url: `  ${MAP}  ` })
+
+    expect((await readMap(server, admin.cookie)).json().map.url).toBe(MAP)
+  })
+})

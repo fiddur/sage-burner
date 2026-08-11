@@ -784,6 +784,35 @@ the software's name is still what the tab says for a moment. Until the fetch
 lands the header renders no name at all, rather than the software's — showing it
 and then replacing it is what would look like a bug.
 
+### The map of the area
+
+Whoever runs a gathering already keeps a map of the site somewhere, with the sauna and the
+kitchen and the parking marked out. This links to it and nothing more (#315): no embed, no map
+of our own.
+
+**Link, not embed**, decided rather than defaulted. An `<iframe>` would need `frame-src` opened
+to a map host in the CSP and would put every member's browser in touch with that host on page
+load, which is exactly what "no external services are required to run it" rules out. A map of
+our own would need a picture, pin coordinates and an editor for both, to reproduce something
+that already exists and is already maintained where it is. A link costs one nullable column.
+
+**Admin-set, global, and absent until it is set.** It is one column on `installation` rather
+than one per `event` — one site, one map, and the burns are all at it — edited under Organise →
+**Settings**. Where nobody has set one there is no menu entry at all, rather than an entry
+leading nowhere.
+
+**In the ☰ menu**, which is where the things that are not a burn's pages live, marked `↗`
+because it is the only entry in the drawer that leaves the app. `rel="noreferrer noopener"`,
+like every other outward link here.
+
+**It is not on the public read.** `GET /api/installation` answers signed-out visitors — it is
+what draws the header — and where the gathering physically is is not a visitor's to know. So
+the link has a route of its own, `GET /api/map` behind `requireApproved`, and the public
+projection selects its columns by name and therefore cannot leak this one by growing. Writing is
+`PUT /api/admin/map`, admin by the prefix rather than by a check inside it. `null` is how the
+wire says "there is none", both ways, so an empty box and a cleared setting are one thing rather
+than two.
+
 ### The app icon
 
 Organise → **Settings** also takes the icon an installed copy wears on a home
