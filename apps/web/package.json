@@ -15,15 +15,15 @@
   "dependencies": {
     "@sage-burner/shared": "workspace:*",
     "@simplewebauthn/browser": "^13.3.0",
-    "marked": "^18.0.7",
-    "preact": "^10.29.7",
+    "marked": "^18.0.9",
+    "preact": "^10.29.8",
     "preact-iso": "^2.12.1"
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.10.6",
     "@testing-library/preact": "^3.2.4",
-    "happy-dom": "^20.11.1",
-    "vite": "^8.1.5",
+    "happy-dom": "^20.11.2",
+    "vite": "^8.2.1",
     "vitest": "^4"
   }
 }
