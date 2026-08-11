@@ -1542,6 +1542,11 @@ describe('the one-card-per-person-per-burn backfill', () => {
     aCard.run('t-cai', 'e-1', 'attendance', 'att-cai', 'a-cai', 'Cai')
     aCard.run('t-song', null, 'song', 'song-1', null, 'Fire in the sky')
     aCard.run('t-other-song', null, 'song', 'song-2', null, 'Dust in my boots')
+    // The card no person can be recovered for: its stay is gone and the app wrote its only
+    // entry, so there is no author to read a subject out of. It shares `(NULL, 'e-1')` with
+    // any other such card, which is the pair the unique index has to tolerate.
+    aCard.run('t-unknown', 'e-1', 'attendance', 'att-unknown', null, 'Somebody')
+    aCard.run('t-unknown-too', 'e-1', 'attendance', 'att-unknown-2', null, 'Somebody else')
 
     const anEntry = db.client.prepare(
       'insert into thread_entry (id, thread_id, kind, seq, author_account_id, body, created_at) values (?, ?, ?, ?, ?, ?, ?)',
@@ -1554,6 +1559,8 @@ describe('the one-card-per-person-per-burn backfill', () => {
     anEntry.run('x-bea-4', 't-bea-back', 'comment', 2, 'a-cai', 'again!', '2026-07-06T10:00:00Z')
     anEntry.run('x-cai-1', 't-cai', 'joined', 1, 'a-cai', 'is coming', '2026-07-07T10:00:00Z')
     anEntry.run('x-song-1', 't-song', 'added', 1, 'a-cai', 'put it in the book', '2026-07-08T10:00:00Z')
+    anEntry.run('x-unknown', 't-unknown', 'scheduled', 1, null, 'moved it', '2026-07-09T10:00:00Z')
+    anEntry.run('x-unknown-2', 't-unknown-too', 'scheduled', 1, null, 'moved it', '2026-07-09T11:00:00Z')
   }
 
   const beforeTheUniqueIndex = () => {
@@ -1641,8 +1648,9 @@ describe('the one-card-per-person-per-burn backfill', () => {
   })
 
   it('leaves every thread that is nobody’s in particular, however many there are', () => {
-    // NULLs stay distinct in a SQLite unique index, which is what lets the songbook's
-    // threads — and a card no person could be recovered for — coexist under it.
+    // NULLs stay distinct in a SQLite unique index, which is what lets the songbook's threads
+    // coexist under it — and two cards at one burn that no person could be recovered for, which
+    // is the pair that shares `(NULL, 'e-1')`.
     const fresh = beforeTheUniqueIndex()
     try {
       seed(fresh)
@@ -1651,6 +1659,8 @@ describe('the one-card-per-person-per-burn backfill', () => {
 
       expect(subjectOf(fresh, 't-song')).toBeNull()
       expect(subjectOf(fresh, 't-other-song')).toBeNull()
+      expect(subjectOf(fresh, 't-unknown')).toBeNull()
+      expect(subjectOf(fresh, 't-unknown-too')).toBeNull()
       expect(entriesOn(fresh, 't-song')).toEqual(['x-song-1@1'])
     } finally {
       fresh.close()

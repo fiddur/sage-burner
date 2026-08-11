@@ -1,4 +1,4 @@
--- #463's backfill read `attendance` by `entity_id`, so a card for somebody who had already
+-- #449's backfill read `attendance` by `entity_id`, so a card for somebody who had already
 -- left before it ran found no row and kept `subject_account_id` NULL — the frozen title, no
 -- link, and a rejoin opening a second card beside it. The person is still recoverable from
 -- whoever wrote the card's first entry, which on an attendance card is the arrival itself.
@@ -10,7 +10,7 @@ SET `subject_account_id` = (
   LIMIT 1
 )
 WHERE `entity_type` = 'attendance' AND `subject_account_id` IS NULL;--> statement-breakpoint
--- Somebody who left and rejoined before #463 now has two cards for one burn, and the unique
+-- Somebody who left and rejoined before #449 now has two cards for one burn, and the unique
 -- index below is what stops that recurring. The one whose stay still exists keeps the pair;
 -- where neither stay exists either card is as good, so the tie is broken by id to keep the
 -- choice the same for every entry being moved.

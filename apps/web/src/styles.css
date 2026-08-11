@@ -1668,7 +1668,7 @@ a.person-badge:focus-visible span:last-child {
 
 /* A chip, not a button-shaped button: it is a label that happens to be pressable, and
    it sits under a sentence rather than in a row of controls. Dashed until it is on, so
-   the row itself says what is being filtered — which is #472's whole signal. */
+   the row itself says what is being filtered. */
 .chip {
   border: 1px dashed var(--line);
   border-radius: 1rem;

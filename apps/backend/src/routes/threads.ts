@@ -19,7 +19,6 @@ import {
   mentionedAccounts,
   profilePage,
   songPage,
-  threadEntityTypes,
   withMentionNames,
 } from '@sage-burner/shared'
 import { and, asc, count, desc, eq, inArray, lte, max, ne, sql } from 'drizzle-orm'
@@ -216,7 +215,7 @@ export const cardEntry = async (
 export const recentThreads = async (
   db: Database,
   limit: number,
-  entities: readonly ThreadEntityType[] = threadEntityTypes,
+  entities: readonly ThreadEntityType[],
 ): Promise<{ id: string; last_at: string; entry_count: number }[]> => {
   const rows = await db
     .select({
@@ -238,11 +237,6 @@ export const recentThreads = async (
 
 type Hearts = ReadonlyMap<string, Supporter[]>
 
-/**
- * A dream's heart stays `session_support` — the heart on its card and the heart on its schedule
- * chip are one heart, and two like-buttons with different meanings on one dream would be worse
- * than none (#479). Everything else is account-keyed `thread_support`.
- */
 const heartsFor = async (db: Database, ids: readonly string[]): Promise<Hearts> => {
   const rows = await db
     .select({
@@ -283,12 +277,6 @@ const heartsFor = async (db: Database, ids: readonly string[]): Promise<Hearts> 
   return held
 }
 
-/**
- * The threads the viewer is already a participant of, by the same rules `participantsOf` uses one
- * thread at a time — so the checkbox that shows the effective state cannot say one thing while
- * `tellAbout` does another (#480). Three queries for a page rather than three per card; the rest
- * of the rules read off columns `readThreads` has already selected.
- */
 const participantThreads = async (
   db: Database,
   ids: readonly string[],
@@ -798,11 +786,6 @@ export const registerThreadRoutes = (
     },
   )
 
-  /**
-   * One route for every kind of card, dispatching on what backs the heart, so the web has one
-   * call and a dream's card cannot come to mean something different from its chip (#479).
-   * Attending is what a dream's heart asks for; everything else asks only to be approved.
-   */
   const heart = async (
     request: FastifyRequest<{ Params: { id: string } }>,
     reply: FastifyReply,

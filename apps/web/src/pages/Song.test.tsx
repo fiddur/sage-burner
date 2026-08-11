@@ -131,6 +131,13 @@ describe('a song’s page', () => {
     expect(screen.queryByText(/^capo /)).toBeNull()
   })
 
+  it('says nothing about a capo of 0, which is the absence rather than a value', async () => {
+    renderPage(stub({}, aSong({ capo: 0 })))
+
+    await screen.findByRole('heading', { name: /Fire in the sky/ })
+    expect(screen.queryByText(/capo/)).toBeNull()
+  })
+
   it('names what it is filed under', async () => {
     renderPage(stub({}, aSong({ category_ids: ['c-1'] })))
 

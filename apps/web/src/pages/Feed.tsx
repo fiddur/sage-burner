@@ -190,7 +190,7 @@ export const Feed = ({ api }: { api: FeedApi }) => {
         chips={feedKinds.map((kind) => ({ id: kind, label: feedKindLabel[kind] }))}
         lit={lit}
         subject="What to show"
-        onChange={(wanted) => route(feedPage(wanted))}
+        onChange={(wanted) => route(feedPage(wanted, query?.[BURN_PARAM]))}
       />
 
       <ErrorText message={error} />

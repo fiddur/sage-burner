@@ -245,8 +245,6 @@ describe('the link to the map of the area', () => {
   })
 
   it('is asked for only where somebody may read it', () => {
-    // The route is `requireApproved`, so a signed-out visitor's read would be a 401 on
-    // every page load.
     const getMapLink = vi.fn<LayoutApi['getMapLink']>(() => Promise.resolve({ map: { url: MAP } }))
     renderNav({ status: 'signed-out' }, { ...noBell, getMapLink })
 

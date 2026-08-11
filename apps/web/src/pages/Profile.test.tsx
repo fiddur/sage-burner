@@ -86,10 +86,8 @@ const fill = (label: string, value: string) => {
 }
 
 /**
- * The introduction's box, by its exact label.
- *
- * `fill`'s prefix match finds three: `MarkdownField` names its Write and Preview buttons
- * after the field, so "A little about you" is a substring of all of them.
+ * The introduction's box, by its exact label. `fill`'s prefix match finds the toolbar buttons
+ * too: `SyntaxToolbar` names each of them after the field.
  */
 const introduction = () => screen.getByLabelText<HTMLTextAreaElement>('A little about you', { exact: true })
 

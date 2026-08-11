@@ -660,9 +660,6 @@ describe('a conversation about a person', () => {
   })
 
   it('tells them and links to their page after they have stopped coming', async () => {
-    // The card is found by the person now (#449), so a comment on one whose stay is gone has
-    // somebody to tell and somewhere to point — it read `attendance` by `entity_id` until #464
-    // and so did neither.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')

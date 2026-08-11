@@ -745,13 +745,6 @@ describe('somebody’s own card', () => {
 })
 
 describe('the kinds a viewer asks for', () => {
-  /**
-   * Filling the songbook makes the whole page songs for a week; a scheduling run makes it
-   * dreams for an evening. The lens is the server's because the page reads the newest fifty:
-   * during a spree all fifty are one kind, so hiding them in the browser would show an empty
-   * Dreams while dream cards sat just past the window (#472).
-   */
-
   const givenDreamCard = async (title: string, created_at: string) => {
     const id = randomUUID()
     await db().insert(thread).values({
