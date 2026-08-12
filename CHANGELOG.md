@@ -18,6 +18,15 @@ under today's heading, and make a new heading when there is none.
   generated on a burn from last year — the last of these quietly wrote a whole meal plan into a burn
   that had already happened. Everything about a finished burn is a record now; reading it still works.
 
+- **A group link that closes in the past says so.** Picking a date already gone answered
+  "Request failed (400)." with no clue which field was wrong. The date picker now offers nothing
+  before today, the form says what is wrong with it before sending, and a refusal from the server
+  names the closing date.
+
+- **A group link cannot be filled past its cap.** A rush of people redeeming the same link at once
+  could all slip past the count and take it a few over. It is checked again as each account is
+  written, which is the check that decides.
+
 - **Applying no longer asks for an email twice.** The address you signed up with is the one we write
   to, so the field is optional: fill it in only if something else would reach you better. It used to
   refuse to send without one, blank, while the account already had it.

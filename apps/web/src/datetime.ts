@@ -17,6 +17,10 @@ export const fromLocalInput = (local: string): string | null => {
   return Number.isNaN(at.getTime()) ? null : at.toISOString()
 }
 
+/** Today as a `<input type="date">` reads one, in the reader's own timezone rather than UTC. */
+export const todayForInput = (now: Date = new Date()): string =>
+  `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const
 
 export const dayName = (date: string, length: 'long' | 'short' = 'long'): string => {

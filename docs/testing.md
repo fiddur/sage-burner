@@ -79,6 +79,8 @@ phone" means 360px.
       SMTP is configured.
 - [ ] The new applicant, signed in, reaches their own application and their bell
       and nothing else — no Feed, no Members.
+- [ ] The group-link form offers no closing date before today, and says so rather than
+      answering "Request failed" if one is typed anyway.
 - [ ] Mint a group link under ⚙️ → Invites with a closing date and a cap of 2.
       Redeem it twice with different addresses: both get in, where a direct invite
       refuses the second. The list shows both names against the link and 2 of 2, and

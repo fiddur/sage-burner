@@ -304,6 +304,48 @@ describe('signing up from an invite link through a provider', () => {
     expect(await db().select().from(accountRole)).toEqual([])
   })
 
+  it('makes no member of a link that has been revoked', async () => {
+    const server = await build()
+    await givenProvider()
+    const token = await givenLink()
+    await db().update(inviteToken).set({ revoked_at: NOW.toISOString() })
+
+    const back = await signInFromInvite(server, token, { email: 'wren@example.org' })
+
+    expect(back.headers.location).toBe('/login?from=refused')
+    expect(await db().select().from(accountRole)).toEqual([])
+  })
+
+  it('makes no member of a group link with no room left on it', async () => {
+    const server = await build()
+    await givenProvider()
+    const token = await givenLink()
+    const [link] = await db().select().from(inviteToken)
+    await db().update(inviteToken).set({ max_uses: 1 })
+    const first = randomUUID()
+    await db()
+      .insert(account)
+      .values({
+        id: first,
+        email: `${first}@example.org`,
+        password_hash: null,
+        created_at: NOW.toISOString(),
+      })
+    await db()
+      .insert(inviteRedemption)
+      .values({
+        id: randomUUID(),
+        token_id: link?.id ?? '',
+        account_id: first,
+        redeemed_at: NOW.toISOString(),
+      })
+
+    const back = await signInFromInvite(server, token, { email: 'wren@example.org' })
+
+    expect(back.headers.location).toBe('/login?from=refused')
+    expect(await db().select().from(account).where(eq(account.email, 'wren@example.org'))).toEqual([])
+  })
+
   it('makes no member of a token nobody minted', async () => {
     const server = await build()
     await givenProvider()

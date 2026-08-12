@@ -1,6 +1,18 @@
 import { describe, expect, it } from 'vitest'
 
-import { dayName, fromLocalInput, localDay, shortDayOf, toLocalInput } from './datetime.ts'
+import { dayName, fromLocalInput, localDay, shortDayOf, todayForInput, toLocalInput } from './datetime.ts'
+
+describe('today as a date input reads it', () => {
+  it('is the reader’s own day, not UTC’s — the two differ for two hours every night here', () => {
+    // `vite.config.ts` pins TZ=Europe/Stockholm, where 00:30 local on the 2nd is still the 1st
+    // in UTC. A `min` taken from the UTC day would refuse a date the reader can see is tomorrow.
+    expect(todayForInput(new Date('2026-08-01T22:30:00.000Z'))).toBe('2026-08-02')
+  })
+
+  it('pads a single-digit month and day, which is what the input expects', () => {
+    expect(todayForInput(new Date('2026-01-05T12:00:00.000Z'))).toBe('2026-01-05')
+  })
+})
 
 describe('datetime-local conversion', () => {
   it('round-trips an instant through the input and back', () => {
