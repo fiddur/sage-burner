@@ -18,6 +18,11 @@ under today's heading, and make a new heading when there is none.
 - **"You need to join this burn" says where.** Inside an opened dream or a meal dialog the message
   arrived without its link to Your details — which is exactly where the button that produces it is.
 
+- **A song can say whose it is.** There is a field for the artist now, beside the words rather than
+  buried in them: it shows next to the title in the songbook and under it on the song's own page,
+  and the book can be listed by artist instead of by title — which puts one songwriter's songs
+  together. Songs nobody has named come last.
+
 - **The bell stops badging what you have already looked at.** A notification only counted as read
   if you opened the bell or the notifications page, so following "What's new" on the redeploy bar,
   or a link out of a push message, left it sitting there unread. Arriving at what a notification

@@ -216,6 +216,25 @@ describe('putting a song in the book', () => {
     expect(made.statusCode).toBe(400)
   })
 
+  it('takes whose song it is, and answers null where nobody has said', async () => {
+    const server = await build()
+    const ada = await givenAccount('Ada')
+
+    const named = await add(server, ada.cookie, { title: 'Fire', artist: 'Tracy Chapman' })
+    const nameless = await add(server, ada.cookie, { title: 'Ashes' })
+
+    expect(named.json().song.artist).toBe('Tracy Chapman')
+    expect(nameless.json().song.artist).toBeNull()
+  })
+
+  it('refuses a blank artist, null being how nothing said is spelled', async () => {
+    const server = await build()
+    const ada = await givenAccount('Ada')
+
+    expect((await add(server, ada.cookie, { title: 'Fire', artist: '   ' })).statusCode).toBe(400)
+    expect((await add(server, ada.cookie, { title: 'Fire', artist: null })).statusCode).toBe(201)
+  })
+
   it('refuses a capo off the neck', async () => {
     const server = await build()
     const ada = await givenAccount('Ada')
@@ -268,6 +287,38 @@ describe('editing a song', () => {
 
     expect(saved.statusCode).toBe(200)
     expect(saved.json().song.body).toBe(CHORUS)
+  })
+
+  it('says whose song it is on the list as well, so it can be sorted on', async () => {
+    const server = await build()
+    const ada = await givenAccount('Ada')
+    await add(server, ada.cookie, { title: 'Fire', artist: 'Tracy Chapman' })
+
+    const [listed] = (await book(server, ada.cookie)).songs
+
+    expect(listed?.artist).toBe('Tracy Chapman')
+  })
+
+  it('takes an artist off again, which is what a blank field means', async () => {
+    const server = await build()
+    const ada = await givenAccount('Ada')
+    const made = await add(server, ada.cookie, { title: 'Fire', artist: 'Tracy Chapman' })
+
+    const saved = await edit(server, ada.cookie, made.json().song.id, { artist: null })
+
+    expect(saved.statusCode).toBe(200)
+    expect(saved.json().song.artist).toBeNull()
+  })
+
+  it('says on the card that somebody named the artist, not that they renamed it', async () => {
+    const server = await build()
+    const ada = await givenAccount('Ada')
+    const made = await add(server, ada.cookie, { title: 'Fire' })
+
+    await edit(server, ada.cookie, made.json().song.id, { artist: 'Tracy Chapman' })
+
+    const { thread } = (await read(server, ada.cookie, made.json().song.id)).json()
+    expect(thread.entries.at(-1).body).toBe('said whose song it is')
   })
 
   it('refuses a write held against a version somebody else has moved past', async () => {
