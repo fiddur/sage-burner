@@ -9,6 +9,16 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-12
 
+- **A link the whole group can use.** Under ⚙️ → Invites there is now a link for a closed group —
+  posted inside a Facebook group or a Discord server only its members can read, so the link itself
+  is the proof of belonging. It works until the date you set, optionally for a limited number of
+  people, and the list shows who came in on it. Withdrawing it closes the door without touching
+  anybody who already walked through.
+
+- **The applications page says how somebody signed up.** An application from a Facebook or Discord
+  signup used to look exactly like any other. It now says which one, with the name they use there —
+  and a link to their profile where the provider gives one.
+
 - **A verse break made of spaces no longer vanishes on a phone.** If the blank line between two
   verses had spaces on it, it disappeared on a narrow screen and welded the two verses together —
   while reading correctly on a laptop.

@@ -20,6 +20,7 @@ import {
   application,
   attendance,
   event,
+  inviteRedemption,
   inviteToken,
   notification,
   notificationSetting,
@@ -86,6 +87,9 @@ const givenInvite = async (
     used_at?: string | null
     applicantName?: string
     applicantEmail?: string
+    kind?: 'single' | 'group'
+    max_uses?: number | null
+    revoked_at?: string | null
   } = {},
 ) => {
   const token = `token-${randomUUID()}`
@@ -115,6 +119,10 @@ const givenInvite = async (
       id: randomUUID(),
       token_hash: createHash('sha256').update(token).digest('hex'),
       application_id: applicationId,
+      kind: over.kind ?? 'single',
+      label: over.kind === 'group' ? 'The Facebook group' : null,
+      max_uses: over.max_uses ?? null,
+      revoked_at: over.revoked_at ?? null,
       expires_at: over.expires_at ?? '2026-08-01T00:00:00.000Z',
       used_at: over.used_at ?? null,
       created_by: admin,
@@ -171,6 +179,66 @@ const redeem = (
   body: Record<string, unknown> = applicant,
 ): Promise<LightMyRequestResponse> =>
   server.inject({ method: 'POST', url: `/api/invites/${encodeURIComponent(token)}/redeem`, payload: body })
+
+describe('a group link, which many people come in on', () => {
+  it('is still live after somebody has used it, which is the whole point', async () => {
+    const server = await build()
+    const token = await givenInvite({ kind: 'group' })
+
+    expect((await redeem(server, token)).statusCode).toBe(201)
+    expect((await redeem(server, token, { ...applicant, email: 'bo@example.org' })).statusCode).toBe(201)
+  })
+
+  it('leaves invite_token_id null and keeps the arrival in its own list', async () => {
+    const server = await build()
+    const token = await givenInvite({ kind: 'group' })
+
+    await redeem(server, token)
+
+    const [made] = await db().select().from(account).where(eq(account.email, applicant.email))
+    expect(made?.invite_token_id).toBeNull()
+
+    const arrivals = await db().select().from(inviteRedemption)
+    expect(arrivals).toHaveLength(1)
+    expect(arrivals[0]?.account_id).toBe(made?.id)
+  })
+
+  it('refuses past its cap, the door closing on the count rather than on one use', async () => {
+    const server = await build()
+    const token = await givenInvite({ kind: 'group', max_uses: 2 })
+
+    expect((await redeem(server, token)).statusCode).toBe(201)
+    expect((await redeem(server, token, { ...applicant, email: 'b@example.org' })).statusCode).toBe(201)
+    expect((await redeem(server, token, { ...applicant, email: 'c@example.org' })).statusCode).toBe(409)
+  })
+
+  it('refuses once revoked, which is how a group link is taken back', async () => {
+    const server = await build()
+    const token = await givenInvite({ kind: 'group', revoked_at: NOW })
+
+    expect((await redeem(server, token)).statusCode).toBe(409)
+  })
+
+  it('says it is full rather than outstanding before anybody types a password', async () => {
+    const server = await build()
+    const token = await givenInvite({ kind: 'group', max_uses: 1 })
+
+    await redeem(server, token)
+
+    const state = await server.inject({ method: 'GET', url: `/api/invites/${token}` })
+    expect(state.json().status).toBe('full')
+  })
+
+  it('never stamps used_at, which would end a link meant to stay open', async () => {
+    const server = await build()
+    const token = await givenInvite({ kind: 'group' })
+
+    await redeem(server, token)
+
+    const [row] = await db().select().from(inviteToken)
+    expect(row?.used_at).toBeNull()
+  })
+})
 
 describe('how often one client may try a token', () => {
   it('refuses past its allowance, and says how long to wait', async () => {

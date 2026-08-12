@@ -1011,6 +1011,12 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
     createInvite: (body: BodyOf<'createInvite'> = {}) =>
       request<InviteResponse>(apiRoutes.createInvite.path(), { method: apiRoutes.createInvite.method, body }),
 
+    createGroupInvite: (body: BodyOf<'createGroupInvite'>) =>
+      request<InviteResponse>(apiRoutes.createGroupInvite.path(), {
+        method: apiRoutes.createGroupInvite.method,
+        body,
+      }),
+
     revokeInvite: (id: string) =>
       request<undefined>(apiRoutes.revokeInvite.path(id), { method: apiRoutes.revokeInvite.method }),
 

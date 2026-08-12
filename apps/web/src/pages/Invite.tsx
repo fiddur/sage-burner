@@ -230,6 +230,8 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
     const explanation = {
       expired: 'This invitation has expired. Ask someone with admin for a fresh one.',
       used: 'This invitation has already been used. If that was you, log in instead.',
+      revoked: 'This invitation has been withdrawn. Ask someone with admin for a fresh one.',
+      full: 'This invitation has been used as many times as it allows. Ask someone with admin.',
       unknown: 'We do not recognise this invitation link. Check you copied all of it.',
     }[loaded.data.state.status]
 

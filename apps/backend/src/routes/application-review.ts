@@ -1,4 +1,5 @@
 import type {
+  ApplicantIdentity,
   ApplicationDecisionResponse,
   ApplicationMessagesResponse,
   ApplicationsResponse,
@@ -18,7 +19,15 @@ import type { Notifier } from '../push/notify.ts'
 
 import { viewerFor } from '../auth/viewer.ts'
 import { whyNothingWritten } from '../db/refusals.ts'
-import { accountRole, application, installation, INSTALLATION_ID, inviteToken } from '../db/schema.ts'
+import {
+  account,
+  accountIdentity,
+  accountRole,
+  application,
+  installation,
+  INSTALLATION_ID,
+  inviteToken,
+} from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { defaultExpiry, mintToken } from '../invites.ts'
 import { NO_ORIGIN, post } from '../mail/mail.ts'
@@ -148,7 +157,29 @@ export const registerApplicationReviewRoutes = (
   app.get(apiRoutes.getApplications.fastify, async (_request, reply) => {
     void noStore(reply)
 
-    const applications = await db.select().from(application).orderBy(desc(application.submitted_at))
+    const rows = await db.select().from(application).orderBy(desc(application.submitted_at))
+
+    // Which door somebody came in through is part of who is asking to join (#513): an admin
+    // vetting against a group they already know is cross-checking exactly this by eye.
+    const identities = await db
+      .select({
+        account_id: accountIdentity.account_id,
+        provider: accountIdentity.provider,
+        name: account.name,
+        profile_url: accountIdentity.profile_url,
+      })
+      .from(accountIdentity)
+      .innerJoin(account, eq(account.id, accountIdentity.account_id))
+
+    const byAccount = new Map<string, ApplicantIdentity[]>()
+    for (const { account_id, ...identity } of identities) {
+      byAccount.set(account_id, [...(byAccount.get(account_id) ?? []), identity])
+    }
+
+    const applications = rows.map((row) => ({
+      ...row,
+      identities: row.account_id === null ? [] : (byAccount.get(row.account_id) ?? []),
+    }))
 
     return { applications } satisfies ApplicationsResponse
   })

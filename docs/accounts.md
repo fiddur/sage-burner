@@ -29,6 +29,58 @@ somebody specific. Applications submitted before this have no account, so approv
 still mints a token: the link is all such an application can offer. Re-issuing for an
 account-first application is refused, since it would be a second account for somebody who has one.
 
+### A group link, where the group is the vetting (#512)
+
+The people in a closed Facebook group or Discord server are already vetted, and since Meta
+removed the Groups API no OAuth scope can ask "is this person in group X". What is still true
+is the possession proof: **a link posted inside the group is readable only by its members**, so
+the link carries the membership.
+
+That kind is `kind: 'group'`, and it is the opposite of every invite before it — redeemable
+until it closes rather than once. Its expiry is **chosen, never defaulted**: an open door is the
+one invite that must be given a closing date. A cap is optional.
+
+**Where the single-use invariant splits.** One account per token is enforced by
+`account_invite_token_idx`, a partial unique index on `account.invite_token_id` — which is
+exactly the invariant a group link must not have. So a group redemption **leaves that column
+null** and records itself in `invite_redemption` instead: one link, many accounts, and the list
+an admin audits. `invite_redemption.account_id` is unique across the table, so nobody arrives on
+two links whichever kind they used. The index is untouched, still guarding the kinds it was
+written for, rather than loosened to accommodate one it was not.
+
+**The cap is checked once, before the scrypt**, in the same read that decides the status. Two
+arrivals in the same instant could take a link one past its cap. That window is deliberately not
+closed: the in-transaction re-check that would close it is unreachable from any test, and this
+app does not build machinery for races at its size.
+
+**Revoking closes rather than deletes.** A direct invite is a row nobody has used, so
+`DELETE /api/admin/invites/:id` removes it. A group link has accounts behind it and rows pointing
+at it, so the same route stamps `revoked_at` instead — the door shuts, and the record of who came
+in through it stays. `inviteStatusOf` grew `revoked` and `full` for the two ways a group link ends
+that a single-use one has no notion of.
+
+**No table-level CHECK enforces the two shapes.** SQLite cannot add one through `ALTER TABLE`, and
+rebuilding `invite_token` would mean dropping a table two others hold foreign keys into. The rules
+— a single-use token carries no cap and no revocation, a group one no application and no `used_at`
+— live where the rows are written, and the route tests are what hold them.
+
+### Which door an applicant came in through (#513)
+
+`GET /api/admin/applications` joins the account's `account_identity` rows, so the review card says
+"via Facebook" or "via Discord" beside the name the provider gave. An admin vetting somebody
+against a community they already know is cross-checking exactly that by eye, and it was the one
+thing the review page did not show.
+
+The link is offered **only where `profile_url` holds one**. Discord has no profile URL to give;
+Facebook's `public_profile` answers an app-scoped id that identifies nobody outside this
+installation's Meta app, so a real link exists only where the app has been approved for
+`user_link`. The provider's name shows beside the form's `applicant_name` where the two differ —
+the form name is what the person typed, the provider name is what their friends would recognise.
+
+The admin's row is its own schema, `adminApplicationSchema`, rather than a field that is sometimes
+present: the applicant's own view of their application has no use for the doors, and a shape that
+carries them optionally is one that goes one reader stale.
+
 - `POST /api/auth/login` — `{ email, password }`. 200 with `{ viewer }` and a
   session cookie, or 401 `invalid_credentials`.
 - `POST /api/auth/logout` — clears the cookie.
