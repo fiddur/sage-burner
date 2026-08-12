@@ -97,11 +97,14 @@ reverse proxies, `TRUST_PROXY`, fail2ban and the upgrade path are in
 
 ## Documentation
 
-The README is the quickstart. Each area's decisions — what it does, and why it
-does it that way rather than the obvious other way — live in `docs/`:
+The README is the quickstart. What the app does, feature by feature, is
+[docs/features.md](./docs/features.md); each area's decisions — what it does,
+and why it does it that way rather than the obvious other way — live in `docs/`:
 
 | Document                                    | What is in it                                                                        |
 | ------------------------------------------- | ------------------------------------------------------------------------------------ |
+| [features.md](./docs/features.md)           | The feature map — everything the app does, one line each                             |
+| [testing.md](./docs/testing.md)             | The tryout protocol: walking a running copy through the features                     |
 | [configuration.md](./docs/configuration.md) | Every environment variable, the database file, migrations                            |
 | [deploying.md](./docs/deploying.md)         | Running it for real: proxy, backups, restore, fail2ban, upgrades                     |
 | [accounts.md](./docs/accounts.md)           | Signing up, applying, invites, sessions, passwords, passkeys, roles                  |
