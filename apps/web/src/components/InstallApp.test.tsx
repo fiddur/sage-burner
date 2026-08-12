@@ -12,14 +12,24 @@ afterEach(() => {
   globalThis.localStorage?.clear()
 })
 
-/** A watch under the test's control, rather than one listening to a real page. */
-const aWatch = (start?: InstallOffer, standalone = false) => {
+/**
+ * A watch under the test's control, rather than one listening to a real page.
+ *
+ * `offersItself` is which browser this is: Chromium has `onbeforeinstallprompt` and makes the
+ * offer itself, Safari and Firefox have neither and are where the instructions belong.
+ */
+const aWatch = ({
+  start,
+  standalone = false,
+  offersItself = false,
+}: { start?: InstallOffer; standalone?: boolean; offersItself?: boolean } = {}) => {
   let offer = start
   const listeners = new Set<() => void>()
   const prompted = vi.fn(() => Promise.resolve(undefined))
 
   const watch: InstallWatch = {
     offer: () => offer,
+    offersItself: () => offersItself,
     standalone: () => standalone,
     onChange: (listener) => {
       listeners.add(listener)
@@ -50,8 +60,14 @@ describe('offering to install the app', () => {
     expect(screen.getByRole('status').textContent).toContain('Add to Home Screen')
   })
 
+  it('says nothing where the browser makes the offer itself and has not yet', () => {
+    render(<InstallApp watch={aWatch({ offersItself: true }).watch} />)
+
+    expect(screen.queryByRole('status')).toBeNull()
+  })
+
   it('says nothing to the installed copy, however it answers being asked', () => {
-    render(<InstallApp watch={aWatch(undefined, true).watch} />)
+    render(<InstallApp watch={aWatch({ standalone: true }).watch} />)
 
     expect(screen.queryByRole('status')).toBeNull()
   })
@@ -94,7 +110,7 @@ describe('offering to install the app', () => {
   })
 
   it('offers once the browser says the site qualifies', async () => {
-    const { watch, offers } = aWatch()
+    const { watch, offers } = aWatch({ offersItself: true })
     render(<InstallApp watch={watch} />)
 
     await act(() => {
@@ -107,7 +123,7 @@ describe('offering to install the app', () => {
   it('shows an offer that arrived before it rendered', () => {
     // The race this exists for: `beforeinstallprompt` fires once, and can fire before
     // any component has mounted. A strip that only listened would never appear.
-    const { watch } = aWatch({ prompt: () => Promise.resolve(undefined) })
+    const { watch } = aWatch({ start: { prompt: () => Promise.resolve(undefined) }, offersItself: true })
 
     render(<InstallApp watch={watch} />)
 
@@ -124,6 +140,7 @@ describe('offering to install the app', () => {
     let asked = 0
     const watch: InstallWatch = {
       offer: () => (++asked === 1 ? undefined : { prompt: () => Promise.resolve(undefined) }),
+      offersItself: () => true,
       standalone: () => false,
       onChange: () => () => undefined,
       taken: () => undefined,
@@ -135,7 +152,7 @@ describe('offering to install the app', () => {
   })
 
   it('opens the browser’s own flow, and spends the offer', async () => {
-    const { watch, offers, prompted } = aWatch()
+    const { watch, offers, prompted } = aWatch({ offersItself: true })
     render(<InstallApp watch={watch} />)
     await act(() => {
       offers()
@@ -148,10 +165,7 @@ describe('offering to install the app', () => {
   })
 
   it('goes quiet after the prompt rather than telling somebody to do it by hand', async () => {
-    // The whole strip, not only the button: a spent offer is not "this browser has no API",
-    // and the instructions came up on top of Chromium's own dialog and stayed there — a tab's
-    // display mode is `browser` however that dialog was answered.
-    const { watch, offers } = aWatch()
+    const { watch, offers } = aWatch({ offersItself: true })
     render(<InstallApp watch={watch} />)
     await act(() => {
       offers()
@@ -164,7 +178,7 @@ describe('offering to install the app', () => {
   })
 
   it('takes no for an answer, and remembers it', async () => {
-    const { watch, offers } = aWatch()
+    const { watch, offers } = aWatch({ offersItself: true })
     render(<InstallApp watch={watch} />)
     await act(() => {
       offers()
@@ -184,7 +198,7 @@ describe('offering to install the app', () => {
     const store = vi.spyOn(globalThis, 'localStorage', 'get').mockImplementation(() => {
       throw new Error('SecurityError')
     })
-    const { watch } = aWatch({ prompt: () => Promise.resolve(undefined) })
+    const { watch } = aWatch({ start: { prompt: () => Promise.resolve(undefined) }, offersItself: true })
 
     expect(() => render(<InstallApp watch={watch} />)).not.toThrow()
     expect(screen.getByRole('button', { name: 'Install' })).toBeTruthy()
@@ -196,7 +210,7 @@ describe('offering to install the app', () => {
     // The event fires on every load until the app is installed, so a nudge with no
     // memory is a nudge for ever.
     globalThis.localStorage.setItem(DISMISSED_KEY, 'yes')
-    const { watch } = aWatch({ prompt: () => Promise.resolve(undefined) })
+    const { watch } = aWatch({ start: { prompt: () => Promise.resolve(undefined) }, offersItself: true })
 
     render(<InstallApp watch={watch} />)
 
@@ -205,7 +219,7 @@ describe('offering to install the app', () => {
   })
 
   it('goes away when the offer does, which is what installing looks like', async () => {
-    const { watch, offers } = aWatch()
+    const { watch, offers } = aWatch({ offersItself: true })
     render(<InstallApp watch={watch} />)
     await act(() => {
       offers()

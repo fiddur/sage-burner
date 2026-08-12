@@ -222,16 +222,19 @@ describe('the bell in a card’s corner', () => {
     await waitFor(() => expect(screen.queryByText('Notification settings')).toBeNull())
   })
 
-  it('says whether it is open, since it is a menu and not a toggle', async () => {
+  it('says whether it is open, and names the switches it opens rather than a menu', async () => {
     renderPage(stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
 
     const bell = await screen.findByRole('button', { name: 'Notification settings for Sauna at dawn' })
     expect(bell.getAttribute('aria-expanded')).toBe('false')
-    expect(bell.getAttribute('aria-haspopup')).toBe('menu')
+    expect(bell.getAttribute('aria-haspopup')).toBeNull()
 
     fireEvent.click(bell)
 
     await waitFor(() => expect(bell.getAttribute('aria-expanded')).toBe('true'))
+    const panel = screen.getByRole('group', { name: 'Notification settings for Sauna at dawn' })
+    expect(bell.getAttribute('aria-controls')).toBe(panel.getAttribute('id'))
+    expect(screen.queryByRole('menu')).toBeNull()
   })
 
   it('follows a card, and stops following it', async () => {
@@ -308,6 +311,33 @@ describe('the heart on a card', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Give a heart to Sauna at dawn' }))
 
     await waitFor(() => expect(supportThread).toHaveBeenCalledWith('c-1'))
+  })
+
+  it('leaves the card folded, a heart being no reason to unfold ten comments', async () => {
+    const supportThread = vi.fn<FeedApi['supportThread']>(() =>
+      Promise.resolve({
+        thread: aCard({
+          id: 'c-1',
+          title: 'Sauna at dawn',
+          support_count: 1,
+          supported_by_me: true,
+          entry_count: 4,
+          entries: [
+            anEntry({ id: 't-0', body: 'offered this dream', kind: 'offered' }),
+            anEntry({ id: 't-1', body: 'the earliest thing said' }),
+          ],
+        }),
+      }),
+    )
+    renderPage(stub({ supportThread }, [], [aCard({ id: 'c-1', title: 'Sauna at dawn', entry_count: 4 })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Give a heart to Sauna at dawn' }))
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Take back your heart for Sauna at dawn' })).toBeTruthy(),
+    )
+    expect(screen.queryByText('the earliest thing said')).toBeNull()
+    expect(screen.getByRole('button', { name: /Show the whole thread \(4\)/ })).toBeTruthy()
   })
 
   it('takes it back', async () => {

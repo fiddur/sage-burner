@@ -94,11 +94,6 @@ export interface AttendanceDeps extends GuardDeps {
   notify?: Notifier
 }
 
-/**
- * The card and the bell a new arrival earns. Exported because the join route is not the only
- * path in: redeeming an invite joins too, and the one join that most deserves a card — a brand
- * new member's — was the silent one (#478).
- */
 export const announceJoined = async (
   db: Database,
   notify: Notifier,

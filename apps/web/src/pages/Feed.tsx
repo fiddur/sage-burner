@@ -101,6 +101,10 @@ export const Feed = ({ api }: { api: FeedApi }) => {
     setWhole((sofar) => ({ ...sofar, [thread.id]: thread }))
   }
 
+  const heldKeepingFold = (shown: Thread, fresh: Thread) => {
+    held({ ...fresh, entries: shown.entries, entry_count: shown.entry_count })
+  }
+
   const forget = (threadId: string) => {
     setWhole(({ [threadId]: _gone, ...rest }) => rest)
   }
@@ -118,16 +122,20 @@ export const Feed = ({ api }: { api: FeedApi }) => {
     showAll: (id: string) => {
       run(async () => held((await api.getThread(id)).thread), 'Could not load the rest of it.')
     },
-    follow: (id: string, following: boolean) => {
+    follow: (card: Thread, following: boolean) => {
       run(
-        async () => held((await api.setThreadFollow(id, { following })).thread),
+        async () => heldKeepingFold(card, (await api.setThreadFollow(card.id, { following })).thread),
         'Could not change that. Please try again.',
       )
     },
-    heart: (id: string, hearting: boolean) => {
+    heart: (card: Thread, hearting: boolean) => {
       run(
         async () =>
-          held((hearting ? await api.supportThread(id) : await api.withdrawSupportForThread(id)).thread),
+          heldKeepingFold(
+            card,
+            (hearting ? await api.supportThread(card.id) : await api.withdrawSupportForThread(card.id))
+              .thread,
+          ),
         'Could not do that just now.',
       )
     },
@@ -458,8 +466,8 @@ const Card = ({
     showAll: (id: string) => void
     reword: (threadId: string, id: string, title: string, body: string, done: () => void) => void
     takeBack: (threadId: string, id: string) => void
-    heart: (id: string, hearting: boolean) => void
-    follow: (id: string, following: boolean) => void
+    heart: (card: Thread, hearting: boolean) => void
+    follow: (card: Thread, following: boolean) => void
   }
   upload: UploadImage
   people: readonly Mentionable[]
@@ -476,7 +484,7 @@ const Card = ({
         following={card.followed_by_me}
         busy={busy}
         onToggle={() => category !== undefined && onToggle(category)}
-        onFollow={(following) => talk.follow(card.id, following)}
+        onFollow={(following) => talk.follow(card, following)}
       />
 
       <p class="feed-card-head">
@@ -529,7 +537,7 @@ const Card = ({
             hearted={card.supported_by_me}
             count={card.support_count}
             busy={busy}
-            onHeart={(hearting) => talk.heart(card.id, hearting)}
+            onHeart={(hearting) => talk.heart(card, hearting)}
           />
         </p>
       )}
