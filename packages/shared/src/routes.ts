@@ -26,6 +26,7 @@ import type {
   FormQuestionCreateInput,
   FormQuestionOrder,
   FormQuestionUpdate,
+  GroupInviteCreate,
   Helper,
   IdOrder,
   InstallationUpdate,
@@ -206,6 +207,11 @@ export const apiRoutes = {
     method: 'POST',
     fastify: '/api/admin/invites',
     path: () => '/api/admin/invites',
+  },
+  createGroupInvite: {
+    method: 'POST',
+    fastify: '/api/admin/invites/group',
+    path: () => '/api/admin/invites/group',
   },
   deleteEventOption: {
     method: 'DELETE',
@@ -1042,6 +1048,7 @@ export interface RouteBodies {
   copyLeadRoles: CopyFrom
   copyPlaces: CopyFrom
   createEvent: EventCreateInput
+  createGroupInvite: GroupInviteCreate
   createInvite: InviteCreate
   finishPasskeyLogin: PasskeyLogin
   helpWithSession: Helper

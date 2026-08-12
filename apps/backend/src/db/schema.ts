@@ -11,6 +11,7 @@ import {
   formQuestionTypes,
   ICON_TYPES,
   IMAGE_TYPES,
+  inviteKinds,
   mealRoles,
   mealSlotKinds,
   notificationCategories,
@@ -406,6 +407,10 @@ export const inviteToken = sqliteTable(
     application_id: text('application_id').references(() => application.id, { onDelete: 'set null' }),
     expires_at: text('expires_at').notNull(),
     used_at: text('used_at'),
+    kind: text('kind', { enum: inviteKinds }).notNull().default('single'),
+    label: text('label'),
+    max_uses: integer('max_uses'),
+    revoked_at: text('revoked_at'),
     // No `onDelete`, so NO ACTION applies and an account that has issued invites cannot be
     // deleted (#35). NO ACTION rather than RESTRICT is what lets an `event` delete cascade
     // through its attendances without tripping over this mid-cascade.
@@ -418,6 +423,25 @@ export const inviteToken = sqliteTable(
     uniqueIndex('invite_token_application_idx')
       .on(table.application_id)
       .where(sql`${table.application_id} is not null`),
+  ],
+)
+
+export const inviteRedemption = sqliteTable(
+  'invite_redemption',
+  {
+    id: text('id').notNull(),
+    token_id: text('token_id')
+      .notNull()
+      .references(() => inviteToken.id),
+    account_id: text('account_id')
+      .notNull()
+      .references(() => account.id, { onDelete: 'cascade' }),
+    redeemed_at: text('redeemed_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    uniqueIndex('invite_redemption_account_idx').on(table.account_id),
+    index('invite_redemption_token_idx').on(table.token_id),
   ],
 )
 

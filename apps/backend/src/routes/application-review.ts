@@ -1,4 +1,5 @@
 import type {
+  ApplicantIdentity,
   ApplicationDecisionResponse,
   ApplicationMessagesResponse,
   ApplicationsResponse,
@@ -8,7 +9,7 @@ import type {
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
 import { apiRoutes, applicationMessageInputSchema, errorResponse, looksLikeEmail } from '@sage-burner/shared'
-import { and, desc, eq } from 'drizzle-orm'
+import { and, desc, eq, inArray } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -18,7 +19,15 @@ import type { Notifier } from '../push/notify.ts'
 
 import { viewerFor } from '../auth/viewer.ts'
 import { whyNothingWritten } from '../db/refusals.ts'
-import { accountRole, application, installation, INSTALLATION_ID, inviteToken } from '../db/schema.ts'
+import {
+  account,
+  accountIdentity,
+  accountRole,
+  application,
+  installation,
+  INSTALLATION_ID,
+  inviteToken,
+} from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { defaultExpiry, mintToken } from '../invites.ts'
 import { NO_ORIGIN, post } from '../mail/mail.ts'
@@ -148,7 +157,32 @@ export const registerApplicationReviewRoutes = (
   app.get(apiRoutes.getApplications.fastify, async (_request, reply) => {
     void noStore(reply)
 
-    const applications = await db.select().from(application).orderBy(desc(application.submitted_at))
+    const rows = await db.select().from(application).orderBy(desc(application.submitted_at))
+
+    const applicants = rows.flatMap((row) => (row.account_id === null ? [] : [row.account_id]))
+    const identities =
+      applicants.length === 0
+        ? []
+        : await db
+            .select({
+              account_id: accountIdentity.account_id,
+              provider: accountIdentity.provider,
+              name: account.name,
+              profile_url: accountIdentity.profile_url,
+            })
+            .from(accountIdentity)
+            .innerJoin(account, eq(account.id, accountIdentity.account_id))
+            .where(inArray(accountIdentity.account_id, applicants))
+
+    const byAccount = new Map<string, ApplicantIdentity[]>()
+    for (const { account_id, ...identity } of identities) {
+      byAccount.set(account_id, [...(byAccount.get(account_id) ?? []), identity])
+    }
+
+    const applications = rows.map((row) => ({
+      ...row,
+      identities: row.account_id === null ? [] : (byAccount.get(row.account_id) ?? []),
+    }))
 
     return { applications } satisfies ApplicationsResponse
   })

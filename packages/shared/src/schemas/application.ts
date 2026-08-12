@@ -6,7 +6,7 @@ import {
   MAX_APPLICANT_NAME_LENGTH,
   MAX_ASKED_QUESTIONS,
 } from '../answers.ts'
-import { applicationStatuses, formQuestionTypes } from '../enums.ts'
+import { applicationStatuses, formQuestionTypes, oauthProviders } from '../enums.ts'
 import { MAX_COMMENT, MAX_QUESTION_LABEL } from '../limits.ts'
 import { emailSchema } from './auth.ts'
 import { dateTimeSchema, idSchema, nonEmptyText } from './common.ts'
@@ -25,6 +25,12 @@ export const storedAnswerSchema = z.object({
 
 export const storedAnswersSchema = z.array(storedAnswerSchema)
 
+export const applicantIdentitySchema = z.object({
+  provider: z.enum(oauthProviders),
+  name: z.string().nullable(),
+  profile_url: z.string().nullable(),
+})
+
 export const applicationSchema = z.object({
   id: idSchema,
   account_id: idSchema.nullable(),
@@ -36,6 +42,10 @@ export const applicationSchema = z.object({
   decided_at: dateTimeSchema.nullable(),
 })
 
+export const adminApplicationSchema = applicationSchema.extend({
+  identities: z.array(applicantIdentitySchema),
+})
+
 export const applicationMessageSchema = z.object({
   id: idSchema,
   author_account_id: idSchema,
@@ -44,6 +54,8 @@ export const applicationMessageSchema = z.object({
   body: z.string(),
   created_at: dateTimeSchema,
 })
+export type ApplicantIdentity = z.infer<typeof applicantIdentitySchema>
+export type AdminApplication = z.infer<typeof adminApplicationSchema>
 export type ApplicationMessage = z.infer<typeof applicationMessageSchema>
 
 export const applicationMessageInputSchema = z.object({ body: nonEmptyText(MAX_COMMENT) }).strict()
@@ -81,7 +93,7 @@ export const applicationCreateSchema = z
 
 export const applicationResponseSchema = z.object({ application: applicationSchema })
 
-export const applicationsResponseSchema = z.object({ applications: z.array(applicationSchema) })
+export const applicationsResponseSchema = z.object({ applications: z.array(adminApplicationSchema) })
 
 export const inviteSchema = z.object({
   token: nonEmptyText(200),

@@ -1,5 +1,6 @@
-import type { ApplicationMessage, Invite, InviteDelivery } from '@sage-burner/shared'
+import type { ApplicantIdentity, ApplicationMessage, Invite, InviteDelivery } from '@sage-burner/shared'
 
+import { oauthProviderInfo } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -27,6 +28,41 @@ const answerText = (value: string | boolean) => {
   if (value === false) return 'No'
 
   return value === '' ? '—' : value
+}
+
+const Doors = ({
+  identities,
+  applicantName,
+}: {
+  identities: readonly ApplicantIdentity[]
+  applicantName: string
+}) => {
+  if (identities.length === 0) return null
+
+  return (
+    <p class="form-note">
+      {identities.map((identity) => {
+        const label = oauthProviderInfo[identity.provider].label
+        const named = identity.name !== null && identity.name !== applicantName ? ` — ${identity.name}` : ''
+
+        return (
+          <span key={identity.provider} class="chip is-on">
+            via {label}
+            {identity.profile_url === null ? (
+              named
+            ) : (
+              <>
+                {' — '}
+                <a href={identity.profile_url} rel="noreferrer noopener" target="_blank">
+                  {identity.name ?? 'their profile'}
+                </a>
+              </>
+            )}
+          </span>
+        )
+      })}
+    </p>
+  )
 }
 
 export const AdminApplications = ({ api }: { api: ApplicationsApi }) => {
@@ -98,6 +134,8 @@ export const AdminApplications = ({ api }: { api: ApplicationsApi }) => {
             <p class="form-note">
               {entry.applicant_email} · applied {entry.submitted_at.slice(0, 10)} · {entry.status}
             </p>
+
+            <Doors identities={entry.identities} applicantName={entry.applicant_name} />
 
             <dl>
               {entry.answers.map((answer) => (

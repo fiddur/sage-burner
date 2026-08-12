@@ -1,6 +1,6 @@
 import type { AdminInvite } from '@sage-burner/shared'
 
-import { cleanup, render, screen, waitFor, within } from '@testing-library/preact'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { InvitesApi } from './AdminInvites.tsx'
@@ -13,10 +13,15 @@ afterEach(cleanup)
 
 const anInvite = (over: Partial<AdminInvite> = {}): AdminInvite => ({
   id: 'inv-1',
+  kind: 'single',
   application_id: null,
   applicant_name: null,
+  label: null,
   expires_at: '2026-08-01T00:00:00.000Z',
   used_at: null,
+  revoked_at: null,
+  max_uses: null,
+  redemptions: [],
   status: 'outstanding',
   ...over,
 })
@@ -24,6 +29,7 @@ const anInvite = (over: Partial<AdminInvite> = {}): AdminInvite => ({
 const stub = (over: Partial<InvitesApi> = {}): InvitesApi => ({
   getInvites: () => Promise.resolve({ invites: [] }),
   createInvite: () => Promise.reject(new Error('createInvite is not stubbed here')),
+  createGroupInvite: () => Promise.reject(new Error('createGroupInvite is not stubbed here')),
   revokeInvite: () => Promise.reject(new Error('revokeInvite is not stubbed here')),
   ...over,
 })
@@ -85,6 +91,91 @@ describe('AdminInvites', () => {
 
     expect(await screen.findByText('Direct invite')).toBeTruthy()
     expect(screen.getByText('Application from Fredrik')).toBeTruthy()
+  })
+
+  it('closes at the end of the day named, so the date given back is the date picked', async () => {
+    // `vite.config.ts` pins TZ=Europe/Stockholm: under UTC both the old midnight and this
+    // land on the same date, and the assertion would pass against either.
+    const createGroupInvite = vi.fn<InvitesApi['createGroupInvite']>(() =>
+      Promise.resolve({
+        invite: { token: 'a-secret-token', expires_at: '2026-09-01T21:59:00.000Z' },
+        delivery: null,
+      }),
+    )
+    renderPage(stub({ createGroupInvite }))
+
+    fireEvent.input(await screen.findByLabelText('Which group'), {
+      target: { value: 'The Facebook group' },
+    })
+    fireEvent.input(screen.getByLabelText('Closes on'), { target: { value: '2026-09-01' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create a group link' }))
+
+    await waitFor(() => expect(createGroupInvite).toHaveBeenCalled())
+    const sent = createGroupInvite.mock.calls[0]?.[0]
+    expect(sent?.expires_at.slice(0, 10)).toBe('2026-09-01')
+    expect(Date.parse(sent?.expires_at ?? '')).toBeGreaterThan(Date.parse('2026-09-01T12:00:00.000Z'))
+  })
+
+  it('names a group link by its label and counts who has come in on it', async () => {
+    renderPage(
+      stub({
+        getInvites: () =>
+          Promise.resolve({
+            invites: [
+              anInvite({
+                id: 'g',
+                kind: 'group',
+                label: 'The Facebook group',
+                max_uses: 20,
+                redemptions: [
+                  { account_id: 'a-1', name: 'Ada', redeemed_at: '2026-08-01T00:00:00.000Z' },
+                  { account_id: 'a-2', name: 'Bo', redeemed_at: '2026-08-02T00:00:00.000Z' },
+                ],
+              }),
+            ],
+          }),
+      }),
+    )
+
+    expect(await screen.findByText('The Facebook group')).toBeTruthy()
+    expect(screen.getByText('2 of 20')).toBeTruthy()
+    expect(screen.getByText(/Ada, Bo/)).toBeTruthy()
+  })
+
+  it('counts an uncapped group link without inventing a ceiling for it', async () => {
+    renderPage(
+      stub({
+        getInvites: () =>
+          Promise.resolve({
+            invites: [
+              anInvite({
+                id: 'g',
+                kind: 'group',
+                label: 'The Discord',
+                max_uses: null,
+                redemptions: [{ account_id: 'a-1', name: null, redeemed_at: '2026-08-01T00:00:00.000Z' }],
+              }),
+            ],
+          }),
+      }),
+    )
+
+    expect(await screen.findByText('1 so far')).toBeTruthy()
+    expect(screen.getByText(/Someone/)).toBeTruthy()
+  })
+
+  it('offers no Revoke on a link already closed', async () => {
+    renderPage(
+      stub({
+        getInvites: () =>
+          Promise.resolve({
+            invites: [anInvite({ id: 'g', kind: 'group', label: 'Closed', status: 'revoked' })],
+          }),
+      }),
+    )
+
+    await screen.findByText('Closed')
+    expect(screen.queryByRole('button', { name: 'Revoke' })).toBeNull()
   })
 
   it('offers Revoke for exactly the invites the route accepts', async () => {

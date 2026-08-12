@@ -15,9 +15,16 @@ import type { Notifier } from '../push/notify.ts'
 import { hashPassword } from '../auth/password.ts'
 import { loginAddressConnection } from '../connections.ts'
 import { isUniqueViolation } from '../db/errors.ts'
-import { account, accountConnection, accountRole, application, inviteToken } from '../db/schema.ts'
+import {
+  account,
+  accountConnection,
+  accountRole,
+  application,
+  inviteRedemption,
+  inviteToken,
+} from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
-import { digestOf } from '../invites.ts'
+import { digestOf, redemptionsOf } from '../invites.ts'
 import { announceJoined, joinBurn } from './attendance.ts'
 import { cookieHeader } from './auth.ts'
 
@@ -52,8 +59,11 @@ export const registerRedemptionRoutes = (
 
     const [invite] = await db
       .select({
+        id: inviteToken.id,
         expires_at: inviteToken.expires_at,
         used_at: inviteToken.used_at,
+        revoked_at: inviteToken.revoked_at,
+        max_uses: inviteToken.max_uses,
         applicant_name: application.applicant_name,
         applicant_email: application.applicant_email,
       })
@@ -62,7 +72,10 @@ export const registerRedemptionRoutes = (
       .where(eq(inviteToken.token_hash, digestOf(request.params.token)))
       .limit(1)
 
-    const status = invite === undefined ? 'unknown' : inviteStatusOf(invite, now())
+    const status =
+      invite === undefined
+        ? 'unknown'
+        : inviteStatusOf({ ...invite, redemptions: await redemptionsOf(db, invite.id) }, now())
 
     return {
       status,
@@ -87,8 +100,10 @@ export const registerRedemptionRoutes = (
 
     const digest = digestOf(request.params.token)
     const [invite] = await db.select().from(inviteToken).where(eq(inviteToken.token_hash, digest)).limit(1)
+    if (invite === undefined) return sendError(reply, 409)
 
-    if (invite === undefined || inviteStatusOf(invite, now()) !== 'outstanding') {
+    const already = await redemptionsOf(db, invite.id)
+    if (inviteStatusOf({ ...invite, redemptions: already }, now()) !== 'outstanding') {
       return sendError(reply, 409)
     }
 
@@ -119,14 +134,19 @@ export const registerRedemptionRoutes = (
     const claimed = ((): boolean => {
       try {
         return db.transaction((tx) => {
-          const stamped = tx
-            .update(inviteToken)
-            .set({ used_at: now().toISOString() })
-            .where(and(eq(inviteToken.id, invite.id), isNull(inviteToken.used_at)))
-            .returning({ id: inviteToken.id })
-            .all()
+          // A group link is not claimed, only counted — the cap is checked above, once, before
+          // the scrypt. Two arrivals in the same instant could take it one past its cap; that is
+          // the size of window this app does not build machinery to close.
+          if (invite.kind === 'single') {
+            const stamped = tx
+              .update(inviteToken)
+              .set({ used_at: now().toISOString() })
+              .where(and(eq(inviteToken.id, invite.id), isNull(inviteToken.used_at)))
+              .returning({ id: inviteToken.id })
+              .all()
 
-          if (stamped.length !== 1) return false
+            if (stamped.length !== 1) return false
+          }
 
           tx.insert(account)
             .values({
@@ -136,10 +156,21 @@ export const registerRedemptionRoutes = (
               name: body.name,
               contact: body.contact ?? body.email,
               allergies_notes: body.allergies_notes,
-              invite_token_id: invite.id,
+              invite_token_id: invite.kind === 'group' ? null : invite.id,
               created_at: now().toISOString(),
             })
             .run()
+
+          if (invite.kind === 'group') {
+            tx.insert(inviteRedemption)
+              .values({
+                id: randomUUID(),
+                token_id: invite.id,
+                account_id: accountId,
+                redeemed_at: now().toISOString(),
+              })
+              .run()
+          }
 
           tx.insert(accountRole).values({ account_id: accountId, role: 'member' }).run()
 

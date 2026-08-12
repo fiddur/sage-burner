@@ -70,6 +70,68 @@ const revoke = (server: FastifyInstance, cookie: string, id: string) =>
     headers: { cookie },
   })
 
+const createGroup = (
+  server: FastifyInstance,
+  cookie: string,
+  payload: Record<string, unknown> = { expires_at: '2026-09-01T00:00:00.000Z', label: 'The Facebook group' },
+): Promise<LightMyRequestResponse> =>
+  server.inject({ method: 'POST', url: '/api/admin/invites/group', headers: { cookie }, payload })
+
+describe('a group link', () => {
+  it('is minted with a closing date and a label to tell it apart by', async () => {
+    const server = await build()
+    const { cookie } = await givenAdmin()
+
+    const made = await createGroup(server, cookie)
+    expect(made.statusCode).toBe(201)
+    expect(made.json().invite.token).toEqual(expect.any(String))
+
+    const [row] = (await list(server, cookie)).json().invites
+    expect(row.kind).toBe('group')
+    expect(row.label).toBe('The Facebook group')
+    expect(row.status).toBe('outstanding')
+    expect(row.redemptions).toEqual([])
+  })
+
+  it('refuses one with no closing date, an open door being the thing that needs one', async () => {
+    const server = await build()
+    const { cookie } = await givenAdmin()
+
+    expect((await createGroup(server, cookie, { label: 'The Facebook group' })).statusCode).toBe(400)
+  })
+
+  it('refuses one whose closing date has already passed', async () => {
+    const server = await build()
+    const { cookie } = await givenAdmin()
+
+    const payload = { expires_at: '2020-01-01T00:00:00.000Z', label: 'Old' }
+    expect((await createGroup(server, cookie, payload)).statusCode).toBe(400)
+  })
+
+  it('is closed rather than deleted, the accounts behind it being the record', async () => {
+    const server = await build()
+    const { cookie } = await givenAdmin()
+    await createGroup(server, cookie)
+
+    const [before] = (await list(server, cookie)).json().invites
+    expect((await revoke(server, cookie, before.id)).statusCode).toBe(204)
+
+    const [after] = (await list(server, cookie)).json().invites
+    expect(after.id).toBe(before.id)
+    expect(after.status).toBe('revoked')
+  })
+
+  it('cannot be closed twice', async () => {
+    const server = await build()
+    const { cookie } = await givenAdmin()
+    await createGroup(server, cookie)
+
+    const [row] = (await list(server, cookie)).json().invites
+    expect((await revoke(server, cookie, row.id)).statusCode).toBe(204)
+    expect((await revoke(server, cookie, row.id)).statusCode).toBe(409)
+  })
+})
+
 describe('direct invites', () => {
   it('mints one for someone who skips the form entirely', async () => {
     const server = await build()

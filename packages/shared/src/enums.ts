@@ -42,17 +42,26 @@ export const tickBoxRequired = (type: string): boolean | undefined => {
   return undefined
 }
 
-export const inviteStatuses = ['outstanding', 'used', 'expired'] as const
+export const inviteStatuses = ['outstanding', 'used', 'expired', 'revoked', 'full'] as const
 export type InviteStatus = (typeof inviteStatuses)[number]
 export const isInviteStatus = (value: unknown): value is InviteStatus => isOneOf(inviteStatuses, value)
 
 export const inviteStatusOf = (
-  invite: { expires_at: string; used_at: string | null },
+  invite: {
+    expires_at: string
+    used_at: string | null
+    revoked_at?: string | null
+    max_uses?: number | null
+    redemptions?: number
+  },
   now: Date,
 ): InviteStatus => {
   if (invite.used_at !== null) return 'used'
+  if (invite.revoked_at != null) return 'revoked'
+  if (Date.parse(invite.expires_at) <= now.getTime()) return 'expired'
+  if (invite.max_uses != null && (invite.redemptions ?? 0) >= invite.max_uses) return 'full'
 
-  return Date.parse(invite.expires_at) <= now.getTime() ? 'expired' : 'outstanding'
+  return 'outstanding'
 }
 
 export const effortLevels = ['none', 'low', 'medium', 'high'] as const
@@ -450,3 +459,7 @@ export const oauthProviderInfo = {
 export const oauthIntents = ['sign-in', 'link'] as const
 
 export type OAuthIntent = (typeof oauthIntents)[number]
+
+export const inviteKinds = ['single', 'group'] as const
+
+export type InviteKind = (typeof inviteKinds)[number]

@@ -213,6 +213,7 @@ export type RoutesApi = Pick<
   | 'getApplications'
   | 'getInvites'
   | 'createInvite'
+  | 'createGroupInvite'
   | 'revokeInvite'
   | 'approveApplication'
   | 'reissueInvite'

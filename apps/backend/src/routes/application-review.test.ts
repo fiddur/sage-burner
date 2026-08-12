@@ -14,6 +14,7 @@ import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import {
   account,
+  accountIdentity,
   accountRole,
   application,
   attendance,
@@ -161,6 +162,51 @@ const decide = (
 
 const list = (server: FastifyInstance, cookie: string) =>
   server.inject({ method: 'GET', url: '/api/admin/applications', headers: { cookie } })
+
+describe('which door an applicant came in through', () => {
+  it('names the provider and the name it gave, so an admin can cross-check by eye (#513)', async () => {
+    const server = await build()
+    const { cookie } = await givenAdmin()
+    const applicant = await givenApplicant('Wren')
+    await db().insert(accountIdentity).values({
+      id: randomUUID(),
+      account_id: applicant.id,
+      provider: 'facebook',
+      subject: 'fb-1',
+      profile_url: null,
+      created_at: '2026-07-02T00:00:00Z',
+    })
+
+    const [row] = (await list(server, cookie)).json().applications
+    expect(row.identities).toEqual([{ provider: 'facebook', name: 'Wren', profile_url: null }])
+  })
+
+  it('carries the profile link where the provider gave one', async () => {
+    const server = await build()
+    const { cookie } = await givenAdmin()
+    const applicant = await givenApplicant('Wren')
+    await db().insert(accountIdentity).values({
+      id: randomUUID(),
+      account_id: applicant.id,
+      provider: 'discord',
+      subject: 'd-1',
+      profile_url: 'https://discord.com/users/1',
+      created_at: '2026-07-02T00:00:00Z',
+    })
+
+    const [row] = (await list(server, cookie)).json().applications
+    expect(row.identities[0].profile_url).toBe('https://discord.com/users/1')
+  })
+
+  it('is an empty list for an application with no account behind it', async () => {
+    const server = await build()
+    const { cookie } = await givenAdmin()
+    await givenApplication()
+
+    const [row] = (await list(server, cookie)).json().applications
+    expect(row.identities).toEqual([])
+  })
+})
 
 describe('reviewing applications', () => {
   it('lists them with their answers', async () => {

@@ -1,4 +1,4 @@
-import type { Application } from '@sage-burner/shared'
+import type { AdminApplication } from '@sage-burner/shared'
 
 import { cleanup, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -11,13 +11,14 @@ import { AdminApplications } from './AdminApplications.tsx'
 
 afterEach(cleanup)
 
-const anApplication = (over: Partial<Application> = {}): Application => ({
+const anApplication = (over: Partial<AdminApplication> = {}): AdminApplication => ({
   id: 'app-1',
   account_id: null,
   answers: [{ question_id: 'q-1', label: 'Why do you want to come?', type: 'text', value: 'the fire' }],
   status: 'pending',
   applicant_name: 'Fredrik',
   applicant_email: 'fredrik@example.org',
+  identities: [],
   submitted_at: '2026-07-02T10:00:00Z',
   decided_at: null,
   ...over,
@@ -41,6 +42,52 @@ const renderPage = (api: ApplicationsApi, roles: ('admin' | 'member')[] = ['admi
   )
 
 describe('AdminApplications', () => {
+  it('says which door an applicant came in through, for cross-checking by eye (#513)', async () => {
+    renderPage(
+      stub({
+        getApplications: () =>
+          Promise.resolve({
+            applications: [
+              anApplication({
+                identities: [{ provider: 'facebook', name: 'Fredrik Liljegren', profile_url: null }],
+              }),
+            ],
+          }),
+      }),
+    )
+
+    expect(await screen.findByText(/via Facebook/)).toBeTruthy()
+    expect(screen.getByText(/Fredrik Liljegren/)).toBeTruthy()
+    expect(screen.queryByRole('link', { name: /Fredrik Liljegren/ })).toBeNull()
+  })
+
+  it('links to the profile only where the provider gave one', async () => {
+    renderPage(
+      stub({
+        getApplications: () =>
+          Promise.resolve({
+            applications: [
+              anApplication({
+                identities: [
+                  { provider: 'discord', name: 'fiddur', profile_url: 'https://discord.com/users/1' },
+                ],
+              }),
+            ],
+          }),
+      }),
+    )
+
+    const link = await screen.findByRole('link', { name: 'fiddur' })
+    expect(link.getAttribute('href')).toBe('https://discord.com/users/1')
+  })
+
+  it('says nothing about doors for an application with no account behind it', async () => {
+    renderPage(stub())
+
+    await screen.findByText('Fredrik')
+    expect(screen.queryByText(/via /)).toBeNull()
+  })
+
   it('shows an application with its answers', async () => {
     renderPage(stub())
 

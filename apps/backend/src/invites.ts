@@ -1,4 +1,9 @@
+import { count, eq } from 'drizzle-orm'
 import { createHash, randomBytes } from 'node:crypto'
+
+import type { Database } from './db/client.ts'
+
+import { inviteRedemption } from './db/schema.ts'
 
 const INVITE_TOKEN_BYTES = 32
 
@@ -14,3 +19,12 @@ export const mintToken = () => {
 
 export const defaultExpiry = (now: Date) =>
   new Date(now.getTime() + INVITE_VALID_DAYS * 24 * 60 * 60 * 1000).toISOString()
+
+export const redemptionsOf = async (db: Database, tokenId: string): Promise<number> => {
+  const [tally] = await db
+    .select({ taken: count() })
+    .from(inviteRedemption)
+    .where(eq(inviteRedemption.token_id, tokenId))
+
+  return tally?.taken ?? 0
+}
