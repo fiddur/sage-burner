@@ -34,7 +34,7 @@ import { useAction, useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
 import { useOauthOutcome } from '../outcome.ts'
 import { rowsFor } from '../textarea.ts'
-import { useSetViewer, useViewer } from '../viewer.tsx'
+import { isMember, useSetViewer, useViewer } from '../viewer.tsx'
 
 export type ApplyApi = Pick<
   ApiClient,
@@ -63,8 +63,12 @@ const identityProblem = (value: string, max: number) => {
   return undefined
 }
 
+/** Blank is not a problem: the account's own address is what the server falls back to (#510). */
 const emailProblem = (value: string) =>
-  identityProblem(value, MAX_APPLICANT_EMAIL_LENGTH) ?? (looksLikeEmail(value) ? undefined : 'malformed')
+  value.trim() === ''
+    ? undefined
+    : (identityProblem(value, MAX_APPLICANT_EMAIL_LENGTH) ??
+      (looksLikeEmail(value) ? undefined : 'malformed'))
 
 const Waiting = ({ sendsEmail, api }: { sendsEmail?: boolean; api: PushApi }) => (
   <>
@@ -113,10 +117,12 @@ const Answered = ({
     <>
       <h1>You are in</h1>
       <p role="status">
-        Welcome. You are a member, and you have been added to {joined ?? 'the burn that is coming'}.{' '}
-        <a href={detailsPage()}>Your details</a> is where you set your arrival and departure — or leave the
-        burn, if you know you cannot come. Either way you are welcome to stay and watch the planning; the next
-        burn will be announced here as well.
+        Welcome. You are a member here now.{' '}
+        {joined === undefined
+          ? 'Every burn being planned is open to you — join the one you are coming to and say when you arrive.'
+          : `You were added to ${joined}, so all that is left is to say when you arrive and leave — or to leave the burn, if you know you cannot come.`}{' '}
+        <a href={detailsPage()}>Your details</a> is where both of those are. Either way you are welcome to
+        stay and watch the planning; the next burn will be announced here as well.
       </p>
     </>
   ) : (
@@ -217,6 +223,7 @@ export const Apply = ({ api }: ApplyProps) => {
       api={api}
       standing={standing.status}
       knownName={viewer.account?.name ?? ''}
+      member={isMember(viewer)}
       onSent={() => setSent(true)}
     />
   )
@@ -227,14 +234,22 @@ const NotAppliedYet = ({
   api,
   standing,
   knownName,
+  member,
   onSent,
 }: {
   api: ApplyApi
   standing: 'loading' | 'ready' | 'failed'
   knownName: string
+  member: boolean
   onSent: () => void
 }) => {
-  if (standing === 'loading') return <p class="form-note">Loading…</p>
+  if (standing === 'loading') {
+    return (
+      <article class="column">
+        <p class="form-note">Loading…</p>
+      </article>
+    )
+  }
 
   if (standing === 'failed') {
     return (
@@ -245,15 +260,19 @@ const NotAppliedYet = ({
     )
   }
 
-  return (
-    <>
-      <p class="form-note">
-        Already a member? This is a new account — log out, sign in the way you usually do, and link the
-        provider under <a href={detailsPage()}>Your details</a>.
-      </p>
-      <ApplicationForm api={api} knownName={knownName} onSent={onSent} />
-    </>
-  )
+  if (member) {
+    return (
+      <article class="column">
+        <h1>Apply to join</h1>
+        <p class="form-note">
+          You are a member here already, so there is nothing to apply for.{' '}
+          <a href={detailsPage()}>Your details</a> is where your own record is.
+        </p>
+      </article>
+    )
+  }
+
+  return <ApplicationForm api={api} knownName={knownName} onSent={onSent} />
 }
 
 const ApplicationForm = ({
@@ -315,7 +334,7 @@ const ApplicationForm = ({
       async () => {
         await api.submitApplication({
           applicant_name: name.trim(),
-          applicant_email: email.trim(),
+          ...(email.trim() === '' ? {} : { applicant_email: email.trim() }),
           answers,
           asked: questions.map((question) => question.id),
         })
@@ -329,7 +348,9 @@ const ApplicationForm = ({
           return 'The questions changed while you were filling this in. Please reload the page and send it again.'
         }
         if (failure.status === 409) {
-          return 'You are already a member here — there is nothing to apply for. Log in the way you usually do.'
+          return failure.code === 'already_applied'
+            ? 'Your application is already in — it was sent, and this page will show where it stands.'
+            : 'You are already a member here — there is nothing to apply for. Log in the way you usually do.'
         }
 
         return 'Could not send your application. Please check your connection and try again.'
@@ -340,6 +361,11 @@ const ApplicationForm = ({
   return (
     <article class="column">
       <h1>Apply to join</h1>
+
+      <p class="form-note">
+        Already a member? This is a new account — log out, sign in the way you usually do, and link the
+        provider under <a href={detailsPage()}>Your details</a>.
+      </p>
 
       <form
         class="form"
@@ -383,7 +409,6 @@ const ApplicationForm = ({
             type="email"
             maxLength={MAX_APPLICANT_EMAIL_LENGTH}
             autocomplete="email"
-            aria-required
             aria-invalid={hasProblem(identityProblems, 'applicant_email')}
             aria-describedby={
               hasProblem(identityProblems, 'applicant_email') ? 'applicant_email-error' : undefined
@@ -392,15 +417,17 @@ const ApplicationForm = ({
             onInput={(event) => setEmail(event.currentTarget.value)}
           />
         </label>
+        <p class="form-note">
+          Left blank, we write to the address you signed in with. Fill it in only if something else would
+          reach you better.
+        </p>
         {hasProblem(identityProblems, 'applicant_email') && (
           <ErrorText
             id="applicant_email-error"
             message={
               identityProblems.includes('applicant_email:too_long')
                 ? `Please keep this under ${MAX_APPLICANT_EMAIL_LENGTH} characters.`
-                : identityProblems.includes('applicant_email:malformed')
-                  ? 'That does not look like an email address.'
-                  : 'Please give us an email address — it is where your invite would go.'
+                : 'That does not look like an email address.'
             }
           />
         )}
