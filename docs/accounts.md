@@ -59,6 +59,32 @@ at it, so the same route stamps `revoked_at` instead — the door shuts, and the
 in through it stays. `inviteStatusOf` grew `revoked` and `full` for the two ways a group link ends
 that a single-use one has no notion of.
 
+### Coming in through a provider on an invite (#512)
+
+A group link is posted **inside** the group it vets — a Facebook group, a Discord server — so
+whoever opens it already has that provider, and asking them for an address and a password is the
+long way round to an account they could make in one click.
+
+`GET /api/auth/oauth/:provider?invite=<token>` is that click. The round trip has to remember which
+invite it set off from, and `oauth_state` is where it remembers: the row gains
+`invite_token_hash`, **the digest and never the token**, because a live credential sitting in a
+row is a credential at rest for no reason. It is the same hash `invite_token.token_hash` already
+holds, so the callback matches on it directly.
+
+**The link is checked twice.** Once before the account is made — an expired, revoked, full or
+unknown link never becomes one — and again in the write for the single-use kind, whose claim
+_is_ the stamp. Nothing else about `signUpThrough` changes: the same address rules, the same
+`address-taken` answer, the same avatar and contact handling.
+
+**What the invite adds is `member`**, in the same transaction as the account, so there is no
+window where somebody exists without the role their link granted. Without an invite the handler
+is exactly what it was — an account with no roles, landing on `/apply`. With one, the account
+lands on the start page, already in.
+
+A link that has gone stale answers `refused` on the login page rather than naming what was wrong
+with it, because only the digest survives the round trip: the page cannot be linked back to, and
+saying more would describe a token the reader cannot see anyway.
+
 **No table-level CHECK enforces the two shapes.** SQLite cannot add one through `ALTER TABLE`, and
 rebuilding `invite_token` would mean dropping a table two others hold foreign keys into. The rules
 — a single-use token carries no cap and no revocation, a group one no application and no `used_at`

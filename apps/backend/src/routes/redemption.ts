@@ -61,6 +61,7 @@ export const registerRedemptionRoutes = (
     const [invite] = await db
       .select({
         id: inviteToken.id,
+        kind: inviteToken.kind,
         expires_at: inviteToken.expires_at,
         used_at: inviteToken.used_at,
         revoked_at: inviteToken.revoked_at,
@@ -80,6 +81,7 @@ export const registerRedemptionRoutes = (
 
     return {
       status,
+      kind: invite?.kind ?? null,
       name: status === 'outstanding' ? (invite?.applicant_name ?? null) : null,
       email: status === 'outstanding' ? (invite?.applicant_email ?? null) : null,
     } satisfies InviteState

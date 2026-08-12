@@ -24,6 +24,9 @@ export const songPage = (songId: string): string => `/songs/${encodeURIComponent
 
 export const OAUTH_OUTCOME_PARAM = 'from'
 
+/** Which invite a provider round trip set off from, so the callback can spend it (#512). */
+export const INVITE_PARAM = 'invite'
+
 // What the page tells an organiser to quote: the request id, which is `reqId` on the log line
 // that carries the provider's own words.
 export const OAUTH_REF_PARAM = 'ref'
@@ -78,3 +81,12 @@ export const loginPage = (outcome?: OAuthOutcome, ref?: string): string =>
 
 export const detailsPage = (outcome?: OAuthOutcome, ref?: string): string =>
   `/profile${outcomeQuery(outcome, ref)}`
+
+export const homePage = (): string => '/'
+
+/**
+ * Where a provider round trip that set off from an invite comes back to when the link itself
+ * is the thing that went wrong — the invite page is what can say which way.
+ */
+export const invitePage = (token: string, status?: string): string =>
+  `/invite/${encodeURIComponent(token)}${status === undefined ? '' : `?${OAUTH_OUTCOME_PARAM}=${encodeURIComponent(status)}`}`

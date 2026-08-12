@@ -75,6 +75,15 @@ phone" means 360px.
       SMTP is configured.
 - [ ] The new applicant, signed in, reaches their own application and their bell
       and nothing else — no Feed, no Members.
+- [ ] Mint a group link under ⚙️ → Invites with a closing date and a cap of 2.
+      Redeem it twice with different addresses: both get in, where a direct invite
+      refuses the second. The list shows both names against the link and 2 of 2, and
+      a third try is refused. Revoke it: the link stops working, both accounts stay.
+- [ ] With Discord or Facebook configured, open a group link and take it up with the
+      provider button: one round trip makes a member, and the invites list counts the
+      arrival. The page does not tell a group link's arrival it is good for one person.
+- [ ] An application from a provider signup shows which door on the review card, with
+      a profile link only where the provider gave one.
 - [ ] The admin's bell rings for the application. From the applications list,
       send the applicant a message; the applicant is notified and can reply.
       The exchange stays private to the two of them.
