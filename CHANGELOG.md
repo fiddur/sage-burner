@@ -9,6 +9,10 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-12
 
+- **A verse break made of spaces no longer vanishes on a phone.** If the blank line between two
+  verses had spaces on it, it disappeared on a narrow screen and welded the two verses together —
+  while reading correctly on a laptop.
+
 - **Every burn being planned is open to every member.** You used to see only the burns you had
   said you were coming to, so if you had joined none, Schedule, Members, Leads and Meals all told
   you there was nothing — while the feed showed you the planning going on. Now every coming burn

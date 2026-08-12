@@ -771,6 +771,12 @@ empty line in the middle of a verse reads as a verse break, which is a lie about
 and must survive: the rule is about halves the wrapping emptied, never about a line the author
 left blank.
 
+`split` alone was not enough to say that (#511). A blank line **padded with spaces** is wide
+enough to wrap, so both of its halves were split, both came out blank, and the verse break
+vanished — below a given width only, so the same song read right on a laptop and wrong on a
+phone. `broken` now returns a row with nothing in it untouched, which is the real statement of
+the rule: a row that was never anything cannot have been emptied.
+
 How many columns fit is measured, not assumed: `.song-ruler` is an empty `1ch` box inside the
 body, so the count is the content width over its width, watched with a `ResizeObserver`.
 Unmeasured means `Infinity`, which is what the tests and any render before layout see — so
