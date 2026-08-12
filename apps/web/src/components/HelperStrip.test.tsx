@@ -16,6 +16,7 @@ const strip = (over: Partial<Parameters<typeof HelperStrip>[0]> = {}) =>
       label="the sauna"
       people={[]}
       candidates={[ADA, BEA, CAI]}
+      viewerAttending
       everyone={[ADA, BEA, CAI]}
       viewerId="a-1"
       busy={false}
@@ -116,11 +117,14 @@ describe('HelperStrip', () => {
     expect(screen.getByRole('button', { name: 'Appoint someone to the sauna' })).toBeTruthy()
   })
 
-  it('offers no hand to somebody who could not be appointed either', () => {
-    // An account holding `admin` without `member`: these are held by an
-    // attendance, so somebody not coming has nothing to put a hand up for. The
-    // caller filters them out of `candidates`, and that decides both.
-    strip({ viewerId: 'a-9' })
+  it('offers the hand to somebody not coming yet, so the refusal can say to join (#503)', () => {
+    strip({ viewerId: 'a-9', viewerAttending: false })
+
+    expect(screen.getByRole('button', { name: 'Take the spot on the sauna' })).toBeTruthy()
+  })
+
+  it('offers no hand to somebody coming who is not eligible for this spot', () => {
+    strip({ viewerId: 'a-9', viewerAttending: true })
 
     expect(screen.queryByRole('button', { name: 'Take the spot on the sauna' })).toBeNull()
   })

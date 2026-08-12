@@ -26,12 +26,19 @@ audiences key on `attendance` rows — `namedBy` intersects mentions with attend
 nothing into the pings.
 
 **The controls that put a person on something nudge rather than refuse.** 🙋 as helper, a
-lead role, a meal crew place — each needs an `attendance` server-side, and each answered a
-bare 400 that surfaced as "Could not save that". They now answer `not_attending`, which the
-web turns into _You need to join the burn_ beside a link to the details page. Whoever
-reaches for a job is pointed at the thing that would let them take it. Arranging the shared
-furniture — moving dreams, lanes, the FAQ — stays approved-wide and needs no attendance at
-all.
+lead role, a meal crew place, hearting a dream — each needs an `attendance` server-side, and
+each answered a bare 400. That surfaced as `Request failed (400).`, not even as the caller's
+fallback, since `errorMessage` prefers an `ApiError`'s own message. They answer
+`not_attending` now, which `joining.ts` turns into _You need to join this burn_ beside a link
+to the details page.
+
+**The 🙋 hand had to be offered for that to reach anybody.** `HelperStrip` gated it on the
+viewer being among `candidates`, which every caller fills from `getEventAttendees` — so the
+person the nudge is written for could not see the control that produces it, and the message
+would only ever have appeared in a stale-tab race. The hand is now offered to any approved
+viewer; the appoint list still is not, since filling somebody else's name needs an attendance
+that exists. Arranging the shared furniture — moving dreams, lanes, the FAQ — stays
+approved-wide and needs no attendance at all.
 
 It is hidden when there is nothing to choose between — one burn is the ordinary
 case and a select with a single option is furniture.

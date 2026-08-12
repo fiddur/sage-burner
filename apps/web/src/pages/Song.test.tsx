@@ -11,6 +11,7 @@ import { ViewerProvider } from '../viewer.tsx'
 import { SongPage } from './Song.tsx'
 
 afterEach(cleanup)
+afterEach(() => vi.unstubAllGlobals())
 
 const ADA: Viewer = {
   status: 'signed-in',
@@ -124,8 +125,6 @@ describe('a song’s page', () => {
 
     expect(watched).toContain(container.querySelector('.song-body'))
     expect(watched).toContain(container.querySelector('.song-ruler'))
-
-    vi.unstubAllGlobals()
   })
 
   it('keeps the columns the author typed, so a chord stays above its syllable', async () => {

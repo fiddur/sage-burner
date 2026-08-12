@@ -22,7 +22,7 @@ import type { PushApi } from '../components/PushToggle.tsx'
 import type { SignUpApi } from '../components/SignUpForm.tsx'
 
 import { isApiError } from '../api/client.ts'
-import { useSelectedBurn } from '../burn.tsx'
+import { useBurns } from '../burn.tsx'
 import { ApplicationThread } from '../components/ApplicationThread.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { FormError } from '../components/FormError.tsx'
@@ -148,7 +148,8 @@ const hasProblem = (problems: string[], field: string) =>
  */
 export const Apply = ({ api }: ApplyProps) => {
   const viewer = useViewer()
-  const burn = useSelectedBurn()
+  const { burns } = useBurns()
+  const joinedBurnName = burns.find((one) => one.attendance !== null)?.event.name
   const setViewer = useSetViewer()
   const sendsEmail = useInstallationSendsEmail()
   const { outcome } = useOauthOutcome()
@@ -195,7 +196,7 @@ export const Apply = ({ api }: ApplyProps) => {
         <Answered
           approved={mine.application.status === 'approved'}
           organisers={mine.organisers}
-          joined={burn?.event.name}
+          joined={joinedBurnName}
         />
         <Talk api={api} messages={mine.messages} />
       </article>

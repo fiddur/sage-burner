@@ -3,9 +3,10 @@ import { detailsPage } from '@sage-burner/shared'
 import { isApiError } from './api/client.ts'
 import { errorMessage } from './load.ts'
 
-export const NEEDS_JOINING = 'You need to join the burn before you can take that on.'
+export const NEEDS_JOINING =
+  'You need to join this burn before you can take that on — Your details is where you say you are coming.'
 
-export const NEEDS_JOINING_THEM = 'They need to join the burn before they can take that on.'
+export const NEEDS_JOINING_THEM = 'They need to join this burn before they can be put on that.'
 
 export const notAttending = (failure: unknown): boolean =>
   isApiError(failure) && failure.code === 'not_attending'

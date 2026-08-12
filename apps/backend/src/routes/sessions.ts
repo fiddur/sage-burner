@@ -548,7 +548,7 @@ export const registerSessionRoutes = (
       if ('code' in found) return reply.code(found.code).send(errorResponse(found.error))
 
       const theirs = await attendanceFor(db, found.dream.event_id, body.account_id)
-      if (theirs === undefined) return sendError(reply, 400)
+      if (theirs === undefined) return sendError(reply, 400, 'not_attending')
 
       const added = await db
         .insert(sessionHelper)

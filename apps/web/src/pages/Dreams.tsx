@@ -13,6 +13,7 @@ import { GuardedPage } from '../components/GuardedPage.tsx'
 import { dreamActions, OpenedDream, threadOf, useDreamThread } from '../components/OpenedDream.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { shortDayOf } from '../datetime.ts'
+import { joinLink } from '../joining.ts'
 import { useAction, useLoad } from '../load.ts'
 import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
 
@@ -83,14 +84,19 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
     },
   )
 
-  const { busy, error, setError, run } = useAction(reload)
+  const { busy, error, failure, setError, run } = useAction(reload)
 
   const setOpened = (next: Opened | undefined) => {
     setError(undefined)
     setOpenedPanel(next)
   }
 
-  const { support, help, facilitate, save, remove } = dreamActions({ api, run, setOpened })
+  const { support, help, facilitate, save, remove } = dreamActions({
+    api,
+    run,
+    setOpened,
+    viewerId: viewer.account?.id,
+  })
 
   const asked: string | undefined = useLocation().query?.[DREAM_PARAM]
 
@@ -128,7 +134,7 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
         later; most dreams have no time until quite close to the burn.
       </p>
 
-      {error !== undefined && opened === undefined && <ErrorText message={error} />}
+      {error !== undefined && opened === undefined && <ErrorText message={error} link={joinLink(failure)} />}
 
       {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
 

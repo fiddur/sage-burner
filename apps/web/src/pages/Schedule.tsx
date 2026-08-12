@@ -19,6 +19,7 @@ import { NotForYou } from '../components/NotForYou.tsx'
 import { dreamActions, OpenedDream, threadOf, useDreamThread } from '../components/OpenedDream.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { dayName, fromLocalInput, toLocalInput } from '../datetime.ts'
+import { joinLink } from '../joining.ts'
 import { useAction, useLoad } from '../load.ts'
 import { pinchedZoom, touchGap } from '../pinch.ts'
 import {
@@ -80,6 +81,7 @@ const dayOf = (row: string) => row.slice(0, 10)
 
 export const Schedule = ({ api }: { api: ScheduleApi }) => {
   const viewer = useViewer()
+  const viewerId = viewer.account?.id
   const approved = isApproved(viewer)
   const [dragged, setDragged] = useState<string | undefined>(undefined)
   const [draggedMeal, setDraggedMeal] = useState<MealBlock | undefined>(undefined)
@@ -115,7 +117,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
     },
   )
 
-  const { busy, error, run, setError } = useAction(reload)
+  const { busy, error, failure, run, setError } = useAction(reload)
 
   const setOpened = (next: Opened | undefined) => {
     setError(undefined)
@@ -236,7 +238,12 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
   const blocks = meals.flatMap((meal) => mealBlocks(meal))
   const shownMeal = meals.find((meal) => meal.id === openedMeal)
 
-  const { support, help, facilitate, save, remove } = dreamActions({ api, run, setOpened })
+  const { support, help, facilitate, save, remove } = dreamActions({
+    api,
+    run,
+    setOpened,
+    viewerId: viewer.account?.id,
+  })
   const talk = useDreamThread({ api, threadId: threadOf(sessions, opened), run })
 
   const offer = ({ title = '', ...fields }: SessionUpdate) => {
@@ -249,7 +256,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
   return (
     <Framed api={api} eventId={event.id} refreshing={refreshing}>
       {error !== undefined && opened === undefined && shownMeal === undefined && (
-        <ErrorText message={error} />
+        <ErrorText message={error} link={joinLink(failure)} />
       )}
 
       <div class="schedule">
@@ -307,7 +314,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
         meal={shownMeal}
         api={api}
         attendees={attendees}
-        viewerId={viewer.account?.id}
+        viewerId={viewerId}
         busy={busy}
         error={error}
         run={run}
@@ -320,7 +327,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
         places={places}
         attendees={attendees}
         talk={talk}
-        viewerId={viewer.account?.id}
+        viewerId={viewerId}
         admin={isAdmin(viewer)}
         upload={api.uploadImage}
         busy={busy}

@@ -16,8 +16,10 @@ under today's heading, and make a new heading when there is none.
   whether you can come.
 
 - **Reaching for a job you cannot take yet says why.** Putting your hand up as helper, taking a
-  lead role or joining a meal crew needs you to have joined that burn. It used to fail with
-  "Could not save that"; it now says you need to join the burn, with a link to where you do it.
+  lead role, joining a meal crew or hearting a dream all need you to have joined that burn.
+  They used to fail with an unreadable "Request failed (400)"; they now say you need to join
+  the burn first, with a link to where you do it. Putting your hand up is also offered now
+  where it was simply absent before.
 
 - **Being let in says what happened.** Approval adds you to the burn that is coming, and the page
   now names it and points at where to set your arrival and departure — or to leave the burn, if

@@ -348,6 +348,7 @@ const RoleRow = ({
               people={role.lead === null ? [] : [role.lead]}
               max={1}
               candidates={attendees}
+              viewerAttending={attendees.some((who) => who.account_id === viewerId)}
               everyone={attendees}
               viewerId={viewerId}
               busy={busy}
@@ -363,6 +364,7 @@ const RoleRow = ({
               people={role.team}
               wanted={role.team_size_wanted}
               candidates={attendees}
+              viewerAttending={attendees.some((who) => who.account_id === viewerId)}
               everyone={attendees}
               viewerId={viewerId}
               busy={busy}

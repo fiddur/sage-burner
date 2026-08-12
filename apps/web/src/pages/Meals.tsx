@@ -236,6 +236,7 @@ const MealTable = ({
                   people={meal.lead === null ? [] : [meal.lead]}
                   max={1}
                   candidates={meal.kind === 'chore' ? [] : attendees}
+                  viewerAttending={attendees.some((who) => who.account_id === viewerId)}
                   everyone={attendees}
                   viewerId={viewerId}
                   busy={busy}
@@ -334,6 +335,7 @@ const Crew = ({
         label={`${role === 'helper' ? 'cooking' : 'cleanup'} at ${meal.label} on ${meal.date}`}
         people={crew}
         candidates={offerable}
+        viewerAttending={attendees.some((who) => who.account_id === viewerId)}
         everyone={attendees}
         viewerId={viewerId}
         busy={busy}

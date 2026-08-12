@@ -409,13 +409,11 @@ describe('Roles', () => {
     })
   })
 
-  it('offers no "join the team" to an admin who is not coming', async () => {
-    // Somebody organising but not attending can still set the register up — the roles are
-    // held by an attendance, so there is nothing for them to join.
+  it('offers the hand to an admin who is not coming, the refusal being what says to join (#503)', async () => {
     renderPage(stub({}, [aRole({ id: 'r-1', title: 'Sauna' })]), ADMIN)
 
     expect(await screen.findByText('Sauna')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Take the spot on Sauna' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Take the spot on Sauna' })).toBeTruthy()
   })
 
   it('offers a previous burn only while the register is empty', async () => {

@@ -230,7 +230,7 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
       if (body.account_id !== null) {
         leadAttendanceId = (await attendanceFor(db, existing.event_id, body.account_id)) ?? null
 
-        if (leadAttendanceId === null) return sendError(reply, 400)
+        if (leadAttendanceId === null) return sendError(reply, 400, 'not_attending')
       }
 
       await db

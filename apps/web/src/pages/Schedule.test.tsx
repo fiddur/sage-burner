@@ -648,6 +648,20 @@ describe('Schedule', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
+  it('tells somebody not coming to join, rather than "Request failed (400)" (#503)', async () => {
+    const supportSession = vi.fn<ScheduleApi['supportSession']>(() =>
+      Promise.reject(apiError(400, 'not_attending', 'Request failed (400).')),
+    )
+    renderPage(stub({ supportSession }, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Show support for Cacao ceremony' }))
+
+    const said = await screen.findByRole('alert')
+    expect(said.textContent).toContain('You need to join this burn')
+    expect(said.textContent).not.toContain('Request failed')
+    expect(screen.getByRole('link', { name: 'Your details' }).getAttribute('href')).toBe('/profile')
+  })
+
   it('takes the heart back when it is already mine', async () => {
     const withdrawSupportForSession = vi.fn<ScheduleApi['withdrawSupportForSession']>(() =>
       Promise.resolve({ session: aDream({ id: 's-1', title: 'Cacao ceremony' }) }),
