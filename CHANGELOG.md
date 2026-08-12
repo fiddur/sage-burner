@@ -9,6 +9,15 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-12
 
+- **The first person onto a new burn can put their hand up.** On a burn nobody had joined yet — every
+  burn on the day it is planned — 🙋 was missing everywhere: no lead role, no meal crew, no helping
+  out, and so not even the nudge telling you to join first. The hand is there now, and pressing it
+  says what to do. Where a job is closed to everybody, as a chore's cook is, nothing is offered, which
+  is unchanged.
+
+- **"You need to join this burn" says where.** Inside an opened dream or a meal dialog the message
+  arrived without its link to Your details — which is exactly where the button that produces it is.
+
 - **The bell stops badging what you have already looked at.** A notification only counted as read
   if you opened the bell or the notifications page, so following "What's new" on the redeploy bar,
   or a link out of a push message, left it sitting there unread. Arriving at what a notification

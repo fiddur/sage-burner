@@ -40,6 +40,25 @@ viewer; the appoint list still is not, since filling somebody else's name needs 
 that exists. Arranging the shared furniture — moving dreams, lanes, the FAQ — stays
 approved-wide and needs no attendance at all.
 
+**A shut spot says so, rather than being inferred from an empty list** (#520). The first
+version of that rule read `!viewerAttending && candidates.length > 0`, which conflated two
+different empties: a spot the page deliberately closed — a chore's lead, which nobody may take
+— and a burn nobody has joined yet, where `getEventAttendees` answers nothing. The second is
+every burn on the day it opens, and it is the state #503 is most about, so the person the nudge
+is for saw no hand at all on exactly the burn they were looking at. `shut` is now a prop the
+chore sites pass, it suppresses 🙋 and 👉 together, and an empty `candidates` list means only
+what it says: nobody to appoint. Joining is what opens the rest, which is what the nudge says.
+
+**`viewerAttending` went with it.** Eight call sites passed the same
+`attendees.some((who) => who.account_id === viewerId)` while also passing `everyone={attendees}`,
+so the component now answers that question itself — eight copies of one expression replaced by
+the one place that needs it.
+
+**The nudge keeps its link inside a panel** (#521). The page-level `ErrorText` had
+`link={joinLink(error)}` and `DreamPanel`'s did not, so pressing 🙋 inside an opened dream or a
+meal dialog — where it is most likely pressed — produced "You need to join this burn" with
+nowhere to go. One `ErrorText`, in the component both surfaces share.
+
 It is hidden when there is nothing to choose between — one burn is the ordinary
 case and a select with a single option is furniture.
 

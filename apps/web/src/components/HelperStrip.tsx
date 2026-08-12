@@ -21,7 +21,7 @@ export const HelperStrip = ({
   wanted,
   max,
   candidates,
-  viewerAttending,
+  shut = false,
   everyone,
   viewerId,
   busy,
@@ -33,7 +33,7 @@ export const HelperStrip = ({
   wanted?: number
   max?: number
   candidates: readonly Person[]
-  viewerAttending: boolean
+  shut?: boolean
   everyone: readonly Face[]
   viewerId: string | undefined
   busy: boolean
@@ -45,9 +45,12 @@ export const HelperStrip = ({
 
   const on = new Set(people.map((person) => person.account_id))
   const mine = viewerId !== undefined && on.has(viewerId)
+  const attending = everyone.some((who) => who.account_id === viewerId)
   const eligible = candidates.some((who) => who.account_id === viewerId)
-  const canBeMe = !mine && viewerId !== undefined && (eligible || (!viewerAttending && candidates.length > 0))
-  const offerable = candidates.filter((who) => !on.has(who.account_id) && who.account_id !== viewerId)
+  const canBeMe = !shut && !mine && viewerId !== undefined && (eligible || !attending)
+  const offerable = shut
+    ? []
+    : candidates.filter((who) => !on.has(who.account_id) && who.account_id !== viewerId)
 
   const short = Math.max(0, (wanted ?? 0) - people.length)
   const vacancies = max === undefined ? Math.max(short, 1) : Math.max(0, max - people.length)

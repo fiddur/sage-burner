@@ -104,8 +104,8 @@ export const MealDialog = ({
             label={meal.label}
             people={meal.lead === null ? [] : [meal.lead]}
             max={1}
-            candidates={meal.kind === 'chore' ? [] : attendees}
-            viewerAttending={attendees.some((who) => who.account_id === viewerId)}
+            candidates={attendees}
+            shut={meal.kind === 'chore'}
             everyone={attendees}
             viewerId={viewerId}
             busy={busy}
@@ -171,12 +171,8 @@ const Crew = ({
     <HelperStrip
       label={`${role === 'helper' ? 'cooking' : 'cleanup'} at ${meal.label}`}
       people={role === 'helper' ? meal.helpers : meal.cleanup}
-      candidates={
-        joinable
-          ? attendees.filter((who) => role === 'cleanup' || who.account_id !== meal.lead?.account_id)
-          : []
-      }
-      viewerAttending={attendees.some((who) => who.account_id === viewerId)}
+      candidates={attendees.filter((who) => role === 'cleanup' || who.account_id !== meal.lead?.account_id)}
+      shut={!joinable}
       everyone={attendees}
       viewerId={viewerId}
       busy={busy}

@@ -238,8 +238,8 @@ const MealTable = ({
                   label={`${meal.label} on ${meal.date}`}
                   people={meal.lead === null ? [] : [meal.lead]}
                   max={1}
-                  candidates={meal.kind === 'chore' ? [] : attendees}
-                  viewerAttending={attendees.some((who) => who.account_id === viewerId)}
+                  candidates={attendees}
+                  shut={meal.kind === 'chore'}
                   everyone={attendees}
                   viewerId={viewerId}
                   busy={busy}
@@ -328,9 +328,7 @@ const Crew = ({
 }) => {
   const crew = role === 'helper' ? meal.helpers : meal.cleanup
 
-  const offerable = joinable
-    ? attendees.filter((who) => role === 'cleanup' || who.account_id !== meal.lead?.account_id)
-    : []
+  const offerable = attendees.filter((who) => role === 'cleanup' || who.account_id !== meal.lead?.account_id)
 
   return (
     <td>
@@ -338,7 +336,7 @@ const Crew = ({
         label={`${role === 'helper' ? 'cooking' : 'cleanup'} at ${meal.label} on ${meal.date}`}
         people={crew}
         candidates={offerable}
-        viewerAttending={attendees.some((who) => who.account_id === viewerId)}
+        shut={!joinable}
         everyone={attendees}
         viewerId={viewerId}
         busy={busy}
