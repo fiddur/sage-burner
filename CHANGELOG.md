@@ -9,6 +9,19 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-12
 
+- **No more being told to install an app you have installed.** On Chrome and Edge the strip flashed
+  "open your browser's share or menu" for a moment before offering the Install button, and it kept
+  saying that to anybody who opened the installed app in an ordinary tab. Those browsers now show the
+  button or nothing at all; the by-hand instruction is for the browsers that have no button — Safari
+  and Firefox — which is who it was written for.
+
+- **Muting a card is silence, not a change of subject.** If you had turned on notifications for every
+  dream's comments and then muted one dream, replies to it still reached you under the other switch.
+  Muting one card now means that card is quiet, whatever else you have on.
+
+- **A heart no longer unfolds the whole conversation.** Pressing ♡ on a card with more comments than
+  it shows opened all of them and took away "show the whole thread". The card stays as it was.
+
 - **An invite works for somebody the app has met before.** Pressing "Continue with Discord" on a
   group link did nothing for anyone who had already signed up that way and was still waiting on an
   application: they were signed in and told nothing. The link now makes them a member, the same as

@@ -8,6 +8,7 @@ import { isApiError } from '../api/client.ts'
 import { isStandalone } from '../install.ts'
 import { useInstallationSendsEmail } from '../installation.tsx'
 import { browserPush, decodeVapidKey, subscriptionBody } from '../push.ts'
+import { isApproved, useViewer } from '../viewer.tsx'
 import { FormError, useFormError } from './FormError.tsx'
 import { NotificationSettingsField } from './NotificationSettingsField.tsx'
 
@@ -29,6 +30,18 @@ const registerWithin = async (browser: PushBrowser, limitMs: number) => {
   } finally {
     clearTimeout(timer)
   }
+}
+
+const InstallToUnlock = () => {
+  const viewer = useViewer()
+
+  return (
+    <p class="form-note">
+      Notifications are not available on this page. On an iPhone that is every browser until the app is
+      installed — add it to your home screen and open it from there. Otherwise the site is not on HTTPS, which
+      they also need. {isApproved(viewer) && <a href="/faq">More in the FAQ.</a>}
+    </p>
+  )
 }
 
 export const PushToggle = ({
@@ -145,13 +158,7 @@ export const PushToggle = ({
     <section>
       <h2>Notifications</h2>
 
-      {state === 'unsupported' && !isStandalone() && (
-        <p class="form-note">
-          Notifications are not available on this page. On an iPhone that is every browser until the app is
-          installed — add it to your home screen and open it from there. Otherwise the site is not on HTTPS,
-          which they also need. <a href="/faq">More in the FAQ.</a>
-        </p>
-      )}
+      {state === 'unsupported' && !isStandalone() && <InstallToUnlock />}
 
       {state === 'unsupported' && isStandalone() && (
         <p class="form-note">

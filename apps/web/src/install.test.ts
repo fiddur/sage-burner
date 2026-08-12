@@ -4,6 +4,7 @@ import {
   DISMISSED_KEY,
   dismissedInstall,
   dismissInstall,
+  hasInstallOffer,
   isStandalone,
   offerIn,
   watchInstalls,
@@ -161,6 +162,27 @@ describe('watching for an install offer', () => {
 
     expect(watchInstalls({ listen: page.listen, installed: () => true }).standalone()).toBe(true)
     expect(watchInstalls({ listen: page.listen, installed: () => false }).standalone()).toBe(false)
+  })
+
+  it('says whether the browser makes the offer itself, which is the other thing it asks', () => {
+    const page = aPage()
+
+    expect(
+      watchInstalls({ listen: page.listen, installed: () => false, offers: () => true }).offersItself(),
+    ).toBe(true)
+    expect(
+      watchInstalls({ listen: page.listen, installed: () => false, offers: () => false }).offersItself(),
+    ).toBe(false)
+  })
+})
+
+describe('telling a browser with the offer API from one without', () => {
+  it('is whether the window carries the property, present or null either way', () => {
+    // Chromium sets it to `null` until a handler is assigned, so presence is the test and a
+    // truthiness check would read every Chromium visitor as a Safari one.
+    expect(hasInstallOffer({ onbeforeinstallprompt: null })).toBe(true)
+    expect(hasInstallOffer({ onbeforeinstallprompt: () => undefined })).toBe(true)
+    expect(hasInstallOffer({})).toBe(false)
   })
 })
 

@@ -11,21 +11,13 @@ export const WHY = 'Installed, it opens like an app — and on some phones that 
 
 export const InstallApp = ({ watch }: { watch: InstallWatch | null }) => {
   const [offer, setOffer] = useState(() => watch?.offer())
-  // A spent offer is not "this browser has no API": the strip would flip to the instructions
-  // on top of Chromium's own install dialog, and stay there afterwards, since a tab's display
-  // mode is `browser` however the dialog was answered.
-  const [offered, setOffered] = useState(() => watch?.offer() !== undefined)
   const [dismissed, setDismissed] = useState(dismissedInstall)
   const viewer = useViewer()
 
   useEffect(() => {
     if (watch === null) return undefined
 
-    const held = () => {
-      const found = watch.offer()
-      if (found !== undefined) setOffered(true)
-      setOffer(found)
-    }
+    const held = () => setOffer(watch.offer())
 
     held()
 
@@ -47,7 +39,7 @@ export const InstallApp = ({ watch }: { watch: InstallWatch | null }) => {
     </button>
   )
 
-  if (offer === undefined && offered) return null
+  if (offer === undefined && watch.offersItself()) return null
 
   if (offer === undefined) {
     return (

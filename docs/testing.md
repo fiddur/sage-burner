@@ -204,6 +204,10 @@ phone" means 360px.
 - [ ] The bell: a panel on a wide screen, a page (`/notifications`) on a phone;
       opening either marks things seen.
 - [ ] Switch a category off; cause that event; neither bell nor push arrives.
+- [ ] Turn on "any dream" comments, then mute one card from its bell: a reply there
+      rings nothing, while a reply on another dream still does.
+- [ ] Heart a card with more comments than it shows: the count fills and the card
+      stays folded, "show the whole thread" still offered.
 - [ ] Subscribe to push in one browser; a notification tapped lands on the
       right page in the open app rather than a new window.
 - [ ] With SMTP configured (⚙️ → Settings), the test message goes to the
@@ -238,6 +242,12 @@ phone" means 360px.
 - [ ] The app offers to install; the home-screen tile wears the uploaded icon
       (upload one under ⚙️ → Settings), and the browser tab wears it too, with
       a dot while the bell holds something unseen.
+- [ ] In Chromium, the by-hand instruction never appears: on first paint there is
+      either nothing or the Install button, and once the app is installed, opening
+      the site in an ordinary tab offers neither. In Safari or Firefox the
+      instruction is what shows.
+- [ ] As the applicant persona, the notification settings' "not available on this
+      page" note carries no FAQ link — the FAQ is a guarded page.
 - [ ] Offline, visited pages render from cache; signing out deletes the cached
       data (an offline reload after sign-out shows no roster).
 - [ ] `/changelog` lists what changed, newest first, and the deploy

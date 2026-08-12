@@ -189,8 +189,6 @@ export const feedKindLabel = {
 
 export const KINDS_PARAM = 'kinds'
 
-// `?kinds=a&kinds=b` reaches a Fastify route as a `string[]`, whatever the route's generic says,
-// so the type is what the caller hopes for rather than what it is handed (#482).
 export const feedKindsFrom = (raw: unknown): FeedKind[] => [
   ...new Set((typeof raw === 'string' ? raw : '').split(',').filter(isFeedKind)),
 ]

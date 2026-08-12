@@ -48,6 +48,5 @@ export type ThreadResponse = z.infer<typeof threadResponseSchema>
 export const commentSchema = z.object({ body: nonEmptyText(MAX_COMMENT) }).strict()
 export type CommentInput = z.infer<typeof commentSchema>
 
-/** What the checkbox shows and sets: the effective state, so what it says is what will happen. */
 export const followSchema = z.object({ following: z.boolean() }).strict()
 export type FollowInput = z.infer<typeof followSchema>
