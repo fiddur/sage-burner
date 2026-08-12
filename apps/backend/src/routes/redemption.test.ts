@@ -345,7 +345,7 @@ describe('looking at an invite before redeeming it', () => {
     const body = (await look(server, token)).body
 
     expect(body).not.toContain(token)
-    expect(Object.keys(JSON.parse(body))).toEqual(['status', 'name', 'email'])
+    expect(Object.keys(JSON.parse(body))).toEqual(['status', 'kind', 'name', 'email'])
   })
 })
 
@@ -887,6 +887,7 @@ describe('what an invite carries', () => {
 
     expect(await look(server, token).then((response) => response.json())).toEqual({
       status: 'outstanding',
+      kind: 'single',
       name: 'Ada Lovelace',
       email: 'ada@example.org',
     })
@@ -907,8 +908,18 @@ describe('what an invite carries', () => {
     const used = await givenInvite({ applicantName: 'Ada', used_at: '2026-07-01T00:00:00.000Z' })
     const expired = await givenInvite({ applicantName: 'Ada', expires_at: '2026-06-01T00:00:00.000Z' })
 
-    expect((await look(server, used)).json()).toEqual({ status: 'used', name: null, email: null })
-    expect((await look(server, expired)).json()).toEqual({ status: 'expired', name: null, email: null })
+    expect((await look(server, used)).json()).toEqual({
+      status: 'used',
+      kind: 'single',
+      name: null,
+      email: null,
+    })
+    expect((await look(server, expired)).json()).toEqual({
+      status: 'expired',
+      kind: 'single',
+      name: null,
+      email: null,
+    })
   })
 
   it('gives back the address the invite was posted to, so the form need not ask either', async () => {

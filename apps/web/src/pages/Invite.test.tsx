@@ -1,4 +1,4 @@
-import type { Attendance, Event, EventOptionTaken, InviteState } from '@sage-burner/shared'
+import type { Attendance, Event, EventOptionTaken, InviteState, OAuthProvider } from '@sage-burner/shared'
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -7,6 +7,7 @@ import type { Viewer } from '../viewer.tsx'
 import type { InviteApi } from './Invite.tsx'
 
 import { apiError } from '../api/client.ts'
+import { InstallationProvider } from '../installation.tsx'
 import { useViewer, ViewerProvider } from '../viewer.tsx'
 import { Invite } from './Invite.tsx'
 
@@ -51,7 +52,7 @@ const anAttendance = (over: Partial<Attendance> = {}): Attendance => ({
  */
 const stub = (over: Partial<InviteApi> = {}): InviteApi => ({
   getAllergyItems: () => Promise.resolve({ items: [] }),
-  getInviteState: () => Promise.resolve({ status: 'outstanding', name: null, email: null }),
+  getInviteState: () => Promise.resolve({ status: 'outstanding', kind: 'single', name: null, email: null }),
   redeemInvite: () => Promise.reject(new Error('redeemInvite is not stubbed here')),
   getActiveEvent: () => Promise.resolve({ event: null }),
   getEventOptions: () => Promise.resolve({ options: [] }),
@@ -70,12 +71,18 @@ const withBurn = (over: Partial<InviteApi> = {}, options: EventOptionTaken[] = [
 /** Renders the shared viewer's state, so a test can see it change. */
 const ViewerProbe = () => <p data-testid="viewer">{useViewer().status}</p>
 
-const renderPage = (api: InviteApi, viewer: Viewer = { status: 'signed-out' }) =>
+const renderPage = (
+  api: InviteApi,
+  viewer: Viewer = { status: 'signed-out' },
+  socialLogins: readonly OAuthProvider[] = [],
+) =>
   render(
-    <ViewerProvider viewer={viewer}>
-      <Invite api={api} token="a-token" />
-      <ViewerProbe />
-    </ViewerProvider>,
+    <InstallationProvider socialLogins={socialLogins}>
+      <ViewerProvider viewer={viewer}>
+        <Invite api={api} token="a-token" />
+        <ViewerProbe />
+      </ViewerProvider>
+    </InstallationProvider>,
   )
 
 const fill = (label: string, value: string) => {
@@ -91,9 +98,51 @@ const complete = () => {
 const join = () => screen.getByRole('button', { name: 'Join' }).click()
 
 const withState = (status: InviteState['status']) =>
-  stub({ getInviteState: () => Promise.resolve({ status, name: null, email: null }) })
+  stub({ getInviteState: () => Promise.resolve({ status, kind: 'single', name: null, email: null }) })
 
 describe('Invite', () => {
+  it('offers the providers, carrying the invite so one click is the whole sign-up', async () => {
+    renderPage(stub(), { status: 'signed-out' }, ['facebook', 'discord'])
+
+    const facebook = await screen.findByRole('link', { name: 'Continue with Facebook' })
+    expect(facebook.getAttribute('href')).toBe('/api/auth/oauth/facebook?invite=a-token')
+    expect(screen.getByRole('link', { name: 'Continue with Discord' }).getAttribute('href')).toBe(
+      '/api/auth/oauth/discord?invite=a-token',
+    )
+  })
+
+  it('offers none where the installation has set none up', async () => {
+    renderPage(stub())
+
+    await screen.findByRole('button', { name: 'Join' })
+    expect(screen.queryByRole('link', { name: /Continue with/ })).toBeNull()
+  })
+
+  it('does not tell a group link’s arrival it is good for one person (#525)', async () => {
+    renderPage(
+      stub({
+        getInviteState: () =>
+          Promise.resolve({
+            status: 'outstanding' as const,
+            kind: 'group' as const,
+            name: null,
+            email: null,
+          }),
+      }),
+    )
+
+    await screen.findByRole('button', { name: 'Join' })
+    expect(screen.getByText(/for everybody in the group/)).toBeTruthy()
+    expect(screen.queryByText(/good for one person/)).toBeNull()
+  })
+
+  it('still says so on a single-use one, which is what that kind means', async () => {
+    renderPage(stub())
+
+    await screen.findByRole('button', { name: 'Join' })
+    expect(screen.getByText(/good for one person/)).toBeTruthy()
+  })
+
   it('offers the form for a live invite', async () => {
     renderPage(stub())
 
@@ -399,7 +448,7 @@ describe('Invite', () => {
     // It would create a second account for the same human, and the page cannot
     // tell whether that is what they meant.
     const getInviteState = vi.fn(() =>
-      Promise.resolve({ status: 'outstanding' as const, name: null, email: null }),
+      Promise.resolve({ status: 'outstanding' as const, kind: 'single' as const, name: null, email: null }),
     )
     renderPage(stub({ getInviteState }), {
       status: 'signed-in',
@@ -421,7 +470,10 @@ describe('Invite', () => {
 describe('the name the applicant already gave', () => {
   it('starts the form from it, rather than asking twice', async () => {
     renderPage(
-      stub({ getInviteState: () => Promise.resolve({ status: 'outstanding', name: 'Ada', email: null }) }),
+      stub({
+        getInviteState: () =>
+          Promise.resolve({ status: 'outstanding', kind: 'single' as const, name: 'Ada', email: null }),
+      }),
     )
 
     expect(await screen.findByLabelText('Your name', { exact: false })).toHaveProperty('value', 'Ada')
@@ -433,7 +485,12 @@ describe('the name the applicant already gave', () => {
     renderPage(
       stub({
         getInviteState: () =>
-          Promise.resolve({ status: 'outstanding', name: 'Ada', email: 'ada@example.org' }),
+          Promise.resolve({
+            status: 'outstanding',
+            kind: 'single' as const,
+            name: 'Ada',
+            email: 'ada@example.org',
+          }),
       }),
     )
 
@@ -457,7 +514,10 @@ describe('the name the applicant already gave', () => {
 
   it('is still the reader’s to change', async () => {
     renderPage(
-      stub({ getInviteState: () => Promise.resolve({ status: 'outstanding', name: 'Ada', email: null }) }),
+      stub({
+        getInviteState: () =>
+          Promise.resolve({ status: 'outstanding', kind: 'single' as const, name: 'Ada', email: null }),
+      }),
     )
 
     fireEvent.input(await screen.findByLabelText('Your name', { exact: false }), {

@@ -1003,6 +1003,7 @@ export const oauthState = sqliteTable(
     provider: text('provider', { enum: oauthProviders }).notNull(),
     intent: text('intent', { enum: oauthIntents }).notNull(),
     nonce: text('nonce').notNull(),
+    invite_token_hash: text('invite_token_hash'),
     account_id: text('account_id').references(() => account.id, { onDelete: 'cascade' }),
     created_at: text('created_at').notNull(),
   },

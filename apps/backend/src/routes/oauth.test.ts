@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 
 import { eq } from 'drizzle-orm'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { DbHandle } from '../db/index.ts'
@@ -18,6 +18,8 @@ import {
   accountConnection,
   accountIdentity,
   accountRole,
+  inviteRedemption,
+  inviteToken,
   oauthSetting,
   oauthState,
   passkey,
@@ -190,10 +192,138 @@ const signInThrough = async (
   return await callback(server, provider, `code=abc&state=${await mintedState()}`, nonceFrom(leaving))
 }
 
+const signInFromInvite = async (
+  server: FastifyInstance,
+  token: string,
+  profile: { email?: string; name?: string } = {},
+  provider = 'facebook',
+) => {
+  identified = profile
+  const leaving = await server.inject({
+    method: 'GET',
+    url: `/api/auth/oauth/${provider}?invite=${encodeURIComponent(token)}`,
+  })
+
+  return await callback(server, provider, `code=abc&state=${await mintedState()}`, nonceFrom(leaving))
+}
+
+const givenLink = async (over: { kind?: 'single' | 'group'; expires_at?: string; used_at?: string } = {}) => {
+  const token = `token-${randomUUID()}`
+  const admin = randomUUID()
+  await db()
+    .insert(account)
+    .values({ id: admin, email: `${admin}@example.org`, password_hash: null, created_at: NOW.toISOString() })
+  await db()
+    .insert(inviteToken)
+    .values({
+      id: randomUUID(),
+      token_hash: createHash('sha256').update(token).digest('hex'),
+      kind: over.kind ?? 'group',
+      label: over.kind === 'single' ? null : 'The Facebook group',
+      application_id: null,
+      expires_at: over.expires_at ?? '2027-01-01T00:00:00.000Z',
+      used_at: over.used_at ?? null,
+      created_by: admin,
+    })
+
+  return token
+}
+
 const linkThrough = async (server: FastifyInstance, cookie: string, provider = 'facebook') => {
   const leaving = await startLink(server, provider, cookie)
   return await callback(server, provider, `code=abc&state=${await mintedState()}`, nonceFrom(leaving))
 }
+
+describe('signing up from an invite link through a provider', () => {
+  it('makes a member in one round trip, which is what a link posted in the group is for', async () => {
+    const server = await build()
+    await givenProvider()
+    const token = await givenLink()
+
+    const back = await signInFromInvite(server, token, { email: 'wren@example.org' })
+
+    expect(back.headers.location).toBe('/')
+    expect(cookiesOn(back)).toContain(`${SESSION_COOKIE}=`)
+
+    const [made] = await db().select().from(account).where(eq(account.email, 'wren@example.org'))
+    expect(made).toBeDefined()
+    expect(
+      await db()
+        .select()
+        .from(accountRole)
+        .where(eq(accountRole.account_id, made?.id ?? '')),
+    ).toEqual([{ account_id: made?.id, role: 'member' }])
+  })
+
+  it('records the arrival against the link, and leaves invite_token_id null for a group one', async () => {
+    const server = await build()
+    await givenProvider()
+    const token = await givenLink()
+
+    await signInFromInvite(server, token, { email: 'wren@example.org' })
+
+    const [made] = await db().select().from(account).where(eq(account.email, 'wren@example.org'))
+    expect(made?.invite_token_id).toBeNull()
+    const arrivals = await db().select().from(inviteRedemption)
+    expect(arrivals).toHaveLength(1)
+    expect(arrivals[0]?.account_id).toBe(made?.id)
+  })
+
+  it('spends a single-use link instead, stamping it and marking the account it made', async () => {
+    const server = await build()
+    await givenProvider()
+    const token = await givenLink({ kind: 'single' })
+
+    await signInFromInvite(server, token, { email: 'wren@example.org' })
+
+    const [spent] = await db().select().from(inviteToken)
+    expect(spent?.used_at).not.toBeNull()
+    const [made] = await db().select().from(account).where(eq(account.email, 'wren@example.org'))
+    expect(made?.invite_token_id).toBe(spent?.id)
+  })
+
+  it('makes no member of a link that has expired, and no account either', async () => {
+    const server = await build()
+    await givenProvider()
+    const token = await givenLink({ expires_at: '2020-01-01T00:00:00.000Z' })
+
+    const back = await signInFromInvite(server, token, { email: 'wren@example.org' })
+
+    expect(back.headers.location).toBe('/login?from=refused')
+    expect(await db().select().from(account).where(eq(account.email, 'wren@example.org'))).toEqual([])
+  })
+
+  it('makes no member of a single-use link already spent', async () => {
+    const server = await build()
+    await givenProvider()
+    const token = await givenLink({ kind: 'single', used_at: NOW.toISOString() })
+
+    const back = await signInFromInvite(server, token, { email: 'wren@example.org' })
+
+    expect(back.headers.location).toBe('/login?from=refused')
+    expect(await db().select().from(accountRole)).toEqual([])
+  })
+
+  it('makes no member of a token nobody minted', async () => {
+    const server = await build()
+    await givenProvider()
+
+    const back = await signInFromInvite(server, 'not-a-real-token', { email: 'wren@example.org' })
+
+    expect(back.headers.location).toBe('/login?from=refused')
+    expect(await db().select().from(account).where(eq(account.email, 'wren@example.org'))).toEqual([])
+  })
+
+  it('makes no member without one, which is the ordinary sign-up it was before', async () => {
+    const server = await build()
+    await givenProvider()
+
+    const back = await signInThrough(server, 'facebook', { email: 'wren@example.org' })
+
+    expect(back.headers.location).toBe('/apply')
+    expect(await db().select().from(accountRole)).toEqual([])
+  })
+})
 
 describe('leaving for a provider', () => {
   it('sends somebody to the provider with the state it minted', async () => {

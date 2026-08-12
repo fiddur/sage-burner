@@ -9,6 +9,13 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-12
 
+- **An invite link takes Discord and Facebook.** A link posted in a group is opened by somebody who
+  already has that provider, so the invite page now offers the same one-click buttons the login page
+  does — one round trip and you are a member, with no address and password to invent. Setting up an
+  email and a password still works for anyone who would rather.
+
+- **A group link no longer says it is good for one person**, which was never true of that kind.
+
 - **Allergies are ticked on the way in, not typed.** Redeeming an invite offered a free-text box
   where the rest of the app offers the shared list with checkboxes. It is the same list now, with
   the box kept for anything the list does not cover.

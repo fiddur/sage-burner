@@ -1,9 +1,17 @@
 import type { AllergyItem, Event, EventOptionTaken, InviteState } from '@sage-burner/shared'
 
-import { MAX_PERSON_NAME, MIN_PASSWORD } from '@sage-burner/shared'
+import {
+  apiRoutes,
+  INVITE_PARAM,
+  MAX_PERSON_NAME,
+  MIN_PASSWORD,
+  oauthProviderInfo,
+  oauthProviders,
+} from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
+import type { FormErrorState } from '../components/FormError.tsx'
 import type { StayDraft } from '../stay.ts'
 
 import { isApiError } from '../api/client.ts'
@@ -12,6 +20,7 @@ import { ErrorText } from '../components/ErrorText.tsx'
 import { FormError } from '../components/FormError.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
 import { StayFields } from '../components/StayFields.tsx'
+import { useSocialLogins } from '../installation.tsx'
 import { useAction, useLoadInto } from '../load.ts'
 import { stayForBurn, stayProblem, stayUpdate } from '../stay.ts'
 import { useSetViewer, useViewer } from '../viewer.tsx'
@@ -59,6 +68,73 @@ const messageForFailure = (failure: unknown): string => {
   if (failure.code === 'network') return failure.message
 
   return 'Could not finish signing you up. Please try again.'
+}
+
+const YouAreIn = ({
+  api,
+  done,
+  burn,
+  error,
+}: {
+  api: Pick<InviteApi, 'joinEvent'>
+  done: 'joined' | 'member'
+  burn: Event | undefined
+  error: FormErrorState
+}) => (
+  <section class="page column">
+    <h1>Welcome</h1>
+    <p role="status">
+      {done === 'joined'
+        ? 'You are in, signed in, and on the list. Everything you just filled in can be changed later on your own page.'
+        : 'You are in, and signed in.'}
+    </p>
+
+    {done === 'member' && <OpenBurnOffer api={api} burn={burn} />}
+
+    <FormError error={error} />
+
+    <p class="home-actions">
+      <a href="/">Go to the start page</a>
+    </p>
+  </section>
+)
+
+const EMPTY_ITEMS: readonly AllergyItem[] = []
+
+const WhoTheLinkIsFor = ({ invited }: { invited: Invited | undefined }) => (
+  <p class="form-note">
+    {invited?.state.kind === 'group'
+      ? 'This link is for everybody in the group it was posted in.'
+      : 'This invitation is good for one person.'}{' '}
+    What you give here becomes your login; the rest is for planning. Food is primarily vegetarian, with vegan
+    options.
+  </p>
+)
+
+/** A link posted in a group is opened by somebody who already has that provider (#512). */
+const OneClickWaysIn = ({ token }: { token: string }) => {
+  const configured = useSocialLogins()
+  const providers = oauthProviders.filter((provider) => configured.includes(provider))
+
+  if (providers.length === 0) return null
+
+  return (
+    <>
+      <p class="row">
+        {providers.map((provider) => (
+          <a
+            key={provider}
+            class="link-button"
+            href={`${apiRoutes.startOauthSignIn.path(provider)}?${INVITE_PARAM}=${encodeURIComponent(token)}`}
+          >
+            Continue with {oauthProviderInfo[provider].label}
+          </a>
+        ))}
+      </p>
+
+      <p class="form-note">Or set up an email and a password:</p>
+    </>
+  )
 }
 
 const OpenBurnOffer = ({ api, burn }: { api: Pick<InviteApi, 'joinEvent'>; burn: Event | undefined }) => {
@@ -138,7 +214,8 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
 
   const { busy: sending, formError: error, setError, run } = useAction()
 
-  const offered = loaded.status === 'ready' ? loaded.data.upcoming : undefined
+  const ready = loaded.status === 'ready' ? loaded.data : undefined
+  const offered = ready === undefined ? undefined : ready.upcoming
 
   const joining = offered !== undefined && coming
 
@@ -187,24 +264,7 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
   }
 
   if (done !== undefined) {
-    return (
-      <section class="page column">
-        <h1>Welcome</h1>
-        <p role="status">
-          {done === 'joined'
-            ? 'You are in, signed in, and on the list. Everything you just filled in can be changed later on your own page.'
-            : 'You are in, and signed in.'}
-        </p>
-
-        {done === 'member' && <OpenBurnOffer api={api} burn={offered?.event} />}
-
-        <FormError error={error} />
-
-        <p class="home-actions">
-          <a href="/">Go to the start page</a>
-        </p>
-      </section>
-    )
+    return <YouAreIn api={api} done={done} burn={offered?.event} error={error} />
   }
 
   if (viewer.status === 'signed-in') {
@@ -262,10 +322,9 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
     <section class="page column">
       <h1>Welcome — let us set you up</h1>
 
-      <p class="form-note">
-        This invitation is good for one person. The email and password become your login; the rest is for
-        planning. Food is primarily vegetarian, with vegan options.
-      </p>
+      <WhoTheLinkIsFor invited={ready} />
+
+      <OneClickWaysIn token={token} />
 
       <form
         class="form"
@@ -316,7 +375,7 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
         </label>
 
         <AllergiesField
-          items={loaded.status === 'ready' ? loaded.data.allergyItems : []}
+          items={ready === undefined ? EMPTY_ITEMS : ready.allergyItems}
           ticked={ticked}
           notes={allergies}
           onTicked={setTicked}

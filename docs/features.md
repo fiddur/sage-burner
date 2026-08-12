@@ -29,6 +29,8 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
   until the date the admin picks and optionally for a limited number of people. It
   lists who came in on it, and withdrawing it shuts the door without touching them.
   See [accounts.md](./accounts.md).
+- Any invite can be taken up through Discord or Facebook in one click, which is how
+  somebody who found the link in that group already signs in everywhere else.
 - The review card says which door an applicant signed up through — the provider and
   the name used there, with a link to their profile where the provider gives one.
 - Signing in: password, passkey, or a linked provider. Passkeys are usernameless

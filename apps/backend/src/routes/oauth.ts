@@ -12,10 +12,13 @@ import {
   applyPage,
   detailsPage,
   emailSchema,
+  homePage,
+  INVITE_PARAM,
+  inviteStatusOf,
   isOAuthProvider,
   loginPage,
 } from '@sage-burner/shared'
-import { and, eq, gt, lt } from 'drizzle-orm'
+import { and, eq, gt, isNull, lt } from 'drizzle-orm'
 import { randomBytes, randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -25,8 +28,18 @@ import type { ProviderAsks, ProviderProfile } from '../oauth/providers.ts'
 
 import { viewerFor } from '../auth/viewer.ts'
 import { loginAddressConnection, providerConnection } from '../connections.ts'
-import { account, accountAvatar, accountConnection, accountIdentity, oauthState } from '../db/schema.ts'
+import {
+  account,
+  accountAvatar,
+  accountConnection,
+  accountIdentity,
+  accountRole,
+  inviteRedemption,
+  inviteToken,
+  oauthState,
+} from '../db/schema.ts'
 import { noStore, sendError } from '../http.ts'
+import { digestOf, redemptionsOf } from '../invites.ts'
 import { anotherWayInSurvives, identitiesFor } from '../oauth/identities.ts'
 import { authorizeUrl } from '../oauth/providers.ts'
 import { usableOauthSetting } from '../oauth/settings.ts'
@@ -66,7 +79,12 @@ export const registerOauthRoutes = (
     profileLink: setting.ask_profile_link,
   })
 
-  const mintState = async (provider: OAuthProvider, intent: OAuthIntent, account_id: string | null) => {
+  const mintState = async (
+    provider: OAuthProvider,
+    intent: OAuthIntent,
+    account_id: string | null,
+    invite_token_hash: string | null = null,
+  ) => {
     const state = randomBytes(32).toString('base64url')
     const nonce = randomBytes(32).toString('base64url')
     const stamp = now()
@@ -75,9 +93,15 @@ export const registerOauthRoutes = (
       .delete(oauthState)
       .where(lt(oauthState.created_at, new Date(stamp.getTime() - STATE_TTL_SECONDS * 1000).toISOString()))
 
-    await db
-      .insert(oauthState)
-      .values({ state, provider, intent, nonce, account_id, created_at: stamp.toISOString() })
+    await db.insert(oauthState).values({
+      state,
+      provider,
+      intent,
+      nonce,
+      account_id,
+      invite_token_hash,
+      created_at: stamp.toISOString(),
+    })
 
     return { state, nonce }
   }
@@ -115,6 +139,12 @@ export const registerOauthRoutes = (
     return row
   }
 
+  const inviteFrom = (request: FastifyRequest): string | undefined => {
+    const asked: unknown = (request.query as Record<string, unknown> | undefined)?.[INVITE_PARAM]
+
+    return typeof asked === 'string' && asked !== '' ? asked : undefined
+  }
+
   const leaving =
     (intent: OAuthIntent) =>
     async (request: FastifyRequest<{ Params: { provider: string } }>, reply: FastifyReply) => {
@@ -139,7 +169,13 @@ export const registerOauthRoutes = (
         return back(reply, page('misconfigured', String(request.id)))
       }
 
-      const { state, nonce } = await mintState(provider, intent, viewer?.account_id ?? null)
+      const invited = inviteFrom(request)
+      const { state, nonce } = await mintState(
+        provider,
+        intent,
+        viewer?.account_id ?? null,
+        invited === undefined ? null : digestOf(invited),
+      )
 
       void reply.header('set-cookie', nonceCookie(nonce, STATE_TTL_SECONDS))
 
@@ -191,6 +227,7 @@ export const registerOauthRoutes = (
     reply: FastifyReply,
     provider: OAuthProvider,
     profile: ProviderProfile,
+    inviteHash: string | null = null,
   ) => {
     // Through the same schema every other way in uses: `account.email` carries a lowercase CHECK,
     // so `Wren@Example.org` taken as given would miss the row it collides with and then fail the
@@ -203,6 +240,22 @@ export const registerOauthRoutes = (
     const [taken] = await db.select({ id: account.id }).from(account).where(eq(account.email, email)).limit(1)
 
     if (taken !== undefined) return back(reply, loginPage('address-taken'))
+
+    // A link that is not open right now must not become a membership. Checked before the account
+    // is made, and again inside the write for the single-use kind, whose claim is the stamp.
+    // Only the digest survives the round trip, so a link that has gone stale cannot be linked
+    // back to — the login page is where somebody is told, the same as every other refusal here.
+    const [invite] =
+      inviteHash === null
+        ? []
+        : await db.select().from(inviteToken).where(eq(inviteToken.token_hash, inviteHash)).limit(1)
+
+    if (inviteHash !== null) {
+      if (invite === undefined) return back(reply, loginPage('refused'))
+
+      const status = inviteStatusOf({ ...invite, redemptions: await redemptionsOf(db, invite.id) }, now())
+      if (status !== 'outstanding') return back(reply, loginPage('refused'))
+    }
 
     const accountId = randomUUID()
 
@@ -229,6 +282,30 @@ export const registerOauthRoutes = (
             created_at: now().toISOString(),
           })
           .run()
+
+        if (invite !== undefined) {
+          if (invite.kind === 'single') {
+            tx.update(inviteToken)
+              .set({ used_at: now().toISOString() })
+              .where(and(eq(inviteToken.id, invite.id), isNull(inviteToken.used_at)))
+              .run()
+
+            // `account_invite_token_idx` is unique, so a second account claiming the same
+            // single-use token fails this write rather than needing a guard of its own.
+            tx.update(account).set({ invite_token_id: invite.id }).where(eq(account.id, accountId)).run()
+          } else {
+            tx.insert(inviteRedemption)
+              .values({
+                id: randomUUID(),
+                token_id: invite.id,
+                account_id: accountId,
+                redeemed_at: now().toISOString(),
+              })
+              .run()
+          }
+
+          tx.insert(accountRole).values({ account_id: accountId, role: 'member' }).run()
+        }
       })
     } catch (failure) {
       request.log.warn({ err: failure, provider }, 'could not make an account for a new identity')
@@ -249,7 +326,7 @@ export const registerOauthRoutes = (
       cookieHeader(sessions.issue(accountId), config, config.session_ttl_seconds),
     )
 
-    return back(reply, applyPage())
+    return back(reply, invite === undefined ? applyPage() : homePage())
   }
 
   const signIn = async (
@@ -257,6 +334,7 @@ export const registerOauthRoutes = (
     reply: FastifyReply,
     provider: OAuthProvider,
     profile: ProviderProfile,
+    inviteHash: string | null = null,
   ) => {
     const [identity] = await db
       .select({ id: accountIdentity.id, account_id: accountIdentity.account_id })
@@ -264,7 +342,7 @@ export const registerOauthRoutes = (
       .where(and(eq(accountIdentity.provider, provider), eq(accountIdentity.subject, profile.subject)))
       .limit(1)
 
-    if (identity === undefined) return await signUpThrough(request, reply, provider, profile)
+    if (identity === undefined) return await signUpThrough(request, reply, provider, profile, inviteHash)
 
     if (profile.profile_url !== undefined) {
       try {
@@ -389,7 +467,7 @@ export const registerOauthRoutes = (
       }
 
       return spent.intent === 'sign-in'
-        ? await signIn(request, reply, provider, identified.profile)
+        ? await signIn(request, reply, provider, identified.profile, spent.invite_token_hash)
         : await link(reply, provider, spent.account_id, identified.profile)
     },
   )
