@@ -9,6 +9,8 @@ import type {
   ApplicationMessageInput,
   AttendanceCreate,
   AttendanceUpdate,
+  BringCreateInput,
+  BringUpdate,
   CommentInput,
   ConnectionCreate,
   ConnectionOrder,
@@ -91,6 +93,11 @@ export const apiRoutes = {
     method: 'GET',
     fastify: '/api/accounts/:accountId/profile',
     path: (accountId: string) => `/api/accounts/${encodeURIComponent(accountId)}/profile`,
+  },
+  addBringItem: {
+    method: 'POST',
+    fastify: '/api/events/:eventId/bring',
+    path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/bring`,
   },
   addEventOption: {
     method: 'POST',
@@ -183,6 +190,11 @@ export const apiRoutes = {
     fastify: '/api/admin/applications/:id/approve',
     path: (id: string) => `/api/admin/applications/${encodeURIComponent(id)}/approve`,
   },
+  bringThis: {
+    method: 'POST',
+    fastify: '/api/bring/:id/hands',
+    path: (id: string) => `/api/bring/${encodeURIComponent(id)}/hands`,
+  },
   copyFaq: {
     method: 'POST',
     fastify: '/api/events/:eventId/faq/copy',
@@ -217,6 +229,11 @@ export const apiRoutes = {
     method: 'DELETE',
     fastify: '/api/event-options/:id',
     path: (id: string) => `/api/event-options/${encodeURIComponent(id)}`,
+  },
+  deleteBringItem: {
+    method: 'DELETE',
+    fastify: '/api/bring/:id',
+    path: (id: string) => `/api/bring/${encodeURIComponent(id)}`,
   },
   deleteComment: {
     method: 'DELETE',
@@ -397,6 +414,11 @@ export const apiRoutes = {
     method: 'GET',
     fastify: '/api/admin/invites',
     path: () => '/api/admin/invites',
+  },
+  getBringList: {
+    method: 'GET',
+    fastify: '/api/events/:eventId/bring',
+    path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/bring`,
   },
   getFeed: {
     method: 'GET',
@@ -823,6 +845,12 @@ export const apiRoutes = {
     fastify: '/api/me/passkeys/challenge',
     path: () => '/api/me/passkeys/challenge',
   },
+  stopBringingThis: {
+    method: 'DELETE',
+    fastify: '/api/bring/:id/hands/:accountId',
+    path: (id: string, accountId: string) =>
+      `/api/bring/${encodeURIComponent(id)}/hands/${encodeURIComponent(accountId)}`,
+  },
   stopHelpingWithSession: {
     method: 'DELETE',
     fastify: '/api/sessions/:id/helpers/:accountId',
@@ -868,6 +896,11 @@ export const apiRoutes = {
     method: 'DELETE',
     fastify: '/api/push/subscriptions',
     path: () => '/api/push/subscriptions',
+  },
+  updateBringItem: {
+    method: 'PATCH',
+    fastify: '/api/bring/:id',
+    path: (id: string) => `/api/bring/${encodeURIComponent(id)}`,
   },
   updateComment: {
     method: 'PATCH',
@@ -1032,6 +1065,7 @@ export interface RouteBodies {
   addMyConnection: ConnectionCreate
   updateMyConnection: ConnectionUpdate
   reorderMyConnections: ConnectionOrder
+  addBringItem: BringCreateInput
   addEventOption: EventOptionCreateInput
   addFaqEntry: FaqCreateInput
   addLeadRole: LeadRoleCreateInput
@@ -1044,6 +1078,7 @@ export interface RouteBodies {
   addRide: RideCreate
   addQuestion: FormQuestionCreateInput
   adminAddAttendance: AttendanceCreate
+  bringThis: Helper
   copyFaq: CopyFrom
   copyLeadRoles: CopyFrom
   copyPlaces: CopyFrom
@@ -1076,6 +1111,7 @@ export interface RouteBodies {
   subscribeToPush: PushSubscriptionCreate
   transferMyPlace: PlaceTransfer
   unsubscribeFromPush: Pick<PushSubscriptionCreate, 'endpoint'>
+  updateBringItem: BringUpdate
   updateComment: CommentInput
   updateEvent: EventUpdate
   updateEventOption: EventOptionUpdate

@@ -11,6 +11,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
 import {
   apiRoutes,
+  bringPage,
   coalesces,
   commentSchema,
   dreamPage,
@@ -35,6 +36,8 @@ import {
   account,
   accountAvatar,
   attendance,
+  bringHand,
+  bringItem,
   event,
   post,
   session,
@@ -47,7 +50,7 @@ import {
   threadSupport,
 } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
-import { approvedAccounts, displayName, namedBy, wants } from '../push/notify.ts'
+import { approvedAccounts, displayName, namedBy, reachedByMention } from '../push/notify.ts'
 
 export interface NewEntry {
   thread_id: string
@@ -315,15 +318,25 @@ const participantThreads = async (
       ),
     )
 
-  return new Set([...spoke, ...facilitating, ...helping].map((row) => row.thread_id))
+  const bringing = await db
+    .select({ thread_id: thread.id })
+    .from(thread)
+    .innerJoin(bringHand, eq(bringHand.item_id, thread.entity_id))
+    .innerJoin(attendance, eq(attendance.id, bringHand.attendance_id))
+    .where(
+      and(
+        inArray(thread.id, [...ids]),
+        eq(thread.entity_type, 'bring'),
+        eq(attendance.account_id, viewer.account_id),
+      ),
+    )
+
+  return new Set([...spoke, ...facilitating, ...helping, ...bringing].map((row) => row.thread_id))
 }
 
 const partOf = (row: CardRow, already: ReadonlySet<string>, viewer: Viewer): boolean =>
   viewer !== undefined &&
-  (already.has(row.id) ||
-    row.subject === viewer.account_id ||
-    row.post_author === viewer.account_id ||
-    row.song_author === viewer.account_id)
+  (already.has(row.id) || row.subject === viewer.account_id || authorOf(row) === viewer.account_id)
 
 const followsFor = async (
   db: Database,
@@ -375,6 +388,10 @@ export const readThreads = async (
       song_title: song.title,
       song_deleted_at: song.deleted_at,
       song_author: song.author_account_id,
+      bring_title: bringItem.title,
+      bring_comment: bringItem.comment,
+      bring_withdrawn_at: bringItem.withdrawn_at,
+      bring_author: bringItem.author_account_id,
     })
     .from(thread)
     .leftJoin(event, eq(event.id, thread.event_id))
@@ -383,6 +400,7 @@ export const readThreads = async (
     .leftJoin(account, eq(account.id, thread.subject_account_id))
     .leftJoin(post, and(eq(thread.entity_type, 'post'), eq(post.id, thread.entity_id)))
     .leftJoin(song, and(eq(thread.entity_type, 'song'), eq(song.id, thread.entity_id)))
+    .leftJoin(bringItem, and(eq(thread.entity_type, 'bring'), eq(bringItem.id, thread.entity_id)))
     .where(inArray(thread.id, [...ids]))
 
   const ranked = db
@@ -476,11 +494,16 @@ export const readThreads = async (
 
 type Viewer = { account_id: string } | undefined
 
+const authorOf = (row: CardRow): string | null => {
+  if (row.entity_type === 'post') return row.post_author
+  if (row.entity_type === 'song') return row.song_author
+  if (row.entity_type === 'bring') return row.bring_author
+
+  return null
+}
+
 const authoredBy = (row: CardRow, viewer: Viewer): boolean =>
-  viewer !== undefined &&
-  (row.entity_type === 'post'
-    ? row.post_author === viewer.account_id
-    : row.entity_type === 'song' && row.song_author === viewer.account_id)
+  viewer !== undefined && authorOf(row) === viewer.account_id
 
 interface CardRow {
   id: string
@@ -500,6 +523,10 @@ interface CardRow {
   song_title: string | null
   song_deleted_at: string | null
   song_author: string | null
+  bring_title: string | null
+  bring_comment: string | null
+  bring_withdrawn_at: string | null
+  bring_author: string | null
 }
 
 type CardFacts = Pick<Thread, 'title' | 'link' | 'body' | 'gone'>
@@ -534,6 +561,13 @@ const songFacts = (row: CardRow): CardFacts => ({
   gone: row.song_title === null || row.song_deleted_at !== null,
 })
 
+const bringFacts = (row: CardRow): CardFacts => ({
+  title: row.bring_title ?? row.title,
+  link: row.bring_title === null || row.event_id === null ? null : bringPage(row.event_id, row.entity_id),
+  body: row.bring_withdrawn_at === null ? written(row.bring_comment) : null,
+  gone: row.bring_title === null || row.bring_withdrawn_at !== null,
+})
+
 const withNamedBody = (facts: CardFacts, named: (body: string) => string): CardFacts =>
   facts.body === null ? facts : { ...facts, body: named(facts.body) }
 
@@ -553,7 +587,13 @@ export const mentionedNames = async (
 }
 
 const factsFor = (row: CardRow): CardFacts =>
-  ({ session: dreamFacts, attendance: personFacts, post: postFacts, song: songFacts })[row.entity_type](row)
+  ({
+    session: dreamFacts,
+    attendance: personFacts,
+    post: postFacts,
+    song: songFacts,
+    bring: bringFacts,
+  })[row.entity_type](row)
 
 export const nameOf = async (db: Database, accountId: string): Promise<string | null> => {
   const [row] = await db
@@ -579,6 +619,16 @@ export const following = async (db: Database, threadId: string): Promise<string[
 
 export const muting = async (db: Database, threadId: string): Promise<string[]> =>
   await saidAbout(db, threadId, false)
+
+export const handsOn = async (db: Database, itemId: string): Promise<string[]> => {
+  const rows = await db
+    .select({ account_id: attendance.account_id })
+    .from(bringHand)
+    .innerJoin(attendance, eq(attendance.id, bringHand.attendance_id))
+    .where(eq(bringHand.item_id, itemId))
+
+  return rows.map((row) => row.account_id)
+}
 
 export const participantsOf = async (
   db: Database,
@@ -620,6 +670,19 @@ export const participantsOf = async (
       .where(eq(song.id, found.entity_id))
       .limit(1)
     if (row?.author != null) people.add(row.author)
+
+    return people
+  }
+
+  if (found.entity_type === 'bring') {
+    const [row] = await db
+      .select({ author: bringItem.author_account_id })
+      .from(bringItem)
+      .where(eq(bringItem.id, found.entity_id))
+      .limit(1)
+    if (row?.author != null) people.add(row.author)
+
+    for (const hand of await handsOn(db, found.entity_id)) people.add(hand)
 
     return people
   }
@@ -934,6 +997,19 @@ export const registerThreadRoutes = (
       return { link: feedPage(), what: row?.title ?? found.title }
     }
 
+    if (found.entity_type === 'bring') {
+      const [row] = await db
+        .select({ title: bringItem.title })
+        .from(bringItem)
+        .where(eq(bringItem.id, found.entity_id))
+        .limit(1)
+
+      return {
+        link: found.event_id === null ? null : bringPage(found.event_id, found.entity_id),
+        what: row?.title ?? found.title,
+      }
+    }
+
     const subject = found.subject_account_id
     if (subject === null) return { link: null, what: found.title }
 
@@ -945,21 +1021,8 @@ export const registerThreadRoutes = (
     attendance: { mine: 'introduction_comment', anybody: 'introduction_comment_any' },
     post: { mine: 'post_comment', anybody: 'post_comment_any' },
     song: { mine: 'song_comment', anybody: 'song_comment_any' },
+    bring: { mine: 'bring_comment', anybody: 'bring_comment_any' },
   } as const satisfies Record<ThreadEntityType, { mine: NotificationCategory; anybody: NotificationCategory }>
-
-  // Being named displaces the ordinary category, so it may only displace it for somebody the
-  // mention actually reaches — otherwise switching `mentioned` off silences what they did ask for.
-  const reaching = async (database: Database, named: readonly string[]): Promise<string[]> => {
-    const asked = await Promise.all(
-      named.map(async (accountId) => {
-        const channels = await wants(database, accountId, 'mentioned')
-
-        return channels.bell || channels.email ? [accountId] : []
-      }),
-    )
-
-    return asked.flat()
-  }
 
   const tellNamed = async (named: readonly string[], who: string, what: string, link: string | null) => {
     const said = `${who} named you in ${what}`
@@ -998,7 +1061,7 @@ export const registerThreadRoutes = (
     const said = `${who} said something about ${what}`
     const { mine, anybody } = commentCategories[found.entity_type]
 
-    const named = await reaching(db, await namedBy(db, body, found.event_id, author))
+    const named = await reachedByMention(db, await namedBy(db, body, found.event_id, author))
     const told = new Set(named)
 
     const people = await participantsOf(db, found)
@@ -1031,7 +1094,7 @@ export const registerThreadRoutes = (
     before: string,
     after: string,
   ) => {
-    const named = await reaching(db, await namedBy(db, after, found.event_id, author))
+    const named = await reachedByMention(db, await namedBy(db, after, found.event_id, author))
     const already = new Set(await namedBy(db, before, found.event_id, author))
     const newly = named.filter((accountId) => !already.has(accountId))
     if (newly.length === 0) return

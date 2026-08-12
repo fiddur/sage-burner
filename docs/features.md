@@ -74,6 +74,11 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
   lodging option refuses politely, helping never runs out.
 - The rideshare board: who needs a lift, who has room, per burn, contact
   resolved from the account.
+- The bring list: one shared list per burn of things the gathering wants and
+  things people are bringing. An item with no hands up is an ask and is shown
+  first; a hand makes it an offer, several hands to one thing are normal, and
+  the person who asked is told the moment somebody answers. Each item carries a
+  conversation and a card on the feed; leaving the burn withdraws your pledges.
 - The FAQ: per burn, seedable from a previous one, any member asks and any
   member answers, in an order somebody arranged.
 - The calendar feed: the programme as an `.ics` subscription per burn —

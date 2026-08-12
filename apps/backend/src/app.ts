@@ -44,6 +44,7 @@ import { registerAttendanceRoutes } from './routes/attendance.ts'
 import { registerAuthRoutes } from './routes/auth.ts'
 import { registerAvatarRoutes } from './routes/avatars.ts'
 import { registerBannerRoutes } from './routes/banner.ts'
+import { registerBringRoutes } from './routes/bring.ts'
 import { registerCalendarRoutes } from './routes/calendar.ts'
 import { registerConnectionRoutes } from './routes/connections.ts'
 import { readDocument, registerDocumentRoutes } from './routes/documents.ts'
@@ -310,6 +311,7 @@ export const createApp = async ({
   })
   registerAllergyRoutes(app, { db })
   registerAttendanceRoutes(app, { db, sessions, now, notify: tellAccount })
+  registerBringRoutes(app, { db, sessions, now, notify: tellAccount })
   registerPostRoutes(app, { db, sessions, now, notify: tellAccount })
   registerProfileRoutes(app, { db, sessions, now, notify: tellAccount })
   registerRosterRoutes(app, { db, sessions, now, notify: tellAccount })

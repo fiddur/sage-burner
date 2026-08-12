@@ -908,6 +908,39 @@ export const post = sqliteTable(
   ],
 )
 
+export const bringItem = sqliteTable(
+  'bring_item',
+  {
+    id: text('id').notNull(),
+    event_id: text('event_id')
+      .notNull()
+      .references(() => event.id, { onDelete: 'cascade' }),
+    author_account_id: text('author_account_id').references(() => account.id, { onDelete: 'set null' }),
+    title: text('title').notNull(),
+    comment: text('comment').notNull().default(''),
+    withdrawn_at: text('withdrawn_at'),
+    created_at: text('created_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    index('bring_item_event_idx').on(table.event_id, table.created_at),
+    check('bring_item_title_check', sql`length(trim(${table.title})) > 0`),
+  ],
+)
+
+export const bringHand = sqliteTable(
+  'bring_hand',
+  {
+    item_id: text('item_id')
+      .notNull()
+      .references(() => bringItem.id, { onDelete: 'cascade' }),
+    attendance_id: text('attendance_id')
+      .notNull()
+      .references(() => attendance.id, { onDelete: 'cascade' }),
+  },
+  (table) => [primaryKey({ columns: [table.item_id, table.attendance_id] })],
+)
+
 // No `event_id`: a song outlives any one burn, so the book is global.
 export const song = sqliteTable(
   'song',

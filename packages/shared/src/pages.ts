@@ -9,6 +9,13 @@ export const DREAM_PARAM = 'dream'
 export const dreamPage = (eventId: string, dreamId: string): string =>
   `/dreams?${BURN_PARAM}=${encodeURIComponent(eventId)}&${DREAM_PARAM}=${encodeURIComponent(dreamId)}`
 
+export const BRING_PARAM = 'item'
+
+export const bringPage = (eventId: string, itemId?: string): string =>
+  `/bring?${BURN_PARAM}=${encodeURIComponent(eventId)}${
+    itemId === undefined ? '' : `&${BRING_PARAM}=${encodeURIComponent(itemId)}`
+  }`
+
 export const profilePage = (accountId: string): string => `/members/${encodeURIComponent(accountId)}`
 
 export const feedPage = (kinds: readonly FeedKind[] = [], burn?: string): string => {

@@ -12,6 +12,8 @@ import type {
   ApprovedAccountsResponse,
   AttendanceResponse,
   BodyOf,
+  BringListResponse,
+  BringResponse,
   CalendarFeedResponse,
   ChangelogResponse,
   ConnectionResponse,
@@ -821,6 +823,37 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
 
     deleteRide: (id: string) =>
       request<undefined>(apiRoutes.deleteRide.path(id), { method: apiRoutes.deleteRide.method }),
+
+    getBringList: (eventId: string, signal?: AbortSignal) =>
+      request<BringListResponse>(apiRoutes.getBringList.path(eventId), { signal }),
+
+    addBringItem: (eventId: string, body: BodyOf<'addBringItem'>) =>
+      request<BringResponse>(apiRoutes.addBringItem.path(eventId), {
+        method: apiRoutes.addBringItem.method,
+        body,
+      }),
+
+    updateBringItem: (id: string, body: BodyOf<'updateBringItem'>) =>
+      request<BringResponse>(apiRoutes.updateBringItem.path(id), {
+        method: apiRoutes.updateBringItem.method,
+        body,
+      }),
+
+    deleteBringItem: (id: string) =>
+      request<undefined>(apiRoutes.deleteBringItem.path(id), {
+        method: apiRoutes.deleteBringItem.method,
+      }),
+
+    bringThis: (id: string, body: BodyOf<'bringThis'>) =>
+      request<BringResponse>(apiRoutes.bringThis.path(id), {
+        method: apiRoutes.bringThis.method,
+        body,
+      }),
+
+    stopBringingThis: (id: string, accountId: string) =>
+      request<BringResponse>(apiRoutes.stopBringingThis.path(id, accountId), {
+        method: apiRoutes.stopBringingThis.method,
+      }),
 
     addPost: (eventId: string, body: BodyOf<'addPost'>) =>
       request<PostResponse>(apiRoutes.addPost.path(eventId), {

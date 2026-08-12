@@ -14,7 +14,7 @@ import { viewerFor } from '../auth/viewer.ts'
 import { isEmptyPatch, patchRow } from '../db/patch.ts'
 import { event, post } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
-import { displayName, namedBy, tellAttendees, wants } from '../push/notify.ts'
+import { displayName, namedBy, reachedByMention, tellAttendees } from '../push/notify.ts'
 import { openEventNow, todayIso } from './events.ts'
 import { addEntry, threadFor } from './threads.ts'
 
@@ -36,20 +36,6 @@ const openPost = async (db: Database, now: () => Date, id: string): Promise<Post
 
 const threadForPost = async (db: Database, announced: Post): Promise<string> =>
   await threadFor(db, 'post', announced)
-
-// Being named displaces the announcement's own category, so it may only displace it for somebody
-// the mention reaches — `docs/the-app.md` has the rule this is the other half of.
-const reaching = async (db: Database, named: readonly string[]): Promise<string[]> => {
-  const asked = await Promise.all(
-    named.map(async (accountId) => {
-      const channels = await wants(db, accountId, 'mentioned')
-
-      return channels.bell || channels.email ? [accountId] : []
-    }),
-  )
-
-  return asked.flat()
-}
 
 export const registerPostRoutes = (
   app: FastifyInstance,
@@ -90,7 +76,7 @@ export const registerPostRoutes = (
     )
 
     const who = await displayName(db, viewer.account_id)
-    const named = await reaching(db, await namedBy(db, row.body, event_id, viewer.account_id))
+    const named = await reachedByMention(db, await namedBy(db, row.body, event_id, viewer.account_id))
 
     await Promise.all(
       named.map(
@@ -133,7 +119,7 @@ export const registerPostRoutes = (
 
     const already = new Set(await namedBy(db, existing.body, existing.event_id, viewer.account_id))
     const newly = (
-      await reaching(db, await namedBy(db, patched.row.body, existing.event_id, viewer.account_id))
+      await reachedByMention(db, await namedBy(db, patched.row.body, existing.event_id, viewer.account_id))
     ).filter((accountId) => !already.has(accountId))
     const by = await displayName(db, viewer.account_id)
 

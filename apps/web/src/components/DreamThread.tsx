@@ -23,7 +23,7 @@ const marks = {
   joined: '🎪',
   introduced: '✍️',
   posted: '📣',
-  added: '🎵',
+  added: '➕',
   restored: '↩️',
   facilitator: '👉',
   helper: '🙋',

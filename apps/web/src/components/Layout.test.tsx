@@ -190,6 +190,7 @@ describe('the menu at the edge of the bar', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Menu' }))
 
     expect((await screen.findByRole('link', { name: /Rideshares/ })).getAttribute('href')).toBe('/rides')
+    expect(screen.getByRole('link', { name: /Bring list/ }).getAttribute('href')).toBe('/bring')
   })
 
   it('is offered on a phone as well, where the bar is fullest', () => {

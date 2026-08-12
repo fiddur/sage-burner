@@ -17,6 +17,7 @@ import {
   MAX_WELCOME_LENGTH,
 } from '../limits.ts'
 import { applicationCreateSchema, applicationSchema } from './application.ts'
+import { bringCreateSchema, bringUpdateSchema } from './bring.ts'
 import { slugSchema } from './common.ts'
 import {
   DEFAULT_TRANSFER_INFO,
@@ -748,6 +749,52 @@ describe('the summaries derived from `eventFields`', () => {
     expect(withCap(42)).toBe(true)
     expect(withCap(0)).toBe(false)
     expect(withCap(-1)).toBe(false)
+  })
+})
+
+describe('something to bring', () => {
+  const anItem = (over: Record<string, unknown> = {}) => ({ title: 'Drums to use around the fire', ...over })
+
+  it('needs a name and nothing else, and is an ask until somebody puts a hand up', () => {
+    const parsed = bringCreateSchema.safeParse(anItem())
+
+    expect(parsed.success).toBe(true)
+    expect(parsed.data).toEqual({
+      title: 'Drums to use around the fire',
+      comment: '',
+      bringing: false,
+    })
+  })
+
+  it('is an offer when the person adding it says they are bringing it', () => {
+    expect(bringCreateSchema.safeParse(anItem({ bringing: true })).data?.bringing).toBe(true)
+  })
+
+  it('refuses a name of nothing but whitespace', () => {
+    expect(bringCreateSchema.safeParse(anItem({ title: '   ' })).success).toBe(false)
+  })
+
+  it('holds a comment as long as any other note', () => {
+    expect(bringCreateSchema.safeParse(anItem({ comment: 'a'.repeat(MAX_NOTES) })).success).toBe(true)
+    expect(bringCreateSchema.safeParse(anItem({ comment: 'a'.repeat(MAX_NOTES + 1) })).success).toBe(false)
+  })
+
+  it('refuses a field nobody named, so a typo is not silently dropped', () => {
+    expect(bringCreateSchema.safeParse(anItem({ wanted: 3 })).success).toBe(false)
+    expect(bringUpdateSchema.safeParse({ wanted: 3 }).success).toBe(false)
+  })
+
+  it('keeps who added it and whether it is withdrawn off what an edit may say', () => {
+    expect(bringUpdateSchema.safeParse({ author_account_id: ID }).success).toBe(false)
+    expect(bringUpdateSchema.safeParse({ withdrawn_at: null }).success).toBe(false)
+    expect(bringUpdateSchema.safeParse({ bringing: true }).success).toBe(false)
+  })
+
+  it('lets an update carry one field alone, and fills nothing in', () => {
+    const parsed = bringUpdateSchema.safeParse({ comment: 'A small bowl drum' })
+
+    expect(parsed.success).toBe(true)
+    expect(parsed.data).toEqual({ comment: 'A small bowl drum' })
   })
 })
 
