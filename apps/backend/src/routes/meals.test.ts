@@ -13,7 +13,15 @@ import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { isForeignKeyViolation, isUniqueViolation } from '../db/errors.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, attendance, event, meal as mealTable, pushSubscription } from '../db/schema.ts'
+import {
+  account,
+  accountRole,
+  attendance,
+  event,
+  mealSlot,
+  meal as mealTable,
+  pushSubscription,
+} from '../db/schema.ts'
 import { sendGuarded } from '../if-match.testing.ts'
 import { sittingDates } from './meals.ts'
 
@@ -669,14 +677,28 @@ describe('a burn that has ended', () => {
       joined_at: NOW,
       payment_status: 'unpaid',
     })
-    await send(server, 'POST', `/api/admin/events/${ENDED}/meal-slots`, admin.cookie, {
-      label: 'Dinner',
-      at: '18:00',
-    })
-    await send(server, 'POST', `/api/admin/events/${ENDED}/meals/generate`, admin.cookie)
+    // Written straight into the tables rather than through the API: laying a finished burn's
+    // meals out is one of the things refused, so the fixture cannot use the routes it tests.
+    const slot = randomUUID()
+    await db()
+      .insert(mealSlot)
+      .values({ id: slot, event_id: ENDED, order: 0, label: 'Dinner', at: '18:00', kind: 'meal' })
+    await db()
+      .insert(mealTable)
+      .values(
+        ['2025-08-01', '2025-08-02', '2025-08-03'].map((date) => ({
+          id: randomUUID(),
+          event_id: ENDED,
+          date,
+          at: '18:00',
+          label: 'Dinner',
+          kind: 'meal' as const,
+          food_idea: '',
+        })),
+      )
     const [meal] = (await send(server, 'GET', `/api/events/${ENDED}/meals`, admin.cookie)).json().meals
 
-    return { server, admin, meal }
+    return { server, admin, meal, slot }
   }
 
   it('refuses every member-facing write', async () => {
@@ -713,6 +735,37 @@ describe('a burn that has ended', () => {
         })
       ).statusCode,
     ).toBe(404)
+  })
+
+  it('refuses the admin’s own writes too, which is where sittings come from (#508)', async () => {
+    const { server, admin, slot } = await setUp()
+
+    expect(
+      (
+        await send(server, 'POST', `/api/admin/events/${ENDED}/meal-slots`, admin.cookie, {
+          label: 'Breakfast',
+          at: '08:00',
+        })
+      ).statusCode,
+    ).toBe(404)
+    expect(
+      (await send(server, 'PATCH', `/api/admin/meal-slots/${slot}`, admin.cookie, { at: '19:00' }))
+        .statusCode,
+    ).toBe(404)
+    expect((await send(server, 'DELETE', `/api/admin/meal-slots/${slot}`, admin.cookie)).statusCode).toBe(404)
+    expect(
+      (await send(server, 'POST', `/api/admin/events/${ENDED}/meals/generate`, admin.cookie)).statusCode,
+    ).toBe(404)
+  })
+
+  it('lays no new sittings into a burn that is over, which is a record now', async () => {
+    const { server, admin } = await setUp()
+
+    await send(server, 'POST', `/api/admin/events/${ENDED}/meals/generate`, admin.cookie)
+
+    expect((await send(server, 'GET', `/api/events/${ENDED}/meals`, admin.cookie)).json().meals).toHaveLength(
+      3,
+    )
   })
 
   it('leaves the record alone when a write is refused', async () => {

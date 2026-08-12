@@ -9,6 +9,15 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-12
 
+- **Being below the line is what puts you on the waiting list.** You were told only when the paid
+  members exactly filled the burn — so on a burn with more people than places, whoever was below the
+  line often heard nothing, while people who did have a place were told it was nearly full. Both
+  messages now go by where you actually stand on the list, and the link opens that burn's roster.
+
+- **A burn that is over cannot be re-planned.** Admin meal times could still be added, changed and
+  generated on a burn from last year — the last of these quietly wrote a whole meal plan into a burn
+  that had already happened. Everything about a finished burn is a record now; reading it still works.
+
 - **Applying no longer asks for an email twice.** The address you signed up with is the one we write
   to, so the field is optional: fill it in only if something else would reach you better. It used to
   refuse to send without one, blank, while the account already had it.

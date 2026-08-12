@@ -533,6 +533,24 @@ said payment timestamp; `payment_date` is written as `todayIso(now)` — a date,
 a timestamp — so an admin recording a batch in one sitting gives every one of
 them the same key and the tie breaks on nothing.
 
+**A tie breaks on the account id** (#506), which sounds arbitrary because it is: what matters is
+that it is _decided_. Two readers of one burn — the roster's query and the waiting-list
+notification's — hand the same rows over in whatever order their own index gives, and with a burn
+that opened on a Sunday every `joined_at` is the same second. Without a last resort in the
+comparison, the line the page draws and the line the notification draws could fall in different
+places, which is the one thing `withPlaces` living in the shared package exists to prevent.
+
+**And the notification is keyed on that line, not on a count** (#506). It compared `paid` to
+`member_cap` and told people they were waiting only when the two were exactly equal — so on an
+over-subscribed burn where the payments had not yet landed on the cap, whoever was below the line
+heard nothing at all, while members who _had_ a place were told the burn was nearly full. It now
+asks `withPlaces` the same question the roster asks: everybody below the line who has not paid is
+told they are waiting, and the nearly-full countdown goes to the unpaid who still have a place.
+
+**Told once per burn**, since recording the next payment does not change anything for somebody
+already below the line. The link carries the burn (`/members?burn=…`, per #333), which is also
+what makes "have we said this already" a query rather than a column.
+
 ## Handing a place over
 
 Withdrawing is refused once you have paid, because what a refund means is #31's

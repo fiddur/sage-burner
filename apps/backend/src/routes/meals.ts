@@ -388,7 +388,7 @@ const whoseHands = (
   return bodyOf(helperSchema, request)?.account_id
 }
 
-export const registerMealAdminRoutes = (app: FastifyInstance, { db }: MealDeps) => {
+export const registerMealAdminRoutes = (app: FastifyInstance, { db, now }: MealDeps) => {
   const answerSlots = async (eventId: string): Promise<MealSlotsResponse> => ({
     slots: await slotsFor(db, eventId),
   })
@@ -407,6 +407,8 @@ export const registerMealAdminRoutes = (app: FastifyInstance, { db }: MealDeps) 
 
     const body = bodyOf(mealSlotCreateSchema, request)
     if (body === undefined) return sendError(reply, 400)
+
+    if ((await openEventNow(db, now, request.params.eventId)) === undefined) return sendError(reply, 404)
 
     const existing = await slotsFor(db, request.params.eventId)
     const order = existing.reduce((highest, slot) => Math.max(highest, slot.order + 1), 0)
@@ -429,6 +431,7 @@ export const registerMealAdminRoutes = (app: FastifyInstance, { db }: MealDeps) 
 
     const [existing] = await db.select().from(mealSlot).where(eq(mealSlot.id, request.params.id)).limit(1)
     if (existing === undefined) return sendError(reply, 404)
+    if ((await openEventNow(db, now, existing.event_id)) === undefined) return sendError(reply, 404)
 
     if (Object.keys(body).length > 0) {
       await db.update(mealSlot).set(body).where(eq(mealSlot.id, request.params.id))
@@ -440,18 +443,23 @@ export const registerMealAdminRoutes = (app: FastifyInstance, { db }: MealDeps) 
   app.delete<{ Params: { id: string } }>(apiRoutes.deleteMealSlot.fastify, async (request, reply) => {
     void noStore(reply)
 
-    const [row] = await db
-      .delete(mealSlot)
+    const [existing] = await db
+      .select({ event_id: mealSlot.event_id })
+      .from(mealSlot)
       .where(eq(mealSlot.id, request.params.id))
-      .returning({ event_id: mealSlot.event_id })
+      .limit(1)
+    if (existing === undefined) return sendError(reply, 404)
+    if ((await openEventNow(db, now, existing.event_id)) === undefined) return sendError(reply, 404)
 
-    return row === undefined ? sendError(reply, 404) : reply.code(204).send()
+    await db.delete(mealSlot).where(eq(mealSlot.id, request.params.id))
+
+    return reply.code(204).send()
   })
 
   app.post<{ Params: { eventId: string } }>(apiRoutes.generateMeals.fastify, async (request, reply) => {
     void noStore(reply)
 
-    const burn = await burnFor(db, request.params.eventId)
+    const burn = await openEventNow(db, now, request.params.eventId)
     if (burn === undefined) return sendError(reply, 404)
 
     const slots = await slotsFor(db, burn.id)
