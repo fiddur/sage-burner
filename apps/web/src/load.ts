@@ -4,7 +4,9 @@ import type { FormErrorState } from './components/FormError.tsx'
 
 import { isApiError } from './api/client.ts'
 import { useRemembered } from './remembered.tsx'
+import { useShown } from './shown.tsx'
 import { isStale } from './stale.ts'
+import { useViewer } from './viewer.tsx'
 
 export const REVALIDATE_EVERY_MS = 60_000
 
@@ -15,6 +17,9 @@ export type Loaded<T> =
 
 export const errorMessage = (failure: unknown, fallback: string) =>
   isApiError(failure) ? failure.message : fallback
+
+/** The address as the notification that points at it spells one: a path and its query. */
+const whereWeAre = () => `${globalThis.location?.pathname ?? ''}${globalThis.location?.search ?? ''}`
 
 export const useLoad = <T>(
   fetcher: (signal: AbortSignal) => Promise<T>,
@@ -27,6 +32,8 @@ export const useLoad = <T>(
   }: { enabled?: boolean; fallback?: string; key?: string; live?: boolean; remember?: string },
 ): { loaded: Loaded<T>; refreshing: boolean; reload: () => Promise<void> } => {
   const remembered = useRemembered()
+  const shown = useShown()
+  const signedIn = useViewer().status === 'signed-in'
   const at = remember === undefined ? undefined : `${remember}:${key}`
 
   const recall = (): Loaded<T> => {
@@ -70,6 +77,7 @@ export const useLoad = <T>(
 
         if (at !== undefined) remembered.write(at, data)
         setLoaded({ status: 'ready', data })
+        if (signedIn) shown.report(whereWeAre(), controller.signal)
       })
       .catch((failure: unknown) => {
         if (controller.signal.aborted) return
@@ -89,7 +97,7 @@ export const useLoad = <T>(
     return () => {
       controller.abort()
     }
-  }, [enabled, attempt, at, key, fallback, remembered])
+  }, [enabled, attempt, at, key, fallback, remembered, shown, signedIn])
 
   useEffect(() => {
     if (!live || !enabled) return undefined

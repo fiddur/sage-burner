@@ -883,6 +883,48 @@ opening the panel does, and the list it was read with keeps its emphasis — the
 is for the next visit. The panel and the page draw the same component, so the peek and
 the page cannot come to say different things about one row.
 
+### Seeing the thing itself also marks it (#527)
+
+Those two were the only ways a notification became seen, so arriving at what one points
+at any other way left it unread: the new-version banner's "What's new" leads to
+`/changelog` and the row written with that link stayed on the bell, and so did a push
+notification's deep link or a shared URL. A badge about something already read is what
+teaches people to stop looking at the badge.
+
+**The client reports the address; the server does the matching.** `POST
+/api/me/notifications/shown` takes `{ link, as_of }` and marks `link = ? AND created_at
+<= ? AND seen_at IS NULL` for that account alone. By address rather than by ids the
+client holds, because of a real race: the banner comes from version polling, quite
+independent of the notification row, so somebody can be on `/changelog` before the
+bell's sixty-second ask has ever fetched the notification. A client marking by id would
+miss that one; a server matching by link cannot.
+
+**The address includes the query**, because that is what distinguishes one bring item's
+notification from another's — `/bring?burn=…&item=…`. So the report is
+`location.pathname + location.search`, and a link is built once in `pages.ts` and read
+back by the browser unchanged. `changelogPage()` exists for exactly that reason: three
+places spelled `/changelog` by hand, and the marking is a string comparison between two
+of them.
+
+**Freshness is what bounds it.** Being on the page is not enough — the shown data must
+be at least as new as the notification, or somebody parked on an open introduction page
+would have a second edit marked seen without ever seeing it. So the claim carries when
+the shown data was read, and the timestamp is the server's own: `Date` on the response
+of the read, which the API client keeps per `AbortSignal` and hands back as `readAt`.
+Whole seconds and the **oldest** read of the load, both of which err towards marking
+less; a device clock is not asked, and could not be trusted if it were. `useLoad`
+reports after each successful fetch, so `live: true` gives the "clears while the page
+is open" case for free — the second notification is marked the moment the refetch
+renders the newer content, and not before.
+
+**Nothing here is a permission.** A forged `as_of` would mark that account's own
+notifications, which `POST /api/me/notifications/seen` already does wholesale, so the
+timestamp is about correctness rather than trust. The report is best-effort — a failure
+is swallowed and retried by the next load — and it is not sent at all for a signed-out
+visit, where there is nobody to mark anything for. What the answer carries is the bell's
+own payload, handed to whoever subscribed, so the badge clears without waiting for the
+next ask.
+
 One row per category under **Your details → Notifications**, in three sections that
 default differently — a count here would go stale on the next feature, and
 `notificationCategoryInfo` is the list:

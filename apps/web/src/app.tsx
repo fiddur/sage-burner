@@ -1,9 +1,11 @@
+import { changelogPage } from '@sage-burner/shared'
 import { LocationProvider, Route, Router } from 'preact-iso'
 import { useMemo } from 'preact/hooks'
 
 import type { ApiClient } from './api/client.ts'
 import type { BellApi } from './components/NotificationBell.tsx'
 import type { InstallWatch } from './install.ts'
+import type { ShownApi } from './shown.tsx'
 import type { Viewer } from './viewer.tsx'
 
 import { createApiClient } from './api/client.ts'
@@ -50,6 +52,7 @@ import { Songs } from './pages/Songs.tsx'
 import { Terms } from './pages/Terms.tsx'
 import { createRemembered, RememberedProvider } from './remembered.tsx'
 import { ROUTER_SCOPE } from './router-scope.ts'
+import { createShown, ShownProvider } from './shown.tsx'
 import { FetchedViewerProvider, ViewerProvider } from './viewer.tsx'
 
 export type RoutesApi = Pick<
@@ -233,7 +236,7 @@ export type RoutesApi = Pick<
   | 'updateQuestion'
 >
 
-export type AppApi = RoutesApi & BellApi & Pick<ApiClient, 'getMe' | 'logout' | 'getVersion'>
+export type AppApi = RoutesApi & BellApi & ShownApi & Pick<ApiClient, 'getMe' | 'logout' | 'getVersion'>
 
 export const Routes = ({ api }: { api: RoutesApi }) => {
   const LoginRoute = useMemo(() => () => <Login api={api} />, [api])
@@ -285,7 +288,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
     <Router>
       <Route path="/" component={HomeRoute} />
       <Route path="/apply" component={ApplyRoute} />
-      <Route path="/changelog" component={ChangelogRoute} />
+      <Route path={changelogPage()} component={ChangelogRoute} />
       <Route path="/privacy" component={PrivacyRoute} />
       <Route path="/terms" component={TermsRoute} />
       <Route path="/members" component={MembersRoute} />
@@ -343,6 +346,7 @@ export const App = ({
       }),
     [api, freshness],
   )
+  const shown = useMemo(() => createShown(client), [client])
 
   const framed = (
     <FetchedBurnProvider api={client}>
@@ -364,14 +368,16 @@ export const App = ({
 
   return (
     <RememberedProvider remembered={remembered}>
-      <LocationProvider scope={ROUTER_SCOPE}>
-        <RouteOnMessage />
-        {viewer === undefined ? (
-          <FetchedViewerProvider api={client}>{content}</FetchedViewerProvider>
-        ) : (
-          <ViewerProvider viewer={viewer}>{content}</ViewerProvider>
-        )}
-      </LocationProvider>
+      <ShownProvider shown={shown}>
+        <LocationProvider scope={ROUTER_SCOPE}>
+          <RouteOnMessage />
+          {viewer === undefined ? (
+            <FetchedViewerProvider api={client}>{content}</FetchedViewerProvider>
+          ) : (
+            <ViewerProvider viewer={viewer}>{content}</ViewerProvider>
+          )}
+        </LocationProvider>
+      </ShownProvider>
     </RememberedProvider>
   )
 }
