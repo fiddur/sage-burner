@@ -9,6 +9,12 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-12
 
+- **An invite works for somebody the app has met before.** Pressing "Continue with Discord" on a
+  group link did nothing for anyone who had already signed up that way and was still waiting on an
+  application: they were signed in and told nothing. The link now makes them a member, the same as
+  it does for a stranger — possession of it is the vetting. Somebody already in keeps their link
+  unspent, and a link that has run out says so rather than blaming the address.
+
 - **An empty bring list says it is empty.** It used to claim "Everything asked for has somebody
   bringing it" on a burn where nothing had been asked for at all, which is the opposite of true.
   Now it says there is nothing on the list yet, and what to do about that.

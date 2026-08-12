@@ -314,6 +314,28 @@ describe('signing up from an invite link through a provider', () => {
     expect(await db().select().from(account).where(eq(account.email, 'wren@example.org'))).toEqual([])
   })
 
+  it('says the link ran out, not that the address is taken, when a single-use one is claimed twice', async () => {
+    const server = await build()
+    await givenProvider()
+    const token = await givenLink({ kind: 'single' })
+    const [link] = await db().select().from(inviteToken)
+    const first = randomUUID()
+    await db()
+      .insert(account)
+      .values({
+        id: first,
+        email: `${first}@example.org`,
+        password_hash: null,
+        invite_token_id: link?.id ?? null,
+        created_at: NOW.toISOString(),
+      })
+
+    const back = await signInFromInvite(server, token, { email: 'wren@example.org' })
+
+    expect(back.headers.location).toBe('/login?from=refused')
+    expect(await db().select().from(account).where(eq(account.email, 'wren@example.org'))).toEqual([])
+  })
+
   it('makes no member without one, which is the ordinary sign-up it was before', async () => {
     const server = await build()
     await givenProvider()
@@ -322,6 +344,105 @@ describe('signing up from an invite link through a provider', () => {
 
     expect(back.headers.location).toBe('/apply')
     expect(await db().select().from(accountRole)).toEqual([])
+  })
+})
+
+describe('taking up an invite as somebody the provider already knows', () => {
+  const givenIdentity = async (over: { roles?: ('admin' | 'member')[] } = {}) => {
+    const id = randomUUID()
+    await db()
+      .insert(account)
+      .values({ id, email: `${id}@example.org`, password_hash: null, created_at: NOW.toISOString() })
+    for (const role of over.roles ?? []) await db().insert(accountRole).values({ account_id: id, role })
+    await db().insert(accountIdentity).values({
+      id: randomUUID(),
+      account_id: id,
+      provider: 'facebook',
+      subject: 'provider-1',
+      profile_url: null,
+      created_at: NOW.toISOString(),
+    })
+
+    return id
+  }
+
+  it('makes a member of an account that has no role yet, the link being the vetting', async () => {
+    const server = await build()
+    await givenProvider()
+    const id = await givenIdentity()
+    const token = await givenLink()
+
+    const back = await signInFromInvite(server, token)
+
+    expect(back.headers.location).toBe('/')
+    expect(await db().select().from(accountRole).where(eq(accountRole.account_id, id))).toEqual([
+      { account_id: id, role: 'member' },
+    ])
+  })
+
+  it('records the arrival against the group link it came on', async () => {
+    const server = await build()
+    await givenProvider()
+    const id = await givenIdentity()
+    const token = await givenLink()
+
+    await signInFromInvite(server, token)
+
+    const arrivals = await db().select().from(inviteRedemption)
+    expect(arrivals).toHaveLength(1)
+    expect(arrivals[0]?.account_id).toBe(id)
+  })
+
+  it('spends a single-use link, stamping it and marking the account it admitted', async () => {
+    const server = await build()
+    await givenProvider()
+    const id = await givenIdentity()
+    const token = await givenLink({ kind: 'single' })
+
+    await signInFromInvite(server, token)
+
+    const [spent] = await db().select().from(inviteToken)
+    expect(spent?.used_at).not.toBeNull()
+    const [admitted] = await db().select().from(account).where(eq(account.id, id))
+    expect(admitted?.invite_token_id).toBe(spent?.id)
+  })
+
+  it('leaves a link alone for somebody who is already a member', async () => {
+    const server = await build()
+    await givenProvider()
+    await givenIdentity({ roles: ['member'] })
+    const token = await givenLink()
+
+    const back = await signInFromInvite(server, token)
+
+    expect(back.headers.location).toBe('/')
+    expect(await db().select().from(inviteRedemption)).toEqual([])
+  })
+
+  it('signs somebody in without a role on a link that has run out', async () => {
+    const server = await build()
+    await givenProvider()
+    const id = await givenIdentity()
+    const token = await givenLink({ expires_at: '2020-01-01T00:00:00.000Z' })
+
+    const back = await signInFromInvite(server, token)
+
+    expect(back.headers.location).toBe('/')
+    expect(cookiesOn(back)).toContain(`${SESSION_COOKIE}=`)
+    expect(await db().select().from(accountRole).where(eq(accountRole.account_id, id))).toEqual([])
+  })
+
+  it('leaves an admin alone as well, a role of any kind being an account that is already in', async () => {
+    const server = await build()
+    await givenProvider()
+    const id = await givenIdentity({ roles: ['admin'] })
+    const token = await givenLink()
+
+    await signInFromInvite(server, token)
+
+    expect(await db().select().from(accountRole).where(eq(accountRole.account_id, id))).toEqual([
+      { account_id: id, role: 'admin' },
+    ])
   })
 })
 
