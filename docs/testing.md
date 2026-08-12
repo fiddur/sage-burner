@@ -28,6 +28,26 @@ creates accounts, burns and content.
    visitor, an applicant, an approved member, and the admin. The applicant and
    member come out of the protocol's own first steps.
 
+**Four checks need the built web app instead, served by the backend on port 3000.**
+The dev pair above cannot pass them — not because anything is broken, but because
+that setup does not serve the pieces they exercise. `docs/configuration.md` has the
+recipe:
+
+```sh
+pnpm --filter sage-burner-web build
+SESSION_SECRET=$(openssl rand -base64 48) WEB_ROOT=$PWD/apps/web/dist pnpm dev:backend
+```
+
+- **The share card** (_First contact_): the shell handler that injects the `<meta>`
+  tags registers only when `web_root` is set, so the dev backend answers `/` with a
+  404 and Vite serves `index.html` uninjected.
+- **Subscribing to push** and **offline from cache** (_Installing, offline_):
+  `/sw.js` exists only after `vite build --config vite.sw.config.ts`, which
+  `pnpm dev:web` never runs — there is no service worker there at all.
+- **Offers to install / the home-screen tile** (_Installing, offline_):
+  `/manifest.webmanifest` is a backend route at a path outside `/api`, and the Vite
+  proxy forwards `/api` only, so it is never reached from port 5173.
+
 Where a step says "phone width", use a viewport under 45rem (~720px); "narrow
 phone" means 360px.
 
@@ -166,7 +186,10 @@ phone" means 360px.
 ## On a phone
 
 - [ ] Below 45rem a member gets the six-icon bottom bar; the top bar keeps ☰,
-      the brand, the burn selector and the session corner, and nothing wraps.
+      the brand and the session corner, and nothing wraps. The burn selector
+      appears once there are two burns — `Layout.tsx` renders it only above one,
+      and the admin steps above leave exactly one, the second create being a
+      slug-conflict check.
 - [ ] The top bar slides away scrolling down a page and returns on the first
       scroll up.
 - [ ] ☰ opens the drawer over the page (Songbook, Rideshares, the map when one
@@ -188,7 +211,7 @@ phone" means 360px.
 - [ ] Admin routes (`/api/admin/...`) refuse the member persona.
 - [ ] The member cannot write anybody else's name, contact or allergies.
 - [ ] The applicant persona (pre-approval) is refused everywhere but their own
-      application, passkeys and bell.
+      application, the private message thread on it, passkeys and bell.
 - [ ] A raw `<script>` typed into a comment, a dream title or the welcome text
       renders as text, never as markup.
 

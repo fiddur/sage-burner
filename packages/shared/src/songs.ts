@@ -148,7 +148,6 @@ export type MusicMark =
   | 'apple-music'
   | 'bandcamp'
   | 'deezer'
-  | 'elsewhere'
   | 'genius'
   | 'soundcloud'
   | 'spotify'

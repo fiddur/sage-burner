@@ -13,7 +13,8 @@ under today's heading, and make a new heading when there is none.
   right edge, and reaching the end of it meant dragging the words sideways one-handed. It now
   breaks onto the next line together with its chord line, so every chord stays over the syllable
   it belongs to — and a chord standing in a gap goes down with the words it heads rather than
-  being left behind on the line above.
+  being left behind on the line above. A wrapped line no longer leaves a blank gap behind it
+  where the words or the chords ran out, which read as a verse break in the middle of a verse.
 
 - **The slow half of the scroll slider works.** On a laptop the words stood completely still until
   the slider was about a third of the way along. Every setting now moves, and the same setting

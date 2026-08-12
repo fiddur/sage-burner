@@ -262,11 +262,10 @@ const useColumns = (box: RefObject<HTMLElement | null>, ruler: RefObject<HTMLEle
 
     measure()
 
-    const watched = box.current
-    if (watched === null || typeof ResizeObserver === 'undefined') return undefined
+    if (typeof ResizeObserver === 'undefined') return undefined
 
     const watching = new ResizeObserver(measure)
-    watching.observe(watched)
+    for (const watched of [box.current, ruler.current]) if (watched !== null) watching.observe(watched)
 
     return () => watching.disconnect()
   }, [box, ruler])

@@ -745,6 +745,13 @@ that **follow** it, so a break may not fall between the two. Without it, `Em` ov
 before `while` is stranded at the end of the line above, pointing at nothing. It is why
 `breakColumn` looks at where the chord tokens start rather than only at what is blank.
 
+**A half that runs out is dropped, but only where something was split** (#494). A continuation
+with no chords on it, or one whose words ended a break ago, renders as an empty line — and an
+empty line in the middle of a verse reads as a verse break, which is a lie about the song. So
+`piece` nulls an empty half. It takes `split` because a body's own blank lines are `words: ''`
+and must survive: the rule is about halves the wrapping emptied, never about a line the author
+left blank.
+
 How many columns fit is measured, not assumed: `.song-ruler` is an empty `1ch` box inside the
 body, so the count is the content width over its width, watched with a `ResizeObserver`.
 Unmeasured means `Infinity`, which is what the tests and any render before layout see — so
