@@ -632,6 +632,21 @@ describe('the way in, before the form', () => {
 
     expect((await screen.findByRole('alert')).textContent).toContain('already an account')
   })
+
+  it('says what the server would not take, rather than blaming the connection', async () => {
+    renderPage(stub({ signUp: () => Promise.reject(apiError(400, 'bad_request', 'bad_request')) }), {
+      status: 'signed-out',
+    })
+
+    fill('Your name', 'Fredrik')
+    fill('Your email address', 'fredrik@example.org')
+    fill('A password', 'a-long-enough-password')
+    fireEvent.click(await screen.findByRole('button', { name: 'Sign up' }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain('at least 10 characters')
+    expect(alert.textContent).not.toContain('connection')
+  })
 })
 
 describe('where an application already stands', () => {

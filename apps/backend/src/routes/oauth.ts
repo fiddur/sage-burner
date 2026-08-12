@@ -23,11 +23,13 @@ import { randomBytes, randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
 import type { Config } from '../config.ts'
+import type { Transaction } from '../db/index.ts'
 import type { IdentifyFailure, OAuthCalls } from '../oauth/client.ts'
 import type { ProviderAsks, ProviderProfile } from '../oauth/providers.ts'
 
 import { viewerFor } from '../auth/viewer.ts'
 import { loginAddressConnection, providerConnection } from '../connections.ts'
+import { isUniqueViolation } from '../db/errors.ts'
 import {
   account,
   accountAvatar,
@@ -214,6 +216,45 @@ export const registerOauthRoutes = (
     })
   }
 
+  type Invite = typeof inviteToken.$inferSelect
+
+  const openInvite = async (inviteHash: string): Promise<Invite | undefined> => {
+    const [invite] = await db
+      .select()
+      .from(inviteToken)
+      .where(eq(inviteToken.token_hash, inviteHash))
+      .limit(1)
+    if (invite === undefined) return undefined
+
+    const status = inviteStatusOf({ ...invite, redemptions: await redemptionsOf(db, invite.id) }, now())
+
+    return status === 'outstanding' ? invite : undefined
+  }
+
+  const claimInvite = (tx: Transaction, invite: Invite, accountId: string) => {
+    if (invite.kind === 'single') {
+      tx.update(inviteToken)
+        .set({ used_at: now().toISOString() })
+        .where(and(eq(inviteToken.id, invite.id), isNull(inviteToken.used_at)))
+        .run()
+
+      // `account_invite_token_idx` is unique, so a second account claiming the same
+      // single-use token fails this write rather than needing a guard of its own.
+      tx.update(account).set({ invite_token_id: invite.id }).where(eq(account.id, accountId)).run()
+    } else {
+      tx.insert(inviteRedemption)
+        .values({
+          id: randomUUID(),
+          token_id: invite.id,
+          account_id: accountId,
+          redeemed_at: now().toISOString(),
+        })
+        .run()
+    }
+
+    tx.insert(accountRole).values({ account_id: accountId, role: 'member' }).onConflictDoNothing().run()
+  }
+
   /**
    * An identity nobody has yet is a new account, not a dead end (#476): sign-up and sign-in
    * converge here, since asking somebody to pick which they are doing is asking them to know.
@@ -245,17 +286,8 @@ export const registerOauthRoutes = (
     // is made, and again inside the write for the single-use kind, whose claim is the stamp.
     // Only the digest survives the round trip, so a link that has gone stale cannot be linked
     // back to — the login page is where somebody is told, the same as every other refusal here.
-    const [invite] =
-      inviteHash === null
-        ? []
-        : await db.select().from(inviteToken).where(eq(inviteToken.token_hash, inviteHash)).limit(1)
-
-    if (inviteHash !== null) {
-      if (invite === undefined) return back(reply, loginPage('refused'))
-
-      const status = inviteStatusOf({ ...invite, redemptions: await redemptionsOf(db, invite.id) }, now())
-      if (status !== 'outstanding') return back(reply, loginPage('refused'))
-    }
+    const invite = inviteHash === null ? undefined : await openInvite(inviteHash)
+    if (inviteHash !== null && invite === undefined) return back(reply, loginPage('refused'))
 
     const accountId = randomUUID()
 
@@ -283,34 +315,12 @@ export const registerOauthRoutes = (
           })
           .run()
 
-        if (invite !== undefined) {
-          if (invite.kind === 'single') {
-            tx.update(inviteToken)
-              .set({ used_at: now().toISOString() })
-              .where(and(eq(inviteToken.id, invite.id), isNull(inviteToken.used_at)))
-              .run()
-
-            // `account_invite_token_idx` is unique, so a second account claiming the same
-            // single-use token fails this write rather than needing a guard of its own.
-            tx.update(account).set({ invite_token_id: invite.id }).where(eq(account.id, accountId)).run()
-          } else {
-            tx.insert(inviteRedemption)
-              .values({
-                id: randomUUID(),
-                token_id: invite.id,
-                account_id: accountId,
-                redeemed_at: now().toISOString(),
-              })
-              .run()
-          }
-
-          tx.insert(accountRole).values({ account_id: accountId, role: 'member' }).run()
-        }
+        if (invite !== undefined) claimInvite(tx, invite, accountId)
       })
     } catch (failure) {
       request.log.warn({ err: failure, provider }, 'could not make an account for a new identity')
 
-      return back(reply, loginPage('address-taken'))
+      return back(reply, loginPage(isUniqueViolation(failure, 'account.email') ? 'address-taken' : 'refused'))
     }
 
     try {
@@ -329,6 +339,27 @@ export const registerOauthRoutes = (
     return back(reply, invite === undefined ? applyPage() : homePage())
   }
 
+  const admitOnInvite = async (request: FastifyRequest, accountId: string, inviteHash: string) => {
+    const [held] = await db
+      .select({ role: accountRole.role })
+      .from(accountRole)
+      .where(eq(accountRole.account_id, accountId))
+      .limit(1)
+    if (held !== undefined) return
+
+    const invite = await openInvite(inviteHash)
+    if (invite === undefined) return
+
+    try {
+      db.transaction((tx) => {
+        claimInvite(tx, invite, accountId)
+      })
+    } catch (failure) {
+      // Swallowed: they are signed in either way, and the status page says where they stand.
+      request.log.warn({ err: failure }, 'could not admit an existing identity on an invite')
+    }
+  }
+
   const signIn = async (
     request: FastifyRequest,
     reply: FastifyReply,
@@ -343,6 +374,8 @@ export const registerOauthRoutes = (
       .limit(1)
 
     if (identity === undefined) return await signUpThrough(request, reply, provider, profile, inviteHash)
+
+    if (inviteHash !== null) await admitOnInvite(request, identity.account_id, inviteHash)
 
     if (profile.profile_url !== undefined) {
       try {

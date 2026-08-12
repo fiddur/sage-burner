@@ -17,7 +17,6 @@ import { loginAddressConnection } from '../connections.ts'
 import { isForeignKeyViolation, isUniqueViolation } from '../db/errors.ts'
 import {
   account,
-  accountAllergy,
   accountConnection,
   accountRole,
   application,
@@ -26,6 +25,7 @@ import {
 } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { digestOf, redemptionsOf } from '../invites.ts'
+import { writeAllergyTicks } from './allergy-ticks.ts'
 import { announceJoined, joinBurn } from './attendance.ts'
 import { cookieHeader } from './auth.ts'
 
@@ -175,9 +175,7 @@ export const registerRedemptionRoutes = (
               .run()
           }
 
-          for (const item_id of new Set(body.allergy_item_ids)) {
-            tx.insert(accountAllergy).values({ account_id: accountId, item_id }).onConflictDoNothing().run()
-          }
+          writeAllergyTicks(tx, accountId, body.allergy_item_ids)
 
           tx.insert(accountRole).values({ account_id: accountId, role: 'member' }).run()
 
