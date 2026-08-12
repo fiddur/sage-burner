@@ -359,10 +359,17 @@ These are member records, so treat them as such:
 
 ## Working an issue: merge on approval
 
-This project defaults to **merge on approval**. Once an issue is ironed out and
-assigned, take it end to end without checking back in for permission. A webhook
-service reviews every ready PR automatically; that review is the gate, not a
-human prompt.
+This project works **merge on approval**: once an issue is ironed out and assigned,
+take it end to end. A webhook service reviews every ready PR automatically, so
+getting one reviewed, approved and ready needs nobody's attention.
+
+**The merge itself needs the go-ahead, and "merge on approval" is it.** Said once it
+stands for the whole run — the PR in hand and every later one in the same session,
+including a queue worked off the Ready column. Do not ask again per PR; that is the
+confirmation step those words remove. Without them, take the PR to `✅Approved` with
+every thread resolved and CI green, then stop and say it is ready. The rule lives in
+`~/.claude/CLAUDE.md` and holds for every project; it is spelled out here because
+this repo's flow is built around it.
 
 1. Sync: `git checkout develop && git fetch origin develop && git reset --hard
 origin/develop`. Reset rather than pull — squash merges make local `develop`
@@ -381,7 +388,8 @@ started` means it has only begun; keep waiting for `updated`.)
    thread with a brief rationale. Resolve every inline thread via the GraphQL
    `resolveReviewThread` mutation.
 9. Any push starts a fresh review round. Repeat from step 7.
-10. **Merge without asking** once all four gates hold:
+10. **Merge, without asking again**, once "merge on approval" is standing and all
+    four gates hold:
     - the latest review body starts with `✅Approved`, **and** it is on the
       current head commit (a `✅Approved` left on an older commit is stale),
     - every inline review thread is resolved,
@@ -391,7 +399,9 @@ started` means it has only begun; keep waiting for `updated`.)
       `gh pr view <n> --json statusCheckRollup`.
     - `mergeStateStatus` is `CLEAN`.
       Then `gh pr merge <n> --merge`. Never `--admin`. Avoid `--auto` — a push
-      clears it and the PR sits `BLOCKED`.
+      clears it and the PR sits `BLOCKED`. Never the `merge` skill either: it is
+      `disable-model-invocation: true`, so only Fredrik can run it, and waiting on
+      him to type `/merge` is the stall this step exists to prevent.
 11. If `BEHIND`: `git fetch origin develop && git merge origin/develop
 --no-edit`, re-run `pnpm check`, push, and re-confirm the gate from step 7.
 12. After merge: `git checkout develop && git fetch origin develop && git reset
@@ -400,7 +410,8 @@ started` means it has only begun; keep waiting for `updated`.)
 
 The gate is not optional. "Merge on approval" removes the human confirmation
 step, not the review — never merge an unapproved PR, and never merge with open
-threads or red CI.
+threads or red CI. It removes that step for the run rather than for one PR: having
+been told once, asking again on the next PR is the same failure as never asking.
 
 **Most of it is enforced now.** The `CI and PR` ruleset targets the repository's
 default branch — which is `develop` — and enforces, with no bypass actors:
