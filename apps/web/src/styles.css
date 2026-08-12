@@ -2573,25 +2573,47 @@ img.avatar {
   border-radius: var(--radius);
 }
 
+/* The whole row is the link (#568), so the box is the target rather than a few words inside it.
+   Only the title is coloured and underlined: a row painted like a link end to end reads as one
+   enormous word, and the artist beside it would look like part of the name. */
+a.song-row {
+  color: inherit;
+  text-decoration: none;
+}
+
+a.song-row:hover,
+a.song-row:focus-visible {
+  border-color: var(--ember);
+}
+
+a.song-row:hover .song-what {
+  color: var(--ember-bright);
+}
+
+.song-what {
+  color: var(--ember);
+  text-decoration: underline;
+}
+
 .song-row.is-gone a {
   color: var(--muted);
   text-decoration-line: line-through;
 }
 
-/* `margin-inline-end: auto` on a flex row, so the marks stay at the far end however long a name
-   is — a name reading as part of the link is the thing to avoid, so it is muted and unlinked. */
 .song-artist {
   margin: 0;
-  margin-inline-end: auto;
   color: var(--muted);
   font-size: 0.9rem;
 }
 
+/* `margin-inline-start: auto` on the marks themselves, not on the artist beside them: a row with
+   nobody named has no artist to carry it, and its marks would sit against the title (#567). */
 .song-marks {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: 0.4rem;
+  margin-inline-start: auto;
   font-size: 0.85rem;
 }
 

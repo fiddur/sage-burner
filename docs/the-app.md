@@ -772,6 +772,13 @@ artist called "". `nonEmptyText(…).nullable()` is what refuses the empty strin
 no CHECK saying the same — SQLite cannot add one through `ALTER TABLE`, and rebuilding `song`
 would take `song_in_category` down with it.
 
+**The row is the link, not the title** (#568). A bordered box the width of the screen with a
+few words in it live is a target problem on a phone; the anchor is the row, and the title inside it
+carries the colour and the underline so it still reads as one. The marks sit at the far end on their
+own `margin-inline-start: auto` rather than on the artist beside them (#567) — a row nobody has named
+an artist for has no such sibling, and its marks used to sit against the title. The taken-out rows
+keep the old shape, since the restore button cannot live inside a link.
+
 **Sorting is the client's, and by artist puts the nameless last.** The list is already loaded
 whole and filtered by chips in the page, so a second order is `inSongOrder` over what is in
 hand rather than a query parameter and a second index. Nulls last in either direction, because

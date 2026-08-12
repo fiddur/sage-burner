@@ -1,8 +1,42 @@
 import type { ApiClient } from './api/client.ts'
 
+import { ROUTER_SCOPE } from './router-scope.ts'
+
 export type VersionApi = Pick<ApiClient, 'getVersion'>
 
 export const CHECK_EVERY_MS = 60_000
+
+const inApp = (link: HTMLAnchorElement, scope: RegExp): boolean =>
+  link.origin === globalThis.location.origin &&
+  !link.getAttribute('href')?.startsWith('#') &&
+  link.download === '' &&
+  (link.target === '' || link.target === '_self') &&
+  scope.test(link.pathname)
+
+/**
+ * `preact-iso` claims every in-app link and pushes state instead, which is what leaves this tab
+ * on the build the bar is complaining about. The listener runs at capture, before the router's.
+ */
+export const hardenNavigation = (
+  go: (href: string) => void = (href) => globalThis.location.assign(href),
+  scope: RegExp = ROUTER_SCOPE,
+): (() => void) => {
+  const onClick = (event: MouseEvent) => {
+    if (event.button !== 0 || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return
+
+    const link = event
+      .composedPath()
+      .find((step): step is HTMLAnchorElement => step instanceof HTMLAnchorElement)
+    if (link === undefined || !inApp(link, scope)) return
+
+    event.preventDefault()
+    go(link.href)
+  }
+
+  globalThis.addEventListener('click', onClick, { capture: true })
+
+  return () => globalThis.removeEventListener('click', onClick, { capture: true })
+}
 
 export const watchForNewVersion = (
   api: VersionApi,

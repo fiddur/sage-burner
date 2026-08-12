@@ -132,11 +132,10 @@ phone" means 360px.
 - [ ] The member's own page shows payment status with no control to change it,
       and a member cannot record payment through the API either.
 - [ ] The admin records a payment: the list reorders paid-first and the
-      have-a-place line moves. With more joiners than the cap, whoever is below
-      the line is told they are waiting — including while the payments recorded
-      so far are fewer than the cap — and nobody who still has a place is. The
-      notification opens that burn's roster, and a second payment does not say
-      it again.
+      have-a-place line moves. Every member who has not paid is told the same
+      thing — how many places are left while some are, that it is full once none
+      are — whatever their position on the list. The notification opens that
+      burn's roster, and a second payment does not say "full" again.
 - [ ] A paid member transfers their place to an unpaid one: the payment moves,
       the giver's stay is deleted, the taker is notified.
 
@@ -279,6 +278,8 @@ phone" means 360px.
       data (an offline reload after sign-out shows no roster).
 - [ ] `/changelog` lists what changed, newest first, and the deploy
       notification links to it.
+- [ ] With the redeploy bar showing, follow "What's new" (or the notification that
+      leads there): the page loads afresh and the bar is gone on arrival.
 
 ## Guard spot-checks
 

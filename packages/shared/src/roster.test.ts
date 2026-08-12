@@ -58,10 +58,7 @@ describe('withPlaces', () => {
     expect(withPlaces([], 42)).toEqual([])
   })
 
-  it('breaks a tie on the account, so two readers of one burn draw the same line (#506)', () => {
-    // Everybody joining in the same second is what a burn that opens on a Sunday looks like,
-    // and two queries reading the same rows hand them over in whatever order their index gives.
-    // Without this the roster and the waiting-list notification can disagree about who is below.
+  it('breaks a tie on the account, so the line falls in the same place on every read (#506)', () => {
     const rows = [at('same', 'unpaid', 'c'), at('same', 'unpaid', 'a'), at('same', 'unpaid', 'b')]
 
     expect(withPlaces(rows, 2).map((entry) => `${entry.account_id}${entry.waiting ? '!' : ''}`)).toEqual([

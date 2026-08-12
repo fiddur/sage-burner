@@ -131,10 +131,12 @@ export const Songs = ({ api }: { api: SongsApi }) => {
       {shown.length > 0 && (
         <ul class="song-list">
           {shown.map((one) => (
-            <li key={one.id} class="song-row">
-              <a href={songPage(one.id)}>{one.title}</a>
-              {one.artist !== null && <span class="song-artist">{one.artist}</span>}
-              <Marks song={one} categories={book.categories} />
+            <li key={one.id}>
+              <a class="song-row" href={songPage(one.id)}>
+                <span class="song-what">{one.title}</span>
+                {one.artist !== null && <span class="song-artist">{one.artist}</span>}
+                <Marks song={one} categories={book.categories} />
+              </a>
             </li>
           ))}
         </ul>

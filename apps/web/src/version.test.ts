@@ -1,8 +1,8 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { VersionApi } from './version.ts'
 
-import { CHECK_EVERY_MS, watchForNewVersion } from './version.ts'
+import { CHECK_EVERY_MS, hardenNavigation, watchForNewVersion } from './version.ts'
 
 /**
  * The clock and the listeners are injected, so nothing here waits a real minute and
@@ -128,5 +128,65 @@ describe('watching for a new version', () => {
     await app.wake()
 
     expect(app.getVersion.mock.calls.length).toBe(before)
+  })
+})
+
+describe('turning in-app links into full loads while the build is stale', () => {
+  const clicking = (html: string) => {
+    document.body.innerHTML = html
+    const link = document.querySelector('a')
+    if (link === null) throw new Error('no link to click')
+
+    return link
+  }
+
+  afterEach(() => {
+    document.body.innerHTML = ''
+  })
+
+  it('navigates rather than letting the router push, which would keep this build', () => {
+    const go = vi.fn()
+    const off = hardenNavigation(go)
+    const link = clicking('<a href="/members">Members</a>')
+
+    link.click()
+
+    expect(go).toHaveBeenCalledWith(`${location.origin}/members`)
+    off()
+  })
+
+  it('stops when the bar goes, so an app on the newest build routes as it always did', () => {
+    const go = vi.fn()
+    hardenNavigation(go)()
+    const link = clicking('<a href="/members">Members</a>')
+
+    link.click()
+
+    expect(go).not.toHaveBeenCalled()
+  })
+
+  it('leaves the click alone where the browser is doing the navigating itself', () => {
+    const go = vi.fn()
+    const off = hardenNavigation(go)
+
+    clicking('<a href="https://example.org/">Somewhere else</a>').click()
+    clicking('<a href="/manifest.webmanifest">Outside the router</a>').click()
+    clicking('<a href="/songs" target="_blank">A new tab</a>').click()
+    clicking('<a href="/songs" download="song.txt">A download</a>').click()
+    clicking('<a href="#words">An anchor on this page</a>').click()
+
+    expect(go).not.toHaveBeenCalled()
+    off()
+  })
+
+  it('leaves a modifier click to the browser, which is opening it elsewhere', () => {
+    const go = vi.fn()
+    const off = hardenNavigation(go)
+    const link = clicking('<a href="/members">Members</a>')
+
+    link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, metaKey: true }))
+
+    expect(go).not.toHaveBeenCalled()
+    off()
   })
 })
