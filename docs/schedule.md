@@ -37,6 +37,15 @@ that "copied with no link back" below deliberately does without.
 The slot's values are **copied with no link back**. Renaming a slot leaves what it has
 already made alone, the same call the repeatable dream makes about its copies.
 
+**A burn that has ended takes none of these writes** (#508). Every member-facing write already
+resolved the burn and refused a finished one, but the admin routes here did not — the four that
+shape the times (adding a slot, editing one, deleting one, generating) and the two that shape the
+sittings (adding one, deleting one). `generate` was the sharp one: pressed against a burn from last
+summer it laid six sittings nobody at that burn ever had. All six go through `openEventNow` now,
+the bare-id ones by reading the row's `event_id` first. Reading stays open, because a finished
+burn's meals are its record; the tests build that record by writing the rows directly, since the
+routes that would lay it out are the ones being refused.
+
 **Which days a sitting falls on comes from the burn's hours, not its days.** A 13:00
 lunch on a day the gates open at 16:00 is not a meal anyone eats, and a day that ends
 at noon has no dinner — which is why the spreadsheet's own plan starts at a Sunday

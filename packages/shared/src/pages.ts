@@ -16,6 +16,9 @@ export const bringPage = (eventId: string, itemId?: string): string =>
     itemId === undefined ? '' : `&${BRING_PARAM}=${encodeURIComponent(itemId)}`
   }`
 
+export const membersPage = (eventId?: string): string =>
+  eventId === undefined ? '/members' : `/members?${BURN_PARAM}=${encodeURIComponent(eventId)}`
+
 export const profilePage = (accountId: string): string => `/members/${encodeURIComponent(accountId)}`
 
 export const feedPage = (kinds: readonly FeedKind[] = [], burn?: string): string => {

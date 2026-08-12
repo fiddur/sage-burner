@@ -122,17 +122,20 @@ const givenBurn = async (cap = 3) => {
   })
 }
 
-const givenComing = async (accountId: string, paid = false) => {
+const givenComing = async (accountId: string, paid = false, joined_at = NOW) => {
   await db()
     .insert(attendance)
     .values({
       id: randomUUID(),
       event_id: BURN,
       account_id: accountId,
-      joined_at: NOW,
+      joined_at,
       payment_status: paid ? 'paid' : 'unpaid',
     })
 }
+
+/** Distinct joining times, so who is below the line is the fixture's to decide rather than the tie-break's. */
+const joinedAt = (minutes: number) => new Date(Date.parse(NOW) + minutes * 60_000).toISOString()
 
 const givenSubscribed = async (accountId: string) => {
   await db()
@@ -382,6 +385,59 @@ describe('the waiting list', () => {
 
     const theirs = (await list(server, unpaid.cookie)).json().notifications
     expect(theirs.map((one: { category: string }) => one.category)).toContain('waiting_list_pushed')
+  })
+
+  it('tells whoever is below the line, not only when the paid exactly fill it (#506)', async () => {
+    // The bug this closes: the notification keyed on `paid === member_cap` while the roster's
+    // line is drawn over everybody, so an over-subscribed burn told the person below it nothing
+    // until the payments happened to land exactly on the cap.
+    const server = await build()
+    await givenBurn(4)
+    const admin = await givenAccount(['admin'])
+    const paid = await givenAccount()
+    const alsoPaid = await givenAccount()
+    const held = [await givenAccount(), await givenAccount()]
+    const below = await givenAccount()
+    const joining = [paid, alsoPaid, ...held, below]
+    for (const [at, who] of joining.entries()) await givenComing(who.id, false, joinedAt(at))
+
+    await setPaid(server, admin.cookie, paid.id)
+    await setPaid(server, admin.cookie, alsoPaid.id)
+
+    const theirs = (await list(server, below.cookie)).json().notifications
+    expect(theirs.map((one: { category: string }) => one.category)).toContain('waiting_list_pushed')
+  })
+
+  it('leaves whoever still has a place off that list, though they have not paid either', async () => {
+    const server = await build()
+    await givenBurn(4)
+    const admin = await givenAccount(['admin'])
+    const paid = await givenAccount()
+    const withAPlace = await givenAccount()
+    const alsoWithAPlace = await givenAccount()
+    const below = await givenAccount()
+    const joining = [paid, withAPlace, alsoWithAPlace, below]
+    for (const [at, who] of joining.entries()) await givenComing(who.id, false, joinedAt(at))
+
+    await setPaid(server, admin.cookie, paid.id)
+
+    const theirs = (await list(server, withAPlace.cookie)).json().notifications
+    expect(theirs.map((one: { category: string }) => one.category)).not.toContain('waiting_list_pushed')
+  })
+
+  it('links the burn it is about, so the roster it names is the one that opens', async () => {
+    const server = await build()
+    await givenBurn(1)
+    const admin = await givenAccount(['admin'])
+    const paid = await givenAccount()
+    const unpaid = await givenAccount()
+    await givenComing(paid.id)
+    await givenComing(unpaid.id)
+
+    await setPaid(server, admin.cookie, paid.id)
+
+    const [told] = (await list(server, unpaid.cookie)).json().notifications
+    expect(told.link).toBe(`/members?burn=${BURN}`)
   })
 
   it('says nothing to somebody who has paid', async () => {

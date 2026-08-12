@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import { withPlaces } from './roster.ts'
 
-const at = (joined_at: string, payment_status: 'unpaid' | 'paid' = 'unpaid') => ({
+const at = (joined_at: string, payment_status: 'unpaid' | 'paid' = 'unpaid', account_id = joined_at) => ({
+  account_id,
   joined_at,
   payment_status,
 })
@@ -55,5 +56,19 @@ describe('withPlaces', () => {
 
   it('handles an empty burn', () => {
     expect(withPlaces([], 42)).toEqual([])
+  })
+
+  it('breaks a tie on the account, so two readers of one burn draw the same line (#506)', () => {
+    // Everybody joining in the same second is what a burn that opens on a Sunday looks like,
+    // and two queries reading the same rows hand them over in whatever order their index gives.
+    // Without this the roster and the waiting-list notification can disagree about who is below.
+    const rows = [at('same', 'unpaid', 'c'), at('same', 'unpaid', 'a'), at('same', 'unpaid', 'b')]
+
+    expect(withPlaces(rows, 2).map((entry) => `${entry.account_id}${entry.waiting ? '!' : ''}`)).toEqual([
+      'a',
+      'b',
+      'c!',
+    ])
+    expect(withPlaces([...rows].reverse(), 2).map((entry) => entry.account_id)).toEqual(['a', 'b', 'c'])
   })
 })

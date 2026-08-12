@@ -133,7 +133,10 @@ phone" means 360px.
       and a member cannot record payment through the API either.
 - [ ] The admin records a payment: the list reorders paid-first and the
       have-a-place line moves. With more joiners than the cap, whoever is below
-      the line is told they are waiting.
+      the line is told they are waiting — including while the payments recorded
+      so far are fewer than the cap — and nobody who still has a place is. The
+      notification opens that burn's roster, and a second payment does not say
+      it again.
 - [ ] A paid member transfers their place to an unpaid one: the payment moves,
       the giver's stay is deleted, the taker is notified.
 
@@ -149,6 +152,9 @@ phone" means 360px.
       the kitchen lane.
 - [ ] At phone width the grid and the meal plan scroll internally under sticky
       headers; the page itself does not scroll sideways.
+- [ ] On a burn that has ended, the admin's meal times refuse adding, editing and
+      deleting, Generate lays no new sittings, and a single sitting can be neither
+      added to it nor taken out.
 - [ ] On a burn that has ended, dreams, lanes, meals and FAQ refuse writes;
       commenting still works.
 
