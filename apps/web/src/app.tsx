@@ -25,6 +25,7 @@ import { AdminRoster } from './pages/AdminRoster.tsx'
 import { AdminSettings } from './pages/AdminSettings.tsx'
 import { AdminSongCategories } from './pages/AdminSongCategories.tsx'
 import { Apply } from './pages/Apply.tsx'
+import { Bring } from './pages/Bring.tsx'
 import { Changelog } from './pages/Changelog.tsx'
 import { Dreams } from './pages/Dreams.tsx'
 import { Faq } from './pages/Faq.tsx'
@@ -150,6 +151,12 @@ export type RoutesApi = Pick<
   | 'addRide'
   | 'updateRide'
   | 'deleteRide'
+  | 'getBringList'
+  | 'addBringItem'
+  | 'updateBringItem'
+  | 'deleteBringItem'
+  | 'bringThis'
+  | 'stopBringingThis'
   | 'addPlace'
   | 'updatePlace'
   | 'deletePlace'
@@ -249,6 +256,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
   const AdminSongCategoriesRoute = useMemo(() => () => <AdminSongCategories api={api} />, [api])
   const RolesRoute = useMemo(() => () => <Roles api={api} />, [api])
   const RidesRoute = useMemo(() => () => <Rides api={api} />, [api])
+  const BringRoute = useMemo(() => () => <Bring api={api} />, [api])
   const FaqRoute = useMemo(() => () => <Faq api={api} />, [api])
   const FeedRoute = useMemo(() => () => <Feed api={api} />, [api])
   const MealsRoute = useMemo(() => () => <Meals api={api} />, [api])
@@ -289,6 +297,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
       <Route path="/songs/:songId" component={SongRoute} />
       <Route path="/roles" component={RolesRoute} />
       <Route path="/rides" component={RidesRoute} />
+      <Route path="/bring" component={BringRoute} />
       <Route path="/faq" component={FaqRoute} />
       <Route path="/feed" component={FeedRoute} />
       <Route path="/notifications" component={NotificationsRoute} />

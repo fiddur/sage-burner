@@ -175,6 +175,26 @@ phone" means 360px.
 - [ ] The song's card is on the feed; song news notifies only those who turned
       `song_added` on.
 
+## The bring list
+
+- [ ] ☰ → Bring list. Add something without ticking "I am bringing this
+      myself": it lands under "Nobody is bringing these yet".
+- [ ] Put your hand up on it from a second member's account: it moves to the
+      half below, and the member who asked is told somebody is bringing it. A
+      second hand on the same item tells them nothing more.
+- [ ] Two hands to one item both show; ✕ takes one off and tells that person,
+      never yourself.
+- [ ] Reword your own item — the pen is offered on yours and not on somebody
+      else's; an admin has the bin on any and the pen on none.
+- [ ] Take an item off: it leaves the list, and its card on the feed says so
+      with the conversation kept.
+- [ ] 💬 opens the item's conversation on the list page; the same comments show
+      on its card on the feed.
+- [ ] From an account that has not joined the burn, 🙋 says to join the burn and
+      links to the details page rather than refusing.
+- [ ] Leave the burn with a pledge outstanding: the hand is gone from the item
+      and the item is not.
+
 ## Being told
 
 - [ ] The bell: a panel on a wide screen, a page (`/notifications`) on a phone;
@@ -204,8 +224,9 @@ phone" means 360px.
       slug-conflict check.
 - [ ] The top bar slides away scrolling down a page and returns on the first
       scroll up.
-- [ ] ☰ opens the drawer over the page (Songbook, Rideshares, the map when one
-      is set); backdrop, ✕ and Escape all close it and focus returns to ☰.
+- [ ] ☰ opens the drawer over the page (Songbook, Rideshares, Bring list, the
+      map when one is set); backdrop, ✕ and Escape all close it and focus
+      returns to ☰.
 - [ ] At 360px nothing anywhere scrolls the page sideways.
 
 ## Installing, offline, and the installation's face

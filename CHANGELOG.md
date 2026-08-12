@@ -9,6 +9,13 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-12
 
+- **A bring list per burn, behind ☰.** One shared list of things the gathering wants and things
+  people are bringing, replacing the spreadsheet's Bring tab. Add a thing — tick "I am bringing this
+  myself" and it is an offer, leave it and it is an ask, waiting for a hand at the top of the page.
+  Several people can bring the same thing, and whoever asked is told the moment somebody says they
+  will. Every item has a conversation and a card on the feed, and leaving a burn quietly takes your
+  pledges with it.
+
 - **An invite link takes Discord and Facebook.** A link posted in a group is opened by somebody who
   already has that provider, so the invite page now offers the same one-click buttons the login page
   does — one round trip and you are a member, with no address and password to invent. Setting up an

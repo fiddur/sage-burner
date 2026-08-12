@@ -542,6 +542,7 @@ const goneLabel = {
   attendance: ' · no longer coming',
   post: ' · taken back',
   song: ' · out of the book',
+  bring: ' · off the list',
 } as const satisfies Record<Thread['entity_type'], string>
 
 const whereItBelongs = (card: Thread): string | undefined =>

@@ -862,12 +862,13 @@ opening the panel does, and the list it was read with keeps its emphasis — the
 is for the next visit. The panel and the page draw the same component, so the peek and
 the page cannot come to say different things about one row.
 
-Twelve categories under **Your details → Notifications**, in sections that default
-differently:
+One row per category under **Your details → Notifications**, in three sections that
+default differently — a count here would go stale on the next feature, and
+`notificationCategoryInfo` is the list:
 
-- **What happens to you** — the original six. On unless you refuse them: being put on
-  a meal is not noise, and somebody who never opens the settings should still hear it.
-- **What else is going on** — the five #259 added. **Off unless you ask.** A burn
+- **What happens to you** — on unless you refuse them: being put on a meal is not
+  noise, and somebody who never opens the settings should still hear it.
+- **What else is going on** — the section #259 added. **Off unless you ask.** A burn
   where every dream and every arrival pings forty-two people is a channel people learn
   to ignore, which costs the notifications that are actually about them.
 - **What you look after** — an application arriving, and **only an admin is shown it**

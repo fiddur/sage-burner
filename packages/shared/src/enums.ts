@@ -92,6 +92,11 @@ export const notificationCategories = [
   'song_added',
   'song_comment',
   'song_comment_any',
+  'bring_added',
+  'bring_answered',
+  'bring_role',
+  'bring_comment',
+  'bring_comment_any',
   'mentioned',
   'lead_role_added',
   'lead_role_filled',
@@ -135,6 +140,15 @@ export const notificationCategoryInfo = {
   song_added: { label: 'A song goes into the songbook', on: false, about: 'else' },
   song_comment: { label: 'Somebody comments on a song you put in', on: true, about: 'you' },
   song_comment_any: { label: 'Somebody comments on any song', on: false, about: 'else' },
+  bring_added: { label: 'Somebody wants or offers something to bring', on: false, about: 'else' },
+  bring_answered: { label: 'Somebody brings what you asked for', on: true, about: 'you' },
+  bring_role: { label: 'Put on or taken off bringing something', on: true, about: 'you' },
+  bring_comment: {
+    label: 'Somebody comments on something you asked for or are bringing',
+    on: true,
+    about: 'you',
+  },
+  bring_comment_any: { label: 'Somebody comments on anything on the bring list', on: false, about: 'else' },
   mentioned: { label: 'Somebody names you', on: true, about: 'you' },
   lead_role_added: { label: 'A lead role is added', on: false, about: 'else' },
   lead_role_filled: { label: 'Somebody takes the lead of a role', on: false, about: 'else' },
@@ -155,7 +169,7 @@ export const notificationSections = [
 export const categoriesAbout = (about: NotificationCategoryInfo['about']): NotificationCategory[] =>
   notificationCategories.filter((category) => notificationCategoryInfo[category].about === about)
 
-export const threadEntityTypes = ['session', 'attendance', 'post', 'song'] as const
+export const threadEntityTypes = ['session', 'attendance', 'post', 'song', 'bring'] as const
 export type ThreadEntityType = (typeof threadEntityTypes)[number]
 export const isThreadEntityType = (value: unknown): value is ThreadEntityType =>
   isOneOf(threadEntityTypes, value)
@@ -170,6 +184,7 @@ export const feedKindLabel = {
   attendance: 'People',
   post: 'Posts',
   song: 'Songs',
+  bring: 'Bring',
 } as const satisfies Record<FeedKind, string>
 
 export const KINDS_PARAM = 'kinds'
@@ -239,11 +254,19 @@ const songCategory = (kind: ThreadEntryKind): NotificationCategory | undefined =
   return undefined
 }
 
+const bringCategory = (kind: ThreadEntryKind): NotificationCategory | undefined => {
+  if (kind === 'comment') return 'bring_comment_any'
+  if (kind === 'added' || kind === 'edited') return 'bring_added'
+
+  return undefined
+}
+
 const categoriesFor = {
   session: sessionCategory,
   attendance: attendanceCategory,
   post: postCategory,
   song: songCategory,
+  bring: bringCategory,
 } as const satisfies Record<ThreadEntityType, (kind: ThreadEntryKind) => NotificationCategory | undefined>
 
 export const entryCategory = (

@@ -145,7 +145,7 @@ has been reached from the page it belongs to. That worked until a page belonged 
 other page: the rideshare board is linked from a form that only renders for a burn you
 have already joined, so somebody who has not joined one could not get there at all.
 
-**☰ is where those live** — 🎵 Songbook and 🛻 Rideshares. Beside the logo rather than on
+**☰ is where those live** — 🎵 Songbook, 🛻 Rideshares and 🎁 Bring list. Beside the logo rather than on
 it: the logo goes home, which is a convention worth more than the space a second target
 costs. **Ahead of the logo**, at the edge its drawer slides in from — a control that
 opens from the left, sitting to the right of something else, reads as belonging to that
@@ -225,9 +225,9 @@ too narrow for words and corner together, and the nav drops to a second row **wh
 cannot be split, at any width.
 
 **Six is the ceiling**, not a coincidence: six by ~3.5rem fits a 360px phone and
-nothing wider does. The pages still to come — the map (#315), the bring list (#24),
-Leave No Trace (#29), music (#316) — go behind ☰ rather than take a seventh seat, which
-is what ☰ was built for and where rideshares (#26) already are.
+nothing wider does. The pages still to come — the map (#315), Leave No Trace (#29),
+music (#316) — go behind ☰ rather than take a seventh seat, which is what ☰ was built
+for and where rideshares (#26) and the bring list (#24) already are.
 
 The entries are **one list in `Layout.tsx`**, drawn as words on a wide screen and as
 icons here, so the two cannot come to offer different pages. Which layout is drawn is
@@ -883,6 +883,51 @@ everybody else.
 burn's attendees are the wrong one for a global book, so `GET /api/accounts` answers ids,
 names and avatars and nothing else — a route selecting three columns cannot leak a fourth,
 the same argument the attendees route makes.
+
+## The bring list
+
+The spreadsheet had a "Bring" tab, and what it was for was one list everybody could read:
+things the gathering wanted, and things somebody had said they were bringing. It replaces
+that (#24), per burn, reached from ☰.
+
+**Asks and offers are the same row.** An item is a name and an optional comment; hands on
+it are what tell the two apart. An offer is an item added with the adder's hand already
+up, an ask is one with no hands yet, and a kind column would be a second place the same
+fact lived — one that could disagree with the hands the moment somebody put one up. The
+page is two halves off `hands.length === 0`, asks first, because an ask nobody has answered
+is the only thing on the page anybody has to do something about.
+
+**There is no wanted count.** "We could use three of these" is a sentence in the comment or
+in the thread. A number would want display rules, a notion of fulfilment and a policy for
+refusing the fourth hand, all bought to prevent two projectors — and at 42 people
+visibility already prevents that, as it did in the spreadsheet.
+
+**A hand is the dream-helper pattern**, down to the table: `bring_hand` keys on
+`attendance` for the reason `session_helper` does, so leaving the burn withdraws every
+pledge through the same cascade that empties a meal shift, and nobody is listed as bringing
+something to a burn they are not coming to. Several hands to one item are normal — many
+people can bring a drum — so `HelperStrip` gets no `max` and keeps one vacancy showing.
+A non-attendee is still offered 🙋 and gets the join nudge (#503) rather than a hidden
+control.
+
+**The asker hears when somebody answers**, which is the moment the ask paid off:
+`bring_answered` goes to whoever added the item, on the hand that turns it from an ask into
+an offer, and not on the ones after — an item with hands is no longer an ask. Never for
+your own click, per #247, and never twice: somebody put on their own ask gets `bring_role`
+for being put on it and nothing else. `bring_role` is the pair to `meal_role` and
+`dream_role` — being given or taken off a job, from either end of a handover.
+
+**Adding one opens a card**, so `entity_type: 'bring'` is the fifth in the vocabulary and
+the migration rebuilds four tables for it. `added` and `edited` entries carry the item, the
+soft withdrawal keeps the conversation the way an announcement's does, and the same
+`DreamThread` draws the conversation on the list page as on the feed — one component, so
+the two cannot come to disagree. The `added` mark stopped being 🎵 when it stopped meaning
+only a song.
+
+**The item is the author's to reword and the author's or an admin's to take off**, which is
+the announcement rule (#438). The list itself is any approved member's: adding an ask needs
+no attendance, because arranging the shared furniture never does — only pledging to bring
+something does, since a pledge is a row keyed by one.
 
 ## What this installation is called
 

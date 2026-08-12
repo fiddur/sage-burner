@@ -59,6 +59,18 @@ export const wants = async (
   return { bell: row?.enabled ?? notifiesByDefault(category), email: row?.email ?? false }
 }
 
+export const reachedByMention = async (db: Database, named: readonly string[]): Promise<string[]> => {
+  const asked = await Promise.all(
+    named.map(async (accountId) => {
+      const channels = await wants(db, accountId, 'mentioned')
+
+      return channels.bell || channels.email ? [accountId] : []
+    }),
+  )
+
+  return asked.flat()
+}
+
 export const recordAndPush =
   (deps: PushDeps, now: () => Date, log: (counts: DeliveryCounts) => void, email?: Email): Notifier =>
   async (accountId, told) => {

@@ -547,7 +547,8 @@ only let a place sit in limbo. The taker is notified; the giver is not, having
 clicked it themselves.
 
 **Leaving takes you off everything you signed up for there.** The row's foreign
-keys do it: helping ticks, meal shifts, lead-role teams and dream helpers cascade,
+keys do it: helping ticks, meal shifts, lead-role teams, dream helpers and pledges
+to bring something cascade,
 a `lead_attendance_id` is set null, and since #23 so is the dream you were
 facilitating — that column named an `account` until then and was the one role a
 withdrawal left behind. The dream itself stays, vacant, and #247's control is what

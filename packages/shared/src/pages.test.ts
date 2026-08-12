@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   applyingOutcomes,
   applyPage,
+  bringPage,
   linkingOutcomes,
   loginPage,
   oauthOutcomes,
@@ -43,5 +44,16 @@ describe('the pages a round trip comes back to', () => {
   it('is the bare page for an ordinary visit', () => {
     expect(loginPage()).toBe('/login')
     expect(applyPage()).toBe('/apply')
+  })
+})
+
+describe('the bring list', () => {
+  it('names the burn it belongs to, and the item when there is one to open', () => {
+    expect(bringPage('burn-1')).toBe('/bring?burn=burn-1')
+    expect(bringPage('burn-1', 'item-2')).toBe('/bring?burn=burn-1&item=item-2')
+  })
+
+  it('encodes both, so an id cannot invent a parameter', () => {
+    expect(bringPage('a&b', 'c=d')).toBe('/bring?burn=a%26b&item=c%3Dd')
   })
 })

@@ -21,6 +21,8 @@ import {
   allergyItem,
   application,
   attendance,
+  bringHand,
+  bringItem,
   event,
   formQuestion,
   inviteToken,
@@ -280,6 +282,39 @@ describe('foreign keys', () => {
     expect(handle.db.select().from(sessionSupport).all()).toHaveLength(0)
     // The dream itself stays: it is the burn's, not the helper's.
     expect(handle.db.select().from(session).all()).toHaveLength(1)
+  })
+
+  it('withdraws a pledge to bring something when the person leaves the burn', () => {
+    seedAttendance(ids.attendance, ids.account)
+    handle.db
+      .insert(bringItem)
+      .values({ id: 'b1', event_id: ids.event, title: 'Huge speakers', created_at: NOW })
+      .run()
+    handle.db.insert(bringHand).values({ item_id: 'b1', attendance_id: ids.attendance }).run()
+
+    handle.db.delete(attendance).where(eq(attendance.id, ids.attendance)).run()
+
+    expect(handle.db.select().from(bringHand).all()).toHaveLength(0)
+    expect(handle.db.select().from(bringItem).all()).toHaveLength(1)
+  })
+
+  it('keeps the item when its author’s account is what goes, leaving nobody named', () => {
+    handle.db
+      .insert(bringItem)
+      .values({
+        id: 'b1',
+        event_id: ids.event,
+        author_account_id: ids.account,
+        title: 'Huge speakers',
+        created_at: NOW,
+      })
+      .run()
+
+    handle.db.delete(account).where(eq(account.id, ids.account)).run()
+
+    expect(handle.db.select().from(bringItem).all()).toEqual([
+      expect.objectContaining({ id: 'b1', author_account_id: null }),
+    ])
   })
 
   it('empties a dream’s facilitator spot when they leave the burn', () => {
@@ -553,6 +588,11 @@ describe('check constraints', () => {
       .prepare('INSERT INTO song (id, title, capo, created_at) VALUES (?, ?, ?, ?)')
       .run(`s-${Math.random()}`, title, capo, NOW)
 
+  const insertBringItem = (title: string) =>
+    handle.client
+      .prepare('INSERT INTO bring_item (id, event_id, title, created_at) VALUES (?, ?, ?, ?)')
+      .run(`b-${Math.random()}`, ids.event, title, NOW)
+
   it('rejects an announcement with nothing but whitespace for a title', () => {
     expect(() => insertPost('   ')).toThrow()
   })
@@ -563,6 +603,14 @@ describe('check constraints', () => {
 
   it('rejects a song with nothing but whitespace for a title', () => {
     expect(() => insertSong('  ')).toThrow()
+  })
+
+  it('rejects something to bring with nothing but whitespace for a name', () => {
+    expect(() => insertBringItem('   ')).toThrow()
+  })
+
+  it('accepts one with a name, so the rejection above is the CHECK and not the statement', () => {
+    expect(() => insertBringItem('Drums to use around the fire')).not.toThrow()
   })
 
   it('rejects a capo off the end of the neck, either way', () => {
