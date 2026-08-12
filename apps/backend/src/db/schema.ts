@@ -937,6 +937,7 @@ export const song = sqliteTable(
   {
     id: text('id').notNull(),
     title: text('title').notNull(),
+    artist: text('artist'),
     body: text('body').notNull().default(''),
     capo: integer('capo'),
     links: text('links', { mode: 'json' }).$type<SongLink[]>().notNull().default([]),

@@ -19,6 +19,28 @@ export type SongsApi = Pick<ApiClient, 'getSongbook' | 'addSong' | 'restoreSong'
 const labelsFor = (categories: readonly SongCategory[], ids: readonly string[]): string[] =>
   categories.flatMap((category) => (ids.includes(category.id) ? [category.label] : []))
 
+export const songSorts = ['title', 'artist'] as const
+
+export type SongSort = (typeof songSorts)[number]
+
+export const songSortLabel: Record<SongSort, string> = {
+  title: 'By title',
+  artist: 'By artist',
+}
+
+/** Nameless songs go last either way, rather than sorting under the empty string. */
+export const inSongOrder = (songs: readonly SongSummary[], by: SongSort): SongSummary[] =>
+  [...songs].sort((one, other) => {
+    if (by === 'artist' && one.artist !== other.artist) {
+      if (one.artist === null) return 1
+      if (other.artist === null) return -1
+
+      return one.artist.localeCompare(other.artist)
+    }
+
+    return one.title.localeCompare(other.title)
+  })
+
 export const RECENTLY_GONE_DAYS = 30
 
 export const recentlyGone = (deletedAt: string | null, now: number): boolean =>
@@ -35,12 +57,15 @@ export const Songs = ({ api }: { api: SongsApi }) => {
 
   const [title, setTitle] = useState('')
   const [filed, setFiled] = useState<readonly string[]>([])
+  const [sortedBy, setSortedBy] = useState<SongSort>('title')
 
   const book = loaded.status === 'ready' ? loaded.data : { songs: [], categories: [] }
   const living = book.songs.filter((one) => one.deleted_at === null)
   const gone = book.songs.filter((one) => recentlyGone(one.deleted_at, Date.now()))
-  const shown =
-    filed.length === 0 ? living : living.filter((one) => one.category_ids.some((id) => filed.includes(id)))
+  const shown = inSongOrder(
+    filed.length === 0 ? living : living.filter((one) => one.category_ids.some((id) => filed.includes(id))),
+    sortedBy,
+  )
 
   const put = () => {
     if (title.trim() === '') {
@@ -79,6 +104,22 @@ export const Songs = ({ api }: { api: SongsApi }) => {
         />
       )}
 
+      {loaded.status === 'ready' && living.length > 0 && (
+        <p class="row">
+          {songSorts.map((by) => (
+            <button
+              key={by}
+              type="button"
+              class={by === sortedBy ? 'chip is-on' : 'chip'}
+              aria-pressed={by === sortedBy}
+              onClick={() => setSortedBy(by)}
+            >
+              {songSortLabel[by]}
+            </button>
+          ))}
+        </p>
+      )}
+
       {loaded.status === 'ready' && shown.length === 0 && (
         <p class="form-note">
           {living.length === 0
@@ -92,6 +133,7 @@ export const Songs = ({ api }: { api: SongsApi }) => {
           {shown.map((one) => (
             <li key={one.id} class="song-row">
               <a href={songPage(one.id)}>{one.title}</a>
+              {one.artist !== null && <span class="song-artist">{one.artist}</span>}
               <Marks song={one} categories={book.categories} />
             </li>
           ))}

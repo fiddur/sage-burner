@@ -127,6 +127,8 @@ export const SongPage = ({ api, songId }: { api: SongApi; songId: string }) => {
         {song.title} <Refreshing on={refreshing} />
       </h1>
 
+      {song.artist !== null && <p class="song-artist">{song.artist}</p>}
+
       <p class="song-marks">
         {song.capo !== null && song.capo > 0 && <span class="song-capo">capo {song.capo}</span>}
         {filed.map((category) => (
@@ -393,6 +395,7 @@ const Fields = ({
   onCancel: () => void
   onSave: (changes: {
     title: string
+    artist: string | null
     body: string
     capo: number | null
     links: SongLink[]
@@ -400,6 +403,7 @@ const Fields = ({
   }) => void
 }) => {
   const [title, setTitle] = useState(song.title)
+  const [artist, setArtist] = useState(song.artist ?? '')
   const [body, setBody] = useState(song.body)
   const [capo, setCapo] = useState(song.capo === null ? '' : String(song.capo))
   const [links, setLinks] = useState<SongLink[]>([...song.links])
@@ -418,6 +422,7 @@ const Fields = ({
 
         onSave({
           title: title.trim(),
+          artist: artist.trim() === '' ? null : artist.trim(),
           body,
           capo: capo === '' ? null : Number(capo),
           links,
@@ -432,6 +437,17 @@ const Fields = ({
           maxLength={MAX_TITLE}
           value={title}
           onInput={(typed) => setTitle(typed.currentTarget.value)}
+        />
+      </label>
+
+      <label class="field">
+        <span>Whose song it is</span>
+        <input
+          type="text"
+          maxLength={MAX_TITLE}
+          placeholder="Nobody has said"
+          value={artist}
+          onInput={(typed) => setArtist(typed.currentTarget.value)}
         />
       </label>
 

@@ -25,6 +25,7 @@ const CHORUS = 'Am      F\ncome and sing with me\nC       G'
 const aSong = (over: Partial<Song> = {}): Song => ({
   id: 's-1',
   title: 'Fire in the sky',
+  artist: null,
   body: CHORUS,
   capo: null,
   links: [],
@@ -243,11 +244,47 @@ describe('a song’s page', () => {
     await waitFor(() =>
       expect(updateSong).toHaveBeenCalledWith('s-1', {
         title: 'Fire on the water',
+        artist: null,
         body: CHORUS,
         capo: null,
         links: [],
         category_ids: [],
       }),
+    )
+  })
+
+  it('says whose song it is, under the title', async () => {
+    renderPage(
+      stub({ getSong: () => Promise.resolve({ song: aSong({ artist: 'Tracy Chapman' }), thread: null }) }),
+    )
+
+    expect(await screen.findByText('Tracy Chapman')).toBeTruthy()
+  })
+
+  it('says nothing where nobody has said whose it is', async () => {
+    renderPage(stub())
+
+    await screen.findByRole('heading', { name: /Fire in the sky/ })
+    expect(screen.queryByText('Tracy Chapman')).toBeNull()
+  })
+
+  it('saves an artist, and a blank one as nobody having said', async () => {
+    const updateSong = vi.fn<SongApi['updateSong']>(() => Promise.resolve({ song: aSong(), thread: null }))
+    renderPage(
+      stub({
+        updateSong,
+        getSong: () => Promise.resolve({ song: aSong({ artist: 'Tracy Chapman' }), thread: null }),
+      }),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Fire in the sky' }))
+    expect(screen.getByLabelText('Whose song it is')).toHaveProperty('value', 'Tracy Chapman')
+
+    fireEvent.input(screen.getByLabelText('Whose song it is'), { target: { value: '  ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() =>
+      expect(updateSong).toHaveBeenCalledWith('s-1', expect.objectContaining({ artist: null })),
     )
   })
 

@@ -25,6 +25,7 @@ export type SongLink = z.infer<typeof songLinkSchema>
 export const songSchema = z.object({
   id: idSchema,
   title: nonEmptyText(MAX_TITLE),
+  artist: nonEmptyText(MAX_TITLE).nullable(),
   body: z.string().max(MAX_SONG_BODY),
   capo: z.int().min(0).max(MAX_CAPO).nullable(),
   links: z.array(songLinkSchema).max(MAX_SONG_LINKS),
@@ -57,6 +58,7 @@ export type SongbookResponse = z.infer<typeof songbookResponseSchema>
 export const songCreateSchema = z
   .object({
     title: songSchema.shape.title,
+    artist: songSchema.shape.artist.default(null),
     body: songSchema.shape.body.default(''),
     capo: songSchema.shape.capo.default(null),
     links: songSchema.shape.links.default([]),

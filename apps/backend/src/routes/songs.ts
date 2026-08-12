@@ -46,6 +46,7 @@ export const songbookFor = async (db: Database): Promise<SongbookResponse> => {
     .select({
       id: song.id,
       title: song.title,
+      artist: song.artist,
       capo: song.capo,
       links: song.links,
       author_account_id: song.author_account_id,
@@ -98,6 +99,7 @@ const refile = (db: Database, songId: string, categoryIds: readonly string[]) =>
 
 const WORDING = {
   title: 'gave it another name',
+  artist: 'said whose song it is',
   body: 'worked on the words',
   capo: 'said where the capo goes',
   links: 'added somewhere to hear it',
@@ -107,6 +109,7 @@ const WORDING = {
 const whatChanged = (before: Song, after: Song): string => {
   const same: Record<keyof typeof WORDING, boolean> = {
     title: before.title === after.title,
+    artist: before.artist === after.artist,
     body: before.body === after.body,
     capo: before.capo === after.capo,
     links: JSON.stringify(before.links) === JSON.stringify(after.links),
@@ -180,6 +183,7 @@ export const registerSongRoutes = (
     const row = {
       id: randomUUID(),
       title: body.title,
+      artist: body.artist,
       body: body.body,
       capo: body.capo,
       links: body.links,

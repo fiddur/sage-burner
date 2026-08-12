@@ -23,6 +23,7 @@ const SONG: SongCategory = { id: 'c-2', order: 1, label: 'Song' }
 const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
 
 const aSong = (over: Partial<SongSummary> & Pick<SongSummary, 'id' | 'title'>): SongSummary => ({
+  artist: null,
   capo: null,
   links: [],
   category_ids: [],
@@ -53,11 +54,58 @@ const renderPage = (api: SongsApi, viewer: Viewer = ADA) =>
   )
 
 describe('the songbook', () => {
-  it('lists what is in it, in the order the server sent', async () => {
-    renderPage(stub({}, [aSong({ id: 's-1', title: 'Ashes' }), aSong({ id: 's-2', title: 'Zephyr' })]))
+  it('lists what is in it by title, whatever order it arrived in', async () => {
+    renderPage(stub({}, [aSong({ id: 's-2', title: 'Zephyr' }), aSong({ id: 's-1', title: 'Ashes' })]))
 
     const links = await screen.findAllByRole('link', { name: /Ashes|Zephyr/ })
     expect(links.map((link) => link.textContent)).toEqual(['Ashes', 'Zephyr'])
+  })
+
+  it('says whose song it is beside the title', async () => {
+    renderPage(stub({}, [aSong({ id: 's-1', title: 'Talkin’ bout a revolution', artist: 'Tracy Chapman' })]))
+
+    expect(await screen.findByText('Tracy Chapman')).toBeTruthy()
+  })
+
+  it('sorts by artist when asked, and back by title', async () => {
+    renderPage(
+      stub({}, [
+        aSong({ id: 's-1', title: 'Ashes', artist: 'Zoe' }),
+        aSong({ id: 's-2', title: 'Zephyr', artist: 'Ada' }),
+      ]),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'By artist' }))
+    expect(screen.getAllByRole('link', { name: /Ashes|Zephyr/ }).map((one) => one.textContent)).toEqual([
+      'Zephyr',
+      'Ashes',
+    ])
+
+    fireEvent.click(screen.getByRole('button', { name: 'By title' }))
+    expect(screen.getAllByRole('link', { name: /Ashes|Zephyr/ }).map((one) => one.textContent)).toEqual([
+      'Ashes',
+      'Zephyr',
+    ])
+  })
+
+  it('puts the songs nobody has named an artist for last, rather than first', async () => {
+    renderPage(
+      stub({}, [aSong({ id: 's-1', title: 'Ashes' }), aSong({ id: 's-2', title: 'Zephyr', artist: 'Zoe' })]),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'By artist' }))
+
+    expect(screen.getAllByRole('link', { name: /Ashes|Zephyr/ }).map((one) => one.textContent)).toEqual([
+      'Zephyr',
+      'Ashes',
+    ])
+  })
+
+  it('offers no sorting where there is nothing to sort', async () => {
+    renderPage(stub())
+
+    await screen.findByText(/Nothing in the book yet/)
+    expect(screen.queryByRole('button', { name: 'By artist' })).toBeNull()
   })
 
   it('links each song to its own page', async () => {

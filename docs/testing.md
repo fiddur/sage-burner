@@ -172,6 +172,10 @@ phone" means 360px.
       song is untouched on reload.
 - [ ] The editor suggests a capo; what is stored is what was chosen, shown
       beside the title.
+- [ ] Name an artist on one song and leave another without one: the name shows
+      beside the title in the book and under it on the song's page, "By artist"
+      groups the named ones and puts the nameless last, and clearing the field
+      takes the name off again.
 - [ ] Autoscroll moves at the slowest speed setting, and the controls stay
       reachable at the foot of the viewport mid-song.
 - [ ] Take a song out: it asks first, saying where the song goes; restore it
