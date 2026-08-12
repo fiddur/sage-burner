@@ -9,6 +9,15 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-12
 
+- **The first person onto a new burn can put their hand up.** On a burn nobody had joined yet — every
+  burn on the day it is planned — 🙋 was missing everywhere: no lead role, no meal crew, no helping
+  out, and so not even the nudge telling you to join first. The hand is there now, and pressing it
+  says what to do. Where a job is closed to everybody, as a chore's cook is, nothing is offered, which
+  is unchanged.
+
+- **"You need to join this burn" says where.** Inside an opened dream or a meal dialog the message
+  arrived without its link to Your details — which is exactly where the button that produces it is.
+
 - **A song can say whose it is.** There is a field for the artist now, beside the words rather than
   buried in them: it shows next to the title in the songbook and under it on the song's own page,
   and the book can be listed by artist instead of by title — which puts one songwriter's songs

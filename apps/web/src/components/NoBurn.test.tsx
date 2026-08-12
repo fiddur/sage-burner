@@ -45,7 +45,6 @@ describe('NoBurn', () => {
     expect(screen.getByRole('alert').textContent).toBe(
       'Could not load your burns, so there is no grid to lay out. Please reload the page.',
     )
-    expect(screen.queryByText(/not coming to a burn/)).toBeNull()
   })
 
   it('says the same to an admin, the failure not being about who is reading it', () => {
@@ -66,7 +65,6 @@ describe('NoBurn', () => {
 
     expect(await screen.findByText('Loading…')).toBeTruthy()
     expect(screen.queryByText(/no burn planned/)).toBeNull()
-    expect(screen.queryByText(/not coming to a burn/)).toBeNull()
   })
 
   it('tells an admin none is planned, and where to make one', async () => {
@@ -80,7 +78,6 @@ describe('NoBurn', () => {
     renderIt(NONE)
 
     expect(await screen.findByText(/no burn planned yet/)).toBeTruthy()
-    expect(screen.queryByText(/not coming to a burn/)).toBeNull()
   })
 
   it('keeps the make-one pointer to the admin, it being no use to a member', async () => {

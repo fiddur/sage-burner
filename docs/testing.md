@@ -199,7 +199,11 @@ phone" means 360px.
 - [ ] 💬 opens the item's conversation on the list page; the same comments show
       on its card on the feed.
 - [ ] From an account that has not joined the burn, 🙋 says to join the burn and
-      links to the details page rather than refusing.
+      links to the details page rather than refusing — from an opened dream panel and
+      a meal dialog as well as from a page, since that is where it is pressed.
+- [ ] On a burn nobody has joined yet, the lead-role, meal-crew and helping 🙋 are all
+      offered (and 👉 is not, there being nobody to appoint). A chore's cook offers
+      neither.
 - [ ] Leave the burn with a pledge outstanding: the hand is gone from the item
       and the item is not.
 
