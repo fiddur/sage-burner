@@ -50,6 +50,7 @@ const anAttendance = (over: Partial<Attendance> = {}): Attendance => ({
  * written against. `withBurn` is what turns the checkbox and the stay questions on.
  */
 const stub = (over: Partial<InviteApi> = {}): InviteApi => ({
+  getAllergyItems: () => Promise.resolve({ items: [] }),
   getInviteState: () => Promise.resolve({ status: 'outstanding', name: null, email: null }),
   redeemInvite: () => Promise.reject(new Error('redeemInvite is not stubbed here')),
   getActiveEvent: () => Promise.resolve({ event: null }),
@@ -114,6 +115,7 @@ describe('Invite', () => {
         password: 'a-password',
         name: 'Fredrik',
         allergies_notes: 'peanuts',
+        allergy_item_ids: [],
         // No burn on offer, so nothing to join — said explicitly rather than left off.
         join_event_id: null,
       }),

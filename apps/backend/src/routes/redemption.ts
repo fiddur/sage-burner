@@ -17,6 +17,7 @@ import { loginAddressConnection } from '../connections.ts'
 import { isUniqueViolation } from '../db/errors.ts'
 import {
   account,
+  accountAllergy,
   accountConnection,
   accountRole,
   application,
@@ -170,6 +171,10 @@ export const registerRedemptionRoutes = (
                 redeemed_at: now().toISOString(),
               })
               .run()
+          }
+
+          for (const item_id of new Set(body.allergy_item_ids)) {
+            tx.insert(accountAllergy).values({ account_id: accountId, item_id }).onConflictDoNothing().run()
           }
 
           tx.insert(accountRole).values({ account_id: accountId, role: 'member' }).run()

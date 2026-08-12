@@ -289,6 +289,27 @@ a reply lands where a submission does.
 approve and reject remain the same explicit actions, and a thread on a rejected application stays
 readable — which is what the status page's "ask the organisers" posture is for.
 
+**A password has a floor of ten characters** (#489). There was none, deliberately — "what makes a
+good password is the member's business, and a floor here mostly pushes people to the one they
+reuse" — and that held while the only way to choose one was redeeming an invite somebody had been
+vetted for. Sign-up is open now, so the same schema is the floor for every account made from the
+internet. `MIN_PASSWORD` is one constant the form and the schema share, so the page can say the
+rule rather than let the server refuse after the fact.
+
+**Somebody who already holds `member` cannot file an application** (#489). `/apply` renders for any
+signed-in viewer with no application row, and the route asked only for a session — so a member who
+came in by invite could add noise to the queue. It answers 409 now, and the page says what to do
+instead: the second account is the trap, not the form.
+
+**The applicant's end of the thread is bounded** (#489), because each message rings every admin's
+bell through `notifyAdmins`. Ten in ten minutes per account, the same shape as the other routes a
+role-less account can reach.
+
+**Allergies are ticked on the way in.** The redemption form had a free-text box while every other
+surface offers the shared vocabulary with checkboxes; `AllergiesField` is now one component both
+use, so the two cannot drift. The list is a public read, which is what lets a form nobody has
+signed into yet render it.
+
 ## Applying
 
 `POST /api/applications` is behind `requireSignedIn` since #476 — it was the only public write in

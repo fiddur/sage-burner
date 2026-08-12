@@ -1,7 +1,7 @@
 import type { ApplicationMessage } from '@sage-burner/shared'
 
 import { MAX_COMMENT } from '@sage-burner/shared'
-import { useState } from 'preact/hooks'
+import { useEffect, useRef, useState } from 'preact/hooks'
 
 import { localDay } from '../datetime.ts'
 import { renderMarkdown } from '../markdown.ts'
@@ -23,6 +23,12 @@ export const ApplicationThread = ({
   onSay: (body: string) => void
 }) => {
   const [saying, setSaying] = useState('')
+  const sent = useRef(messages.length)
+
+  useEffect(() => {
+    if (messages.length > sent.current) setSaying('')
+    sent.current = messages.length
+  }, [messages.length])
 
   return (
     <section class="application-thread">
@@ -64,10 +70,7 @@ export const ApplicationThread = ({
           busyLabel="Sending…"
           type="button"
           disabled={saying.trim() === ''}
-          onClick={() => {
-            onSay(saying.trim())
-            setSaying('')
-          }}
+          onClick={() => onSay(saying.trim())}
         />
       </p>
     </section>

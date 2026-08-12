@@ -19,6 +19,7 @@ export const redeemRequestSchema = z
     name: nonEmptyText(MAX_PERSON_NAME),
     contact: optionalText(MAX_CONTACT).optional(),
     allergies_notes: optionalText(MAX_NOTES),
+    allergy_item_ids: z.array(idSchema).default([]),
     join_event_id: idSchema.nullable().optional(),
   })
   .strict()

@@ -29,7 +29,6 @@ export const OAUTH_OUTCOME_PARAM = 'from'
 export const OAUTH_REF_PARAM = 'ref'
 
 export const oauthOutcomes = [
-  'unlinked',
   'refused',
   'misconfigured',
   'unreachable',
@@ -45,14 +44,10 @@ export const oauthOutcomes = [
  * rather than over a list it has to remember to filter. Anything that goes wrong at the provider
  * lands wherever the round trip started, so three appear in both.
  */
-export const signingInOutcomes = [
-  'refused',
-  'misconfigured',
-  'unreachable',
-  'unlinked',
-  'no-address',
-  'address-taken',
-] as const
+export const signingInOutcomes = ['refused', 'misconfigured', 'unreachable', 'address-taken'] as const
+
+/** `no-address` lands here rather than on login: a provider that gave none cannot sign anybody in. */
+export const applyingOutcomes = ['no-address'] as const
 
 export const linkingOutcomes = [
   'refused',

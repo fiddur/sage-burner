@@ -1,15 +1,29 @@
 import { describe, expect, it } from 'vitest'
 
-import { applyPage, linkingOutcomes, loginPage, oauthOutcomes, signingInOutcomes } from './pages.ts'
+import {
+  applyingOutcomes,
+  applyPage,
+  linkingOutcomes,
+  loginPage,
+  oauthOutcomes,
+  signingInOutcomes,
+} from './pages.ts'
 
 describe('where an outcome can land', () => {
   it('files every one under at least one page, so neither list can go stale silently', () => {
     for (const outcome of oauthOutcomes) {
       const filed =
-        signingInOutcomes.some((one) => one === outcome) || linkingOutcomes.some((one) => one === outcome)
+        signingInOutcomes.some((one) => one === outcome) ||
+        linkingOutcomes.some((one) => one === outcome) ||
+        applyingOutcomes.some((one) => one === outcome)
 
       expect(filed, outcome).toBe(true)
     }
+  })
+
+  it('keeps what lands on apply off the sign-in list, a provider with no address signing nobody in', () => {
+    expect(signingInOutcomes).not.toContain('no-address')
+    expect(applyingOutcomes).toContain('no-address')
   })
 
   it('files what goes wrong at the provider under both, since it lands where it started', () => {

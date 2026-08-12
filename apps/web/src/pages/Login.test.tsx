@@ -3,6 +3,7 @@ import type {
   PublicKeyCredentialRequestOptionsJSON,
 } from '@simplewebauthn/browser'
 
+import { signingInOutcomes } from '@sage-burner/shared'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -48,13 +49,12 @@ const fillIn = (email: string, password: string) => {
 const submit = () => screen.getByRole('button', { name: 'Log in' }).click()
 
 describe('what a provider round trip says when it comes back here', () => {
-  it('says nothing about whether an account exists for that provider', () => {
-    // The whole point of `unlinked`: signing in from a provider nobody has linked and from
-    // one that is not somebody's have to read identically, or the page is an oracle.
-    const message = signInOutcome('unlinked')
-
-    expect(message).toContain('No account here is linked to that')
-    expect(message).not.toMatch(/exists|found|unknown|no such/i)
+  it('has a sentence for every outcome that lands here, and says nothing about who exists', () => {
+    for (const outcome of signingInOutcomes) {
+      const message = signInOutcome(outcome)
+      expect(message, outcome).toBeDefined()
+      expect(message, outcome).not.toMatch(/exists|found|unknown|no such/i)
+    }
   })
 
   it('has a sentence for a refusal, and none for an ordinary visit', () => {

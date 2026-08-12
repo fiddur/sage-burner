@@ -71,3 +71,5 @@ export const MAX_OAUTH_CLIENT_SECRET = 500
 export const MAX_INVITE_LABEL = 80
 
 export const MAX_GROUP_INVITE_USES = 200
+
+export const MIN_PASSWORD = 10

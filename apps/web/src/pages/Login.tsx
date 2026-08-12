@@ -190,9 +190,6 @@ export const Login = ({
 export const signInOutcome = (outcome: string | null, ref: string | null = null): string | undefined => {
   const quote = quoting(ref)
 
-  if (outcome === 'unlinked') {
-    return 'No account here is linked to that. Sign in another way, then link it under Your details.'
-  }
   if (outcome === 'address-taken') {
     return 'There is already an account with that address. Sign in with your password, then link that provider under Your details.'
   }

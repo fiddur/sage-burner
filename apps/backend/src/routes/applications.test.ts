@@ -146,16 +146,27 @@ const applicantCookie = () => {
   return applicantAccount.cookie
 }
 
-const givenApplicant = async () => {
+const givenSignedIn = async (roles: ('admin' | 'member')[] = []) => {
   const id = randomUUID()
   await db()
     .insert(account)
     .values({ id, email: `${id}@example.org`, password_hash: null, created_at: NOW })
+  for (const role of roles) await db().insert(accountRole).values({ account_id: id, role })
 
   const sessions = createSessions({ secret: SECRET, now: () => new Date(), ttlSeconds: 3600 })
-  applicantAccount = { id, cookie: `${SESSION_COOKIE}=${sessions.issue(id)}` }
 
-  return applicantAccount
+  return { id, cookie: `${SESSION_COOKIE}=${sessions.issue(id)}` }
+}
+
+/**
+ * Only the first call becomes the one `submit()` uses by default — a second would
+ * otherwise repoint it, and a test mixing the two would fail somewhere else entirely.
+ */
+const givenApplicant = async () => {
+  const made = await givenSignedIn()
+  applicantAccount ??= made
+
+  return made
 }
 
 const applicant = { applicant_name: 'Fredrik', applicant_email: 'fredrik@example.org' }
@@ -167,6 +178,46 @@ const submitAfter = async (server: FastifyInstance, questionId: string, label: s
   await db().update(formQuestion).set({ label }).where(eq(formQuestion.id, questionId))
   return submit(server, { ...applicant, answers: { [questionId]: 'For the fire' }, asked: [questionId] })
 }
+
+describe('how often an applicant may ring every admin', () => {
+  it('refuses past its allowance, each message being a fan-out to every admin (#489)', async () => {
+    const server = await build()
+    await givenSubscribedAdmin()
+    const who = await givenApplicant()
+    const filed = await submit(server, { ...applicant, answers: {} }, who.cookie)
+    expect(filed.statusCode, 'the application must exist for the thread to answer 200').toBe(201)
+
+    const say = () =>
+      server.inject({
+        method: 'POST',
+        url: '/api/me/application/messages',
+        headers: { cookie: who.cookie },
+        payload: { body: 'hello' },
+      })
+
+    const codes: number[] = []
+    for (let at = 0; at < 12; at += 1) codes.push((await say()).statusCode)
+
+    expect(codes.filter((code) => code === 429).length).toBeGreaterThan(0)
+    expect(codes[0]).toBe(200)
+  })
+})
+
+describe('somebody who is already a member', () => {
+  it('cannot file an application, having nothing left to apply for (#489)', async () => {
+    const server = await build()
+    const member = await givenSignedIn(['member'])
+
+    const sent = await server.inject({
+      method: 'POST',
+      url: '/api/applications',
+      headers: { cookie: member.cookie },
+      payload: { ...applicant, answers: {}, asked: [] },
+    })
+
+    expect(sent.statusCode).toBe(409)
+  })
+})
 
 describe('submitting an application', () => {
   it('accepts a submission answering every question', async () => {

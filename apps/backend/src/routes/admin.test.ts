@@ -306,7 +306,18 @@ describe('an admin setting somebody’s password', () => {
     const server = await build()
     const admin = await givenAccount(['admin'])
 
-    expect((await setPassword(server, admin.cookie, randomUUID(), { password: 'x' })).statusCode).toBe(404)
+    const missing = await setPassword(server, admin.cookie, randomUUID(), { password: 'a-long-enough-one' })
+    expect(missing.statusCode).toBe(404)
+  })
+
+  it('refuses one under the floor, an admin choosing a password getting the same floor (#489)', async () => {
+    const server = await build()
+    const admin = await givenAccount(['admin'])
+    const someone = await givenAccount(['member'])
+
+    expect((await setPassword(server, admin.cookie, someone.id, { password: 'short' })).statusCode).toBe(400)
+    const long = await setPassword(server, admin.cookie, someone.id, { password: 'a-long-enough-one' })
+    expect(long.statusCode).toBe(204)
   })
 
   it('refuses an empty password, and a body with anything else in it', async () => {

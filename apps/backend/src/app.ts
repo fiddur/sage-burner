@@ -20,7 +20,13 @@ import type { Delivery, VapidKeys } from './push/push.ts'
 import { createGate, SCRYPT_GATE } from './auth/gate.ts'
 import { createGuards } from './auth/guards.ts'
 import { createSessions } from './auth/session.ts'
-import { createThrottle, LOGIN_BY_ADDRESS, LOGIN_BY_IP, REDEEM_BY_IP } from './auth/throttle.ts'
+import {
+  APPLICATION_MESSAGES,
+  createThrottle,
+  LOGIN_BY_ADDRESS,
+  LOGIN_BY_IP,
+  REDEEM_BY_IP,
+} from './auth/throttle.ts'
 import { refuseEnvelopeStrippers } from './envelope.ts'
 import { clientErrorHandler, frameworkErrorHandler, registerErrorHandler } from './errors.ts'
 import { sendError } from './http.ts'
@@ -85,7 +91,7 @@ export interface AppDeps {
   oauth?: OAuthCalls
   defer?: EmailQueue['defer']
   gate?: Gate
-  bounds?: { login?: Bound; address?: Bound; redeem?: Bound }
+  bounds?: { login?: Bound; address?: Bound; redeem?: Bound; applicationMessages?: Bound }
   changelog?: string
   privacy?: string
   terms?: string
@@ -159,6 +165,7 @@ const throttles = (bounds: NonNullable<AppDeps['bounds']>, now: () => number) =>
     byAddress: createThrottle({ ...(bounds.address ?? LOGIN_BY_ADDRESS), now }),
   },
   redemptions: createThrottle({ ...(bounds.redeem ?? REDEEM_BY_IP), now }),
+  applicationMessages: createThrottle({ ...(bounds.applicationMessages ?? APPLICATION_MESSAGES), now }),
 })
 
 const ADMIN_PREFIX = '/api/admin'
@@ -223,7 +230,7 @@ export const createApp = async ({
 
   const gate = suppliedGate ?? createGate(SCRYPT_GATE)
 
-  const { limits, redemptions } = throttles(bounds, () => now().getTime())
+  const { limits, redemptions, applicationMessages } = throttles(bounds, () => now().getTime())
 
   registerAdminPrefixGuard(app, { db, sessions })
 
@@ -281,6 +288,7 @@ export const createApp = async ({
     sessions,
     now,
     notifyOne: tellAccount,
+    throttle: applicationMessages,
     notify: async (message) =>
       await notifyAdmins(db, tellAccount, {
         category: 'application',

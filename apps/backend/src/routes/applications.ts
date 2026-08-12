@@ -19,6 +19,7 @@ import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
+import type { Throttle } from '../auth/throttle.ts'
 import type { Notifier } from '../push/notify.ts'
 
 import { createGuards } from '../auth/guards.ts'
@@ -33,6 +34,7 @@ export interface ApplicationRouteDeps extends GuardDeps {
   now: () => Date
   notify?: (message: string) => Promise<unknown>
   notifyOne?: Notifier
+  throttle?: Throttle
 }
 
 const organisersFor = async (db: GuardDeps['db']) => {
@@ -94,7 +96,7 @@ export const sayOnApplication = async (
 
 export const registerApplicationRoutes = (
   app: FastifyInstance,
-  { db, sessions, now, notify, notifyOne = async () => undefined }: ApplicationRouteDeps,
+  { db, sessions, now, notify, notifyOne = async () => undefined, throttle }: ApplicationRouteDeps,
 ) => {
   const { requireSignedIn } = createGuards({ db, sessions })
 
@@ -136,6 +138,15 @@ export const registerApplicationRoutes = (
       const viewer = await viewerFor(request, { db, sessions })
       if (viewer === undefined) return sendError(reply, 401)
 
+      // Every message here rings every admin's bell, so it is bounded like the other routes
+      // a role-less account can reach.
+      const room = throttle?.take(viewer.account_id) ?? { ok: true as const }
+      if (!room.ok) {
+        void reply.header('retry-after', String(room.retryAfterSeconds))
+
+        return sendError(reply, 429)
+      }
+
       const body = bodyOf(applicationMessageInputSchema, request)
       if (body === undefined) return sendError(reply, 400)
 
@@ -166,6 +177,7 @@ export const registerApplicationRoutes = (
 
     const viewer = await viewerFor(request, { db, sessions })
     if (viewer === undefined) return sendError(reply, 401)
+    if (viewer.roles.includes('member')) return sendError(reply, 409)
 
     const body = bodyOf(applicationCreateSchema, request)
     if (body === undefined) return sendError(reply, 400)

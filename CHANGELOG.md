@@ -9,6 +9,24 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-12
 
+- **Allergies are ticked on the way in, not typed.** Redeeming an invite offered a free-text box
+  where the rest of the app offers the shared list with checkboxes. It is the same list now, with
+  the box kept for anything the list does not cover.
+
+- **A password needs ten characters.** Sign-up is open to anyone with the address of this app now,
+  so there is a floor where there was none, and the form says what it is before the server refuses.
+
+- **Somebody who is already a member cannot file an application.** It only ever added noise to the
+  organisers' queue, and the apply page now says what to do instead — log in the usual way and link
+  the provider under Your details.
+
+- **The application page no longer flashes a blank form** while it is still finding out whether you
+  have already applied, and a message you send the organisers stays in the box if the send fails
+  rather than vanishing.
+
+- **The wait no longer promises 24 hours**, which nothing in the app enforces. It says what actually
+  happens: applications are read together before each burn.
+
 - **A link the whole group can use.** Under ⚙️ → Invites there is now a link for a closed group —
   posted inside a Facebook group or a Discord server only its members can read, so the link itself
   is the proof of belonging. It works until the date you set, optionally for a limited number of

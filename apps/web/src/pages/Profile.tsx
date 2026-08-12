@@ -1,6 +1,6 @@
 import type { AllergyItem, Profile } from '@sage-burner/shared'
 
-import { MAX_CONTACT, MAX_INTRODUCTION, MAX_NOTES, MAX_PERSON_NAME } from '@sage-burner/shared'
+import { MAX_CONTACT, MAX_INTRODUCTION, MAX_PERSON_NAME } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -11,6 +11,7 @@ import type { PushApi } from '../components/PushToggle.tsx'
 import type { WaysInApi } from '../components/WaysInField.tsx'
 import type { YourBurnsApi } from '../components/YourBurns.tsx'
 
+import { AllergiesField } from '../components/AllergiesField.tsx'
 import { AvatarField } from '../components/AvatarField.tsx'
 import { ConnectionsField } from '../components/ConnectionsField.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
@@ -26,7 +27,6 @@ import { WaysInField } from '../components/WaysInField.tsx'
 import { YourBurns } from '../components/YourBurns.tsx'
 import { stillUploading } from '../image-upload.ts'
 import { useAction, useLoad, useLoadInto } from '../load.ts'
-import { rowsFor } from '../textarea.ts'
 import { isApproved, isMember, useViewer } from '../viewer.tsx'
 
 export type ProfileApi = Pick<
@@ -164,40 +164,13 @@ export const ProfilePage = ({ api }: { api: ProfileApi }) => {
             sees it.
           </p>
 
-          {items.length > 0 && (
-            <fieldset class="field">
-              <legend>Allergies or food you cannot eat</legend>
-              {items.map((item) => (
-                <label key={item.id} class="field-inline">
-                  <input
-                    type="checkbox"
-                    checked={ticked.includes(item.id)}
-                    onChange={(changed) =>
-                      setTicked((current) =>
-                        changed.currentTarget.checked
-                          ? [...current, item.id]
-                          : current.filter((id) => id !== item.id),
-                      )
-                    }
-                  />
-                  <span>{item.label}</span>
-                </label>
-              ))}
-            </fieldset>
-          )}
-
-          <label class="field">
-            <span>
-              {items.length > 0 ? 'Anything else you cannot eat' : 'Allergies or food you cannot eat'}
-            </span>
-            <textarea
-              name="allergies_notes"
-              maxLength={MAX_NOTES}
-              rows={rowsFor(allergies)}
-              value={allergies}
-              onInput={(inputEvent) => setAllergies(inputEvent.currentTarget.value)}
-            />
-          </label>
+          <AllergiesField
+            items={items}
+            ticked={ticked}
+            notes={allergies}
+            onTicked={setTicked}
+            onNotes={setAllergies}
+          />
 
           <p class="form-note">
             Food is primarily vegetarian, with vegan options. Read by whoever plans the meals, for every burn
