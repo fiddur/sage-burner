@@ -138,8 +138,6 @@ export const registerApplicationRoutes = (
       const viewer = await viewerFor(request, { db, sessions })
       if (viewer === undefined) return sendError(reply, 401)
 
-      // Every message here rings every admin's bell, so it is bounded like the other routes
-      // a role-less account can reach.
       const room = throttle?.take(viewer.account_id) ?? { ok: true as const }
       if (!room.ok) {
         void reply.header('retry-after', String(room.retryAfterSeconds))

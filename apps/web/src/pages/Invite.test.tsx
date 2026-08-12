@@ -187,7 +187,26 @@ describe('Invite', () => {
     })
   }
 
-  it('takes a password of any shape, since what makes a good one is theirs to decide', async () => {
+  it('takes any shape of password above the floor, what makes a good one being theirs to decide', async () => {
+    const redeemInvite = vi.fn(() => Promise.resolve({ viewer: null, attendance: null }))
+    renderPage(stub({ redeemInvite }))
+
+    await screen.findByRole('button', { name: 'Join' })
+    complete()
+    fill('Password', '🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥')
+    join()
+
+    await waitFor(() =>
+      expect(redeemInvite).toHaveBeenCalledWith(
+        'a-token',
+        expect.objectContaining({ password: '🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥' }),
+      ),
+    )
+  })
+
+  it('refuses a password under the floor here rather than at the server (#489)', async () => {
+    // The field carries `minLength`, so the browser stops the submit and says so itself; what
+    // matters is that nothing is sent and the page states the rule either way.
     const redeemInvite = vi.fn(() => Promise.resolve({ viewer: null, attendance: null }))
     renderPage(stub({ redeemInvite }))
 
@@ -196,9 +215,9 @@ describe('Invite', () => {
     fill('Password', 'hi')
     join()
 
-    await waitFor(() =>
-      expect(redeemInvite).toHaveBeenCalledWith('a-token', expect.objectContaining({ password: 'hi' })),
-    )
+    expect(redeemInvite).not.toHaveBeenCalled()
+    expect(screen.getByLabelText('Password', { exact: false })).toHaveProperty('validity.tooShort', true)
+    expect(screen.getByText(/At least 10 characters/)).toBeTruthy()
   })
 
   it('asks for a password, a blank one being no password at all', async () => {

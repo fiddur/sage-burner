@@ -197,6 +197,17 @@ describe('the allergies somebody ticks on the way in', () => {
     expect(ticked[0]?.item_id).toBe(item)
   })
 
+  it('answers 400 rather than 500 for an item that has since been deleted', async () => {
+    const server = await build()
+    const token = await givenInvite()
+
+    const response = await redeem(server, token, { ...applicant, allergy_item_ids: [randomUUID()] })
+
+    expect(response.statusCode).toBe(400)
+    const [invite] = await db().select().from(inviteToken)
+    expect(invite?.used_at, 'a refused redemption must not spend the token').toBeNull()
+  })
+
   it('takes none at all, the whole field being optional', async () => {
     const server = await build()
     const token = await givenInvite()

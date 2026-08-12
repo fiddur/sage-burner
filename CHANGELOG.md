@@ -14,7 +14,8 @@ under today's heading, and make a new heading when there is none.
   the box kept for anything the list does not cover.
 
 - **A password needs ten characters.** Sign-up is open to anyone with the address of this app now,
-  so there is a floor where there was none, and the form says what it is before the server refuses.
+  so there is a floor where there was none — and every form that chooses one says so before the
+  server refuses: signing up, redeeming an invite, and an admin setting somebody's.
 
 - **Somebody who is already a member cannot file an application.** It only ever added noise to the
   organisers' queue, and the apply page now says what to do instead — log in the usual way and link

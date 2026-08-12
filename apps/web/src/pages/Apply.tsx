@@ -321,10 +321,19 @@ const ApplicationForm = ({
         })
         onSent()
       },
-      (failure) =>
-        isApiError(failure) && failure.status === 400
-          ? 'The questions changed while you were filling this in. Please reload the page and send it again.'
-          : 'Could not send your application. Please check your connection and try again.',
+      (failure) => {
+        if (!isApiError(failure)) {
+          return 'Could not send your application. Please check your connection and try again.'
+        }
+        if (failure.status === 400) {
+          return 'The questions changed while you were filling this in. Please reload the page and send it again.'
+        }
+        if (failure.status === 409) {
+          return 'You are already a member here — there is nothing to apply for. Log in the way you usually do.'
+        }
+
+        return 'Could not send your application. Please check your connection and try again.'
+      },
     )
   }
 

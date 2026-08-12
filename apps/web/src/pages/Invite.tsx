@@ -1,6 +1,6 @@
 import type { AllergyItem, Event, EventOptionTaken, InviteState } from '@sage-burner/shared'
 
-import { MAX_PERSON_NAME } from '@sage-burner/shared'
+import { MAX_PERSON_NAME, MIN_PASSWORD } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -121,7 +121,7 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
       const [state, upcoming, allergyList] = await Promise.all([
         api.getInviteState(token, signal),
         upcomingBurn(api, signal),
-        api.getAllergyItems(signal),
+        api.getAllergyItems(signal).catch(() => ({ items: [] })),
       ])
 
       return { state, upcoming, allergyItems: allergyList.items }
@@ -146,6 +146,7 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
     if (email.trim() === '') return 'Please give us an email address — it becomes your login.'
     if (name.trim() === '') return 'Please tell us your name.'
     if (password === '') return 'Please choose a password.'
+    if (password.length < MIN_PASSWORD) return `A password needs at least ${MIN_PASSWORD} characters.`
 
     return joining && stay !== undefined ? stayProblem(stay) : undefined
   }
@@ -292,9 +293,14 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
             name="password"
             autocomplete="new-password"
             aria-required
+            minLength={MIN_PASSWORD}
+            aria-describedby="password-floor"
             value={password}
             onInput={(event) => setPassword(event.currentTarget.value)}
           />
+          <span class="form-note" id="password-floor">
+            At least {MIN_PASSWORD} characters.
+          </span>
         </label>
 
         <label class="field">

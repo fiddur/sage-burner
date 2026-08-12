@@ -10,6 +10,7 @@ import type { Delivery } from '../push/push.ts'
 
 import { createApp } from '../app.ts'
 import { createSessions } from '../auth/session.ts'
+import { APPLICATION_MESSAGES } from '../auth/throttle.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
@@ -195,11 +196,15 @@ describe('how often an applicant may ring every admin', () => {
         payload: { body: 'hello' },
       })
 
-    const codes: number[] = []
-    for (let at = 0; at < 12; at += 1) codes.push((await say()).statusCode)
+    const answers: { code: number; retryAfter: string | undefined }[] = []
+    for (let at = 0; at < APPLICATION_MESSAGES.attempts + 2; at += 1) {
+      const said = await say()
+      answers.push({ code: said.statusCode, retryAfter: said.headers['retry-after']?.toString() })
+    }
 
-    expect(codes.filter((code) => code === 429).length).toBeGreaterThan(0)
-    expect(codes[0]).toBe(200)
+    expect(answers.filter((one) => one.code === 200)).toHaveLength(APPLICATION_MESSAGES.attempts)
+    expect(answers.at(-1)?.code).toBe(429)
+    expect(answers.at(-1)?.retryAfter, 'a refusal says how long to wait').toBeDefined()
   })
 })
 
