@@ -191,7 +191,7 @@ describe('Members', () => {
   it('says so when no burn is open, rather than showing an empty table', async () => {
     renderPage(stub(aRoster({ event: null })), MEMBER, null)
 
-    expect(await screen.findByText(/not coming to a burn yet/)).toBeTruthy()
+    expect(await screen.findByText(/no burn planned yet/)).toBeTruthy()
     expect(screen.queryByRole('table')).toBeNull()
   })
 })

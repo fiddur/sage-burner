@@ -18,6 +18,7 @@ import { MarkdownField } from '../components/MarkdownField.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { stillUploading } from '../image-upload.ts'
+import { joinFirst, joinLink } from '../joining.ts'
 import { useAction, useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
 import { isApproved, useViewer } from '../viewer.tsx'
@@ -124,7 +125,7 @@ export const Roles = ({ api }: { api: RolesApi }) => {
     },
   )
 
-  const { busy, error, setError, run } = useAction(reload)
+  const { busy, error, failure, setError, run } = useAction(reload)
 
   const ready = loaded.status === 'ready' ? (loaded.data ?? undefined) : undefined
 
@@ -139,7 +140,7 @@ export const Roles = ({ api }: { api: RolesApi }) => {
         and anyone can change or remove one, so talk to each other first.
       </p>
 
-      <ErrorText message={error} />
+      <ErrorText message={error} link={joinLink(failure)} />
 
       <Notice loaded={loaded} />
 
@@ -204,7 +205,13 @@ export const Roles = ({ api }: { api: RolesApi }) => {
                         run(() => api.setLeadRoleLead(role.id, accountId), 'Could not change the lead.')
                       }
                       onJoin={(accountId) =>
-                        run(() => api.joinLeadRoleTeam(role.id, accountId), 'Could not add them to the team.')
+                        run(
+                          () => api.joinLeadRoleTeam(role.id, accountId),
+                          joinFirst(
+                            'Could not add them to the team.',
+                            accountId === viewer.account?.id ? 'mine' : 'theirs',
+                          ),
+                        )
                       }
                       onLeave={(accountId) =>
                         run(

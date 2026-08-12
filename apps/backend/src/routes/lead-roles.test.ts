@@ -413,7 +413,10 @@ describe('holding a role', () => {
     const id = (await add(server, member.cookie, eventId)).json().role.id
 
     expect((await setLead(server, member.cookie, id, { account_id: absent.id })).statusCode).toBe(400)
-    expect((await joinTeam(server, member.cookie, id, absent.id)).statusCode).toBe(400)
+
+    const joined = await joinTeam(server, member.cookie, id, absent.id)
+    expect(joined.statusCode).toBe(400)
+    expect(joined.json().error).toBe('not_attending')
   })
 
   it('is vacated by withdrawing from the burn, rather than left on a name', async () => {

@@ -12,24 +12,36 @@ is reached from the page it belongs to, which is where somebody is standing when
 they want it.
 
 The **burn selector** sits after ☰ and the logo, and everything to the right of it is
-about the burn it names. It lists the burns a member has said they are coming to, and
-defaults to the soonest — the list arrives soonest-first, so that is the first
-entry rather than a rule applied twice. **An account holding `admin` sees every
-burn still to come**: one without `member` has no attendance anywhere and would
-otherwise face an empty selector on the burn they are setting up. Somebody coming
-to none gets no selector and no burn-scoped content; their details page is where
-they join one.
+about the burn it names. **It lists every burn still to come, to every approved member**
+(#503), joined ones first, and defaults to the first — the list arrives soonest-first and
+the sort is stable, so within each half that order survives.
+
+It used to list only the burns a member had said they were coming to, with `admin` as the
+exception, and that left the person watching from the side on `NoBurn` everywhere while the
+feed showed them everything being planned. **The API was always ahead of the UI here**:
+`getMyBurns` already returns every coming burn with a null attendance, schedule reads and
+writes are gated on the role rather than on attendance, and the burn-wide notification
+audiences key on `attendance` rows — `namedBy` intersects mentions with attendance, so
+`@everybody` on a burn thread still never reaches a non-attendee. Opening the pages leaks
+nothing into the pings.
+
+**The controls that put a person on something nudge rather than refuse.** 🙋 as helper, a
+lead role, a meal crew place — each needs an `attendance` server-side, and each answered a
+bare 400 that surfaced as "Could not save that". They now answer `not_attending`, which the
+web turns into _You need to join the burn_ beside a link to the details page. Whoever
+reaches for a job is pointed at the thing that would let them take it. Arranging the shared
+furniture — moving dreams, lanes, the FAQ — stays approved-wide and needs no attendance at
+all.
 
 It is hidden when there is nothing to choose between — one burn is the ordinary
 case and a select with a single option is furniture.
 
-**Every burn-scoped page says the same thing when it has no burn**, through `NoBurn`,
-and it says a different thing to each persona because that is what decided the list
-is empty. An admin is offered every coming burn, so empty means none is planned
-and the fix is theirs — a link to Events. A member is offered the ones they have
-joined, so empty usually means they have not joined one, and the fix is on their own
-page. The old copy said "there is no burn open at the moment" to both, which is a
-claim about the world where only one of them needed a claim about themselves.
+**Every burn-scoped page says the same thing when it has no burn**, through `NoBurn`.
+Now that both personas are offered every coming burn, an empty list means the same thing
+to both — none is planned — so the two messages have converged on saying exactly that.
+Only the fix differs, and the link to Events stays the admin's, being no use to anybody
+else. Before #503 the member's copy said they had not joined one, which was true of the
+list they were shown then and is a false claim about the world now.
 
 It renders "Loading…" while the burns are still arriving, which is the state that
 made this shared rather than copied: the burns are fetched once for the session, so a

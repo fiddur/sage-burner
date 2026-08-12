@@ -104,6 +104,30 @@ describe('a song’s page', () => {
     expect(screen.getByText('come and sing with me')).toBeTruthy()
   })
 
+  it('watches the ruler as well as the body, a font change moving neither box', async () => {
+    const watched: Element[] = []
+
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe(target: Element) {
+          watched.push(target)
+        }
+        disconnect() {
+          return undefined
+        }
+      },
+    )
+
+    const { container } = renderPage(stub())
+    await screen.findByRole('heading', { name: /Fire in the sky/ })
+
+    expect(watched).toContain(container.querySelector('.song-body'))
+    expect(watched).toContain(container.querySelector('.song-ruler'))
+
+    vi.unstubAllGlobals()
+  })
+
   it('keeps the columns the author typed, so a chord stays above its syllable', async () => {
     const { container } = renderPage(stub())
 

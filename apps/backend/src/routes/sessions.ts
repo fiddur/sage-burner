@@ -175,7 +175,7 @@ const oneDream = async (db: Database, row: DreamRow, mine: string | undefined): 
 
 interface Refusal {
   code: 400 | 404
-  error: 'bad_request' | 'not_found'
+  error: 'bad_request' | 'not_attending' | 'not_found'
 }
 
 interface Arranging {
@@ -530,7 +530,7 @@ export const registerSessionRoutes = (
     if ('code' in found) return found
 
     const mine = found.mine
-    if (mine === undefined) return { code: 400, error: 'bad_request' }
+    if (mine === undefined) return { code: 400, error: 'not_attending' }
 
     return { ...found, mine }
   }

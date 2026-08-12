@@ -8,6 +8,7 @@ import type {
 
 import {
   answerProblems,
+  detailsPage,
   isTickBox,
   looksLikeEmail,
   MAX_ANSWER_LENGTH,
@@ -21,6 +22,7 @@ import type { PushApi } from '../components/PushToggle.tsx'
 import type { SignUpApi } from '../components/SignUpForm.tsx'
 
 import { isApiError } from '../api/client.ts'
+import { useSelectedBurn } from '../burn.tsx'
 import { ApplicationThread } from '../components/ApplicationThread.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { FormError } from '../components/FormError.tsx'
@@ -101,16 +103,20 @@ const Talk = ({ api, messages }: { api: ApplyApi; messages: readonly Application
 const Answered = ({
   approved,
   organisers,
+  joined,
 }: {
   approved: boolean
   organisers: MyApplication['organisers']
+  joined: string | undefined
 }) =>
   approved ? (
     <>
       <h1>You are in</h1>
       <p role="status">
-        Welcome. You are a member, and you are on the list for the burn that is coming —{' '}
-        <a href="/">have a look around</a>.
+        Welcome. You are a member, and you have been added to {joined ?? 'the burn that is coming'}.{' '}
+        <a href={detailsPage()}>Your details</a> is where you set your arrival and departure — or leave the
+        burn, if you know you cannot come. Either way you are welcome to stay and watch the planning; the next
+        burn will be announced here as well.
       </p>
     </>
   ) : (
@@ -142,6 +148,7 @@ const hasProblem = (problems: string[], field: string) =>
  */
 export const Apply = ({ api }: ApplyProps) => {
   const viewer = useViewer()
+  const burn = useSelectedBurn()
   const setViewer = useSetViewer()
   const sendsEmail = useInstallationSendsEmail()
   const { outcome } = useOauthOutcome()
@@ -185,7 +192,11 @@ export const Apply = ({ api }: ApplyProps) => {
   if (mine?.application != null && mine.application.status !== 'pending') {
     return (
       <article class="column">
-        <Answered approved={mine.application.status === 'approved'} organisers={mine.organisers} />
+        <Answered
+          approved={mine.application.status === 'approved'}
+          organisers={mine.organisers}
+          joined={burn?.event.name}
+        />
         <Talk api={api} messages={mine.messages} />
       </article>
     )
@@ -200,11 +211,19 @@ export const Apply = ({ api }: ApplyProps) => {
     )
   }
 
-  return <ApplicationForm api={api} onSent={() => setSent(true)} />
+  return <ApplicationForm api={api} knownName={viewer.account?.name ?? ''} onSent={() => setSent(true)} />
 }
 
-const ApplicationForm = ({ api, onSent }: { api: ApplyApi; onSent: () => void }) => {
-  const [name, setName] = useState('')
+const ApplicationForm = ({
+  api,
+  knownName,
+  onSent,
+}: {
+  api: ApplyApi
+  knownName: string
+  onSent: () => void
+}) => {
+  const [name, setName] = useState(knownName)
   const [email, setEmail] = useState('')
   const [answers, setAnswers] = useState<SubmittedAnswers>({})
   const [problems, setProblems] = useState<AnswerProblem[]>([])

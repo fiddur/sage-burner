@@ -286,7 +286,7 @@ export const registerLeadRoleRoutes = (app: FastifyInstance, deps: LeadRoleDeps)
       if (existing === undefined) return sendError(reply, 404)
 
       const attendanceId = await attendanceFor(db, existing.event_id, body.account_id)
-      if (attendanceId === undefined) return sendError(reply, 400)
+      if (attendanceId === undefined) return sendError(reply, 400, 'not_attending')
 
       await db
         .insert(leadRoleMember)

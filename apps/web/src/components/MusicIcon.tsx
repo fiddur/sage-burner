@@ -1,6 +1,6 @@
 import type { MusicMark } from '@sage-burner/shared'
 
-export type Shown = MusicMark | 'elsewhere'
+type Shown = MusicMark | 'elsewhere'
 
 type Drawn = { path: string } | { emoji: string }
 

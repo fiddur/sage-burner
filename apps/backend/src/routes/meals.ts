@@ -220,7 +220,7 @@ export const registerMealRoutes = (
       if (body.account_id !== null) {
         taking = await attendanceFor(db, existing.event_id, body.account_id)
 
-        if (taking === undefined) return sendError(reply, 400)
+        if (taking === undefined) return sendError(reply, 400, 'not_attending')
       }
 
       const [current] = await db
@@ -281,7 +281,7 @@ export const registerMealRoutes = (
       if (accountId === undefined) return sendError(reply, 400)
 
       const mine = await attendanceFor(db, existing.event_id, accountId)
-      if (mine === undefined) return sendError(reply, 400)
+      if (mine === undefined) return sendError(reply, 400, 'not_attending')
 
       const row = { meal_id: existing.id, attendance_id: mine, role }
 

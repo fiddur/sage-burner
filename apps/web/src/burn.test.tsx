@@ -178,21 +178,32 @@ describe('a link that names a burn', () => {
 })
 
 describe('choosableBurns', () => {
-  it('gives a member the burns they are coming to, and not the rest', () => {
+  it('offers every coming burn, joined or not, so watching from the side reaches the pages', () => {
     const joined = aBurn('e-1', 'Summer', true)
     const other = aBurn('e-2', 'Winter', false)
 
-    expect(choosableBurns(false, [joined, other])).toEqual([joined])
+    expect(choosableBurns([joined, other])).toEqual([joined, other])
   })
 
-  it('gives an admin every burn still to come', () => {
-    // The passing sibling, and the case that matters: an account holding `admin`
-    // without `member` has no attendance anywhere, so the member rule would leave
-    // them with an empty selector on the burn they are setting up.
-    const joined = aBurn('e-1', 'Summer', true)
-    const other = aBurn('e-2', 'Winter', false)
+  it('puts the joined ones first, whatever order they arrived in', () => {
+    const joined = aBurn('e-2', 'Winter', true)
+    const other = aBurn('e-1', 'Summer', false)
 
-    expect(choosableBurns(true, [joined, other])).toEqual([joined, other])
+    expect(choosableBurns([other, joined])).toEqual([joined, other])
+  })
+
+  it('holds the order the API sent within each half, which is soonest first', () => {
+    const soon = aBurn('e-1', 'Summer', false)
+    const later = aBurn('e-2', 'Winter', false)
+
+    expect(choosableBurns([soon, later])).toEqual([soon, later])
+  })
+
+  it('leaves an account with no attendance anywhere a full list rather than an empty one', () => {
+    const one = aBurn('e-1', 'Summer', false)
+    const two = aBurn('e-2', 'Winter', false)
+
+    expect(choosableBurns([one, two])).toEqual([one, two])
   })
 })
 
@@ -203,10 +214,14 @@ describe('the burn choice', () => {
     expect((await screen.findByText(/^ready:/)).textContent).toBe('ready:Summer,Winter:Summer')
   })
 
-  it('is ready with nothing for somebody who is coming to none', async () => {
-    // Their details page is where they join one. Sitting on "loading" forever would
-    // leave every burn-scoped page saying nothing at all.
+  it('offers the coming burn to somebody who has joined none, rather than nothing', async () => {
     renderChoice([aBurn('e-1', 'Summer', false)])
+
+    expect((await screen.findByText(/^ready:/)).textContent).toBe('ready:Summer:Summer')
+  })
+
+  it('is ready with nothing when no burn is coming at all', async () => {
+    renderChoice([])
 
     expect((await screen.findByText(/^ready:/)).textContent).toBe('ready::none')
   })

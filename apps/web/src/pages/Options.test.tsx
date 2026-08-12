@@ -280,8 +280,7 @@ describe('Options', () => {
       null,
     )
 
-    expect(await screen.findByText(/not coming to a burn yet/)).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Your details' })).toBeTruthy()
+    expect(await screen.findByText(/no burn planned yet/)).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'Events' })).toBeNull()
   })
 

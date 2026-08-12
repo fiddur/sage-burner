@@ -658,7 +658,14 @@ describe('where an application already stands', () => {
     expect(screen.queryByRole('button', { name: 'Send application' })).toBeNull()
   })
 
-  it('says so once it has been accepted', async () => {
+  it('starts the name from the account rather than asking for it a second time', async () => {
+    renderPage(stub())
+
+    await screen.findByRole('button', { name: 'Send application' })
+    expect(labelled('Your name')).toHaveProperty('value', 'Fredrik')
+  })
+
+  it('says so once it has been accepted, and that the coming burn was joined with it', async () => {
     renderPage(
       stub({
         getMyApplication: () =>
@@ -666,7 +673,11 @@ describe('where an application already stands', () => {
       }),
     )
 
-    expect((await screen.findByRole('status')).textContent).toContain('You are a member')
+    const said = (await screen.findByRole('status')).textContent
+    expect(said).toContain('You are a member')
+    expect(said).toContain('added to')
+    expect(said).toContain('leave the burn')
+    expect(screen.getByRole('link', { name: 'Your details' }).getAttribute('href')).toBe('/profile')
   })
 
   it('says who to ask once it has not been', async () => {
