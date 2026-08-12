@@ -6,7 +6,7 @@ import {
   notificationCategories,
   notifiesByDefault,
 } from '@sage-burner/shared'
-import { and, count, desc, eq, inArray, isNull } from 'drizzle-orm'
+import { and, count, desc, eq, inArray, isNull, lte } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { Database } from '../db/index.ts'
@@ -267,6 +267,25 @@ export const notificationsFor = async (db: Database, accountId: string) => {
     notifications: rows satisfies Notification[],
     unseen: tally?.unseen ?? 0,
   }
+}
+
+export const markShownSeen = async (
+  db: Database,
+  accountId: string,
+  { link, asOf }: { link: string; asOf: string },
+  at: Date,
+) => {
+  await db
+    .update(notification)
+    .set({ seen_at: at.toISOString() })
+    .where(
+      and(
+        eq(notification.account_id, accountId),
+        eq(notification.link, link),
+        lte(notification.created_at, asOf),
+        isNull(notification.seen_at),
+      ),
+    )
 }
 
 export const markSeen = async (db: Database, accountId: string, at: Date) => {

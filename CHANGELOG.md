@@ -14,6 +14,13 @@ under today's heading, and make a new heading when there is none.
   and the book can be listed by artist instead of by title — which puts one songwriter's songs
   together. Songs nobody has named come last.
 
+- **The bell stops badging what you have already looked at.** A notification only counted as read
+  if you opened the bell or the notifications page, so following "What's new" on the redeploy bar,
+  or a link out of a push message, left it sitting there unread. Arriving at what a notification
+  points at now marks that one — and only that one — as long as the page is showing something at
+  least as new as the notification itself. A page left open clears it the moment it refreshes and
+  shows the change.
+
 - **No more being told to install an app you have installed.** On Chrome and Edge the strip flashed
   "open your browser's share or menu" for a moment before offering the Install button, and it kept
   saying that to anybody who opened the installed app in an ordinary tab. Those browsers now show the

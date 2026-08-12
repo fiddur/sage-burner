@@ -71,6 +71,7 @@ import type {
   SongCategoryUpdate,
   SongCreateInput,
   SongUpdate,
+  TargetShownInput,
 } from './index.ts'
 
 import { feedKindsQuery } from './enums.ts'
@@ -643,6 +644,11 @@ export const apiRoutes = {
     fastify: '/api/me/notifications/seen',
     path: () => '/api/me/notifications/seen',
   },
+  markTargetShown: {
+    method: 'POST',
+    fastify: '/api/me/notifications/shown',
+    path: () => '/api/me/notifications/shown',
+  },
   offerSession: {
     method: 'POST',
     fastify: '/api/events/:eventId/sessions',
@@ -1124,6 +1130,7 @@ export interface RouteBodies {
   updateMeal: MealUpdate
   updateMealIntro: MealIntroUpdate
   updateMealSlot: MealSlotUpdate
+  markTargetShown: TargetShownInput
   updateMyNotificationSettings: NotificationSettings
   updateMyProfile: ProfileUpdate
   updateMyStay: AttendanceUpdate

@@ -1,7 +1,12 @@
 import type { NotificationSettings, NotificationsResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
-import { apiRoutes, notificationCategories, notificationSettingsSchema } from '@sage-burner/shared'
+import {
+  apiRoutes,
+  notificationCategories,
+  notificationSettingsSchema,
+  targetShownSchema,
+} from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -9,7 +14,7 @@ import type { GuardDeps } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
 import { notificationSetting } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
-import { markSeen, notificationsFor, switchedOn } from '../push/notify.ts'
+import { markSeen, markShownSeen, notificationsFor, switchedOn } from '../push/notify.ts'
 
 export interface NotificationDeps extends GuardDeps {
   now: () => Date
@@ -35,6 +40,20 @@ export const registerNotificationRoutes = (app: FastifyInstance, { db, sessions,
     if (accountId === undefined) return sendError(reply, 401)
 
     await markSeen(db, accountId, now())
+
+    return (await notificationsFor(db, accountId)) satisfies NotificationsResponse
+  })
+
+  app.post(apiRoutes.markTargetShown.fastify, async (request, reply) => {
+    void noStore(reply)
+
+    const accountId = await mine(request)
+    if (accountId === undefined) return sendError(reply, 401)
+
+    const body = bodyOf(targetShownSchema, request)
+    if (body === undefined) return sendError(reply, 400)
+
+    await markShownSeen(db, accountId, { link: body.link, asOf: body.as_of }, now())
 
     return (await notificationsFor(db, accountId)) satisfies NotificationsResponse
   })
