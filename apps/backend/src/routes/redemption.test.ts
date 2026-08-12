@@ -249,6 +249,48 @@ describe('a group link, which many people come in on', () => {
     expect((await redeem(server, token, { ...applicant, email: 'c@example.org' })).statusCode).toBe(409)
   })
 
+  it('refuses a burst that fills the cap while somebody’s password is being hashed (#524)', async () => {
+    // The pre-read passes before the scrypt, so a link one below its cap admits everybody who
+    // arrives during it. `hash` is where the arrival is simulated: the count inside the
+    // transaction is what refuses this one, and nothing else can reach that branch.
+    let filled = false
+    const server = await build(undefined, async (password) => {
+      if (!filled) {
+        filled = true
+        const other = randomUUID()
+        await db()
+          .insert(account)
+          .values({ id: other, email: `${other}@example.org`, password_hash: null, created_at: NOW })
+        const [link] = await db().select().from(inviteToken)
+        await db()
+          .insert(inviteRedemption)
+          .values({
+            id: randomUUID(),
+            token_id: link?.id ?? '',
+            account_id: other,
+            redeemed_at: NOW,
+          })
+      }
+
+      return `hashed:${password}`
+    })
+    const token = await givenInvite({ kind: 'group', max_uses: 1 })
+
+    const answer = await redeem(server, token)
+
+    expect(answer.statusCode).toBe(409)
+    expect(await db().select().from(account).where(eq(account.email, applicant.email))).toEqual([])
+    expect(await db().select().from(inviteRedemption)).toHaveLength(1)
+  })
+
+  it('admits somebody where the cap is not full, which is the ordinary arrival', async () => {
+    const server = await build()
+    const token = await givenInvite({ kind: 'group', max_uses: 2 })
+
+    expect((await redeem(server, token)).statusCode).toBe(201)
+    expect(await db().select().from(inviteRedemption)).toHaveLength(1)
+  })
+
   it('refuses once revoked, which is how a group link is taken back', async () => {
     const server = await build()
     const token = await givenInvite({ kind: 'group', revoked_at: NOW })
