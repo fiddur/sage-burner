@@ -236,8 +236,9 @@ minutes after a merge.
 ### Signing up through a provider
 
 Sign-up and sign-in converge on one handler, because asking somebody to say which one they are
-doing is asking them to know. An identity nobody has yet makes an account rather than bouncing to
-`unlinked`.
+doing is asking them to know. An identity nobody has yet makes an account rather than being
+refused, which is why nothing answers `unlinked` any more (#489): every path that used to reach
+it now falls through to `signUpThrough`, so the outcome was a branch nothing could take.
 
 **That needs an address**, since an account is keyed by one — so both providers are now asked for
 `email`, which neither was before: nothing here matched on an address, so collecting one bought
@@ -288,6 +289,27 @@ a reply lands where a submission does.
 **A thread does not change the status.** Pending stays pending while the conversation runs;
 approve and reject remain the same explicit actions, and a thread on a rejected application stays
 readable — which is what the status page's "ask the organisers" posture is for.
+
+**A password has a floor of ten characters** (#489). There was none, deliberately — "what makes a
+good password is the member's business, and a floor here mostly pushes people to the one they
+reuse" — and that held while the only way to choose one was redeeming an invite somebody had been
+vetted for. Sign-up is open now, so the same schema is the floor for every account made from the
+internet. `MIN_PASSWORD` is one constant the form and the schema share, so the page can say the
+rule rather than let the server refuse after the fact.
+
+**Somebody who already holds `member` cannot file an application** (#489). `/apply` renders for any
+signed-in viewer with no application row, and the route asked only for a session — so a member who
+came in by invite could add noise to the queue. It answers 409 now, and the page says what to do
+instead: the second account is the trap, not the form.
+
+**The applicant's end of the thread is bounded** (#489), because each message rings every admin's
+bell through `notifyAdmins`. Ten in ten minutes per account, the same shape as the other routes a
+role-less account can reach.
+
+**Allergies are ticked on the way in.** The redemption form had a free-text box while every other
+surface offers the shared vocabulary with checkboxes; `AllergiesField` is now one component both
+use, so the two cannot drift. The list is a public read, which is what lets a form nobody has
+signed into yet render it.
 
 ## Applying
 
@@ -720,11 +742,18 @@ Two things it deliberately does not do:
   `you@example.org` rather than creating a second account beside it — the
   table's `UNIQUE` is byte-exact.
 
-The password only has to be non-empty. There is no length or composition rule:
-those are the app deciding what a good password is on someone else's behalf, and
-they push people towards the one they already reuse everywhere. A rule here would
-also have to apply to a password being _set_ and never at login, so that adding
-one later cannot lock out an existing member.
+The password needs `MIN_PASSWORD` characters and nothing else — no composition
+rule, since those are the app deciding what a good password is on somebody else's
+behalf, and they push people towards the one they already reuse everywhere. There
+was no length rule either while redemption was the only way to choose one and
+whoever held the link had been vetted; sign-up being open changed what the same
+schema is a floor for (#489).
+
+**The floor applies where a password is _set_ and never at login**, which is why
+`loginPasswordSchema` stays at `min(1)`: adding a rule later must not lock out a
+member whose existing password is shorter than it. `ensureAdmin` is the one place
+a short one now stops something — a first bootstrap, which is a fresh choice
+rather than an old one.
 
 ## Passkeys
 
@@ -1204,11 +1233,13 @@ is made from Your details by somebody already signed in; signing in matches a st
 or refuses. An OAuth button that created accounts would be a hole straight through the
 membership gate the application form exists to be.
 
-**It never matches on an email address**, and neither provider is asked for one. Matching a
-provider's address to an account is an account-takeover path the moment any provider hands
-over one it did not verify, and it would make the button an oracle for which addresses have
-accounts here — which the usernameless passkey login went out of its way not to be. An
-unmatched sign-in answers `unlinked`, worded to read the same whether or not an account exists.
+**It never matches on an email address.** Both providers are asked for one now, because an
+account is keyed by one and sign-up goes through here — but the address makes an account, it
+never finds one. Matching a provider's address to an existing account is an account-takeover
+path the moment any provider hands over one it did not verify, and it would make the button an
+oracle for which addresses have accounts here, which the usernameless passkey login went out of
+its way not to be. An address that already has an account answers `address-taken` and says to
+sign in and link the provider, rather than signing anybody in.
 
 **It never leaves an account with no way in.** Removing an identity is refused with a 409 when
 no password, passkey or other identity remains — `removePasskey`'s refusal generalised.

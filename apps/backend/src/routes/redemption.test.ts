@@ -16,7 +16,9 @@ import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
 import {
   account,
+  accountAllergy,
   accountConnection,
+  allergyItem,
   application,
   attendance,
   event,
@@ -179,6 +181,41 @@ const redeem = (
   body: Record<string, unknown> = applicant,
 ): Promise<LightMyRequestResponse> =>
   server.inject({ method: 'POST', url: `/api/invites/${encodeURIComponent(token)}/redeem`, payload: body })
+
+describe('the allergies somebody ticks on the way in', () => {
+  it('lands on the account, the same vocabulary the rest of the app uses', async () => {
+    const server = await build()
+    const token = await givenInvite()
+    const item = randomUUID()
+    await db().insert(allergyItem).values({ id: item, order: 0, label: 'Peanuts' })
+
+    const response = await redeem(server, token, { ...applicant, allergy_item_ids: [item] })
+    expect(response.statusCode).toBe(201)
+
+    const ticked = await db().select().from(accountAllergy)
+    expect(ticked).toHaveLength(1)
+    expect(ticked[0]?.item_id).toBe(item)
+  })
+
+  it('answers 400 rather than 500 for an item that has since been deleted', async () => {
+    const server = await build()
+    const token = await givenInvite()
+
+    const response = await redeem(server, token, { ...applicant, allergy_item_ids: [randomUUID()] })
+
+    expect(response.statusCode).toBe(400)
+    const [invite] = await db().select().from(inviteToken)
+    expect(invite?.used_at, 'a refused redemption must not spend the token').toBeNull()
+  })
+
+  it('takes none at all, the whole field being optional', async () => {
+    const server = await build()
+    const token = await givenInvite()
+
+    expect((await redeem(server, token, applicant)).statusCode).toBe(201)
+    expect(await db().select().from(accountAllergy)).toHaveLength(0)
+  })
+})
 
 describe('a group link, which many people come in on', () => {
   it('is still live after somebody has used it, which is the whole point', async () => {
@@ -651,17 +688,25 @@ describe('redeeming', () => {
     expect(invite?.used_at).toBeNull()
   })
 
-  it('takes a password of any shape, and spends the invite on it', async () => {
-    // No length or composition rule: what makes a good password is the member's
-    // business, and a floor here mostly pushes people to the one they reuse.
+  it('takes any shape of password above the floor, and spends the invite on it', async () => {
     const server = await build()
     const token = await givenInvite()
 
-    const response = await redeem(server, token, { ...applicant, password: 'hi' })
+    const response = await redeem(server, token, { ...applicant, password: '🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥' })
 
     expect(response.statusCode).toBe(201)
     const [invite] = await db().select().from(inviteToken)
     expect(invite?.used_at).not.toBeNull()
+  })
+
+  it('refuses one under the floor, sign-up being open to the internet now (#489)', async () => {
+    const server = await build()
+    const token = await givenInvite()
+
+    expect((await redeem(server, token, { ...applicant, password: 'hi' })).statusCode).toBe(400)
+
+    const [invite] = await db().select().from(inviteToken)
+    expect(invite?.used_at, 'a refused redemption must not spend the token').toBeNull()
   })
 
   it('refuses an empty password, which is not one', async () => {

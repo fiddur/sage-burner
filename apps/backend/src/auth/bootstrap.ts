@@ -1,4 +1,4 @@
-import { emailSchema, newPasswordSchema } from '@sage-burner/shared'
+import { emailSchema, MIN_PASSWORD, newPasswordSchema } from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
@@ -51,7 +51,7 @@ export const ensureAdmin = async ({
   }
 
   if (!newPasswordSchema.safeParse(password).success) {
-    throw new Error('Set a password — ADMIN_PASSWORD is empty.')
+    throw new Error(`ADMIN_PASSWORD needs at least ${MIN_PASSWORD} characters.`)
   }
 
   const id = newId()

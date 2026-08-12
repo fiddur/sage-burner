@@ -561,8 +561,8 @@ describe('Apply', () => {
     const submitApplication = vi.fn(() => Promise.resolve({ application: {} as never }))
     renderPage(stub({ submitApplication, getQuestions: () => new Promise(() => undefined) }))
 
+    const button = await screen.findByRole('button', { name: 'Send application' })
     identify()
-    const button = screen.getByRole('button', { name: 'Send application' })
     expect(button).toHaveProperty('disabled', true)
 
     button.click()
@@ -654,7 +654,9 @@ describe('where an application already stands', () => {
       }),
     )
 
-    expect((await screen.findByRole('status')).textContent).toContain('within 24 hours')
+    expect((await screen.findByRole('status')).textContent).toContain(
+      'We read them together before each burn',
+    )
     expect(screen.queryByRole('button', { name: 'Send application' })).toBeNull()
   })
 

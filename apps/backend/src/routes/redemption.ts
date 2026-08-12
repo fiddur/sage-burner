@@ -14,9 +14,10 @@ import type { Notifier } from '../push/notify.ts'
 
 import { hashPassword } from '../auth/password.ts'
 import { loginAddressConnection } from '../connections.ts'
-import { isUniqueViolation } from '../db/errors.ts'
+import { isForeignKeyViolation, isUniqueViolation } from '../db/errors.ts'
 import {
   account,
+  accountAllergy,
   accountConnection,
   accountRole,
   application,
@@ -131,7 +132,7 @@ export const registerRedemptionRoutes = (
     if (taken !== undefined) return sendError(reply, 409)
     const accountId = randomUUID()
 
-    const claimed = ((): boolean => {
+    const claimed = ((): boolean | 'unknown-allergy' => {
       try {
         return db.transaction((tx) => {
           // A group link is not claimed, only counted — the cap is checked above, once, before
@@ -172,6 +173,10 @@ export const registerRedemptionRoutes = (
               .run()
           }
 
+          for (const item_id of new Set(body.allergy_item_ids)) {
+            tx.insert(accountAllergy).values({ account_id: accountId, item_id }).onConflictDoNothing().run()
+          }
+
           tx.insert(accountRole).values({ account_id: accountId, role: 'member' }).run()
 
           tx.insert(accountConnection).values(loginAddressConnection(accountId, body.email)).run()
@@ -180,10 +185,12 @@ export const registerRedemptionRoutes = (
         })
       } catch (error) {
         if (isEmailConflict(error)) return false
+        if (isForeignKeyViolation(error)) return 'unknown-allergy'
         throw error
       }
     })()
 
+    if (claimed === 'unknown-allergy') return sendError(reply, 400)
     if (!claimed) return sendError(reply, 409)
 
     void reply.header(

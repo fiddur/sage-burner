@@ -162,19 +162,27 @@ describe('ensureAdmin', () => {
     expect(await db.select().from(account)).toHaveLength(1)
   })
 
-  it('takes any password that is a password at all', async () => {
+  it('takes any password at or above the floor', async () => {
+    const db = database()
+
+    await expect(
+      ensureAdmin({ db, email: 'ada@example.org', password: 'a-long-enough-one', params: cheap }),
+    ).resolves.toMatchObject({ created: true })
+  })
+
+  it('refuses one under the floor, which is the same floor everybody else gets', async () => {
     const db = database()
 
     await expect(
       ensureAdmin({ db, email: 'ada@example.org', password: 'hi', params: cheap }),
-    ).resolves.toMatchObject({ created: true })
+    ).rejects.toThrow(/at least 10 characters/)
   })
 
   it('rejects an empty password, which is not one', async () => {
     const db = database()
 
     await expect(ensureAdmin({ db, email: 'ada@example.org', password: '', params: cheap })).rejects.toThrow(
-      /ADMIN_PASSWORD is empty/,
+      /at least 10 characters/,
     )
     expect(await db.select().from(account)).toHaveLength(0)
   })

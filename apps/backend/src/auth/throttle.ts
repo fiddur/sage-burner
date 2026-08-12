@@ -22,6 +22,8 @@ export const LOGIN_BY_ADDRESS: Bound = { attempts: 10, windowMs: 15 * 60_000 }
 
 export const REDEEM_BY_IP: Bound = { attempts: 20, windowMs: 10 * 60_000 }
 
+export const APPLICATION_MESSAGES: Bound = { attempts: 10, windowMs: 10 * 60_000 }
+
 export const MOST_KEYS = 4096
 
 export const createThrottle = ({ attempts, windowMs, now, keys = MOST_KEYS }: ThrottleOptions): Throttle => {

@@ -1,24 +1,30 @@
-import type { Event, EventOptionTaken, InviteState } from '@sage-burner/shared'
+import type { AllergyItem, Event, EventOptionTaken, InviteState } from '@sage-burner/shared'
 
-import { MAX_NOTES, MAX_PERSON_NAME } from '@sage-burner/shared'
+import { MAX_PERSON_NAME, MIN_PASSWORD } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 import type { StayDraft } from '../stay.ts'
 
 import { isApiError } from '../api/client.ts'
+import { AllergiesField } from '../components/AllergiesField.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { FormError } from '../components/FormError.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
 import { StayFields } from '../components/StayFields.tsx'
 import { useAction, useLoadInto } from '../load.ts'
 import { stayForBurn, stayProblem, stayUpdate } from '../stay.ts'
-import { rowsFor } from '../textarea.ts'
 import { useSetViewer, useViewer } from '../viewer.tsx'
 
 export type InviteApi = Pick<
   ApiClient,
-  'getActiveEvent' | 'getEventOptions' | 'getInviteState' | 'joinEvent' | 'redeemInvite' | 'updateMyStay'
+  | 'getActiveEvent'
+  | 'getAllergyItems'
+  | 'getEventOptions'
+  | 'getInviteState'
+  | 'joinEvent'
+  | 'redeemInvite'
+  | 'updateMyStay'
 >
 
 interface Upcoming {
@@ -29,6 +35,7 @@ interface Upcoming {
 interface Invited {
   state: InviteState
   upcoming: Upcoming | undefined
+  allergyItems: readonly AllergyItem[]
 }
 
 const upcomingBurn = async (api: InviteApi, signal: AbortSignal): Promise<Upcoming | undefined> => {
@@ -104,18 +111,20 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
   const [allergies, setAllergies] = useState('')
+  const [ticked, setTicked] = useState<readonly string[]>([])
   const [coming, setComing] = useState(true)
   const [stay, setStay] = useState<StayDraft | undefined>(undefined)
   const [done, setDone] = useState<'joined' | 'member' | undefined>(undefined)
 
   const { loaded } = useLoadInto(
     async (signal): Promise<Invited> => {
-      const [state, upcoming] = await Promise.all([
+      const [state, upcoming, allergyList] = await Promise.all([
         api.getInviteState(token, signal),
         upcomingBurn(api, signal),
+        api.getAllergyItems(signal).catch(() => ({ items: [] })),
       ])
 
-      return { state, upcoming }
+      return { state, upcoming, allergyItems: allergyList.items }
     },
     ({ state, upcoming }) => {
       if (state.name !== null) setName(state.name)
@@ -137,6 +146,7 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
     if (email.trim() === '') return 'Please give us an email address — it becomes your login.'
     if (name.trim() === '') return 'Please tell us your name.'
     if (password === '') return 'Please choose a password.'
+    if (password.length < MIN_PASSWORD) return `A password needs at least ${MIN_PASSWORD} characters.`
 
     return joining && stay !== undefined ? stayProblem(stay) : undefined
   }
@@ -152,6 +162,7 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
         password,
         name: name.trim(),
         allergies_notes: allergies.trim() === '' ? null : allergies.trim(),
+        allergy_item_ids: [...ticked],
         join_event_id: joining ? offered.event.id : null,
       })
       if (signedIn !== null) {
@@ -282,9 +293,14 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
             name="password"
             autocomplete="new-password"
             aria-required
+            minLength={MIN_PASSWORD}
+            aria-describedby="password-floor"
             value={password}
             onInput={(event) => setPassword(event.currentTarget.value)}
           />
+          <span class="form-note" id="password-floor">
+            At least {MIN_PASSWORD} characters.
+          </span>
         </label>
 
         <label class="field">
@@ -299,16 +315,13 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
           />
         </label>
 
-        <label class="field">
-          <span>Allergies or food you cannot eat (optional)</span>
-          <textarea
-            name="allergies_notes"
-            maxLength={MAX_NOTES}
-            rows={rowsFor(allergies)}
-            value={allergies}
-            onInput={(event) => setAllergies(event.currentTarget.value)}
-          />
-        </label>
+        <AllergiesField
+          items={loaded.status === 'ready' ? loaded.data.allergyItems : []}
+          ticked={ticked}
+          notes={allergies}
+          onTicked={setTicked}
+          onNotes={setAllergies}
+        />
 
         <p class="form-note">
           We cook together, so this is read by whoever plans the meals. You can change it later.

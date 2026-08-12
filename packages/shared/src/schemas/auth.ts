@@ -1,14 +1,14 @@
 import { z } from 'zod'
 
 import { accountRoles } from '../enums.ts'
-import { MAX_EMAIL, MAX_PERSON_NAME } from '../limits.ts'
+import { MAX_EMAIL, MAX_PERSON_NAME, MIN_PASSWORD } from '../limits.ts'
 import { idSchema, nonEmptyText } from './common.ts'
 
 export const emailSchema = z.string().trim().toLowerCase().pipe(z.email().max(MAX_EMAIL))
 
 export const loginPasswordSchema = z.string().min(1).max(1024)
 
-export const newPasswordSchema = z.string().min(1).max(1024)
+export const newPasswordSchema = z.string().min(MIN_PASSWORD).max(1024)
 
 export const loginRequestSchema = z.object({
   email: emailSchema,

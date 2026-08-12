@@ -70,7 +70,7 @@ const Waiting = ({ sendsEmail, api }: { sendsEmail?: boolean; api: PushApi }) =>
   <>
     <h1>Application sent</h1>
     <p role="status">
-      Thank you — we have your application. Approval is normally handled within 24 hours.{' '}
+      Thank you — we have your application. We read them together before each burn.{' '}
       {sendsEmail === true
         ? 'If you do not get a notification or an email, you can check back here.'
         : 'If you do not get a notification, you can check back here.'}
@@ -212,7 +212,48 @@ export const Apply = ({ api }: ApplyProps) => {
     )
   }
 
-  return <ApplicationForm api={api} knownName={viewer.account?.name ?? ''} onSent={() => setSent(true)} />
+  return (
+    <NotAppliedYet
+      api={api}
+      standing={standing.status}
+      knownName={viewer.account?.name ?? ''}
+      onSent={() => setSent(true)}
+    />
+  )
+}
+
+/** Nothing of theirs to show yet — but a blank form is a claim they have not applied. */
+const NotAppliedYet = ({
+  api,
+  standing,
+  knownName,
+  onSent,
+}: {
+  api: ApplyApi
+  standing: 'loading' | 'ready' | 'failed'
+  knownName: string
+  onSent: () => void
+}) => {
+  if (standing === 'loading') return <p class="form-note">Loading…</p>
+
+  if (standing === 'failed') {
+    return (
+      <article class="column">
+        <h1>Apply to join</h1>
+        <ErrorText message="Could not check whether you have already applied. Please reload the page." />
+      </article>
+    )
+  }
+
+  return (
+    <>
+      <p class="form-note">
+        Already a member? This is a new account — log out, sign in the way you usually do, and link the
+        provider under <a href={detailsPage()}>Your details</a>.
+      </p>
+      <ApplicationForm api={api} knownName={knownName} onSent={onSent} />
+    </>
+  )
 }
 
 const ApplicationForm = ({
@@ -280,10 +321,19 @@ const ApplicationForm = ({
         })
         onSent()
       },
-      (failure) =>
-        isApiError(failure) && failure.status === 400
-          ? 'The questions changed while you were filling this in. Please reload the page and send it again.'
-          : 'Could not send your application. Please check your connection and try again.',
+      (failure) => {
+        if (!isApiError(failure)) {
+          return 'Could not send your application. Please check your connection and try again.'
+        }
+        if (failure.status === 400) {
+          return 'The questions changed while you were filling this in. Please reload the page and send it again.'
+        }
+        if (failure.status === 409) {
+          return 'You are already a member here — there is nothing to apply for. Log in the way you usually do.'
+        }
+
+        return 'Could not send your application. Please check your connection and try again.'
+      },
     )
   }
 

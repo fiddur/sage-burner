@@ -1,6 +1,6 @@
 import type { MeResponse } from '@sage-burner/shared'
 
-import { apiRoutes, MAX_EMAIL, MAX_PERSON_NAME, oauthProviderInfo } from '@sage-burner/shared'
+import { apiRoutes, MAX_EMAIL, MAX_PERSON_NAME, MIN_PASSWORD, oauthProviderInfo } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -96,9 +96,15 @@ export const SignUpForm = ({
             name="password"
             autocomplete="new-password"
             required
+            minLength={MIN_PASSWORD}
+            aria-describedby="password-floor"
             value={password}
             onInput={(typed) => setPassword(typed.currentTarget.value)}
           />
+          <span class="form-note" id="password-floor">
+            At least {MIN_PASSWORD} characters. Length is what makes one hard to guess — a few words you will
+            remember beats something short and clever.
+          </span>
         </label>
 
         <ErrorText message={error} />

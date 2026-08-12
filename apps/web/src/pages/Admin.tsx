@@ -1,6 +1,6 @@
 import type { AccountRole, AdminAccount } from '@sage-burner/shared'
 
-import { accountRoles } from '@sage-burner/shared'
+import { accountRoles, MIN_PASSWORD } from '@sage-burner/shared'
 import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -158,7 +158,8 @@ const SetPassword = ({
         type="text"
         autocomplete="off"
         aria-label={`New password for ${email}`}
-        placeholder="New password"
+        placeholder={`New password (${MIN_PASSWORD}+)`}
+        minLength={MIN_PASSWORD}
         value={password}
         disabled={state === 'saving'}
         onInput={(inputEvent) => {
@@ -166,7 +167,11 @@ const SetPassword = ({
           setState('idle')
         }}
       />
-      <button type="button" disabled={state === 'saving' || password === ''} onClick={() => void save()}>
+      <button
+        type="button"
+        disabled={state === 'saving' || password.length < MIN_PASSWORD}
+        onClick={() => void save()}
+      >
         Set it
       </button>
       {state === 'done' && (
