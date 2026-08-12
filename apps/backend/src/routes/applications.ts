@@ -175,7 +175,7 @@ export const registerApplicationRoutes = (
 
     const viewer = await viewerFor(request, { db, sessions })
     if (viewer === undefined) return sendError(reply, 401)
-    if (viewer.roles.includes('member')) return sendError(reply, 409)
+    if (viewer.roles.includes('member')) return sendError(reply, 409, 'already_member')
 
     const body = bodyOf(applicationCreateSchema, request)
     if (body === undefined) return sendError(reply, 400)
@@ -200,13 +200,20 @@ export const registerApplicationRoutes = (
         value: body.answers[question.id] ?? (isTickBox(question.type) ? false : ''),
       }))
 
+    const [own] = await db
+      .select({ email: account.email })
+      .from(account)
+      .where(eq(account.id, viewer.account_id))
+      .limit(1)
+    if (own === undefined) return sendError(reply, 401)
+
     const row = {
       id: randomUUID(),
       account_id: viewer.account_id,
       answers,
       status: 'pending',
       applicant_name: body.applicant_name,
-      applicant_email: body.applicant_email,
+      applicant_email: body.applicant_email ?? own.email,
       submitted_at: now().toISOString(),
       decided_at: null,
     } satisfies Application
@@ -214,7 +221,7 @@ export const registerApplicationRoutes = (
     try {
       await db.insert(application).values(row)
     } catch (error) {
-      if (isUniqueViolation(error, 'application.account_id')) return sendError(reply, 409)
+      if (isUniqueViolation(error, 'application.account_id')) return sendError(reply, 409, 'already_applied')
       throw error
     }
 

@@ -1,4 +1,4 @@
-import type { FormQuestion } from '@sage-burner/shared'
+import type { FormQuestion, MyBurn } from '@sage-burner/shared'
 
 import { MAX_ANSWER_LENGTH, MAX_APPLICANT_EMAIL_LENGTH, MAX_APPLICANT_NAME_LENGTH } from '@sage-burner/shared'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
@@ -10,6 +10,7 @@ import type { Viewer } from '../viewer.tsx'
 import type { ApplyApi } from './Apply.tsx'
 
 import { apiError } from '../api/client.ts'
+import { BurnProvider } from '../burn.tsx'
 import { InstallationProvider } from '../installation.tsx'
 import { ViewerProvider } from '../viewer.tsx'
 
@@ -65,12 +66,42 @@ const APPLICANT: Viewer = {
   account: { id: 'a-1', name: 'Fredrik', avatar: null, roles: [] },
 }
 
-const renderPage = (api: ApplyApi, viewer: Viewer = APPLICANT) =>
+const renderPage = (api: ApplyApi, viewer: Viewer = APPLICANT, burns: MyBurn[] = []) =>
   render(
     <ViewerProvider viewer={viewer}>
-      <Apply api={api} />
+      <BurnProvider value={{ status: 'ready', burns, selected: burns[0] }}>
+        <Apply api={api} />
+      </BurnProvider>
     </ViewerProvider>,
   )
+
+const aBurn = (name: string, joined: boolean): MyBurn => ({
+  event: {
+    id: `e-${name}`,
+    name,
+    slug: name.toLowerCase(),
+    start_date: '2026-08-01',
+    end_date: '2026-08-05',
+    start_time: '16:00',
+    end_time: '12:00',
+  },
+  attendance: joined
+    ? {
+        id: 'att-1',
+        event_id: `e-${name}`,
+        account_id: 'a-1',
+        joined_at: '2026-07-02T00:00:00.000Z',
+        arrival_date: null,
+        departure_date: null,
+        lodging_option_id: null,
+        helping_option_ids: [],
+        helping_other: null,
+        notes: null,
+        payment_status: 'unpaid',
+        payment_date: null,
+      }
+    : null,
+})
 
 /**
  * Fields are found by label prefix, because a required question's accessible
@@ -111,6 +142,14 @@ const identify = () => {
 }
 
 const send = () => screen.getByRole('button', { name: 'Send application' }).click()
+
+/** The form's own checks, past the ones a browser makes on `type="email"` — which happy-dom makes too. */
+const submitPastTheFields = () => {
+  const form = document.querySelector('form')
+  if (form === null) throw new Error('there is no form on the page')
+
+  fireEvent.submit(form)
+}
 
 describe('Apply', () => {
   it('renders whatever questions the API returns', async () => {
@@ -469,6 +508,68 @@ describe('Apply', () => {
     )
   })
 
+  it('sends no address at all where the field is left blank, the account carrying one (#510)', async () => {
+    const submitApplication = vi.fn(() => Promise.resolve({ application: {} as never }))
+    renderPage(stub({ submitApplication }))
+
+    await ready()
+    fill('Your name', 'Fredrik')
+    send()
+
+    await waitFor(() =>
+      expect(submitApplication).toHaveBeenCalledWith({
+        applicant_name: 'Fredrik',
+        answers: {},
+        asked: [],
+      }),
+    )
+  })
+
+  it('says what a blank address means rather than refusing one', async () => {
+    renderPage(stub())
+
+    await ready()
+
+    expect(screen.getByText(/we write to the address you signed in with/)).toBeTruthy()
+  })
+
+  it('still refuses an address that is not one, past the field’s own check', async () => {
+    renderPage(stub())
+
+    await ready()
+    fill('Your name', 'Fredrik')
+    fill('Your email address', 'not-an-address')
+    submitPastTheFields()
+
+    expect((await screen.findByText(/does not look like an email address/)).textContent).toBeTruthy()
+  })
+
+  it('tells a second submit its application is already in, not that it is a member (#531)', async () => {
+    renderPage(
+      stub({
+        submitApplication: () => Promise.reject(apiError(409, 'already_applied', 'Request failed (409).')),
+      }),
+    )
+
+    await ready()
+    fill('Your name', 'Fredrik')
+    send()
+
+    const said = await screen.findByRole('alert')
+    expect(said.textContent).toContain('already in')
+    expect(said.textContent).not.toContain('nothing to apply for')
+  })
+
+  it('tells a member there is nothing to apply for, and shows them no form (#531)', async () => {
+    renderPage(stub(), {
+      status: 'signed-in',
+      account: { id: 'a-1', name: 'Fredrik', avatar: null, roles: ['member'] },
+    })
+
+    expect(await screen.findByText(/nothing to apply for/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Send application' })).toBeNull()
+  })
+
   it('tells the applicant to reload when the server rejects, not to try again', async () => {
     // A 400 means the questions changed since the page loaded, so both sides ran
     // the same rules against different lists. "Try again" is false advice there:
@@ -682,19 +783,38 @@ describe('where an application already stands', () => {
     expect(labelled('Your name')).toHaveProperty('value', 'Fredrik')
   })
 
-  it('says so once it has been accepted, and that the coming burn was joined with it', async () => {
+  it('says so once it has been accepted, and names the burn it added them to', async () => {
     renderPage(
       stub({
         getMyApplication: () =>
           Promise.resolve({ mine: { application: anApplication('approved'), messages: [], organisers: [] } }),
       }),
+      APPLICANT,
+      [aBurn('Summer burn', true)],
     )
 
     const said = (await screen.findByRole('status')).textContent
-    expect(said).toContain('You are a member')
-    expect(said).toContain('added to')
+    expect(said).toContain('You are a member here now')
+    expect(said).toContain('added to Summer burn')
     expect(said).toContain('leave the burn')
     expect(screen.getByRole('link', { name: 'Your details' }).getAttribute('href')).toBe('/profile')
+  })
+
+  it('claims no join where none happened, which is approval between burns (#522)', async () => {
+    renderPage(
+      stub({
+        getMyApplication: () =>
+          Promise.resolve({ mine: { application: anApplication('approved'), messages: [], organisers: [] } }),
+      }),
+      APPLICANT,
+      [aBurn('Summer burn', false)],
+    )
+
+    const said = (await screen.findByRole('status')).textContent
+    expect(said).toContain('You are a member here now')
+    expect(said).not.toContain('added to')
+    expect(said).not.toContain('leave the burn')
+    expect(said).toContain('join the one you are coming to')
   })
 
   it('says who to ask once it has not been', async () => {

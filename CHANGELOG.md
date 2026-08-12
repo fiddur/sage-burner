@@ -18,6 +18,18 @@ under today's heading, and make a new heading when there is none.
   could all slip past the count and take it a few over. It is checked again as each account is
   written, which is the check that decides.
 
+- **Applying no longer asks for an email twice.** The address you signed up with is the one we write
+  to, so the field is optional: fill it in only if something else would reach you better. It used to
+  refuse to send without one, blank, while the account already had it.
+
+- **"You are in" stops claiming a burn you are not on.** Being approved between burns joined you to
+  nothing, and the page still said you had been added to "the burn that is coming" and offered to let
+  you leave it. It now says what is true either way, and names the burn only when there is one.
+
+- **A second submit of the same application says so** instead of "you are already a member here", and
+  somebody who is already a member is told there is nothing to apply for rather than being shown the
+  whole form to fill in first.
+
 - **The first person onto a new burn can put their hand up.** On a burn nobody had joined yet — every
   burn on the day it is planned — 🙋 was missing everywhere: no lead role, no meal crew, no helping
   out, and so not even the nudge telling you to join first. The hand is there now, and pressing it
