@@ -54,7 +54,10 @@ export const dreamActions = ({
   },
 
   facilitate: (id: string, accountId: string | null) => {
-    run(() => api.updateSession(id, { facilitator_account_id: accountId }), 'Could not save that.')
+    run(
+      () => api.updateSession(id, { facilitator_account_id: accountId }),
+      joinFirst('Could not save that.', accountId === viewerId ? 'mine' : 'theirs'),
+    )
   },
 
   save: (id: string, changes: SessionUpdate) => {

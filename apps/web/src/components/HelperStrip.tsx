@@ -46,7 +46,7 @@ export const HelperStrip = ({
   const on = new Set(people.map((person) => person.account_id))
   const mine = viewerId !== undefined && on.has(viewerId)
   const eligible = candidates.some((who) => who.account_id === viewerId)
-  const canBeMe = !mine && viewerId !== undefined && (eligible || !viewerAttending)
+  const canBeMe = !mine && viewerId !== undefined && (eligible || (!viewerAttending && candidates.length > 0))
   const offerable = candidates.filter((who) => !on.has(who.account_id) && who.account_id !== viewerId)
 
   const short = Math.max(0, (wanted ?? 0) - people.length)

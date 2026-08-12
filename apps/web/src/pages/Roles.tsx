@@ -125,7 +125,7 @@ export const Roles = ({ api }: { api: RolesApi }) => {
     },
   )
 
-  const { busy, error, failure, setError, run } = useAction(reload)
+  const { busy, error, setError, run } = useAction(reload)
 
   const ready = loaded.status === 'ready' ? (loaded.data ?? undefined) : undefined
 
@@ -140,7 +140,7 @@ export const Roles = ({ api }: { api: RolesApi }) => {
         and anyone can change or remove one, so talk to each other first.
       </p>
 
-      <ErrorText message={error} link={joinLink(failure)} />
+      <ErrorText message={error} link={joinLink(error)} />
 
       <Notice loaded={loaded} />
 
@@ -202,7 +202,13 @@ export const Roles = ({ api }: { api: RolesApi }) => {
                       onEdit={() => setEditing(role.id)}
                       onRemove={() => run(() => api.deleteLeadRole(role.id), 'Could not remove that role.')}
                       onLead={(accountId) =>
-                        run(() => api.setLeadRoleLead(role.id, accountId), 'Could not change the lead.')
+                        run(
+                          () => api.setLeadRoleLead(role.id, accountId),
+                          joinFirst(
+                            'Could not change the lead.',
+                            accountId === viewer.account?.id ? 'mine' : 'theirs',
+                          ),
+                        )
                       }
                       onJoin={(accountId) =>
                         run(

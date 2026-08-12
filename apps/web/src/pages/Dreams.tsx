@@ -84,7 +84,7 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
     },
   )
 
-  const { busy, error, failure, setError, run } = useAction(reload)
+  const { busy, error, setError, run } = useAction(reload)
 
   const setOpened = (next: Opened | undefined) => {
     setError(undefined)
@@ -134,7 +134,7 @@ export const Dreams = ({ api }: { api: DreamsApi }) => {
         later; most dreams have no time until quite close to the burn.
       </p>
 
-      {error !== undefined && opened === undefined && <ErrorText message={error} link={joinLink(failure)} />}
+      {error !== undefined && opened === undefined && <ErrorText message={error} link={joinLink(error)} />}
 
       {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
 

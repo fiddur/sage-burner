@@ -66,7 +66,7 @@ export const Meals = ({ api }: { api: MealsApi }) => {
         Meals <Refreshing on={refreshing} />
       </h1>
 
-      <ErrorText message={error} link={joinLink(failure)} />
+      <ErrorText message={error} link={joinLink(error)} />
 
       {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
 
@@ -122,7 +122,10 @@ export const Meals = ({ api }: { api: MealsApi }) => {
               viewerId={viewer.account?.id}
               busy={busy}
               onLead={(id, accountId) =>
-                run(() => api.setMealLead(id, { account_id: accountId }), 'Could not save that.')
+                run(
+                  () => api.setMealLead(id, { account_id: accountId }),
+                  joinFirst('Could not save that.', accountId === viewer.account?.id ? 'mine' : 'theirs'),
+                )
               }
               onStand={(id, role, joining, accountId) =>
                 run(

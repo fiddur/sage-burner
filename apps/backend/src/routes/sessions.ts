@@ -343,7 +343,7 @@ export const registerSessionRoutes = (
         return sendError(reply, 400)
       }
       const spot = await facilitatorSpot(db, open.id, body.facilitator_account_id)
-      if (!spot.ok) return sendError(reply, 400)
+      if (!spot.ok) return sendError(reply, 400, 'not_attending')
 
       const { facilitator_account_id: wanted, ...fields } = body
       const row: DreamRow = {
@@ -439,7 +439,7 @@ export const registerSessionRoutes = (
         return sendError(reply, 400)
       }
       const spot = await facilitatorSpot(db, existing.event_id, body.facilitator_account_id)
-      if (!spot.ok) return sendError(reply, 400)
+      if (!spot.ok) return sendError(reply, 400, 'not_attending')
 
       if (await refuseIfStale(request, reply, () => dreamsOf(existing.event_id, mine))) return reply
 

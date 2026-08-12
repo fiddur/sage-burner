@@ -19,7 +19,7 @@ import { NotForYou } from '../components/NotForYou.tsx'
 import { dreamActions, OpenedDream, threadOf, useDreamThread } from '../components/OpenedDream.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { dayName, fromLocalInput, toLocalInput } from '../datetime.ts'
-import { joinLink } from '../joining.ts'
+import { joinFirst, joinLink } from '../joining.ts'
 import { useAction, useLoad } from '../load.ts'
 import { pinchedZoom, touchGap } from '../pinch.ts'
 import {
@@ -117,7 +117,7 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
     },
   )
 
-  const { busy, error, failure, run, setError } = useAction(reload)
+  const { busy, error, run, setError } = useAction(reload)
 
   const setOpened = (next: Opened | undefined) => {
     setError(undefined)
@@ -238,25 +238,23 @@ export const Schedule = ({ api }: { api: ScheduleApi }) => {
   const blocks = meals.flatMap((meal) => mealBlocks(meal))
   const shownMeal = meals.find((meal) => meal.id === openedMeal)
 
-  const { support, help, facilitate, save, remove } = dreamActions({
-    api,
-    run,
-    setOpened,
-    viewerId: viewer.account?.id,
-  })
+  const { support, help, facilitate, save, remove } = dreamActions({ api, run, setOpened, viewerId })
   const talk = useDreamThread({ api, threadId: threadOf(sessions, opened), run })
 
   const offer = ({ title = '', ...fields }: SessionUpdate) => {
-    run(async () => {
-      await api.offerSession(event.id, { ...fields, title })
-      setOpened(undefined)
-    }, 'Could not offer that.')
+    run(
+      async () => {
+        await api.offerSession(event.id, { ...fields, title })
+        setOpened(undefined)
+      },
+      joinFirst('Could not offer that.', fields.facilitator_account_id === viewerId ? 'mine' : 'theirs'),
+    )
   }
 
   return (
     <Framed api={api} eventId={event.id} refreshing={refreshing}>
       {error !== undefined && opened === undefined && shownMeal === undefined && (
-        <ErrorText message={error} link={joinLink(failure)} />
+        <ErrorText message={error} link={joinLink(error)} />
       )}
 
       <div class="schedule">
@@ -759,7 +757,7 @@ const OpenedMeal = ({
   viewerId: string | undefined
   busy: boolean
   error: string | undefined
-  run: (work: () => Promise<unknown>, fallback: string) => void
+  run: (work: () => Promise<unknown>, fallback: string | ((failure: unknown) => string)) => void
   onClose: () => void
 }) => {
   if (meal === undefined) return null
@@ -773,7 +771,10 @@ const OpenedMeal = ({
       error={error}
       onClose={onClose}
       onLead={(accountId) =>
-        run(() => api.setMealLead(meal.id, { account_id: accountId }), 'Could not save that.')
+        run(
+          () => api.setMealLead(meal.id, { account_id: accountId }),
+          joinFirst('Could not save that.', accountId === viewerId ? 'mine' : 'theirs'),
+        )
       }
       onStand={(role, joining, accountId) =>
         run(
@@ -781,7 +782,7 @@ const OpenedMeal = ({
             joining
               ? api.joinMealCrew(meal.id, role, { account_id: accountId })
               : api.leaveMealCrew(meal.id, role, accountId),
-          'Could not save that.',
+          joinFirst('Could not save that.', accountId === viewerId ? 'mine' : 'theirs'),
         )
       }
       onIdea={(food_idea) => run(() => api.setMealIdea(meal.id, { food_idea }), 'Could not save that.')}

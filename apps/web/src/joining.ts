@@ -3,8 +3,7 @@ import { detailsPage } from '@sage-burner/shared'
 import { isApiError } from './api/client.ts'
 import { errorMessage } from './load.ts'
 
-export const NEEDS_JOINING =
-  'You need to join this burn before you can take that on — Your details is where you say you are coming.'
+export const NEEDS_JOINING = 'You need to join this burn before you can take that on.'
 
 export const NEEDS_JOINING_THEM = 'They need to join this burn before they can be put on that.'
 
@@ -20,5 +19,5 @@ export const joinFirst =
         : NEEDS_JOINING_THEM
       : errorMessage(failure, fallback)
 
-export const joinLink = (failure: unknown): { href: string; label: string } | undefined =>
-  notAttending(failure) ? { href: detailsPage(), label: 'Your details' } : undefined
+export const joinLink = (message: string | undefined): { href: string; label: string } | undefined =>
+  message === NEEDS_JOINING ? { href: detailsPage(), label: 'Your details' } : undefined

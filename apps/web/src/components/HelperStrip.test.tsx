@@ -129,6 +129,12 @@ describe('HelperStrip', () => {
     expect(screen.queryByRole('button', { name: 'Take the spot on the sauna' })).toBeNull()
   })
 
+  it('offers no hand on a spot shut to everybody, which joining would not open', () => {
+    strip({ viewerId: 'a-9', viewerAttending: false, candidates: [] })
+
+    expect(screen.queryByRole('button', { name: 'Take the spot on the sauna' })).toBeNull()
+  })
+
   it('never offers you in the appoint list, since 🙋 is that route', () => {
     strip({ viewerId: 'a-1' })
 
