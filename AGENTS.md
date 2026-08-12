@@ -488,6 +488,14 @@ them.)
 Keep `README.md` and `docs/` current when behavior changes. If a change makes
 the README's setup instructions wrong, it is not finished.
 
+**`docs/features.md` is the feature map** — one or two lines per feature, in
+user terms, linking into the area docs. A change that adds, removes or renames
+a feature updates it in the same PR; the detail and the why stay in the area
+docs, never copied here. **`docs/testing.md` is the tryout protocol** built on
+that map: when a feature's observable behaviour changes, the check that
+exercises it changes too. A check that can be an automated test belongs in the
+suite, not in the protocol.
+
 **`CHANGELOG.md` is part of that** (#325). Anything a member would notice gets a line
 under today's date, newest first, written for the people using the app rather than the
 people building it — a refactor gets none. The app serves it at `/changelog`, and it is

@@ -1,0 +1,151 @@
+# What sage-burner does
+
+The feature map: one or two lines per feature, in the words of the person using
+it. Two readers are meant: somebody curious about what the app can do, and an
+agent trying a running copy out — [testing.md](./testing.md) is the protocol
+built on this list. Each section links to the doc that carries the detail and
+the _why_; nothing here repeats an argument those docs already make.
+
+This list is kept current with the code — a change that adds, removes or renames
+a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
+
+[← back to the README](../README.md)
+
+## Getting in — [accounts.md](./accounts.md)
+
+- Anyone can sign up and apply: `/apply` makes an account — email and password,
+  or through Discord or Facebook — and then asks the application questions.
+- An applicant waits with access to their own application, a private message
+  thread with the admins, and their bell — and nothing else.
+- Admins review applications with the answers as the applicant saw them, can ask
+  a question back on the thread, and approve or reject; either way the applicant
+  is told.
+- Approval is one action: membership granted, the coming burn joined, the feed
+  card opened, the bell rung.
+- Direct invites: an admin mints a single-use, expiring link for somebody
+  already known; redeeming it creates the account, offers the upcoming burn
+  ticked, and signs them in. Lost links are re-issued, not worked around.
+- Signing in: password, passkey, or a linked provider. Passkeys are usernameless
+  and per device, several per account, alongside a password or instead of one —
+  removing the last passkey off an account with no password is refused.
+- The first admin comes from the CLI (`admin:create`); after that, admins grant
+  roles and set passwords from the accounts list.
+- Two roles, `admin` and `member`, independent — organising without attending is
+  coherent.
+
+## Who you are — [accounts.md](./accounts.md), [the-app.md](./the-app.md)
+
+- Your details page holds everything that describes the person: name, the
+  ordered list of ways you can be reached (one row per network, plus free
+  links), allergies (ticked from a shared vocabulary, plus free text),
+  an introduction, a picture, passkeys and linked providers, notification
+  switches, and signing out.
+- Every member has a page other members read — introduction, picture, contacts.
+- The members roster per burn: names, arrival and departure, lodging, allergies
+  and payment status are every member's to read; the email and the payment date
+  stay admin's.
+- Allergies follow the person, not the burn — corrected once, corrected
+  everywhere.
+
+## Burns — [burns.md](./burns.md)
+
+- Burns recur — up to four a year, each with its own attendance and payments.
+  Admins create and edit them: name, dates, daily hours, location, member cap,
+  welcome text, payment and transfer instructions.
+- The public homepage shows the active burn — name, dates, place, welcome
+  markdown — with Apply and Log in for a visitor.
+- Members join burn by burn from their own details page. A stay starts as the
+  whole burn and carries arrival, departure, lodging, helping preferences and
+  notes.
+- Who has a place is derived, never stored: paid first, then unpaid, each in
+  join order, with the line drawn where the cap runs out. Paying moves you up;
+  waiting-list movements notify the people they happen to.
+- Admins record payment; a paid member who cannot come hands their place (and
+  payment) to somebody unpaid.
+- Lodging and helping-out are per-burn lists with optional capacities — a full
+  lodging option refuses politely, helping never runs out.
+- The rideshare board: who needs a lift, who has room, per burn, contact
+  resolved from the account.
+- The FAQ: per burn, seedable from a previous one, any member asks and any
+  member answers, in an order somebody arranged.
+- The calendar feed: the programme as an `.ics` subscription per burn —
+  `webcal://` link and an `https://` copy button — protected by a rotatable
+  token, carrying titles, times and places and nothing personal.
+
+## The programme — [schedule.md](./schedule.md)
+
+- Dreams — the workshops, ceremonies and happenings members offer each other.
+  Offered without a time is the normal state; scheduling comes later, and any
+  approved member may arrange any dream on the grid.
+- A dream carries a facilitator (assignable, must be coming), helpers with a
+  hand-up control, and ❤️‍🔥 from the people looking forward to it. A dream can
+  repeat, and everything a dream needs is editable without leaving the grid.
+- The schedule grid: lanes are places (with emoji and colour), the hours come
+  from the burn, blocks drag and resize, and the whole thing pinches on a
+  phone. A timetable view reads it as a list.
+- Places and the lead-roles register both seed from a previous burn.
+- Meals: an admin sets slot templates (Lunch 13:00, Dinner 18:00, chores) and
+  generates the sittings; regenerating adds what is missing and removes
+  nothing. The plan is one table — food idea, lead, help, cleanup — and any
+  member takes a role, moves a sitting or writes the food idea. The kitchen
+  draws its own schedule lane from the meals.
+- The lead-roles register: the burn's jobs, any member takes one, hands one
+  over or appoints somebody — and whoever it happens to is told.
+- Editing is scoped to burns that have not ended; a finished burn is a record.
+
+## Talking — [the-app.md](./the-app.md)
+
+- The feed: what everyone has been doing and saying. Quiet one-line news
+  (someone joined, a lead taken) beside cards that carry a conversation — a
+  dream, a person at a burn, an announcement, a song.
+- A chip row filters the feed by kind, carried in the URL, defaulting to
+  everything.
+- Comments on any card: markdown, edit your own, delete your own (an admin may
+  delete any), open even after the burn has ended.
+- Mentions — `@name` from a picker, `@everybody` — notify the people named.
+  A card can be followed or muted.
+- Announcements: any approved member posts one; withdrawing keeps the
+  conversation.
+- A heart on every card, quietly — no notification, no bump.
+
+## The songbook — [the-app.md](./the-app.md)
+
+- One shared book, belonging to no burn. Any approved member adds a song, edits
+  any song, or takes one out (softly — restore is offered, nothing is purged).
+- A song is plain preformatted text; chord lines are detected, not marked up,
+  so pasting from ultimate-guitar just works.
+- On a narrow screen the app wraps the song itself, breaking chord-and-lyric
+  pairs only at columns blank in both — no chord and no word is ever split, and
+  every chord stays over its syllable.
+- Transposing is viewer-side and holds the columns; the capo is stored, with a
+  suggestion offered; autoscroll with a speed slider for the phone on the
+  floor.
+- Links to recordings show the platform's own mark; categories are a curated
+  (admin-edited) vocabulary, filtered by the same chip row the feed uses.
+
+## Being told — [accounts.md](./accounts.md)
+
+- A notification is a record: the bell holds what happened while you were away,
+  as a panel on a wide screen and a page on a phone.
+- Browser push per device, opt-in, with nothing to sign up for.
+- Email as a channel of its own, per category, off until asked for — the column
+  appears only once an admin has configured SMTP.
+- Categories default by kind: what happens _to you_ is on unless refused, what
+  happens _around you_ is off unless asked for. Attendance is the audience for
+  burn-wide news, and nobody is told about their own click.
+- Admins are told when somebody applies; everybody who asked is told when a new
+  version deploys, with a link to the changelog.
+
+## The installation — [the-app.md](./the-app.md), [configuration.md](./configuration.md), [deploying.md](./deploying.md)
+
+- Self-hosted: one container, one Node process, one SQLite file. No external
+  services required; push, email and provider sign-in are optional and
+  configured from inside the app.
+- Admins name the installation, upload its icon, link the site map, and set up
+  SMTP (with a test message to their own address) and OAuth providers.
+- A shared link draws a proper card — the backend injects the installation's
+  name, the burn's dates and a banner into the shell for crawlers.
+- The app installs to a home screen and works offline from its cache; signing
+  out deletes the cached data.
+- `/changelog` says what each deploy changed, in the members' words, and the
+  deploy notification points at it.
