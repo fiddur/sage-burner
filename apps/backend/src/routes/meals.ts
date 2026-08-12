@@ -495,6 +495,8 @@ export const registerMealAdminRoutes = (app: FastifyInstance, { db, now }: MealD
     const body = bodyOf(mealCreateSchema, request)
     if (body === undefined) return sendError(reply, 400)
 
+    if ((await openEventNow(db, now, request.params.eventId)) === undefined) return sendError(reply, 404)
+
     const id = randomUUID()
 
     try {
@@ -516,8 +518,16 @@ export const registerMealAdminRoutes = (app: FastifyInstance, { db, now }: MealD
   app.delete<{ Params: { id: string } }>(apiRoutes.deleteMeal.fastify, async (request, reply) => {
     void noStore(reply)
 
-    const deleted = await db.delete(meal).where(eq(meal.id, request.params.id)).returning({ id: meal.id })
+    const [existing] = await db
+      .select({ event_id: meal.event_id })
+      .from(meal)
+      .where(eq(meal.id, request.params.id))
+      .limit(1)
+    if (existing === undefined) return sendError(reply, 404)
+    if ((await openEventNow(db, now, existing.event_id)) === undefined) return sendError(reply, 404)
 
-    return deleted.length === 0 ? sendError(reply, 404) : reply.code(204).send()
+    await db.delete(meal).where(eq(meal.id, request.params.id))
+
+    return reply.code(204).send()
   })
 }

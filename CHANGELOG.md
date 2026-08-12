@@ -14,9 +14,10 @@ under today's heading, and make a new heading when there is none.
   line often heard nothing, while people who did have a place were told it was nearly full. Both
   messages now go by where you actually stand on the list, and the link opens that burn's roster.
 
-- **A burn that is over cannot be re-planned.** Admin meal times could still be added, changed and
-  generated on a burn from last year — the last of these quietly wrote a whole meal plan into a burn
-  that had already happened. Everything about a finished burn is a record now; reading it still works.
+- **A burn that is over cannot be re-planned.** Meal times could still be added, changed and generated
+  on a burn from last year, and single sittings added to or deleted from it — Generate quietly wrote a
+  whole meal plan into a burn that had already happened. Everything about a finished burn is a record
+  now; reading it still works.
 
 - **A group link that closes in the past says so.** Picking a date already gone answered
   "Request failed (400)." with no clue which field was wrong. The date picker now offers nothing

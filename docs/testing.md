@@ -153,7 +153,8 @@ phone" means 360px.
 - [ ] At phone width the grid and the meal plan scroll internally under sticky
       headers; the page itself does not scroll sideways.
 - [ ] On a burn that has ended, the admin's meal times refuse adding, editing and
-      deleting, and Generate lays no new sittings.
+      deleting, Generate lays no new sittings, and a single sitting can be neither
+      added to it nor taken out.
 - [ ] On a burn that has ended, dreams, lanes, meals and FAQ refuse writes;
       commenting still works.
 

@@ -759,10 +759,34 @@ describe('a burn that has ended', () => {
   })
 
   it('lays no new sittings into a burn that is over, which is a record now', async () => {
+    // A second slot with nothing in the record answering it, so `generate` has three sittings to
+    // add: without the guard the count goes to six, which is what the refusal has to prevent.
     const { server, admin } = await setUp()
+    await db()
+      .insert(mealSlot)
+      .values({ id: randomUUID(), event_id: ENDED, order: 1, label: 'Breakfast', at: '08:00', kind: 'meal' })
 
     await send(server, 'POST', `/api/admin/events/${ENDED}/meals/generate`, admin.cookie)
 
+    expect((await send(server, 'GET', `/api/events/${ENDED}/meals`, admin.cookie)).json().meals).toHaveLength(
+      3,
+    )
+  })
+
+  it('refuses a single sitting written into it, and refuses taking one out', async () => {
+    const { server, admin, meal } = await setUp()
+
+    expect(
+      (
+        await send(server, 'POST', `/api/admin/events/${ENDED}/meals`, admin.cookie, {
+          date: '2025-08-02',
+          at: '21:00',
+          label: 'Late supper',
+          kind: 'meal',
+        })
+      ).statusCode,
+    ).toBe(404)
+    expect((await send(server, 'DELETE', `/api/admin/meals/${meal.id}`, admin.cookie)).statusCode).toBe(404)
     expect((await send(server, 'GET', `/api/events/${ENDED}/meals`, admin.cookie)).json().meals).toHaveLength(
       3,
     )
