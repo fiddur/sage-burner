@@ -25,6 +25,12 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
 - Direct invites: an admin mints a single-use, expiring link for somebody
   already known; redeeming it creates the account, offers the upcoming burn
   ticked, and signs them in. Lost links are re-issued, not worked around.
+- A group link: one link for a closed group whose members are already vetted, good
+  until the date the admin picks and optionally for a limited number of people. It
+  lists who came in on it, and withdrawing it shuts the door without touching them.
+  See [accounts.md](./accounts.md).
+- The review card says which door an applicant signed up through — the provider and
+  the name used there, with a link to their profile where the provider gives one.
 - Signing in: password, passkey, or a linked provider. Passkeys are usernameless
   and per device, several per account, alongside a password or instead of one —
   removing the last passkey off an account with no password is refused.

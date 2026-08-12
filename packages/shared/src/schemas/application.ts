@@ -25,7 +25,6 @@ export const storedAnswerSchema = z.object({
 
 export const storedAnswersSchema = z.array(storedAnswerSchema)
 
-/** Which door somebody came in through, for an admin cross-checking them against a group they know. */
 export const applicantIdentitySchema = z.object({
   provider: z.enum(oauthProviders),
   name: z.string().nullable(),
@@ -43,7 +42,6 @@ export const applicationSchema = z.object({
   decided_at: dateTimeSchema.nullable(),
 })
 
-/** The admin's row carries the doors as well, which the applicant's own view has no use for. */
 export const adminApplicationSchema = applicationSchema.extend({
   identities: z.array(applicantIdentitySchema),
 })

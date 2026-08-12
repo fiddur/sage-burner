@@ -1,6 +1,6 @@
 import type { AdminInvite } from '@sage-burner/shared'
 
-import { cleanup, render, screen, waitFor, within } from '@testing-library/preact'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { InvitesApi } from './AdminInvites.tsx'
@@ -91,6 +91,29 @@ describe('AdminInvites', () => {
 
     expect(await screen.findByText('Direct invite')).toBeTruthy()
     expect(screen.getByText('Application from Fredrik')).toBeTruthy()
+  })
+
+  it('closes at the end of the day named, so the date given back is the date picked', async () => {
+    // `vite.config.ts` pins TZ=Europe/Stockholm: under UTC both the old midnight and this
+    // land on the same date, and the assertion would pass against either.
+    const createGroupInvite = vi.fn<InvitesApi['createGroupInvite']>(() =>
+      Promise.resolve({
+        invite: { token: 'a-secret-token', expires_at: '2026-09-01T21:59:00.000Z' },
+        delivery: null,
+      }),
+    )
+    renderPage(stub({ createGroupInvite }))
+
+    fireEvent.input(await screen.findByLabelText('Which group'), {
+      target: { value: 'The Facebook group' },
+    })
+    fireEvent.input(screen.getByLabelText('Closes on'), { target: { value: '2026-09-01' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create a group link' }))
+
+    await waitFor(() => expect(createGroupInvite).toHaveBeenCalled())
+    const sent = createGroupInvite.mock.calls[0]?.[0]
+    expect(sent?.expires_at.slice(0, 10)).toBe('2026-09-01')
+    expect(Date.parse(sent?.expires_at ?? '')).toBeGreaterThan(Date.parse('2026-09-01T12:00:00.000Z'))
   })
 
   it('names a group link by its label and counts who has come in on it', async () => {

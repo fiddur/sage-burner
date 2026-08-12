@@ -29,7 +29,6 @@ export const adminInvitesResponseSchema = z.object({ invites: z.array(adminInvit
 
 export const inviteCreateSchema = z.object({ expires_at: dateTimeSchema.optional() }).strict().default({})
 
-/** A group link is an open door, so it is the one invite whose closing date must be chosen. */
 export const groupInviteCreateSchema = z
   .object({
     expires_at: dateTimeSchema,

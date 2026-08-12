@@ -9,7 +9,7 @@ import type {
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
 import { apiRoutes, applicationMessageInputSchema, errorResponse, looksLikeEmail } from '@sage-burner/shared'
-import { and, desc, eq } from 'drizzle-orm'
+import { and, desc, eq, inArray } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -159,17 +159,20 @@ export const registerApplicationReviewRoutes = (
 
     const rows = await db.select().from(application).orderBy(desc(application.submitted_at))
 
-    // Which door somebody came in through is part of who is asking to join (#513): an admin
-    // vetting against a group they already know is cross-checking exactly this by eye.
-    const identities = await db
-      .select({
-        account_id: accountIdentity.account_id,
-        provider: accountIdentity.provider,
-        name: account.name,
-        profile_url: accountIdentity.profile_url,
-      })
-      .from(accountIdentity)
-      .innerJoin(account, eq(account.id, accountIdentity.account_id))
+    const applicants = rows.flatMap((row) => (row.account_id === null ? [] : [row.account_id]))
+    const identities =
+      applicants.length === 0
+        ? []
+        : await db
+            .select({
+              account_id: accountIdentity.account_id,
+              provider: accountIdentity.provider,
+              name: account.name,
+              profile_url: accountIdentity.profile_url,
+            })
+            .from(accountIdentity)
+            .innerJoin(account, eq(account.id, accountIdentity.account_id))
+            .where(inArray(accountIdentity.account_id, applicants))
 
     const byAccount = new Map<string, ApplicantIdentity[]>()
     for (const { account_id, ...identity } of identities) {

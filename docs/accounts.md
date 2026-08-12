@@ -67,15 +67,22 @@ rebuilding `invite_token` would mean dropping a table two others hold foreign ke
 ### Which door an applicant came in through (#513)
 
 `GET /api/admin/applications` joins the account's `account_identity` rows, so the review card says
-"via Facebook" or "via Discord" beside the name the provider gave. An admin vetting somebody
-against a community they already know is cross-checking exactly that by eye, and it was the one
-thing the review page did not show.
+"via Facebook" or "via Discord" beside the account's own name. An admin vetting somebody against a
+community they already know is cross-checking exactly that by eye, and it was the one thing the
+review page did not show.
+
+**The name is `account.name`, not the provider's**, because `account_identity` carries no name
+column — only the provider, the subject and a profile URL. It arrives from the provider at
+sign-up, so for most people it is the same string, but it is editable afterwards and two linked
+providers on one account render it twice. Storing the provider's own name on the identity row is
+what would make the card say what it appears to say; until then this is the account's name shown
+beside the door it came in through.
 
 The link is offered **only where `profile_url` holds one**. Discord has no profile URL to give;
 Facebook's `public_profile` answers an app-scoped id that identifies nobody outside this
 installation's Meta app, so a real link exists only where the app has been approved for
-`user_link`. The provider's name shows beside the form's `applicant_name` where the two differ —
-the form name is what the person typed, the provider name is what their friends would recognise.
+`user_link`. The account's name shows beside the form's `applicant_name` where the two differ — the form name
+is what the person typed into the application, the account name is what they signed up as.
 
 The admin's row is its own schema, `adminApplicationSchema`, rather than a field that is sometimes
 present: the applicant's own view of their application has no use for the doors, and a shape that

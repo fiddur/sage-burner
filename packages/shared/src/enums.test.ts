@@ -121,6 +121,51 @@ describe('the feed filter carried in a URL', () => {
 describe('inviteStatusOf', () => {
   const at = (iso: string) => new Date(iso)
 
+  it('is revoked once the door is shut, whatever the expiry still says', () => {
+    const shut = {
+      expires_at: '2027-01-01T00:00:00.000Z',
+      used_at: null,
+      revoked_at: '2026-08-01T00:00:00.000Z',
+    }
+    expect(inviteStatusOf(shut, at('2026-07-01T00:00:00.000Z'))).toBe('revoked')
+  })
+
+  it('is full once as many have come in as the cap allows', () => {
+    const link = { expires_at: '2027-01-01T00:00:00.000Z', used_at: null, max_uses: 2, redemptions: 2 }
+    expect(inviteStatusOf(link, at('2026-07-01T00:00:00.000Z'))).toBe('full')
+  })
+
+  it('is outstanding below the cap, which is the passing sibling', () => {
+    const link = { expires_at: '2027-01-01T00:00:00.000Z', used_at: null, max_uses: 2, redemptions: 1 }
+    expect(inviteStatusOf(link, at('2026-07-01T00:00:00.000Z'))).toBe('outstanding')
+  })
+
+  it('never runs out when no cap was set, however many have used it', () => {
+    const link = { expires_at: '2027-01-01T00:00:00.000Z', used_at: null, max_uses: null, redemptions: 99 }
+    expect(inviteStatusOf(link, at('2026-07-01T00:00:00.000Z'))).toBe('outstanding')
+  })
+
+  it('says used before revoked, and revoked before expired, one end being enough', () => {
+    const both = {
+      expires_at: '2020-01-01T00:00:00.000Z',
+      used_at: '2026-01-01T00:00:00.000Z',
+      revoked_at: '2026-01-02T00:00:00.000Z',
+    }
+    expect(inviteStatusOf(both, at('2026-07-01T00:00:00.000Z'))).toBe('used')
+
+    const shutAndStale = {
+      expires_at: '2020-01-01T00:00:00.000Z',
+      used_at: null,
+      revoked_at: '2026-01-02T00:00:00.000Z',
+    }
+    expect(inviteStatusOf(shutAndStale, at('2026-07-01T00:00:00.000Z'))).toBe('revoked')
+  })
+
+  it('says expired before full, a closed door outranking a full one', () => {
+    const link = { expires_at: '2020-01-01T00:00:00.000Z', used_at: null, max_uses: 1, redemptions: 5 }
+    expect(inviteStatusOf(link, at('2026-07-01T00:00:00.000Z'))).toBe('expired')
+  })
+
   it('is outstanding while the expiry is still ahead', () => {
     expect(
       inviteStatusOf({ expires_at: '2026-08-01T00:00:00Z', used_at: null }, at('2026-07-31T23:59:59Z')),

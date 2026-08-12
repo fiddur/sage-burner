@@ -124,8 +124,6 @@ export const registerInviteRoutes = (app: FastifyInstance, { db, sessions, now }
   app.delete<{ Params: { id: string } }>(apiRoutes.revokeInvite.fastify, async (request, reply) => {
     void noStore(reply)
 
-    // A group link has accounts behind it, so revoking closes the door rather than removing the
-    // row the redemptions point at. Deleting one would unmake the record of who came in on it.
     const closed = await db
       .update(inviteToken)
       .set({ revoked_at: now().toISOString() })

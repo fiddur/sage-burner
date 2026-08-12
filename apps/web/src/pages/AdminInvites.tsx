@@ -53,7 +53,7 @@ const GroupLinkForm = ({
         submitted.preventDefault()
         if (!ready) return
 
-        const at = fromLocalInput(`${closes}T00:00`)
+        const at = fromLocalInput(`${closes}T23:59`)
         if (at === null) return
 
         onMint(at, label.trim(), cap === '' ? null : Number(cap))
