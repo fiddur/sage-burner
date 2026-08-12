@@ -396,6 +396,21 @@ silently goes nowhere; the column keeps whatever the old box held for everybody 
 applied before, with no CHECK on the shape, and `looksLikeEmail` is what decides
 whether one of those is worth posting to.
 
+**Blank means the address the account already has** (#510). Since #476 applying starts with an
+account, so the app knows an address before the form is drawn — but the _client_ does not, and
+deliberately: the viewer carries a name and nothing else personal, and `getMyProfile` is behind
+`requireApproved`, which an applicant does not hold. Rather than putting the address on the viewer
+for every page, or adding a route for one field, `applicant_email` became **optional** and the
+route falls back to `account.email`. That keeps the two columns independent — applying with a
+different address than you sign in with stays possible, which is the reason the field exists — and
+asks nothing new of the client. The form says what blank means and no longer refuses one.
+
+**The two 409s say which they are** (#531). `already_member` is somebody with nothing left to apply
+for; `already_applied` is the unique index on `application.account_id` catching a second tab. They
+read identically before, so a double submit was told it was already a member. The page also swaps
+the form for a sentence when the viewer holds `member`, rather than letting them fill it in and
+learn on submit.
+
 **"Asked" means the form said so, not that the question exists now.** The
 submission carries `asked` — the ids the page actually rendered — and only those
 get an entry. Without it, a question an admin added while someone was filling
@@ -492,6 +507,14 @@ rather than to try again, since retrying cannot help.
 where a link is the only thing there is to offer. For everything since, approval grants the role
 outright and mints nothing. What follows describes that older path, which the two outstanding
 invites still ride.
+
+**What the approved person is told is written in the past tense, and only where it happened**
+(#517, #522). Approval calls `joinTheNextBurn`, which joins nothing where no burn is planned — so
+the page's old fallback, "you have been added to the burn that is coming", asserted a membership of
+a burn for somebody on none, and offered to let them leave it. It also read the _current_ burn list
+rather than a record of what approval did, so a member who joined and then left was still told they
+were on it. The sentence now names the burn only when one is joined, and otherwise says what is
+true: every burn being planned is open to them, and joining is theirs to do.
 
 32 CSPRNG bytes, base64url, valid 30 days. Only
 the SHA-256 digest is stored, so the raw token exists in that one response and

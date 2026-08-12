@@ -147,6 +147,11 @@ const applicantCookie = () => {
   return applicantAccount.cookie
 }
 
+const applicantId = () => {
+  if (applicantAccount === undefined) throw new Error('givenApplicant() first')
+  return applicantAccount.id
+}
+
 const givenSignedIn = async (roles: ('admin' | 'member')[] = []) => {
   const id = randomUUID()
   await db()
@@ -221,6 +226,17 @@ describe('somebody who is already a member', () => {
     })
 
     expect(sent.statusCode).toBe(409)
+    expect(sent.json().error).toBe('already_member')
+  })
+
+  it('is told apart from a second submit of the same application (#531)', async () => {
+    const server = await build()
+    await submit(server, { ...applicant, answers: {} })
+
+    const again = await submit(server, { ...applicant, answers: {} })
+
+    expect(again.statusCode).toBe(409)
+    expect(again.json().error).toBe('already_applied')
   })
 })
 
@@ -351,14 +367,33 @@ describe('submitting an application', () => {
     expect(await stored()).toHaveLength(0)
   })
 
-  it('requires a name and a contact', async () => {
+  it('requires a name, the address being the account’s own where none is given', async () => {
     const server = await build()
 
     expect((await submit(server, { applicant_email: 'a@b.c', answers: {} })).statusCode).toBe(400)
-    expect((await submit(server, { applicant_name: 'Fredrik', answers: {} })).statusCode).toBe(400)
     expect(
       (await submit(server, { applicant_name: '  ', applicant_email: 'a@b.c', answers: {} })).statusCode,
     ).toBe(400)
+    expect((await submit(server, { applicant_name: 'Fredrik', answers: {} })).statusCode).toBe(201)
+  })
+
+  it('files the account’s own address where the form gave none (#510)', async () => {
+    const server = await build()
+    const [signedIn] = await db().select().from(account).where(eq(account.id, applicantId()))
+
+    await submit(server, { applicant_name: 'Fredrik', answers: {} })
+
+    const [row] = await stored()
+    expect(row?.applicant_email).toBe(signedIn?.email)
+  })
+
+  it('keeps an address the form did give, a different one being allowed', async () => {
+    const server = await build()
+
+    await submit(server, { applicant_name: 'Fredrik', applicant_email: 'somewhere@else.org', answers: {} })
+
+    const [row] = await stored()
+    expect(row?.applicant_email).toBe('somewhere@else.org')
   })
 
   it('accepts a form with no questions yet', async () => {

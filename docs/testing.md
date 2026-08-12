@@ -71,6 +71,10 @@ phone" means 360px.
       the questions; the form renders whatever questions the admin has set, in
       order, and refuses submission with a required question blank or an
       agreement unticked.
+- [ ] Leave the email field blank: the application still sends, and the admin's
+      review card shows the address the account signed up with.
+- [ ] Signed in as a member, `/apply` says there is nothing to apply for and shows
+      no form.
 - [ ] The confirmation says whether anything will be emailed, matching whether
       SMTP is configured.
 - [ ] The new applicant, signed in, reaches their own application and their bell
@@ -92,7 +96,8 @@ phone" means 360px.
       send the applicant a message; the applicant is notified and can reply.
       The exchange stays private to the two of them.
 - [ ] Approve. The applicant gains membership, is joined to the coming burn, a
-      card appears on the feed, and their bell says they are in. This account is
+      card appears on the feed, and their bell says they are in. With no burn planned,
+      the same page says every coming burn is open to them and claims no join. This account is
       the protocol's **member** persona from here on.
 
 ## Setting a burn up (admin)

@@ -21,6 +21,8 @@ export const errorCodes = [
   'invite_used',
   'list_full',
   'not_attending',
+  'already_member',
+  'already_applied',
 ] as const
 export type ErrorCode = (typeof errorCodes)[number]
 

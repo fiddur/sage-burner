@@ -85,7 +85,7 @@ export type MyApplicationResponse = z.infer<typeof myApplicationResponseSchema>
 export const applicationCreateSchema = z
   .object({
     applicant_name: nonEmptyText(MAX_APPLICANT_NAME_LENGTH),
-    applicant_email: emailSchema,
+    applicant_email: emailSchema.optional(),
     answers: submittedAnswersSchema,
     asked: z.array(idSchema).max(MAX_ASKED_QUESTIONS),
   })
