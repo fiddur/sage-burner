@@ -38,12 +38,15 @@ pnpm --filter sage-burner-web build
 SESSION_SECRET=$(openssl rand -base64 48) WEB_ROOT=$PWD/apps/web/dist pnpm dev:backend
 ```
 
+A fresh `SESSION_SECRET` invalidates the sessions from the `dev:web` phase — cookies
+are not port-scoped — so all four personas sign in again on `:3000`.
+
 - **The share card** (_First contact_): the shell handler that injects the `<meta>`
   tags registers only when `web_root` is set, so the dev backend answers `/` with a
   404 and Vite serves `index.html` uninjected.
-- **Subscribing to push** and **offline from cache** (_Installing, offline_):
-  `/sw.js` exists only after `vite build --config vite.sw.config.ts`, which
-  `pnpm dev:web` never runs — there is no service worker there at all.
+- **Subscribing to push** (_Being told_) and **offline from cache** (_Installing,
+  offline_): `/sw.js` exists only after `vite build --config vite.sw.config.ts`,
+  which `pnpm dev:web` never runs — there is no service worker there at all.
 - **Offers to install / the home-screen tile** (_Installing, offline_):
   `/manifest.webmanifest` is a backend route at a path outside `/api`, and the Vite
   proxy forwards `/api` only, so it is never reached from port 5173.

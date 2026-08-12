@@ -18,6 +18,7 @@ import { MarkdownField } from '../components/MarkdownField.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { stillUploading } from '../image-upload.ts'
+import { joinFirst, joinLink } from '../joining.ts'
 import { useAction, useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
 import { isApproved, useViewer } from '../viewer.tsx'
@@ -139,7 +140,7 @@ export const Roles = ({ api }: { api: RolesApi }) => {
         and anyone can change or remove one, so talk to each other first.
       </p>
 
-      <ErrorText message={error} />
+      <ErrorText message={error} link={joinLink(error)} />
 
       <Notice loaded={loaded} />
 
@@ -201,10 +202,22 @@ export const Roles = ({ api }: { api: RolesApi }) => {
                       onEdit={() => setEditing(role.id)}
                       onRemove={() => run(() => api.deleteLeadRole(role.id), 'Could not remove that role.')}
                       onLead={(accountId) =>
-                        run(() => api.setLeadRoleLead(role.id, accountId), 'Could not change the lead.')
+                        run(
+                          () => api.setLeadRoleLead(role.id, accountId),
+                          joinFirst(
+                            'Could not change the lead.',
+                            accountId === viewer.account?.id ? 'mine' : 'theirs',
+                          ),
+                        )
                       }
                       onJoin={(accountId) =>
-                        run(() => api.joinLeadRoleTeam(role.id, accountId), 'Could not add them to the team.')
+                        run(
+                          () => api.joinLeadRoleTeam(role.id, accountId),
+                          joinFirst(
+                            'Could not add them to the team.',
+                            accountId === viewer.account?.id ? 'mine' : 'theirs',
+                          ),
+                        )
                       }
                       onLeave={(accountId) =>
                         run(
@@ -341,6 +354,7 @@ const RoleRow = ({
               people={role.lead === null ? [] : [role.lead]}
               max={1}
               candidates={attendees}
+              viewerAttending={attendees.some((who) => who.account_id === viewerId)}
               everyone={attendees}
               viewerId={viewerId}
               busy={busy}
@@ -356,6 +370,7 @@ const RoleRow = ({
               people={role.team}
               wanted={role.team_size_wanted}
               candidates={attendees}
+              viewerAttending={attendees.some((who) => who.account_id === viewerId)}
               everyone={attendees}
               viewerId={viewerId}
               busy={busy}

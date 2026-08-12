@@ -115,6 +115,7 @@ export const DreamDetails = ({
             candidates={attendees.filter(
               (person) => !dream.helpers.some((helper) => helper.account_id === person.account_id),
             )}
+            viewerAttending={attendees.some((who) => who.account_id === viewerId)}
             everyone={attendees}
             viewerId={viewerId}
             busy={busy}
@@ -128,6 +129,7 @@ export const DreamDetails = ({
             label={dream.title}
             people={dream.helpers}
             candidates={attendees.filter((person) => person.account_id !== dream.facilitator_account_id)}
+            viewerAttending={attendees.some((who) => who.account_id === viewerId)}
             everyone={attendees}
             viewerId={viewerId}
             busy={busy}

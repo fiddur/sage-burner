@@ -17,6 +17,7 @@ import { Refreshing } from '../components/Refreshing.tsx'
 import { TheirVersion } from '../components/TheirVersion.tsx'
 import { dayName } from '../datetime.ts'
 import { stillUploading } from '../image-upload.ts'
+import { joinFirst, joinLink } from '../joining.ts'
 import { useAction, useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
 import { useViewer } from '../viewer.tsx'
@@ -65,7 +66,7 @@ export const Meals = ({ api }: { api: MealsApi }) => {
         Meals <Refreshing on={refreshing} />
       </h1>
 
-      <ErrorText message={error} />
+      <ErrorText message={error} link={joinLink(error)} />
 
       {loaded.status === 'loading' && <p class="form-note">Loading…</p>}
 
@@ -121,7 +122,10 @@ export const Meals = ({ api }: { api: MealsApi }) => {
               viewerId={viewer.account?.id}
               busy={busy}
               onLead={(id, accountId) =>
-                run(() => api.setMealLead(id, { account_id: accountId }), 'Could not save that.')
+                run(
+                  () => api.setMealLead(id, { account_id: accountId }),
+                  joinFirst('Could not save that.', accountId === viewer.account?.id ? 'mine' : 'theirs'),
+                )
               }
               onStand={(id, role, joining, accountId) =>
                 run(
@@ -129,7 +133,7 @@ export const Meals = ({ api }: { api: MealsApi }) => {
                     joining
                       ? api.joinMealCrew(id, role, { account_id: accountId })
                       : api.leaveMealCrew(id, role, accountId),
-                  'Could not save that.',
+                  joinFirst('Could not save that.', accountId === viewer.account?.id ? 'mine' : 'theirs'),
                 )
               }
               onIdea={(id, food_idea) =>
@@ -235,6 +239,7 @@ const MealTable = ({
                   people={meal.lead === null ? [] : [meal.lead]}
                   max={1}
                   candidates={meal.kind === 'chore' ? [] : attendees}
+                  viewerAttending={attendees.some((who) => who.account_id === viewerId)}
                   everyone={attendees}
                   viewerId={viewerId}
                   busy={busy}
@@ -333,6 +338,7 @@ const Crew = ({
         label={`${role === 'helper' ? 'cooking' : 'cleanup'} at ${meal.label} on ${meal.date}`}
         people={crew}
         candidates={offerable}
+        viewerAttending={attendees.some((who) => who.account_id === viewerId)}
         everyone={attendees}
         viewerId={viewerId}
         busy={busy}

@@ -70,22 +70,23 @@ describe('NoBurn', () => {
   })
 
   it('tells an admin none is planned, and where to make one', async () => {
-    // They are offered every burn still to come, so an empty selector means there
-    // is none — and the fix is theirs.
     renderIt(NONE, ADMIN)
 
     expect(await screen.findByText(/no burn planned yet/)).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Events' }).getAttribute('href')).toBe('/admin/events')
   })
 
-  it('tells a member they have not joined one, and where to', async () => {
-    // They are offered the burns they have joined, so an empty selector usually
-    // means they have not joined — not that none exists. The old copy said the
-    // latter, which is a claim about the world rather than about them.
+  it('tells a member the same, every coming burn being offered to them too now', async () => {
     renderIt(NONE)
 
-    expect(await screen.findByText(/not coming to a burn yet/)).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Your details' }).getAttribute('href')).toBe('/profile')
+    expect(await screen.findByText(/no burn planned yet/)).toBeTruthy()
+    expect(screen.queryByText(/not coming to a burn/)).toBeNull()
+  })
+
+  it('keeps the make-one pointer to the admin, it being no use to a member', async () => {
+    renderIt(NONE)
+
+    expect(screen.queryByRole('link', { name: 'Events' })).toBeNull()
   })
 
   it('carries the page’s own words for what is missing', async () => {

@@ -9,6 +9,25 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-12
 
+- **Every burn being planned is open to every member.** You used to see only the burns you had
+  said you were coming to, so if you had joined none, Schedule, Members, Leads and Meals all told
+  you there was nothing — while the feed showed you the planning going on. Now every coming burn
+  is there, the ones you have joined first, so you can watch and help plan a burn before you know
+  whether you can come.
+
+- **Reaching for a job you cannot take yet says why.** Putting your hand up as helper, taking a
+  lead role, joining a meal crew or hearting a dream all need you to have joined that burn.
+  They used to fail with an unreadable "Request failed (400)"; they now say you need to join
+  the burn first, with a link to where you do it. Putting your hand up is also offered now
+  where it was simply absent before.
+
+- **Being let in says what happened.** Approval adds you to the burn that is coming, and the page
+  now names it and points at where to set your arrival and departure — or to leave the burn, if
+  you know you cannot come. Staying to watch the planning is fine either way.
+
+- **Applying no longer asks twice for your name.** The account you just made already had it, and
+  the form now starts from it instead of an empty box.
+
 - **A song fits the phone you are holding.** A line too wide for the screen used to run off the
   right edge, and reaching the end of it meant dragging the words sideways one-handed. It now
   breaks onto the next line together with its chord line, so every chord stays over the syllable

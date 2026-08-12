@@ -5,6 +5,7 @@ import { useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 import type { UploadImage } from '../image-upload.ts'
 
+import { joinFirst } from '../joining.ts'
 import { useLoad } from '../load.ts'
 import { DreamDetails } from './DreamDetails.tsx'
 import { DreamFields } from './DreamFields.tsx'
@@ -28,15 +29,17 @@ export const dreamActions = ({
   api,
   run,
   setOpened,
+  viewerId,
 }: {
   api: OpenedDreamApi
-  run: (work: () => Promise<unknown>, fallback: string) => void
+  run: (work: () => Promise<unknown>, fallback: string | ((failure: unknown) => string)) => void
   setOpened: (next: Opened | undefined) => void
+  viewerId: string | undefined
 }) => ({
   support: (id: string, supporting: boolean) => {
     run(
       () => (supporting ? api.supportSession(id) : api.withdrawSupportForSession(id)),
-      'Could not save that.',
+      joinFirst('Could not save that.'),
     )
   },
 
@@ -46,12 +49,15 @@ export const dreamActions = ({
         helping
           ? api.helpWithSession(id, { account_id: accountId })
           : api.stopHelpingWithSession(id, accountId),
-      'Could not save that.',
+      joinFirst('Could not save that.', accountId === viewerId ? 'mine' : 'theirs'),
     )
   },
 
   facilitate: (id: string, accountId: string | null) => {
-    run(() => api.updateSession(id, { facilitator_account_id: accountId }), 'Could not save that.')
+    run(
+      () => api.updateSession(id, { facilitator_account_id: accountId }),
+      joinFirst('Could not save that.', accountId === viewerId ? 'mine' : 'theirs'),
+    )
   },
 
   save: (id: string, changes: SessionUpdate) => {
@@ -91,7 +97,7 @@ export const useDreamThread = ({
 }: {
   api: DreamTalkApi
   threadId: string | null | undefined
-  run: (work: () => Promise<unknown>, fallback: string) => void
+  run: (work: () => Promise<unknown>, fallback: string | ((failure: unknown) => string)) => void
 }): DreamTalk => {
   const [held, setHeld] = useState<Thread | undefined>(undefined)
 

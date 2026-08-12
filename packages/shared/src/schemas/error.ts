@@ -20,6 +20,7 @@ export const errorCodes = [
   'not_approved',
   'invite_used',
   'list_full',
+  'not_attending',
 ] as const
 export type ErrorCode = (typeof errorCodes)[number]
 

@@ -93,10 +93,6 @@ describe('wrapping a row too wide for the page', () => {
     ])
   })
 
-  it('keeps a blank line blank where nothing was split, since a verse break is part of the words', () => {
-    expect(wrappedRows([{ chords: null, words: '' }], 40)).toEqual([{ chords: null, words: '' }])
-  })
-
   it('breaks a line of words with no chords over it at a space', () => {
     expect(wrappedRows([{ chords: null, words: 'come and sing with me' }], 12)).toEqual([
       { chords: null, words: 'come and' },
@@ -120,6 +116,12 @@ describe('wrapping a row too wide for the page', () => {
   it('wraps nothing until something has measured the width', () => {
     expect(wrappedRows([LINE], Number.POSITIVE_INFINITY)).toEqual([LINE])
     expect(wrappedRows([LINE], 0)).toEqual([LINE])
+  })
+})
+
+describe('a row that fits as it is', () => {
+  it('keeps a blank line blank, since a verse break is part of the words', () => {
+    expect(wrappedRows([{ chords: null, words: '' }], 40)).toEqual([{ chords: null, words: '' }])
   })
 })
 

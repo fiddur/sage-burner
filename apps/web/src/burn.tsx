@@ -8,7 +8,7 @@ import { useCallback, useContext, useEffect, useState } from 'preact/hooks'
 
 import type { ApiClient } from './api/client.ts'
 
-import { isAdmin, isApproved, useViewer } from './viewer.tsx'
+import { isApproved, useViewer } from './viewer.tsx'
 
 export interface BurnChoice {
   status: 'loading' | 'ready' | 'failed'
@@ -31,8 +31,8 @@ const EMPTY: BurnContextValue = {
 
 const BurnContext = createContext<BurnContextValue>(EMPTY)
 
-export const choosableBurns = (admin: boolean, coming: readonly MyBurn[]): readonly MyBurn[] =>
-  admin ? coming : coming.filter((burn) => burn.attendance !== null)
+export const choosableBurns = (coming: readonly MyBurn[]): readonly MyBurn[] =>
+  [...coming].sort((one, other) => Number(one.attendance === null) - Number(other.attendance === null))
 
 export const BurnProvider = ({
   children,
@@ -57,7 +57,6 @@ export const FetchedBurnProvider = ({
 }) => {
   const viewer = useViewer()
   const approved = isApproved(viewer)
-  const admin = isAdmin(viewer)
   const [burns, setBurns] = useState<readonly MyBurn[]>([])
   const [status, setStatus] = useState<BurnChoice['status']>('loading')
   const [chosen, setChosen] = useState<string | undefined>(undefined)
@@ -83,7 +82,7 @@ export const FetchedBurnProvider = ({
       .getMyBurns(controller.signal)
       .then(({ coming }) => {
         if (controller.signal.aborted) return
-        setBurns(choosableBurns(admin, coming))
+        setBurns(choosableBurns(coming))
         setStatus('ready')
       })
       .catch(() => {
@@ -91,7 +90,7 @@ export const FetchedBurnProvider = ({
       })
 
     return () => controller.abort()
-  }, [api, approved, admin, attempt])
+  }, [api, approved, attempt])
 
   const select = useCallback((eventId: string) => setChosen(eventId), [])
   const reload = useCallback(() => setAttempt((before) => before + 1), [])

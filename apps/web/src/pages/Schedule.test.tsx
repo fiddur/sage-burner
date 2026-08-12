@@ -559,7 +559,7 @@ describe('Schedule', () => {
   it('says so when no burn is open, rather than drawing an empty grid', async () => {
     renderPage(stub({}, [], [TEMPLE]), MEMBER, null)
 
-    expect(await screen.findByText(/not coming to a burn yet/)).toBeTruthy()
+    expect(await screen.findByText(/no burn planned yet/)).toBeTruthy()
     expect(document.querySelector('.schedule-grid')).toBeNull()
   })
 
@@ -646,6 +646,20 @@ describe('Schedule', () => {
 
     await waitFor(() => expect(supportSession).toHaveBeenCalledWith('s-1'))
     expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('tells somebody not coming to join, rather than "Request failed (400)" (#503)', async () => {
+    const supportSession = vi.fn<ScheduleApi['supportSession']>(() =>
+      Promise.reject(apiError(400, 'not_attending', 'Request failed (400).')),
+    )
+    renderPage(stub({ supportSession }, [aDream({ id: 's-1', title: 'Cacao ceremony' })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Show support for Cacao ceremony' }))
+
+    const said = await screen.findByRole('alert')
+    expect(said.textContent).toContain('You need to join this burn')
+    expect(said.textContent).not.toContain('Request failed')
+    expect(screen.getByRole('link', { name: 'Your details' }).getAttribute('href')).toBe('/profile')
   })
 
   it('takes the heart back when it is already mine', async () => {

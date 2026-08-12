@@ -1,3 +1,4 @@
+import type { ErrorCode } from '@sage-burner/shared'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { z, ZodType } from 'zod'
 
@@ -9,8 +10,8 @@ export const noStore = (reply: FastifyReply) => reply.header('cache-control', 'n
 
 export type ClientStatus = 400 | 401 | 403 | 404 | 409 | 415 | 429
 
-export const sendError = (reply: FastifyReply, status: ClientStatus) =>
-  reply.code(status).send(errorResponse(codeFor(status)))
+export const sendError = (reply: FastifyReply, status: ClientStatus, code?: ErrorCode) =>
+  reply.code(status).send(errorResponse(code ?? codeFor(status)))
 
 export const bodyOf = <Schema extends ZodType>(
   schema: Schema,

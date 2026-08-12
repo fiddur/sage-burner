@@ -289,9 +289,11 @@ them say exactly where the gate is. Opening it later is moving one route out fro
 behind the guard, which is a smaller decision than taking it back.
 
 **But it does not need a burn you are in** (#321). Every burn-scoped page takes its
-burn from the bar, which lists the ones you have said you are coming to — so an
+burn from the bar, which listed only the ones you had said you were coming to — so an
 approved member who had joined none landed on "you are not coming to a burn yet" and
-could read nothing. This is the page that answers "what does taking part actually ask
+could read nothing. #503 has since opened the bar to every coming burn, so that is no
+longer how somebody ends up without one; the fallback to the active burn stays, for the
+case where no burn is coming at all. This is the page that answers "what does taking part actually ask
 of me?", which is read _before_ deciding, so when the bar has nothing the next burn
 answers instead: `GET /api/events/active`, which is public, so nothing is disclosed
 that was not already. The page says which burn it is showing whenever the bar did not

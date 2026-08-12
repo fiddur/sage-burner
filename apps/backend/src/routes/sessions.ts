@@ -175,7 +175,7 @@ const oneDream = async (db: Database, row: DreamRow, mine: string | undefined): 
 
 interface Refusal {
   code: 400 | 404
-  error: 'bad_request' | 'not_found'
+  error: 'bad_request' | 'not_attending' | 'not_found'
 }
 
 interface Arranging {
@@ -343,7 +343,7 @@ export const registerSessionRoutes = (
         return sendError(reply, 400)
       }
       const spot = await facilitatorSpot(db, open.id, body.facilitator_account_id)
-      if (!spot.ok) return sendError(reply, 400)
+      if (!spot.ok) return sendError(reply, 400, 'not_attending')
 
       const { facilitator_account_id: wanted, ...fields } = body
       const row: DreamRow = {
@@ -439,7 +439,7 @@ export const registerSessionRoutes = (
         return sendError(reply, 400)
       }
       const spot = await facilitatorSpot(db, existing.event_id, body.facilitator_account_id)
-      if (!spot.ok) return sendError(reply, 400)
+      if (!spot.ok) return sendError(reply, 400, 'not_attending')
 
       if (await refuseIfStale(request, reply, () => dreamsOf(existing.event_id, mine))) return reply
 
@@ -530,7 +530,7 @@ export const registerSessionRoutes = (
     if ('code' in found) return found
 
     const mine = found.mine
-    if (mine === undefined) return { code: 400, error: 'bad_request' }
+    if (mine === undefined) return { code: 400, error: 'not_attending' }
 
     return { ...found, mine }
   }
@@ -548,7 +548,7 @@ export const registerSessionRoutes = (
       if ('code' in found) return reply.code(found.code).send(errorResponse(found.error))
 
       const theirs = await attendanceFor(db, found.dream.event_id, body.account_id)
-      if (theirs === undefined) return sendError(reply, 400)
+      if (theirs === undefined) return sendError(reply, 400, 'not_attending')
 
       const added = await db
         .insert(sessionHelper)
