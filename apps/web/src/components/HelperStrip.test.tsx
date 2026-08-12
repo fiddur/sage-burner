@@ -16,7 +16,6 @@ const strip = (over: Partial<Parameters<typeof HelperStrip>[0]> = {}) =>
       label="the sauna"
       people={[]}
       candidates={[ADA, BEA, CAI]}
-      viewerAttending
       everyone={[ADA, BEA, CAI]}
       viewerId="a-1"
       busy={false}
@@ -118,21 +117,29 @@ describe('HelperStrip', () => {
   })
 
   it('offers the hand to somebody not coming yet, so the refusal can say to join (#503)', () => {
-    strip({ viewerId: 'a-9', viewerAttending: false })
+    strip({ viewerId: 'a-9' })
 
     expect(screen.getByRole('button', { name: 'Take the spot on the sauna' })).toBeTruthy()
   })
 
+  it('offers the hand on a burn nobody has joined yet, which is every burn on day one (#520)', () => {
+    strip({ viewerId: 'a-9', candidates: [], everyone: [] })
+
+    expect(screen.getByRole('button', { name: 'Take the spot on the sauna' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Appoint someone to the sauna' })).toBeNull()
+  })
+
   it('offers no hand to somebody coming who is not eligible for this spot', () => {
-    strip({ viewerId: 'a-9', viewerAttending: true })
+    strip({ viewerId: 'a-9', candidates: [ADA], everyone: [ADA, { account_id: 'a-9', avatar: null }] })
 
     expect(screen.queryByRole('button', { name: 'Take the spot on the sauna' })).toBeNull()
   })
 
-  it('offers no hand on a spot shut to everybody, which joining would not open', () => {
-    strip({ viewerId: 'a-9', viewerAttending: false, candidates: [] })
+  it('offers nothing on a spot the page shut, which joining would not open', () => {
+    strip({ viewerId: 'a-9', shut: true })
 
     expect(screen.queryByRole('button', { name: 'Take the spot on the sauna' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Appoint someone to the sauna' })).toBeNull()
   })
 
   it('never offers you in the appoint list, since 🙋 is that route', () => {

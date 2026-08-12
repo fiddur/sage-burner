@@ -193,17 +193,17 @@ describe('choosableBurns', () => {
   })
 
   it('holds the order the API sent within each half, which is soonest first', () => {
-    const soon = aBurn('e-1', 'Summer', false)
-    const later = aBurn('e-2', 'Winter', false)
+    const joinedSoon = aBurn('e-1', 'Summer', true)
+    const joinedLater = aBurn('e-3', 'Autumn', true)
+    const soon = aBurn('e-2', 'Winter', false)
+    const later = aBurn('e-4', 'Spring', false)
 
-    expect(choosableBurns([soon, later])).toEqual([soon, later])
-  })
-
-  it('leaves an account with no attendance anywhere a full list rather than an empty one', () => {
-    const one = aBurn('e-1', 'Summer', false)
-    const two = aBurn('e-2', 'Winter', false)
-
-    expect(choosableBurns([one, two])).toEqual([one, two])
+    expect(choosableBurns([joinedSoon, soon, joinedLater, later])).toEqual([
+      joinedSoon,
+      joinedLater,
+      soon,
+      later,
+    ])
   })
 })
 

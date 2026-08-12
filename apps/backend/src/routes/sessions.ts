@@ -582,7 +582,7 @@ export const registerSessionRoutes = (
       if ('code' in found) return reply.code(found.code).send(errorResponse(found.error))
 
       const theirs = await attendanceFor(db, found.dream.event_id, request.params.accountId)
-      if (theirs === undefined) return sendError(reply, 400)
+      if (theirs === undefined) return sendError(reply, 400, 'not_attending')
 
       const gone = await db
         .delete(sessionHelper)

@@ -2,6 +2,7 @@ import type { ComponentChildren } from 'preact'
 
 import { useEffect, useRef } from 'preact/hooks'
 
+import { joinLink } from '../joining.ts'
 import { useOverlay } from '../overlay.ts'
 import { ErrorText } from './ErrorText.tsx'
 
@@ -48,7 +49,7 @@ export const DreamPanel = ({
         ref={panel}
         onClick={(clickEvent) => clickEvent.stopPropagation()}
       >
-        <ErrorText message={error} />
+        <ErrorText message={error} link={joinLink(error)} />
         {children}
       </div>
     </div>

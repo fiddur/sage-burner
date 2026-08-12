@@ -134,7 +134,6 @@ export const Bring = ({ api }: { api: BringApi }) => {
             item={item}
             attendees={attendees}
             viewerId={viewerId}
-            attending={attending}
             admin={isAdmin(viewer)}
             busy={busy}
             opened={opened === item.id}
@@ -249,7 +248,6 @@ const Row = ({
   item,
   attendees,
   viewerId,
-  attending,
   admin,
   busy,
   opened,
@@ -265,7 +263,6 @@ const Row = ({
   item: BringEntry
   attendees: readonly Attendee[]
   viewerId: string | undefined
-  attending: boolean
   admin: boolean
   busy: boolean
   opened: boolean
@@ -314,7 +311,6 @@ const Row = ({
         label={`bringing ${item.title}`}
         people={item.hands}
         candidates={attendees}
-        viewerAttending={attending}
         everyone={attendees}
         viewerId={viewerId}
         busy={busy}
