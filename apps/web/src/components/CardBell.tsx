@@ -1,7 +1,7 @@
 import type { NotificationCategory } from '@sage-burner/shared'
 
 import { notificationCategoryInfo } from '@sage-burner/shared'
-import { useEffect, useRef, useState } from 'preact/hooks'
+import { useEffect, useId, useRef, useState } from 'preact/hooks'
 
 export const CardBell = ({
   what,
@@ -22,6 +22,7 @@ export const CardBell = ({
 }) => {
   const [open, setOpen] = useState(false)
   const wrap = useRef<HTMLDivElement>(null)
+  const panelId = useId()
 
   useEffect(() => {
     if (!open) return undefined
@@ -48,7 +49,7 @@ export const CardBell = ({
         type="button"
         class="card-bell-button"
         aria-label={`Notification settings for ${what}`}
-        aria-haspopup="menu"
+        aria-controls={panelId}
         aria-expanded={open}
         onClick={() => setOpen((was) => !was)}
       >
@@ -56,7 +57,12 @@ export const CardBell = ({
       </button>
 
       {open && (
-        <div class="card-bell-menu" role="menu" aria-label={`Notification settings for ${what}`}>
+        <div
+          id={panelId}
+          class="card-bell-menu"
+          role="group"
+          aria-label={`Notification settings for ${what}`}
+        >
           <p class="card-bell-title">Notification settings</p>
 
           <label class="tick">

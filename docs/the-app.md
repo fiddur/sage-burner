@@ -621,9 +621,16 @@ was lovely" is a thing somebody posts on the way home. Every other dream write s
 "A song goes into the songbook 🔔", which is opaque unless you already know it is a setting —
 it reads as a label. The menu is titled _Notification settings_ and holds the two switches that
 exist for one card: this kind of thing, and this card. It is the app's first dropdown, so it sets
-the pattern — a real button with `aria-haspopup`, `aria-expanded`, and closing on outside-press and
-Escape. The activity **lines** keep their inline chip: a bell-menu per one-liner is more chrome
+the pattern — a real button with `aria-expanded` and `aria-controls`, and closing on outside-press
+and Escape. The activity **lines** keep their inline chip: a bell-menu per one-liner is more chrome
 than line.
+
+**It is not a menu, and it stopped saying it was** (#487). `role="menu"` puts a screen reader into
+menu mode, where it expects `menuitem` children and arrow-key navigation; what is inside is a title
+and two checkboxes, so the labels were announced unpredictably and nothing moved focus in. The panel
+is a `role="group"` with the same accessible name and the button points at it with `aria-controls`,
+which is what a disclosure is. `aria-haspopup` went with the role: it means "menu" whatever value it
+is given.
 
 **A pair of categories per kind of card, split the way every other pair here is** (#259).
 A comment on a thread you are part of is `about: 'you'` and **on**; a comment on any card
@@ -647,8 +654,14 @@ enabled)` is the absence-means-default pattern `notification_setting` already us
 the participants rule above decides; `enabled` puts somebody in the reply audience without their
 having spoken; disabled takes them out of it though they would otherwise be in — which is the
 escape hatch for a commenter drowning in a lively thread, and falls out of the same column for
-free. `tellAbout`'s audience becomes (participants ∪ followers) − muted − author. Mentions and the
-wider `_any` audience are untouched: those are what the category switches govern.
+free. `tellAbout`'s audience becomes (participants ∪ followers) − muted − author, and the wider
+`_any` audience is **muted − author** as well (#487). It was not, and a mute was then a downgrade
+rather than a silence: subtracting muters from the participants made them newly eligible for the
+`_any` bucket, so somebody who had turned on `dream_comment_any` and then muted one thread heard
+about every reply to it under the other category, while the box read unchecked. A mute is the one
+switch that names a single card, so it wins on that card whatever the category switches say.
+Mentions stay untouched: naming somebody addresses them, and the category switches are what govern
+everything else.
 
 **The checkbox shows the effective state**, so what it says is always what will happen — which
 means `readThreads` has to compute participant-or-follower for a page of fifty cards. Three
@@ -692,6 +705,15 @@ entries with `row_number() over (partition by thread_id order by seq desc)` and 
 entry of fifty threads to slice three off each was the one read here that grew with how talkative
 a burn had been (#387). `thread_entry_seq_idx` is `(thread_id, seq)` because that is what all
 three readers order by — it was `(thread_id, created_at)`, which served none of them.
+
+**A heart does not unfold the card** (#487). Every write on a thread answers with the whole thread,
+which is right for saying, rewording and deleting a comment — you have just written in it — and
+surprising for ♡ and for the bell's follow switch, where pressing one on a card with ten comments
+unfolded all ten and made "show the whole thread" vanish. The fold is the client's, not the
+server's, so the fix is there: those two paths keep the `entries` and `entry_count` the card was
+already showing and take everything else from the answer. Keeping the fold rather than folding to
+three is what makes it right in both directions — a card somebody had expanded stays expanded. The
+song page's own conversation is unaffected, because it never folds.
 
 **Retention is the burn, for everything that has one.** `activity` cascades with `event`
 and so does a `thread` that names one, and the route reads the newest fifty. An audit log
@@ -1275,8 +1297,24 @@ the app offline.
 ### Offering to install it
 
 A strip offers a one-tap **Install** where the browser allows one (#281), and **says how by
-hand where it does not** (#452). Three states, one strip: an offer becomes the button;
-no offer becomes the instruction; the installed copy, or a dismissal, becomes nothing.
+hand where it does not** (#452). Three states, one strip: an offer becomes the button; a browser
+with no offer API becomes the instruction; the installed copy, a browser that could offer and has
+not, or a dismissal, becomes nothing.
+
+**"Has not offered" and "cannot offer" are different, and telling them apart is the whole of
+#460.** Chromium fires `beforeinstallprompt` only after it has fetched and validated the manifest
+icon and the worker is in place — reliably after first paint — so a strip showing the instruction
+whenever there is no offer _yet_ flashed "open your browser's share or menu" at every Chromium
+visitor for a few hundred milliseconds and then swapped it for the button. Worse, Chromium fires
+it not at all for an app it has already installed, and a browser tab is not
+`display-mode: standalone` — so somebody who installed it and later opened the site in a tab was
+told to install what they had installed. `hasInstallOffer` is
+`'onbeforeinstallprompt' in globalThis`, a direct feature test for "this browser has the API", and
+it closes both: the instruction shows only where that is false. Presence, not truthiness —
+Chromium leaves the property `null` until a handler is assigned. It sits beside `isStandalone` and
+reaches the strip as `InstallWatch.offersItself`, injected the way `installed` is, so the suite
+decides which browser it is; and it replaced a piece of state that tracked whether an offer had
+ever arrived, since a browser that has made one demonstrably has the API.
 
 **Chromium only for the button.** `beforeinstallprompt` is the only API that opens a
 browser's own install flow; Firefox and Safari have no equivalent, and there is no way
@@ -1290,7 +1328,9 @@ releases and goes stale silently, so the strip names the shape of the thing ("yo
 share or menu") and points at the **FAQ** for a walkthrough, which is admin-editable content
 and fixable the day Chrome moves the button. The link is there **only for an approved
 member**, who is the only one who can read the FAQ — an unconditional link would be a dead
-end for the signed-out visitor who also sees this strip.
+end for the signed-out visitor who also sees this strip. **The notification settings gate the
+identical link the same way** (#460): that page is `require="signed-in"`, so an account with no
+role yet reaches it, and its own copy pointed at the FAQ unconditionally.
 
 **iOS makes it more than convenience.** Web push works there only from an installed app: in
 a browser tab the Notification API is simply absent. So the strip may honestly say installing

@@ -13,6 +13,7 @@ export const offerIn = (event: unknown): InstallOffer | undefined => {
 
 export interface InstallWatch {
   offer: () => InstallOffer | undefined
+  offersItself: () => boolean
   standalone: () => boolean
   onChange: (listener: () => void) => () => void
   taken: () => void
@@ -22,15 +23,19 @@ export const isStandalone = (): boolean =>
   globalThis.matchMedia?.('(display-mode: standalone)').matches === true ||
   Reflect.get(globalThis.navigator ?? {}, 'standalone') === true
 
+export const hasInstallOffer = (host: object = globalThis): boolean => 'onbeforeinstallprompt' in host
+
 export const watchInstalls = ({
   listen = (name: string, handler: (event: Event) => void) => {
     globalThis.addEventListener(name, handler)
     return () => globalThis.removeEventListener(name, handler)
   },
   installed = isStandalone,
+  offers = hasInstallOffer,
 }: {
   listen?: (name: string, handler: (event: Event) => void) => () => void
   installed?: () => boolean
+  offers?: () => boolean
 } = {}): InstallWatch => {
   let offer: InstallOffer | undefined
   const listeners = new Set<() => void>()
@@ -55,6 +60,7 @@ export const watchInstalls = ({
 
   return {
     offer: () => offer,
+    offersItself: () => offers(),
     standalone: () => installed(),
     onChange: (listener) => {
       listeners.add(listener)

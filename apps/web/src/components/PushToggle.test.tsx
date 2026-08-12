@@ -6,6 +6,7 @@ import type { PushApi } from './PushToggle.tsx'
 
 import { apiError } from '../api/client.ts'
 import { decodeVapidKey, subscriptionBody } from '../push.ts'
+import { ViewerProvider } from '../viewer.tsx'
 import { ACTIVATION_LIMIT_MS, PushToggle } from './PushToggle.tsx'
 
 afterEach(cleanup)
@@ -122,6 +123,34 @@ describe('PushToggle', () => {
 
     expect(screen.getByText(/add it to your home screen/)).toBeTruthy()
     expect(screen.queryByRole('button')).toBeNull()
+  })
+
+  it('points a member at the FAQ, and an applicant at nothing they cannot read', () => {
+    render(
+      <ViewerProvider
+        viewer={{
+          status: 'signed-in',
+          account: { id: 'a-1', name: 'Ada', avatar: null, roles: ['member'] },
+        }}
+      >
+        <PushToggle api={stub()} browser={undefined} />
+      </ViewerProvider>,
+    )
+
+    expect(screen.getByRole('link', { name: 'More in the FAQ.' }).getAttribute('href')).toBe('/faq')
+  })
+
+  it('offers no FAQ link to somebody with no role, whose /faq is a guarded page', () => {
+    render(
+      <ViewerProvider
+        viewer={{ status: 'signed-in', account: { id: 'a-1', name: 'Ada', avatar: null, roles: [] } }}
+      >
+        <PushToggle api={stub()} browser={undefined} />
+      </ViewerProvider>,
+    )
+
+    expect(screen.getByText(/add it to your home screen/)).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'More in the FAQ.' })).toBeNull()
   })
 
   it('says the browser cannot do it at all once it is the installed copy', () => {

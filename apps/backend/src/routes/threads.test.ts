@@ -955,9 +955,6 @@ describe('the heart on a card', () => {
   })
 
   it('refuses a withdrawn dream rather than writing a heart with nothing behind it', async () => {
-    // The card outlives the dream on purpose, and `thread.entity_id` carries no foreign key for
-    // exactly that reason — but `session_support.session_id` does, so this insert would be a
-    // dangling one and a 500.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -1047,8 +1044,6 @@ describe('following a card, and muting one', () => {
   })
 
   it('leaves somebody who muted it out, though they would otherwise be part of it', async () => {
-    // The escape hatch for a commenter drowning in a lively thread, and it falls out of the
-    // same column for free.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -1061,6 +1056,37 @@ describe('following a card, and muting one', () => {
     await say(server, bea.cookie, id, 'is one person enough?')
 
     expect(await bell(server, ada.cookie)).toEqual([])
+  })
+
+  it('is silence, not a downgrade, for somebody who asked about every card of that kind', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    await givenComing(ada.id)
+    await givenComing(bea.id)
+    const { thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+    await setOn(server, ada.cookie, ['dream_comment_any'])
+
+    await follow(server, ada.cookie, id, false)
+    await say(server, bea.cookie, id, 'is one person enough?')
+
+    expect(await bell(server, ada.cookie)).toEqual([])
+  })
+
+  it('still reaches that switch on a card nobody muted', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bea = await givenAccount('Bea')
+    const cai = await givenAccount('Cai')
+    for (const who of [ada, bea, cai]) await givenComing(who.id)
+    const { thread: id } = await offerDream(server, ada.cookie, 'Sauna at dawn')
+    await setOn(server, cai.cookie, ['dream_comment_any'])
+
+    await say(server, bea.cookie, id, 'is one person enough?')
+
+    expect((await bell(server, cai.cookie)).map((one) => one.category)).toEqual(['dream_comment_any'])
   })
 
   it('says the effective state back, so the checkbox cannot claim one thing and do another', async () => {

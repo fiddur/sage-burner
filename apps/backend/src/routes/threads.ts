@@ -864,9 +864,6 @@ export const registerThreadRoutes = (
     if (found === undefined) return sendError(reply, 404)
 
     if (found.entity_type === 'session') {
-      // `thread.entity_id` deliberately carries no foreign key, so a withdrawn dream's card
-      // outlives the row — but `session_support.session_id` does, so hearting one would be a
-      // dangling insert and a 500 rather than a refusal.
       const [dream] = await db
         .select({ id: session.id })
         .from(session)
@@ -1055,12 +1052,14 @@ export const registerThreadRoutes = (
     const named = await reachedByMention(db, await namedBy(db, body, found.event_id, author))
     const told = new Set(named)
 
+    const muted = new Set(await muting(db, found.id))
+
     const people = await participantsOf(db, found)
     for (const accountId of await following(db, found.id)) people.add(accountId)
-    for (const accountId of await muting(db, found.id)) people.delete(accountId)
+    for (const accountId of muted) people.delete(accountId)
     people.delete(author)
 
-    const listening = await audienceFor(found.event_id, author)
+    const listening = (await audienceFor(found.event_id, author)).filter((accountId) => !muted.has(accountId))
 
     await Promise.all([
       tellNamed(named, who, what, link),

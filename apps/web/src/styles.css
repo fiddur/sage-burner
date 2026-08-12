@@ -1745,7 +1745,6 @@ a.person-badge:focus-visible span:last-child {
   font-weight: 600;
 }
 
-/* The heart, which used to sit loose at the tail of the card beside the chip. */
 .feed-card-foot {
   display: flex;
   flex-wrap: wrap;
@@ -1754,8 +1753,11 @@ a.person-badge:focus-visible span:last-child {
   margin: 0.5rem 0 0;
 }
 
+/* The room `.card-bell` takes out of the corner: absolutely positioned, it is out of flow, so a
+   title long enough to wrap runs under it without this. */
 .feed-card-head {
   margin: 0;
+  padding-inline-end: 1.6rem;
   font-weight: 600;
 }
 
