@@ -20,6 +20,9 @@ export const messageForSignUp = (failure: unknown): string => {
   if (isApiError(failure) && failure.status === 429) {
     return 'That is a lot of accounts from one place. Please wait a little and try again.'
   }
+  if (isApiError(failure) && failure.status === 400) {
+    return `Check what you gave: a name, an address that looks like an email, and a password of at least ${MIN_PASSWORD} characters.`
+  }
 
   return 'Could not make your account. Please check your connection and try again.'
 }

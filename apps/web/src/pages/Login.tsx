@@ -199,7 +199,9 @@ export const signInOutcome = (outcome: string | null, ref: string | null = null)
   if (outcome === 'unreachable') {
     return `That provider could not be reached. Try again in a moment, or sign in with your password; if it keeps happening, tell an organiser.${quote}`
   }
-  if (outcome === 'refused') return 'That did not work. Try again, or sign in with your password.'
+  if (outcome === 'refused') {
+    return 'That did not work. If you came from an invitation, the link has run out or been used up — ask whoever sent it for a fresh one. Otherwise try again, or sign in with your password.'
+  }
 
   return undefined
 }

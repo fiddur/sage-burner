@@ -97,6 +97,14 @@ const complete = () => {
 
 const join = () => screen.getByRole('button', { name: 'Join' }).click()
 
+/** The form's own check, past the field's `minLength` — which a browser enforces and jsdom does. */
+const submitPastTheField = () => {
+  const form = document.querySelector('form')
+  if (form === null) throw new Error('there is no form on the page')
+
+  fireEvent.submit(form)
+}
+
 const withState = (status: InviteState['status']) =>
   stub({ getInviteState: () => Promise.resolve({ status, kind: 'single', name: null, email: null }) })
 
@@ -254,8 +262,6 @@ describe('Invite', () => {
   })
 
   it('refuses a password under the floor here rather than at the server (#489)', async () => {
-    // The field carries `minLength`, so the browser stops the submit and says so itself; what
-    // matters is that nothing is sent and the page states the rule either way.
     const redeemInvite = vi.fn(() => Promise.resolve({ viewer: null, attendance: null }))
     renderPage(stub({ redeemInvite }))
 
@@ -266,7 +272,21 @@ describe('Invite', () => {
 
     expect(redeemInvite).not.toHaveBeenCalled()
     expect(screen.getByLabelText('Password', { exact: false })).toHaveProperty('validity.tooShort', true)
-    expect(screen.getByText(/At least 10 characters/)).toBeTruthy()
+  })
+
+  it('says the floor itself for a submit the field did not stop', async () => {
+    const redeemInvite = vi.fn(() => Promise.resolve({ viewer: null, attendance: null }))
+    renderPage(stub({ redeemInvite }))
+
+    await screen.findByRole('button', { name: 'Join' })
+    complete()
+    fill('Password', 'hi')
+    submitPastTheField()
+
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'A password needs at least 10 characters',
+    )
+    expect(redeemInvite).not.toHaveBeenCalled()
   })
 
   it('asks for a password, a blank one being no password at all', async () => {

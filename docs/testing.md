@@ -82,6 +82,10 @@ phone" means 360px.
 - [ ] With Discord or Facebook configured, open a group link and take it up with the
       provider button: one round trip makes a member, and the invites list counts the
       arrival. The page does not tell a group link's arrival it is good for one person.
+- [ ] As somebody who signed up through that provider and has no role yet — the pending
+      applicant above — open a second group link and press the provider button: they come
+      out a member, and the list counts the arrival against that link. Pressing it again
+      leaves the link unspent, membership already being theirs.
 - [ ] An application from a provider signup shows which door on the review card, with
       a profile link only where the provider gave one.
 - [ ] The admin's bell rings for the application. From the applications list,

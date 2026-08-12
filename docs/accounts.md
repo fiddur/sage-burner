@@ -83,7 +83,26 @@ lands on the start page, already in.
 
 A link that has gone stale answers `refused` on the login page rather than naming what was wrong
 with it, because only the digest survives the round trip: the page cannot be linked back to, and
-saying more would describe a token the reader cannot see anyway.
+saying more would describe a token the reader cannot see anyway. The page's copy names both halves
+of what `refused` can mean — a round trip that came back wrong, and a link that has run out — since
+whoever pressed a button in a group has no reason to read "sign in with your password" as advice.
+The write's own failure says the same thing: the pre-read above it is what answers `address-taken`,
+and inside the transaction only a single-use link claimed twice can collide, so anything that is not
+`account.email` is the link having run out rather than the address being held.
+
+**An identity the app already knows takes the link up too** (#534). `signIn` forwarded the invite
+only where no `account_identity` matched, so somebody who had once signed up through Discord and
+never got a role — a pending or rejected applicant — could press the button on the link posted in
+that very server, be signed in, and be told nothing. Possession of the link is the vetting, and
+their identity already matching is not a reason to refuse: a rejected applicant getting in on a
+group link is the group vouching for them, which is the model. So the same check the sign-up path
+runs decides it, and the same write grants `member` and records the redemption.
+
+**Only for an account with no role at all.** A member's membership is not the link's to spend
+again, and an admin who opens the link to see whether it works must not be handed a role by
+looking — so any role already held leaves the link alone for whoever can use it. A link that has
+run out signs them in regardless, since they have an account either way, and the status page is
+where somebody with no role reads where they stand.
 
 **No table-level CHECK enforces the two shapes.** SQLite cannot add one through `ALTER TABLE`, and
 rebuilding `invite_token` would mean dropping a table two others hold foreign keys into. The rules
@@ -335,7 +354,9 @@ role-less account can reach.
 **Allergies are ticked on the way in.** The redemption form had a free-text box while every other
 surface offers the shared vocabulary with checkboxes; `AllergiesField` is now one component both
 use, so the two cannot drift. The list is a public read, which is what lets a form nobody has
-signed into yet render it.
+signed into yet render it. Both ends write through `writeAllergyTicks` (#532), whose leading
+`DELETE` is a no-op on an account three lines old — one place to change rather than two that can
+drift, and a foreign key still refuses an item id nobody minted.
 
 ## Applying
 
