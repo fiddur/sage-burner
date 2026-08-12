@@ -2578,6 +2578,15 @@ img.avatar {
   text-decoration-line: line-through;
 }
 
+/* `margin-inline-end: auto` on a flex row, so the marks stay at the far end however long a name
+   is — a name reading as part of the link is the thing to avoid, so it is muted and unlinked. */
+.song-artist {
+  margin: 0;
+  margin-inline-end: auto;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
 .song-marks {
   display: flex;
   flex-wrap: wrap;

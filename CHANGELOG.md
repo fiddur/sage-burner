@@ -9,6 +9,11 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-12
 
+- **A song can say whose it is.** There is a field for the artist now, beside the words rather than
+  buried in them: it shows next to the title in the songbook and under it on the song's own page,
+  and the book can be listed by artist instead of by title — which puts one songwriter's songs
+  together. Songs nobody has named come last.
+
 - **No more being told to install an app you have installed.** On Chrome and Edge the strip flashed
   "open your browser's share or menu" for a moment before offering the Install button, and it kept
   saying that to anybody who opened the installed app in an ordinary tab. Those browsers now show the

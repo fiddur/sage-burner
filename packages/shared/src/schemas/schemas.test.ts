@@ -810,6 +810,7 @@ describe('a song', () => {
     expect(parsed.success).toBe(true)
     expect(parsed.data).toEqual({
       title: 'Fire in the sky',
+      artist: null,
       body: '',
       capo: null,
       links: [],
@@ -819,6 +820,15 @@ describe('a song', () => {
 
   it('refuses a title of nothing but whitespace', () => {
     expect(songCreateSchema.safeParse(aSong({ title: '   ' })).success).toBe(false)
+  })
+
+  it('takes an artist, and refuses a blank one where nothing said is null', () => {
+    expect(songCreateSchema.safeParse(aSong({ artist: 'The Sagebrush Band' })).data?.artist).toBe(
+      'The Sagebrush Band',
+    )
+    expect(songCreateSchema.safeParse(aSong({ artist: null })).data?.artist).toBeNull()
+    expect(songCreateSchema.safeParse(aSong({ artist: '' })).success).toBe(false)
+    expect(songCreateSchema.safeParse(aSong({ artist: '   ' })).success).toBe(false)
   })
 
   it('holds a body as long as a welcome page is short', () => {

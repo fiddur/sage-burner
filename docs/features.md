@@ -135,6 +135,8 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
   floor.
 - Links to recordings show the platform's own mark; categories are a curated
   (admin-edited) vocabulary, filtered by the same chip row the feed uses.
+- Whose song it is, as a field of its own: shown beside the title in the book and
+  under it on the page, and the list sorts by it as well as by title.
 
 ## Being told — [accounts.md](./accounts.md)
 

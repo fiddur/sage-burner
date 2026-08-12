@@ -743,7 +743,21 @@ the database against the one in the code, so the two cannot drift silently again
 
 The point is singing together: one shared book, so whoever picks up a guitar and whoever
 holds a phone are looking at the same words. A song has a **title** and everything else is
-optional — the words, chords, links, a capo, categories.
+optional — the words, chords, links, a capo, categories, and whose song it is.
+
+**The artist is a field, not a line in the words** (#538). A book is browsed by who wrote it
+about as often as by what it is called, and a name pasted into the body cannot be sorted on —
+it is also a chord line's width away from being read as one. So `song.artist` is a nullable
+column: most of what is already in the book has no artist recorded, and a blank is not an
+artist called "". `nonEmptyText(…).nullable()` is what refuses the empty string, and there is
+no CHECK saying the same — SQLite cannot add one through `ALTER TABLE`, and rebuilding `song`
+would take `song_in_category` down with it.
+
+**Sorting is the client's, and by artist puts the nameless last.** The list is already loaded
+whole and filtered by chips in the page, so a second order is `inSongOrder` over what is in
+hand rather than a query parameter and a second index. Nulls last in either direction, because
+a run of songs nobody has named at the top of the book is what "by artist" is least likely to
+mean. The book's own read stays alphabetical by title, which is what the page opens on.
 
 **It belongs to no burn** (#316), which makes it the second deliberately global thing here
 after the feed. Songs outlive a date, so there is no `event_id` on `song` and none on its
