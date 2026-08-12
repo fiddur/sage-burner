@@ -9,6 +9,15 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-12
 
+- **A group link that closes in the past says so.** Picking a date already gone answered
+  "Request failed (400)." with no clue which field was wrong. The date picker now offers nothing
+  before today, the form says what is wrong with it before sending, and a refusal from the server
+  names the closing date.
+
+- **A group link cannot be filled past its cap.** A rush of people redeeming the same link at once
+  could all slip past the count and take it a few over. It is checked again as each account is
+  written, which is the check that decides.
+
 - **The first person onto a new burn can put their hand up.** On a burn nobody had joined yet — every
   burn on the day it is planned — 🙋 was missing everywhere: no lead role, no meal crew, no helping
   out, and so not even the nudge telling you to join first. The hand is there now, and pressing it

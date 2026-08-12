@@ -2,7 +2,7 @@ import type { InviteState, RedeemResponse } from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
 import { apiRoutes, inviteStatusOf, redeemRequestSchema } from '@sage-burner/shared'
-import { and, eq, isNull } from 'drizzle-orm'
+import { and, count, eq, isNull } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { Gate } from '../auth/gate.ts'
@@ -137,9 +137,16 @@ export const registerRedemptionRoutes = (
     const claimed = ((): boolean | 'unknown-allergy' => {
       try {
         return db.transaction((tx) => {
-          // A group link is not claimed, only counted — the cap is checked above, once, before
-          // the scrypt. Two arrivals in the same instant could take it one past its cap; that is
-          // the size of window this app does not build machinery to close.
+          if (invite.kind === 'group' && invite.max_uses !== null) {
+            const [tally] = tx
+              .select({ taken: count() })
+              .from(inviteRedemption)
+              .where(eq(inviteRedemption.token_id, invite.id))
+              .all()
+
+            if ((tally?.taken ?? 0) >= invite.max_uses) return false
+          }
+
           if (invite.kind === 'single') {
             const stamped = tx
               .update(inviteToken)

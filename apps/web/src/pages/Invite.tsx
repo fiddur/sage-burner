@@ -99,11 +99,9 @@ const YouAreIn = ({
   </section>
 )
 
-const EMPTY_ITEMS: readonly AllergyItem[] = []
-
-const WhoTheLinkIsFor = ({ invited }: { invited: Invited | undefined }) => (
+const WhoTheLinkIsFor = ({ invited }: { invited: Invited }) => (
   <p class="form-note">
-    {invited?.state.kind === 'group'
+    {invited.state.kind === 'group'
       ? 'This link is for everybody in the group it was posted in.'
       : 'This invitation is good for one person.'}{' '}
     What you give here becomes your login; the rest is for planning. Food is primarily vegetarian, with vegan
@@ -322,7 +320,7 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
     <section class="page column">
       <h1>Welcome — let us set you up</h1>
 
-      <WhoTheLinkIsFor invited={ready} />
+      <WhoTheLinkIsFor invited={loaded.data} />
 
       <OneClickWaysIn token={token} />
 
@@ -375,7 +373,7 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
         </label>
 
         <AllergiesField
-          items={ready === undefined ? EMPTY_ITEMS : ready.allergyItems}
+          items={loaded.data.allergyItems}
           ticked={ticked}
           notes={allergies}
           onTicked={setTicked}

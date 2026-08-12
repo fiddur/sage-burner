@@ -282,10 +282,6 @@ export const registerOauthRoutes = (
 
     if (taken !== undefined) return back(reply, loginPage('address-taken'))
 
-    // A link that is not open right now must not become a membership. Checked before the account
-    // is made, and again inside the write for the single-use kind, whose claim is the stamp.
-    // Only the digest survives the round trip, so a link that has gone stale cannot be linked
-    // back to — the login page is where somebody is told, the same as every other refusal here.
     const invite = inviteHash === null ? undefined : await openInvite(inviteHash)
     if (inviteHash !== null && invite === undefined) return back(reply, loginPage('refused'))
 
@@ -391,7 +387,7 @@ export const registerOauthRoutes = (
       cookieHeader(sessions.issue(identity.account_id), config, config.session_ttl_seconds),
     )
 
-    return back(reply, '/')
+    return back(reply, homePage())
   }
 
   const maybeReach = async (

@@ -10,8 +10,8 @@ import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { InviteLink } from '../components/InviteLink.tsx'
 import { Table } from '../components/Table.tsx'
-import { fromLocalInput } from '../datetime.ts'
-import { useAction, useLoad } from '../load.ts'
+import { fromLocalInput, todayForInput } from '../datetime.ts'
+import { errorMessage, useAction, useLoad } from '../load.ts'
 import { isAdmin, useViewer } from '../viewer.tsx'
 
 export type InvitesApi = Pick<ApiClient, 'getInvites' | 'createInvite' | 'createGroupInvite' | 'revokeInvite'>
@@ -43,15 +43,17 @@ const GroupLinkForm = ({
   const [label, setLabel] = useState('')
   const [closes, setCloses] = useState('')
   const [cap, setCap] = useState('')
+  const today = todayForInput()
 
   const ready = label.trim() !== '' && closes !== ''
+  const alreadyShut = closes !== '' && closes < today
 
   return (
     <form
       class="form"
       onSubmit={(submitted) => {
         submitted.preventDefault()
-        if (!ready) return
+        if (!ready || alreadyShut) return
 
         const at = fromLocalInput(`${closes}T23:59`)
         if (at === null) return
@@ -80,8 +82,15 @@ const GroupLinkForm = ({
 
         <label class="field">
           <span>Closes on</span>
-          <input type="date" value={closes} onInput={(typed) => setCloses(typed.currentTarget.value)} />
+          <input
+            type="date"
+            min={today}
+            aria-invalid={alreadyShut}
+            value={closes}
+            onInput={(typed) => setCloses(typed.currentTarget.value)}
+          />
         </label>
+        {alreadyShut && <ErrorText message="That date has gone. A link has to close in the future." />}
 
         <label class="field">
           <span>At most this many (optional)</span>
@@ -95,7 +104,7 @@ const GroupLinkForm = ({
         </label>
 
         <p class="row">
-          <button type="submit" disabled={busy || !ready}>
+          <button type="submit" disabled={busy || !ready || alreadyShut}>
             Create a group link
           </button>
         </p>
@@ -126,10 +135,16 @@ export const AdminInvites = ({ api }: { api: InvitesApi }) => {
 
   const mintGroup = (expires_at: string, label: string, max_uses: number | null) => {
     setMinted(undefined)
-    run(async () => {
-      const response = await api.createGroupInvite({ expires_at, label, max_uses })
-      setMinted(response.invite)
-    }, 'Could not create that link. Please try again.')
+    run(
+      async () => {
+        const response = await api.createGroupInvite({ expires_at, label, max_uses })
+        setMinted(response.invite)
+      },
+      (failure) =>
+        isApiError(failure) && failure.status === 400
+          ? 'That closing date has gone. Pick one in the future — a link has to close some time.'
+          : errorMessage(failure, 'Could not create that link. Please try again.'),
+    )
   }
 
   const revoke = (id: string) => {

@@ -48,10 +48,21 @@ an admin audits. `invite_redemption.account_id` is unique across the table, so n
 two links whichever kind they used. The index is untouched, still guarding the kinds it was
 written for, rather than loosened to accommodate one it was not.
 
-**The cap is checked once, before the scrypt**, in the same read that decides the status. Two
-arrivals in the same instant could take a link one past its cap. That window is deliberately not
-closed: the in-transaction re-check that would close it is unreachable from any test, and this
-app does not build machinery for races at its size.
+**The cap is checked twice: once before the scrypt, and once inside the write** (#524). The first
+read decides the status and refuses cheaply, before a deliberately slow hash and a gate queue. That
+read is the one that used to be the only one, and the window it leaves is wider than "two arrivals
+in the same instant" — everybody who arrives _during_ somebody else's hash passes it, so a burst of
+K on a link one below its cap all pass and all insert. The overshoot was bounded by concurrency
+rather than by one.
+
+Closing it needs three lines, not machinery: `db.transaction`'s callback is synchronous and SQLite
+serializes writers, so a `SELECT count(*)` on `invite_redemption` immediately before the insert is
+authoritative. The refusal answers the same 409 the pre-read does.
+
+**That branch is reachable from a test**, which is why it is worth having: `hash` is injected, so a
+test that inserts a redemption _while the password is being hashed_ is exactly the burst, and the
+in-transaction count is the only thing that refuses it. Deleting the check fails that test and
+nothing else.
 
 **Revoking closes rather than deletes.** A direct invite is a row nobody has used, so
 `DELETE /api/admin/invites/:id` removes it. A group link has accounts behind it and rows pointing
