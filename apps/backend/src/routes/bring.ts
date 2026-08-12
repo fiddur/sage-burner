@@ -8,7 +8,7 @@ import type {
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 
 import { apiRoutes, bringCreateSchema, bringPage, bringUpdateSchema, helperSchema } from '@sage-burner/shared'
-import { and, asc, eq, gte, inArray, isNull } from 'drizzle-orm'
+import { and, asc, eq, gte, isNull } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -18,8 +18,9 @@ import type { Notifier } from '../push/notify.ts'
 import { attendanceFor } from '../attendances.ts'
 import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
+import { handsFor, handsOn } from '../bring-hands.ts'
 import { isEmptyPatch, patchRow } from '../db/patch.ts'
-import { account, attendance, bringHand, bringItem, event, thread } from '../db/schema.ts'
+import { account, bringHand, bringItem, event, thread } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { displayName, namedBy, reachedByMention, tellAttendees } from '../push/notify.ts'
 import { openEventNow, todayIso } from './events.ts'
@@ -28,28 +29,6 @@ import { addEntry, threadFor, threadIdFor } from './threads.ts'
 export interface BringDeps extends GuardDeps {
   now: () => Date
   notify?: Notifier
-}
-
-const handsFor = async (
-  db: Database,
-  itemIds: readonly string[],
-): Promise<ReadonlyMap<string, BringEntry['hands']>> => {
-  if (itemIds.length === 0) return new Map()
-
-  const rows = await db
-    .select({ item_id: bringHand.item_id, account_id: account.id, name: account.name })
-    .from(bringHand)
-    .innerJoin(attendance, eq(attendance.id, bringHand.attendance_id))
-    .innerJoin(account, eq(account.id, attendance.account_id))
-    .where(inArray(bringHand.item_id, [...itemIds]))
-    .orderBy(asc(account.name), asc(account.id))
-
-  const held = new Map<string, BringEntry['hands']>()
-  for (const row of rows) {
-    held.set(row.item_id, [...(held.get(row.item_id) ?? []), { account_id: row.account_id, name: row.name }])
-  }
-
-  return held
 }
 
 type Listed = Omit<BringEntry, 'hands'>
@@ -82,7 +61,7 @@ const listing = (db: Database) =>
     .leftJoin(account, eq(account.id, bringItem.author_account_id))
     .leftJoin(thread, and(eq(thread.entity_type, 'bring'), eq(thread.entity_id, bringItem.id)))
 
-export const bringListFor = async (db: Database, eventId: string): Promise<BringEntry[]> =>
+const bringListFor = async (db: Database, eventId: string): Promise<BringEntry[]> =>
   await withHands(
     db,
     await listing(db)
@@ -118,18 +97,21 @@ export const registerBringRoutes = (
 
   const guarded = { preHandler: requireApproved }
 
-  const handsOf = async (itemId: string): Promise<readonly { account_id: string }[]> =>
-    (await handsFor(db, [itemId])).get(itemId) ?? []
-
   const noteOnItem = async (
     item: BringItem,
     body: string,
     by: string | undefined,
     kind: ThreadEntryKind = 'helper',
+    talkedOn?: string,
   ) =>
     await addEntry(
       db,
-      { thread_id: await threadFor(db, 'bring', item), kind, author_account_id: by ?? null, body },
+      {
+        thread_id: talkedOn ?? (await threadFor(db, 'bring', item)),
+        kind,
+        author_account_id: by ?? null,
+        body,
+      },
       now(),
     )
 
@@ -205,16 +187,23 @@ export const registerBringRoutes = (
         created_at: now().toISOString(),
       } satisfies BringItem
 
-      db.transaction((tx) => {
+      const threadId = db.transaction((tx) => {
         tx.insert(bringItem).values(row).run()
-        threadIdFor(tx, { type: 'bring', id: row.id, event_id: row.event_id, title: row.title })
 
         if (body.bringing && mine !== undefined) {
           tx.insert(bringHand).values({ item_id: row.id, attendance_id: mine }).run()
         }
+
+        return threadIdFor(tx, { type: 'bring', id: row.id, event_id: row.event_id, title: row.title })
       })
 
-      await noteOnItem(row, body.bringing ? 'is bringing this' : 'asked for this', viewer.account_id, 'added')
+      await noteOnItem(
+        row,
+        body.bringing ? 'is bringing this' : 'asked for this',
+        viewer.account_id,
+        'added',
+        threadId,
+      )
 
       const who = await displayName(db, viewer.account_id)
       const named = await reachedByMention(
@@ -325,7 +314,7 @@ export const registerBringRoutes = (
     const theirs = await attendanceFor(db, on.item.event_id, body.account_id)
     if (theirs === undefined) return sendError(reply, 400, 'not_attending')
 
-    const asked = (await handsOf(on.item.id)).length === 0
+    const asked = (await handsOn(db, on.item.id)).length === 0
 
     const added = await db
       .insert(bringHand)

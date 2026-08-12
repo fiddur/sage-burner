@@ -32,6 +32,7 @@ import type { Notifier } from '../push/notify.ts'
 import { attendanceFor } from '../attendances.ts'
 import { createGuards } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
+import { handsOn } from '../bring-hands.ts'
 import {
   account,
   accountAvatar,
@@ -620,16 +621,6 @@ export const following = async (db: Database, threadId: string): Promise<string[
 export const muting = async (db: Database, threadId: string): Promise<string[]> =>
   await saidAbout(db, threadId, false)
 
-export const handsOn = async (db: Database, itemId: string): Promise<string[]> => {
-  const rows = await db
-    .select({ account_id: attendance.account_id })
-    .from(bringHand)
-    .innerJoin(attendance, eq(attendance.id, bringHand.attendance_id))
-    .where(eq(bringHand.item_id, itemId))
-
-  return rows.map((row) => row.account_id)
-}
-
 export const participantsOf = async (
   db: Database,
   found: {
@@ -682,7 +673,7 @@ export const participantsOf = async (
       .limit(1)
     if (row?.author != null) people.add(row.author)
 
-    for (const hand of await handsOn(db, found.entity_id)) people.add(hand)
+    for (const hand of await handsOn(db, found.entity_id)) people.add(hand.account_id)
 
     return people
   }

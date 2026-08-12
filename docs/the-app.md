@@ -897,6 +897,12 @@ fact lived — one that could disagree with the hands the moment somebody put on
 page is two halves off `hands.length === 0`, asks first, because an ask nobody has answered
 is the only thing on the page anybody has to do something about.
 
+**An empty list is a third case, not an empty half** (#541). "Everything asked for has
+somebody bringing it" is true of a list whose asks are all answered and the opposite of true
+of a list with nothing on it — which is every burn on the day it opens. So the asks note is
+picked off `items.length`, not off the half, and an empty list says what to do instead: add
+the first thing.
+
 **There is no wanted count.** "We could use three of these" is a sentence in the comment or
 in the thread. A number would want display rules, a notion of fulfilment and a policy for
 refusing the fourth hand, all bought to prevent two projectors — and at 42 people
@@ -928,6 +934,16 @@ only a song.
 the announcement rule (#438). The list itself is any approved member's: adding an ask needs
 no attendance, because arranging the shared furniture never does — only pledging to bring
 something does, since a pledge is a row keyed by one.
+
+**Taking an item off tells nobody, and that is the decision** (#540). Withdrawing ends the
+pledges of whoever had a hand up, so #247's rule — anything somebody else changes about your
+roles tells you — looks like it should apply. It does not: the pledge did not change hands,
+the thing it was a pledge for stopped existing, and the withdrawal is written into the item's
+conversation where the hands are already listed. A dream's withdrawal is silent for the same
+reason, and a notification saying "you are no longer bringing X" about an X that is gone would
+send people looking for a page that no longer lists it. **Two simultaneous first hands would
+each ring the asker**, since each reads the item as still an ask; at 42 people that window is
+not worth machinery, per the same argument the roster's writes make.
 
 ## What this installation is called
 
