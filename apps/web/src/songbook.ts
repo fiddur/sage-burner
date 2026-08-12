@@ -56,9 +56,9 @@ const breakColumn = (chords: string, words: string, columns: number): number => 
   return 0
 }
 
-const piece = (row: SongRow, chords: string, words: string): SongRow => ({
-  chords: row.chords === null || chords.trim() === '' ? null : chords.trimEnd(),
-  words: row.words === null ? null : words.trimEnd(),
+const piece = (row: SongRow, chords: string, words: string, split: boolean): SongRow => ({
+  chords: row.chords === null || (split && chords.trim() === '') ? null : chords.trimEnd(),
+  words: row.words === null || (split && words.trim() === '') ? null : words.trimEnd(),
 })
 
 const broken = (row: SongRow, columns: number): SongRow[] => {
@@ -70,7 +70,7 @@ const broken = (row: SongRow, columns: number): SongRow[] => {
     const at = breakColumn(chords, words, columns)
     if (at === 0) break
 
-    pieces.push(piece(row, chords.slice(0, at), words.slice(0, at)))
+    pieces.push(piece(row, chords.slice(0, at), words.slice(0, at), true))
 
     const restChords = chords.slice(at)
     const restWords = words.slice(at)
@@ -80,7 +80,7 @@ const broken = (row: SongRow, columns: number): SongRow[] => {
     words = Number.isFinite(shared) ? restWords.slice(shared) : restWords
   }
 
-  return [...pieces, piece(row, chords, words)]
+  return [...pieces, piece(row, chords, words, pieces.length > 0)]
 }
 
 export const wrappedRows = (rows: readonly SongRow[], columns: number): SongRow[] =>

@@ -86,6 +86,17 @@ describe('wrapping a row too wide for the page', () => {
     ])
   })
 
+  it('drops the words line off a continuation whose words have run out, the mirror of the chord rule', () => {
+    expect(wrappedRows([{ chords: 'C  G  Am  F', words: 'hey' }], 6)).toEqual([
+      { chords: 'C  G', words: 'hey' },
+      { chords: 'Am  F', words: null },
+    ])
+  })
+
+  it('keeps a blank line blank where nothing was split, since a verse break is part of the words', () => {
+    expect(wrappedRows([{ chords: null, words: '' }], 40)).toEqual([{ chords: null, words: '' }])
+  })
+
   it('breaks a line of words with no chords over it at a space', () => {
     expect(wrappedRows([{ chords: null, words: 'come and sing with me' }], 12)).toEqual([
       { chords: null, words: 'come and' },

@@ -360,8 +360,8 @@ These are member records, so treat them as such:
 ## Working an issue: merge on approval
 
 This project works **merge on approval**: once an issue is ironed out and assigned,
-take it end to end. A webhook service reviews every ready PR automatically, so
-getting one reviewed, approved and ready needs nobody's attention.
+take it end to end, up to the merge. A webhook service reviews every ready PR
+automatically, so getting one reviewed, approved and ready needs nobody's attention.
 
 **The merge itself needs the go-ahead, and "merge on approval" is it.** Said once it
 stands for the whole run — the PR in hand and every later one in the same session,
