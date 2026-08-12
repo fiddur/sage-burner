@@ -104,6 +104,20 @@ describe('the bring list', () => {
     expect(asks.nextElementSibling?.textContent).not.toContain('Speakers')
   })
 
+  it('says an empty list is empty, rather than that everything asked for is covered', async () => {
+    renderPage(stub())
+
+    expect(await screen.findByText(/Nothing on the list yet/)).toBeTruthy()
+    expect(screen.queryByText(/Everything asked for has somebody bringing it/)).toBeNull()
+  })
+
+  it('says everything asked for is covered when every item has a hand', async () => {
+    renderPage(stub({}, [anItem({ id: 'b-1', hands: [{ account_id: 'a-2', name: 'Bea' }] })]))
+
+    expect(await screen.findByText(/Everything asked for has somebody bringing it/)).toBeTruthy()
+    expect(screen.queryByText(/Nothing on the list yet/)).toBeNull()
+  })
+
   it('says who added it, linking to them', async () => {
     renderPage(stub({}, [anItem({ id: 'b-1', author_account_id: 'a-2', author_name: 'Bea' })]))
 

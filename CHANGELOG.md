@@ -9,6 +9,10 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-12
 
+- **An empty bring list says it is empty.** It used to claim "Everything asked for has somebody
+  bringing it" on a burn where nothing had been asked for at all, which is the opposite of true.
+  Now it says there is nothing on the list yet, and what to do about that.
+
 - **A bring list per burn, behind ☰.** One shared list of things the gathering wants and things
   people are bringing, replacing the spreadsheet's Bring tab. Add a thing — tick "I am bringing this
   myself" and it is an offer, leave it and it is an ask, waiting for a hand at the top of the page.

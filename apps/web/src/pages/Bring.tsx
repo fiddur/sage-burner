@@ -44,6 +44,11 @@ type Attendee = EventAttendeesResponse['attendees'][number]
 
 const BLANK = { title: '', comment: '', bringing: false }
 
+const asksNote = (items: readonly BringEntry[]) =>
+  items.length === 0
+    ? 'Nothing on the list yet — add the first thing below.'
+    : 'Everything asked for has somebody bringing it.'
+
 export const Bring = ({ api }: { api: BringApi }) => {
   const viewer = useViewer()
   const approved = isApproved(viewer)
@@ -176,7 +181,7 @@ export const Bring = ({ api }: { api: BringApi }) => {
         <>
           <section>
             <h2>Nobody is bringing these yet</h2>
-            {half(asks, 'Everything asked for has somebody bringing it.')}
+            {half(asks, asksNote(items))}
           </section>
 
           <section>
