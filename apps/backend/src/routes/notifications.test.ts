@@ -523,6 +523,121 @@ describe('the unseen count', () => {
   })
 })
 
+describe('seeing what a notification points at', () => {
+  const shown = (server: FastifyInstance, cookie: string, body: Record<string, string>) =>
+    server.inject({ method: 'POST', url: '/api/me/notifications/shown', headers: { cookie }, payload: body })
+
+  const givenNotification = async (
+    accountId: string,
+    over: { link?: string | null; created_at?: string } = {},
+  ) => {
+    const id = randomUUID()
+    await db()
+      .insert(notification)
+      .values({
+        id,
+        account_id: accountId,
+        category: 'new_version',
+        body: 'A new version is out',
+        link: over.link ?? '/changelog',
+        created_at: over.created_at ?? NOW,
+      })
+
+    return id
+  }
+
+  const seenAt = async (id: string) => {
+    const [row] = await db().select().from(notification).where(eq(notification.id, id))
+
+    return row?.seen_at ?? null
+  }
+
+  it('marks one whose target was shown with data as new as it is', async () => {
+    const server = await build()
+    const ada = await givenAccount()
+    const id = await givenNotification(ada.id)
+
+    const answer = await shown(server, ada.cookie, { link: '/changelog', as_of: NOW })
+
+    expect(answer.statusCode).toBe(200)
+    expect(await seenAt(id)).toBe(NOW)
+    expect(answer.json().unseen).toBe(0)
+  })
+
+  it('leaves one written after the shown data was fetched', async () => {
+    const server = await build()
+    const ada = await givenAccount()
+    const later = new Date(Date.parse(NOW) + 60_000).toISOString()
+    const id = await givenNotification(ada.id, { created_at: later })
+
+    await shown(server, ada.cookie, { link: '/changelog', as_of: NOW })
+
+    expect(await seenAt(id)).toBeNull()
+  })
+
+  it('marks it once the page has refetched, without a navigation', async () => {
+    const server = await build()
+    const ada = await givenAccount()
+    const later = new Date(Date.parse(NOW) + 60_000).toISOString()
+    const id = await givenNotification(ada.id, { created_at: later })
+
+    await shown(server, ada.cookie, { link: '/changelog', as_of: NOW })
+    await shown(server, ada.cookie, { link: '/changelog', as_of: later })
+
+    expect(await seenAt(id)).toBe(NOW)
+  })
+
+  it('marks only what that page is about, the query being part of the address', async () => {
+    const server = await build()
+    const ada = await givenAccount()
+    const here = await givenNotification(ada.id, { link: '/bring?burn=e-1&item=b-1' })
+    const elsewhere = await givenNotification(ada.id, { link: '/bring?burn=e-1&item=b-2' })
+    const nowhere = await givenNotification(ada.id, { link: null })
+
+    await shown(server, ada.cookie, { link: '/bring?burn=e-1&item=b-1', as_of: NOW })
+
+    expect(await seenAt(here)).toBe(NOW)
+    expect(await seenAt(elsewhere)).toBeNull()
+    expect(await seenAt(nowhere)).toBeNull()
+  })
+
+  it('leaves somebody else’s notification for the same page alone', async () => {
+    const server = await build()
+    const ada = await givenAccount()
+    const bea = await givenAccount()
+    const theirs = await givenNotification(bea.id)
+
+    await shown(server, ada.cookie, { link: '/changelog', as_of: NOW })
+
+    expect(await seenAt(theirs)).toBeNull()
+  })
+
+  it('is refused to somebody signed out', async () => {
+    const server = await build()
+
+    expect(
+      (
+        await server.inject({
+          method: 'POST',
+          url: '/api/me/notifications/shown',
+          payload: { link: '/changelog', as_of: NOW },
+        })
+      ).statusCode,
+    ).toBe(401)
+  })
+
+  it('refuses a body that is not one, rather than marking everything', async () => {
+    const server = await build()
+    const ada = await givenAccount()
+    const id = await givenNotification(ada.id)
+
+    expect((await shown(server, ada.cookie, { link: '/changelog' })).statusCode).toBe(400)
+    expect((await shown(server, ada.cookie, { link: '', as_of: NOW })).statusCode).toBe(400)
+    expect((await shown(server, ada.cookie, { as_of: NOW })).statusCode).toBe(400)
+    expect(await seenAt(id)).toBeNull()
+  })
+})
+
 describe('the email channel', () => {
   const setOn = (server: FastifyInstance, cookie: string, on: string[], email: string[]) =>
     server.inject({

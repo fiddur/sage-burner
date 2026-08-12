@@ -172,8 +172,33 @@ export interface ClientDeps {
   onRead?: (response: Response) => void
 }
 
+/**
+ * When the server answered the oldest GET made with this signal, which is what
+ * `markTargetShown` reports (#527) — a page is only as new as its oldest read, and the
+ * device's own clock cannot be trusted to say when either happened.
+ */
+export const serverDateOf = (response: Pick<Response, 'headers'>): string | undefined => {
+  const header = response.headers.get('date')
+  if (header === null) return undefined
+
+  const at = Date.parse(header)
+
+  return Number.isNaN(at) ? undefined : new Date(at).toISOString()
+}
+
 export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRead }: ClientDeps = {}) => {
   const versions = new Map<Guarded, string>()
+  const readTimes = new WeakMap<AbortSignal, string>()
+
+  const noteReadTime = (response: Response, signal?: AbortSignal) => {
+    if (signal === undefined) return
+
+    const at = serverDateOf(response)
+    if (at === undefined) return
+
+    const held = readTimes.get(signal)
+    if (held === undefined || at < held) readTimes.set(signal, at)
+  }
 
   const precondition = (method: string, version?: Guarded): Record<string, string> => {
     const held = version === undefined ? undefined : versions.get(version)
@@ -223,7 +248,10 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
       )
     }
 
-    if (method === 'GET') onRead?.(response)
+    if (method === 'GET') {
+      noteReadTime(response, signal)
+      onRead?.(response)
+    }
 
     if (response.status === 204) return undefined as T
 
@@ -244,6 +272,8 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
 
   return {
     request,
+    readAt: (signal: AbortSignal): string | undefined => readTimes.get(signal),
+
     getVersion: () => request<VersionResponse>(apiRoutes.getVersion.path()),
 
     getChangelog: (signal?: AbortSignal) =>
@@ -264,6 +294,12 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
     markNotificationsSeen: () =>
       request<NotificationsResponse>(apiRoutes.markNotificationsSeen.path(), {
         method: apiRoutes.markNotificationsSeen.method,
+      }),
+
+    markTargetShown: (body: BodyOf<'markTargetShown'>) =>
+      request<NotificationsResponse>(apiRoutes.markTargetShown.path(), {
+        method: apiRoutes.markTargetShown.method,
+        body,
       }),
 
     getMyNotificationSettings: (signal?: AbortSignal) =>

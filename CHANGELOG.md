@@ -9,6 +9,13 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-12
 
+- **The bell stops badging what you have already looked at.** A notification only counted as read
+  if you opened the bell or the notifications page, so following "What's new" on the redeploy bar,
+  or a link out of a push message, left it sitting there unread. Arriving at what a notification
+  points at now marks that one — and only that one — as long as the page is showing something at
+  least as new as the notification itself. A page left open clears it the moment it refreshes and
+  shows the change.
+
 - **An invite works for somebody the app has met before.** Pressing "Continue with Discord" on a
   group link did nothing for anyone who had already signed up that way and was still waiting on an
   application: they were signed in and told nothing. The link now makes them a member, the same as

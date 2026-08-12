@@ -32,6 +32,8 @@ const clientWith = (
 ): AppApi => ({
   logout,
   getMe: () => Promise.reject(new Error('getMe is not stubbed in this file')),
+  readAt: () => undefined,
+  markTargetShown: () => Promise.reject(new Error('markTargetShown is not stubbed in this file')),
   getMapLink: () => Promise.reject(new Error('getMapLink is not stubbed in this file')),
   signUp: () => Promise.reject(new Error('signUp is not stubbed in this file')),
   sendMyApplicationMessage: () =>
@@ -252,10 +254,10 @@ const clientWith = (
  * because `Home` catches and the unmount abort swallowed the late `setState` —
  * which is why it went unnoticed rather than why it was fine.
  */
-const renderAt = (path: string, viewer: Viewer = { status: 'signed-out' }) => {
+const renderAt = (path: string, viewer: Viewer = { status: 'signed-out' }, over: Partial<AppApi> = {}) => {
   window.history.replaceState(null, '', path)
 
-  return render(<App viewer={viewer} title="The Burning Sage" api={clientWith()} />)
+  return render(<App viewer={viewer} title="The Burning Sage" api={{ ...clientWith(), ...over }} />)
 }
 
 /**
@@ -507,5 +509,76 @@ describe('navigation', () => {
     expect(linkNames()).not.toContain('Log in')
     expect(linkNames()).not.toContain('Your details')
     expect(linkNames()).not.toContain('Organise')
+  })
+})
+
+describe('seeing a notification’s target (#527)', () => {
+  const MEMBER: Viewer = {
+    status: 'signed-in',
+    account: { id: 'a1', name: 'Ada', avatar: null, roles: ['member'] },
+  }
+
+  const READ_AT = '2026-08-12T10:00:00.000Z'
+
+  const aNotification = () => ({
+    id: 'n-1',
+    category: 'new_version' as const,
+    body: 'A new version is out',
+    link: '/changelog',
+    created_at: '2026-08-12T09:00:00.000Z',
+    seen_at: null,
+  })
+
+  it('tells the server the page was shown, with the moment its data was read', async () => {
+    const markTargetShown = vi.fn<AppApi['markTargetShown']>(() =>
+      Promise.resolve({ notifications: [{ ...aNotification(), seen_at: READ_AT }], unseen: 0 }),
+    )
+    renderAt('/changelog', MEMBER, {
+      readAt: () => READ_AT,
+      markTargetShown,
+      getMyNotifications: () => Promise.resolve({ notifications: [aNotification()], unseen: 1 }),
+    })
+
+    await waitFor(() => expect(markTargetShown).toHaveBeenCalledWith({ link: '/changelog', as_of: READ_AT }))
+  })
+
+  it('stops the bell badging what has just been read, without waiting for its next ask', async () => {
+    renderAt('/changelog', MEMBER, {
+      readAt: () => READ_AT,
+      markTargetShown: () => Promise.resolve({ notifications: [], unseen: 0 }),
+      getMyNotifications: () => Promise.resolve({ notifications: [aNotification()], unseen: 1 }),
+    })
+
+    await screen.findByRole('link', { name: 'Notifications, 1 new' })
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Notifications' })).toBeTruthy())
+  })
+
+  it('says nothing for a signed-out visit, there being nobody to mark it for', async () => {
+    const markTargetShown = vi.fn<AppApi['markTargetShown']>(() =>
+      Promise.resolve({ notifications: [], unseen: 0 }),
+    )
+    renderAt('/changelog', { status: 'signed-out' }, { readAt: () => READ_AT, markTargetShown })
+
+    await screen.findByRole('heading', { name: "What's new" })
+    expect(markTargetShown).not.toHaveBeenCalled()
+  })
+
+  it('says nothing where the read carried no server date to claim', async () => {
+    const markTargetShown = vi.fn<AppApi['markTargetShown']>(() =>
+      Promise.resolve({ notifications: [], unseen: 0 }),
+    )
+    renderAt('/changelog', MEMBER, { readAt: () => undefined, markTargetShown })
+
+    await screen.findByRole('heading', { name: "What's new" })
+    expect(markTargetShown).not.toHaveBeenCalled()
+  })
+
+  it('does not break the page when the report fails', async () => {
+    renderAt('/changelog', MEMBER, {
+      readAt: () => READ_AT,
+      markTargetShown: () => Promise.reject(new Error('offline')),
+    })
+
+    expect(await screen.findByText('Something changed.')).toBeTruthy()
   })
 })

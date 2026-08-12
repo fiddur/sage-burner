@@ -19,6 +19,11 @@ export const notificationsResponseSchema = z.object({
 })
 export type NotificationsResponse = z.infer<typeof notificationsResponseSchema>
 
+export const targetShownSchema = z
+  .object({ link: z.string().min(1).max(2048), as_of: dateTimeSchema })
+  .strict()
+export type TargetShownInput = z.infer<typeof targetShownSchema>
+
 export const notificationSettingsSchema = z
   .object({
     on: z.array(z.enum(notificationCategories)),

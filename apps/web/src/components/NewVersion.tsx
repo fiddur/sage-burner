@@ -1,3 +1,4 @@
+import { changelogPage } from '@sage-burner/shared'
 import { useEffect, useState } from 'preact/hooks'
 
 import type { VersionApi } from '../version.ts'
@@ -17,7 +18,7 @@ export const NewVersion = ({ api }: { api: VersionApi }) => {
       <button type="button" onClick={() => globalThis.location.reload()}>
         Reload
       </button>
-      <a href="/changelog">What's new</a>
+      <a href={changelogPage()}>What&rsquo;s new</a>
     </p>
   )
 }

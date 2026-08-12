@@ -139,7 +139,9 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
 ## Being told — [accounts.md](./accounts.md)
 
 - A notification is a record: the bell holds what happened while you were away,
-  as a panel on a wide screen and a page on a phone.
+  as a panel on a wide screen and a page on a phone. Opening the bell marks
+  everything seen, and so does arriving at what one points at — once the page is
+  showing data as new as the notification.
 - Browser push per device, opt-in, with nothing to sign up for.
 - Email as a channel of its own, per category, off until asked for — the column
   appears only once an admin has configured SMTP.

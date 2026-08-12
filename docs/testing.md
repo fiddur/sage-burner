@@ -203,6 +203,12 @@ phone" means 360px.
 
 - [ ] The bell: a panel on a wide screen, a page (`/notifications`) on a phone;
       opening either marks things seen.
+- [ ] Without opening the bell, follow a notification's own link — a dream card from
+      the bell's list, or "What's new" on the redeploy bar. The badge drops by one on
+      arrival, and only that notification loses its emphasis.
+- [ ] Leave that page open and cause a second notification for the same thing from
+      another browser: the badge appears while the page is up, and clears itself
+      within a minute — when the page has refetched and is showing the change.
 - [ ] Switch a category off; cause that event; neither bell nor push arrives.
 - [ ] Subscribe to push in one browser; a notification tapped lands on the
       right page in the open app rather than a new window.

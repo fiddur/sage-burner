@@ -25,6 +25,8 @@ export const feedPage = (kinds: readonly FeedKind[] = [], burn?: string): string
   return `/feed${filter}${filter === '' ? '?' : '&'}${BURN_PARAM}=${encodeURIComponent(burn)}`
 }
 
+export const changelogPage = (): string => '/changelog'
+
 export const songbookPage = (): string => '/songs'
 
 export const songPage = (songId: string): string => `/songs/${encodeURIComponent(songId)}`

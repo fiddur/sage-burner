@@ -1,3 +1,4 @@
+import { changelogPage } from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 
 import type { Database } from '../db/index.ts'
@@ -31,7 +32,7 @@ export const announceDeploy = async (
   await notifyEveryone(db, notify, {
     category: 'new_version',
     body: 'A new version of the app is out. Reload to pick it up.',
-    link: '/changelog',
+    link: changelogPage(),
   })
 
   return 'announced'

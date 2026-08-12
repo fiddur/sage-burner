@@ -348,6 +348,77 @@ describe('a body that is not JSON', () => {
   })
 })
 
+describe('when the server answered a read (#527)', () => {
+  const withDate = (date: string | undefined) =>
+    vi.fn<typeof fetch>(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ build_sha: 'abc' }), {
+          status: 200,
+          headers: {
+            'content-type': 'application/json',
+            ...(date === undefined ? {} : { date }),
+          },
+        }),
+      ),
+    )
+
+  it('takes the server’s own clock off the response, as an instant', async () => {
+    const client = createApiClient(withDate('Wed, 12 Aug 2026 10:00:00 GMT'))
+    const { signal } = new AbortController()
+
+    await client.getChangelog(signal)
+
+    expect(client.readAt(signal)).toBe('2026-08-12T10:00:00.000Z')
+  })
+
+  it('keeps the oldest of the reads one load made, a page being no newer than its oldest part', async () => {
+    let answered = 'Wed, 12 Aug 2026 10:01:00 GMT'
+    const doFetch = vi.fn<typeof fetch>(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({}), {
+          status: 200,
+          headers: { 'content-type': 'application/json', date: answered },
+        }),
+      ),
+    )
+    const client = createApiClient(doFetch)
+    const { signal } = new AbortController()
+
+    await client.getChangelog(signal)
+    answered = 'Wed, 12 Aug 2026 10:00:00 GMT'
+    await client.getChangelog(signal)
+
+    expect(client.readAt(signal)).toBe('2026-08-12T10:00:00.000Z')
+  })
+
+  it('answers nothing for a signal no read carried, rather than a time it made up', async () => {
+    const client = createApiClient(withDate('Wed, 12 Aug 2026 10:00:00 GMT'))
+    const { signal } = new AbortController()
+
+    await client.getChangelog()
+
+    expect(client.readAt(signal)).toBeUndefined()
+  })
+
+  it('answers nothing where the response carried no date', async () => {
+    const client = createApiClient(withDate(undefined))
+    const { signal } = new AbortController()
+
+    await client.getChangelog(signal)
+
+    expect(client.readAt(signal)).toBeUndefined()
+  })
+
+  it('notes nothing for a write, which shows nobody anything', async () => {
+    const client = createApiClient(withDate('Wed, 12 Aug 2026 10:00:00 GMT'))
+    const { signal } = new AbortController()
+
+    await client.request('/api/things', { method: 'POST', body: {}, signal })
+
+    expect(client.readAt(signal)).toBeUndefined()
+  })
+})
+
 describe('quoting what was read back (#274)', () => {
   /** Answers each call in turn, so a read and the write after it can differ. */
   const answering = (...answers: { body: unknown; init?: ResponseInit }[]) => {

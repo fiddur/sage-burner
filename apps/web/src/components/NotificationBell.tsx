@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { markFavicon } from '../favicon.ts'
+import { useShown } from '../shown.tsx'
 import { usePhone } from '../viewport.ts'
 import { NotificationList } from './NotificationList.tsx'
 
@@ -20,7 +21,17 @@ export const NotificationBell = ({ api }: { api: BellApi }) => {
   const wrap = useRef<HTMLSpanElement>(null)
   const bell = useRef<HTMLAnchorElement>(null)
   const phone = usePhone()
+  const shown = useShown()
   const { path } = useLocation()
+
+  useEffect(
+    () =>
+      shown.subscribe(({ notifications, unseen: count }) => {
+        setItems(notifications)
+        setUnseen(count)
+      }),
+    [shown],
+  )
 
   useEffect(() => {
     const controller = new AbortController()
