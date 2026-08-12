@@ -3,12 +3,14 @@ import { useEffect, useState } from 'preact/hooks'
 
 import type { VersionApi } from '../version.ts'
 
-import { watchForNewVersion } from '../version.ts'
+import { hardenNavigation, watchForNewVersion } from '../version.ts'
 
-export const NewVersion = ({ api }: { api: VersionApi }) => {
+export const NewVersion = ({ api, go }: { api: VersionApi; go?: (href: string) => void }) => {
   const [stale, setStale] = useState(false)
 
   useEffect(() => watchForNewVersion(api, () => setStale(true)), [api])
+
+  useEffect(() => (stale ? hardenNavigation(go) : undefined), [stale, go])
 
   if (!stale) return null
 

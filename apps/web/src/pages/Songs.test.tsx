@@ -44,6 +44,14 @@ const stub = (
   ...over,
 })
 
+/**
+ * The row *is* the link since #568, so its accessible name carries the artist and the marks
+ * as well as the title — hence a match rather than an equality, and a read of the title itself.
+ */
+const rowFor = (title: string) => screen.getByRole('link', { name: new RegExp(title) })
+
+const titlesShown = () => [...document.querySelectorAll('.song-what')].map((one) => one.textContent)
+
 const renderPage = (api: SongsApi, viewer: Viewer = ADA) =>
   render(
     <RememberedProvider remembered={createRemembered()}>
@@ -57,8 +65,9 @@ describe('the songbook', () => {
   it('lists what is in it by title, whatever order it arrived in', async () => {
     renderPage(stub({}, [aSong({ id: 's-2', title: 'Zephyr' }), aSong({ id: 's-1', title: 'Ashes' })]))
 
-    const links = await screen.findAllByRole('link', { name: /Ashes|Zephyr/ })
-    expect(links.map((link) => link.textContent)).toEqual(['Ashes', 'Zephyr'])
+    await screen.findAllByRole('link', { name: /Ashes|Zephyr/ })
+
+    expect(titlesShown()).toEqual(['Ashes', 'Zephyr'])
   })
 
   it('says whose song it is beside the title', async () => {
@@ -76,16 +85,10 @@ describe('the songbook', () => {
     )
 
     fireEvent.click(await screen.findByRole('button', { name: 'By artist' }))
-    expect(screen.getAllByRole('link', { name: /Ashes|Zephyr/ }).map((one) => one.textContent)).toEqual([
-      'Zephyr',
-      'Ashes',
-    ])
+    expect(titlesShown()).toEqual(['Zephyr', 'Ashes'])
 
     fireEvent.click(screen.getByRole('button', { name: 'By title' }))
-    expect(screen.getAllByRole('link', { name: /Ashes|Zephyr/ }).map((one) => one.textContent)).toEqual([
-      'Ashes',
-      'Zephyr',
-    ])
+    expect(titlesShown()).toEqual(['Ashes', 'Zephyr'])
   })
 
   it('puts the songs nobody has named an artist for last, rather than first', async () => {
@@ -95,10 +98,7 @@ describe('the songbook', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'By artist' }))
 
-    expect(screen.getAllByRole('link', { name: /Ashes|Zephyr/ }).map((one) => one.textContent)).toEqual([
-      'Zephyr',
-      'Ashes',
-    ])
+    expect(titlesShown()).toEqual(['Zephyr', 'Ashes'])
   })
 
   it('offers no sorting where there is nothing to sort', async () => {
@@ -108,10 +108,20 @@ describe('the songbook', () => {
     expect(screen.queryByRole('button', { name: 'By artist' })).toBeNull()
   })
 
-  it('links each song to its own page', async () => {
-    renderPage(stub({}, [aSong({ id: 's-1', title: 'Ashes' })]))
+  it('links each song to its own page, the whole row being the link (#568)', async () => {
+    // The artist and the marks inside the anchor is the whole of it: as siblings they were
+    // dead space in a box the width of the screen.
+    renderPage(
+      stub({}, [
+        aSong({ id: 's-1', title: 'Ashes', artist: 'Zoe', links: [{ url: 'https://example.org/a' }] }),
+      ]),
+    )
 
-    expect((await screen.findByRole('link', { name: 'Ashes' })).getAttribute('href')).toBe('/songs/s-1')
+    const row = await screen.findByRole('link', { name: /Ashes/ })
+    expect(row.getAttribute('href')).toBe('/songs/s-1')
+    expect(row.querySelector('.song-what')?.textContent).toBe('Ashes')
+    expect(row.querySelector('.song-artist')?.textContent).toBe('Zoe')
+    expect(row.querySelector('.song-marks')).not.toBeNull()
   })
 
   it('says there is somewhere to hear it', async () => {
@@ -119,14 +129,14 @@ describe('the songbook', () => {
       stub({}, [aSong({ id: 's-1', title: 'Ashes', capo: 3, links: [{ url: 'https://example.org/a' }] })]),
     )
 
-    await screen.findByRole('link', { name: 'Ashes' })
+    await screen.findByRole('link', { name: /Ashes/ })
     expect(screen.getByTitle('There is somewhere to hear it')).toBeTruthy()
   })
 
   it('says nothing about the capo, which is knowledge for once the song is open', async () => {
     renderPage(stub({}, [aSong({ id: 's-1', title: 'Ashes', capo: 3 })]))
 
-    await screen.findByRole('link', { name: 'Ashes' })
+    await screen.findByRole('link', { name: /Ashes/ })
     expect(screen.queryByText('capo 3')).toBeNull()
   })
 
@@ -140,12 +150,12 @@ describe('the songbook', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Chant' }))
 
-    expect(screen.getByRole('link', { name: 'Ashes' })).toBeTruthy()
-    expect(screen.queryByRole('link', { name: 'Zephyr' })).toBeNull()
+    expect(rowFor('Ashes')).toBeTruthy()
+    expect(screen.queryByRole('link', { name: /Zephyr/ })).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'Everything' }))
 
-    expect(screen.getByRole('link', { name: 'Zephyr' })).toBeTruthy()
+    expect(rowFor('Zephyr')).toBeTruthy()
   })
 
   it('shows a song filed under either category while either chip is lit', async () => {
@@ -161,8 +171,8 @@ describe('the songbook', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Chant' }))
     fireEvent.click(screen.getByRole('button', { name: 'Song' }))
 
-    expect(screen.getByRole('link', { name: 'Ashes' })).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Zephyr' })).toBeTruthy()
+    expect(rowFor('Ashes')).toBeTruthy()
+    expect(rowFor('Zephyr')).toBeTruthy()
   })
 
   it('says the book is empty rather than leaving a gap', async () => {
@@ -226,7 +236,7 @@ describe('the songbook', () => {
   it('leaves out the taken-out heading when nothing has been', async () => {
     renderPage(stub({}, [aSong({ id: 's-1', title: 'Ashes' })]))
 
-    await screen.findByRole('link', { name: 'Ashes' })
+    await screen.findByRole('link', { name: /Ashes/ })
     expect(screen.queryByRole('heading', { name: 'Recently taken out' })).toBeNull()
   })
 

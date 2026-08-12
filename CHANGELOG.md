@@ -9,10 +9,19 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-12
 
-- **Being below the line is what puts you on the waiting list.** You were told only when the paid
-  members exactly filled the burn — so on a burn with more people than places, whoever was below the
-  line often heard nothing, while people who did have a place were told it was nearly full. Both
-  messages now go by where you actually stand on the list, and the link opens that burn's roster.
+- **"What's new" now lands on the new version.** Following the redeploy bar — or the notification that
+  points at the same page — used to keep the tab on the old build, so the bar was still there when you
+  arrived. While the bar is up, any link you follow loads the new version, and the bar is gone once you
+  are on it.
+
+- **The whole songbook row opens the song**, not just the title, and the 🎧 and the category sit at the
+  right edge whether or not the song names an artist.
+
+- **The waiting-list messages say the one thing that decides it: whether a place is left.** Everybody
+  who has not paid now hears the same thing — either "N places left, and they go to whoever pays" or
+  "full, every place is held by somebody who has paid". You used to be told only when the paid members
+  exactly filled the burn, so whoever was over the line often heard nothing at all, and the message
+  otherwise implied a queue position that paying overturns. The link opens that burn's roster.
 
 - **A burn that is over cannot be re-planned.** Meal times could still be added, changed and generated
   on a burn from last year, and single sittings added to or deleted from it — Generate quietly wrote a

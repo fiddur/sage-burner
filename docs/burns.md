@@ -534,22 +534,30 @@ a timestamp — so an admin recording a batch in one sitting gives every one of
 them the same key and the tie breaks on nothing.
 
 **A tie breaks on the account id** (#506), which sounds arbitrary because it is: what matters is
-that it is _decided_. Two readers of one burn — the roster's query and the waiting-list
-notification's — hand the same rows over in whatever order their own index gives, and with a burn
-that opened on a Sunday every `joined_at` is the same second. Without a last resort in the
-comparison, the line the page draws and the line the notification draws could fall in different
-places, which is the one thing `withPlaces` living in the shared package exists to prevent.
+that it is _decided_. A burn that opens on a Sunday gives every `joined_at` the same second, and a
+`SELECT` with no `ORDER BY` hands those rows over in whatever order the index it chose gives — so
+without a last resort in the comparison, the line falls in a different place from one read to the
+next, and a member watching the page sees it move with nothing having changed.
 
-**And the notification is keyed on that line, not on a count** (#506). It compared `paid` to
-`member_cap` and told people they were waiting only when the two were exactly equal — so on an
-over-subscribed burn where the payments had not yet landed on the cap, whoever was below the line
-heard nothing at all, while members who _had_ a place were told the burn was nearly full. It now
-asks `withPlaces` the same question the roster asks: everybody below the line who has not paid is
-told they are waiting, and the nearly-full countdown goes to the unpaid who still have a place.
+**The notification asks a plainer question than the line does** (#565): is there a place left to
+pay for? Among unpaid members the order decides nothing — the list is paid-first, so any of them can
+jump all the others by paying — so "unpaid, third, has a place" and "unpaid, fifth, waiting" are the
+same situation, and telling those two people different things implies a queue position no rule
+honours. Both messages therefore go to **every** unpaid member, and split on `member_cap - paid`:
 
-**Told once per burn**, since recording the next payment does not change anything for somebody
-already below the line. The link carries the burn (`/members?burn=…`, per #333), which is also
-what makes "have we said this already" a query rather than a column.
+- places left, and few enough to be worth saying: _N places left, and they go to whoever pays._
+- none left: _full — every place is held by somebody who has paid._
+
+That keeps #506's fix — it compared `paid` to `member_cap` for equality, so an over-subscribed burn
+whose payments had not landed exactly on the cap told the person below the line nothing, and an admin
+who recorded more payments than places silenced it altogether — without #506's split of the audience,
+which said more than the data supports. The roster still draws the line, because for a **paid**
+member it is a real fact and the page is where somebody looks to see it.
+
+**Told once per burn** that it is full, since recording the next payment changes nothing for somebody
+already out. The countdown repeats, because the number in it changes. The link carries the burn
+(`/members?burn=…`, per #333), which is also what makes "have we said this already" a query rather
+than a column.
 
 ## Handing a place over
 

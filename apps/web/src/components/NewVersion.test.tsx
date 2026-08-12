@@ -38,6 +38,52 @@ describe('the redeploy bar', () => {
     expect(screen.queryByRole('status')).toBeNull()
   })
 
+  it('follows What’s new with a full load, so the bar is gone when it lands (#566)', async () => {
+    // The bar exists because this tab is running code the server no longer serves; a router push
+    // would land on the changelog still running it, which is what left the bar up.
+    vi.useFakeTimers()
+    const go = vi.fn()
+    render(<NewVersion api={changing()} go={go} />)
+    await vi.advanceTimersByTimeAsync(CHECK_EVERY_MS * 2)
+
+    screen.getByRole('link', { name: /new/ }).click()
+
+    expect(go).toHaveBeenCalledWith(`${location.origin}/changelog`)
+  })
+
+  it('does the same for any other link, the bell’s notification among them', async () => {
+    vi.useFakeTimers()
+    const go = vi.fn()
+    render(
+      <>
+        <NewVersion api={changing()} go={go} />
+        <a href="/notifications">Notifications</a>
+      </>,
+    )
+    await vi.advanceTimersByTimeAsync(CHECK_EVERY_MS * 2)
+
+    screen.getByRole('link', { name: 'Notifications' }).click()
+
+    expect(go).toHaveBeenCalledWith(`${location.origin}/notifications`)
+  })
+
+  it('leaves navigation alone while the build is the one the server serves', async () => {
+    vi.useFakeTimers()
+    const go = vi.fn()
+    const api = { getVersion: () => Promise.resolve({ build_sha: 'same' }) } satisfies VersionApi
+    render(
+      <>
+        <NewVersion api={api} go={go} />
+        <a href="/notifications">Notifications</a>
+      </>,
+    )
+    await vi.advanceTimersByTimeAsync(CHECK_EVERY_MS * 2)
+
+    screen.getByRole('link', { name: 'Notifications' }).click()
+
+    expect(go).not.toHaveBeenCalled()
+  })
+
   it('offers a reload and what changed, once the build moves', async () => {
     // Both, not one: a reload throws away whatever is half-typed, and the changelog is
     // the thing worth reading before deciding to lose it (#325).

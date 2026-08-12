@@ -1,4 +1,4 @@
-import { membersPage, withPlaces } from '@sage-burner/shared'
+import { membersPage } from '@sage-burner/shared'
 import { and, eq } from 'drizzle-orm'
 
 import type { Database } from '../db/index.ts'
@@ -8,7 +8,7 @@ import { attendance, event, notification } from '../db/schema.ts'
 
 const NEARLY_FULL = 4
 
-const toldTheyAreWaiting = async (db: Database, link: string): Promise<Set<string>> => {
+const toldItIsFull = async (db: Database, link: string): Promise<Set<string>> => {
   const rows = await db
     .selectDistinct({ account_id: notification.account_id })
     .from(notification)
@@ -31,37 +31,34 @@ export const tellAboutTheWaitingList = async (
   if (burn === undefined) return
 
   const rows = await db
-    .select({
-      account_id: attendance.account_id,
-      payment_status: attendance.payment_status,
-      joined_at: attendance.joined_at,
-    })
+    .select({ account_id: attendance.account_id, payment_status: attendance.payment_status })
     .from(attendance)
     .where(eq(attendance.event_id, eventId))
 
+  const unpaid = rows.filter((row) => row.payment_status !== 'paid')
+  const left = burn.member_cap - (rows.length - unpaid.length)
   const link = membersPage(eventId)
-  const placed = withPlaces(rows, burn.member_cap)
-  const already = await toldTheyAreWaiting(db, link)
 
-  const below = placed.filter(
-    (one) => one.waiting && one.payment_status !== 'paid' && !already.has(one.account_id),
-  )
+  if (left <= 0) {
+    const already = await toldItIsFull(db, link)
 
-  for (const row of below) {
-    await notify(row.account_id, {
-      category: 'waiting_list_pushed',
-      body: `${burn.name} is full. Places go to paid members first and then in the order people joined, so you are on the waiting list until somebody hands theirs over.`,
-      link,
-    })
+    for (const row of unpaid.filter((one) => !already.has(one.account_id))) {
+      await notify(row.account_id, {
+        category: 'waiting_list_pushed',
+        body: `${burn.name} is full — every place is held by somebody who has paid. You are on the waiting list until one is handed over.`,
+        link,
+      })
+    }
+
+    return
   }
 
-  const paid = rows.filter((row) => row.payment_status === 'paid').length
-  if (paid < burn.member_cap - NEARLY_FULL || paid >= burn.member_cap) return
+  if (left > NEARLY_FULL) return
 
-  for (const row of placed.filter((one) => !one.waiting && one.payment_status !== 'paid')) {
+  for (const row of unpaid) {
     await notify(row.account_id, {
       category: 'waiting_list_near',
-      body: `${burn.name} has ${burn.member_cap - paid} places left and your payment is not recorded yet.`,
+      body: `${burn.name} has ${left} ${left === 1 ? 'place' : 'places'} left, and they go to whoever pays. Your payment is not recorded yet.`,
       link,
     })
   }

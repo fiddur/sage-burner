@@ -1069,6 +1069,20 @@ version for it to be new against. It is called from `server.ts` rather than
 `createApp`, deliberately: the suite builds an app per test, and an announcement wired
 into that would fire in every one of them.
 
+**While the bar is up, every in-app link is a full load** (#566). The bar says this tab is running
+code the server no longer serves, and `preact-iso` claims same-origin clicks and pushes state — so
+following it to `/changelog`, or following the notification that leads there, landed on the new page
+still running the old build, with the bar still up saying so. `hardenNavigation` listens for clicks
+at **capture**, ahead of the router's own listener, and hands an in-app link to `location.assign`
+instead. The service worker answers navigations fresh-first, so that is the new shell, and the bar is
+gone on arrival because the build now matches.
+
+One rule rather than a list of destinations, because the bar is not about the changelog: any
+navigation is the natural moment to pick the new build up, and the next one after that is a
+router push again like every other day. It leaves alone exactly what the browser is already
+handling itself — another origin, a modifier click, `target`, `download`, a `#` on this page — and
+anything outside `ROUTER_SCOPE`, which the router would not have claimed either.
+
 What notifies today:
 
 - **Being handed a lead role, or taken off one** — the lead column and the team
