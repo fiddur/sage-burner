@@ -119,9 +119,25 @@ describe('wrapping a row too wide for the page', () => {
   })
 })
 
-describe('a row that fits as it is', () => {
+describe('a row with nothing in it', () => {
   it('keeps a blank line blank, since a verse break is part of the words', () => {
     expect(wrappedRows([{ chords: null, words: '' }], 40)).toEqual([{ chords: null, words: '' }])
+  })
+
+  it('keeps one padded with spaces, which is wide enough to wrap but was never emptied (#511)', () => {
+    expect(wrappedRows([{ chords: null, words: ' '.repeat(40) }], 33)).toEqual([{ chords: null, words: '' }])
+  })
+
+  it('keeps the break between two verses at every width', () => {
+    const song = songRows('verse one\n' + ' '.repeat(40) + '\nverse two')
+
+    for (const columns of [33, 71, 128]) {
+      expect(wrappedRows(song, columns)).toEqual([
+        { chords: null, words: 'verse one' },
+        { chords: null, words: '' },
+        { chords: null, words: 'verse two' },
+      ])
+    }
   })
 })
 

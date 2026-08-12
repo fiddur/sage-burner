@@ -66,6 +66,8 @@ const broken = (row: SongRow, columns: number): SongRow[] => {
   let chords = row.chords ?? ''
   let words = row.words ?? ''
 
+  if (chords.trim() === '' && words.trim() === '') return [piece(row, chords, words, false)]
+
   while (Math.max(chords.length, words.length) > columns) {
     const at = breakColumn(chords, words, columns)
     if (at === 0) break
