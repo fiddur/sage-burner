@@ -50,6 +50,7 @@ const aPoint = (over: Partial<MeetingPointEntry> = {}): MeetingPointEntry => ({
 const aMeeting = (over: Partial<Meeting> = {}): Meeting => ({
   id: 'm-1',
   event_id: 'e-1',
+  author_account_id: 'a-1',
   title: 'Planning call',
   starts_at: '2099-07-20T17:00:00.000Z',
   ends_at: null,

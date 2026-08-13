@@ -62,12 +62,20 @@ way in, so changing the default later moves every meeting that never had one.
 else's browser follows, which is the same shape as a song link or a profile URL — so it takes the
 same `isProfileUrl` refusal. A `javascript:` link in an `href` is stored script, not a bad link.
 
-**A line on the feed, not a card.** A meeting has no thread, so there is nothing for a card to
-be — but scheduling one is burn news, and the feed is where burn news goes. `notifyAttendees`
-writes an `activity` line and rings whoever asked; `tellAttendees` would have done only the
-second, and `meeting_scheduled` is off by default like everything in _what else is going on_, so
-a meeting put in the diary reached almost nobody. Moving one says so again, because a time that
-has changed is the half worth hearing; rewording the note does not.
+**A card, like everything else on the feed** (#597). It was a line for a day: an `activity` row
+rendered with the pre-#480 chip, so a meeting was the one thing on the feed nobody could reply to —
+backwards for the thing most likely to need _I can't make that time_. `meeting` is the seventh
+`ThreadEntityType` now, so it gets comments, hearts, follow and the card bell for free, and there is
+no line beside it, which would put one thing on the feed twice.
+
+The entry kind is `scheduled`, which already existed for a dream being put in the timetable and
+already coalesces — so a meeting moved three times is one line saying it moved, not four. Moving it
+bumps the card; rewording the note does not, because a time that has changed is the half worth
+hearing. Renaming it renames the thread, so the card cannot go on showing the old title.
+
+`meeting.author_account_id` was added for this: a card says whose it is, and `participantsOf` needs
+somebody to tell when a reply lands. Rows written before it keep a null one, exactly as a post whose
+author has left does.
 
 **One at a time in the banner.** The next meeting is where it is edited and where it is taken out
 of the diary, because that is the one anybody is looking at; everything else is a line under it.
