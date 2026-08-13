@@ -2,7 +2,7 @@ import type { MeResponse } from '@sage-burner/shared'
 
 import { apiRoutes, applyPage, feedPage, oauthProviderInfo, oauthProviders } from '@sage-burner/shared'
 import { useLocation } from 'preact-iso'
-import { useRef, useState } from 'preact/hooks'
+import { useEffect, useRef, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 import type { Ceremony, PasskeyApi } from '../passkey.ts'
@@ -50,6 +50,11 @@ export const Login = ({
 
   const { route } = useLocation()
   const inFlight = useRef(false)
+  const roles = viewer.account?.roles
+
+  useEffect(() => {
+    if (roles !== undefined) route(landsOn(roles))
+  }, [roles, route])
 
   if (viewer.status === 'loading') {
     return (
@@ -81,8 +86,6 @@ export const Login = ({
       avatar: signedIn.avatar,
       roles: signedIn.roles,
     })
-
-    route(landsOn(signedIn.roles))
   }
 
   const withPasskey = async () => {

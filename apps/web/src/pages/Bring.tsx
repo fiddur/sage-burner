@@ -333,7 +333,7 @@ const Row = ({
           <Destroy
             what={item.title}
             verb="Take off"
-            because="It goes off the bring list."
+
             busy={busy}
             onDestroy={onWithdraw}
           />

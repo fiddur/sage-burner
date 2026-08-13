@@ -87,8 +87,6 @@ describe('destroying something', () => {
   })
 
   it('keeps an accessible name the call site needs, where the word alone says too little', () => {
-    // Several "Remove" buttons on one page are one name to a screen reader; the pages that
-    // had a name of their own before keep it.
     render(
       <Destroy
         what="a passkey"

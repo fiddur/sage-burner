@@ -4,13 +4,6 @@ import { useState } from 'preact/hooks'
 
 import { IconButton } from './IconButton.tsx'
 
-/**
- * The one control for anything that cannot be undone by pressing it again. It was four hand-rolled
- * copies and twenty-eight controls with nothing at all, so whether a thing asked was decided by
- * which call site was written last — which is how a meeting was lost. Something recoverable by the
- * same press is not destructive and must not use this: a confirmation on everything is a
- * confirmation on nothing.
- */
 export const Destroy = ({
   what,
   verb = 'Remove',
