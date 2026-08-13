@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { isProfileUrl } from '../enums.ts'
 import { MAX_DECIDED_NOTE, MAX_MEETING_LINK, MAX_NOTES, MAX_POST, MAX_TITLE } from '../limits.ts'
 import { dateTimeSchema, idSchema, nonEmptyText, optionalText } from './common.ts'
 
@@ -63,7 +64,12 @@ export const meetingSchema = z.object({
   title: nonEmptyText(MAX_TITLE),
   starts_at: dateTimeSchema,
   ends_at: dateTimeSchema.nullable(),
-  link: z.string().trim().max(MAX_MEETING_LINK).nullable(),
+  link: z
+    .string()
+    .trim()
+    .max(MAX_MEETING_LINK)
+    .nullable()
+    .refine((url) => url === null || isProfileUrl(url), { message: 'must be an https link' }),
   notes: z.string().trim().max(MAX_NOTES),
   created_at: dateTimeSchema,
 })
@@ -74,6 +80,14 @@ export type MeetingsResponse = z.infer<typeof meetingsResponseSchema>
 
 export const meetingResponseSchema = z.object({ meeting: meetingSchema })
 export type MeetingResponse = z.infer<typeof meetingResponseSchema>
+
+/**
+ * Somebody else's browser follows this, so it is the same https-only shape every other authored
+ * URL in the app takes — `javascript:` in an `href` is stored script, not a bad link.
+ */
+const joinedOn = optionalText(MAX_MEETING_LINK).refine((url) => url === null || isProfileUrl(url), {
+  message: 'must be an https link',
+})
 
 const withValidRun = <T extends { starts_at: string; ends_at?: string | null }>(schema: z.ZodType<T>) =>
   schema.refine((value) => value.ends_at == null || Date.parse(value.ends_at) > Date.parse(value.starts_at), {
@@ -86,7 +100,7 @@ export const meetingCreateSchema = withValidRun(
     .pick({ title: true, starts_at: true, ends_at: true, link: true, notes: true })
     .extend({
       ends_at: meetingSchema.shape.ends_at.default(null),
-      link: optionalText(MAX_MEETING_LINK).default(null),
+      link: joinedOn.default(null),
       notes: meetingSchema.shape.notes.default(''),
     })
     .strict(),
@@ -97,7 +111,7 @@ export type MeetingCreateInput = z.input<typeof meetingCreateSchema>
 export const meetingUpdateSchema = withValidRun(
   meetingSchema
     .pick({ title: true, starts_at: true, ends_at: true, link: true, notes: true })
-    .extend({ link: optionalText(MAX_MEETING_LINK).default(null) })
+    .extend({ link: joinedOn.default(null) })
     .strict(),
 )
 export type MeetingUpdate = z.infer<typeof meetingUpdateSchema>

@@ -27,7 +27,7 @@ import {
   withEventDateOrder,
 } from './event.ts'
 import { formQuestionSchema } from './form-question.ts'
-import { publicMeetingFields, publicMeetingSchema } from './meeting.ts'
+import { meetingCreateSchema, publicMeetingFields, publicMeetingSchema } from './meeting.ts'
 import {
   attendanceFields,
   attendanceSchema,
@@ -566,6 +566,38 @@ describe('deriving schemas', () => {
 
     const fine = { ...halfASlot, time_slot_end: '2026-10-03T11:00:00Z' }
     expect(createSession.safeParse(fine).success).toBe(true)
+  })
+})
+
+describe('a meeting somebody schedules', () => {
+  it('refuses a link that is not https, which in an href is stored script', () => {
+    const scripted = meetingCreateSchema.safeParse({
+      title: 'Planning call',
+      starts_at: '2026-10-03T17:00:00Z',
+      link: 'javascript:alert(1)',
+    })
+
+    expect(scripted.success).toBe(false)
+  })
+
+  it('takes an ordinary https one, which is what people paste', () => {
+    const parsed = meetingCreateSchema.safeParse({
+      title: 'Planning call',
+      starts_at: '2026-10-03T17:00:00Z',
+      link: 'https://meet.example/abc-defg-hij',
+    })
+
+    expect(parsed.success).toBe(true)
+  })
+
+  it('takes none at all, a meeting in a kitchen having no link', () => {
+    const parsed = meetingCreateSchema.safeParse({
+      title: 'Planning call',
+      starts_at: '2026-10-03T17:00:00Z',
+    })
+
+    expect(parsed.success).toBe(true)
+    expect(parsed.data?.link).toBeNull()
   })
 })
 

@@ -47,12 +47,20 @@ last summer is a typo, not an intention.
 ## Meetings are scheduled, not discussed
 
 `meeting` has no thread. It is a title, a start, an optional end, an optional link and a note:
-what the next-meeting banner reads and what the calendar feed carries. "Next" is derived —
-the earliest start still ahead — rather than stored, so nothing has to be moved when one passes.
+what the next-meeting banner reads and what the calendar feed carries. "Next" is derived rather
+than stored, so nothing has to be moved when one passes.
 
-**An end nobody gave means an hour**, and `meetingEnds` is the one place that says so, shared by
-the banner and the feed. Stored as null rather than filled in on the way in, so changing the
-default later moves every meeting that never had one.
+**Derived from the end, not the start.** A meeting people are joining as it runs is exactly when
+the link is wanted, so it stays the next meeting until it has finished — dropping it the moment it
+began would take the banner away at 19:00 for a call at 19:00.
+
+**An end nobody gave means an hour**, and `meetingEnds` is the one place that says so, read by the
+banner through `nextMeeting` and by the feed directly. Stored as null rather than filled in on the
+way in, so changing the default later moves every meeting that never had one.
+
+**The link is https or nothing.** It is member-authored and it lands in an `href` that somebody
+else's browser follows, which is the same shape as a song link or a profile URL — so it takes the
+same `isProfileUrl` refusal. A `javascript:` link in an `href` is stored script, not a bad link.
 
 ## In the calendar feed
 
