@@ -18,7 +18,7 @@ import {
   isOAuthProvider,
   loginPage,
 } from '@sage-burner/shared'
-import { and, eq, gt, isNull, lt } from 'drizzle-orm'
+import { and, eq, gt, isNull, lt, ne } from 'drizzle-orm'
 import { randomBytes, randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -36,6 +36,7 @@ import {
   accountConnection,
   accountIdentity,
   accountRole,
+  application,
   inviteRedemption,
   inviteToken,
   oauthState,
@@ -249,10 +250,16 @@ export const registerOauthRoutes = (
           account_id: accountId,
           redeemed_at: now().toISOString(),
         })
+        .onConflictDoNothing()
         .run()
     }
 
     tx.insert(accountRole).values({ account_id: accountId, role: 'member' }).onConflictDoNothing().run()
+
+    tx.update(application)
+      .set({ status: 'approved', decided_at: now().toISOString() })
+      .where(and(eq(application.account_id, accountId), ne(application.status, 'approved')))
+      .run()
   }
 
   /**

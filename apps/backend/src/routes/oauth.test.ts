@@ -18,6 +18,7 @@ import {
   accountConnection,
   accountIdentity,
   accountRole,
+  application,
   inviteRedemption,
   inviteToken,
   oauthSetting,
@@ -356,7 +357,7 @@ describe('signing up from an invite link through a provider', () => {
     expect(await db().select().from(account).where(eq(account.email, 'wren@example.org'))).toEqual([])
   })
 
-  it('says the link ran out, not that the address is taken, when a single-use one is claimed twice', async () => {
+  it('says the link ran out, not that the address is taken, when another account already holds it', async () => {
     const server = await build()
     await givenProvider()
     const token = await givenLink({ kind: 'single' })
@@ -485,6 +486,137 @@ describe('taking up an invite as somebody the provider already knows', () => {
     expect(await db().select().from(accountRole).where(eq(accountRole.account_id, id))).toEqual([
       { account_id: id, role: 'admin' },
     ])
+  })
+
+  const givenApplication = async (accountId: string, status: 'pending' | 'rejected' = 'pending') => {
+    const id = randomUUID()
+    await db()
+      .insert(application)
+      .values({
+        id,
+        answers: [{ question_id: randomUUID(), label: 'Why?', type: 'text', value: 'because' }],
+        status,
+        account_id: accountId,
+        applicant_name: 'Waiting Wren',
+        applicant_email: `${accountId}@example.org`,
+        submitted_at: '2026-07-01T00:00:00.000Z',
+        decided_at: status === 'pending' ? null : '2026-07-01T12:00:00.000Z',
+      })
+
+    return id
+  }
+
+  it("settles the admitted account's pending application, so the queue stops offering a decision", async () => {
+    const server = await build()
+    await givenProvider()
+    const id = await givenIdentity()
+    await givenApplication(id)
+    const token = await givenLink()
+
+    await signInFromInvite(server, token)
+
+    const [settled] = await db().select().from(application).where(eq(application.account_id, id))
+    expect(settled?.status).toBe('approved')
+  })
+
+  it('stamps that decision with the moment the link was pressed', async () => {
+    const server = await build()
+    await givenProvider()
+    const id = await givenIdentity()
+    await givenApplication(id)
+    const token = await givenLink()
+    clock = new Date('2026-07-03T09:00:00.000Z')
+
+    await signInFromInvite(server, token)
+
+    const [settled] = await db().select().from(application).where(eq(application.account_id, id))
+    expect(settled?.decided_at).toBe('2026-07-03T09:00:00.000Z')
+  })
+
+  it('settles a rejected one too, rather than telling somebody holding member they were turned down', async () => {
+    const server = await build()
+    await givenProvider()
+    const id = await givenIdentity()
+    await givenApplication(id, 'rejected')
+    const token = await givenLink()
+
+    await signInFromInvite(server, token)
+
+    const [settled] = await db().select().from(application).where(eq(application.account_id, id))
+    expect(settled?.status).toBe('approved')
+  })
+
+  it('leaves another applicant waiting where they were', async () => {
+    const server = await build()
+    await givenProvider()
+    const id = await givenIdentity()
+    const other = await givenAccount({ roles: [], password: null })
+    await givenApplication(other.id)
+    await givenApplication(id)
+    const token = await givenLink()
+
+    await signInFromInvite(server, token)
+
+    const [untouched] = await db().select().from(application).where(eq(application.account_id, other.id))
+    expect(untouched?.status).toBe('pending')
+  })
+
+  it('settles nothing where the link has run out, the role not having been granted either', async () => {
+    const server = await build()
+    await givenProvider()
+    const id = await givenIdentity()
+    await givenApplication(id)
+    const token = await givenLink({ expires_at: '2020-01-01T00:00:00.000Z' })
+
+    await signInFromInvite(server, token)
+
+    const [waiting] = await db().select().from(application).where(eq(application.account_id, id))
+    expect(waiting?.status).toBe('pending')
+  })
+
+  it('leaves the date on a decision already made, for somebody whose roles were taken off', async () => {
+    const server = await build()
+    await givenProvider()
+    const id = await givenIdentity()
+    const paper = await givenApplication(id)
+    await db()
+      .update(application)
+      .set({ status: 'approved', decided_at: '2026-07-01T12:00:00.000Z' })
+      .where(eq(application.id, paper))
+    const token = await givenLink()
+    clock = new Date('2026-07-03T09:00:00.000Z')
+
+    await signInFromInvite(server, token)
+
+    const [settled] = await db().select().from(application).where(eq(application.account_id, id))
+    expect(settled?.decided_at).toBe('2026-07-01T12:00:00.000Z')
+  })
+
+  it('admits somebody already counted against a group link, whose roles were taken off since', async () => {
+    const server = await build()
+    await givenProvider()
+    const id = await givenIdentity()
+    const first = await givenLink()
+    await signInFromInvite(server, first)
+    await db().delete(accountRole).where(eq(accountRole.account_id, id))
+
+    await signInFromInvite(server, await givenLink())
+
+    expect(await db().select().from(accountRole).where(eq(accountRole.account_id, id))).toEqual([
+      { account_id: id, role: 'member' },
+    ])
+  })
+
+  it('counts them once all the same, the redemption being per account', async () => {
+    const server = await build()
+    await givenProvider()
+    const id = await givenIdentity()
+    await signInFromInvite(server, await givenLink())
+    await db().delete(accountRole).where(eq(accountRole.account_id, id))
+
+    await signInFromInvite(server, await givenLink())
+
+    expect(await db().select().from(inviteRedemption)).toHaveLength(1)
   })
 })
 

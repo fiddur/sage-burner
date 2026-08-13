@@ -92,6 +92,8 @@ phone" means 360px.
       applicant above — open a second group link and press the provider button: they come
       out a member, and the list counts the arrival against that link. Pressing it again
       leaves the link unspent, membership already being theirs.
+- [ ] Their application now reads approved in ⚙️ → Applications, dated today, with no
+      Approve or Reject left to press — where before it sat among the people still waiting.
 - [ ] An application from a provider signup shows which door on the review card, with
       a profile link only where the provider gave one.
 - [ ] The admin's bell rings for the application. From the applications list,
