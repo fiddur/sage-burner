@@ -7,6 +7,18 @@ There are no version numbers: every merge to `develop` builds an image and the s
 picks it up within a few minutes, so a date can hold several deploys. Add your line
 under today's heading, and make a new heading when there is none.
 
+# 2026-08-13
+
+- **Taking up a group link answers the application it belonged to.** Somebody who had applied and
+  then pressed the link posted in the group was let in, but stayed in the organisers' queue looking
+  like they were still waiting — and pressing Reject on them changed nothing except the "this one has
+  not been accepted" they then read on a page carrying the full member navigation. Being admitted is
+  now the decision: their application reads approved, dated the moment they arrived, and the queue
+  shows only the people it can still decide about.
+
+- **A link admits you even if an earlier one already did.** If your roles had been taken off and you
+  had come in on a group link before, pressing a live one signed you in with nothing and said nothing.
+
 # 2026-08-12
 
 - **"What's new" now lands on the new version.** Following the redeploy bar — or the notification that

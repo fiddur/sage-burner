@@ -115,6 +115,25 @@ looking — so any role already held leaves the link alone for whoever can use i
 run out signs them in regardless, since they have an account either way, and the status page is
 where somebody with no role reads where they stand.
 
+**Being admitted settles the application, because being in is a decision** (#548). The applicant
+who presses the link holds `member` from that moment, so a queue still offering Approve and Reject
+on them is offering a decision that no longer decides anything: Reject would answer 200 and change
+nothing but the copy the person reads, which then contradicts the member navigation on the same
+page. So `claimInvite` writes `approved` and the moment it happened onto their own application, in
+the transaction that grants the role — after which Reject answers 409 the way it does for any
+application already settled. A rejection already recorded is overwritten rather than left standing
+beside the role, since a group link admitting a rejected applicant is deliberate and the record has
+to say which of the two is true. A decision already `approved` keeps its own date; nothing else
+here reads somebody else's row, so an applicant is the only one their arrival settles.
+
+**Somebody already counted against a group link is admitted by another** (#546).
+`invite_redemption.account_id` being unique across the table means a second link cannot write a
+second row, and until this the write simply failed — rolling back the role with it, so an account
+whose roles had been taken off could press a live link and be signed in with nothing, silently,
+where the same person on a single-use link would be let in. The insert is `onConflictDoNothing`:
+they are counted once, forever, against whichever link counted them first, and every later link
+still admits them. The cap it does not consume is the price of the invariant above it.
+
 **No table-level CHECK enforces the two shapes.** SQLite cannot add one through `ALTER TABLE`, and
 rebuilding `invite_token` would mean dropping a table two others hold foreign keys into. The rules
 — a single-use token carries no cap and no revocation, a group one no application and no `used_at`

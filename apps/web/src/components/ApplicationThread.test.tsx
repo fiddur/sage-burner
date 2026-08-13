@@ -56,6 +56,7 @@ describe('the thread on an application', () => {
     const { rerender } = draw([aMessage({ id: 'm-1' })])
 
     fireEvent.input(box(), { target: { value: 'When does it start?' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
     rerender(
       <ApplicationThread
