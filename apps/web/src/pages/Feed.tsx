@@ -306,14 +306,7 @@ const Mine = ({
             Reword it
           </button>
         )}
-        <Destroy
-          what={card.title}
-          verb="Take back"
-          trigger="Take it back"
-          triggerLabel={`Take back ${card.title}`}
-          busy={busy}
-          onDestroy={onTakeBack}
-        />
+        <Destroy what={card.title} verb="Take back" busy={busy} onDestroy={onTakeBack} />
       </p>
     )
   }

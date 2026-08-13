@@ -901,7 +901,7 @@ describe('what everyone has been doing', () => {
       BOSS,
     )
 
-    expect(await screen.findByRole('button', { name: 'Take back Sunday' })).toBeTruthy()
+    expect((await screen.findByRole('button', { name: 'Take back Sunday' })).textContent).toBe('🗑️')
     expect(screen.queryByRole('button', { name: 'Reword it' })).toBeNull()
   })
 

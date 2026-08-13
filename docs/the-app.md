@@ -309,6 +309,18 @@ Three rules the pages follow, all of them things a phone found first:
   browser ignore `rows`, so the fields that ask for a taller empty box would open at
   the stylesheet's floor in Chrome and at their own everywhere else.
 
+### Taking something back is not news (#611)
+
+The feed sorts a card by the newest entry on it, and withdrawing writes a `withdrawn` entry — so
+taking an announcement back sent it to the **top** of the feed, above everything that had happened
+since, marked "taken back". A removal is the one thing on a card nobody needs surfaced: the entry is
+worth keeping, because the card says who did it and when, and the soft withdrawal keeps the
+conversation on purpose.
+
+So the ordering key ignores `withdrawn` entries, and so does the date the card shows — one rule, or
+a card dated today would sit among yesterday's and read as a second bug. A comment on a withdrawn
+card still brings it up, which is the half that must not break: the conversation is what survives.
+
 ## Destroying something asks first (#594)
 
 One component, `Destroy`, for anything that cannot be undone by pressing the same control again.

@@ -282,6 +282,12 @@ phone" means 360px.
       running right now stays in the banner with its Join link.
 - [ ] On a burn that has ended, raising a point and recording a decision are both refused.
 
+## Taking something back
+
+- [ ] Announce something, then take it back with 🗑️ — the same bin every other card offers.
+      The card stays, marked "taken back", where it already was: **not** at the top of the feed.
+- [ ] Say something on a card that has been taken back: that does bring it back up.
+
 ## Nothing goes without asking
 
 - [ ] Press 🗑️ on the meeting in the diary: it asks, naming the meeting, and nothing happens

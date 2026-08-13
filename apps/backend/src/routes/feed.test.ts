@@ -549,6 +549,72 @@ describe('the feed', () => {
     ])
   })
 
+  it('leaves a withdrawal where the card already was, taking something back not being news', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const older = await offerDream(server, ada.cookie, 'Sauna at dawn')
+    stamp = '2026-07-02T01:00:00.000Z'
+    await offerDream(server, ada.cookie, 'Cacao ceremony')
+
+    stamp = '2026-07-02T02:00:00.000Z'
+    await server.inject({
+      method: 'DELETE',
+      url: `/api/sessions/${older}`,
+      headers: { cookie: ada.cookie },
+    })
+
+    expect((await cards(server, ada.cookie)).map((card) => card.title)).toEqual([
+      'Cacao ceremony',
+      'Sauna at dawn',
+    ])
+  })
+
+  it('dates that card by what last happened on it rather than by its removal', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const dream = await offerDream(server, ada.cookie, 'Sauna at dawn')
+
+    stamp = '2026-07-09T00:00:00.000Z'
+    await server.inject({
+      method: 'DELETE',
+      url: `/api/sessions/${dream}`,
+      headers: { cookie: ada.cookie },
+    })
+
+    const [card] = await cards(server, ada.cookie)
+    expect(card?.last_at).toBe(NOW)
+  })
+
+  it('still brings one back up when somebody says something on it', async () => {
+    // The half that must not break: the conversation is what a soft withdrawal keeps.
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const older = await offerDream(server, ada.cookie, 'Sauna at dawn')
+    const [first] = await cards(server, ada.cookie)
+    stamp = '2026-07-02T01:00:00.000Z'
+    await offerDream(server, ada.cookie, 'Cacao ceremony')
+    stamp = '2026-07-02T02:00:00.000Z'
+    await server.inject({
+      method: 'DELETE',
+      url: `/api/sessions/${older}`,
+      headers: { cookie: ada.cookie },
+    })
+
+    stamp = '2026-07-02T03:00:00.000Z'
+    await say(server, ada.cookie, first?.id ?? '', 'shame, I was coming to that')
+
+    expect((await cards(server, ada.cookie)).map((card) => card.title)).toEqual([
+      'Sauna at dawn',
+      'Cacao ceremony',
+    ])
+  })
+
   it('cuts the page against both halves, not each on its own', async () => {
     // Fifty things, not fifty of each: a burn full of talk must not push the news off
     // the page, and a quiet one must not leave it half empty.
