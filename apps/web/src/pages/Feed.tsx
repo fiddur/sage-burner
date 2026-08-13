@@ -31,6 +31,7 @@ import { Refreshing } from '../components/Refreshing.tsx'
 import { localDay } from '../datetime.ts'
 import { useAction, useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
+import { usePushNudge } from '../push-nudge.tsx'
 import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
 
 export type FeedApi = Pick<
@@ -85,6 +86,8 @@ export const Feed = ({ api }: { api: FeedApi }) => {
 
   const settings = loaded.status === 'ready' ? loaded.data.settings : undefined
 
+  const { askAbout } = usePushNudge()
+
   const toggle = (category: NotificationCategory) => {
     if (settings === undefined) return
 
@@ -93,6 +96,8 @@ export const Feed = ({ api }: { api: FeedApi }) => {
       on: on ? settings.on.filter((one) => one !== category) : [...settings.on, category],
       email: [...settings.email],
     }
+
+    if (!on) askAbout()
 
     run(() => api.updateMyNotificationSettings(wanted), 'Could not change that. Please try again.')
   }

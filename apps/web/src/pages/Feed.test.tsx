@@ -10,6 +10,8 @@ import type { FeedApi } from './Feed.tsx'
 
 import { apiError } from '../api/client.ts'
 import { BurnProvider } from '../burn.tsx'
+import { PushNudge } from '../components/PushNudge.tsx'
+import { PushNudgeProvider, usePushNudge } from '../push-nudge.tsx'
 import { ViewerProvider } from '../viewer.tsx'
 import { Feed } from './Feed.tsx'
 
@@ -276,6 +278,90 @@ describe('the bell in a card’s corner', () => {
 
     expect(screen.getByLabelText('Notify on replies')).toBeTruthy()
     expect(screen.queryByLabelText(/Notify me on similar/)).toBeNull()
+  })
+})
+
+describe('switching a kind on from a card', () => {
+  const pushStub = {
+    getPushKey: () => Promise.resolve({ public_key: 'BFakeKey_with-url-safe' }),
+    subscribeToPush: () => Promise.resolve(undefined),
+    unsubscribeFromPush: () => Promise.resolve(undefined),
+  }
+
+  const unsubscribed = {
+    permission: () => 'default' as const,
+    requestPermission: () => Promise.resolve('granted' as const),
+    register: () =>
+      Promise.resolve({
+        getSubscription: () => Promise.resolve(null),
+        subscribe: () => Promise.reject(new Error('not subscribed in this test')),
+      }),
+  }
+
+  const withNudge = (api: FeedApi) =>
+    render(
+      <ViewerProvider viewer={ADA}>
+        <PushNudgeProvider>
+          <BurnProvider value={{ status: 'ready', burns: [BURN], selected: BURN }}>
+            <Feed api={api} />
+          </BurnProvider>
+          <PushNudge api={pushStub} browser={unsubscribed} />
+        </PushNudgeProvider>
+      </ViewerProvider>,
+    )
+
+  const NUDGE = 'Nothing will reach you on this device yet.'
+
+  it('offers push here, which is the moment somebody asked to be told about something', async () => {
+    withNudge(stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Notification settings for Sauna at dawn' }))
+    fireEvent.change(screen.getByLabelText(/Notify me on similar/), { target: { checked: true } })
+
+    expect(await screen.findByText(NUDGE)).toBeTruthy()
+  })
+
+  /**
+   * The strip renders nothing until it has asked the browser, so a switched-off case asserted
+   * against the strip passes while the answer is still outstanding. This reads the flag instead.
+   */
+  const Probe = () => <p data-testid="asked">{usePushNudge().wanted ? 'yes' : 'no'}</p>
+
+  const withProbe = (api: FeedApi) =>
+    render(
+      <ViewerProvider viewer={ADA}>
+        <PushNudgeProvider>
+          <BurnProvider value={{ status: 'ready', burns: [BURN], selected: BURN }}>
+            <Feed api={api} />
+          </BurnProvider>
+          <Probe />
+        </PushNudgeProvider>
+      </ViewerProvider>,
+    )
+
+  it('offers nothing when a kind is switched off, there being nothing to hear', async () => {
+    withProbe(
+      stub(
+        { getMyNotificationSettings: () => Promise.resolve({ on: ['dream_offered'], email: [] }) },
+        [],
+        [aCard({ id: 'c-1', title: 'Sauna at dawn' })],
+      ),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Notification settings for Sauna at dawn' }))
+    fireEvent.change(screen.getByLabelText(/Notify me on similar/), { target: { checked: false } })
+
+    await waitFor(() => expect(screen.getByText('Notification settings')).toBeTruthy())
+    expect(screen.getByTestId('asked').textContent).toBe('no')
+  })
+
+  it('offers it on the way on, which is the passing sibling of that', async () => {
+    withProbe(stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Notification settings for Sauna at dawn' }))
+    fireEvent.change(screen.getByLabelText(/Notify me on similar/), { target: { checked: true } })
+
+    await waitFor(() => expect(screen.getByTestId('asked').textContent).toBe('yes'))
   })
 })
 

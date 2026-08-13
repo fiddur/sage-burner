@@ -22,7 +22,7 @@ export const PushToggle = ({ api, browser }: { api: PushToggleApi; browser?: Pus
       />
 
       <h3>What to tell me about</h3>
-      <NotificationSettingsField api={api} sendsEmail={sendsEmail === true} push={push} />
+      <NotificationSettingsField api={api} sendsEmail={sendsEmail === true} />
     </section>
   )
 }

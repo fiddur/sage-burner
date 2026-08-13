@@ -241,9 +241,13 @@ phone" means 360px.
 - [ ] With SMTP configured (⚙️ → Settings), the test message goes to the
       admin's own address, and the email column appears on the notification
       settings — off everywhere until asked.
-- [ ] In a browser with push off, tick a category on the details page: a nudge appears
-      under the table offering to turn notifications on here. Press "Do not ask me here",
-      tick another category — no nudge. In a different browser, ticking one nudges again.
+- [ ] In a browser with push off, tick a category on the details page: a strip appears at the
+      bottom of the window offering to turn notifications on here.
+- [ ] Without dismissing it, go to the feed and tick "Notify me on similar" in a card's 🔔:
+      the same strip is raised — and switching one _off_ raises nothing.
+- [ ] Press "Do not ask me here". Tick another category, on either the feed or the details
+      page: no strip, this time or after a reload. In a different browser, ticking one raises
+      it again.
 - [ ] Take up an invite in a browser with push off: the welcome offers "Notify me here",
       and accepting it subscribes without a trip to another page.
 - [ ] ⚙️ → Notifications sent lists what has gone out, newest first, with the number told,
