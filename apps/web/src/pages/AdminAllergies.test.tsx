@@ -77,6 +77,7 @@ describe('AdminAllergies', () => {
     renderPage(stub({ deleteAllergyItem: () => Promise.reject(apiError(409, 'conflict', 'nope')) }))
 
     fireEvent.click(await screen.findByLabelText('Remove Vegan'))
+    fireEvent.click(screen.getByRole('button', { name: 'Really remove Vegan' }))
 
     expect((await screen.findByRole('alert')).textContent).toContain('Rename it instead')
   })
@@ -87,6 +88,7 @@ describe('AdminAllergies', () => {
     renderPage(stub({ deleteAllergyItem: () => Promise.reject(apiError(500, 'unknown', 'boom')) }))
 
     fireEvent.click(await screen.findByLabelText('Remove Vegan'))
+    fireEvent.click(screen.getByRole('button', { name: 'Really remove Vegan' }))
 
     expect((await screen.findByRole('alert')).textContent).toContain('Could not remove that')
   })

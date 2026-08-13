@@ -83,6 +83,7 @@ describe('curating what a song can be filed under', () => {
     renderPage(stub({ deleteSongCategory }))
 
     fireEvent.click(await screen.findByRole('button', { name: 'Remove Song' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Really remove Song' }))
 
     await waitFor(() => expect(deleteSongCategory).toHaveBeenCalledWith('c-2'))
   })

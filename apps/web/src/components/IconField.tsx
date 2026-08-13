@@ -6,6 +6,7 @@ import type { ApiClient } from '../api/client.ts'
 import { isApiError } from '../api/client.ts'
 import { ICON_ACCEPT, preparedIcon } from '../icon.ts'
 import { useInstallationIcon, useSetInstallationIcon } from '../installation.tsx'
+import { Destroy } from './Destroy.tsx'
 import { ErrorText } from './ErrorText.tsx'
 
 export type IconApi = Pick<ApiClient, 'removeInstallationIcon' | 'setInstallationIcon'>
@@ -90,9 +91,13 @@ export const IconField = ({ api }: { api: IconApi }) => {
           />
         </label>
 
-        <button type="button" class="link-button" disabled={busy} onClick={() => void remove()}>
-          Back to the flame
-        </button>
+        <Destroy
+          what="the uploaded icon"
+          because="The app's own flame goes back in its place."
+          trigger="Back to the flame"
+          busy={busy}
+          onDestroy={() => void remove()}
+        />
       </p>
 
       <ErrorText message={error} />

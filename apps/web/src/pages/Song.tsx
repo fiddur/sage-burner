@@ -18,6 +18,7 @@ import { useEffect, useRef, useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 import type { Mentionable } from '../mentioning.ts'
 
+import { Destroy } from '../components/Destroy.tsx'
 import { DreamThread } from '../components/DreamThread.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { Faces } from '../components/Faces.tsx'
@@ -223,35 +224,20 @@ const Links = ({ links }: { links: readonly SongLink[] }) => {
   )
 }
 
-const TakeItOut = ({ title, busy, onTakeOut }: { title: string; busy: boolean; onTakeOut: () => void }) => {
-  const [asking, setAsking] = useState(false)
-
-  if (!asking) {
-    return (
-      <IconButton
-        icon="🗑️"
-        label={`Take ${title} out of the book`}
-        disabled={busy}
-        onClick={() => setAsking(true)}
-      />
-    )
-  }
-
-  return (
-    <>
-      <span class="form-note">
-        Take it out? It goes to <em>Recently taken out</em> at the foot of the songbook, where anybody can put
-        it back for {RECENTLY_GONE_DAYS} days.
-      </span>
-      <button type="button" disabled={busy} aria-label={`Really take ${title} out`} onClick={onTakeOut}>
-        Take it out
-      </button>
-      <button type="button" class="link-button" disabled={busy} onClick={() => setAsking(false)}>
-        Keep it
-      </button>
-    </>
-  )
-}
+const TakeItOut = ({ title, busy, onTakeOut }: { title: string; busy: boolean; onTakeOut: () => void }) => (
+  <Destroy
+    what={title}
+    verb="Take out"
+    because={
+      <>
+        It goes to <em>Recently taken out</em> at the foot of the songbook, where anybody can put it back for{' '}
+        {RECENTLY_GONE_DAYS} days.
+      </>
+    }
+    busy={busy}
+    onDestroy={onTakeOut}
+  />
+)
 
 const useColumns = (box: RefObject<HTMLElement | null>, ruler: RefObject<HTMLElement | null>): number => {
   const [columns, setColumns] = useState(Number.POSITIVE_INFINITY)

@@ -304,7 +304,7 @@ describe('Roles', () => {
 
     fireEvent.click(await screen.findByLabelText('Remove Sauna'))
 
-    expect(screen.getByText('Remove Sauna and everyone on it?')).toBeTruthy()
+    expect(screen.getByText('Remove Sauna? Everyone on it goes too.')).toBeTruthy()
     expect(deleteLeadRole).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByLabelText('Really remove Sauna'))

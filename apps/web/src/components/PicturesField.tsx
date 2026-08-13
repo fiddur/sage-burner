@@ -3,9 +3,9 @@ import { apiRoutes, MAX_IMAGES_PER_ACCOUNT } from '@sage-burner/shared'
 import type { ApiClient } from '../api/client.ts'
 
 import { useAction, useLoad } from '../load.ts'
+import { Destroy } from './Destroy.tsx'
 import { ErrorText } from './ErrorText.tsx'
 import { FormError } from './FormError.tsx'
-import { IconButton } from './IconButton.tsx'
 
 export type PicturesApi = Pick<ApiClient, 'getMyImages' | 'removeMyImage'>
 
@@ -47,12 +47,11 @@ export const PicturesField = ({ api }: { api: PicturesApi }) => {
                 {/* No alt text to give: what a picture is of lives in prose nothing here can find. */}
                 <img src={apiRoutes.storedImage.path(picture.id)} alt="" loading="lazy" />
                 <span class="form-note">{stored(picture.created_at)}</span>
-                <IconButton
-                  icon="✕"
-                  label={`Take off picture ${at + 1} of ${images.length}, added ${stored(picture.created_at)}`}
-                  disabled={busy}
-                  busy={busyWith === picture.id}
-                  onClick={() => {
+                <Destroy
+                  what={`picture ${at + 1} of ${images.length}, added ${stored(picture.created_at)}`}
+                  verb="Take off"
+                  busy={busy || busyWith === picture.id}
+                  onDestroy={() => {
                     run(
                       async () => {
                         await api.removeMyImage(picture.id)

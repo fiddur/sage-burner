@@ -6,6 +6,7 @@ import { useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
+import { Destroy } from '../components/Destroy.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { IconButton } from '../components/IconButton.tsx'
@@ -166,11 +167,10 @@ const OptionList = ({
                   disabled={busy}
                   onClick={() => setEditing(row.id)}
                 />
-                <IconButton
-                  icon="🗑️"
-                  label={`Remove ${row.label}`}
-                  disabled={busy}
-                  onClick={() => run(() => api.deleteEventOption(row.id), 'Could not remove that.')}
+                <Destroy
+                  what={row.label}
+                  busy={busy}
+                  onDestroy={() => run(() => api.deleteEventOption(row.id), 'Could not remove that.')}
                 />
               </>
             )}

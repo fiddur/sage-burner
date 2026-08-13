@@ -12,6 +12,7 @@ import { renderMarkdown } from '../markdown.ts'
 import { useMentioning } from '../mentioning.ts'
 import { rowsFor } from '../textarea.ts'
 import { AddPicture } from './AddPicture.tsx'
+import { Destroy } from './Destroy.tsx'
 import { IconButton } from './IconButton.tsx'
 import { MentionMenu } from './MentionMenu.tsx'
 import { NAMELESS } from './PersonBadge.tsx'
@@ -190,11 +191,11 @@ export const DreamThread = ({
                       />
                     )}
                     {(entry.author?.account_id === viewerId || admin) && (
-                      <IconButton
-                        icon="🗑️"
-                        label="Take this comment back"
-                        disabled={busy}
-                        onClick={() => onRemove(entry.id)}
+                      <Destroy
+                        what="this comment"
+                        verb="Take back"
+                        busy={busy}
+                        onDestroy={() => onRemove(entry.id)}
                       />
                     )}
                   </p>

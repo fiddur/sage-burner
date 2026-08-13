@@ -6,6 +6,7 @@ import { useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
+import { Destroy } from '../components/Destroy.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { InviteLink } from '../components/InviteLink.tsx'
@@ -214,14 +215,14 @@ export const AdminInvites = ({ api }: { api: InvitesApi }) => {
                   {invite.application_id === null &&
                     invite.status !== 'used' &&
                     invite.status !== 'revoked' && (
-                      <button
-                        type="button"
-                        class="link-button"
-                        disabled={busy}
-                        onClick={() => void revoke(invite.id)}
-                      >
-                        Revoke
-                      </button>
+                      <Destroy
+                        what={describe(invite)}
+                        verb="Revoke"
+                        because="The link stops working; whoever came in on it stays."
+                        trigger="Revoke"
+                        busy={busy}
+                        onDestroy={() => void revoke(invite.id)}
+                      />
                     )}
                 </td>
               </tr>

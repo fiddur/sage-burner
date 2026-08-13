@@ -9,6 +9,17 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-13
 
+- **Nothing is destroyed on one press any more.** Removing a meeting, a talking point, a bring item,
+  a ride, a comment, an announcement, an invite, a passkey, a linked provider, your picture, the app
+  icon, the mail settings — anything with no undo — now asks first, names what is going, and says
+  what goes with it. Hearts, raised hands and anything else a second press would undo are unchanged.
+
+- **Signing in takes you to the feed** instead of leaving you on the login page with a link to the
+  homepage. Somebody still waiting on an application lands on their own application instead.
+
+- **Putting a meeting in the diary has its own place on the page**, rather than sitting inside the
+  box describing the meeting that is already there.
+
 - **A meeting put in the diary shows on the feed, and rings by default.** It was saved and shown on
   the Meetings page but said nothing anywhere else — the bell only rang for the few who had switched
   that kind on, and there was no line at all. Everybody coming to the burn sees it now, and sees it

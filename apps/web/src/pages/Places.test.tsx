@@ -164,6 +164,7 @@ describe('Places', () => {
     renderPage(stub({ deletePlace }))
 
     fireEvent.click(await screen.findByRole('button', { name: 'Remove Sauna' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Really remove Sauna' }))
 
     await waitFor(() => expect(deletePlace).toHaveBeenCalledWith('p-2'))
   })
@@ -253,6 +254,7 @@ describe('Places', () => {
     renderPage(stub({ deletePlace: () => Promise.reject(apiError(409, 'conflict', 'Still in use.')) }))
 
     fireEvent.click(await screen.findByRole('button', { name: 'Remove Sauna' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Really remove Sauna' }))
 
     expect((await screen.findByRole('alert')).textContent).toContain('Still in use.')
   })

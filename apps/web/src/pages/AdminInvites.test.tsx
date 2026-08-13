@@ -301,6 +301,7 @@ describe('AdminInvites', () => {
     renderPage(stub({ getInvites, revokeInvite }))
 
     ;(await screen.findByRole('button', { name: 'Revoke' })).click()
+    ;(await screen.findByRole('button', { name: /^Really /u })).click()
 
     await waitFor(() => expect(revokeInvite).toHaveBeenCalledWith('inv-1'))
     expect(await screen.findByText('No invites yet.')).toBeTruthy()
@@ -315,6 +316,7 @@ describe('AdminInvites', () => {
     )
 
     ;(await screen.findByRole('button', { name: 'Revoke' })).click()
+    ;(await screen.findByRole('button', { name: /^Really /u })).click()
 
     expect((await screen.findByRole('alert')).textContent).toContain('cannot be revoked')
   })

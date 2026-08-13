@@ -808,6 +808,7 @@ describe('what everyone has been doing', () => {
     )
 
     fireEvent.click(await screen.findByRole('button', { name: 'Take back Sunday' }))
+    fireEvent.click(screen.getByRole('button', { name: /^Really /u }))
 
     await waitFor(() => expect(deletePost).toHaveBeenCalledWith('s-1'))
   })

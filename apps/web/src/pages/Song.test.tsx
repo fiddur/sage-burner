@@ -338,7 +338,7 @@ describe('a song’s page', () => {
     const deleteSong = vi.fn<SongApi['deleteSong']>(() => Promise.resolve(undefined))
     renderPage(stub({ deleteSong }))
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Take Fire in the sky out of the book' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Take out Fire in the sky' }))
 
     expect(screen.getByText(/Recently taken out/)).toBeTruthy()
     expect(deleteSong).not.toHaveBeenCalled()
@@ -348,8 +348,8 @@ describe('a song’s page', () => {
     const deleteSong = vi.fn<SongApi['deleteSong']>(() => Promise.resolve(undefined))
     renderPage(stub({ deleteSong }))
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Take Fire in the sky out of the book' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Really take Fire in the sky out' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Take out Fire in the sky' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Really take out Fire in the sky' }))
 
     await waitFor(() => expect(deleteSong).toHaveBeenCalledWith('s-1'))
   })
@@ -358,11 +358,11 @@ describe('a song’s page', () => {
     const deleteSong = vi.fn<SongApi['deleteSong']>(() => Promise.resolve(undefined))
     renderPage(stub({ deleteSong }))
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Take Fire in the sky out of the book' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Take out Fire in the sky' }))
     fireEvent.click(screen.getByRole('button', { name: 'Keep it' }))
 
     expect(deleteSong).not.toHaveBeenCalled()
-    expect(screen.getByRole('button', { name: 'Take Fire in the sky out of the book' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Take out Fire in the sky' })).toBeTruthy()
   })
 
   it('offers no editing of one that is out, only putting it back', async () => {

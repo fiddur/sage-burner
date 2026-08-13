@@ -10,6 +10,7 @@ import type { Loaded } from '../load.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
 import { CopyFrom } from '../components/CopyFrom.tsx'
+import { Destroy } from '../components/Destroy.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { HelperStrip } from '../components/HelperStrip.tsx'
@@ -336,7 +337,6 @@ const RoleRow = ({
   onJoin: (accountId: string) => void
   onLeave: (accountId: string) => void
 }) => {
-  const [confirming, setConfirming] = useState(false)
   return (
     <tr>
       <th scope="row">{role.title}</th>
@@ -390,29 +390,7 @@ const RoleRow = ({
       <td class="lead-actions">
         <IconButton icon="✏️" label={`Edit ${role.title}`} disabled={busy} onClick={onEdit} />
 
-        {confirming ? (
-          <>
-            <span class="form-note">Remove {role.title} and everyone on it?</span>
-            <button
-              type="button"
-              disabled={busy}
-              aria-label={`Really remove ${role.title}`}
-              onClick={onRemove}
-            >
-              Remove it
-            </button>
-            <button type="button" class="link-button" disabled={busy} onClick={() => setConfirming(false)}>
-              Keep it
-            </button>
-          </>
-        ) : (
-          <IconButton
-            icon="🗑️"
-            label={`Remove ${role.title}`}
-            disabled={busy}
-            onClick={() => setConfirming(true)}
-          />
-        )}
+        <Destroy what={role.title} because="Everyone on it goes too." busy={busy} onDestroy={onRemove} />
       </td>
     </tr>
   )

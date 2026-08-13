@@ -11,6 +11,7 @@ import { useEffect, useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { useSetProviderConfigured } from '../installation.tsx'
+import { Destroy } from './Destroy.tsx'
 import { ErrorText } from './ErrorText.tsx'
 import { PendingButton } from './PendingButton.tsx'
 
@@ -200,14 +201,13 @@ export const OauthField = ({ api, provider }: { api: OauthApi; provider: OAuthPr
             <PendingButton busy={busy} label="Save" busyLabel="Saving…" type="submit" />
 
             {stored !== null && (
-              <button
-                type="button"
-                class="link-button"
-                disabled={busy}
-                onClick={() => void run(async () => await api.removeOauthSettings(provider))}
-              >
-                Remove
-              </button>
+              <Destroy
+                what={`signing in with ${oauthProviderInfo[provider].label}`}
+                because="Nobody can use that button until it is set up again."
+                trigger="Remove"
+                busy={busy}
+                onDestroy={() => void run(async () => await api.removeOauthSettings(provider))}
+              />
             )}
           </p>
 

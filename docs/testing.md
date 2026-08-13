@@ -278,6 +278,18 @@ phone" means 360px.
       running right now stays in the banner with its Join link.
 - [ ] On a burn that has ended, raising a point and recording a decision are both refused.
 
+## Nothing goes without asking
+
+- [ ] Press 🗑️ on the meeting in the diary: it asks, naming the meeting, and nothing happens
+      until **Take out of the diary** is pressed. **Keep it** leaves it alone, and the bin is
+      offered again.
+- [ ] The same on a talking point, a bring item, a ride, a place, an allergy item, a song
+      category, a lodging option, a meal slot, an application question, a comment, an
+      announcement, an invite (Revoke), a passkey, a linked provider, a way of being reached,
+      your picture, the app icon, the banner, the mail server and a provider's settings.
+- [ ] A heart, a raised hand, and taking yourself off a crew do **not** ask — pressing again
+      undoes them.
+
 ## The calendar
 
 - [ ] The Schedule page carries the feed link — `webcal://` to follow, `https`

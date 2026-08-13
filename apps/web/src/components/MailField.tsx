@@ -13,6 +13,7 @@ import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
 import { useSetInstallationSendsEmail } from '../installation.tsx'
+import { Destroy } from './Destroy.tsx'
 import { ErrorText } from './ErrorText.tsx'
 import { FormError, useFormError } from './FormError.tsx'
 import { PendingButton } from './PendingButton.tsx'
@@ -282,14 +283,13 @@ export const MailField = ({ api }: { api: MailApi }) => {
             />
           )}
           {stored !== null && (
-            <button
-              type="button"
-              class="link-button"
-              disabled={busy || testing}
-              onClick={() => void remove()}
-            >
-              Remove
-            </button>
+            <Destroy
+              what="the mail server"
+              because="No invite and no notification is posted until one is set up again."
+              trigger="Remove"
+              busy={busy || testing}
+              onDestroy={() => void remove()}
+            />
           )}
         </p>
       </form>

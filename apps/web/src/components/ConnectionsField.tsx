@@ -16,6 +16,7 @@ import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
 import { useAction, useLoad } from '../load.ts'
+import { Destroy } from './Destroy.tsx'
 import { ErrorText } from './ErrorText.tsx'
 import { FormError } from './FormError.tsx'
 import { ReorderableList } from './ReorderableList.tsx'
@@ -269,19 +270,17 @@ export const ConnectionsField = ({ api, loginAddress }: { api: ConnectionsApi; l
                 >
                   Change
                 </button>
-                <button
-                  type="button"
-                  class="link-button"
-                  disabled={busy}
-                  aria-label={`Remove ${nameOf(row)}`}
-                  onClick={() => {
+                <Destroy
+                  what={nameOf(row)}
+                  trigger="Remove"
+                  triggerLabel={`Remove ${nameOf(row)}`}
+                  busy={busy}
+                  onDestroy={() => {
                     run(async () => {
                       await api.removeMyConnection(row.id)
                     }, 'Could not remove that. Please try again.')
                   }}
-                >
-                  Remove
-                </button>
+                />
               </>
             )
           }

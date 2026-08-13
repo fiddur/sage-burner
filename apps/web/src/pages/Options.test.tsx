@@ -230,6 +230,7 @@ describe('Options', () => {
     renderPage(stub({ deleteEventOption }))
 
     fireEvent.click(await screen.findByRole('button', { name: 'Remove Own tent' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Really remove Own tent' }))
 
     await waitFor(() => expect(deleteEventOption).toHaveBeenCalledWith('o-2'))
   })
@@ -294,6 +295,7 @@ describe('Options', () => {
     renderPage(stub({ deleteEventOption: () => Promise.reject(apiError(409, 'conflict', 'In use.')) }))
 
     fireEvent.click(await screen.findByRole('button', { name: 'Remove Own tent' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Really remove Own tent' }))
 
     expect((await screen.findByRole('alert')).textContent).toContain('In use.')
   })

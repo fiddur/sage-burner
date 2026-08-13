@@ -6,6 +6,7 @@ import { useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
+import { Destroy } from '../components/Destroy.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { IconButton } from '../components/IconButton.tsx'
@@ -109,12 +110,7 @@ export const AdminAllergies = ({ api }: { api: AllergiesApi }) => {
                         setDraft(item.label)
                       }}
                     />
-                    <IconButton
-                      icon="🗑️"
-                      label={`Remove ${item.label}`}
-                      disabled={busy}
-                      onClick={() => remove(item)}
-                    />
+                    <Destroy what={item.label} busy={busy} onDestroy={() => remove(item)} />
                   </>
                 )}
               </>

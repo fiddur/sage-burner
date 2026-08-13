@@ -214,6 +214,7 @@ describe('setting a provider up', () => {
     )
 
     fireEvent.click(await screen.findByRole('button', { name: 'Remove' }))
+    fireEvent.click(screen.getByRole('button', { name: /^Really /u }))
 
     await waitFor(() => expect(screen.getByTestId('elsewhere').textContent).toBe('discord'))
   })
@@ -248,6 +249,7 @@ describe('setting a provider up', () => {
     show(stub({ getOauthSettings: () => Promise.resolve({ settings: SAVED }), removeOauthSettings }))
 
     fireEvent.click(await screen.findByRole('button', { name: 'Remove' }))
+    fireEvent.click(screen.getByRole('button', { name: /^Really /u }))
 
     await waitFor(() => expect(removeOauthSettings).toHaveBeenCalledWith('facebook'))
     await waitFor(() => expect(screen.getByLabelText<HTMLInputElement>('Facebook client ID').value).toBe(''))

@@ -10,9 +10,9 @@ import type { Loaded } from '../load.ts'
 
 import { useBurns, useSelectedBurn } from '../burn.tsx'
 import { CopyFrom } from '../components/CopyFrom.tsx'
+import { Destroy } from '../components/Destroy.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
-import { IconButton } from '../components/IconButton.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { ReorderableList } from '../components/ReorderableList.tsx'
@@ -209,7 +209,6 @@ const FaqRow = ({
   onEdit: () => void
   onRemove: () => void
 }) => {
-  const [confirming, setConfirming] = useState(false)
   const answered = entry.answer.trim() !== ''
 
   return (
@@ -227,29 +226,7 @@ const FaqRow = ({
           {answered ? 'Edit' : 'Answer it'}
         </button>
 
-        {confirming ? (
-          <>
-            <span class="form-note">Remove this question and its answer?</span>
-            <button
-              type="button"
-              disabled={busy}
-              aria-label={`Really remove ${entry.question}`}
-              onClick={onRemove}
-            >
-              Remove it
-            </button>
-            <button type="button" class="link-button" disabled={busy} onClick={() => setConfirming(false)}>
-              Keep it
-            </button>
-          </>
-        ) : (
-          <IconButton
-            icon="🗑️"
-            label={`Remove ${entry.question}`}
-            disabled={busy}
-            onClick={() => setConfirming(true)}
-          />
-        )}
+        <Destroy what={entry.question} because="Its answer goes too." busy={busy} onDestroy={onRemove} />
       </p>
     </details>
   )

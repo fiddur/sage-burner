@@ -22,6 +22,7 @@ import type { Mentionable } from '../mentioning.ts'
 import { useSelectedBurn } from '../burn.tsx'
 import { CardBell } from '../components/CardBell.tsx'
 import { ChipRow } from '../components/ChipRow.tsx'
+import { Destroy } from '../components/Destroy.tsx'
 import { DreamThread } from '../components/DreamThread.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
@@ -305,15 +306,14 @@ const Mine = ({
             Reword it
           </button>
         )}
-        <button
-          type="button"
-          class="link-button"
-          disabled={busy}
-          aria-label={`Take back ${card.title}`}
-          onClick={onTakeBack}
-        >
-          Take it back
-        </button>
+        <Destroy
+          what={card.title}
+          verb="Take back"
+          trigger="Take it back"
+          triggerLabel={`Take back ${card.title}`}
+          busy={busy}
+          onDestroy={onTakeBack}
+        />
       </p>
     )
   }

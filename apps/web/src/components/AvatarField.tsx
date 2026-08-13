@@ -6,6 +6,7 @@ import { isApiError } from '../api/client.ts'
 import { AVATAR_TYPE, resizedAvatar } from '../avatar.ts'
 import { useSetViewer, useViewer } from '../viewer.tsx'
 import { Avatar } from './Avatar.tsx'
+import { Destroy } from './Destroy.tsx'
 import { ErrorText } from './ErrorText.tsx'
 
 export const messageForFailure = (failure: unknown): string => {
@@ -83,9 +84,13 @@ export const AvatarField = ({ api }: { api: Pick<ApiClient, 'removeMyAvatar' | '
         </label>
 
         {account.avatar !== null && (
-          <button type="button" class="link-button" disabled={busy} onClick={() => void remove()}>
-            Back to initials
-          </button>
+          <Destroy
+            what="your picture"
+            because="Your initials go back in its place."
+            trigger="Back to initials"
+            busy={busy}
+            onDestroy={() => void remove()}
+          />
         )}
       </p>
 

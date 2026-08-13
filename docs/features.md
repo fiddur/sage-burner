@@ -148,6 +148,9 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
 - Meetings in the diary: the page says when the next one is and how to join it, and
   every meeting appears in the burn's calendar feed beside the dreams.
 
+- Anything that cannot be undone asks first — one question in place of the control, naming
+  the thing and what else goes with it. What a second press would undo does not ask.
+
 ## Being told — [accounts.md](./accounts.md)
 
 - A notification is a record: the bell holds what happened while you were away,

@@ -60,6 +60,7 @@ describe('choosing the picture a shared link shows', () => {
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Remove it' }))
+    fireEvent.click(screen.getByRole('button', { name: /^Really /u }))
 
     await waitFor(() => {
       expect(removed).toBe(true)

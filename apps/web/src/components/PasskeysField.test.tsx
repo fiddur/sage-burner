@@ -145,6 +145,7 @@ describe('PasskeysField', () => {
     )
 
     ;(await screen.findByRole('button', { name: 'Remove Phone' })).click()
+    ;(await screen.findByRole('button', { name: /^Really /u })).click()
 
     expect(await screen.findByText('You have no passkeys yet.')).toBeTruthy()
     expect(remove).toHaveBeenCalledWith('pk-1')
@@ -161,6 +162,7 @@ describe('PasskeysField', () => {
     )
 
     ;(await screen.findByRole('button', { name: 'Remove Phone' })).click()
+    ;(await screen.findByRole('button', { name: /^Really /u })).click()
 
     expect((await screen.findByRole('alert')).textContent).toContain('only way you have left')
   })

@@ -251,6 +251,7 @@ describe('the list on your own details page', () => {
 
     await waitFor(() => expect(screen.getByText('Discord')).toBeTruthy())
     fireEvent.click(screen.getByRole('button', { name: 'Remove Discord' }))
+    fireEvent.click(screen.getByRole('button', { name: /^Really /u }))
 
     await waitFor(() => expect(removeMyConnection).toHaveBeenCalledWith('c-1'))
   })

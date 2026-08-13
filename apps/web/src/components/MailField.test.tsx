@@ -150,6 +150,7 @@ describe('the mail settings form', () => {
     )
 
     fireEvent.click(await screen.findByRole('button', { name: 'Remove' }))
+    fireEvent.click(screen.getByRole('button', { name: /^Really /u }))
 
     await waitFor(() => expect(screen.getByLabelText('Server')).toHaveProperty('value', ''))
     expect(screen.queryByRole('button', { name: 'Send a test to me' })).toBeNull()

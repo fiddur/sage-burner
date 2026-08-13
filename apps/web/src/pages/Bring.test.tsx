@@ -247,7 +247,7 @@ describe('the bring list', () => {
   it('offers the pen on your own item only, and the bin to an admin as well', async () => {
     renderPage(stub({}, [anItem({ id: 'b-1', author_account_id: 'a-2', author_name: 'Bea' })]), BOSS)
 
-    expect(await screen.findByRole('button', { name: 'Take Drums off the list' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: 'Take off Drums' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Edit Drums' })).toBeNull()
   })
 
@@ -256,7 +256,7 @@ describe('the bring list', () => {
 
     expect(await screen.findByRole('button', { name: 'Take the spot on bringing Drums' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Edit Drums' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Take Drums off the list' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Take off Drums' })).toBeNull()
   })
 
   it('edits one in place, sending both fields the form holds', async () => {
@@ -281,7 +281,8 @@ describe('the bring list', () => {
     const deleteBringItem = vi.fn<BringApi['deleteBringItem']>(() => Promise.resolve(undefined))
     renderPage(stub({ deleteBringItem }, [anItem({ id: 'b-1' })]))
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Take Drums off the list' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Take off Drums' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Really take off Drums' }))
 
     await waitFor(() => expect(deleteBringItem).toHaveBeenCalledWith('b-1'))
   })
