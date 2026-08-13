@@ -170,8 +170,8 @@ phone" means 360px.
 - [ ] Mention the member by name from the picker — they are notified once, not
       also for the comment pile. Follow and mute a card and confirm the
       checkbox states what will actually happen.
-- [ ] Post an announcement; reword it (one card, bumped); withdraw it — the
-      title and conversation stay, the body goes.
+- [ ] Post an announcement; reword it (one card, bumped); withdraw it — the card
+      leaves the feed, and a reload does not bring it back.
 - [ ] Heart a card: the count moves, nothing is notified, nothing bumps.
 
 ## The songbook
@@ -285,8 +285,12 @@ phone" means 360px.
 ## Taking something back
 
 - [ ] Announce something, then take it back with 🗑️ — the same bin every other card offers.
-      The card stays, marked "taken back", where it already was: **not** at the top of the feed.
-- [ ] Say something on a card that has been taken back: that does bring it back up.
+      The card goes off the feed as it is pressed, and is not there after a reload either:
+      not at the top, and not where it was.
+- [ ] The same for a dream withdrawn, a bring item taken off the list, and somebody leaving
+      the burn — each card leaves the feed with the thing it is about.
+- [ ] Take a song out of the book: its card goes too. Put it back and the card returns,
+      carrying what was said on it while it was out.
 
 ## Nothing goes without asking
 

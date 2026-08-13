@@ -240,9 +240,7 @@ describe('the feed', () => {
     ])
   })
 
-  it('keeps the conversation when the dream is withdrawn, and says so', async () => {
-    // Withdrawing states it on the card rather than deleting it: what people said to
-    // each other stays worth reading, which is why `thread.entity_id` carries no key.
+  it('takes a withdrawn dream off the page, a removal not being something going on', async () => {
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -255,10 +253,36 @@ describe('the feed', () => {
       headers: { cookie: ada.cookie },
     })
 
-    const [card] = await cards(server, ada.cookie)
-    expect(card?.gone).toBe(true)
-    expect(card?.title).toBe('Sauna at dawn')
-    expect(card?.entries.map((entry) => entry.kind)).toEqual(['offered', 'withdrawn'])
+    expect(await cards(server, ada.cookie)).toEqual([])
+  })
+
+  it('keeps the conversation the withdrawal ended, which the thread still answers', async () => {
+    // The soft withdrawal is still soft: what people said to each other is what
+    // `thread.entity_id` carries no key for. It is off the feed, not deleted.
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const dream = await offerDream(server, ada.cookie, 'Sauna at dawn')
+    const [before] = await cards(server, ada.cookie)
+
+    await server.inject({
+      method: 'DELETE',
+      url: `/api/sessions/${dream}`,
+      headers: { cookie: ada.cookie },
+    })
+
+    const answered = await server.inject({
+      method: 'GET',
+      url: `/api/threads/${before?.id ?? ''}`,
+      headers: { cookie: ada.cookie },
+    })
+    expect(answered.json().thread.gone).toBe(true)
+    expect(answered.json().thread.title).toBe('Sauna at dawn')
+    expect(answered.json().thread.entries.map((entry: { kind: string }) => entry.kind)).toEqual([
+      'offered',
+      'withdrawn',
+    ])
   })
 
   it('names the burn, and spans them', async () => {
@@ -549,7 +573,8 @@ describe('the feed', () => {
     ])
   })
 
-  it('leaves a withdrawal where the card already was, taking something back not being news', async () => {
+  it('leaves the ones nobody took back where they were', async () => {
+    // The passing sibling: what goes is the withdrawn one, not the page around it.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -557,8 +582,10 @@ describe('the feed', () => {
     const older = await offerDream(server, ada.cookie, 'Sauna at dawn')
     stamp = '2026-07-02T01:00:00.000Z'
     await offerDream(server, ada.cookie, 'Cacao ceremony')
-
     stamp = '2026-07-02T02:00:00.000Z'
+    await offerDream(server, ada.cookie, 'Cold plunge')
+
+    stamp = '2026-07-02T03:00:00.000Z'
     await server.inject({
       method: 'DELETE',
       url: `/api/sessions/${older}`,
@@ -566,31 +593,14 @@ describe('the feed', () => {
     })
 
     expect((await cards(server, ada.cookie)).map((card) => card.title)).toEqual([
+      'Cold plunge',
       'Cacao ceremony',
-      'Sauna at dawn',
     ])
   })
 
-  it('dates that card by what last happened on it rather than by its removal', async () => {
-    const server = await build()
-    await givenBurn()
-    const ada = await givenAccount('Ada')
-    await givenComing(ada.id)
-    const dream = await offerDream(server, ada.cookie, 'Sauna at dawn')
-
-    stamp = '2026-07-09T00:00:00.000Z'
-    await server.inject({
-      method: 'DELETE',
-      url: `/api/sessions/${dream}`,
-      headers: { cookie: ada.cookie },
-    })
-
-    const [card] = await cards(server, ada.cookie)
-    expect(card?.last_at).toBe(NOW)
-  })
-
-  it('still brings one back up when somebody says something on it', async () => {
-    // The half that must not break: the conversation is what a soft withdrawal keeps.
+  it('does not bring one back when somebody says something on it', async () => {
+    // #611's fix left a taken-back card in place and let a comment lift it; the card is
+    // off the page now, so there is nothing for the comment to lift.
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -609,10 +619,31 @@ describe('the feed', () => {
     stamp = '2026-07-02T03:00:00.000Z'
     await say(server, ada.cookie, first?.id ?? '', 'shame, I was coming to that')
 
-    expect((await cards(server, ada.cookie)).map((card) => card.title)).toEqual([
-      'Sauna at dawn',
-      'Cacao ceremony',
-    ])
+    expect((await cards(server, ada.cookie)).map((card) => card.title)).toEqual(['Cacao ceremony'])
+  })
+
+  it('takes an announcement off the page when it is taken back', async () => {
+    // Four routes write a `withdrawn` entry — this is the one whose bin is on the feed
+    // itself, so the card goes from under the press that removed it.
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const announced = await server.inject({
+      method: 'POST',
+      url: `/api/events/${BURN}/posts`,
+      headers: { cookie: ada.cookie },
+      payload: { title: 'The gate opens at noon', body: '' },
+    })
+    expect(await cards(server, ada.cookie)).toHaveLength(1)
+
+    await server.inject({
+      method: 'DELETE',
+      url: `/api/posts/${announced.json().post.id}`,
+      headers: { cookie: ada.cookie },
+    })
+
+    expect(await cards(server, ada.cookie)).toEqual([])
   })
 
   it('cuts the page against both halves, not each on its own', async () => {
@@ -761,7 +792,7 @@ describe('somebody’s own card', () => {
     expect((await cards(server, ada.cookie))[0]?.gone).toBe(false)
   })
 
-  it('says somebody is no longer coming once they have left, and keeps what was said', async () => {
+  it('leaves the page once they are no longer coming, and keeps what was said', async () => {
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -777,13 +808,21 @@ describe('somebody’s own card', () => {
       headers: { cookie: ada.cookie },
     })
 
-    const [card] = await cards(server, bea.cookie)
-    expect(card?.gone).toBe(true)
+    expect(await cards(server, bea.cookie)).toEqual([])
+    const answered = await server.inject({
+      method: 'GET',
+      url: `/api/threads/${before?.id ?? ''}`,
+      headers: { cookie: bea.cookie },
+    })
     // Still their name and still their page: the stay is what has gone, not the person, and
     // the card is found by the person now (#449).
-    expect(card?.link).toBe(`/members/${ada.id}`)
-    expect(card?.title).toBe('Ada')
-    expect(card?.entries.map((entry) => entry.kind)).toEqual(['joined', 'comment'])
+    expect(answered.json().thread.gone).toBe(true)
+    expect(answered.json().thread.link).toBe(`/members/${ada.id}`)
+    expect(answered.json().thread.title).toBe('Ada')
+    expect(answered.json().thread.entries.map((entry: { kind: string }) => entry.kind)).toEqual([
+      'joined',
+      'comment',
+    ])
   })
 
   it('reopens the one card on a rejoin rather than stranding it and opening another', async () => {

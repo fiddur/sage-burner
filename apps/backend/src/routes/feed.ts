@@ -51,10 +51,18 @@ export const registerFeedRoutes = (app: FastifyInstance, { db, sessions }: Guard
 
       const recent = entities.length === 0 ? [] : await recentThreads(db, FEED_LIMIT, entities)
 
+      const cards = await readThreads(
+        db,
+        recent.map((one) => one.id),
+        { newest: CARD_ENTRIES, counts: new Map(recent.map((one) => [one.id, one.entry_count])), viewer },
+      )
+
+      const live = new Set(cards.flatMap((card) => (card.gone ? [] : [card.id])))
+
       const kept = new Set(
         [
           ...lines.map((line) => ({ id: line.id, at: line.created_at })),
-          ...recent.map((one) => ({ id: one.id, at: one.last_at })),
+          ...recent.filter((one) => live.has(one.id)).map((one) => ({ id: one.id, at: one.last_at })),
         ]
           .sort((one, other) =>
             one.at === other.at ? other.id.localeCompare(one.id) : other.at.localeCompare(one.at),
@@ -63,13 +71,10 @@ export const registerFeedRoutes = (app: FastifyInstance, { db, sessions }: Guard
           .map((one) => one.id),
       )
 
-      const threads = await readThreads(
-        db,
-        recent.filter((one) => kept.has(one.id)).map((one) => one.id),
-        { newest: CARD_ENTRIES, counts: new Map(recent.map((one) => [one.id, one.entry_count])), viewer },
-      )
-
-      return { activity: lines.filter((line) => kept.has(line.id)), threads } satisfies FeedResponse
+      return {
+        activity: lines.filter((line) => kept.has(line.id)),
+        threads: cards.filter((card) => kept.has(card.id)),
+      } satisfies FeedResponse
     },
   )
 }

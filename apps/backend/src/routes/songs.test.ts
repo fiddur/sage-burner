@@ -89,6 +89,10 @@ const restore = (server: FastifyInstance, cookie: string, id: string) =>
 const cards = async (server: FastifyInstance, cookie: string): Promise<Thread[]> =>
   (await server.inject({ method: 'GET', url: '/api/feed', headers: { cookie } })).json().threads
 
+/** Read by id, which is how a card taken back is read at all: the feed drops it (#617). */
+const cardOf = async (server: FastifyInstance, cookie: string, threadId: string): Promise<Thread> =>
+  (await server.inject({ method: 'GET', url: `/api/threads/${threadId}`, headers: { cookie } })).json().thread
+
 const bell = async (server: FastifyInstance, cookie: string): Promise<{ category: string; body: string }[]> =>
   (await server.inject({ method: 'GET', url: '/api/me/notifications', headers: { cookie } })).json()
     .notifications
@@ -440,11 +444,12 @@ describe('taking a song out, and putting it back', () => {
     const server = await build()
     const ada = await givenAccount('Ada')
     const id = (await add(server, ada.cookie, { title: 'Fire' })).json().song.id
+    const [before] = await cards(server, ada.cookie)
     await remove(server, ada.cookie, id)
     await remove(server, ada.cookie, id)
 
-    const [card] = await cards(server, ada.cookie)
-    expect(card?.entries.filter((entry) => entry.kind === 'withdrawn')).toHaveLength(1)
+    const card = await cardOf(server, ada.cookie, before?.id ?? '')
+    expect(card.entries.filter((entry) => entry.kind === 'withdrawn')).toHaveLength(1)
   })
 
   it('takes the filing with it when the whole row goes', async () => {
@@ -499,14 +504,15 @@ describe('a song on the feed', () => {
     expect(card?.entries.filter((entry) => entry.kind === 'edited')).toHaveLength(1)
   })
 
-  it('says it has been taken out, and says it again when it comes back', async () => {
+  it('goes off the page when it is taken out, and comes back with it', async () => {
     const server = await build()
     const ada = await givenAccount('Ada')
     const id = (await add(server, ada.cookie, { title: 'Fire' })).json().song.id
+    const [before] = await cards(server, ada.cookie)
 
     await remove(server, ada.cookie, id)
-    const gone = (await cards(server, ada.cookie))[0]
-    expect(gone?.gone).toBe(true)
+    expect(await cards(server, ada.cookie)).toEqual([])
+    expect((await cardOf(server, ada.cookie, before?.id ?? '')).gone).toBe(true)
 
     await restore(server, ada.cookie, id)
     const back = (await cards(server, ada.cookie))[0]

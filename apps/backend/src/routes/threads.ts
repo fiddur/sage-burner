@@ -23,7 +23,7 @@ import {
   songPage,
   withMentionNames,
 } from '@sage-burner/shared'
-import { and, asc, count, desc, eq, inArray, lte, ne, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, inArray, lte, max, ne, sql } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -225,15 +225,6 @@ export const cardEntry = async (
   return await addEntry(db, { thread_id: id, kind, author_account_id: who.account_id, body }, at)
 }
 
-/**
- * What last happened on a card that is worth surfacing. Taking something back is not news: the
- * `withdrawn` entry says who did it and when, and the card is a tombstone by then — sorting it to
- * the top would put a removal above everything that has actually happened since.
- */
-const liveliness = sql<
-  string | null
->`max(case when ${threadEntry.kind} = 'withdrawn' then null else ${threadEntry.created_at} end)`
-
 export const recentThreads = async (
   db: Database,
   limit: number,
@@ -242,14 +233,14 @@ export const recentThreads = async (
   const rows = await db
     .select({
       id: threadEntry.thread_id,
-      last_at: liveliness,
+      last_at: max(threadEntry.created_at),
       entry_count: count(),
     })
     .from(threadEntry)
     .innerJoin(thread, eq(thread.id, threadEntry.thread_id))
     .where(inArray(thread.entity_type, [...entities]))
     .groupBy(threadEntry.thread_id)
-    .orderBy(desc(liveliness), desc(threadEntry.thread_id))
+    .orderBy(desc(max(threadEntry.created_at)), desc(threadEntry.thread_id))
     .limit(limit)
 
   return rows.flatMap((row) =>
@@ -498,7 +489,7 @@ export const readThreads = async (
     if (row === undefined) return []
 
     const shown = (held.get(id) ?? []).map((entry) => ({ ...entry, body: named(entry.body) }))
-    const last = shown.findLast((entry) => entry.kind !== 'withdrawn') ?? shown.at(-1)
+    const last = shown.at(-1)
 
     return [
       {

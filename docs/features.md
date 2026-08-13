@@ -121,6 +121,9 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
   A card can be followed or muted.
 - Announcements: any approved member posts one; withdrawing keeps the
   conversation.
+- Anything taken back leaves the feed: a withdrawn announcement, dream, song or
+  bring item, and a stay somebody left. The conversation is kept, its place on
+  the page is not.
 - A heart on every card, quietly — no notification, no bump.
 
 ## The songbook — [the-app.md](./the-app.md)

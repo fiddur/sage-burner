@@ -1,6 +1,8 @@
 import type { FastifyInstance } from 'fastify'
 
 import { randomUUID } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import type { DbHandle } from '../db/index.ts'
@@ -9,8 +11,17 @@ import { createApp } from '../app.ts'
 import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
-import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, activity, attendance, event, thread, threadEntry } from '../db/schema.ts'
+import { createDb, migrationsFolder, runMigrations } from '../db/index.ts'
+import {
+  account,
+  accountRole,
+  activity,
+  attendance,
+  event,
+  meeting,
+  thread,
+  threadEntry,
+} from '../db/schema.ts'
 
 const SECRET = 'm'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
@@ -29,6 +40,13 @@ afterEach(async () => {
 
 const db = () => {
   const found = handle?.db
+  if (found === undefined) throw new Error('build() first')
+
+  return found
+}
+
+const client = () => {
+  const found = handle?.client
   if (found === undefined) throw new Error('build() first')
 
   return found
@@ -98,6 +116,7 @@ interface Card {
   entity_type: string
   entity_id: string
   title: string
+  last_at: string | null
   entries: { kind: string; body: string }[]
 }
 
@@ -396,6 +415,43 @@ describe('the meetings themselves', () => {
     expect(card.entries.map((entry) => [entry.kind, entry.body])).toEqual([
       ['scheduled', 'put it in the diary'],
     ])
+  })
+
+  it('gets one from the backfill when it was in the diary before cards existed', async () => {
+    // The other half of `20260813180000_meeting_cards` (#616): what it writes is what the
+    // feed reads. Staged by hand and swept by the shipped SQL, since the migration has
+    // long run by the time this suite can write a meeting.
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const older = randomUUID()
+    await db().insert(meeting).values({
+      id: older,
+      event_id: BURN,
+      author_account_id: null,
+      title: 'Planning call',
+      starts_at: '2026-07-20T17:00:00.000Z',
+      ends_at: null,
+      link: null,
+      notes: '',
+      created_at: '2026-07-01T09:00:00.000Z',
+    })
+    const before = await server.inject({ method: 'GET', url: '/api/feed', headers: { cookie: ada.cookie } })
+    expect(before.json().threads).toEqual([])
+
+    client().exec(
+      readFileSync(path.join(migrationsFolder, '20260813180000_meeting_cards', 'migration.sql'), 'utf8'),
+    )
+
+    const card = await cardFor(server, ada.cookie, older)
+    expect(card.title).toBe('Planning call')
+    expect(card.entries.map((entry) => [entry.kind, entry.body])).toEqual([
+      ['scheduled', 'put it in the diary'],
+    ])
+    // Dated by the planning rather than by the meeting, which is months of difference on
+    // something scheduled early.
+    expect(card.last_at).toBe('2026-07-01T09:00:00.000Z')
   })
 
   it('writes no line beside that card, which would put one thing on the feed twice', async () => {
