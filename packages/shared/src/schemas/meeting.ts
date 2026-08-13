@@ -57,6 +57,7 @@ export type DecisionInput = z.input<typeof decisionSchema>
 export const meetingSchema = z.object({
   id: idSchema,
   event_id: idSchema,
+  author_account_id: idSchema.nullable(),
   title: nonEmptyText(MAX_TITLE),
   starts_at: dateTimeSchema,
   ends_at: dateTimeSchema.nullable(),

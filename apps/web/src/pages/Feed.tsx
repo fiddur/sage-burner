@@ -557,6 +557,7 @@ const goneLabel = {
   song: ' · out of the book',
   bring: ' · off the list',
   point: ' · taken off',
+  meeting: ' · out of the diary',
 } as const satisfies Record<Thread['entity_type'], string>
 
 const whereItBelongs = (card: Thread): string | undefined =>

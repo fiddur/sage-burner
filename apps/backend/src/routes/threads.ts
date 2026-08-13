@@ -41,6 +41,7 @@ import {
   bringHand,
   bringItem,
   event,
+  meeting,
   meetingPoint,
   post,
   session,
@@ -399,6 +400,10 @@ export const readThreads = async (
       point_body: meetingPoint.body,
       point_decision: meetingPoint.decision,
       point_author: meetingPoint.author_account_id,
+      meeting_title: meeting.title,
+      meeting_notes: meeting.notes,
+      meeting_starts_at: meeting.starts_at,
+      meeting_author: meeting.author_account_id,
     })
     .from(thread)
     .leftJoin(event, eq(event.id, thread.event_id))
@@ -409,6 +414,7 @@ export const readThreads = async (
     .leftJoin(song, and(eq(thread.entity_type, 'song'), eq(song.id, thread.entity_id)))
     .leftJoin(bringItem, and(eq(thread.entity_type, 'bring'), eq(bringItem.id, thread.entity_id)))
     .leftJoin(meetingPoint, and(eq(thread.entity_type, 'point'), eq(meetingPoint.id, thread.entity_id)))
+    .leftJoin(meeting, and(eq(thread.entity_type, 'meeting'), eq(meeting.id, thread.entity_id)))
     .where(inArray(thread.id, [...ids]))
 
   const ranked = db
@@ -507,6 +513,7 @@ const authorOf = (row: CardRow): string | null => {
   if (row.entity_type === 'song') return row.song_author
   if (row.entity_type === 'bring') return row.bring_author
   if (row.entity_type === 'point') return row.point_author
+  if (row.entity_type === 'meeting') return row.meeting_author
 
   return null
 }
@@ -540,6 +547,10 @@ interface CardRow {
   point_body: string | null
   point_decision: string | null
   point_author: string | null
+  meeting_title: string | null
+  meeting_notes: string | null
+  meeting_starts_at: string | null
+  meeting_author: string | null
 }
 
 type CardFacts = Pick<Thread, 'title' | 'link' | 'body' | 'gone'>
@@ -588,6 +599,13 @@ const pointFacts = (row: CardRow): CardFacts => ({
   gone: row.point_title === null,
 })
 
+const meetingFacts = (row: CardRow): CardFacts => ({
+  title: row.meeting_title ?? row.title,
+  link: row.meeting_title === null || row.event_id === null ? null : meetingsPage(row.event_id),
+  body: written(row.meeting_notes),
+  gone: row.meeting_title === null,
+})
+
 const withNamedBody = (facts: CardFacts, named: (body: string) => string): CardFacts =>
   facts.body === null ? facts : { ...facts, body: named(facts.body) }
 
@@ -614,6 +632,7 @@ const factsFor = (row: CardRow): CardFacts =>
     song: songFacts,
     bring: bringFacts,
     point: pointFacts,
+    meeting: meetingFacts,
   })[row.entity_type](row)
 
 export const nameOf = async (db: Database, accountId: string): Promise<string | null> => {
@@ -650,7 +669,7 @@ interface Whose {
 
 const authorRow = async (
   db: Database,
-  table: typeof bringItem | typeof meetingPoint | typeof post | typeof song,
+  table: typeof bringItem | typeof meeting | typeof meetingPoint | typeof post | typeof song,
   entityId: string,
 ): Promise<string[]> => {
   const [row] = await db
@@ -668,6 +687,7 @@ const alsoInIt = {
   post: async (db: Database, found: Whose) => await authorRow(db, post, found.entity_id),
   song: async (db: Database, found: Whose) => await authorRow(db, song, found.entity_id),
   point: async (db: Database, found: Whose) => await authorRow(db, meetingPoint, found.entity_id),
+  meeting: async (db: Database, found: Whose) => await authorRow(db, meeting, found.entity_id),
   bring: async (db: Database, found: Whose) => [
     ...(await authorRow(db, bringItem, found.entity_id)),
     ...(await handsOn(db, found.entity_id)).map((hand) => hand.account_id),
@@ -970,7 +990,7 @@ export const registerThreadRoutes = (
   }
 
   const titleOf = async (
-    table: typeof bringItem | typeof meetingPoint | typeof post | typeof song,
+    table: typeof bringItem | typeof meeting | typeof meetingPoint | typeof post | typeof song,
     found: Subject,
   ): Promise<string> => {
     const [row] = await db
@@ -1000,6 +1020,10 @@ export const registerThreadRoutes = (
       link: atItsBurn(found, meetingsPage),
       what: await titleOf(meetingPoint, found),
     }),
+    meeting: async (found: Subject) => ({
+      link: found.event_id === null ? null : meetingsPage(found.event_id),
+      what: await titleOf(meeting, found),
+    }),
     attendance: async (found: Subject) => {
       const subject = found.subject_account_id
       if (subject === null) return { link: null, what: found.title }
@@ -1021,6 +1045,7 @@ export const registerThreadRoutes = (
     song: { mine: 'song_comment', anybody: 'song_comment_any' },
     bring: { mine: 'bring_comment', anybody: 'bring_comment_any' },
     point: { mine: 'point_comment', anybody: 'point_comment_any' },
+    meeting: { mine: 'meeting_comment', anybody: 'meeting_comment_any' },
   } as const satisfies Record<ThreadEntityType, { mine: NotificationCategory; anybody: NotificationCategory }>
 
   const tellNamed = async (named: readonly string[], who: string, what: string, link: string | null) => {

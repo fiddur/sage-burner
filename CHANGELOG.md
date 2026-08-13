@@ -9,6 +9,11 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-13
 
+- **A meeting on the feed is a card you can reply to**, like a dream, a song or an announcement —
+  headed with its name, with hearts, its own bell and a thread. It was a bare line with an old-style
+  switch beside it and nowhere to say anything, which was backwards for the thing most likely to
+  need "I can't make that time". Moving a meeting brings its card back to the top.
+
 - **Nothing is destroyed on one press any more.** Removing a meeting, a talking point, a bring item,
   a ride, a comment, an announcement, an invite, a passkey, a linked provider, your picture, the app
   icon, the mail settings — anything with no undo — now asks first, names what is going, and says

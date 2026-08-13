@@ -947,6 +947,7 @@ export const meeting = sqliteTable(
     event_id: text('event_id')
       .notNull()
       .references(() => event.id, { onDelete: 'cascade' }),
+    author_account_id: text('author_account_id').references(() => account.id, { onDelete: 'set null' }),
     title: text('title').notNull(),
     starts_at: text('starts_at').notNull(),
     ends_at: text('ends_at'),

@@ -269,9 +269,11 @@ phone" means 360px.
       link opens it, and leaving the end blank means it runs an hour.
 - [ ] Press ✏️ on it: the form opens filled in with what it already says, and saving moves it.
       A link that is not `https://` is refused.
-- [ ] The feed carries a line for it — "… put a meeting in the diary: …" — which everybody
-      attending sees whatever their notification settings say, and moving it adds a second.
-      Rewording its note adds none.
+- [ ] The feed carries a **card** for it, headed with the meeting's name and carrying
+      "put it in the diary". Comment on it, heart it, and use its 🔔 — a meeting is not a
+      second-class thing on the feed. There is no separate line beside the card.
+- [ ] Move the meeting: the card says "moved it" and comes back to the top. Moving it again
+      does not stack up a second line. Rewording its note changes nothing on the feed.
 - [ ] Subscribe to the burn's calendar feed: the meeting is in it beside the dreams, with the
       joining link as its description — and the note you typed is nowhere in the file.
 - [ ] A meeting whose time has passed moves under **Meetings that have been**, and one that is
