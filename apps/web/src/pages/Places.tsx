@@ -9,6 +9,7 @@ import type { Loaded } from '../load.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
 import { CopyFrom } from '../components/CopyFrom.tsx'
+import { Destroy } from '../components/Destroy.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { IconButton } from '../components/IconButton.tsx'
@@ -153,11 +154,10 @@ export const Places = ({ api }: { api: PlacesApi }) => {
                   disabled={busy}
                   onClick={() => setEditing(row.id)}
                 />
-                <IconButton
-                  icon="🗑️"
-                  label={`Remove ${row.name}`}
-                  disabled={busy}
-                  onClick={() => run(() => api.deletePlace(row.id), 'Could not remove the place.')}
+                <Destroy
+                  what={row.name}
+                  busy={busy}
+                  onDestroy={() => run(() => api.deletePlace(row.id), 'Could not remove the place.')}
                 />
               </>
             )}

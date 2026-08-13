@@ -12,6 +12,7 @@ import { useEffect, useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { isApiError } from '../api/client.ts'
+import { Destroy } from './Destroy.tsx'
 import { ErrorText } from './ErrorText.tsx'
 import { MarkdownField } from './MarkdownField.tsx'
 import { ReorderableList } from './ReorderableList.tsx'
@@ -169,16 +170,15 @@ export const QuestionEditor = ({ api }: { api: QuestionsApi }) => {
               <button type="button" class="link-button" disabled={busy} onClick={() => setEditing(row.id)}>
                 Edit
               </button>
-              <button
-                type="button"
-                class="link-button"
-                disabled={busy}
-                onClick={() =>
+              <Destroy
+                what={row.label}
+                because="Answers already given to it stay on the applications."
+                trigger="Remove"
+                busy={busy}
+                onDestroy={() =>
                   void run(() => api.deleteQuestion(row.id).then(() => undefined), 'Could not delete.')
                 }
-              >
-                Remove
-              </button>
+              />
             </>
           )
         }

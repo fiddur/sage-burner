@@ -7,6 +7,7 @@ import type { Ceremony, PasskeyApi } from '../passkey.ts'
 import { isApiError } from '../api/client.ts'
 import { useLoad } from '../load.ts'
 import { addPasskey, messageForCeremony, passkeysWork } from '../passkey.ts'
+import { Destroy } from './Destroy.tsx'
 import { ErrorText } from './ErrorText.tsx'
 import { FormError, useFormError } from './FormError.tsx'
 import { PendingButton } from './PendingButton.tsx'
@@ -100,15 +101,14 @@ export const PasskeysField = ({
                     Added {added(key.created_at)}
                     {key.last_used_at === null ? ', never used' : `, last used ${added(key.last_used_at)}`}
                   </span>
-                  <button
-                    type="button"
-                    class="link-button"
-                    disabled={busy}
-                    aria-label={`Remove ${key.label}`}
-                    onClick={() => void remove(key.id)}
-                  >
-                    Remove
-                  </button>
+                  <Destroy
+                    what={key.label}
+                    because="This device stops being a way in."
+                    trigger="Remove"
+                    triggerLabel={`Remove ${key.label}`}
+                    busy={busy}
+                    onDestroy={() => void remove(key.id)}
+                  />
                 </li>
               ))}
             </ul>

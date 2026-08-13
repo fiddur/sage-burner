@@ -6,8 +6,8 @@ import { useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { useAction, useLoad } from '../load.ts'
+import { Destroy } from './Destroy.tsx'
 import { ErrorText } from './ErrorText.tsx'
-import { IconButton } from './IconButton.tsx'
 
 export type MealSlotsApi = Pick<
   ApiClient,
@@ -57,11 +57,10 @@ export const MealSlots = ({ api, eventId }: { api: MealSlotsApi; eventId: string
                 )
               }
             />
-            <IconButton
-              icon="🗑️"
-              label={`Remove ${slot.label}`}
-              disabled={busy}
-              onClick={() => run(() => api.deleteMealSlot(slot.id), 'Could not remove that.')}
+            <Destroy
+              what={slot.label}
+              busy={busy}
+              onDestroy={() => run(() => api.deleteMealSlot(slot.id), 'Could not remove that.')}
             />
           </li>
         ))}

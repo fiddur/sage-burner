@@ -309,6 +309,30 @@ Three rules the pages follow, all of them things a phone found first:
   browser ignore `rows`, so the fields that ask for a taller empty box would open at
   the stylesheet's floor in Chrome and at their own everywhere else.
 
+## Destroying something asks first (#594)
+
+One component, `Destroy`, for anything that cannot be undone by pressing the same control again.
+It replaces four hand-rolled copies of the same "Really …?" state — in the dream's withdrawal, the
+lead role, the FAQ entry and the songbook — and covers the twenty-eight controls that had nothing
+at all. Whether a thing asked was decided by which call site was written last, which is how a
+scheduled meeting was lost with one press.
+
+**Inline, not a modal.** The question replaces the control in place: no overlay, no portal, nothing
+to trap focus in. That is what the four originals did and it is the cheaper thing to get right.
+
+**The wording comes from two props.** `what` names the thing and `verb` says what is about to
+happen to it, so the trigger reads _Remove Sauna_, the question _Remove Sauna? Everyone on it goes
+too._ and the answer carries the accessible name _Really remove Sauna_ — which is what a test keys
+on. `because` is the clause naming what else goes; it takes markup, for the one that italicises.
+
+**A worded trigger keeps its own accessible name.** Where the control is part of a sentence — _I
+cannot come after all_, _Back to the flame_ — the visible text is the name. `triggerLabel` overrides
+that for the pages where several buttons read _Remove_ and the name has to say which.
+
+**What must not use it:** anything the same press undoes. A heart, a hand put up, taking yourself
+off a crew, a soft withdrawal that can be restored. A confirmation on everything is a confirmation
+on nothing, and those controls are how somebody explores what a button does.
+
 ## Feed
 
 A page of what everyone has been doing (#303) and what they are talking about (#375),

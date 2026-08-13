@@ -173,6 +173,7 @@ describe('QuestionEditor', () => {
     await screen.findByText('Only')
 
     screen.getByRole('button', { name: 'Remove' }).click()
+    ;(await screen.findByRole('button', { name: /^Really /u })).click()
 
     await waitFor(() => {
       expect(getQuestions).toHaveBeenCalledTimes(2)
@@ -302,6 +303,7 @@ describe('QuestionEditor', () => {
     await screen.findByText('Only')
 
     screen.getByRole('button', { name: 'Remove' }).click()
+    ;(await screen.findByRole('button', { name: /^Really /u })).click()
 
     expect((await screen.findByRole('alert')).textContent).toContain('went wrong')
     expect(screen.getByText('Only')).toBeTruthy()

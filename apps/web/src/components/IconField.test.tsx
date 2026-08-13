@@ -103,6 +103,7 @@ describe('choosing the icon on a home screen', () => {
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Back to the flame' }))
+    fireEvent.click(screen.getByRole('button', { name: /^Really /u }))
 
     await waitFor(() => {
       expect(removed).toBe(true)

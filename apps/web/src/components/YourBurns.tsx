@@ -8,6 +8,7 @@ import { isApiError } from '../api/client.ts'
 import { useBurns } from '../burn.tsx'
 import { useAction, useLoad } from '../load.ts'
 import { useViewer } from '../viewer.tsx'
+import { Destroy } from './Destroy.tsx'
 import { ErrorText } from './ErrorText.tsx'
 import { HandOverPlace } from './HandOverPlace.tsx'
 import { StayForm } from './StayForm.tsx'
@@ -145,11 +146,13 @@ export const YourBurns = ({ api }: { api: YourBurnsApi }) => {
                   />
                 ) : (
                   <p class="row">
-                    <button
-                      type="button"
-                      class="link-button"
-                      disabled={busy}
-                      onClick={() =>
+                    <Destroy
+                      what={`your place at ${burn.event.name}`}
+                      verb="Give up"
+                      because="Somebody on the waiting list may take it."
+                      trigger="I cannot come after all"
+                      busy={busy}
+                      onDestroy={() =>
                         act(
                           async () => {
                             await api.leaveEvent(burn.event.id)
@@ -161,9 +164,7 @@ export const YourBurns = ({ api }: { api: YourBurnsApi }) => {
                           },
                         )
                       }
-                    >
-                      I cannot come after all
-                    </button>
+                    />
                   </p>
                 )}
               </>

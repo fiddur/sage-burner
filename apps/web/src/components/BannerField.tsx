@@ -6,6 +6,7 @@ import type { ApiClient } from '../api/client.ts'
 import { isApiError } from '../api/client.ts'
 import { BANNER_ACCEPT, preparedBanner } from '../banner.ts'
 import { useInstallationBanner, useSetInstallationBanner } from '../installation.tsx'
+import { Destroy } from './Destroy.tsx'
 import { ErrorText } from './ErrorText.tsx'
 
 export type BannerApi = Pick<ApiClient, 'removeInstallationBanner' | 'setInstallationBanner'>
@@ -79,9 +80,13 @@ export const BannerField = ({ api }: { api: BannerApi }) => {
         </label>
 
         {banner !== undefined && banner !== null && (
-          <button type="button" class="link-button" disabled={busy} onClick={() => void remove()}>
-            Remove it
-          </button>
+          <Destroy
+            what="the banner"
+            because="A shared link draws no picture until another is uploaded."
+            trigger="Remove it"
+            busy={busy}
+            onDestroy={() => void remove()}
+          />
         )}
       </p>
 

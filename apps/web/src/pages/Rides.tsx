@@ -6,6 +6,7 @@ import { useState } from 'preact/hooks'
 import type { ApiClient } from '../api/client.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
+import { Destroy } from '../components/Destroy.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { IconButton } from '../components/IconButton.tsx'
@@ -241,11 +242,11 @@ const Half = ({
                   disabled={busy}
                   onClick={() => onEdit(row.id)}
                 />
-                <IconButton
-                  icon="🗑️"
-                  label={`Take down your journey from ${row.from}`}
-                  disabled={busy}
-                  onClick={() => onWithdraw(row.id)}
+                <Destroy
+                  what={`your journey from ${row.from}`}
+                  verb="Take down"
+                  busy={busy}
+                  onDestroy={() => onWithdraw(row.id)}
                 />
               </p>
             )}

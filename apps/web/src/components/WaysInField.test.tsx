@@ -115,6 +115,7 @@ describe('the ways in on your own details page', () => {
     show({ getMyIdentities: () => Promise.resolve({ identities: [...held] }), removeMyIdentity }, ['discord'])
 
     fireEvent.click(await screen.findByRole('button', { name: /Take Discord off/ }))
+    ;(await screen.findByRole('button', { name: /^Really /u })).click()
 
     await waitFor(() => expect(removeMyIdentity).toHaveBeenCalledWith('discord'))
     expect(await screen.findByRole('link', { name: 'Link it' })).toBeTruthy()
@@ -129,6 +130,7 @@ describe('the ways in on your own details page', () => {
     )
 
     fireEvent.click(await screen.findByRole('button', { name: /Take Discord off/ }))
+    ;(await screen.findByRole('button', { name: /^Really /u })).click()
 
     expect((await screen.findByRole('alert')).textContent).toContain('only way')
   })

@@ -1,6 +1,7 @@
 import type { MeResponse } from '@sage-burner/shared'
 
-import { apiRoutes, oauthProviderInfo, oauthProviders } from '@sage-burner/shared'
+import { apiRoutes, applyPage, feedPage, oauthProviderInfo, oauthProviders } from '@sage-burner/shared'
+import { useLocation } from 'preact-iso'
 import { useRef, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -21,6 +22,9 @@ const messageForFailure = (failure: unknown): string => {
 
   return 'Could not sign in just now. Please try again.'
 }
+
+export const landsOn = (roles: readonly ('admin' | 'member')[]): string =>
+  roles.length === 0 ? applyPage() : feedPage()
 
 export const Login = ({
   api,
@@ -44,6 +48,7 @@ export const Login = ({
   const { outcome: came, ref } = useOauthOutcome()
   const outcome = signInOutcome(came, ref)
 
+  const { route } = useLocation()
   const inFlight = useRef(false)
 
   if (viewer.status === 'loading') {
@@ -59,9 +64,7 @@ export const Login = ({
     return (
       <section class="page column">
         <h1>You are signed in</h1>
-        <p>
-          <a href="/">Go to the homepage</a>.
-        </p>
+        <p class="form-note">One moment…</p>
       </section>
     )
   }
@@ -78,6 +81,8 @@ export const Login = ({
       avatar: signedIn.avatar,
       roles: signedIn.roles,
     })
+
+    route(landsOn(signedIn.roles))
   }
 
   const withPasskey = async () => {

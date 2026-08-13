@@ -110,6 +110,7 @@ describe('YourBurns', () => {
     )
 
     fireEvent.click(await screen.findByRole('button', { name: 'I cannot come after all' }))
+    fireEvent.click(screen.getByRole('button', { name: /^Really /u }))
 
     expect((await screen.findByRole('alert')).textContent).toContain('hand your place to somebody else')
   })
@@ -196,6 +197,7 @@ describe('the bar’s list of burns', () => {
     )
 
     fireEvent.click(await screen.findByRole('button', { name: 'I cannot come after all' }))
+    fireEvent.click(screen.getByRole('button', { name: /^Really /u }))
 
     await waitFor(() => expect(leaveEvent).toHaveBeenCalledWith('e-1'))
     expect(reload).toHaveBeenCalled()

@@ -9,6 +9,7 @@ import { isApiError } from '../api/client.ts'
 import { useSocialLogins } from '../installation.tsx'
 import { useLoad } from '../load.ts'
 import { quoting, useOauthOutcome } from '../outcome.ts'
+import { Destroy } from './Destroy.tsx'
 import { ErrorText } from './ErrorText.tsx'
 import { FormError, useFormError } from './FormError.tsx'
 
@@ -103,15 +104,15 @@ export const WaysInField = ({ api }: { api: WaysInApi }) => {
               </span>
 
               {held(provider) ? (
-                <button
-                  type="button"
-                  class="link-button"
-                  disabled={busy}
-                  aria-label={`Take ${oauthProviderInfo[provider].label} off your account`}
-                  onClick={() => void remove(provider)}
-                >
-                  Take it off
-                </button>
+                <Destroy
+                  what={`${oauthProviderInfo[provider].label} from your account`}
+                  verb="Take off"
+                  because="You stop being able to sign in that way."
+                  trigger="Take it off"
+                  triggerLabel={`Take ${oauthProviderInfo[provider].label} off your account`}
+                  busy={busy}
+                  onDestroy={() => void remove(provider)}
+                />
               ) : (
                 <a class="link-button" href={apiRoutes.startOauthLink.path(provider)}>
                   Link it

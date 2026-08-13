@@ -129,6 +129,46 @@ describe('the meetings page', () => {
     expect(await screen.findByText('Nothing in the diary. Put the next one in below.')).toBeTruthy()
   })
 
+  it('asks before taking a meeting out of the diary, there being no undo', async () => {
+    const deleteMeeting = vi.fn<MeetingsApi['deleteMeeting']>(() => Promise.resolve(undefined))
+    renderPage(stub({ getMeetings: () => Promise.resolve({ meetings: [aMeeting()] }), deleteMeeting }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Take out of the diary Planning call' }))
+
+    expect(screen.getByText('Take out of the diary Planning call?')).toBeTruthy()
+    expect(deleteMeeting).not.toHaveBeenCalled()
+  })
+
+  it('takes it out once that is answered', async () => {
+    const deleteMeeting = vi.fn<MeetingsApi['deleteMeeting']>(() => Promise.resolve(undefined))
+    renderPage(stub({ getMeetings: () => Promise.resolve({ meetings: [aMeeting()] }), deleteMeeting }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Take out of the diary Planning call' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Really take out of the diary Planning call' }))
+
+    await waitFor(() => expect(deleteMeeting).toHaveBeenCalledWith('m-1'))
+  })
+
+  it('asks before taking a point off, whose thread goes with it', async () => {
+    const deleteMeetingPoint = vi.fn<MeetingsApi['deleteMeetingPoint']>(() => Promise.resolve(undefined))
+    renderPage(stub({ getMeetingPoints: () => Promise.resolve({ points: [aPoint()] }), deleteMeetingPoint }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Take off Where do we park?' }))
+
+    expect(screen.getByText(/Take off Where do we park\?/u)).toBeTruthy()
+    expect(deleteMeetingPoint).not.toHaveBeenCalled()
+  })
+
+  it('puts a new meeting in the diary from outside the box of the one already there', async () => {
+    // #595: the banner describes one meeting, so a form for a second inside its frame reads as
+    // doing something to the first.
+    const { container } = renderPage(stub({ getMeetings: () => Promise.resolve({ meetings: [aMeeting()] }) }))
+
+    const adding = await screen.findByRole('button', { name: 'Put a meeting in the diary' })
+
+    expect(container.querySelector('.next-meeting')?.contains(adding)).toBe(false)
+  })
+
   it('changes the meeting in the diary from the banner it is shown in', async () => {
     const updateMeeting = vi.fn<MeetingsApi['updateMeeting']>(() => Promise.resolve({ meeting: aMeeting() }))
     renderPage(stub({ getMeetings: () => Promise.resolve({ meetings: [aMeeting()] }), updateMeeting }))

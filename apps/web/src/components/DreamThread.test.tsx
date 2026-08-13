@@ -81,7 +81,7 @@ describe('a conversation about a dream', () => {
     expect(document.querySelector('.thread-did')?.textContent).toContain('Ada offered this dream')
     // Nobody edits or deletes what happened: only a comment is anybody's.
     expect(screen.queryByRole('button', { name: /Rewrite/ })).toBeNull()
-    expect(screen.queryByRole('button', { name: /Take this comment back/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Take back this comment/ })).toBeNull()
   })
 
   it('reads as "Somebody" where the account behind a line has gone', () => {
@@ -99,7 +99,7 @@ describe('a conversation about a dream', () => {
     )
 
     expect(screen.getAllByRole('button', { name: /Rewrite what you said/ })).toHaveLength(1)
-    expect(screen.getAllByRole('button', { name: /Take this comment back/ })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: /Take back this comment/ })).toHaveLength(1)
   })
 
   it('lets an admin take somebody else’s comment down without rewriting it', () => {
@@ -109,7 +109,7 @@ describe('a conversation about a dream', () => {
       admin: true,
     })
 
-    expect(screen.getAllByRole('button', { name: /Take this comment back/ })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: /Take back this comment/ })).toHaveLength(1)
     expect(screen.queryByRole('button', { name: /Rewrite what you said/ })).toBeNull()
   })
 

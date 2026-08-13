@@ -12,7 +12,7 @@ import type { Ceremony, PasskeyApi } from '../passkey.ts'
 
 import { apiError } from '../api/client.ts'
 import { ViewerProvider } from '../viewer.tsx'
-import { Login, signInOutcome } from './Login.tsx'
+import { landsOn, Login, signInOutcome } from './Login.tsx'
 
 /**
  * The login form against an injected client, so the assertions are about what a
@@ -340,5 +340,19 @@ describe('signing in with a passkey', () => {
 
     expect(screen.queryByRole('button', { name: 'Use a passkey' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Log in' })).toBeTruthy()
+  })
+})
+
+describe('where signing in lands', () => {
+  it('is the feed for a member, which is what they came for', () => {
+    expect(landsOn(['member'])).toBe('/feed')
+  })
+
+  it('is the feed for an admin as well', () => {
+    expect(landsOn(['admin'])).toBe('/feed')
+  })
+
+  it('is their own application for somebody with no role, who the feed would bounce', () => {
+    expect(landsOn([])).toBe('/apply')
   })
 })

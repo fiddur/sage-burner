@@ -5,6 +5,7 @@ import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 
+import { Destroy } from '../components/Destroy.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { IconButton } from '../components/IconButton.tsx'
@@ -93,11 +94,10 @@ export const AdminSongCategories = ({ api }: { api: SongCategoriesApi }) => {
                       setDraft(category.label)
                     }}
                   />
-                  <IconButton
-                    icon="🗑️"
-                    label={`Remove ${category.label}`}
-                    disabled={busy}
-                    onClick={() => run(() => api.deleteSongCategory(category.id), 'Could not remove that.')}
+                  <Destroy
+                    what={category.label}
+                    busy={busy}
+                    onDestroy={() => run(() => api.deleteSongCategory(category.id), 'Could not remove that.')}
                   />
                 </>
               )

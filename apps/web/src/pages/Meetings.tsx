@@ -19,6 +19,7 @@ import type { DreamTalk } from '../components/OpenedDream.tsx'
 import type { UploadImage } from '../image-upload.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
+import { Destroy } from '../components/Destroy.tsx'
 import { DreamThread } from '../components/DreamThread.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
@@ -190,16 +191,8 @@ export const Meetings = ({ api }: { api: MeetingsApi }) => {
           <NextMeeting
             next={next}
             busy={busy}
-            scheduling={scheduling}
             editing={amending}
-            onScheduling={setScheduling}
             onEditing={setAmending}
-            onSchedule={(fields) =>
-              run(async () => {
-                await api.addMeeting(burn.event.id, fields)
-                setScheduling(false)
-              }, 'Could not put that in the diary.')
-            }
             onSave={(id, fields) =>
               run(async () => {
                 await api.updateMeeting(id, fields)
@@ -225,6 +218,18 @@ export const Meetings = ({ api }: { api: MeetingsApi }) => {
             upload={api.uploadImage}
             onDraft={setDraft}
             onRaise={raise}
+          />
+
+          <ScheduleOne
+            busy={busy}
+            scheduling={scheduling}
+            onScheduling={setScheduling}
+            onSchedule={(fields) =>
+              run(async () => {
+                await api.addMeeting(burn.event.id, fields)
+                setScheduling(false)
+              }, 'Could not put that in the diary.')
+            }
           />
 
           <TheDiary
@@ -264,11 +269,11 @@ const TheDiary = ({
         {meetings.map((one) => (
           <li key={one.id}>
             <strong>{one.title}</strong> — {whenItIs(one)}
-            <IconButton
-              icon="🗑️"
-              label={`Take ${one.title} out of the diary`}
-              disabled={busy}
-              onClick={() => onDelete(one.id)}
+            <Destroy
+              what={one.title}
+              verb="Take out of the diary"
+              busy={busy}
+              onDestroy={() => onDelete(one.id)}
             />
           </li>
         ))}
@@ -381,24 +386,44 @@ const RaiseAPoint = ({
   </form>
 )
 
+const ScheduleOne = ({
+  busy,
+  scheduling,
+  onScheduling,
+  onSchedule,
+}: {
+  busy: boolean
+  scheduling: boolean
+  onScheduling: (wanted: boolean) => void
+  onSchedule: (fields: MeetingDraft) => void
+}) => (
+  <section>
+    <h2>Put a meeting in the diary</h2>
+
+    {scheduling ? (
+      <MeetingFields busy={busy} onCancel={() => onScheduling(false)} onSave={onSchedule} />
+    ) : (
+      <p class="row">
+        <button type="button" disabled={busy} onClick={() => onScheduling(true)}>
+          Put a meeting in the diary
+        </button>
+      </p>
+    )}
+  </section>
+)
+
 const NextMeeting = ({
   next,
   busy,
-  scheduling,
   editing,
-  onScheduling,
   onEditing,
-  onSchedule,
   onSave,
   onDelete,
 }: {
   next: Meeting | undefined
   busy: boolean
-  scheduling: boolean
   editing: boolean
-  onScheduling: (wanted: boolean) => void
   onEditing: (wanted: boolean) => void
-  onSchedule: (fields: MeetingDraft) => void
   onSave: (id: string, fields: MeetingDraft) => void
   onDelete: (id: string) => void
 }) => (
@@ -425,29 +450,22 @@ const NextMeeting = ({
       <div class="markdown-preview" dangerouslySetInnerHTML={{ __html: renderMarkdown(next.notes) }} />
     )}
 
-    <p class="row">
-      <button type="button" disabled={busy} onClick={() => onScheduling(!scheduling)}>
-        {scheduling ? 'Never mind' : 'Put a meeting in the diary'}
-      </button>
-      {next !== undefined && (
-        <>
-          <IconButton
-            icon="✏️"
-            label={`Edit ${next.title}`}
-            disabled={busy}
-            onClick={() => onEditing(!editing)}
-          />
-          <IconButton
-            icon="🗑️"
-            label={`Take ${next.title} out of the diary`}
-            disabled={busy}
-            onClick={() => onDelete(next.id)}
-          />
-        </>
-      )}
-    </p>
-
-    {scheduling && <MeetingFields busy={busy} onCancel={() => onScheduling(false)} onSave={onSchedule} />}
+    {next !== undefined && (
+      <p class="row">
+        <IconButton
+          icon="✏️"
+          label={`Edit ${next.title}`}
+          disabled={busy}
+          onClick={() => onEditing(!editing)}
+        />
+        <Destroy
+          what={next.title}
+          verb="Take out of the diary"
+          busy={busy}
+          onDestroy={() => onDelete(next.id)}
+        />
+      </p>
+    )}
 
     {editing && next !== undefined && (
       <MeetingFields
@@ -560,7 +578,13 @@ const Point = ({
           <IconButton icon="✏️" label={`Edit ${point.title}`} disabled={busy} onClick={() => onEdit(true)} />
         )}
         {(mine || admin) && (
-          <IconButton icon="🗑️" label={`Take ${point.title} off`} disabled={busy} onClick={onRemove} />
+          <Destroy
+            what={point.title}
+            verb="Take off"
+            because="What has been said about it goes too."
+            busy={busy}
+            onDestroy={onRemove}
+          />
         )}
       </p>
 

@@ -9,6 +9,7 @@ import type { DreamTalk } from '../components/OpenedDream.tsx'
 import type { UploadImage } from '../image-upload.ts'
 
 import { useSelectedBurn } from '../burn.tsx'
+import { Destroy } from '../components/Destroy.tsx'
 import { DreamThread } from '../components/DreamThread.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
@@ -329,11 +330,12 @@ const Row = ({
           <IconButton icon="✏️" label={`Edit ${item.title}`} disabled={busy} onClick={() => onEdit(true)} />
         )}
         {(mine || admin) && (
-          <IconButton
-            icon="🗑️"
-            label={`Take ${item.title} off the list`}
-            disabled={busy}
-            onClick={onWithdraw}
+          <Destroy
+            what={item.title}
+            verb="Take off"
+            because="It goes off the bring list."
+            busy={busy}
+            onDestroy={onWithdraw}
           />
         )}
       </p>

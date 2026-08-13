@@ -228,6 +228,7 @@ describe('the rideshare board', () => {
     renderPage(stub({ deleteRide }, [aRide({ id: 'r-1', from: 'Göteborg' })]))
 
     fireEvent.click(await screen.findByRole('button', { name: 'Take down your journey from Göteborg' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Really take down your journey from Göteborg' }))
 
     await waitFor(() => expect(deleteRide).toHaveBeenCalledWith('r-1'))
   })
@@ -240,6 +241,7 @@ describe('the rideshare board', () => {
     )
 
     fireEvent.click(await screen.findByRole('button', { name: 'Take down your journey from Göteborg' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Really take down your journey from Göteborg' }))
 
     expect((await screen.findByRole('alert')).textContent).toContain('That is not yours.')
   })
