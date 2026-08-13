@@ -5,7 +5,7 @@ import {
   threadEntryKinds,
 } from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
-import { cpSync, mkdtempSync, readdirSync } from 'node:fs'
+import { cpSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -177,6 +177,32 @@ describe('migrations', () => {
     expect(indexes('thread')).toEqual(['thread_entity_idx', 'thread_event_idx', 'thread_subject_idx'])
     expect(indexes('notification')).toEqual(['notification_account_idx'])
     expect(indexes('activity')).toEqual(['activity_event_idx', 'activity_recent_idx'])
+  })
+
+  it('sweeps out the feed lines meetings had for half a day, and leaves every other line', () => {
+    // A fresh database has none of these, so asserting on one proves nothing about the migration.
+    // This runs the statement that ships, against rows of the shape it exists to remove.
+    const sql = readFileSync(
+      path.join(migrationsFolder, '20260813160000_meeting_lines_gone', 'migration.sql'),
+      'utf8',
+    )
+
+    const seeded: readonly [string, string][] = [
+      ['a-1', 'meeting_scheduled'],
+      ['a-2', 'meeting_scheduled'],
+      ['a-3', 'dream_offered'],
+    ]
+
+    for (const [id, category] of seeded) {
+      handle.client
+        .prepare('insert into activity (id, event_id, category, body, link, created_at) values (?,?,?,?,?,?)')
+        .run(id, ids.event, category, 'something happened', null, '2026-08-13T09:00:00.000Z')
+    }
+
+    handle.client.exec(sql)
+
+    const left = handle.client.prepare('select id from activity order by id').all()
+    expect(left).toEqual([{ id: 'a-3' }])
   })
 
   it('is idempotent — running again on the same database is a no-op', () => {

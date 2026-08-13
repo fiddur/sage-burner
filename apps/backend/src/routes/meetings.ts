@@ -32,7 +32,7 @@ import { account, event, meeting, meetingPoint, thread } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { displayName, namedBy, reachedByMention, tellAttendees } from '../push/notify.ts'
 import { openEventNow, todayIso } from './events.ts'
-import { addEntry, renameThread, threadFor, threadIdFor } from './threads.ts'
+import { addEntry, forgetThread, renameThread, threadFor, threadIdFor } from './threads.ts'
 
 export interface MeetingDeps extends GuardDeps {
   now: () => Date
@@ -282,7 +282,10 @@ export const registerMeetingRoutes = (
       const mine = existing.author_account_id === viewer.account_id
       if (!mine && !viewer.roles.includes('admin')) return sendError(reply, 403)
 
-      await db.delete(meetingPoint).where(eq(meetingPoint.id, existing.id))
+      db.transaction((tx) => {
+        tx.delete(meetingPoint).where(eq(meetingPoint.id, existing.id)).run()
+        forgetThread(tx, 'point', existing.id)
+      })
 
       return reply.code(204).send()
     },
@@ -438,7 +441,10 @@ export const registerMeetingRoutes = (
     const existing = await meetingOnOpenBurn(db, now, request.params.id)
     if (existing === undefined) return sendError(reply, 404)
 
-    await db.delete(meeting).where(eq(meeting.id, existing.id))
+    db.transaction((tx) => {
+      tx.delete(meeting).where(eq(meeting.id, existing.id)).run()
+      forgetThread(tx, 'meeting', existing.id)
+    })
 
     return reply.code(204).send()
   })

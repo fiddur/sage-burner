@@ -146,6 +146,18 @@ export const addEntry = async (db: Database, entry: NewEntry, at: Date): Promise
   return 'inserted'
 }
 
+/**
+ * A meeting and a talking point are the only thread-carrying things that are deleted outright
+ * rather than withdrawn, and `thread` is polymorphic, so nothing cascades — the card would outlive
+ * the thing it is about. `thread_entry`, `thread_support` and `thread_follow` all cascade from
+ * `thread`, so this is the whole cleanup.
+ */
+export const forgetThread = (tx: Transaction, type: ThreadEntityType, entityId: string) => {
+  tx.delete(thread)
+    .where(and(eq(thread.entity_type, type), eq(thread.entity_id, entityId)))
+    .run()
+}
+
 export const threadFor = async (
   db: Database,
   type: ThreadEntityType,

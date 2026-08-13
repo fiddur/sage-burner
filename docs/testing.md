@@ -272,6 +272,8 @@ phone" means 360px.
 - [ ] The feed carries a **card** for it, headed with the meeting's name and carrying
       "put it in the diary". Comment on it, heart it, and use its 🔔 — a meeting is not a
       second-class thing on the feed. There is no separate line beside the card.
+- [ ] Take the meeting out of the diary: its card goes off the feed with it, and so does what
+      was said on it. The same for a talking point.
 - [ ] Move the meeting: the card says "moved it" and comes back to the top. Moving it again
       does not stack up a second line. Rewording its note changes nothing on the feed.
 - [ ] Subscribe to the burn's calendar feed: the meeting is in it beside the dreams, with the

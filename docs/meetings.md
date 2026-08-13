@@ -81,6 +81,14 @@ hearing. Renaming it renames the thread, so the card cannot go on showing the ol
 somebody to tell when a reply lands. Rows written before it keep a null one, exactly as a post whose
 author has left does.
 
+**Taking one out takes its card with it** (#608). A meeting and a talking point are the only
+thread-carrying things deleted outright: a post, a song and a bring item are all withdrawn, which is
+why their tombstone card is deliberate and the conversation under it survives. `thread` is
+polymorphic — `entity_type` and `entity_id`, no foreign key — so nothing cascades, and the card
+outlived the meeting until the delete started removing the thread in the same transaction.
+`thread_entry`, `thread_support` and `thread_follow` all cascade from `thread`, so that is the whole
+cleanup.
+
 **One at a time in the banner.** The next meeting is where it is edited and where it is taken out
 of the diary, because that is the one anybody is looking at; everything else is a line under it.
 Meetings that have already been sit in a list of their own rather than mixed into the ones still
