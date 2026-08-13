@@ -10,7 +10,7 @@ import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, activity, attendance, event } from '../db/schema.ts'
+import { account, accountRole, activity, attendance, event, thread, threadEntry } from '../db/schema.ts'
 
 const SECRET = 'm'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
@@ -222,13 +222,13 @@ describe('deciding a point', () => {
     await decide(server, ada.cookie, id, { decision: 'By the barn' })
 
     const [point] = await listing(server, ada.cookie)
-    const thread = await server.inject({
+    const said = await server.inject({
       method: 'GET',
       url: `/api/threads/${point?.thread_id ?? ''}`,
       headers: { cookie: ada.cookie },
     })
     expect(
-      thread.json().thread.entries.map((entry: { kind: string; body: string }) => [entry.kind, entry.body]),
+      said.json().thread.entries.map((entry: { kind: string; body: string }) => [entry.kind, entry.body]),
     ).toEqual([
       ['raised', 'raised this'],
       ['decided', 'By the barn'],
@@ -326,6 +326,19 @@ describe('who may change a point', () => {
 
     expect(gone.statusCode).toBe(204)
     expect((await points(server, ada.cookie)).json().points).toEqual([])
+  })
+
+  it('takes the card off the feed when a point goes, for the same reason', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const id = (await raise(server, ada.cookie, { title: 'Where do we park?' })).json().point.id
+
+    await server.inject({ method: 'DELETE', url: `/api/points/${id}`, headers: { cookie: ada.cookie } })
+
+    const feed = await server.inject({ method: 'GET', url: '/api/feed', headers: { cookie: ada.cookie } })
+    expect(feed.json().threads).toEqual([])
   })
 
   it('refuses a member who neither raised it nor organises', async () => {
@@ -542,6 +555,36 @@ describe('the meetings themselves', () => {
     })
 
     expect(changed.statusCode).toBe(400)
+  })
+
+  it('takes its card off the feed with it, the meeting no longer existing to have one', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const id = (
+      await schedule(server, ada.cookie, { title: 'Planning call', starts_at: '2026-07-20T17:00:00.000Z' })
+    ).json().meeting.id
+
+    await server.inject({ method: 'DELETE', url: `/api/meetings/${id}`, headers: { cookie: ada.cookie } })
+
+    const feed = await server.inject({ method: 'GET', url: '/api/feed', headers: { cookie: ada.cookie } })
+    expect(feed.json().threads).toEqual([])
+  })
+
+  it('leaves nothing of the conversation about it either', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+    const id = (
+      await schedule(server, ada.cookie, { title: 'Planning call', starts_at: '2026-07-20T17:00:00.000Z' })
+    ).json().meeting.id
+
+    await server.inject({ method: 'DELETE', url: `/api/meetings/${id}`, headers: { cookie: ada.cookie } })
+
+    expect(await db().select().from(thread)).toEqual([])
+    expect(await db().select().from(threadEntry)).toEqual([])
   })
 
   it('takes one off the diary again', async () => {

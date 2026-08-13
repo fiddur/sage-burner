@@ -5,7 +5,7 @@ import {
   threadEntryKinds,
 } from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
-import { cpSync, mkdtempSync, readdirSync } from 'node:fs'
+import { cpSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -177,6 +177,67 @@ describe('migrations', () => {
     expect(indexes('thread')).toEqual(['thread_entity_idx', 'thread_event_idx', 'thread_subject_idx'])
     expect(indexes('notification')).toEqual(['notification_account_idx'])
     expect(indexes('activity')).toEqual(['activity_event_idx', 'activity_recent_idx'])
+  })
+
+  const leftovers = () =>
+    readFileSync(path.join(migrationsFolder, '20260813160000_meeting_leftovers', 'migration.sql'), 'utf8')
+
+  const givenMeeting = (id: string) => {
+    handle.client
+      .prepare('insert into meeting (id, event_id, title, starts_at, notes, created_at) values (?,?,?,?,?,?)')
+      .run(id, ids.event, 'Planning call', '2026-08-20T17:00:00.000Z', '', '2026-08-13T09:00:00.000Z')
+  }
+
+  const givenThread = (id: string, type: string, entityId: string) => {
+    handle.client
+      .prepare('insert into thread (id, event_id, entity_type, entity_id, title) values (?,?,?,?,?)')
+      .run(id, ids.event, type, entityId, 'Planning call')
+    handle.client
+      .prepare(
+        'insert into thread_entry (id, thread_id, kind, seq, author_account_id, body, created_at) ' +
+          'values (?,?,?,?,?,?,?)',
+      )
+      .run(`${id}-e`, id, 'scheduled', 1, ids.account, 'put it in the diary', '2026-08-13T09:00:00.000Z')
+  }
+
+  it('sweeps out the feed lines meetings had for half a day, and leaves every other line', () => {
+    const seeded: readonly [string, string][] = [
+      ['a-1', 'meeting_scheduled'],
+      ['a-2', 'meeting_scheduled'],
+      ['a-3', 'dream_offered'],
+    ]
+
+    for (const [id, category] of seeded) {
+      handle.client
+        .prepare('insert into activity (id, event_id, category, body, link, created_at) values (?,?,?,?,?,?)')
+        .run(id, ids.event, category, 'something happened', null, '2026-08-13T09:00:00.000Z')
+    }
+
+    handle.client.exec(leftovers())
+
+    expect(handle.client.prepare('select id from activity order by id').all()).toEqual([{ id: 'a-3' }])
+  })
+
+  it('sweeps out a card whose meeting is gone, and the conversation stranded under it', () => {
+    givenMeeting('m-live')
+    givenThread('t-gone', 'meeting', 'm-vanished')
+    givenThread('t-live', 'meeting', 'm-live')
+
+    handle.client.exec(leftovers())
+
+    expect(handle.client.prepare('select id from thread order by id').all()).toEqual([{ id: 't-live' }])
+    expect(handle.client.prepare('select thread_id from thread_entry').all()).toEqual([
+      { thread_id: 't-live' },
+    ])
+  })
+
+  it('does the same for a talking point, and leaves every other kind of card alone', () => {
+    givenThread('t-point', 'point', 'p-vanished')
+    givenThread('t-song', 'song', 'whatever-song')
+
+    handle.client.exec(leftovers())
+
+    expect(handle.client.prepare('select id from thread order by id').all()).toEqual([{ id: 't-song' }])
   })
 
   it('is idempotent — running again on the same database is a no-op', () => {

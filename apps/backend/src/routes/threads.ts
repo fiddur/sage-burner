@@ -146,6 +146,12 @@ export const addEntry = async (db: Database, entry: NewEntry, at: Date): Promise
   return 'inserted'
 }
 
+export const forgetThread = (tx: Transaction, type: ThreadEntityType, entityId: string) => {
+  tx.delete(thread)
+    .where(and(eq(thread.entity_type, type), eq(thread.entity_id, entityId)))
+    .run()
+}
+
 export const threadFor = async (
   db: Database,
   type: ThreadEntityType,

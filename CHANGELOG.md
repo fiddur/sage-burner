@@ -9,6 +9,11 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-13
 
+- **A meeting taken out of the diary leaves the feed too.** Its card stayed behind, and so did the
+  lines meetings had for the half-day before they were cards — so a meeting nobody had any more was
+  on the feed twice. Both are gone, including the ones already stranded there, and the same for a
+  talking point.
+
 - **A meeting on the feed is a card you can reply to**, like a dream, a song or an announcement —
   headed with its name, with hearts, its own bell and a thread. It was a bare line with an old-style
   switch beside it and nowhere to say anything, which was backwards for the thing most likely to
