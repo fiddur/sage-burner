@@ -54,6 +54,7 @@ import type {
   MyApplicationResponse,
   MyBurnsResponse,
   MyImagesResponse,
+  NotificationLogResponse,
   NotificationSettings,
   NotificationsResponse,
   OAuthSettingsResponse,
@@ -290,6 +291,9 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
 
     getMyNotifications: (signal?: AbortSignal) =>
       request<NotificationsResponse>(apiRoutes.getMyNotifications.path(), { signal }),
+
+    getNotificationLog: (signal?: AbortSignal) =>
+      request<NotificationLogResponse>(apiRoutes.getNotificationLog.path(), { signal }),
 
     markNotificationsSeen: () =>
       request<NotificationsResponse>(apiRoutes.markNotificationsSeen.path(), {

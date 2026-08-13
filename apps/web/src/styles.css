@@ -2300,6 +2300,22 @@ img.avatar {
   background: color-mix(in srgb, var(--sage) 10%, transparent);
 }
 
+/*
+  The nudge under the notification categories (#574). The sage of `.install-app` rather than
+  the ember of a warning: a tick that will not reach this browser is worth saying, but it is
+  an offer, not something going wrong.
+*/
+.push-nudge {
+  margin: 1rem 0;
+  padding: 0.6rem 0.8rem;
+  border-left: 3px solid var(--sage);
+  background: color-mix(in srgb, var(--sage) 10%, transparent);
+}
+
+.push-nudge > p:last-child {
+  margin-bottom: 0;
+}
+
 /* What is on screen has not refreshed in five minutes. Muted rather than alarming:
    the app still works, and this is a caveat on it rather than a failure. */
 .stale-data {

@@ -901,3 +901,97 @@ describe('the email channel', () => {
     expect((await list(app, ada.cookie)).json().notifications).toHaveLength(1)
   })
 })
+
+describe('the log an organiser scans', () => {
+  const log = (server: FastifyInstance, cookie?: string) =>
+    server.inject({
+      method: 'GET',
+      url: '/api/admin/notification-log',
+      headers: cookie === undefined ? {} : { cookie },
+    })
+
+  it('says what went out, to how many, and how many devices took it', async () => {
+    const server = await build()
+    await givenBurn()
+    const admin = await givenAccount(['admin'])
+    const ada = await givenAccount()
+    await givenComing(ada.id)
+    await givenSubscribed(ada.id)
+
+    await setPaid(server, admin.cookie, ada.id)
+
+    expect((await log(server, admin.cookie)).json().entries).toMatchObject([
+      { category: 'payment', told: 1, suppressed: 0, accepted: 1, failed: 0, gone: 0 },
+    ])
+  })
+
+  it('counts the devices that were not there to take it', async () => {
+    const server = await build(() => Promise.resolve('gone'))
+    await givenBurn()
+    const admin = await givenAccount(['admin'])
+    const ada = await givenAccount()
+    await givenComing(ada.id)
+    await givenSubscribed(ada.id)
+
+    await setPaid(server, admin.cookie, ada.id)
+
+    expect((await log(server, admin.cookie)).json().entries[0]).toMatchObject({ accepted: 0, gone: 1 })
+  })
+
+  it("is nobody but an admin's", async () => {
+    const server = await build()
+    const member = await givenAccount()
+
+    expect((await log(server, member.cookie)).statusCode).toBe(403)
+  })
+
+  it('refuses somebody who is not signed in', async () => {
+    const server = await build()
+
+    expect((await log(server)).statusCode).toBe(401)
+  })
+})
+
+describe('what one line in the log covers', () => {
+  const log = (server: FastifyInstance, cookie: string) =>
+    server.inject({ method: 'GET', url: '/api/admin/notification-log', headers: { cookie } })
+
+  it('is a whole waiting-list warning, however many have not paid', async () => {
+    const server = await build()
+    await givenBurn(5)
+    const admin = await givenAccount(['admin'])
+    const paid = await givenAccount()
+    for (const one of [paid, await givenAccount(), await givenAccount()]) await givenComing(one.id)
+
+    await setPaid(server, admin.cookie, paid.id)
+
+    const said = (await log(server, admin.cookie)).json().entries
+    expect(said.filter((one: { category: string }) => one.category === 'waiting_list_near')).toHaveLength(1)
+  })
+
+  it('is a whole burn-wide comment, not one line per person hearing it', async () => {
+    const server = await build()
+    await givenBurn(10)
+    const admin = await givenAccount(['admin'])
+    const ada = await givenAccount()
+    const bo = await givenAccount()
+    const cyd = await givenAccount()
+    for (const one of [admin, ada, bo, cyd]) await givenComing(one.id)
+    const item = await server.inject({
+      method: 'POST',
+      url: `/api/events/${BURN}/bring`,
+      headers: { cookie: ada.cookie },
+      payload: { title: 'A gazebo' },
+    })
+
+    await server.inject({
+      method: 'POST',
+      url: `/api/threads/${item.json().item.thread_id}/comments`,
+      headers: { cookie: bo.cookie },
+      payload: { body: 'Here is a thought' },
+    })
+
+    const said = (await log(server, admin.cookie)).json().entries
+    expect(said.filter((one: { body: string }) => one.body.includes('said something'))).toHaveLength(2)
+  })
+})

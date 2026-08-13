@@ -241,6 +241,15 @@ phone" means 360px.
 - [ ] With SMTP configured (⚙️ → Settings), the test message goes to the
       admin's own address, and the email column appears on the notification
       settings — off everywhere until asked.
+- [ ] In a browser with push off, tick a category on the details page: a nudge appears
+      under the table offering to turn notifications on here. Press "Do not ask me here",
+      tick another category — no nudge. In a different browser, ticking one nudges again.
+- [ ] Take up an invite in a browser with push off: the welcome offers "Notify me here",
+      and accepting it subscribes without a trip to another page.
+- [ ] ⚙️ → Notifications sent lists what has gone out, newest first, with the number told,
+      the number who had the category off, and the devices that took it. Cause a burn-wide
+      notification: it is **one** line whose "Told" is the number attending, not one line
+      per person.
 
 ## The calendar
 

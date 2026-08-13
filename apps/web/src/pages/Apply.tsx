@@ -18,7 +18,7 @@ import {
 import { useCallback, useMemo, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
-import type { PushApi } from '../components/PushToggle.tsx'
+import type { PushToggleApi } from '../components/PushToggle.tsx'
 import type { SignUpApi } from '../components/SignUpForm.tsx'
 
 import { isApiError } from '../api/client.ts'
@@ -40,7 +40,7 @@ export type ApplyApi = Pick<
   ApiClient,
   'getQuestions' | 'submitApplication' | 'getMyApplication' | 'sendMyApplicationMessage'
 > &
-  PushApi &
+  PushToggleApi &
   SignUpApi
 
 interface ApplyProps {
@@ -70,7 +70,7 @@ const emailProblem = (value: string) =>
     : (identityProblem(value, MAX_APPLICANT_EMAIL_LENGTH) ??
       (looksLikeEmail(value) ? undefined : 'malformed'))
 
-const Waiting = ({ sendsEmail, api }: { sendsEmail?: boolean; api: PushApi }) => (
+const Waiting = ({ sendsEmail, api }: { sendsEmail?: boolean; api: PushToggleApi }) => (
   <>
     <h1>Application sent</h1>
     <p role="status">

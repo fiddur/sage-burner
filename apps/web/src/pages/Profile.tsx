@@ -7,7 +7,7 @@ import type { ApiClient } from '../api/client.ts'
 import type { ConnectionsApi } from '../components/ConnectionsField.tsx'
 import type { PasskeysApi } from '../components/PasskeysField.tsx'
 import type { PicturesApi } from '../components/PicturesField.tsx'
-import type { PushApi } from '../components/PushToggle.tsx'
+import type { PushToggleApi } from '../components/PushToggle.tsx'
 import type { WaysInApi } from '../components/WaysInField.tsx'
 import type { YourBurnsApi } from '../components/YourBurns.tsx'
 
@@ -43,7 +43,7 @@ export type ProfileApi = Pick<
   PasskeysApi &
   PicturesApi &
   WaysInApi &
-  PushApi &
+  PushToggleApi &
   YourBurnsApi
 
 export const ProfilePage = ({ api }: { api: ProfileApi }) => {

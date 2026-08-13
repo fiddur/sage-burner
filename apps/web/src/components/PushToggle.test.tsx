@@ -2,12 +2,13 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/pr
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { PushBrowser } from '../push.ts'
-import type { PushApi } from './PushToggle.tsx'
+import type { PushToggleApi } from './PushToggle.tsx'
 
 import { apiError } from '../api/client.ts'
 import { decodeVapidKey, subscriptionBody } from '../push.ts'
 import { ViewerProvider } from '../viewer.tsx'
-import { ACTIVATION_LIMIT_MS, PushToggle } from './PushToggle.tsx'
+import { ACTIVATION_LIMIT_MS } from './PushHere.tsx'
+import { PushToggle } from './PushToggle.tsx'
 
 afterEach(cleanup)
 
@@ -67,7 +68,7 @@ const aBrowser = (over: Partial<PushBrowser> = {}): PushBrowser => ({
 /** The one call whose arguments a test needs to inspect. */
 type Subscribe = Awaited<ReturnType<PushBrowser['register']>>['subscribe']
 
-const stub = (over: Partial<PushApi> = {}): PushApi => ({
+const stub = (over: Partial<PushToggleApi> = {}): PushToggleApi => ({
   getMyNotificationSettings: () => Promise.resolve({ on: [], email: [] }),
   updateMyNotificationSettings: () =>
     Promise.reject(new Error('updateMyNotificationSettings is not stubbed here')),
@@ -199,7 +200,7 @@ describe('PushToggle', () => {
     // the browser keeps its subscription — a restored volume, or a role removed and
     // given back. Without this the toggle says "on" and nothing arrives, fixable
     // only by pressing Stop and then Start.
-    const subscribeToPush = vi.fn<PushApi['subscribeToPush']>(() => Promise.resolve(undefined))
+    const subscribeToPush = vi.fn<PushToggleApi['subscribeToPush']>(() => Promise.resolve(undefined))
     const { browser } = rememberingBrowser()
     render(<PushToggle api={stub({ subscribeToPush })} browser={browser} />)
 
@@ -215,7 +216,7 @@ describe('PushToggle', () => {
   })
 
   it('does not re-assert when this browser has no subscription', async () => {
-    const subscribeToPush = vi.fn<PushApi['subscribeToPush']>(() => Promise.resolve(undefined))
+    const subscribeToPush = vi.fn<PushToggleApi['subscribeToPush']>(() => Promise.resolve(undefined))
     render(<PushToggle api={stub({ subscribeToPush })} browser={aBrowser()} />)
 
     await screen.findByRole('button', { name: 'Notify me here' })
@@ -239,7 +240,7 @@ describe('PushToggle', () => {
   })
 
   it('subscribes and sends the endpoint and keys', async () => {
-    const subscribeToPush = vi.fn<PushApi['subscribeToPush']>(() => Promise.resolve(undefined))
+    const subscribeToPush = vi.fn<PushToggleApi['subscribeToPush']>(() => Promise.resolve(undefined))
     render(<PushToggle api={stub({ subscribeToPush })} browser={aBrowser()} />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Notify me here' }))
@@ -278,7 +279,7 @@ describe('PushToggle', () => {
   })
 
   it('does not subscribe when permission is refused at the prompt', async () => {
-    const subscribeToPush = vi.fn<PushApi['subscribeToPush']>(() => Promise.resolve(undefined))
+    const subscribeToPush = vi.fn<PushToggleApi['subscribeToPush']>(() => Promise.resolve(undefined))
     render(
       <PushToggle
         api={stub({ subscribeToPush })}
@@ -346,7 +347,7 @@ describe('PushToggle', () => {
   })
 
   it('unsubscribes by the endpoint the browser still holds', async () => {
-    const unsubscribeFromPush = vi.fn<PushApi['unsubscribeFromPush']>(() => Promise.resolve(undefined))
+    const unsubscribeFromPush = vi.fn<PushToggleApi['unsubscribeFromPush']>(() => Promise.resolve(undefined))
     render(
       <PushToggle
         api={stub({ unsubscribeFromPush })}
@@ -371,7 +372,7 @@ describe('PushToggle', () => {
     // keeps answering, and the toggle reads "on" with nothing subscribed — and the
     // 'on' branch only offers to turn it off, so there is no way back.
     const { browser, unsubscribe } = rememberingBrowser()
-    const unsubscribeFromPush = vi.fn<PushApi['unsubscribeFromPush']>(() => Promise.resolve(undefined))
+    const unsubscribeFromPush = vi.fn<PushToggleApi['unsubscribeFromPush']>(() => Promise.resolve(undefined))
     render(<PushToggle api={stub({ unsubscribeFromPush })} browser={browser} />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Stop notifying me here' }))
@@ -407,7 +408,7 @@ describe('PushToggle', () => {
     // The consequence of the bug above, from the outside: the state the page
     // derives on mount has to agree with what the server was told.
     const { browser, getSubscription } = rememberingBrowser()
-    const subscribeToPush = vi.fn<PushApi['subscribeToPush']>(() => Promise.resolve(undefined))
+    const subscribeToPush = vi.fn<PushToggleApi['subscribeToPush']>(() => Promise.resolve(undefined))
     render(<PushToggle api={stub({ subscribeToPush })} browser={browser} />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Stop notifying me here' }))
@@ -435,7 +436,7 @@ describe('PushToggle', () => {
     // `notifyAdmins` deletes it — whereas a leftover browser subscription shows
     // "on" with nothing behind it and no way back.
     const { browser, unsubscribe } = rememberingBrowser()
-    const unsubscribeFromPush = vi.fn<PushApi['unsubscribeFromPush']>(() =>
+    const unsubscribeFromPush = vi.fn<PushToggleApi['unsubscribeFromPush']>(() =>
       Promise.reject(apiError(500, 'internal', 'Server fell over.')),
     )
     render(<PushToggle api={stub({ unsubscribeFromPush })} browser={browser} />)

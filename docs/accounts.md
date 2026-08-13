@@ -1008,6 +1008,72 @@ a bell filling with things somebody asked not to hear about is the same noise in
 quieter place. The same holds in the other direction: nothing is recorded at all for a
 category somebody never turned on.
 
+### Asked for at the moment somebody joins (#574)
+
+The permission prompt used to live in one place, the toggle, and the toggle was rendered in two:
+the details page and the _Application sent_ panel. **The invite flow asked nowhere.** Somebody who
+followed a link, filled the form and read "You are in, signed in, and on the list" got the install
+strip and no offer of notifications at all — at the one moment they have just decided to join. So
+the invite welcome offers it, the way Apply's waiting panel does.
+
+**One implementation, not a second copy of a control.** `usePushHere` is the state machine and
+`PushAsk` is the button and the copy for the states it cannot offer one in; the toggle on the
+details page is that pair plus the category table, the invite welcome is the pair alone. That is
+the distinction `docs/the-app.md` draws when it says signing out and the toggle live in one place:
+what must not be duplicated is a _control_ whose two copies can disagree about what is on. Two
+places asking one browser for one permission cannot.
+
+**Ticking a category is the other moment worth asking at.** "Tell me about X" on a browser with no
+subscription reaches the bell and nothing else, which is precisely the silence this closes — so
+switching one on there raises a nudge under the table, with the same button. It repeats, because the
+answer differs per browser and per moment, and it carries **"Do not ask me here"** so it cannot
+become the thing people learn to skip past. That refusal is `localStorage`, per browser like the
+subscription itself — a "never ask" that synced across devices would silence a phone because
+somebody said no on a laptop — and a key of its own rather than the install strip's, since having
+the app installed says nothing about wanting to be notified.
+
+**On iOS it leads with installing**, because push does not exist in Safari until the app is on the
+home screen: `PushAsk` renders the install line rather than a button that cannot deliver, splitting
+on whether this is already the installed copy exactly as the toggle did.
+
+### What went out, and how far it got (#575)
+
+`notification` rows say who was told; nothing said whether it arrived. `notifyRows` computed
+`{ sent, failed, gone }` per account and threw them away — the callback in `app.ts` logged the
+counts only when something went wrong, with no account and no category — and somebody with the
+category switched off left no trace at all, which for an audit is the interesting half.
+
+**One row per notification, not per recipient.** `notification_batch` is what ⚙️ → Notifications
+sent lists: when, the category, the first line of the body, how many were told, how many had it
+switched off, how many devices took it, how many emails were queued. A fan-out to thirty attendees
+is one line here and thirty in `notification`.
+
+**`oneBatch` is what makes that true, and every shared-audience loop calls it** — not only the
+fan-out helpers. A comment on a card tells the people in it and, separately, everybody who asked
+about that kind; the waiting list tells everybody who has not paid. Those are loops in
+`threads.ts` and `waiting-list.ts` calling the notifier directly, and without an id minted once
+above them each recipient opened a row of their own: a comment in a forty-person burn wrote forty
+lines, nearly all `told: 0, suppressed: 1`, pushing everything real out of the two hundred the
+page holds. One category per row, so a comment is two rows — the participants' and the listeners'
+— because those are two categories and the log is read by what it was about.
+
+Mentions stay one row per person, deliberately: they are separate notifications with separate
+bodies, naming different people.
+
+**`accepted` is not `delivered`, and the column is named so it cannot be read as one.** It counts
+the subscriptions the push service took; `gone` is a 404 or 410, meaning the subscription is dead
+and `push.ts` has just deleted it. What a device actually showed is unknowable without the service
+worker acknowledging a `push` — and only while online — which is not what this is.
+
+**It prunes itself.** These are member records in aggregate, and the issue an audit log always has
+is unbounded growth, so a row older than `RETENTION_DAYS` goes when the next notification opens a
+batch. The `notification` rows are the record; this is the delivery note.
+
+**No CHECK on its category**, unlike `notification`, `notification_setting` and `activity`. Those
+three are rebuilt by every migration that widens the vocabulary and a fourth would tax that change
+again — for a table nothing but this process writes into, and where a write failing because the
+vocabulary moved on would mean losing the record of a notification that did go out.
+
 ### The email column
 
 Where an admin has set an SMTP server up, each row grows a second switch (#30). The

@@ -70,6 +70,9 @@ export const Admin = ({ api }: { api: AdminApi }) => {
         <a href="/admin/song-categories">Song categories</a>
       </p>
       <p>
+        <a href="/admin/notifications">Notifications sent</a>
+      </p>
+      <p>
         <a href="/admin/settings">Settings</a>
       </p>
 

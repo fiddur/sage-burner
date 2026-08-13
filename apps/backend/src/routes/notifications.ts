@@ -1,4 +1,8 @@
-import type { NotificationSettings, NotificationsResponse } from '@sage-burner/shared'
+import type {
+  NotificationLogResponse,
+  NotificationSettings,
+  NotificationsResponse,
+} from '@sage-burner/shared'
 import type { FastifyInstance } from 'fastify'
 
 import {
@@ -14,7 +18,9 @@ import type { GuardDeps } from '../auth/guards.ts'
 import { viewerFor } from '../auth/viewer.ts'
 import { notificationSetting } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
-import { markSeen, markShownSeen, notificationsFor, switchedOn } from '../push/notify.ts'
+import { markSeen, markShownSeen, notificationBatches, notificationsFor, switchedOn } from '../push/notify.ts'
+
+export const LOG_LENGTH = 200
 
 export interface NotificationDeps extends GuardDeps {
   now: () => Date
@@ -31,6 +37,12 @@ export const registerNotificationRoutes = (app: FastifyInstance, { db, sessions,
     if (accountId === undefined) return sendError(reply, 401)
 
     return (await notificationsFor(db, accountId)) satisfies NotificationsResponse
+  })
+
+  app.get(apiRoutes.getNotificationLog.fastify, async (_request, reply) => {
+    void noStore(reply)
+
+    return { entries: await notificationBatches(db, LOG_LENGTH) } satisfies NotificationLogResponse
   })
 
   app.post(apiRoutes.markNotificationsSeen.fastify, async (request, reply) => {

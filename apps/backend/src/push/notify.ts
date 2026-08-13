@@ -6,7 +6,7 @@ import {
   notificationCategories,
   notifiesByDefault,
 } from '@sage-burner/shared'
-import { and, count, desc, eq, inArray, isNull, lte } from 'drizzle-orm'
+import { and, count, desc, eq, inArray, isNull, lt, lte, sql } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { Database } from '../db/index.ts'
@@ -19,6 +19,7 @@ import {
   activity,
   attendance,
   notification,
+  notificationBatch,
   notificationSetting,
 } from '../db/schema.ts'
 import { notifyAccount } from './push.ts'
@@ -27,7 +28,72 @@ export interface Told {
   category: NotificationCategory
   body: string
   link: string | null
+  batch?: string
 }
+
+export const RETENTION_DAYS = 90
+
+interface Counted {
+  told?: number
+  suppressed?: number
+  emailed?: number
+  accepted?: number
+  failed?: number
+  gone?: number
+}
+
+/**
+ * One notification, however many people it reaches. Every loop that tells a shared audience the
+ * same thing calls this once and passes the result to each `notify`, so `notification_batch` gets
+ * one row rather than one per recipient — which is what makes the log readable at all.
+ */
+export const oneBatch = (told: Told): Told => ({ ...told, batch: told.batch ?? randomUUID() })
+
+const countInto = async (db: Database, at: Date, told: Told, counted: Counted) => {
+  const id = told.batch ?? randomUUID()
+
+  const opened = await db
+    .insert(notificationBatch)
+    .values({
+      id,
+      category: told.category,
+      body: told.body,
+      link: told.link,
+      created_at: at.toISOString(),
+    })
+    .onConflictDoNothing()
+    .returning({ id: notificationBatch.id })
+
+  if (opened.length > 0) {
+    await db
+      .delete(notificationBatch)
+      .where(
+        lt(
+          notificationBatch.created_at,
+          new Date(at.getTime() - RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString(),
+        ),
+      )
+  }
+
+  await db
+    .update(notificationBatch)
+    .set({
+      told: sql`${notificationBatch.told} + ${counted.told ?? 0}`,
+      suppressed: sql`${notificationBatch.suppressed} + ${counted.suppressed ?? 0}`,
+      emailed: sql`${notificationBatch.emailed} + ${counted.emailed ?? 0}`,
+      accepted: sql`${notificationBatch.accepted} + ${counted.accepted ?? 0}`,
+      failed: sql`${notificationBatch.failed} + ${counted.failed ?? 0}`,
+      gone: sql`${notificationBatch.gone} + ${counted.gone ?? 0}`,
+    })
+    .where(eq(notificationBatch.id, id))
+}
+
+export const notificationBatches = async (db: Database, limit: number) =>
+  await db
+    .select()
+    .from(notificationBatch)
+    .orderBy(desc(notificationBatch.created_at), desc(notificationBatch.id))
+    .limit(limit)
 
 export type Notifier = (accountId: string, told: Told) => Promise<unknown>
 
@@ -71,16 +137,21 @@ export const reachedByMention = async (db: Database, named: readonly string[]): 
   return asked.flat()
 }
 
+export type PushTrouble = DeliveryCounts & { account_id: string; category: NotificationCategory }
+
 export const recordAndPush =
-  (deps: PushDeps, now: () => Date, log: (counts: DeliveryCounts) => void, email?: Email): Notifier =>
+  (deps: PushDeps, now: () => Date, log: (trouble: PushTrouble) => void, email?: Email): Notifier =>
   async (accountId, told) => {
     const channels = await wants(deps.db, accountId, told.category)
+    const emailed = channels.email && email !== undefined
 
-    if (channels.email && email !== undefined) {
-      email.defer(async () => await email.post(accountId, told))
+    if (emailed) email.defer(async () => await email.post(accountId, told))
+
+    if (!channels.bell) {
+      await countInto(deps.db, now(), told, { suppressed: 1, emailed: emailed ? 1 : 0 })
+
+      return undefined
     }
-
-    if (!channels.bell) return undefined
 
     await deps.db.insert(notification).values({
       id: randomUUID(),
@@ -92,7 +163,17 @@ export const recordAndPush =
     })
 
     const counts = await notifyAccount(deps, accountId, pushPayload(told))
-    if (counts.failed > 0 || counts.gone > 0) log(counts)
+    if (counts.failed > 0 || counts.gone > 0) {
+      log({ ...counts, account_id: accountId, category: told.category })
+    }
+
+    await countInto(deps.db, now(), told, {
+      told: 1,
+      emailed: emailed ? 1 : 0,
+      accepted: counts.sent,
+      failed: counts.failed,
+      gone: counts.gone,
+    })
 
     return counts
   }
@@ -148,9 +229,10 @@ export const notifyAttendees = async (
   told: Told,
   { except = [], at }: { at: Date; except?: readonly (string | undefined)[] },
 ): Promise<number> => {
-  await recordActivity(db, eventId, told, at)
+  const one = oneBatch(told)
+  await recordActivity(db, eventId, one, at)
 
-  return await tellAttendees(db, notify, eventId, told, { except })
+  return await tellAttendees(db, notify, eventId, one, { except })
 }
 
 export const tellAttendees = async (
@@ -167,8 +249,9 @@ export const tellAttendees = async (
 
   const silent = new Set(except)
   const audience = rows.filter((row) => !silent.has(row.account_id))
+  const one = oneBatch(told)
 
-  await Promise.all(audience.map(async (row) => await notify(row.account_id, told)))
+  await Promise.all(audience.map(async (row) => await notify(row.account_id, one)))
 
   return audience.length
 }
@@ -190,8 +273,9 @@ export const tellApproved = async (
 ): Promise<number> => {
   const silent = new Set(except)
   const audience = (await approvedAccounts(db)).filter((accountId) => !silent.has(accountId))
+  const one = oneBatch(told)
 
-  await Promise.all(audience.map(async (accountId) => await notify(accountId, told)))
+  await Promise.all(audience.map(async (accountId) => await notify(accountId, one)))
 
   return audience.length
 }
@@ -230,7 +314,8 @@ export const notifyAdmins = async (db: Database, notify: Notifier, told: Told): 
     .from(accountRole)
     .where(eq(accountRole.role, 'admin'))
 
-  for (const row of rows) await notify(row.account_id, told)
+  const one = oneBatch(told)
+  for (const row of rows) await notify(row.account_id, one)
 
   return rows.length
 }
@@ -238,7 +323,8 @@ export const notifyAdmins = async (db: Database, notify: Notifier, told: Told): 
 export const notifyEveryone = async (db: Database, notify: Notifier, told: Told): Promise<number> => {
   const rows = await db.select({ id: account.id }).from(account)
 
-  for (const row of rows) await notify(row.id, told)
+  const one = oneBatch(told)
+  for (const row of rows) await notify(row.id, one)
 
   return rows.length
 }

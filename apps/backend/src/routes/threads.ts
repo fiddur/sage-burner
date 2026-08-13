@@ -51,7 +51,7 @@ import {
   threadSupport,
 } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
-import { approvedAccounts, displayName, namedBy, reachedByMention } from '../push/notify.ts'
+import { approvedAccounts, displayName, namedBy, oneBatch, reachedByMention } from '../push/notify.ts'
 
 export interface NewEntry {
   thread_id: string
@@ -1061,14 +1061,17 @@ export const registerThreadRoutes = (
 
     const listening = (await audienceFor(found.event_id, author)).filter((accountId) => !muted.has(accountId))
 
+    const toTheirOwn = oneBatch({ category: mine, body: said, link })
+    const toAnybodyListening = oneBatch({ category: anybody, body: said, link })
+
     await Promise.all([
       tellNamed(named, who, what, link),
       ...[...people]
         .filter((accountId) => !told.has(accountId))
-        .map(async (accountId) => await notify(accountId, { category: mine, body: said, link })),
+        .map(async (accountId) => await notify(accountId, toTheirOwn)),
       ...listening
         .filter((accountId) => !people.has(accountId) && !told.has(accountId))
-        .map(async (accountId) => await notify(accountId, { category: anybody, body: said, link })),
+        .map(async (accountId) => await notify(accountId, toAnybodyListening)),
     ])
   }
 

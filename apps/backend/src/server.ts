@@ -18,8 +18,8 @@ await announceDeploy(
   recordAndPush(
     { db: handle.db, deliver: deliverWithWebPush(DEFAULT_PUSH_CONTACT), mintKeys: generateVAPIDKeys },
     () => new Date(),
-    (counts) => {
-      app.log.warn({ ...counts }, 'announcing a deploy')
+    (trouble) => {
+      app.log.warn({ ...trouble }, 'announcing a deploy')
     },
   ),
 ).catch((failure: unknown) => {
