@@ -5,10 +5,12 @@ import type {
 
 import { signingInOutcomes } from '@sage-burner/shared'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
+import { LocationProvider } from 'preact-iso'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { AppApi } from '../app.tsx'
 import type { Ceremony, PasskeyApi } from '../passkey.ts'
+import type { Viewer } from '../viewer.tsx'
 
 import { apiError } from '../api/client.ts'
 import { ViewerProvider } from '../viewer.tsx'
@@ -34,12 +36,22 @@ const noPasskeys = (): PasskeyApi => ({
   finishPasskeyLogin: () => Promise.reject(new Error('finishPasskeyLogin is not stubbed here')),
 })
 
-const renderLogin = (login: AppApi['login']) =>
-  render(
-    <ViewerProvider viewer={{ status: 'signed-out' }}>
-      <Login api={{ login, ...noPasskeys() }} />
-    </ViewerProvider>,
+/**
+ * Under the router, because signing in navigates: outside a `LocationProvider` preact-iso's
+ * context is `{}`, so `route` is undefined and calling it throws where nothing here would
+ * notice — which is how the first version of this shipped untested.
+ */
+const renderLogin = (login: AppApi['login'], viewer: Viewer = { status: 'signed-out' }) => {
+  history.replaceState(null, '', '/login')
+
+  return render(
+    <LocationProvider>
+      <ViewerProvider viewer={viewer}>
+        <Login api={{ login, ...noPasskeys() }} />
+      </ViewerProvider>
+    </LocationProvider>,
   )
+}
 
 const fillIn = (email: string, password: string) => {
   fireEvent.input(screen.getByLabelText('Email'), { target: { value: email } })
@@ -354,5 +366,53 @@ describe('where signing in lands', () => {
 
   it('is their own application for somebody with no role, who the feed would bounce', () => {
     expect(landsOn([])).toBe('/apply')
+  })
+})
+
+describe('signing in navigates rather than offering a link', () => {
+  const aMember = { account_id: 'a-1', name: null, avatar: null, roles: ['member' as const] }
+
+  it('lands a member on the feed', async () => {
+    renderLogin(() => Promise.resolve({ viewer: aMember }))
+
+    fillIn('ada@example.org', 'a good long passphrase')
+    submit()
+
+    await waitFor(() => expect(location.pathname).toBe('/feed'))
+  })
+
+  it('lands somebody with no role on their own application', async () => {
+    renderLogin(() => Promise.resolve({ viewer: { ...aMember, roles: [] } }))
+
+    fillIn('ada@example.org', 'a good long passphrase')
+    submit()
+
+    await waitFor(() => expect(location.pathname).toBe('/apply'))
+  })
+
+  it('takes somebody already signed in off the login page, rather than stranding them', async () => {
+    // Pressing Back after signing in, or opening a bookmark: the page has no link out and the
+    // nav offers none to somebody signed in.
+    renderLogin(() => Promise.reject(new Error('login is not called here')), {
+      status: 'signed-in',
+      account: { id: 'a-1', name: 'Ada', avatar: null, roles: ['member'] },
+    })
+
+    await waitFor(() => expect(location.pathname).toBe('/feed'))
+  })
+})
+
+describe('what Back does after signing in', () => {
+  it('replaces the login page rather than stacking on it, so Back is not a loop', async () => {
+    const before = history.length
+    renderLogin(() =>
+      Promise.resolve({ viewer: { account_id: 'a-1', name: null, avatar: null, roles: ['member'] } }),
+    )
+
+    fillIn('ada@example.org', 'a good long passphrase')
+    submit()
+
+    await waitFor(() => expect(location.pathname).toBe('/feed'))
+    expect(history.length).toBe(before)
   })
 })

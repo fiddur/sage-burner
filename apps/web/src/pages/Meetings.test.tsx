@@ -160,8 +160,6 @@ describe('the meetings page', () => {
   })
 
   it('puts a new meeting in the diary from outside the box of the one already there', async () => {
-    // #595: the banner describes one meeting, so a form for a second inside its frame reads as
-    // doing something to the first.
     const { container } = renderPage(stub({ getMeetings: () => Promise.resolve({ meetings: [aMeeting()] }) }))
 
     const adding = await screen.findByRole('button', { name: 'Put a meeting in the diary' })
