@@ -9,6 +9,14 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-13
 
+- **Taking something back no longer sends it to the top of the feed.** Withdrawing an announcement, a
+  dream, a song or a bring item counted as the newest thing on its card, so removing something put it
+  above everything that had actually happened since. The card stays where it was, marked as taken
+  back — and a comment on it still brings it up.
+
+- **Taking an announcement back is the same trashcan every other card uses**, rather than a worded
+  link.
+
 - **A meeting taken out of the diary leaves the feed too.** Its card stayed behind, and so did the
   lines meetings had for the half-day before they were cards — so a meeting nobody had any more was
   on the feed twice. Both are gone, including the ones already stranded there, and the same for a
