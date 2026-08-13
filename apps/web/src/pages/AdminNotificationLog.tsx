@@ -7,20 +7,11 @@ import type { ApiClient } from '../api/client.ts'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { Table } from '../components/Table.tsx'
-import { localDay } from '../datetime.ts'
+import { localMoment } from '../datetime.ts'
 import { useLoad } from '../load.ts'
 import { isAdmin, useViewer } from '../viewer.tsx'
 
 export type NotificationLogApi = Pick<ApiClient, 'getNotificationLog'>
-
-export const when = (iso: string): string => {
-  const at = new Date(iso)
-  if (Number.isNaN(at.getTime())) return iso
-
-  const time = `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`
-
-  return `${localDay(iso)} ${time}`
-}
 
 export const firstLine = (body: string): string => body.split('\n')[0] ?? body
 
@@ -71,7 +62,7 @@ export const AdminNotificationLog = ({ api }: { api: NotificationLogApi }) => {
           <tbody>
             {loaded.data.entries.map((entry) => (
               <tr key={entry.id}>
-                <td>{when(entry.created_at)}</td>
+                <td>{localMoment(entry.created_at)}</td>
                 <td>{notificationCategoryInfo[entry.category].label}</td>
                 <td>{firstLine(entry.body)}</td>
                 <td>{entry.told}</td>

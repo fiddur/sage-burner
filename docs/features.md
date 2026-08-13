@@ -140,6 +140,14 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
 - Whose song it is, as a field of its own: shown beside the title in the book and
   under it on the page, and the list sorts by it as well as by title.
 
+## Meetings — [meetings.md](./meetings.md)
+
+- Talking points: one rolling list per burn, split into open and addressed. Raise one,
+  discuss it in its own thread on the feed, and record what was decided on the point
+  itself — clearing the decision reopens it.
+- Meetings in the diary: the page says when the next one is and how to join it, and
+  every meeting appears in the burn's calendar feed beside the dreams.
+
 ## Being told — [accounts.md](./accounts.md)
 
 - A notification is a record: the bell holds what happened while you were away,

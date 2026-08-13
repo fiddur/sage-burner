@@ -1,0 +1,206 @@
+import type { Meeting, MeetingPointEntry } from '@sage-burner/shared'
+
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+import type { Viewer } from '../viewer.tsx'
+import type { MeetingsApi } from './Meetings.tsx'
+
+import { BurnProvider } from '../burn.tsx'
+import { ViewerProvider } from '../viewer.tsx'
+import { Meetings, whenItIs } from './Meetings.tsx'
+
+afterEach(cleanup)
+
+const MEMBER: Viewer = {
+  status: 'signed-in',
+  account: { id: 'a-1', name: 'Ada', avatar: null, roles: ['member'] },
+}
+
+const BURN = {
+  id: 'e-1',
+  name: 'Summer burn',
+  slug: 'summer-burn',
+  start_date: '2026-08-01',
+  end_date: '2026-08-03',
+  start_time: '16:00',
+  end_time: '12:00',
+  location: '',
+  welcome_markdown: '',
+  payment_info_markdown: '',
+  transfer_info_markdown: '',
+  member_cap: 42,
+  created_at: '2026-07-02T00:00:00.000Z',
+}
+
+const aPoint = (over: Partial<MeetingPointEntry> = {}): MeetingPointEntry => ({
+  id: 'p-1',
+  event_id: 'e-1',
+  author_account_id: 'a-1',
+  author_name: 'Ada',
+  title: 'Where do we park?',
+  body: '',
+  decision: null,
+  decided_note: null,
+  created_at: '2026-07-02T00:00:00.000Z',
+  thread_id: 't-1',
+  ...over,
+})
+
+const aMeeting = (over: Partial<Meeting> = {}): Meeting => ({
+  id: 'm-1',
+  event_id: 'e-1',
+  title: 'Planning call',
+  starts_at: '2099-07-20T17:00:00.000Z',
+  ends_at: null,
+  link: null,
+  notes: '',
+  created_at: '2026-07-02T00:00:00.000Z',
+  ...over,
+})
+
+const stub = (over: Partial<MeetingsApi> = {}): MeetingsApi => ({
+  getMeetingPoints: () => Promise.resolve({ points: [] }),
+  addMeetingPoint: () => Promise.reject(new Error('addMeetingPoint is not stubbed here')),
+  updateMeetingPoint: () => Promise.reject(new Error('updateMeetingPoint is not stubbed here')),
+  deleteMeetingPoint: () => Promise.reject(new Error('deleteMeetingPoint is not stubbed here')),
+  decidePoint: () => Promise.reject(new Error('decidePoint is not stubbed here')),
+  getMeetings: () => Promise.resolve({ meetings: [] }),
+  addMeeting: () => Promise.reject(new Error('addMeeting is not stubbed here')),
+  updateMeeting: () => Promise.reject(new Error('updateMeeting is not stubbed here')),
+  deleteMeeting: () => Promise.reject(new Error('deleteMeeting is not stubbed here')),
+  getEventAttendees: () => Promise.resolve({ attendees: [] }),
+  getThread: () => Promise.reject(new Error('getThread is not stubbed here')),
+  postComment: () => Promise.reject(new Error('postComment is not stubbed here')),
+  updateComment: () => Promise.reject(new Error('updateComment is not stubbed here')),
+  deleteComment: () => Promise.reject(new Error('deleteComment is not stubbed here')),
+  uploadImage: () => Promise.reject(new Error('uploadImage is not stubbed here')),
+  ...over,
+})
+
+const MINE = { event: BURN, attendance: null }
+
+const renderPage = (api: MeetingsApi) =>
+  render(
+    <ViewerProvider viewer={MEMBER}>
+      <BurnProvider value={{ status: 'ready', burns: [MINE], selected: MINE }}>
+        <Meetings api={api} />
+      </BurnProvider>
+    </ViewerProvider>,
+  )
+
+describe('the meetings page', () => {
+  it('splits the points into what is open and what has been addressed', async () => {
+    renderPage(
+      stub({
+        getMeetingPoints: () =>
+          Promise.resolve({
+            points: [
+              aPoint({ id: 'p-1', title: 'Where do we park?' }),
+              aPoint({ id: 'p-2', title: 'Who cooks Friday?', decision: 'Bo does' }),
+            ],
+          }),
+      }),
+    )
+
+    expect(await screen.findByText('Where do we park?')).toBeTruthy()
+    expect(screen.getByText('Bo does')).toBeTruthy()
+  })
+
+  it('says when the next meeting is, with the link to join on', async () => {
+    renderPage(
+      stub({
+        getMeetings: () => Promise.resolve({ meetings: [aMeeting({ link: 'https://meet.example/abc' })] }),
+      }),
+    )
+
+    expect(await screen.findByText('Planning call')).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Join' }).getAttribute('href')).toBe('https://meet.example/abc')
+  })
+
+  it('says the diary is empty rather than showing a meeting that has been and gone', async () => {
+    renderPage(
+      stub({
+        getMeetings: () =>
+          Promise.resolve({ meetings: [aMeeting({ starts_at: '2020-01-01T10:00:00.000Z' })] }),
+      }),
+    )
+
+    expect(await screen.findByText('Nothing in the diary. Put the next one in below.')).toBeTruthy()
+  })
+
+  it('raises a point with what was typed', async () => {
+    const addMeetingPoint = vi.fn<MeetingsApi['addMeetingPoint']>(() => Promise.resolve({ point: aPoint() }))
+    renderPage(stub({ addMeetingPoint }))
+
+    await screen.findByRole('button', { name: 'Raise it' })
+    fireEvent.input(screen.getByLabelText('What is it?'), { target: { value: 'Where do we park?' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Raise it' }))
+
+    await waitFor(() =>
+      expect(addMeetingPoint).toHaveBeenCalledWith('e-1', { title: 'Where do we park?', body: '' }),
+    )
+  })
+
+  it('refuses to raise one with nothing in it, and says why', async () => {
+    const addMeetingPoint = vi.fn<MeetingsApi['addMeetingPoint']>(() => Promise.resolve({ point: aPoint() }))
+    renderPage(stub({ addMeetingPoint }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Raise it' }))
+
+    expect(await screen.findByText('Say what the point is, so somebody can answer it.')).toBeTruthy()
+    expect(addMeetingPoint).not.toHaveBeenCalled()
+  })
+
+  it('records a decision on the point it was pressed from', async () => {
+    const decidePoint = vi.fn<MeetingsApi['decidePoint']>(() =>
+      Promise.resolve({ point: aPoint({ decision: 'By the barn' }) }),
+    )
+    renderPage(stub({ getMeetingPoints: () => Promise.resolve({ points: [aPoint()] }), decidePoint }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Record decision' }))
+    fireEvent.input(screen.getByLabelText('Decision, for Where do we park?'), {
+      target: { value: 'By the barn' },
+    })
+    fireEvent.input(screen.getByLabelText('Where it was decided, for Where do we park?'), {
+      target: { value: 'Planning call Oct 20' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Record it' }))
+
+    await waitFor(() =>
+      expect(decidePoint).toHaveBeenCalledWith('p-1', {
+        decision: 'By the barn',
+        decided_note: 'Planning call Oct 20',
+      }),
+    )
+  })
+
+  it('reopens an addressed point by clearing what was decided', async () => {
+    const decidePoint = vi.fn<MeetingsApi['decidePoint']>(() => Promise.resolve({ point: aPoint() }))
+    renderPage(
+      stub({
+        getMeetingPoints: () => Promise.resolve({ points: [aPoint({ decision: 'By the barn' })] }),
+        decidePoint,
+      }),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Reopen' }))
+
+    await waitFor(() =>
+      expect(decidePoint).toHaveBeenCalledWith('p-1', { decision: null, decided_note: null }),
+    )
+  })
+})
+
+describe('when a meeting is', () => {
+  it('is read in the reader own timezone, the only one they can turn up in', () => {
+    // `vite.config.ts` pins TZ=Europe/Stockholm.
+    expect(whenItIs(aMeeting({ starts_at: '2026-07-20T17:00:00.000Z' }), new Date('2026-07-01'))).toBe(
+      'Mon 20 Jul 19:00',
+    )
+  })
+
+  it('answers back what it was given when that is not a date', () => {
+    expect(whenItIs(aMeeting({ starts_at: 'not a date' }))).toBe('not a date')
+  })
+})

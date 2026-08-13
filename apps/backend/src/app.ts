@@ -59,6 +59,7 @@ import { registerInviteRoutes } from './routes/invites.ts'
 import { registerLeadRoleRoutes } from './routes/lead-roles.ts'
 import { registerMailRoutes } from './routes/mail.ts'
 import { registerMealAdminRoutes, registerMealRoutes } from './routes/meals.ts'
+import { registerMeetingRoutes } from './routes/meetings.ts'
 import { registerNotificationRoutes } from './routes/notifications.ts'
 import { registerOauthAdminRoutes } from './routes/oauth-admin.ts'
 import { registerOauthRoutes } from './routes/oauth.ts'
@@ -312,6 +313,7 @@ export const createApp = async ({
   registerAllergyRoutes(app, { db })
   registerAttendanceRoutes(app, { db, sessions, now, notify: tellAccount })
   registerBringRoutes(app, { db, sessions, now, notify: tellAccount })
+  registerMeetingRoutes(app, { db, sessions, now, notify: tellAccount })
   registerPostRoutes(app, { db, sessions, now, notify: tellAccount })
   registerProfileRoutes(app, { db, sessions, now, notify: tellAccount })
   registerRosterRoutes(app, { db, sessions, now, notify: tellAccount })

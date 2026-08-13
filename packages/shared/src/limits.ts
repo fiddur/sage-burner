@@ -73,3 +73,7 @@ export const MAX_INVITE_LABEL = 80
 export const MAX_GROUP_INVITE_USES = 200
 
 export const MIN_PASSWORD = 10
+
+export const MAX_MEETING_LINK = 500
+
+export const MAX_DECIDED_NOTE = 200

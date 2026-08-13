@@ -6,6 +6,7 @@ import {
   bringPage,
   linkingOutcomes,
   loginPage,
+  meetingsPage,
   oauthOutcomes,
   signingInOutcomes,
 } from './pages.ts'
@@ -55,5 +56,16 @@ describe('the bring list', () => {
 
   it('encodes both, so an id cannot invent a parameter', () => {
     expect(bringPage('a&b', 'c=d')).toBe('/bring?burn=a%26b&item=c%3Dd')
+  })
+})
+
+describe('the meetings page', () => {
+  it('names the burn it belongs to, and the point when there is one to open', () => {
+    expect(meetingsPage('burn-1')).toBe('/meetings?burn=burn-1')
+    expect(meetingsPage('burn-1', 'p-2')).toBe('/meetings?burn=burn-1&point=p-2')
+  })
+
+  it('encodes both, so an id cannot invent a parameter', () => {
+    expect(meetingsPage('a&b', 'c=d')).toBe('/meetings?burn=a%26b&point=c%3Dd')
   })
 })

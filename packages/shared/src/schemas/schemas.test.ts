@@ -27,6 +27,7 @@ import {
   withEventDateOrder,
 } from './event.ts'
 import { formQuestionSchema } from './form-question.ts'
+import { publicMeetingFields, publicMeetingSchema } from './meeting.ts'
 import {
   attendanceFields,
   attendanceSchema,
@@ -565,6 +566,31 @@ describe('deriving schemas', () => {
 
     const fine = { ...halfASlot, time_slot_end: '2026-10-03T11:00:00Z' }
     expect(createSession.safeParse(fine).success).toBe(true)
+  })
+})
+
+describe('publicMeetingSchema', () => {
+  it('exposes exactly these fields and nothing else', () => {
+    expect(Object.keys(publicMeetingFields.shape).sort()).toEqual([
+      'ends_at',
+      'id',
+      'link',
+      'starts_at',
+      'title',
+    ])
+  })
+
+  it('keeps the notes off the feed, which is where a meeting says things members only should read', () => {
+    const parsed = publicMeetingSchema.safeParse({
+      id: ID,
+      title: 'Planning call',
+      link: null,
+      starts_at: '2026-10-03T17:00:00Z',
+      ends_at: '2026-10-03T18:00:00Z',
+      notes: 'the code is 1234',
+    })
+
+    expect(parsed.success).toBe(false)
   })
 })
 

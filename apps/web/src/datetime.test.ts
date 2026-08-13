@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
-import { dayName, fromLocalInput, localDay, shortDayOf, todayForInput, toLocalInput } from './datetime.ts'
+import {
+  dayName,
+  fromLocalInput,
+  localDay,
+  localMoment,
+  shortDayOf,
+  todayForInput,
+  toLocalInput,
+} from './datetime.ts'
 
 describe('today as a date input reads it', () => {
   it('is the reader’s own day, not UTC’s — the two differ for two hours every night here', () => {
@@ -119,5 +127,21 @@ describe('the day a feed line happened', () => {
 
   it('gives back what it was handed when that is not a date', () => {
     expect(localDay('not a date')).toBe('not a date')
+  })
+})
+
+describe('localMoment', () => {
+  it('is a day and a clock time in the reader own timezone, the only one they can act in', () => {
+    // In UTC every wrong implementation of this looks right; `vite.config.ts` pins
+    // TZ=Europe/Stockholm.
+    expect(localMoment('2026-08-03T12:30:00.000Z', new Date('2026-08-03'))).toBe('3 Aug 14:30')
+  })
+
+  it('names the year for a moment in another one, as the day alone does', () => {
+    expect(localMoment('2025-08-03T12:30:00.000Z', new Date('2026-08-03'))).toBe('3 Aug 2025 14:30')
+  })
+
+  it('answers back what it was given when that is not a date', () => {
+    expect(localMoment('not a date')).toBe('not a date')
   })
 })

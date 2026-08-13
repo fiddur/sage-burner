@@ -97,6 +97,11 @@ export const notificationCategories = [
   'bring_role',
   'bring_comment',
   'bring_comment_any',
+  'point_raised',
+  'point_decided',
+  'point_comment',
+  'point_comment_any',
+  'meeting_scheduled',
   'mentioned',
   'lead_role_added',
   'lead_role_filled',
@@ -149,6 +154,11 @@ export const notificationCategoryInfo = {
     about: 'you',
   },
   bring_comment_any: { label: 'Somebody comments on anything on the bring list', on: false, about: 'else' },
+  point_raised: { label: 'Somebody raises a talking point', on: false, about: 'else' },
+  point_decided: { label: 'A talking point is decided', on: false, about: 'else' },
+  point_comment: { label: 'Somebody comments on a point you raised', on: true, about: 'you' },
+  point_comment_any: { label: 'Somebody comments on any talking point', on: false, about: 'else' },
+  meeting_scheduled: { label: 'A meeting is put in the diary', on: false, about: 'else' },
   mentioned: { label: 'Somebody names you', on: true, about: 'you' },
   lead_role_added: { label: 'A lead role is added', on: false, about: 'else' },
   lead_role_filled: { label: 'Somebody takes the lead of a role', on: false, about: 'else' },
@@ -169,7 +179,7 @@ export const notificationSections = [
 export const categoriesAbout = (about: NotificationCategoryInfo['about']): NotificationCategory[] =>
   notificationCategories.filter((category) => notificationCategoryInfo[category].about === about)
 
-export const threadEntityTypes = ['session', 'attendance', 'post', 'song', 'bring'] as const
+export const threadEntityTypes = ['session', 'attendance', 'post', 'song', 'bring', 'point'] as const
 export type ThreadEntityType = (typeof threadEntityTypes)[number]
 export const isThreadEntityType = (value: unknown): value is ThreadEntityType =>
   isOneOf(threadEntityTypes, value)
@@ -185,6 +195,7 @@ export const feedKindLabel = {
   post: 'Posts',
   song: 'Songs',
   bring: 'Bring',
+  point: 'Meetings',
 } as const satisfies Record<FeedKind, string>
 
 export const KINDS_PARAM = 'kinds'
@@ -215,6 +226,8 @@ export const threadEntryKinds = [
   'scheduled',
   'edited',
   'withdrawn',
+  'raised',
+  'decided',
 ] as const
 export type ThreadEntryKind = (typeof threadEntryKinds)[number]
 export const isThreadEntryKind = (value: unknown): value is ThreadEntryKind =>
@@ -259,12 +272,21 @@ const bringCategory = (kind: ThreadEntryKind): NotificationCategory | undefined 
   return undefined
 }
 
+const pointCategory = (kind: ThreadEntryKind): NotificationCategory | undefined => {
+  if (kind === 'comment') return 'point_comment_any'
+  if (kind === 'raised') return 'point_raised'
+  if (kind === 'decided') return 'point_decided'
+
+  return undefined
+}
+
 const categoriesFor = {
   session: sessionCategory,
   attendance: attendanceCategory,
   post: postCategory,
   song: songCategory,
   bring: bringCategory,
+  point: pointCategory,
 } as const satisfies Record<ThreadEntityType, (kind: ThreadEntryKind) => NotificationCategory | undefined>
 
 export const entryCategory = (

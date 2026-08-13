@@ -17,6 +17,7 @@ import {
   dreamPage,
   feedPage,
   followSchema,
+  meetingsPage,
   mentionedAccounts,
   profilePage,
   songPage,
@@ -40,6 +41,7 @@ import {
   bringHand,
   bringItem,
   event,
+  meetingPoint,
   post,
   session,
   sessionHelper,
@@ -393,6 +395,10 @@ export const readThreads = async (
       bring_comment: bringItem.comment,
       bring_withdrawn_at: bringItem.withdrawn_at,
       bring_author: bringItem.author_account_id,
+      point_title: meetingPoint.title,
+      point_body: meetingPoint.body,
+      point_decision: meetingPoint.decision,
+      point_author: meetingPoint.author_account_id,
     })
     .from(thread)
     .leftJoin(event, eq(event.id, thread.event_id))
@@ -402,6 +408,7 @@ export const readThreads = async (
     .leftJoin(post, and(eq(thread.entity_type, 'post'), eq(post.id, thread.entity_id)))
     .leftJoin(song, and(eq(thread.entity_type, 'song'), eq(song.id, thread.entity_id)))
     .leftJoin(bringItem, and(eq(thread.entity_type, 'bring'), eq(bringItem.id, thread.entity_id)))
+    .leftJoin(meetingPoint, and(eq(thread.entity_type, 'point'), eq(meetingPoint.id, thread.entity_id)))
     .where(inArray(thread.id, [...ids]))
 
   const ranked = db
@@ -499,6 +506,7 @@ const authorOf = (row: CardRow): string | null => {
   if (row.entity_type === 'post') return row.post_author
   if (row.entity_type === 'song') return row.song_author
   if (row.entity_type === 'bring') return row.bring_author
+  if (row.entity_type === 'point') return row.point_author
 
   return null
 }
@@ -528,6 +536,10 @@ interface CardRow {
   bring_comment: string | null
   bring_withdrawn_at: string | null
   bring_author: string | null
+  point_title: string | null
+  point_body: string | null
+  point_decision: string | null
+  point_author: string | null
 }
 
 type CardFacts = Pick<Thread, 'title' | 'link' | 'body' | 'gone'>
@@ -569,6 +581,13 @@ const bringFacts = (row: CardRow): CardFacts => ({
   gone: row.bring_title === null || row.bring_withdrawn_at !== null,
 })
 
+const pointFacts = (row: CardRow): CardFacts => ({
+  title: row.point_title ?? row.title,
+  link: row.point_title === null || row.event_id === null ? null : meetingsPage(row.event_id, row.entity_id),
+  body: written(row.point_decision ?? row.point_body),
+  gone: row.point_title === null,
+})
+
 const withNamedBody = (facts: CardFacts, named: (body: string) => string): CardFacts =>
   facts.body === null ? facts : { ...facts, body: named(facts.body) }
 
@@ -594,6 +613,7 @@ const factsFor = (row: CardRow): CardFacts =>
     post: postFacts,
     song: songFacts,
     bring: bringFacts,
+    point: pointFacts,
   })[row.entity_type](row)
 
 export const nameOf = async (db: Database, accountId: string): Promise<string | null> => {
@@ -621,76 +641,68 @@ export const following = async (db: Database, threadId: string): Promise<string[
 export const muting = async (db: Database, threadId: string): Promise<string[]> =>
   await saidAbout(db, threadId, false)
 
-export const participantsOf = async (
+interface Whose {
+  id: string
+  entity_type: ThreadEntityType
+  entity_id: string
+  subject_account_id: string | null
+}
+
+const authorRow = async (
   db: Database,
-  found: {
-    id: string
-    entity_type: ThreadEntityType
-    entity_id: string
-    subject_account_id: string | null
+  table: typeof bringItem | typeof meetingPoint | typeof post | typeof song,
+  entityId: string,
+): Promise<string[]> => {
+  const [row] = await db
+    .select({ author: table.author_account_id })
+    .from(table)
+    .where(eq(table.id, entityId))
+    .limit(1)
+
+  return row?.author == null ? [] : [row.author]
+}
+
+const alsoInIt = {
+  attendance: (_db: Database, found: Whose) =>
+    Promise.resolve(found.subject_account_id === null ? [] : [found.subject_account_id]),
+  post: async (db: Database, found: Whose) => await authorRow(db, post, found.entity_id),
+  song: async (db: Database, found: Whose) => await authorRow(db, song, found.entity_id),
+  point: async (db: Database, found: Whose) => await authorRow(db, meetingPoint, found.entity_id),
+  bring: async (db: Database, found: Whose) => [
+    ...(await authorRow(db, bringItem, found.entity_id)),
+    ...(await handsOn(db, found.entity_id)).map((hand) => hand.account_id),
+  ],
+  session: async (db: Database, found: Whose) => {
+    const facilitating = await db
+      .select({ account_id: attendance.account_id })
+      .from(session)
+      .innerJoin(attendance, eq(attendance.id, session.facilitator_attendance_id))
+      .where(eq(session.id, found.entity_id))
+
+    const helping = await db
+      .select({ account_id: attendance.account_id })
+      .from(sessionHelper)
+      .innerJoin(attendance, eq(attendance.id, sessionHelper.attendance_id))
+      .where(eq(sessionHelper.session_id, found.entity_id))
+
+    return [...facilitating, ...helping].map((row) => row.account_id)
   },
-): Promise<Set<string>> => {
+} as const satisfies Record<
+  ThreadEntityType,
+  (db: Database, found: Whose) => Promise<string[]> | Promise<readonly string[]>
+>
+
+export const participantsOf = async (db: Database, found: Whose): Promise<Set<string>> => {
   const spoke = await db
     .selectDistinct({ account_id: threadEntry.author_account_id })
     .from(threadEntry)
-    .where(and(eq(threadEntry.thread_id, found.id), inArray(threadEntry.kind, ['comment', 'offered'])))
+    .where(
+      and(eq(threadEntry.thread_id, found.id), inArray(threadEntry.kind, ['comment', 'offered', 'raised'])),
+    )
 
   const people = new Set(spoke.flatMap((row) => (row.account_id === null ? [] : [row.account_id])))
 
-  if (found.entity_type === 'attendance') {
-    if (found.subject_account_id !== null) people.add(found.subject_account_id)
-
-    return people
-  }
-
-  if (found.entity_type === 'post') {
-    const [row] = await db
-      .select({ author: post.author_account_id })
-      .from(post)
-      .where(eq(post.id, found.entity_id))
-      .limit(1)
-    if (row?.author != null) people.add(row.author)
-
-    return people
-  }
-
-  if (found.entity_type === 'song') {
-    const [row] = await db
-      .select({ author: song.author_account_id })
-      .from(song)
-      .where(eq(song.id, found.entity_id))
-      .limit(1)
-    if (row?.author != null) people.add(row.author)
-
-    return people
-  }
-
-  if (found.entity_type === 'bring') {
-    const [row] = await db
-      .select({ author: bringItem.author_account_id })
-      .from(bringItem)
-      .where(eq(bringItem.id, found.entity_id))
-      .limit(1)
-    if (row?.author != null) people.add(row.author)
-
-    for (const hand of await handsOn(db, found.entity_id)) people.add(hand.account_id)
-
-    return people
-  }
-
-  const facilitating = await db
-    .select({ account_id: attendance.account_id })
-    .from(session)
-    .innerJoin(attendance, eq(attendance.id, session.facilitator_attendance_id))
-    .where(eq(session.id, found.entity_id))
-
-  const helping = await db
-    .select({ account_id: attendance.account_id })
-    .from(sessionHelper)
-    .innerJoin(attendance, eq(attendance.id, sessionHelper.attendance_id))
-    .where(eq(sessionHelper.session_id, found.entity_id))
-
-  for (const row of [...facilitating, ...helping]) people.add(row.account_id)
+  for (const accountId of await alsoInIt[found.entity_type](db, found)) people.add(accountId)
 
   return people
 }
@@ -951,58 +963,58 @@ export const registerThreadRoutes = (
     return { thread: found } satisfies ThreadResponse
   }
 
-  const aboutWhat = async (found: {
+  interface Subject {
     event_id: string | null
     entity_type: ThreadEntityType
     entity_id: string
     subject_account_id: string | null
     title: string
-  }): Promise<{ link: string | null; what: string }> => {
-    if (found.entity_type === 'session') {
-      return {
-        link: found.event_id === null ? null : dreamPage(found.event_id, found.entity_id),
-        what: found.title,
-      }
-    }
-
-    if (found.entity_type === 'song') {
-      const [row] = await db
-        .select({ title: song.title })
-        .from(song)
-        .where(eq(song.id, found.entity_id))
-        .limit(1)
-
-      return { link: songPage(found.entity_id), what: row?.title ?? found.title }
-    }
-
-    if (found.entity_type === 'post') {
-      const [row] = await db
-        .select({ title: post.title })
-        .from(post)
-        .where(eq(post.id, found.entity_id))
-        .limit(1)
-
-      return { link: feedPage(), what: row?.title ?? found.title }
-    }
-
-    if (found.entity_type === 'bring') {
-      const [row] = await db
-        .select({ title: bringItem.title })
-        .from(bringItem)
-        .where(eq(bringItem.id, found.entity_id))
-        .limit(1)
-
-      return {
-        link: found.event_id === null ? null : bringPage(found.event_id, found.entity_id),
-        what: row?.title ?? found.title,
-      }
-    }
-
-    const subject = found.subject_account_id
-    if (subject === null) return { link: null, what: found.title }
-
-    return { link: profilePage(subject), what: (await nameOf(db, subject)) ?? found.title }
   }
+
+  const titleOf = async (
+    table: typeof bringItem | typeof meetingPoint | typeof post | typeof song,
+    found: Subject,
+  ): Promise<string> => {
+    const [row] = await db
+      .select({ title: table.title })
+      .from(table)
+      .where(eq(table.id, found.entity_id))
+      .limit(1)
+
+    return row?.title ?? found.title
+  }
+
+  const atItsBurn = (found: Subject, page: (eventId: string, id: string) => string): string | null =>
+    found.event_id === null ? null : page(found.event_id, found.entity_id)
+
+  const whatItIsAbout = {
+    session: (found: Subject) => Promise.resolve({ link: atItsBurn(found, dreamPage), what: found.title }),
+    song: async (found: Subject) => ({
+      link: songPage(found.entity_id),
+      what: await titleOf(song, found),
+    }),
+    post: async (found: Subject) => ({ link: feedPage(), what: await titleOf(post, found) }),
+    bring: async (found: Subject) => ({
+      link: atItsBurn(found, bringPage),
+      what: await titleOf(bringItem, found),
+    }),
+    point: async (found: Subject) => ({
+      link: atItsBurn(found, meetingsPage),
+      what: await titleOf(meetingPoint, found),
+    }),
+    attendance: async (found: Subject) => {
+      const subject = found.subject_account_id
+      if (subject === null) return { link: null, what: found.title }
+
+      return { link: profilePage(subject), what: (await nameOf(db, subject)) ?? found.title }
+    },
+  } as const satisfies Record<
+    ThreadEntityType,
+    (found: Subject) => Promise<{ link: string | null; what: string }>
+  >
+
+  const aboutWhat = async (found: Subject): Promise<{ link: string | null; what: string }> =>
+    await whatItIsAbout[found.entity_type](found)
 
   const commentCategories = {
     session: { mine: 'dream_comment', anybody: 'dream_comment_any' },
@@ -1010,6 +1022,7 @@ export const registerThreadRoutes = (
     post: { mine: 'post_comment', anybody: 'post_comment_any' },
     song: { mine: 'song_comment', anybody: 'song_comment_any' },
     bring: { mine: 'bring_comment', anybody: 'bring_comment_any' },
+    point: { mine: 'point_comment', anybody: 'point_comment_any' },
   } as const satisfies Record<ThreadEntityType, { mine: NotificationCategory; anybody: NotificationCategory }>
 
   const tellNamed = async (named: readonly string[], who: string, what: string, link: string | null) => {
