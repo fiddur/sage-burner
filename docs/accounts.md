@@ -1025,12 +1025,25 @@ places asking one browser for one permission cannot.
 
 **Ticking a category is the other moment worth asking at.** "Tell me about X" on a browser with no
 subscription reaches the bell and nothing else, which is precisely the silence this closes — so
-switching one on there raises a nudge under the table, with the same button. It repeats, because the
-answer differs per browser and per moment, and it carries **"Do not ask me here"** so it cannot
-become the thing people learn to skip past. That refusal is `localStorage`, per browser like the
-subscription itself — a "never ask" that synced across devices would silence a phone because
-somebody said no on a laptop — and a key of its own rather than the install strip's, since having
-the app installed says nothing about wanting to be notified.
+switching one on raises a nudge offering the same button. It carries **"Do not ask me here"**, which
+is `localStorage`, per browser like the subscription itself: a "never ask" that synced across devices
+would silence a phone because somebody said no on a laptop. A key of its own rather than the install
+strip's, since having the app installed says nothing about wanting to be notified.
+
+**Both places a category is switched on raise it, and one refusal covers them all** (#584). There
+are two such controls — the table on the details page and the 🔔 on every feed card — and the feed
+is where people actually tick things while reading. So neither renders a nudge of its own: they say
+_a category was switched on_ to `PushNudgeProvider`, mounted above both, and one strip answers.
+Held there rather than inside either control because a dismissal pressed on the feed has to silence
+the one under the settings table too, and state inside a component cannot say that — and because
+somebody switching four kinds on in a sitting must be asked at most once, which is what the shared
+flag makes true.
+
+**The strip is fixed to the bottom of the window.** It answers a tick that can happen anywhere, and
+the settings table is three screens long while the feed is longer, so a notice in the flow at the
+top of the page would appear off-screen exactly when it was raised. `usePushHere` lives inside the
+strip rather than beside it, so a page nobody has ticked anything on registers no service worker and
+re-posts no subscription.
 
 **On iOS it leads with installing**, because push does not exist in Safari until the app is on the
 home screen: `PushAsk` renders the install line rather than a button that cannot deliver, splitting

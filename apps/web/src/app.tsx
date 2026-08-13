@@ -13,6 +13,7 @@ import { FetchedBurnProvider } from './burn.tsx'
 import { InstallApp } from './components/InstallApp.tsx'
 import { Layout } from './components/Layout.tsx'
 import { NewVersion } from './components/NewVersion.tsx'
+import { PushNudge } from './components/PushNudge.tsx'
 import { RouteOnMessage } from './components/RouteOnMessage.tsx'
 import { StaleData } from './components/StaleData.tsx'
 import { createFreshness, freshnessAt } from './freshness.ts'
@@ -52,6 +53,7 @@ import { Schedule } from './pages/Schedule.tsx'
 import { SongPage } from './pages/Song.tsx'
 import { Songs } from './pages/Songs.tsx'
 import { Terms } from './pages/Terms.tsx'
+import { PushNudgeProvider } from './push-nudge.tsx'
 import { createRemembered, RememberedProvider } from './remembered.tsx'
 import { ROUTER_SCOPE } from './router-scope.ts'
 import { createShown, ShownProvider } from './shown.tsx'
@@ -366,12 +368,15 @@ export const App = ({
 
   const framed = (
     <FetchedBurnProvider api={client}>
-      <Layout api={client}>
-        <NewVersion api={client} />
-        <InstallApp watch={installs} />
-        <StaleData freshness={freshness} />
-        <Routes api={client} />
-      </Layout>
+      <PushNudgeProvider>
+        <Layout api={client}>
+          <NewVersion api={client} />
+          <InstallApp watch={installs} />
+          <StaleData freshness={freshness} />
+          <Routes api={client} />
+          <PushNudge api={client} />
+        </Layout>
+      </PushNudgeProvider>
     </FetchedBurnProvider>
   )
 

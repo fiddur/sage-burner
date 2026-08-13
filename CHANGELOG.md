@@ -9,6 +9,12 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-13
 
+- **Switching notifications on from the feed offers to turn them on in this browser too.** Ticking
+  "Notify me on similar" in a card's 🔔 used to save the setting and say nothing, so what you asked
+  for arrived in the bell and nowhere else. The offer now follows the tick wherever it happens, as a
+  strip at the bottom of the window — and "Do not ask me here" answers for every later one, not just
+  the tick it was pressed on.
+
 - **Meetings.** A page per burn for what we need to talk about: raise a talking point, discuss it in
   its own thread on the feed, and record what was decided on the point itself — the spreadsheet's
   meeting tab, except the discussion happens where the point is instead of somewhere else. The page

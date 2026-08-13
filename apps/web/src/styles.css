@@ -2362,15 +2362,29 @@ img.avatar {
 }
 
 /*
-  The nudge under the notification categories (#574). The sage of `.install-app` rather than
-  the ember of a warning: a tick that will not reach this browser is worth saying, but it is
-  an offer, not something going wrong.
+  The nudge (#584). Fixed rather than in the flow: it answers a tick that can happen anywhere —
+  the settings table is three screens long and the feed is longer — so a strip at the top of the
+  page would appear off-screen exactly when it is raised. Sage of `.install-app` rather than the
+  ember of a warning: it is an offer, not something going wrong.
 */
 .push-nudge {
-  margin: 1rem 0;
+  position: fixed;
+  z-index: 25;
+  inset-inline: 0.5rem;
+  bottom: calc(0.5rem + env(safe-area-inset-bottom));
+  max-width: 40rem;
+  margin-inline: auto;
   padding: 0.6rem 0.8rem;
+  border: 1px solid var(--line);
   border-left: 3px solid var(--sage);
-  background: color-mix(in srgb, var(--sage) 10%, transparent);
+  border-radius: 0.5rem;
+  background: var(--paper);
+  box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 20%);
+}
+
+/* Above the bar rather than under it: 4.5rem is the height `.has-bottom-bar .site-footer` clears. */
+.has-bottom-bar .push-nudge {
+  bottom: calc(5rem + env(safe-area-inset-bottom));
 }
 
 .push-nudge > p:last-child {

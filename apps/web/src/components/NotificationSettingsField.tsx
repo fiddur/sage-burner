@@ -4,14 +4,12 @@ import { categoriesAbout, notificationCategoryInfo, notificationSections } from 
 import { useEffect, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
-import type { PushHere } from './PushHere.tsx'
 
 import { isApiError } from '../api/client.ts'
-import { dismissedPushNudge, dismissPushNudge } from '../push.ts'
+import { usePushNudge } from '../push-nudge.tsx'
 import { isAdmin, useViewer } from '../viewer.tsx'
 import { ErrorText } from './ErrorText.tsx'
 import { FormError, useFormError } from './FormError.tsx'
-import { PushAsk } from './PushHere.tsx'
 import { Table } from './Table.tsx'
 
 export type NotificationSettingsApi = Pick<
@@ -24,19 +22,16 @@ type Channel = keyof NotificationSettings
 export const NotificationSettingsField = ({
   api,
   sendsEmail = false,
-  push,
 }: {
   api: NotificationSettingsApi
   sendsEmail?: boolean
-  push?: PushHere
 }) => {
   const admin = isAdmin(useViewer())
   const [settings, setSettings] = useState<NotificationSettings | undefined>(undefined)
   const [unavailable, setUnavailable] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useFormError()
-  const [asked, setAsked] = useState(false)
-  const [dropped, setDropped] = useState(dismissedPushNudge)
+  const { askAbout } = usePushNudge()
 
   useEffect(() => {
     const controller = new AbortController()
@@ -66,7 +61,7 @@ export const NotificationSettingsField = ({
       [channel]: notify ? [...held, category] : held.filter((one) => one !== category),
     }
 
-    if (channel === 'on' && notify) setAsked(true)
+    if (channel === 'on' && notify) askAbout()
 
     setBusy(true)
     setError(undefined)
@@ -87,8 +82,6 @@ export const NotificationSettingsField = ({
   ]
 
   const sections = notificationSections.filter((section) => section.about !== 'admin' || admin)
-  const nudging = asked && !dropped && push !== undefined && push.state !== 'on' && push.state !== 'checking'
-
   return (
     <>
       <FormError error={error} />
@@ -128,30 +121,6 @@ export const NotificationSettingsField = ({
           </tbody>
         </Table>
       ))}
-
-      {nudging && (
-        <aside class="push-nudge">
-          <p class="form-note">
-            <strong>Nothing will reach you on this device yet.</strong> It is asked for per browser, so what
-            you tick here arrives in the bell — and nowhere else — until you turn notifications on.
-          </p>
-
-          <PushAsk push={push} />
-
-          <p class="form-note">
-            <button
-              type="button"
-              class="link-button"
-              onClick={() => {
-                dismissPushNudge()
-                setDropped(true)
-              }}
-            >
-              Do not ask me here
-            </button>
-          </p>
-        </aside>
-      )}
 
       <p class="form-note">
         What else is going on means the burns you are coming to — nobody hears about a burn they have not said
