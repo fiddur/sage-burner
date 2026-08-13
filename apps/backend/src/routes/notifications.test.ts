@@ -246,6 +246,7 @@ describe('what somebody has switched on', () => {
     'bring_role',
     'bring_comment',
     'point_comment',
+    'meeting_scheduled',
     'mentioned',
     'application',
     'application_news',
@@ -309,7 +310,7 @@ describe('what somebody has switched on', () => {
     expect(back.json().on).toEqual(['meal_role'])
   })
 
-  it('defaults to what happens to you, with no row seeded for a new account', async () => {
+  it('defaults to what happens to you, and the one thing around you that cannot wait', async () => {
     const server = await build()
     const ada = await givenAccount()
 
@@ -320,6 +321,22 @@ describe('what somebody has switched on', () => {
     })
 
     expect(settings.json().on).toEqual(DEFAULTS)
+  })
+
+  it('has a meeting on to begin with, being the only burn news with a time to be at', async () => {
+    // The exception to the section's rule, worth its own assertion rather than a name
+    // buried in the list above: a dream offered can be read whenever you next look.
+    const server = await build()
+    const ada = await givenAccount()
+
+    const settings = await server.inject({
+      method: 'GET',
+      url: '/api/me/notification-settings',
+      headers: { cookie: ada.cookie },
+    })
+
+    expect(settings.json().on).toContain('meeting_scheduled')
+    expect(settings.json().on).not.toContain('point_raised')
   })
 
   it('leaves what is going on around you off until it is asked for', async () => {

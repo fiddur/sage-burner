@@ -158,7 +158,7 @@ export const notificationCategoryInfo = {
   point_decided: { label: 'A talking point is decided', on: false, about: 'else' },
   point_comment: { label: 'Somebody comments on a point you raised', on: true, about: 'you' },
   point_comment_any: { label: 'Somebody comments on any talking point', on: false, about: 'else' },
-  meeting_scheduled: { label: 'A meeting is put in the diary', on: false, about: 'else' },
+  meeting_scheduled: { label: 'A meeting is put in the diary', on: true, about: 'else' },
   mentioned: { label: 'Somebody names you', on: true, about: 'you' },
   lead_role_added: { label: 'A lead role is added', on: false, about: 'else' },
   lead_role_filled: { label: 'Somebody takes the lead of a role', on: false, about: 'else' },

@@ -161,8 +161,9 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
 - Email as a channel of its own, per category, off until asked for — the column
   appears only once an admin has configured SMTP.
 - Categories default by kind: what happens _to you_ is on unless refused, what
-  happens _around you_ is off unless asked for. Attendance is the audience for
-  burn-wide news, and nobody is told about their own click.
+  happens _around you_ is off unless asked for — except a meeting being scheduled,
+  which is on, because it is the only one with a time you have to be at. Attendance
+  is the audience for burn-wide news, and nobody is told about their own click.
 - Admins are told when somebody applies; everybody who asked is told when a new
   version deploys, with a link to the changelog.
 

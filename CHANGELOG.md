@@ -9,10 +9,13 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-13
 
-- **A meeting put in the diary shows on the feed.** It was saved and shown on the Meetings page but
-  said nothing anywhere else — the bell only rang for the few who had switched that kind on, and
-  there was no line at all. Everybody coming to the burn sees it now, and sees it again if the time
-  moves.
+- **A meeting put in the diary shows on the feed, and rings by default.** It was saved and shown on
+  the Meetings page but said nothing anywhere else — the bell only rang for the few who had switched
+  that kind on, and there was no line at all. Everybody coming to the burn sees it now, and sees it
+  again if the time moves. It is also the one kind of burn news that is switched on to begin with:
+  a dream or a song can be read whenever you next look, and a meeting at 19:00 on Sunday cannot.
+  (If you have saved your notification settings at some point, your own choice stands — turn it on
+  under Your details → Notifications.)
 
 - **Switching notifications on from the feed offers to turn them on in this browser too.** Ticking
   "Notify me on similar" in a card's 🔔 used to save the setting and say nothing, so what you asked
