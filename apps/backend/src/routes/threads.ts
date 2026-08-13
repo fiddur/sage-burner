@@ -696,9 +696,7 @@ export const participantsOf = async (db: Database, found: Whose): Promise<Set<st
   const spoke = await db
     .selectDistinct({ account_id: threadEntry.author_account_id })
     .from(threadEntry)
-    .where(
-      and(eq(threadEntry.thread_id, found.id), inArray(threadEntry.kind, ['comment', 'offered', 'raised'])),
-    )
+    .where(and(eq(threadEntry.thread_id, found.id), inArray(threadEntry.kind, ['comment', 'offered'])))
 
   const people = new Set(spoke.flatMap((row) => (row.account_id === null ? [] : [row.account_id])))
 

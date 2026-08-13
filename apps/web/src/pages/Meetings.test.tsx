@@ -129,6 +129,60 @@ describe('the meetings page', () => {
     expect(await screen.findByText('Nothing in the diary. Put the next one in below.')).toBeTruthy()
   })
 
+  it('changes the meeting in the diary from the banner it is shown in', async () => {
+    const updateMeeting = vi.fn<MeetingsApi['updateMeeting']>(() => Promise.resolve({ meeting: aMeeting() }))
+    renderPage(stub({ getMeetings: () => Promise.resolve({ meetings: [aMeeting()] }), updateMeeting }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Planning call' }))
+    fireEvent.input(screen.getByLabelText('What the meeting is'), {
+      target: { value: 'Planning call, moved' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() =>
+      expect(updateMeeting).toHaveBeenCalledWith('m-1', {
+        title: 'Planning call, moved',
+        starts_at: '2099-07-20T17:00:00.000Z',
+        ends_at: null,
+        link: null,
+        notes: '',
+      }),
+    )
+  })
+
+  it('starts that form from what the meeting already says', async () => {
+    renderPage(
+      stub({
+        getMeetings: () => Promise.resolve({ meetings: [aMeeting({ link: 'https://meet.example/abc' })] }),
+      }),
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Planning call' }))
+
+    expect(screen.getByLabelText('A link to join the meeting on')).toHaveProperty(
+      'value',
+      'https://meet.example/abc',
+    )
+  })
+
+  it('keeps a meeting that has been out of the way of one still to come', async () => {
+    renderPage(
+      stub({
+        getMeetings: () =>
+          Promise.resolve({
+            meetings: [
+              aMeeting({ id: 'm-old', title: 'Last month', starts_at: '2020-01-01T10:00:00.000Z' }),
+              aMeeting({ id: 'm-soon', title: 'Next week' }),
+            ],
+          }),
+      }),
+    )
+
+    expect(await screen.findByText('Next week')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Meetings that have been' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'Also in the diary' })).toBeNull()
+  })
+
   it('raises a point with what was typed', async () => {
     const addMeetingPoint = vi.fn<MeetingsApi['addMeetingPoint']>(() => Promise.resolve({ point: aPoint() }))
     renderPage(stub({ addMeetingPoint }))

@@ -41,6 +41,10 @@ CREATE INDEX `meeting_event_idx` ON `meeting` (`event_id`,`starts_at`);--> state
 -- categories — and five tables are rebuilt rather than altered because each carries a CHECK listing
 -- a vocabulary, and SQLite cannot alter one in place. The shape is `20260812200000_bring_list`'s,
 -- with `thread_entry` added to it for the two new kinds.
+--
+-- Each rebuild recreates the indexes the table has *now*, not the ones the migration it was copied
+-- from created: `thread_entry_recent_idx` was dropped by `20260810220000_thread_subject` in favour
+-- of `thread_entry_seq_idx`, and a rebuild is the one place a dropped index can come back to life.
 PRAGMA foreign_keys=OFF;--> statement-breakpoint
 CREATE TABLE `__new_thread` (
 	`id` text NOT NULL,
@@ -83,7 +87,7 @@ SELECT `id`, `thread_id`, `kind`, `seq`, `author_account_id`, `body`, `created_a
 --> statement-breakpoint
 DROP TABLE `thread_entry`;--> statement-breakpoint
 ALTER TABLE `__new_thread_entry` RENAME TO `thread_entry`;--> statement-breakpoint
-CREATE INDEX `thread_entry_recent_idx` ON `thread_entry` (`thread_id`,`created_at`);--> statement-breakpoint
+CREATE INDEX `thread_entry_seq_idx` ON `thread_entry` (`thread_id`,`seq`);--> statement-breakpoint
 CREATE TABLE `__new_notification` (
 	`id` text PRIMARY KEY NOT NULL,
 	`account_id` text NOT NULL,

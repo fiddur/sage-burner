@@ -6,6 +6,7 @@ import {
   MAX_NOTES,
   MAX_POST,
   MAX_TITLE,
+  meetingEnds,
   nextMeeting,
   POINT_PARAM,
   profilePage,
@@ -27,7 +28,7 @@ import { NoBurn } from '../components/NoBurn.tsx'
 import { useDreamThread } from '../components/OpenedDream.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
-import { fromLocalInput, localMoment, shortDayOf } from '../datetime.ts'
+import { fromLocalInput, localMoment, shortDayOf, toLocalInput } from '../datetime.ts'
 import { useAction, useLoad } from '../load.ts'
 import { renderMarkdown } from '../markdown.ts'
 import { rowsFor } from '../textarea.ts'
@@ -54,6 +55,14 @@ export type MeetingsApi = Pick<
 
 const BLANK = { title: '', body: '' }
 
+interface MeetingDraft {
+  title: string
+  starts_at: string
+  ends_at: string | null
+  link: string | null
+  notes: string
+}
+
 export const whenItIs = (meeting: Meeting, today: Date = new Date()): string => {
   const day = shortDayOf(meeting.starts_at)
 
@@ -67,6 +76,7 @@ export const Meetings = ({ api }: { api: MeetingsApi }) => {
   const [draft, setDraft] = useState(BLANK)
   const [opened, setOpened] = useState<string | undefined>(undefined)
   const [scheduling, setScheduling] = useState(false)
+  const [amending, setAmending] = useState(false)
   const [editing, setEditing] = useState<string | undefined>(undefined)
 
   const { loaded, refreshing, reload } = useLoad(
@@ -124,8 +134,11 @@ export const Meetings = ({ api }: { api: MeetingsApi }) => {
 
   const open = points.filter((point) => point.decision === null)
   const addressed = points.filter((point) => point.decision !== null)
-  const next = nextMeeting(meetings, new Date())
-  const past = meetings.filter((one) => one.id !== next?.id)
+  const now = new Date()
+  const next = nextMeeting(meetings, now)
+  const rest = meetings.filter((one) => one.id !== next?.id)
+  const ahead = rest.filter((one) => Date.parse(meetingEnds(one.starts_at, one.ends_at)) > now.getTime())
+  const over = rest.filter((one) => Date.parse(meetingEnds(one.starts_at, one.ends_at)) <= now.getTime())
 
   const list = (shown: readonly MeetingPointEntry[], empty: string) => (
     <PointList
@@ -178,12 +191,20 @@ export const Meetings = ({ api }: { api: MeetingsApi }) => {
             next={next}
             busy={busy}
             scheduling={scheduling}
+            editing={amending}
             onScheduling={setScheduling}
+            onEditing={setAmending}
             onSchedule={(fields) =>
               run(async () => {
                 await api.addMeeting(burn.event.id, fields)
                 setScheduling(false)
               }, 'Could not put that in the diary.')
+            }
+            onSave={(id, fields) =>
+              run(async () => {
+                await api.updateMeeting(id, fields)
+                setAmending(false)
+              }, 'Could not save that.')
             }
             onDelete={(id) => run(() => api.deleteMeeting(id), 'Could not take that out.')}
           />
@@ -207,7 +228,15 @@ export const Meetings = ({ api }: { api: MeetingsApi }) => {
           />
 
           <TheDiary
-            meetings={past}
+            heading="Also in the diary"
+            meetings={ahead}
+            busy={busy}
+            onDelete={(id) => run(() => api.deleteMeeting(id), 'Could not take that out.')}
+          />
+
+          <TheDiary
+            heading="Meetings that have been"
+            meetings={over}
             busy={busy}
             onDelete={(id) => run(() => api.deleteMeeting(id), 'Could not take that out.')}
           />
@@ -218,17 +247,19 @@ export const Meetings = ({ api }: { api: MeetingsApi }) => {
 }
 
 const TheDiary = ({
+  heading,
   meetings,
   busy,
   onDelete,
 }: {
+  heading: string
   meetings: readonly Meeting[]
   busy: boolean
   onDelete: (id: string) => void
 }) =>
   meetings.length === 0 ? null : (
     <section>
-      <h2>Meetings in the diary</h2>
+      <h2>{heading}</h2>
       <ul class="meeting-list">
         {meetings.map((one) => (
           <li key={one.id}>
@@ -354,21 +385,21 @@ const NextMeeting = ({
   next,
   busy,
   scheduling,
+  editing,
   onScheduling,
+  onEditing,
   onSchedule,
+  onSave,
   onDelete,
 }: {
   next: Meeting | undefined
   busy: boolean
   scheduling: boolean
+  editing: boolean
   onScheduling: (wanted: boolean) => void
-  onSchedule: (fields: {
-    title: string
-    starts_at: string
-    ends_at: string | null
-    link: string | null
-    notes: string
-  }) => void
+  onEditing: (wanted: boolean) => void
+  onSchedule: (fields: MeetingDraft) => void
+  onSave: (id: string, fields: MeetingDraft) => void
   onDelete: (id: string) => void
 }) => (
   <section class="next-meeting">
@@ -399,16 +430,33 @@ const NextMeeting = ({
         {scheduling ? 'Never mind' : 'Put a meeting in the diary'}
       </button>
       {next !== undefined && (
-        <IconButton
-          icon="🗑️"
-          label={`Take ${next.title} out of the diary`}
-          disabled={busy}
-          onClick={() => onDelete(next.id)}
-        />
+        <>
+          <IconButton
+            icon="✏️"
+            label={`Edit ${next.title}`}
+            disabled={busy}
+            onClick={() => onEditing(!editing)}
+          />
+          <IconButton
+            icon="🗑️"
+            label={`Take ${next.title} out of the diary`}
+            disabled={busy}
+            onClick={() => onDelete(next.id)}
+          />
+        </>
       )}
     </p>
 
     {scheduling && <MeetingFields busy={busy} onCancel={() => onScheduling(false)} onSave={onSchedule} />}
+
+    {editing && next !== undefined && (
+      <MeetingFields
+        meeting={next}
+        busy={busy}
+        onCancel={() => onEditing(false)}
+        onSave={(fields) => onSave(next.id, fields)}
+      />
+    )}
   </section>
 )
 
@@ -656,25 +704,21 @@ const DecisionFields = ({
 }
 
 const MeetingFields = ({
+  meeting,
   busy,
   onCancel,
   onSave,
 }: {
+  meeting?: Meeting | undefined
   busy: boolean
   onCancel: () => void
-  onSave: (fields: {
-    title: string
-    starts_at: string
-    ends_at: string | null
-    link: string | null
-    notes: string
-  }) => void
+  onSave: (fields: MeetingDraft) => void
 }) => {
-  const [title, setTitle] = useState('Planning call')
-  const [starts, setStarts] = useState('')
-  const [ends, setEnds] = useState('')
-  const [link, setLink] = useState('')
-  const [notes, setNotes] = useState('')
+  const [title, setTitle] = useState(meeting?.title ?? 'Planning call')
+  const [starts, setStarts] = useState(toLocalInput(meeting?.starts_at ?? null))
+  const [ends, setEnds] = useState(toLocalInput(meeting?.ends_at ?? null))
+  const [link, setLink] = useState(meeting?.link ?? '')
+  const [notes, setNotes] = useState(meeting?.notes ?? '')
 
   const startsAt = fromLocalInput(starts)
 
@@ -737,7 +781,7 @@ const MeetingFields = ({
       <p class="row">
         <PendingButton
           busy={busy}
-          label="Put it in"
+          label={meeting === undefined ? 'Put it in' : 'Save'}
           busyLabel="Saving…"
           type="button"
           disabled={title.trim() === '' || startsAt === null}

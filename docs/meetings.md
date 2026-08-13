@@ -62,6 +62,11 @@ way in, so changing the default later moves every meeting that never had one.
 else's browser follows, which is the same shape as a song link or a profile URL — so it takes the
 same `isProfileUrl` refusal. A `javascript:` link in an `href` is stored script, not a bad link.
 
+**One at a time in the banner.** The next meeting is where it is edited and where it is taken out
+of the diary, because that is the one anybody is looking at; everything else is a line under it.
+Meetings that have already been sit in a list of their own rather than mixed into the ones still
+ahead — a diary reads forwards.
+
 ## In the calendar feed
 
 Meetings become `VEVENT`s beside the dreams in `GET /calendar/:token/schedule.ics`, through

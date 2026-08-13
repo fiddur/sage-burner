@@ -1969,8 +1969,7 @@ a.person-badge:focus-visible span:last-child {
   margin: 0.35rem 0 0;
 }
 
-/* The decision is pinned rather than left in the scroll: it is the one thing somebody
-   opening an addressed point came for, and a thread can be long. */
+/* The sage callout `.point-decision` shares with `.push-nudge`: an answer, not a warning. */
 .point-decision {
   margin: 0.5rem 0 0;
   padding: 0.5rem 0.7rem;

@@ -919,8 +919,6 @@ export const post = sqliteTable(
   ],
 )
 
-// `decision` is what makes a point addressed — no status column to keep in step with it, and
-// clearing it reopens the point. `docs/meetings.md` has why the thread is the discussion.
 export const meetingPoint = sqliteTable(
   'meeting_point',
   {

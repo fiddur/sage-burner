@@ -41,10 +41,6 @@ export const meetingPointUpdateSchema = meetingPointSchema
   .strict()
 export type MeetingPointUpdate = z.infer<typeof meetingPointUpdateSchema>
 
-/**
- * Clearing the decision reopens the point, so `null` is a value somebody sends rather than a
- * field they leave out — `.strict()` on a partial would let a typo mean "reopen it".
- */
 export const decisionSchema = z
   .object({
     decision: z.string().trim().max(MAX_POST).nullable(),
@@ -81,10 +77,6 @@ export type MeetingsResponse = z.infer<typeof meetingsResponseSchema>
 export const meetingResponseSchema = z.object({ meeting: meetingSchema })
 export type MeetingResponse = z.infer<typeof meetingResponseSchema>
 
-/**
- * Somebody else's browser follows this, so it is the same https-only shape every other authored
- * URL in the app takes — `javascript:` in an `href` is stored script, not a bad link.
- */
 const joinedOn = optionalText(MAX_MEETING_LINK).refine((url) => url === null || isProfileUrl(url), {
   message: 'must be an https link',
 })
@@ -117,11 +109,7 @@ export const meetingUpdateSchema = withValidRun(
 export type MeetingUpdate = z.infer<typeof meetingUpdateSchema>
 export type MeetingUpdateInput = z.input<typeof meetingUpdateSchema>
 
-/**
- * What a token-holding calendar client is told about a meeting. An allowlist, like
- * `publicSessionFields`: `schemas.test.ts` pins the key set, so a column added to `meeting`
- * reaches the feed only when somebody names it here.
- */
+/** An allowlist: a column added to `meeting` reaches the feed only when somebody names it here. */
 export const publicMeetingFields = meetingSchema
   .pick({ id: true, title: true, link: true })
   .extend({ starts_at: dateTimeSchema, ends_at: dateTimeSchema })

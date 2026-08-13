@@ -258,6 +258,78 @@ describe('deciding a point', () => {
   })
 })
 
+describe('who may change a point', () => {
+  const raised = async (server: FastifyInstance, cookie: string, title = 'Where do we park?') =>
+    (await raise(server, cookie, { title })).json().point.id as string
+
+  it('is whoever raised it, the wording being theirs', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const id = await raised(server, ada.cookie)
+
+    const changed = await server.inject({
+      method: 'PATCH',
+      url: `/api/points/${id}`,
+      headers: { cookie: ada.cookie },
+      payload: { title: 'Where does everybody park?' },
+    })
+
+    expect(changed.statusCode).toBe(200)
+    expect(changed.json().point.title).toBe('Where does everybody park?')
+  })
+
+  it('is not somebody else, however approved they are', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bo = await givenAccount('Bo')
+    const id = await raised(server, ada.cookie)
+
+    const changed = await server.inject({
+      method: 'PATCH',
+      url: `/api/points/${id}`,
+      headers: { cookie: bo.cookie },
+      payload: { title: 'Something else entirely' },
+    })
+
+    expect(changed.statusCode).toBe(403)
+  })
+
+  it('lets an admin take one off, which whoever raised it can do as well', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const boss = await givenAccount('Boss', ['admin'])
+    const id = await raised(server, ada.cookie)
+
+    const gone = await server.inject({
+      method: 'DELETE',
+      url: `/api/points/${id}`,
+      headers: { cookie: boss.cookie },
+    })
+
+    expect(gone.statusCode).toBe(204)
+    expect((await points(server, ada.cookie)).json().points).toEqual([])
+  })
+
+  it('refuses a member who neither raised it nor organises', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const bo = await givenAccount('Bo')
+    const id = await raised(server, ada.cookie)
+
+    const gone = await server.inject({
+      method: 'DELETE',
+      url: `/api/points/${id}`,
+      headers: { cookie: bo.cookie },
+    })
+
+    expect(gone.statusCode).toBe(403)
+  })
+})
+
 describe('the meetings themselves', () => {
   it('goes in the diary, with the link people join on', async () => {
     const server = await build()
@@ -325,6 +397,58 @@ describe('the meetings themselves', () => {
     const nobody = await givenAccount('Nobody', [])
 
     expect((await meetings(server, nobody.cookie)).statusCode).toBe(403)
+  })
+
+  it('changes one that is already in the diary', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const id = (
+      await schedule(server, ada.cookie, { title: 'Planning call', starts_at: '2026-07-20T17:00:00.000Z' })
+    ).json().meeting.id
+
+    const changed = await server.inject({
+      method: 'PATCH',
+      url: `/api/meetings/${id}`,
+      headers: { cookie: ada.cookie },
+      payload: {
+        title: 'Planning call, moved',
+        starts_at: '2026-07-21T18:00:00.000Z',
+        ends_at: null,
+        link: 'https://meet.example/abc',
+        notes: '',
+      },
+    })
+
+    expect(changed.statusCode).toBe(200)
+    expect(changed.json().meeting).toMatchObject({
+      title: 'Planning call, moved',
+      starts_at: '2026-07-21T18:00:00.000Z',
+      link: 'https://meet.example/abc',
+    })
+  })
+
+  it('refuses a change that would end it before it starts', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const id = (
+      await schedule(server, ada.cookie, { title: 'Planning call', starts_at: '2026-07-20T17:00:00.000Z' })
+    ).json().meeting.id
+
+    const changed = await server.inject({
+      method: 'PATCH',
+      url: `/api/meetings/${id}`,
+      headers: { cookie: ada.cookie },
+      payload: {
+        title: 'Planning call',
+        starts_at: '2026-07-21T18:00:00.000Z',
+        ends_at: '2026-07-21T17:00:00.000Z',
+        notes: '',
+      },
+    })
+
+    expect(changed.statusCode).toBe(400)
   })
 
   it('takes one off the diary again', async () => {

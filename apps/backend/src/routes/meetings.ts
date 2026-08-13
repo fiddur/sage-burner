@@ -108,7 +108,7 @@ export const registerMeetingRoutes = (
     point: MeetingPoint,
     body: string,
     by: string | undefined,
-    kind: 'decided' | 'edited' | 'raised' | 'renamed',
+    kind: 'decided' | 'edited' | 'raised',
     talkedOn?: string,
   ) =>
     await addEntry(

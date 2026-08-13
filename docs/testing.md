@@ -263,8 +263,12 @@ phone" means 360px.
 - [ ] Press **Reopen**: it goes back to Open points and the decision is gone from both.
 - [ ] Put a meeting in the diary with a start and a joining link. The banner names it, the
       link opens it, and leaving the end blank means it runs an hour.
+- [ ] Press ✏️ on it: the form opens filled in with what it already says, and saving moves it.
+      A link that is not `https://` is refused.
 - [ ] Subscribe to the burn's calendar feed: the meeting is in it beside the dreams, with the
       joining link as its description — and the note you typed is nowhere in the file.
+- [ ] A meeting whose time has passed moves under **Meetings that have been**, and one that is
+      running right now stays in the banner with its Join link.
 - [ ] On a burn that has ended, raising a point and recording a decision are both refused.
 
 ## The calendar
