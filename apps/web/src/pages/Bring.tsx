@@ -329,15 +329,7 @@ const Row = ({
         {mine && (
           <IconButton icon="✏️" label={`Edit ${item.title}`} disabled={busy} onClick={() => onEdit(true)} />
         )}
-        {(mine || admin) && (
-          <Destroy
-            what={item.title}
-            verb="Take off"
-
-            busy={busy}
-            onDestroy={onWithdraw}
-          />
-        )}
+        {(mine || admin) && <Destroy what={item.title} verb="Take off" busy={busy} onDestroy={onWithdraw} />}
       </p>
 
       {opened && (

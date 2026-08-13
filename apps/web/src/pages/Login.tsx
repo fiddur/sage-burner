@@ -53,7 +53,7 @@ export const Login = ({
   const roles = viewer.account?.roles
 
   useEffect(() => {
-    if (roles !== undefined) route(landsOn(roles))
+    if (roles !== undefined) route(landsOn(roles), true)
   }, [roles, route])
 
   if (viewer.status === 'loading') {

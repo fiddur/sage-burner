@@ -38,8 +38,8 @@ const noPasskeys = (): PasskeyApi => ({
 
 /**
  * Under the router, because signing in navigates: outside a `LocationProvider` preact-iso's
- * context is `{}`, so `route` is undefined and the call throws into the form's own catch —
- * which reads as "Could not sign in just now" while every success test still passes.
+ * context is `{}`, so `route` is undefined and calling it throws where nothing here would
+ * notice — which is how the first version of this shipped untested.
  */
 const renderLogin = (login: AppApi['login'], viewer: Viewer = { status: 'signed-out' }) => {
   history.replaceState(null, '', '/login')
@@ -399,5 +399,20 @@ describe('signing in navigates rather than offering a link', () => {
     })
 
     await waitFor(() => expect(location.pathname).toBe('/feed'))
+  })
+})
+
+describe('what Back does after signing in', () => {
+  it('replaces the login page rather than stacking on it, so Back is not a loop', async () => {
+    const before = history.length
+    renderLogin(() =>
+      Promise.resolve({ viewer: { account_id: 'a-1', name: null, avatar: null, roles: ['member'] } }),
+    )
+
+    fillIn('ada@example.org', 'a good long passphrase')
+    submit()
+
+    await waitFor(() => expect(location.pathname).toBe('/feed'))
+    expect(history.length).toBe(before)
   })
 })
