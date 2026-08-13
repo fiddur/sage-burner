@@ -30,9 +30,9 @@ import { viewerFor } from '../auth/viewer.ts'
 import { isEmptyPatch, patchRow } from '../db/patch.ts'
 import { account, event, meeting, meetingPoint, thread } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
-import { displayName, namedBy, notifyAttendees, reachedByMention, tellAttendees } from '../push/notify.ts'
+import { displayName, namedBy, reachedByMention, tellAttendees } from '../push/notify.ts'
 import { openEventNow, todayIso } from './events.ts'
-import { addEntry, threadFor, threadIdFor } from './threads.ts'
+import { addEntry, renameThread, threadFor, threadIdFor } from './threads.ts'
 
 export interface MeetingDeps extends GuardDeps {
   now: () => Date
@@ -122,18 +122,25 @@ export const registerMeetingRoutes = (
       now(),
     )
 
-  /**
-   * A meeting has no thread, so the feed line is its whole presence there — `notifyAttendees`
-   * rather than `tellAttendees`, whose bell alone reaches only the few who asked for a category
-   * that is off by default.
-   */
+  const noteOnMeeting = async (row: Meeting, body: string, by: string, talkedOn?: string) =>
+    await addEntry(
+      db,
+      {
+        thread_id: talkedOn ?? (await threadFor(db, 'meeting', row)),
+        kind: 'scheduled',
+        author_account_id: by,
+        body,
+      },
+      now(),
+    )
+
   const sayInTheFeed = async (row: Meeting, said: string, by: string) => {
-    await notifyAttendees(
+    await tellAttendees(
       db,
       notify,
       row.event_id,
       { category: 'meeting_scheduled', body: said, link: meetingsPage(row.event_id) },
-      { except: [by], at: now() },
+      { except: [by] },
     )
   }
 
@@ -356,6 +363,7 @@ export const registerMeetingRoutes = (
     const row = {
       id: randomUUID(),
       event_id: open.id,
+      author_account_id: viewer.account_id,
       title: body.title,
       starts_at: body.starts_at,
       ends_at: body.ends_at,
@@ -364,7 +372,13 @@ export const registerMeetingRoutes = (
       created_at: now().toISOString(),
     } satisfies Meeting
 
-    await db.insert(meeting).values(row)
+    const threadId = db.transaction((tx) => {
+      tx.insert(meeting).values(row).run()
+
+      return threadIdFor(tx, { type: 'meeting', id: row.id, event_id: row.event_id, title: row.title })
+    })
+
+    await noteOnMeeting(row, 'put it in the diary', viewer.account_id, threadId)
 
     await sayInTheFeed(
       row,
@@ -402,11 +416,17 @@ export const registerMeetingRoutes = (
     if (row === undefined) return sendError(reply, 404)
 
     if (row.starts_at !== existing.starts_at) {
+      await noteOnMeeting(row, 'moved it', viewer.account_id)
+
       await sayInTheFeed(
         row,
         `${await displayName(db, viewer.account_id)} moved a meeting: ${row.title}`,
         viewer.account_id,
       )
+    }
+
+    if (row.title !== existing.title) {
+      await renameThread(db, await threadFor(db, 'meeting', row), row.title)
     }
 
     return { meeting: row } satisfies MeetingResponse

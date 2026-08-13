@@ -94,6 +94,21 @@ const listing = async (
   cookie: string,
 ): Promise<{ id: string; thread_id: string | null }[]> => (await points(server, cookie)).json().points
 
+interface Card {
+  entity_type: string
+  entity_id: string
+  title: string
+  entries: { kind: string; body: string }[]
+}
+
+const cardFor = async (server: FastifyInstance, cookie: string, meetingId: string): Promise<Card> => {
+  const feed = await server.inject({ method: 'GET', url: '/api/feed', headers: { cookie } })
+  const mine = (feed.json().threads as Card[]).find((card) => card.entity_id === meetingId)
+  if (mine === undefined) throw new Error('no card for that meeting')
+
+  return mine
+}
+
 const meetings = (server: FastifyInstance, cookie: string, eventId = BURN) =>
   server.inject({ method: 'GET', url: `/api/events/${eventId}/meetings`, headers: { cookie } })
 
@@ -351,7 +366,26 @@ describe('the meetings themselves', () => {
     })
   })
 
-  it('puts a line on the feed, a meeting having no card to be its presence there', async () => {
+  it('gets a card, so the one thing on the feed nobody could reply to now takes replies', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+
+    const put = await schedule(server, ada.cookie, {
+      title: 'Planning call',
+      starts_at: '2026-07-20T17:00:00.000Z',
+    })
+
+    const card = await cardFor(server, ada.cookie, put.json().meeting.id)
+
+    expect(card).toMatchObject({ entity_type: 'meeting', title: 'Planning call' })
+    expect(card.entries.map((entry) => [entry.kind, entry.body])).toEqual([
+      ['scheduled', 'put it in the diary'],
+    ])
+  })
+
+  it('writes no line beside that card, which would put one thing on the feed twice', async () => {
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -359,17 +393,10 @@ describe('the meetings themselves', () => {
 
     await schedule(server, ada.cookie, { title: 'Planning call', starts_at: '2026-07-20T17:00:00.000Z' })
 
-    expect(await db().select().from(activity)).toMatchObject([
-      {
-        event_id: BURN,
-        category: 'meeting_scheduled',
-        body: 'Ada put a meeting in the diary: Planning call',
-        link: `/meetings?burn=${BURN}`,
-      },
-    ])
+    expect(await db().select().from(activity)).toEqual([])
   })
 
-  it('says so again when it moves, which is the half worth hearing', async () => {
+  it('bumps the card when it moves, which is the half worth hearing', async () => {
     const server = await build()
     await givenBurn()
     const ada = await givenAccount('Ada')
@@ -389,10 +416,9 @@ describe('the meetings themselves', () => {
       },
     })
 
-    expect((await db().select().from(activity)).map((row) => row.body)).toEqual([
-      'Ada put a meeting in the diary: Planning call',
-      'Ada moved a meeting: Planning call',
-    ])
+    // `coalesces('scheduled')`, so a meeting moved three times is one line rather than four.
+    const card = await cardFor(server, ada.cookie, id)
+    expect(card.entries.map((entry) => entry.body)).toEqual(['moved it'])
   })
 
   it('says nothing more when the time is untouched, a reworded note not being news', async () => {
@@ -415,7 +441,7 @@ describe('the meetings themselves', () => {
       },
     })
 
-    expect(await db().select().from(activity)).toHaveLength(1)
+    expect((await cardFor(server, ada.cookie, id)).entries).toHaveLength(1)
   })
 
   it('refuses one that ends before it starts', async () => {
