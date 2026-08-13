@@ -987,6 +987,16 @@ default differently — a count here would go stale on the next feature, and
 - **What else is going on** — the section #259 added. **Off unless you ask.** A burn
   where every dream and every arrival pings forty-two people is a channel people learn
   to ignore, which costs the notifications that are actually about them.
+
+  **One exception, and what makes it one: a meeting has a time you have to be at.**
+  Everything else in this section can be read whenever you next look — a dream offered, a
+  song added, somebody saying they are coming — so nothing is lost by finding out late. A
+  planning call at 19:00 on Sunday is either heard before Sunday or missed, and the whole
+  point of putting it in the diary is that people come. So `meeting_scheduled` is on by
+  default while sitting here rather than under _what happens to you_, which is about your
+  own record changing. The section still says where a category belongs; `on` says whether
+  it can wait.
+
 - **What you look after** — an application arriving, and **only an admin is shown it**
   (#326). Nobody else is ever told, and a switch that cannot do anything reads as a
   promise. On, like the first section: an application stays open until somebody reviews

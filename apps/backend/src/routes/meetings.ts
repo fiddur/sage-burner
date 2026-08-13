@@ -30,7 +30,7 @@ import { viewerFor } from '../auth/viewer.ts'
 import { isEmptyPatch, patchRow } from '../db/patch.ts'
 import { account, event, meeting, meetingPoint, thread } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
-import { displayName, namedBy, reachedByMention, tellAttendees } from '../push/notify.ts'
+import { displayName, namedBy, notifyAttendees, reachedByMention, tellAttendees } from '../push/notify.ts'
 import { openEventNow, todayIso } from './events.ts'
 import { addEntry, threadFor, threadIdFor } from './threads.ts'
 
@@ -121,6 +121,21 @@ export const registerMeetingRoutes = (
       },
       now(),
     )
+
+  /**
+   * A meeting has no thread, so the feed line is its whole presence there — `notifyAttendees`
+   * rather than `tellAttendees`, whose bell alone reaches only the few who asked for a category
+   * that is off by default.
+   */
+  const sayInTheFeed = async (row: Meeting, said: string, by: string) => {
+    await notifyAttendees(
+      db,
+      notify,
+      row.event_id,
+      { category: 'meeting_scheduled', body: said, link: meetingsPage(row.event_id) },
+      { except: [by], at: now() },
+    )
+  }
 
   const tellNamed = async (named: readonly string[], who: string, point: MeetingPoint) => {
     await Promise.all(
@@ -351,16 +366,10 @@ export const registerMeetingRoutes = (
 
     await db.insert(meeting).values(row)
 
-    await tellAttendees(
-      db,
-      notify,
-      row.event_id,
-      {
-        category: 'meeting_scheduled',
-        body: `${await displayName(db, viewer.account_id)} put a meeting in the diary: ${row.title}`,
-        link: meetingsPage(row.event_id),
-      },
-      { except: [viewer.account_id] },
+    await sayInTheFeed(
+      row,
+      `${await displayName(db, viewer.account_id)} put a meeting in the diary: ${row.title}`,
+      viewer.account_id,
     )
 
     return reply.code(201).send({ meeting: row } satisfies MeetingResponse)
@@ -371,6 +380,9 @@ export const registerMeetingRoutes = (
 
     const body = bodyOf(meetingUpdateSchema, request)
     if (body === undefined) return sendError(reply, 400)
+
+    const viewer = await viewerFor(request, { db, sessions })
+    if (viewer === undefined) return sendError(reply, 401)
 
     const existing = await meetingOnOpenBurn(db, now, request.params.id)
     if (existing === undefined) return sendError(reply, 404)
@@ -388,6 +400,14 @@ export const registerMeetingRoutes = (
       .returning()
 
     if (row === undefined) return sendError(reply, 404)
+
+    if (row.starts_at !== existing.starts_at) {
+      await sayInTheFeed(
+        row,
+        `${await displayName(db, viewer.account_id)} moved a meeting: ${row.title}`,
+        viewer.account_id,
+      )
+    }
 
     return { meeting: row } satisfies MeetingResponse
   })

@@ -10,7 +10,7 @@ import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, attendance, event } from '../db/schema.ts'
+import { account, accountRole, activity, attendance, event } from '../db/schema.ts'
 
 const SECRET = 'm'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
@@ -349,6 +349,73 @@ describe('the meetings themselves', () => {
       ends_at: null,
       link: 'https://meet.example/abc',
     })
+  })
+
+  it('puts a line on the feed, a meeting having no card to be its presence there', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    await givenComing(ada.id)
+
+    await schedule(server, ada.cookie, { title: 'Planning call', starts_at: '2026-07-20T17:00:00.000Z' })
+
+    expect(await db().select().from(activity)).toMatchObject([
+      {
+        event_id: BURN,
+        category: 'meeting_scheduled',
+        body: 'Ada put a meeting in the diary: Planning call',
+        link: `/meetings?burn=${BURN}`,
+      },
+    ])
+  })
+
+  it('says so again when it moves, which is the half worth hearing', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const id = (
+      await schedule(server, ada.cookie, { title: 'Planning call', starts_at: '2026-07-20T17:00:00.000Z' })
+    ).json().meeting.id
+
+    await server.inject({
+      method: 'PATCH',
+      url: `/api/meetings/${id}`,
+      headers: { cookie: ada.cookie },
+      payload: {
+        title: 'Planning call',
+        starts_at: '2026-07-21T18:00:00.000Z',
+        ends_at: null,
+        notes: '',
+      },
+    })
+
+    expect((await db().select().from(activity)).map((row) => row.body)).toEqual([
+      'Ada put a meeting in the diary: Planning call',
+      'Ada moved a meeting: Planning call',
+    ])
+  })
+
+  it('says nothing more when the time is untouched, a reworded note not being news', async () => {
+    const server = await build()
+    await givenBurn()
+    const ada = await givenAccount('Ada')
+    const id = (
+      await schedule(server, ada.cookie, { title: 'Planning call', starts_at: '2026-07-20T17:00:00.000Z' })
+    ).json().meeting.id
+
+    await server.inject({
+      method: 'PATCH',
+      url: `/api/meetings/${id}`,
+      headers: { cookie: ada.cookie },
+      payload: {
+        title: 'Planning call',
+        starts_at: '2026-07-20T17:00:00.000Z',
+        ends_at: null,
+        notes: 'bring the map',
+      },
+    })
+
+    expect(await db().select().from(activity)).toHaveLength(1)
   })
 
   it('refuses one that ends before it starts', async () => {
