@@ -143,6 +143,7 @@ const clientWith = (
   getVersion: () => Promise.resolve({ build_sha: 'the-one-this-page-loaded' }),
   getChangelog: () => Promise.resolve({ markdown: '## 2026-08-07\n\n- Something changed.\n' }),
   getMyNotifications: () => Promise.resolve({ notifications: [], unseen: 0 }),
+  getNotificationLog: () => Promise.resolve({ entries: [] }),
   getMyNotificationSettings: () => Promise.resolve({ on: [], email: [] }),
   updateMyNotificationSettings: () =>
     Promise.reject(new Error('updateMyNotificationSettings is not stubbed here')),

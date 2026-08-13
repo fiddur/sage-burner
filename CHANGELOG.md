@@ -9,6 +9,16 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-13
 
+- **You are offered notifications when you join.** Taking up an invite used to end on "You are in"
+  with no mention of them, so the one moment you have just decided to come was the moment the app
+  said nothing. Ticking a category on your own page now also says when this browser would hear
+  nothing about it — with the switch right there, and a "do not ask me here" that sticks.
+
+- **Organisers can see what actually went out.** ⚙️ → Notifications sent is one line per
+  notification: when, what it was about, how many people were told, how many had that category
+  switched off, and how many devices took it. It says taken rather than delivered, because a push
+  service accepting a message is not a phone showing it.
+
 - **Taking up a group link answers the application it belonged to.** Somebody who had applied and
   then pressed the link posted in the group was let in, but stayed in the organisers' queue looking
   like they were still waiting — and pressing Reject on them changed nothing except the "this one has

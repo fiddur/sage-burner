@@ -254,8 +254,8 @@ export const createApp = async ({
   const tellAccount = recordAndPush(
     push,
     now,
-    (counts) => {
-      app.log.warn({ ...counts }, 'notifying a member')
+    (trouble) => {
+      app.log.warn({ ...trouble }, 'notifying a member')
     },
     { post: byEmail, defer: defer ?? emails.defer },
   )

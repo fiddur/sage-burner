@@ -746,6 +746,27 @@ export const notificationSetting = sqliteTable(
   ],
 )
 
+// No CHECK on `category`, unlike its three neighbours: this is a record of what was posted, not
+// a table anybody writes into, and a vocabulary that has moved on must not be able to fail the
+// write that says a notification went out. `docs/accounts.md` has the rest.
+export const notificationBatch = sqliteTable(
+  'notification_batch',
+  {
+    id: text('id').notNull(),
+    category: text('category', { enum: notificationCategories }).notNull(),
+    body: text('body').notNull(),
+    link: text('link'),
+    created_at: text('created_at').notNull(),
+    told: integer('told').notNull().default(0),
+    suppressed: integer('suppressed').notNull().default(0),
+    emailed: integer('emailed').notNull().default(0),
+    accepted: integer('accepted').notNull().default(0),
+    failed: integer('failed').notNull().default(0),
+    gone: integer('gone').notNull().default(0),
+  },
+  (table) => [primaryKey({ columns: [table.id] }), index('notification_batch_idx').on(table.created_at)],
+)
+
 export const activity = sqliteTable(
   'activity',
   {

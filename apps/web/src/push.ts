@@ -67,3 +67,25 @@ export const browserPush = (): PushBrowser | undefined => {
     },
   }
 }
+
+// A decision of its own, and so a key of its own: `DISMISSED_KEY` is about installing, and
+// somebody who has the app installed may still not want to be asked about notifications.
+export const NUDGE_DISMISSED_KEY = 'sage-burner:push-nudge-dismissed'
+
+export const dismissedPushNudge = (store?: Storage): boolean => {
+  try {
+    const held = store ?? globalThis.localStorage
+
+    return typeof held?.getItem(NUDGE_DISMISSED_KEY) === 'string'
+  } catch {
+    return false
+  }
+}
+
+export const dismissPushNudge = (store?: Storage): void => {
+  try {
+    const held = store ?? globalThis.localStorage
+
+    held?.setItem(NUDGE_DISMISSED_KEY, 'yes')
+  } catch {}
+}

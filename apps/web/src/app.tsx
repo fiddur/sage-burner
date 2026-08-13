@@ -22,6 +22,7 @@ import { AdminAllergies } from './pages/AdminAllergies.tsx'
 import { AdminApplications } from './pages/AdminApplications.tsx'
 import { AdminEvents } from './pages/AdminEvents.tsx'
 import { AdminInvites } from './pages/AdminInvites.tsx'
+import { AdminNotificationLog } from './pages/AdminNotificationLog.tsx'
 import { AdminQuestions } from './pages/AdminQuestions.tsx'
 import { AdminRoster } from './pages/AdminRoster.tsx'
 import { AdminSettings } from './pages/AdminSettings.tsx'
@@ -222,6 +223,7 @@ export type RoutesApi = Pick<
   | 'unsubscribeFromPush'
   | 'getApplications'
   | 'getInvites'
+  | 'getNotificationLog'
   | 'createInvite'
   | 'createGroupInvite'
   | 'revokeInvite'
@@ -246,6 +248,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
   const AdminQuestionsRoute = useMemo(() => () => <AdminQuestions api={api} />, [api])
   const AdminApplicationsRoute = useMemo(() => () => <AdminApplications api={api} />, [api])
   const AdminInvitesRoute = useMemo(() => () => <AdminInvites api={api} />, [api])
+  const AdminNotificationLogRoute = useMemo(() => () => <AdminNotificationLog api={api} />, [api])
   const OptionsRoute = useMemo(() => () => <Options api={api} />, [api])
   const PlacesRoute = useMemo(() => () => <Places api={api} />, [api])
   const AdminRosterRoute = useMemo(() => () => <AdminRoster api={api} />, [api])
@@ -313,6 +316,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
       <Route path="/admin/questions" component={AdminQuestionsRoute} />
       <Route path="/admin/applications" component={AdminApplicationsRoute} />
       <Route path="/admin/invites" component={AdminInvitesRoute} />
+      <Route path="/admin/notifications" component={AdminNotificationLogRoute} />
       <Route path="/admin/song-categories" component={AdminSongCategoriesRoute} />
       <Route path="/options" component={OptionsRoute} />
       <Route path="/places" component={PlacesRoute} />

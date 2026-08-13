@@ -146,7 +146,9 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
   as a panel on a wide screen and a page on a phone. Opening the bell marks
   everything seen, and so does arriving at what one points at — once the page is
   showing data as new as the notification.
-- Browser push per device, opt-in, with nothing to sign up for.
+- Browser push per device, opt-in, with nothing to sign up for. It is offered where
+  somebody has just joined on an invite, and again under the categories when a switch
+  is turned on in a browser that would hear nothing — until you say not to ask there.
 - Email as a channel of its own, per category, off until asked for — the column
   appears only once an admin has configured SMTP.
 - Categories default by kind: what happens _to you_ is on unless refused, what

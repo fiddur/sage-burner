@@ -3,6 +3,7 @@ import type { Attendance, Event, EventOptionTaken, InviteState, OAuthProvider } 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import type { PushBrowser } from '../push.ts'
 import type { Viewer } from '../viewer.tsx'
 import type { InviteApi } from './Invite.tsx'
 
@@ -56,6 +57,9 @@ const stub = (over: Partial<InviteApi> = {}): InviteApi => ({
   redeemInvite: () => Promise.reject(new Error('redeemInvite is not stubbed here')),
   getActiveEvent: () => Promise.resolve({ event: null }),
   getEventOptions: () => Promise.resolve({ options: [] }),
+  getPushKey: () => Promise.resolve({ public_key: null }),
+  subscribeToPush: () => Promise.reject(new Error('subscribeToPush is not stubbed here')),
+  unsubscribeFromPush: () => Promise.reject(new Error('unsubscribeFromPush is not stubbed here')),
   updateMyStay: () => Promise.reject(new Error('updateMyStay is not stubbed here')),
   joinEvent: () => Promise.reject(new Error('joinEvent is not stubbed here')),
   ...over,
@@ -786,5 +790,46 @@ describe('the welcome for somebody who did not join a burn', () => {
     await screen.findByLabelText('Your name')
 
     expect(screen.queryByRole('link', { name: /Looking for a lift/ })).toBeNull()
+  })
+})
+
+describe('hearing about it after signing up', () => {
+  const aBrowser = (): PushBrowser => ({
+    permission: () => 'default',
+    requestPermission: () => Promise.resolve('granted'),
+    register: () =>
+      Promise.resolve({
+        getSubscription: () => Promise.resolve(null),
+        subscribe: () =>
+          Promise.resolve({
+            endpoint: 'https://push.example/one',
+            unsubscribe: () => Promise.resolve(true),
+            toJSON: () => ({
+              endpoint: 'https://push.example/one',
+              keys: { p256dh: 'a-public-key', auth: 'a-secret' },
+            }),
+          }),
+      }),
+  })
+
+  it('offers notifications, where the invite flow used to say nothing', async () => {
+    render(
+      <InstallationProvider>
+        <ViewerProvider viewer={{ status: 'signed-out' }}>
+          <Invite
+            api={stub({ redeemInvite: () => Promise.resolve({ viewer: null, attendance: null }) })}
+            token="a-token"
+            browser={aBrowser()}
+          />
+        </ViewerProvider>
+      </InstallationProvider>,
+    )
+
+    await screen.findByRole('button', { name: 'Join' })
+    complete()
+    join()
+
+    expect(await screen.findByRole('heading', { name: 'Hear about it here?' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: 'Notify me here' })).toBeTruthy()
   })
 })

@@ -19,6 +19,26 @@ export const notificationsResponseSchema = z.object({
 })
 export type NotificationsResponse = z.infer<typeof notificationsResponseSchema>
 
+export const notificationLogEntrySchema = z.object({
+  id: idSchema,
+  category: z.enum(notificationCategories),
+  body: z.string(),
+  link: z.string().nullable(),
+  created_at: dateTimeSchema,
+  told: z.int().min(0),
+  suppressed: z.int().min(0),
+  emailed: z.int().min(0),
+  accepted: z.int().min(0),
+  failed: z.int().min(0),
+  gone: z.int().min(0),
+})
+export type NotificationLogEntry = z.infer<typeof notificationLogEntrySchema>
+
+export const notificationLogResponseSchema = z.object({
+  entries: z.array(notificationLogEntrySchema),
+})
+export type NotificationLogResponse = z.infer<typeof notificationLogResponseSchema>
+
 export const targetShownSchema = z
   .object({ link: z.string().min(1).max(2048), as_of: dateTimeSchema })
   .strict()

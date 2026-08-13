@@ -501,6 +501,11 @@ export const apiRoutes = {
     fastify: '/api/me/images',
     path: () => '/api/me/images',
   },
+  getNotificationLog: {
+    method: 'GET',
+    fastify: '/api/admin/notification-log',
+    path: () => '/api/admin/notification-log',
+  },
   getMyNotifications: {
     method: 'GET',
     fastify: '/api/me/notifications',

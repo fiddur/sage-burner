@@ -12,6 +12,8 @@ import { useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
 import type { FormErrorState } from '../components/FormError.tsx'
+import type { PushApi } from '../components/PushHere.tsx'
+import type { PushBrowser } from '../push.ts'
 import type { StayDraft } from '../stay.ts'
 
 import { isApiError } from '../api/client.ts'
@@ -19,6 +21,7 @@ import { AllergiesField } from '../components/AllergiesField.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { FormError } from '../components/FormError.tsx'
 import { PendingButton } from '../components/PendingButton.tsx'
+import { PushAsk, usePushHere } from '../components/PushHere.tsx'
 import { StayFields } from '../components/StayFields.tsx'
 import { useSocialLogins } from '../installation.tsx'
 import { useAction, useLoadInto } from '../load.ts'
@@ -34,7 +37,8 @@ export type InviteApi = Pick<
   | 'joinEvent'
   | 'redeemInvite'
   | 'updateMyStay'
->
+> &
+  PushApi
 
 interface Upcoming {
   event: Event
@@ -75,29 +79,43 @@ const YouAreIn = ({
   done,
   burn,
   error,
+  browser,
 }: {
-  api: Pick<InviteApi, 'joinEvent'>
+  api: Pick<InviteApi, 'joinEvent'> & PushApi
   done: 'joined' | 'member'
   burn: Event | undefined
   error: FormErrorState
-}) => (
-  <section class="page column">
-    <h1>Welcome</h1>
-    <p role="status">
-      {done === 'joined'
-        ? 'You are in, signed in, and on the list. Everything you just filled in can be changed later on your own page.'
-        : 'You are in, and signed in.'}
-    </p>
+  browser?: PushBrowser | undefined
+}) => {
+  const push = usePushHere(api, browser)
 
-    {done === 'member' && <OpenBurnOffer api={api} burn={burn} />}
+  return (
+    <section class="page column">
+      <h1>Welcome</h1>
+      <p role="status">
+        {done === 'joined'
+          ? 'You are in, signed in, and on the list. Everything you just filled in can be changed later on your own page.'
+          : 'You are in, and signed in.'}
+      </p>
 
-    <FormError error={error} />
+      {done === 'member' && <OpenBurnOffer api={api} burn={burn} />}
 
-    <p class="home-actions">
-      <a href="/">Go to the start page</a>
-    </p>
-  </section>
-)
+      <FormError error={error} />
+
+      <section>
+        <h2>Hear about it here?</h2>
+        <PushAsk
+          push={push}
+          blurb="Shifts you are handed, meals you are cooking, somebody answering you. Per browser, and you can change what it tells you about on your own page."
+        />
+      </section>
+
+      <p class="home-actions">
+        <a href="/">Go to the start page</a>
+      </p>
+    </section>
+  )
+}
 
 const WhoTheLinkIsFor = ({ invited }: { invited: Invited }) => (
   <p class="form-note">
@@ -178,7 +196,15 @@ const OpenBurnOffer = ({ api, burn }: { api: Pick<InviteApi, 'joinEvent'>; burn:
   )
 }
 
-export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
+export const Invite = ({
+  api,
+  token,
+  browser,
+}: {
+  api: InviteApi
+  token: string
+  browser?: PushBrowser | undefined
+}) => {
   const viewer = useViewer()
   const setViewer = useSetViewer()
   const [email, setEmail] = useState('')
@@ -262,7 +288,7 @@ export const Invite = ({ api, token }: { api: InviteApi; token: string }) => {
   }
 
   if (done !== undefined) {
-    return <YouAreIn api={api} done={done} burn={offered?.event} error={error} />
+    return <YouAreIn api={api} done={done} burn={offered?.event} error={error} browser={browser} />
   }
 
   if (viewer.status === 'signed-in') {
