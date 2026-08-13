@@ -42,7 +42,12 @@ interface Counted {
   gone?: number
 }
 
-const asOne = (told: Told): Told => ({ ...told, batch: told.batch ?? randomUUID() })
+/**
+ * One notification, however many people it reaches. Every loop that tells a shared audience the
+ * same thing calls this once and passes the result to each `notify`, so `notification_batch` gets
+ * one row rather than one per recipient — which is what makes the log readable at all.
+ */
+export const oneBatch = (told: Told): Told => ({ ...told, batch: told.batch ?? randomUUID() })
 
 const countInto = async (db: Database, at: Date, told: Told, counted: Counted) => {
   const id = told.batch ?? randomUUID()
@@ -224,7 +229,7 @@ export const notifyAttendees = async (
   told: Told,
   { except = [], at }: { at: Date; except?: readonly (string | undefined)[] },
 ): Promise<number> => {
-  const one = asOne(told)
+  const one = oneBatch(told)
   await recordActivity(db, eventId, one, at)
 
   return await tellAttendees(db, notify, eventId, one, { except })
@@ -244,7 +249,7 @@ export const tellAttendees = async (
 
   const silent = new Set(except)
   const audience = rows.filter((row) => !silent.has(row.account_id))
-  const one = asOne(told)
+  const one = oneBatch(told)
 
   await Promise.all(audience.map(async (row) => await notify(row.account_id, one)))
 
@@ -268,7 +273,7 @@ export const tellApproved = async (
 ): Promise<number> => {
   const silent = new Set(except)
   const audience = (await approvedAccounts(db)).filter((accountId) => !silent.has(accountId))
-  const one = asOne(told)
+  const one = oneBatch(told)
 
   await Promise.all(audience.map(async (accountId) => await notify(accountId, one)))
 
@@ -309,7 +314,7 @@ export const notifyAdmins = async (db: Database, notify: Notifier, told: Told): 
     .from(accountRole)
     .where(eq(accountRole.role, 'admin'))
 
-  const one = asOne(told)
+  const one = oneBatch(told)
   for (const row of rows) await notify(row.account_id, one)
 
   return rows.length
@@ -318,7 +323,7 @@ export const notifyAdmins = async (db: Database, notify: Notifier, told: Told): 
 export const notifyEveryone = async (db: Database, notify: Notifier, told: Told): Promise<number> => {
   const rows = await db.select({ id: account.id }).from(account)
 
-  const one = asOne(told)
+  const one = oneBatch(told)
   for (const row of rows) await notify(row.id, one)
 
   return rows.length

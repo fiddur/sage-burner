@@ -17,7 +17,7 @@ import {
   pushSubscription,
 } from '../db/schema.ts'
 import { createEmailQueue } from '../mail/queue.ts'
-import { notificationBatches, notifyAttendees, recordAndPush, RETENTION_DAYS } from './notify.ts'
+import { notificationBatches, notifyAttendees, oneBatch, recordAndPush, RETENTION_DAYS } from './notify.ts'
 
 const NOW = '2026-08-03T00:00:00.000Z'
 const BURN = '9f1c2f2a-6f1a-4a2e-9c6d-2f0a1b3c4d5e'
@@ -125,6 +125,15 @@ describe('the record of a notification going out', () => {
     await notifyAttendees(deps.db, telling(deps), BURN, TOLD, { at: clock })
 
     expect(await rows()).toMatchObject([{ told: 3, suppressed: 0 }])
+  })
+
+  it('counts a loop that is not a fan-out helper as one too, given one batch to share', async () => {
+    const deps = build()
+    const told = oneBatch(TOLD)
+    const telling_ = telling(deps)
+    for (let made = 0; made < 3; made += 1) await telling_(await givenAccount(), told)
+
+    expect(await rows()).toMatchObject([{ told: 3 }])
   })
 
   it('counts somebody who has the category switched off, which nothing else records', async () => {

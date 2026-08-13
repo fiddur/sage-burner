@@ -1046,10 +1046,19 @@ category switched off left no trace at all, which for an audit is the interestin
 **One row per notification, not per recipient.** `notification_batch` is what ⚙️ → Notifications
 sent lists: when, the category, the first line of the body, how many were told, how many had it
 switched off, how many devices took it, how many emails were queued. A fan-out to thirty attendees
-is one line here and thirty in `notification` — the fan-out helpers mint one id and every
-`recordAndPush` in that fan-out counts into it. A notification sent to one person is its own row.
-Mentions are the ad-hoc loops rather than a helper, so each named person is a row of their own,
-which is honest: they are separate notifications with separate bodies.
+is one line here and thirty in `notification`.
+
+**`oneBatch` is what makes that true, and every shared-audience loop calls it** — not only the
+fan-out helpers. A comment on a card tells the people in it and, separately, everybody who asked
+about that kind; the waiting list tells everybody who has not paid. Those are loops in
+`threads.ts` and `waiting-list.ts` calling the notifier directly, and without an id minted once
+above them each recipient opened a row of their own: a comment in a forty-person burn wrote forty
+lines, nearly all `told: 0, suppressed: 1`, pushing everything real out of the two hundred the
+page holds. One category per row, so a comment is two rows — the participants' and the listeners'
+— because those are two categories and the log is read by what it was about.
+
+Mentions stay one row per person, deliberately: they are separate notifications with separate
+bodies, naming different people.
 
 **`accepted` is not `delivered`, and the column is named so it cannot be read as one.** It counts
 the subscriptions the push service took; `gone` is a 404 or 410, meaning the subscription is dead

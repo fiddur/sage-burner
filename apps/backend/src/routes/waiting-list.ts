@@ -5,6 +5,7 @@ import type { Database } from '../db/index.ts'
 import type { Notifier } from '../push/notify.ts'
 
 import { attendance, event, notification } from '../db/schema.ts'
+import { oneBatch } from '../push/notify.ts'
 
 const NEARLY_FULL = 4
 
@@ -41,13 +42,14 @@ export const tellAboutTheWaitingList = async (
 
   if (left <= 0) {
     const already = await toldItIsFull(db, link)
+    const full = oneBatch({
+      category: 'waiting_list_pushed',
+      body: `${burn.name} is full — every place is held by somebody who has paid. You are on the waiting list until one is handed over.`,
+      link,
+    })
 
     for (const row of unpaid.filter((one) => !already.has(one.account_id))) {
-      await notify(row.account_id, {
-        category: 'waiting_list_pushed',
-        body: `${burn.name} is full — every place is held by somebody who has paid. You are on the waiting list until one is handed over.`,
-        link,
-      })
+      await notify(row.account_id, full)
     }
 
     return
@@ -55,11 +57,13 @@ export const tellAboutTheWaitingList = async (
 
   if (left > NEARLY_FULL) return
 
+  const nearly = oneBatch({
+    category: 'waiting_list_near',
+    body: `${burn.name} has ${left} ${left === 1 ? 'place' : 'places'} left, and they go to whoever pays. Your payment is not recorded yet.`,
+    link,
+  })
+
   for (const row of unpaid) {
-    await notify(row.account_id, {
-      category: 'waiting_list_near',
-      body: `${burn.name} has ${left} ${left === 1 ? 'place' : 'places'} left, and they go to whoever pays. Your payment is not recorded yet.`,
-      link,
-    })
+    await notify(row.account_id, nearly)
   }
 }
