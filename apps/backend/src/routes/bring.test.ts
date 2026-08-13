@@ -102,6 +102,10 @@ const handDown = (server: FastifyInstance, cookie: string, id: string, accountId
 const cards = async (server: FastifyInstance, cookie: string): Promise<Thread[]> =>
   (await server.inject({ method: 'GET', url: '/api/feed', headers: { cookie } })).json().threads
 
+/** Read by id, which is how a card taken back is read at all: the feed drops it (#617). */
+const cardOf = async (server: FastifyInstance, cookie: string, threadId: string): Promise<Thread> =>
+  (await server.inject({ method: 'GET', url: `/api/threads/${threadId}`, headers: { cookie } })).json().thread
+
 const bell = async (server: FastifyInstance, cookie: string): Promise<{ category: string; body: string }[]> =>
   (await server.inject({ method: 'GET', url: '/api/me/notifications', headers: { cookie } })).json()
     .notifications
@@ -508,15 +512,19 @@ describe('changing an item', () => {
     await givenComing(ada.id)
     const first = (await add(server, ada.cookie, { title: 'Drums' })).json().item.id
     const second = (await add(server, ada.cookie, { title: 'Speakers' })).json().item.id
+    const before = await cards(server, ada.cookie)
 
     expect((await takeOff(server, bea.cookie, first)).statusCode).toBe(403)
     expect((await takeOff(server, boss.cookie, first)).statusCode).toBe(204)
     expect((await takeOff(server, ada.cookie, second)).statusCode).toBe(204)
 
     expect(await list(server, ada.cookie)).toEqual([])
-    expect(
-      (await cards(server, ada.cookie)).map((card) => `${card.title}${card.gone ? ' gone' : ''}`).toSorted(),
-    ).toEqual(['Drums gone', 'Speakers gone'])
+    expect(await cards(server, ada.cookie)).toEqual([])
+    const kept = await Promise.all(before.map(async (one) => await cardOf(server, ada.cookie, one.id)))
+    expect(kept.map((card) => `${card.title}${card.gone ? ' gone' : ''}`).toSorted()).toEqual([
+      'Drums gone',
+      'Speakers gone',
+    ])
   })
 
   it('adds one line for a rewording and none for a save that changed nothing', async () => {

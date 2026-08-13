@@ -309,18 +309,6 @@ Three rules the pages follow, all of them things a phone found first:
   browser ignore `rows`, so the fields that ask for a taller empty box would open at
   the stylesheet's floor in Chrome and at their own everywhere else.
 
-### Taking something back is not news (#611)
-
-The feed sorts a card by the newest entry on it, and withdrawing writes a `withdrawn` entry — so
-taking an announcement back sent it to the **top** of the feed, above everything that had happened
-since, marked "taken back". A removal is the one thing on a card nobody needs surfaced: the entry is
-worth keeping, because the card says who did it and when, and the soft withdrawal keeps the
-conversation on purpose.
-
-So the ordering key ignores `withdrawn` entries, and so does the date the card shows — one rule, or
-a card dated today would sit among yesterday's and read as a second bug. A comment on a withdrawn
-card still brings it up, which is the half that must not break: the conversation is what survives.
-
 ## Destroying something asks first (#594)
 
 One component, `Destroy`, for anything that cannot be undone by pressing the same control again.
@@ -362,6 +350,34 @@ on, and shrinks as each kind of thing gains one — saying you are coming was a 
 The server merges both halves by time and cuts them to fifty **against each other**, so a
 burn full of talk cannot push its news off the page and a quiet one does not leave the
 page half empty.
+
+### Something taken back is off the page (#617)
+
+The feed is what is going on, and a tombstone is not. A card whose thing has been taken back is
+dropped from the read, wherever its date would have put it — an announcement or a bring item with a
+`withdrawn_at`, a song with a `deleted_at`, a dream whose `session` row is gone, a stay somebody
+left. A meeting and a talking point delete their thread outright (#608), so they never reach it.
+
+**One definition of gone, and it is `factsFor`'s.** The route reads the cards and drops the ones
+`readThreads` marks `gone`, rather than repeating each entity's rule as a `where` clause — a second
+spelling of "withdrawn" is a second thing to keep in step, and the entity that gains a soft
+withdrawal next would have to remember both. The cut to fifty happens after, so a run of tombstones
+takes the page's slots but never a live card's place in the order.
+
+#611 was the first answer to this, and the wrong one: it made a `withdrawn` entry not count as
+liveliness, so the card stayed where it already was, marked "taken back", and a comment on it could
+still lift it. There is no card left to order, so that rule is gone and `recentThreads` is back to
+`max(created_at)` — a card whose newest entry is a withdrawal is never on the page for the ordering
+to matter.
+
+**Only the place on the page goes.** `GET /api/threads/:id` answers for a withdrawn card exactly as
+it did, which is what the soft withdrawal is for and how the tests read one. The web still renders
+`gone`, because a card can go stale under a page that is already open — that it can is its own bug
+(#614) — but no load will bring one back.
+
+**What it costs.** A withdrawn dream's conversation is now reachable from nowhere in the app: the
+panel went with the dream, and the card was the last door. The rows are all there; a page for a
+thread of its own is a separate thing to want.
 
 ### The chip row
 
@@ -424,10 +440,10 @@ and what people said, in the order it happened: offered, facilitated, a hand up,
 question, an answer. The point of hanging it on a dream rather than on a change is that a
 dream is still there next week, so the comment is still worth reading.
 
-**The card is the conversation, not a preview of one** — a comment box included. It is
-also the only place a withdrawn dream's thread can be read, since there is no panel left
-to open. The same component draws it inside the dream's own panel (#342), so the two
-cannot come to show one conversation differently.
+**The card is the conversation, not a preview of one** — a comment box included. The same
+component draws it inside the dream's own panel (#342), so the two cannot come to show one
+conversation differently. A withdrawn dream has neither: the panel goes with the dream and the
+card is off the feed (#617), leaving `GET /api/threads/:id` as the only thing that answers for it.
 
 **The title is never frozen into a sentence, and that is the bug this fixed.** An
 `activity` line freezes it — "Ada offered a dream: Sauna at dawn" — and goes on saying it

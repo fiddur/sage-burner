@@ -88,9 +88,20 @@ delete started removing the thread in the same transaction. `thread_entry`, `thr
 
 A meeting and a talking point are the only two that need it, which is not the same as being the only
 hard deletes: a withdrawn dream deletes its `session` row too, and leaving a burn deletes an
-`attendance`. Those keep their card on purpose — the dream's conversation outlives the dream, and a
-rejoin re-points the person's card at the new stay. These two are the ones whose card has nothing
-left to be about.
+`attendance`. Those keep their thread on purpose — the dream's conversation outlives the dream, and
+a rejoin re-points the person's card at the new stay. Neither is on the feed any more either
+(#617); the difference is that there is still something to read behind the one and nothing behind
+these two.
+
+**And one for a meeting written before cards existed** (#616). Between #592 and #603 a scheduled
+meeting wrote an `activity` line and no thread; #603 gave new meetings a card and backfilled
+nothing, and #608 then swept those lines — so a meeting from that half-day was on the feed nowhere,
+with no entry saying it had been planned and nowhere to reply that the time does not work.
+`20260813180000_meeting_cards` opens one card per meeting that has none, with the `scheduled` entry
+`noteOnMeeting` would have written, dated from `meeting.created_at` rather than from the deploy: a
+meeting is _at_ Sunday 19:00 and was _planned_ last Tuesday, and the feed is a record of the second.
+The author is the meeting's own, which is null for every row written before #603 added the column —
+those read "Somebody put it in the diary", since nothing anywhere recorded who.
 
 **One at a time in the banner.** The next meeting is where it is edited and where it is taken out
 of the diary, because that is the one anybody is looking at; everything else is a line under it.

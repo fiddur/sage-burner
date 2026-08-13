@@ -95,6 +95,10 @@ const withdraw = (server: FastifyInstance, cookie: string, id: string) =>
 const cards = async (server: FastifyInstance, cookie: string): Promise<Thread[]> =>
   (await server.inject({ method: 'GET', url: '/api/feed', headers: { cookie } })).json().threads
 
+/** Read by id, which is how a card taken back is read at all: the feed drops it (#617). */
+const cardOf = async (server: FastifyInstance, cookie: string, threadId: string): Promise<Thread> =>
+  (await server.inject({ method: 'GET', url: `/api/threads/${threadId}`, headers: { cookie } })).json().thread
+
 const bell = async (server: FastifyInstance, cookie: string): Promise<{ category: string; body: string }[]> =>
   (await server.inject({ method: 'GET', url: '/api/me/notifications', headers: { cookie } })).json()
     .notifications
@@ -418,11 +422,12 @@ describe('taking an announcement back', () => {
 
     expect((await withdraw(server, ada.cookie, id)).statusCode).toBe(204)
 
-    const [card] = await cards(server, ada.cookie)
-    expect(card?.gone).toBe(true)
-    expect(card?.title).toBe('The planning call is Sunday')
-    expect(card?.body).toBeNull()
-    expect(card?.entries.map((entry) => entry.kind)).toEqual(['posted', 'comment', 'withdrawn'])
+    expect(await cards(server, ada.cookie)).toEqual([])
+    const card = await cardOf(server, ada.cookie, before?.id ?? '')
+    expect(card.gone).toBe(true)
+    expect(card.title).toBe('The planning call is Sunday')
+    expect(card.body).toBeNull()
+    expect(card.entries.map((entry) => entry.kind)).toEqual(['posted', 'comment', 'withdrawn'])
   })
 
   it('is the author’s, or an admin’s, and nobody else’s', async () => {
@@ -457,12 +462,13 @@ describe('taking an announcement back', () => {
     const ada = await givenAccount('Ada')
     await givenComing(ada.id)
     const id = await given(server, ada.cookie)
+    const [before] = await cards(server, ada.cookie)
 
     await withdraw(server, ada.cookie, id)
     await withdraw(server, ada.cookie, id)
 
-    const [card] = await cards(server, ada.cookie)
-    expect(card?.entries.filter((entry) => entry.kind === 'withdrawn')).toHaveLength(1)
+    const card = await cardOf(server, ada.cookie, before?.id ?? '')
+    expect(card.entries.filter((entry) => entry.kind === 'withdrawn')).toHaveLength(1)
   })
 
   it('goes with the burn, thread and all', async () => {

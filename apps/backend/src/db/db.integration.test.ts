@@ -182,10 +182,13 @@ describe('migrations', () => {
   const leftovers = () =>
     readFileSync(path.join(migrationsFolder, '20260813160000_meeting_leftovers', 'migration.sql'), 'utf8')
 
-  const givenMeeting = (id: string) => {
+  const givenMeeting = (id: string, author: string | null = null) => {
     handle.client
-      .prepare('insert into meeting (id, event_id, title, starts_at, notes, created_at) values (?,?,?,?,?,?)')
-      .run(id, ids.event, 'Planning call', '2026-08-20T17:00:00.000Z', '', '2026-08-13T09:00:00.000Z')
+      .prepare(
+        'insert into meeting (id, event_id, author_account_id, title, starts_at, notes, created_at) ' +
+          'values (?,?,?,?,?,?,?)',
+      )
+      .run(id, ids.event, author, 'Planning call', '2026-08-20T17:00:00.000Z', '', '2026-08-13T09:00:00.000Z')
   }
 
   const givenThread = (id: string, type: string, entityId: string) => {
@@ -238,6 +241,62 @@ describe('migrations', () => {
     handle.client.exec(leftovers())
 
     expect(handle.client.prepare('select id from thread order by id').all()).toEqual([{ id: 't-song' }])
+  })
+
+  const meetingCards = () =>
+    readFileSync(path.join(migrationsFolder, '20260813180000_meeting_cards', 'migration.sql'), 'utf8')
+
+  const cardsOn = (entityId: string) =>
+    handle.client
+      .prepare(
+        'select `entry`.`kind`, `entry`.`author_account_id`, `entry`.`body`, `entry`.`created_at` ' +
+          'from `thread` `card` join `thread_entry` `entry` on `entry`.`thread_id` = `card`.`id` ' +
+          "where `card`.`entity_type` = 'meeting' and `card`.`entity_id` = ? order by `entry`.`seq`",
+      )
+      .all(entityId)
+
+  it('opens a card for a meeting that never had one, dated from when it was planned', () => {
+    givenMeeting('m-old', ids.account)
+
+    handle.client.exec(meetingCards())
+
+    expect(cardsOn('m-old')).toEqual([
+      {
+        kind: 'scheduled',
+        author_account_id: ids.account,
+        body: 'put it in the diary',
+        created_at: '2026-08-13T09:00:00.000Z',
+      },
+    ])
+  })
+
+  it('says somebody planned it when the row predates the column that would say who', () => {
+    givenMeeting('m-older')
+
+    handle.client.exec(meetingCards())
+
+    expect(cardsOn('m-older').map((row) => row.author_account_id)).toEqual([null])
+  })
+
+  it('gives a card that already exists no second beginning', () => {
+    givenMeeting('m-live', ids.account)
+    givenThread('t-live', 'meeting', 'm-live')
+
+    handle.client.exec(meetingCards())
+
+    expect(handle.client.prepare('select id from thread order by id').all()).toEqual([{ id: 't-live' }])
+    expect(handle.client.prepare('select id from thread_entry order by id').all()).toEqual([
+      { id: 't-live-e' },
+    ])
+  })
+
+  it('opens one that reaches the wire, `thread.id` being a uuid there', () => {
+    givenMeeting('m-old', ids.account)
+
+    handle.client.exec(meetingCards())
+
+    const [row] = handle.client.prepare('select id from thread').all()
+    expect(row?.id).toMatch(/^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/u)
   })
 
   it('is idempotent — running again on the same database is a no-op', () => {
