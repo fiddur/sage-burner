@@ -49,6 +49,10 @@ import type {
   MealResponse,
   MealSlotsResponse,
   MealsResponse,
+  MeetingPointResponse,
+  MeetingPointsResponse,
+  MeetingResponse,
+  MeetingsResponse,
   MemberRosterResponse,
   MeResponse,
   MyApplicationResponse,
@@ -863,6 +867,52 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
 
     deleteRide: (id: string) =>
       request<undefined>(apiRoutes.deleteRide.path(id), { method: apiRoutes.deleteRide.method }),
+
+    getMeetingPoints: (eventId: string, signal?: AbortSignal) =>
+      request<MeetingPointsResponse>(apiRoutes.getMeetingPoints.path(eventId), { signal }),
+
+    addMeetingPoint: (eventId: string, body: BodyOf<'addMeetingPoint'>) =>
+      request<MeetingPointResponse>(apiRoutes.addMeetingPoint.path(eventId), {
+        method: apiRoutes.addMeetingPoint.method,
+        body,
+      }),
+
+    updateMeetingPoint: (id: string, body: BodyOf<'updateMeetingPoint'>) =>
+      request<MeetingPointResponse>(apiRoutes.updateMeetingPoint.path(id), {
+        method: apiRoutes.updateMeetingPoint.method,
+        body,
+      }),
+
+    deleteMeetingPoint: (id: string) =>
+      request<undefined>(apiRoutes.deleteMeetingPoint.path(id), {
+        method: apiRoutes.deleteMeetingPoint.method,
+      }),
+
+    decidePoint: (id: string, body: BodyOf<'decidePoint'>) =>
+      request<MeetingPointResponse>(apiRoutes.decidePoint.path(id), {
+        method: apiRoutes.decidePoint.method,
+        body,
+      }),
+
+    getMeetings: (eventId: string, signal?: AbortSignal) =>
+      request<MeetingsResponse>(apiRoutes.getMeetings.path(eventId), { signal }),
+
+    addMeeting: (eventId: string, body: BodyOf<'addMeeting'>) =>
+      request<MeetingResponse>(apiRoutes.addMeeting.path(eventId), {
+        method: apiRoutes.addMeeting.method,
+        body,
+      }),
+
+    updateMeeting: (id: string, body: BodyOf<'updateMeeting'>) =>
+      request<MeetingResponse>(apiRoutes.updateMeeting.path(id), {
+        method: apiRoutes.updateMeeting.method,
+        body,
+      }),
+
+    deleteMeeting: (id: string) =>
+      request<undefined>(apiRoutes.deleteMeeting.path(id), {
+        method: apiRoutes.deleteMeeting.method,
+      }),
 
     getBringList: (eventId: string, signal?: AbortSignal) =>
       request<BringListResponse>(apiRoutes.getBringList.path(eventId), { signal }),

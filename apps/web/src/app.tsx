@@ -37,6 +37,7 @@ import { Home } from './pages/Home.tsx'
 import { Invite } from './pages/Invite.tsx'
 import { Login } from './pages/Login.tsx'
 import { Meals } from './pages/Meals.tsx'
+import { Meetings } from './pages/Meetings.tsx'
 import { Members } from './pages/Members.tsx'
 import { NotFound } from './pages/NotFound.tsx'
 import { Notifications } from './pages/Notifications.tsx'
@@ -155,6 +156,15 @@ export type RoutesApi = Pick<
   | 'addRide'
   | 'updateRide'
   | 'deleteRide'
+  | 'getMeetingPoints'
+  | 'addMeetingPoint'
+  | 'updateMeetingPoint'
+  | 'deleteMeetingPoint'
+  | 'decidePoint'
+  | 'getMeetings'
+  | 'addMeeting'
+  | 'updateMeeting'
+  | 'deleteMeeting'
   | 'getBringList'
   | 'addBringItem'
   | 'updateBringItem'
@@ -263,6 +273,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
   const RolesRoute = useMemo(() => () => <Roles api={api} />, [api])
   const RidesRoute = useMemo(() => () => <Rides api={api} />, [api])
   const BringRoute = useMemo(() => () => <Bring api={api} />, [api])
+  const MeetingsRoute = useMemo(() => () => <Meetings api={api} />, [api])
   const FaqRoute = useMemo(() => () => <Faq api={api} />, [api])
   const FeedRoute = useMemo(() => () => <Feed api={api} />, [api])
   const MealsRoute = useMemo(() => () => <Meals api={api} />, [api])
@@ -304,6 +315,7 @@ export const Routes = ({ api }: { api: RoutesApi }) => {
       <Route path="/roles" component={RolesRoute} />
       <Route path="/rides" component={RidesRoute} />
       <Route path="/bring" component={BringRoute} />
+      <Route path="/meetings" component={MeetingsRoute} />
       <Route path="/faq" component={FaqRoute} />
       <Route path="/feed" component={FeedRoute} />
       <Route path="/notifications" component={NotificationsRoute} />

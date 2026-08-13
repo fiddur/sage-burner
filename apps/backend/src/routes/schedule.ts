@@ -1,12 +1,12 @@
 import type { FastifyInstance } from 'fastify'
 
-import { apiRoutes, publicSessionSchema } from '@sage-burner/shared'
+import { apiRoutes, meetingEnds, publicMeetingSchema, publicSessionSchema } from '@sage-burner/shared'
 import { asc, eq } from 'drizzle-orm'
 
 import type { Database } from '../db/index.ts'
 import type { CalendarEvent } from '../ics.ts'
 
-import { event, place, session } from '../db/schema.ts'
+import { event, meeting, place, session } from '../db/schema.ts'
 import { sendError } from '../http.ts'
 import { renderCalendar } from '../ics.ts'
 
@@ -52,8 +52,48 @@ export const registerScheduleRoutes = (app: FastifyInstance, { db, now }: Schedu
       return parsed.success ? [parsed.data] : []
     })
 
-    return reply
-      .header('content-type', 'text/calendar; charset=utf-8')
-      .send(renderCalendar({ name: found.name, events, now: now(), domain: 'sage-burner' }))
+    const meetings = await db
+      .select({
+        id: meeting.id,
+        title: meeting.title,
+        link: meeting.link,
+        starts_at: meeting.starts_at,
+        ends_at: meeting.ends_at,
+      })
+      .from(meeting)
+      .where(eq(meeting.event_id, found.id))
+      .orderBy(asc(meeting.starts_at), asc(meeting.id))
+
+    const diary: CalendarEvent[] = meetings.flatMap((row) => {
+      const parsed = publicMeetingSchema.safeParse({
+        ...row,
+        ends_at: meetingEnds(row.starts_at, row.ends_at),
+      })
+
+      if (!parsed.success) return []
+
+      return [
+        {
+          id: parsed.data.id,
+          title: parsed.data.title,
+          description: parsed.data.link ?? '',
+          time_slot_start: parsed.data.starts_at,
+          time_slot_end: parsed.data.ends_at,
+          location: null,
+          color: null,
+        },
+      ]
+    })
+
+    return reply.header('content-type', 'text/calendar; charset=utf-8').send(
+      renderCalendar({
+        name: found.name,
+        events: [...events, ...diary].sort((one, other) =>
+          one.time_slot_start.localeCompare(other.time_slot_start),
+        ),
+        now: now(),
+        domain: 'sage-burner',
+      }),
+    )
   })
 }

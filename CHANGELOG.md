@@ -9,6 +9,12 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-13
 
+- **Meetings.** A page per burn for what we need to talk about: raise a talking point, discuss it in
+  its own thread on the feed, and record what was decided on the point itself — the spreadsheet's
+  meeting tab, except the discussion happens where the point is instead of somewhere else. The page
+  says when the next meeting is and how to join it, and meetings turn up in the burn's calendar feed
+  beside the dreams. Clearing a decision reopens the point.
+
 - **You are offered notifications when you join.** Taking up an invite used to end on "You are in"
   with no mention of them, so the one moment you have just decided to come was the moment the app
   said nothing. Ticking a category on your own page now also says when this browser would hear

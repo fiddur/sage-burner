@@ -10,7 +10,7 @@ import type { DbHandle } from '../db/index.ts'
 import { createApp } from '../app.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, attendance, event, place, session } from '../db/schema.ts'
+import { account, accountRole, attendance, event, meeting, place, session } from '../db/schema.ts'
 
 const SECRET = 's'.repeat(40)
 const NOW = '2026-07-02T00:00:00.000Z'
@@ -132,6 +132,32 @@ const givenDream = async (
       time_slot_start: 'time_slot_start' in over ? over.time_slot_start : '2026-08-02T18:00:00.000Z',
       time_slot_end: 'time_slot_end' in over ? over.time_slot_end : '2026-08-02T20:00:00.000Z',
       place_id: over.place_id ?? null,
+    })
+  return id
+}
+
+const givenMeeting = async (
+  eventId: string,
+  over: Partial<{
+    title: string
+    starts_at: string
+    ends_at: string | null
+    link: string | null
+    notes: string
+  }> = {},
+) => {
+  const id = randomUUID()
+  await db()
+    .insert(meeting)
+    .values({
+      id,
+      event_id: eventId,
+      title: over.title ?? 'Planning call',
+      starts_at: over.starts_at ?? '2026-07-20T17:00:00.000Z',
+      ends_at: 'ends_at' in over ? (over.ends_at ?? null) : null,
+      link: over.link ?? null,
+      notes: over.notes ?? '',
+      created_at: NOW,
     })
   return id
 }
@@ -378,5 +404,58 @@ describe('the public calendar feed', () => {
     await givenDream(eventId, host)
 
     expect((await feed(server, eventId)).body.replaceAll('\r\n', '')).not.toContain('\n')
+  })
+})
+
+describe('meetings in the feed', () => {
+  it('carries a meeting beside the dreams, so one subscription covers both', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    await givenMeeting(eventId, { title: 'Planning call' })
+
+    const body = (await feed(server, eventId)).body
+
+    expect(body).toContain('SUMMARY:Planning call')
+    expect(body).toContain('DTSTART:20260720T170000Z')
+  })
+
+  it('runs an hour when nobody said when it ends, rather than being left out', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    await givenMeeting(eventId, { ends_at: null })
+
+    expect((await feed(server, eventId)).body).toContain('DTEND:20260720T180000Z')
+  })
+
+  it('keeps the end somebody did give', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    await givenMeeting(eventId, { ends_at: '2026-07-20T19:30:00.000Z' })
+
+    expect((await feed(server, eventId)).body).toContain('DTEND:20260720T193000Z')
+  })
+
+  it('carries the joining link, which is the one thing a calendar entry has to have', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    await givenMeeting(eventId, { link: 'https://meet.example/abc' })
+
+    expect((await feed(server, eventId)).body).toContain('DESCRIPTION:https://meet.example/abc')
+  })
+
+  it('leaves the notes out, the feed being readable by whoever holds the address', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    await givenMeeting(eventId, { notes: 'the code is 1234' })
+
+    expect((await feed(server, eventId)).body).not.toContain('1234')
+  })
+
+  it('answers a burn nobody has scheduled a meeting for with its dreams alone', async () => {
+    const server = await build()
+    const eventId = await givenEvent()
+    await givenDream(eventId, await givenHost())
+
+    expect((await feed(server, eventId)).body).toContain('SUMMARY:Cacao ceremony')
   })
 })

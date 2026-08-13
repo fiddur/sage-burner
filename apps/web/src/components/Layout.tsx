@@ -35,6 +35,7 @@ const menuPages: readonly NavPage[] = [
   { href: '/songs', label: 'Songbook', icon: '🎵' },
   { href: '/rides', label: 'Rideshares', icon: '🛻' },
   { href: '/bring', label: 'Bring list', icon: '🎁' },
+  { href: '/meetings', label: 'Meetings', icon: '🗣️' },
 ]
 
 export type LayoutApi = BellApi & Pick<ApiClient, 'getMapLink'>

@@ -162,6 +162,23 @@ describe('migrations', () => {
     }
   })
 
+  it('leaves each rebuilt table with the indexes it has now, not the ones it once had', () => {
+    // A rebuild recreates indexes by hand, so it is the one place a dropped index can come back:
+    // `thread_entry_recent_idx` went in `20260810220000_thread_subject` and a migration copied
+    // from an older one resurrected it, taking `thread_entry_seq_idx` with it.
+    const indexes = (table: string): string[] =>
+      handle.client
+        .prepare("select name from sqlite_master where type = 'index' and tbl_name = ? and sql is not null")
+        .all(table)
+        .flatMap((row) => (typeof row.name === 'string' ? [row.name] : []))
+        .toSorted()
+
+    expect(indexes('thread_entry')).toEqual(['thread_entry_seq_idx'])
+    expect(indexes('thread')).toEqual(['thread_entity_idx', 'thread_event_idx', 'thread_subject_idx'])
+    expect(indexes('notification')).toEqual(['notification_account_idx'])
+    expect(indexes('activity')).toEqual(['activity_event_idx', 'activity_recent_idx'])
+  })
+
   it('is idempotent — running again on the same database is a no-op', () => {
     expect(() => runMigrations(handle)).not.toThrow()
     expect(handle.db.select().from(event).all()).toHaveLength(1)

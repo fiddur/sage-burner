@@ -919,6 +919,49 @@ export const post = sqliteTable(
   ],
 )
 
+export const meetingPoint = sqliteTable(
+  'meeting_point',
+  {
+    id: text('id').notNull(),
+    event_id: text('event_id')
+      .notNull()
+      .references(() => event.id, { onDelete: 'cascade' }),
+    author_account_id: text('author_account_id').references(() => account.id, { onDelete: 'set null' }),
+    title: text('title').notNull(),
+    body: text('body').notNull().default(''),
+    decision: text('decision'),
+    decided_note: text('decided_note'),
+    created_at: text('created_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    index('meeting_point_event_idx').on(table.event_id, table.created_at),
+    check('meeting_point_title_check', sql`length(trim(${table.title})) > 0`),
+  ],
+)
+
+export const meeting = sqliteTable(
+  'meeting',
+  {
+    id: text('id').notNull(),
+    event_id: text('event_id')
+      .notNull()
+      .references(() => event.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    starts_at: text('starts_at').notNull(),
+    ends_at: text('ends_at'),
+    link: text('link'),
+    notes: text('notes').notNull().default(''),
+    created_at: text('created_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    index('meeting_event_idx').on(table.event_id, table.starts_at),
+    check('meeting_title_check', sql`length(trim(${table.title})) > 0`),
+    check('meeting_run_check', sql`${table.ends_at} is null or ${table.ends_at} > ${table.starts_at}`),
+  ],
+)
+
 export const bringItem = sqliteTable(
   'bring_item',
   {

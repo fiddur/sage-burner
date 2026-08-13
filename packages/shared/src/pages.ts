@@ -16,6 +16,13 @@ export const bringPage = (eventId: string, itemId?: string): string =>
     itemId === undefined ? '' : `&${BRING_PARAM}=${encodeURIComponent(itemId)}`
   }`
 
+export const POINT_PARAM = 'point'
+
+export const meetingsPage = (eventId: string, pointId?: string): string =>
+  `/meetings?${BURN_PARAM}=${encodeURIComponent(eventId)}${
+    pointId === undefined ? '' : `&${POINT_PARAM}=${encodeURIComponent(pointId)}`
+  }`
+
 export const membersPage = (eventId?: string): string =>
   eventId === undefined ? '/members' : `/members?${BURN_PARAM}=${encodeURIComponent(eventId)}`
 

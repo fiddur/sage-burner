@@ -245,6 +245,7 @@ describe('what somebody has switched on', () => {
     'bring_answered',
     'bring_role',
     'bring_comment',
+    'point_comment',
     'mentioned',
     'application',
     'application_news',

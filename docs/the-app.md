@@ -750,9 +750,10 @@ problem #311 fixed for the banner. Offline you get the card's newest lines; the 
 the conversation needs the network.
 
 What is _not_ on it yet: an unread mark per thread, a digest instead of one notification
-per comment, reactions on a line, and threads on a meal, a ride or a plan item.
+per comment, reactions on a line, and threads on a meal or a ride.
 `entity_type` is what makes each of those a value in the vocabulary and a branch in three
-places — the link, the participants, and the comment's categories. Adding one is **not**
+places — the link, the participants, and the comment's categories. Those three are lookups
+keyed by the type rather than chains of `if`, so the compiler names what a sixth is missing. Adding one is **not**
 free of a migration, which #426 established by being the second: the column carries a
 CHECK listing the vocabulary, so a value added to `enums.ts` alone passes Zod and the type
 checker and then fails the write. `db.integration.test.ts` now checks each vocabulary in
@@ -986,7 +987,9 @@ for being put on it and nothing else. `bring_role` is the pair to `meal_role` an
 `dream_role` — being given or taken off a job, from either end of a handover.
 
 **Adding one opens a card**, so `entity_type: 'bring'` is the fifth in the vocabulary and
-the migration rebuilds four tables for it. `added` and `edited` entries carry the item, the
+the migration rebuilds four tables for it (a talking point is the sixth, and its migration
+rebuilds five — `thread_entry` as well, for the two entry kinds it brings; see
+[meetings.md](./meetings.md)). `added` and `edited` entries carry the item, the
 soft withdrawal keeps the conversation the way an announcement's does, and the same
 `DreamThread` draws the conversation on the list page as on the feed — one component, so
 the two cannot come to disagree. The `added` mark stopped being 🎵 when it stopped meaning

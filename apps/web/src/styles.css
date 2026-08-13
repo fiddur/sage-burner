@@ -1946,6 +1946,67 @@ a.person-badge:focus-visible span:last-child {
   gap: 0.5rem;
 }
 
+.point-list,
+.meeting-list {
+  list-style: none;
+  margin: 0.5rem 0 1.5rem;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.point-row {
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+}
+
+.point-what {
+  margin: 0;
+}
+
+.point-note {
+  margin: 0.35rem 0 0;
+}
+
+/* The sage callout `.point-decision` shares with `.push-nudge`: an answer, not a warning. */
+.point-decision {
+  margin: 0.5rem 0 0;
+  padding: 0.5rem 0.7rem;
+  border-left: 3px solid var(--sage);
+  background: color-mix(in srgb, var(--sage) 8%, transparent);
+}
+
+.point-decision h3 {
+  margin: 0 0 0.25rem;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+/* As with `.bring-actions`: without the gap two emoji buttons read as one control. */
+.point-actions {
+  margin: 0.35rem 0 0;
+}
+
+.point-actions > * + * {
+  margin-inline-start: 0.6rem;
+}
+
+.point-edit,
+.point-decide,
+.meeting-edit {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.next-meeting {
+  padding: 0.6rem 0.8rem;
+  border-left: 3px solid var(--ember);
+  background: color-mix(in srgb, var(--ember) 8%, transparent);
+}
+
 /* The shared table: the members list, the roster, the accounts list, the invites. */
 .table {
   border-collapse: collapse;

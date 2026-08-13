@@ -16,6 +16,7 @@ import type {
   ConnectionOrder,
   ConnectionUpdate,
   CopyFrom,
+  DecisionInput,
   EventCreateInput,
   EventOptionCreateInput,
   EventOptionOrder,
@@ -47,6 +48,10 @@ import type {
   MealSlotCreateInput,
   MealSlotUpdate,
   MealUpdate,
+  MeetingCreateInput,
+  MeetingPointCreateInput,
+  MeetingPointUpdate,
+  MeetingUpdateInput,
   NotificationSettings,
   OAuthSettingsUpdate,
   PasskeyLogin,
@@ -94,6 +99,51 @@ export const apiRoutes = {
     method: 'GET',
     fastify: '/api/accounts/:accountId/profile',
     path: (accountId: string) => `/api/accounts/${encodeURIComponent(accountId)}/profile`,
+  },
+  addMeetingPoint: {
+    method: 'POST',
+    fastify: '/api/events/:eventId/points',
+    path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/points`,
+  },
+  getMeetingPoints: {
+    method: 'GET',
+    fastify: '/api/events/:eventId/points',
+    path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/points`,
+  },
+  updateMeetingPoint: {
+    method: 'PATCH',
+    fastify: '/api/points/:id',
+    path: (id: string) => `/api/points/${encodeURIComponent(id)}`,
+  },
+  deleteMeetingPoint: {
+    method: 'DELETE',
+    fastify: '/api/points/:id',
+    path: (id: string) => `/api/points/${encodeURIComponent(id)}`,
+  },
+  decidePoint: {
+    method: 'PUT',
+    fastify: '/api/points/:id/decision',
+    path: (id: string) => `/api/points/${encodeURIComponent(id)}/decision`,
+  },
+  addMeeting: {
+    method: 'POST',
+    fastify: '/api/events/:eventId/meetings',
+    path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/meetings`,
+  },
+  getMeetings: {
+    method: 'GET',
+    fastify: '/api/events/:eventId/meetings',
+    path: (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/meetings`,
+  },
+  updateMeeting: {
+    method: 'PATCH',
+    fastify: '/api/meetings/:id',
+    path: (id: string) => `/api/meetings/${encodeURIComponent(id)}`,
+  },
+  deleteMeeting: {
+    method: 'DELETE',
+    fastify: '/api/meetings/:id',
+    path: (id: string) => `/api/meetings/${encodeURIComponent(id)}`,
   },
   addBringItem: {
     method: 'POST',
@@ -1077,6 +1127,8 @@ export interface RouteBodies {
   updateMyConnection: ConnectionUpdate
   reorderMyConnections: ConnectionOrder
   addBringItem: BringCreateInput
+  addMeeting: MeetingCreateInput
+  addMeetingPoint: MeetingPointCreateInput
   addEventOption: EventOptionCreateInput
   addFaqEntry: FaqCreateInput
   addLeadRole: LeadRoleCreateInput
@@ -1123,6 +1175,9 @@ export interface RouteBodies {
   transferMyPlace: PlaceTransfer
   unsubscribeFromPush: Pick<PushSubscriptionCreate, 'endpoint'>
   updateBringItem: BringUpdate
+  updateMeeting: MeetingUpdateInput
+  updateMeetingPoint: MeetingPointUpdate
+  decidePoint: DecisionInput
   updateComment: CommentInput
   updateEvent: EventUpdate
   updateEventOption: EventOptionUpdate

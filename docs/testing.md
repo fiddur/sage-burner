@@ -251,6 +251,26 @@ phone" means 360px.
       notification: it is **one** line whose "Told" is the number attending, not one line
       per person.
 
+## Meetings
+
+- [ ] ☰ → Meetings, on a burn you are attending: raise a point. It appears under **Open
+      points** with your name, and on the feed as a card whose first line is "raised this".
+- [ ] Comment on that card from the feed: the comment shows on the point's thread on the
+      Meetings page too — it is one thread, not two.
+- [ ] Record a decision on it, with a "where was it decided". The point moves to
+      **Addressed**, the decision shows on the card, and the feed card gains a `⚖️` entry
+      carrying the decision itself.
+- [ ] Press **Reopen**: it goes back to Open points and the decision is gone from both.
+- [ ] Put a meeting in the diary with a start and a joining link. The banner names it, the
+      link opens it, and leaving the end blank means it runs an hour.
+- [ ] Press ✏️ on it: the form opens filled in with what it already says, and saving moves it.
+      A link that is not `https://` is refused.
+- [ ] Subscribe to the burn's calendar feed: the meeting is in it beside the dreams, with the
+      joining link as its description — and the note you typed is nowhere in the file.
+- [ ] A meeting whose time has passed moves under **Meetings that have been**, and one that is
+      running right now stays in the banner with its Join link.
+- [ ] On a burn that has ended, raising a point and recording a decision are both refused.
+
 ## The calendar
 
 - [ ] The Schedule page carries the feed link — `webcal://` to follow, `https`
