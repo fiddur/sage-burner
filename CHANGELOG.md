@@ -9,6 +9,11 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-13
 
+- **A meeting put in the diary shows on the feed.** It was saved and shown on the Meetings page but
+  said nothing anywhere else — the bell only rang for the few who had switched that kind on, and
+  there was no line at all. Everybody coming to the burn sees it now, and sees it again if the time
+  moves.
+
 - **Switching notifications on from the feed offers to turn them on in this browser too.** Ticking
   "Notify me on similar" in a card's 🔔 used to save the setting and say nothing, so what you asked
   for arrived in the bell and nowhere else. The offer now follows the tick wherever it happens, as a
