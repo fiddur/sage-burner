@@ -416,7 +416,7 @@ describe('the meetings themselves', () => {
       },
     })
 
-    // `coalesces('scheduled')`, so a meeting moved three times is one line rather than four.
+    // One entry, not two: the `scheduled` kind coalesces.
     const card = await cardFor(server, ada.cookie, id)
     expect(card.entries.map((entry) => entry.body)).toEqual(['moved it'])
   })

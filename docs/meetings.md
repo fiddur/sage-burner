@@ -44,11 +44,15 @@ the author edits the wording of their own point, and the author or an admin take
 Everything refuses a burn that has ended, through `openEventNow` — a decision recorded against
 last summer is a typo, not an intention.
 
-## Meetings are scheduled, not discussed
+## A meeting is a time, and a conversation about it
 
-`meeting` has no thread. It is a title, a start, an optional end, an optional link and a note:
-what the next-meeting banner reads and what the calendar feed carries. "Next" is derived rather
-than stored, so nothing has to be moved when one passes.
+`meeting` is a title, a start, an optional end, an optional link and a note: what the next-meeting
+banner reads, what the calendar feed carries, and — since #597 — what a feed card is about. "Next"
+is derived rather than stored, so nothing has to be moved when one passes.
+
+It had no thread for a day, on the reasoning that a meeting is scheduled rather than discussed.
+That was wrong in the way that mattered: the discussion a meeting needs is _whether that time
+works_, and there was nowhere to say it.
 
 **Derived from the end, not the start.** A meeting people are joining as it runs is exactly when
 the link is wanted, so it stays the next meeting until it has finished — dropping it the moment it
