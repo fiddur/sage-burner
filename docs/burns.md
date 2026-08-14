@@ -562,15 +562,19 @@ same thing twice. The link carries the burn (`/members?burn=…`, per #333), whi
 we said this already" a query rather than a column.
 
 **The line is what triggers the telling, not the payment** (#564). It used to be called from the
-payment route alone, which left out the one person most likely to care: somebody joining a burn that
-is _already_ full changes nothing an admin will touch, so with every place paid for, nothing would
-ever have fired for them — they were below the line on the roster and had heard nothing about it.
-Joining recomputes it too.
+payment route alone, which left out the one person most likely to care: somebody arriving at a burn
+that is _already_ full changes nothing an admin will touch, so with every place paid for, nothing
+would ever have fired for them — they were below the line on the roster and had heard nothing about
+it. **Every way an unpaid row appears recomputes it**: joining, and an admin adding somebody. Those
+are the two doors onto the same bug.
 
 **Leaving does not**, and that is not an omission. `left` is the cap less what has been paid for, and
 leaving only ever removes an **unpaid** row — so the line cannot move, and there is nothing new to
 say to anybody. Handing a place over does not move it either: it marks the taker paid and deletes the
 giver, who was.
+
+**Editing `member_cap` does move it, and tells nobody.** Lowering a cap pushes people onto the
+waiting list with nothing said. That one is open rather than decided.
 
 ## Handing a place over
 

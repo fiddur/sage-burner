@@ -320,6 +320,8 @@ export const registerAttendanceRoutes = (
     const made = await joinedRow(request.params.eventId, body.account_id)
     if (made === undefined) return sendError(reply, 404)
 
+    await tellAboutTheWaitingList(db, request.params.eventId, notify)
+
     return reply.code(201).send({ attendance: made } satisfies AttendanceResponse)
   })
 

@@ -611,6 +611,27 @@ describe('the waiting list', () => {
     expect(theirs.map((one: { category: string }) => one.category)).toEqual(['waiting_list_pushed'])
   })
 
+  it('tells somebody an admin adds to a burn that is already full', async () => {
+    const server = await build()
+    await givenBurn(1)
+    const admin = await givenAccount(['admin'])
+    const paid = await givenAccount()
+    await givenComing(paid.id)
+    await setPaid(server, admin.cookie, paid.id)
+    const added = await givenAccount()
+
+    const put = await server.inject({
+      method: 'POST',
+      url: `/api/admin/events/${BURN}/attendance`,
+      headers: { cookie: admin.cookie },
+      payload: { account_id: added.id },
+    })
+    expect(put.statusCode).toBe(201)
+
+    const theirs = (await list(server, added.cookie)).json().notifications
+    expect(theirs.map((one: { category: string }) => one.category)).toEqual(['waiting_list_pushed'])
+  })
+
   it('says nothing to somebody who joins a burn with room in it', async () => {
     // The passing sibling: telling on every join would satisfy the one above while
     // greeting every new member of every burn with a waiting-list warning.
