@@ -331,6 +331,13 @@ These are member records, so treat them as such:
   it needs no defaults, and an upgrade is never what starts posting to somebody's
   inbox. Absent where the installation has no mail server, rather than present and
   inert: a switch that cannot do anything reads as a promise.
+- **The digest is the one thing that is on by default** (#620), and the exception is
+  deliberate: it is **only what you have not seen, and only when you have not been
+  here**, so the people it reaches are exactly the people who have stopped opening the
+  app and will therefore never open the settings to switch it on. An upgrade does start
+  this one. Everything above still holds for the per-category column, which is an instant
+  copy of each notification. `account.digest` is nullable — absence is "has not said" and
+  `DEFAULT_DIGEST` decides what that means — and `docs/accounts.md` carries the rest.
 - **An invite is posted to the address the applicant gave** (#30), and the raw token
   is still in the approval's response either way. `applicant_contact` became
   `applicant_email` because once the app writes to it, an address is the one thing

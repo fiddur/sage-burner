@@ -239,8 +239,9 @@ phone" means 360px.
 - [ ] Subscribe to push in one browser; a notification tapped lands on the
       right page in the open app rather than a new window.
 - [ ] With SMTP configured (⚙️ → Settings), the test message goes to the
-      admin's own address, and the email column appears on the notification
-      settings — off everywhere until asked.
+      admin's own address, and the Email column appears on the notification
+      settings — unticked for every kind until asked. The digest below the tables
+      is the one thing there that starts on.
 - [ ] In a browser with push off, tick a category on the details page: a strip appears at the
       bottom of the window offering to turn notifications on here.
 - [ ] Without dismissing it, go to the feed and tick "Notify me on similar" in a card's 🔔:
