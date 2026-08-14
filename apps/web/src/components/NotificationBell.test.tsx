@@ -289,15 +289,11 @@ describe('the bell', () => {
 
 describe('what the bell asks for while nobody is looking', () => {
   const hidden = (state: 'visible' | 'hidden') =>
-    Object.defineProperty(document, 'visibilityState', { configurable: true, value: state })
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue(state)
 
-  afterEach(() => hidden('visible'))
+  afterEach(() => vi.restoreAllMocks())
 
   it('stops polling a tab that is not on screen', async () => {
-    // `last_active_at` is stamped by any API request carrying a session, so a poll from a
-    // background tab would keep somebody "here" for ever and they would never get a digest —
-    // the one thing written for people who have stopped looking. `load.ts` skips while
-    // hidden for its own reasons; this is why the bell has to.
     vi.useFakeTimers()
     const ask = vi.fn(() => Promise.resolve({ notifications: [], unseen: 0 }))
 
@@ -320,8 +316,6 @@ describe('what the bell asks for while nobody is looking', () => {
   })
 
   it('goes on polling one that is', async () => {
-    // The passing sibling: never polling would satisfy the test above while making the bell
-    // go stale on the screen somebody is watching.
     vi.useFakeTimers()
     const ask = vi.fn(() => Promise.resolve({ notifications: [], unseen: 0 }))
 
@@ -338,6 +332,21 @@ describe('what the bell asks for while nobody is looking', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('catches up the moment the tab is looked at again', async () => {
+    const ask = vi.fn(() => Promise.resolve({ notifications: [], unseen: 0 }))
+    render(
+      <LocationProvider>
+        <NotificationBell api={stub({ getMyNotifications: ask })} />
+      </LocationProvider>,
+    )
+
+    await waitFor(() => expect(ask).toHaveBeenCalledTimes(1))
+
+    document.dispatchEvent(new Event('visibilitychange', { bubbles: true }))
+
+    await waitFor(() => expect(ask).toHaveBeenCalledTimes(2))
   })
 
   it('catches up the moment somebody comes back to the tab', async () => {
