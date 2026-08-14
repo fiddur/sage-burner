@@ -841,8 +841,9 @@ that would be a key per dream ever opened, kept until sign-out, which is the sha
 problem #311 fixed for the banner. Offline you get the card's newest lines; the rest of
 the conversation needs the network.
 
-What is _not_ on it yet: an unread mark per thread, a digest instead of one notification
-per comment, reactions on a line, and threads on a meal or a ride.
+What is _not_ on it yet: an unread mark per thread, reactions on a line, and threads on a
+meal or a ride — the meal being the one shared list with no presence here at all (#667).
+The digest is this page by email, and `docs/accounts.md` has it.
 `entity_type` is what makes each of those a value in the vocabulary and a branch in three
 places — the link, the participants, and the comment's categories. Those three are lookups
 keyed by the type rather than chains of `if`, so the compiler names what a sixth is missing. Adding one is **not**

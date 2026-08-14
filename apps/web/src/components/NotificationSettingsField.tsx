@@ -161,8 +161,8 @@ export const NotificationSettingsField = ({
           </label>
 
           <p class="form-note">
-            Only what you have not seen, and only when you have not been here — so it never arrives on a day
-            you have already read it all.
+            The feed since you were last here, whatever the switches above say — and only when you have not
+            been here, so it never arrives on a day you have already read it all.
           </p>
         </>
       )}

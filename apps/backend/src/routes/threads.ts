@@ -23,7 +23,7 @@ import {
   songPage,
   withMentionNames,
 } from '@sage-burner/shared'
-import { and, asc, count, desc, eq, inArray, lte, max, ne, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gt, inArray, lte, max, ne, sql } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 
 import type { GuardDeps } from '../auth/guards.ts'
@@ -368,10 +368,12 @@ export const readThreads = async (
   ids: readonly string[],
   {
     newest,
+    after,
     counts,
     viewer,
   }: {
     newest?: number
+    after?: string | null
     counts?: ReadonlyMap<string, number>
     viewer?: { account_id: string }
   } = {},
@@ -439,7 +441,12 @@ export const readThreads = async (
         ),
     })
     .from(threadEntry)
-    .where(inArray(threadEntry.thread_id, [...ids]))
+    .where(
+      and(
+        inArray(threadEntry.thread_id, [...ids]),
+        after == null ? undefined : gt(threadEntry.created_at, after),
+      ),
+    )
     .as('ranked')
 
   const entries = await db

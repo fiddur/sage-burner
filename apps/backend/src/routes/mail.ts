@@ -99,12 +99,7 @@ export const registerMailRoutes = (
       return { sent: false, to: who.email, reason: NOT_CONFIGURED } satisfies MailTestResponse
     }
 
-    const sections = await digestPreviewFor(
-      db,
-      viewer.account_id,
-      { hours: body.hours, origin: config.public_origin },
-      now(),
-    )
+    const sections = await digestPreviewFor(db, { hours: body.hours, origin: config.public_origin }, now())
 
     if (sections.length === 0) {
       return { sent: false, to: who.email, reason: NOTHING_TO_PREVIEW } satisfies MailTestResponse

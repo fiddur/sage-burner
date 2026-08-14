@@ -133,7 +133,7 @@ export const digestMessage = ({
   return written({
     installation,
     to,
-    subject: `${installation}: ${total === 1 ? '1 thing' : `${total} things`} you have not seen`,
+    subject: `${installation}: ${total === 1 ? '1 thing' : `${total} things`} while you were away`,
     blocks: [
       { paragraph: 'While you have been away:' },
       ...sections.flatMap((section): Block[] => {

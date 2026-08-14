@@ -1112,25 +1112,49 @@ upgrade must never be what starts posting to somebody's inbox.
 
 **The digest is the one exception, and it is deliberately one** (#620). The rule above is
 about the per-category channel — an instant copy of each notification, which is somebody
-choosing to be reached that way. The digest is a different thing: **only what you have not
-seen, and only when you have not been here.** It is on by default, daily, because the
-people it is for are precisely the people who have stopped opening the app and will
-therefore never open the settings page to switch it on. An upgrade does start it, and what
-it can produce for somebody who never comes back is one message a day that would each have
-been a reason to come back.
+choosing to be reached that way. The digest is a different thing: **the feed, and only when
+you have not been here.** It is on by default, daily, because the people it is for are
+precisely the people who have stopped opening the app and will therefore never open the
+settings page to switch it on. An upgrade does start it, and what it can produce for
+somebody who never comes back is one message a day that would each have been a reason to
+come back.
+
+**It is the feed and not the notifications** (#666), which is the correction that made it
+worth having. Built from `notification` rows it could only ever carry what somebody had
+already switched on, and `dream_offered`, `member_joined`, `point_raised`, `song_added` and
+`bring_added` are all off by default — so the one population it exists for, the people who
+never opened the settings page, got a digest of almost nothing. `docs/the-app.md` has why
+the feed is settings-blind; the digest inherits that, and the switches above it now decide
+what reaches the bell and the inbox instantly, never what the digest holds.
+
+`seen_at` is therefore not in it at all. The feed records no read state on purpose, and the
+digest never needed one: its cut was always a time mark. That also makes everybody's digest
+the **same message with a different cut** — there is nothing in it addressed to one person,
+which is why `digestPreviewFor` takes no account id.
+
+**What the feed cannot carry drops out of the digest with it.** Nothing writes an `activity`
+row or a thread entry for `payment`, `waiting_list_near`, `waiting_list_pushed`, `meal_role`,
+`new_version`, `application` or `application_news`, so none of them is in a digest. Those stay
+the bell's and the per-category email column's. Meals are the one shared list with no feed
+presence at all, which is a gap in the feed rather than in the digest — #667 is where it is
+tracked, and giving a meal a card puts it in the digest with no change here.
+
+**Only an approved account is due one.** `dueForDigest` filters on `approvedAccounts`, which
+is new with the switch and load-bearing: reading somebody's own notifications was safe for an
+applicant, whose rows are only ever about their own application, and reading the feed is not.
+Admin counts as well as member, the two roles being independent everywhere else.
 
 `account.digest` is `daily | weekly | off`, nullable, and **absence means "has not said"** —
 the same shape `notification_setting` uses, with `DEFAULT_DIGEST` in the shared package
 holding what that means. The wire carries it whole alongside the two lists, for the reason
 the lists are carried whole.
 
-A digest goes out only when **all** of these hold: a mail server is configured; the choice
-is not `off`; something is unseen; something unseen is newer than the last digest; and the
+A digest goes out only when **all** of these hold: a mail server is configured; the account is
+approved; the choice is not `off`; something has happened on the feed since the cut; and the
 account has not been on the site inside the window — 24 hours or 7 days.
 
-**It then carries everything unseen since the later of two marks** (#654): when they were
-last on the site, and when the last digest went. Both are needed and each answers a different
-question.
+**The cut is the later of two marks** (#654): when they were last on the site, and when the
+last digest went. Both are needed and each answers a different question.
 
 **The visit** is what makes a first digest worth having. Somebody who signed up, looked once
 and never came back gets the whole stretch since that look — the dreams offered, the points
@@ -1166,9 +1190,30 @@ population it exists for. The poll skips while `visibilityState` is `hidden` and
 as before to anybody actually watching it.
 
 **A section carries at most `MOST_PER_SECTION` lines** and says "and N more" for the rest, and
-the count in the subject is what is waiting rather than what was printed. Without it, somebody
-away six months gets every unseen row in one message — and since nothing prunes `notification`,
-that is every row ever written for them.
+the count in the subject is what is waiting rather than what was printed. The read is bounded
+before that too, by the same `FEED_LIMIT` the page uses, so somebody away six months gets the
+newest fifty things rather than the whole history of the burn.
+
+**The sections are the feed's own chips** — `feedKindLabel`, so Burns, Dreams, People, Posts,
+Songs, Bring, Points, Meetings, in `feedKinds` order. The digest then reads as the page it
+links to, and a new kind will not compile until it has a heading.
+
+**A card is one line, and never a quoted comment.** `lineFor` writes `title — verbs (+N
+comments)`: the verbs are the entries past the cut that are not comments, and comments are
+counted rather than printed, since a 2000-character paragraph is not a digest. A card that
+only got comments is `title — +3 comments`, and the counts are **diffs** rather than totals,
+which is what makes a card bumped by one comment say so.
+
+The verbs collapse per actor — "Fredrik put it in the book, said whose song it is" — which
+is free rather than clever: `thread_entry.body` stores the bare predicate and the name is
+prepended when the line is read, so the collapse is a group-by and there is no name to strip.
+A run for the next actor starts again after a `;`, and a null author is "Somebody", as on the
+page.
+
+**A card whose thing has been taken back is dropped**, the rule the feed already follows
+(#617), so a digest cannot mail a link to a withdrawn dream. That comes from `readThreads`
+computing `gone`, which is why the digest reads through it rather than doing its own thinner
+query — the drop rule stays in one place.
 
 **The `digest_sent_at` guard has an hour of slack.** The tick offset moves on every redeploy,
 so against a strict `now - 24h` a sweep waking a few minutes earlier than the night before finds
@@ -1218,11 +1263,14 @@ installation's name is admin-authored.
 **An admin can post one to themselves** (#640). ⚙️ → Settings takes a number of hours,
 defaulting to 24, and posts a digest of that stretch to the **admin's own address** — the rule
 the test button already follows, since a send-to box on an admin page is an open relay with
-extra steps. Two things make it a preview rather than a second digest: it **ignores `seen_at`**,
-because an admin who uses the app has read everything and a preview that is almost always empty
-is a button nobody presses twice; and it **never writes `digest_sent_at`**, because a preview
-that spends the real one costs somebody the thing being checked. With nothing in the stretch it
-says so rather than posting an empty message.
+extra steps. One thing makes it a preview rather than a second digest: it **never writes
+`digest_sent_at`**, because a preview that spends the real one costs somebody the thing being
+checked. With nothing in the stretch it says so rather than posting an empty message.
+
+One rather than two, because the feed has no seen mark to ignore: the preview and the sweep
+run the same read and differ only in the cut. An admin who uses the app every day still gets
+a full one, which is the property that matters — a button that is almost always empty is a
+button nobody presses twice.
 
 The hours are a field rather than daily/weekly buttons for a reason worth keeping: the real
 digest has no window — its cut is the last visit — so two buttons would have sent identical

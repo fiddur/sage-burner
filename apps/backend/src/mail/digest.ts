@@ -1,17 +1,15 @@
-import type { DigestChoice, NotificationCategory } from '@sage-burner/shared'
+import type { DigestChoice, FeedKind, Thread, ThreadEntry } from '@sage-burner/shared'
 
-import {
-  DEFAULT_DIGEST,
-  detailsPage,
-  notificationCategories,
-  notificationCategoryInfo,
-} from '@sage-burner/shared'
-import { and, desc, eq, gt, isNull } from 'drizzle-orm'
+import { DEFAULT_DIGEST, detailsPage, feedKindLabel, feedKinds, threadEntityTypes } from '@sage-burner/shared'
+import { desc, eq, gt } from 'drizzle-orm'
 
 import type { Database } from '../db/index.ts'
 import type { MailDeps, Posted } from './mail.ts'
 
-import { account, notification } from '../db/schema.ts'
+import { account, activity } from '../db/schema.ts'
+import { approvedAccounts } from '../push/notify.ts'
+import { FEED_LIMIT } from '../routes/feed.ts'
+import { readThreads, recentThreads } from '../routes/threads.ts'
 import { installationTitle, mailSettingsFor, post } from './mail.ts'
 import { absolute, digestMessage } from './messages.ts'
 
@@ -38,7 +36,7 @@ export interface DigestCandidate {
 }
 
 export interface DigestSection {
-  category: NotificationCategory
+  kind: FeedKind
   label: string
   total: number
   entries: { body: string; link: string | undefined }[]
@@ -56,6 +54,8 @@ export const laterOf = (one: string | null, other: string | null): string | null
 }
 
 export const dueForDigest = async (db: Database, at: Date): Promise<DigestCandidate[]> => {
+  const approved = new Set(await approvedAccounts(db))
+
   const rows = await db
     .select({
       id: account.id,
@@ -67,6 +67,8 @@ export const dueForDigest = async (db: Database, at: Date): Promise<DigestCandid
     .from(account)
 
   return rows.flatMap((row) => {
+    if (!approved.has(row.id)) return []
+
     const choice = row.digest ?? DEFAULT_DIGEST
     if (!isRepeating(choice)) return []
 
@@ -86,47 +88,109 @@ export const dueForDigest = async (db: Database, at: Date): Promise<DigestCandid
   })
 }
 
-export const unseenFor = async (
-  db: Database,
-  accountId: string,
-  { after, origin }: { after: string | null; origin: string | undefined },
-): Promise<DigestSection[]> => {
-  const rows = await db
-    .select({
-      category: notification.category,
-      body: notification.body,
-      link: notification.link,
-      created_at: notification.created_at,
-    })
-    .from(notification)
-    .where(and(eq(notification.account_id, accountId), isNull(notification.seen_at)))
-    .orderBy(desc(notification.created_at), desc(notification.id))
+const SOMEBODY = 'Somebody'
 
-  const within = after === null ? rows : rows.filter((row) => row.created_at > after)
+const talkOf = (said: number): string => `+${said} ${said === 1 ? 'comment' : 'comments'}`
 
-  return sectionsOf(within, origin)
+const perActor = (entries: readonly ThreadEntry[]): string[] => {
+  const runs: { who: string; what: string[] }[] = []
+
+  for (const entry of entries) {
+    const who = entry.author?.name ?? SOMEBODY
+    const run = runs.at(-1)
+
+    if (run?.who === who) run.what.push(entry.body)
+    else runs.push({ who, what: [entry.body] })
+  }
+
+  return runs.map((run) => `${run.who} ${run.what.join(', ')}`)
 }
 
-const sectionsOf = (
-  rows: readonly { category: NotificationCategory; body: string; link: string | null }[],
-  origin: string | undefined,
-): DigestSection[] =>
-  notificationCategories.flatMap((category) => {
-    const mine = rows.filter((row) => row.category === category)
+export const lineFor = (card: Pick<Thread, 'entries' | 'title'>): string | undefined => {
+  const said = card.entries.filter((entry) => entry.kind === 'comment').length
+  const did = perActor(card.entries.filter((entry) => entry.kind !== 'comment'))
+
+  if (did.length === 0 && said === 0) return undefined
+  if (did.length === 0) return `${card.title} — ${talkOf(said)}`
+  if (said === 0) return `${card.title} — ${did.join('; ')}`
+
+  return `${card.title} — ${did.join('; ')} (${talkOf(said)})`
+}
+
+interface FeedLine {
+  id: string
+  at: string
+  kind: FeedKind
+  body: string
+  link: string | null
+}
+
+export const feedSince = async (
+  db: Database,
+  { after, origin }: { after: string | null; origin: string | undefined },
+): Promise<DigestSection[]> => {
+  const lines = await db
+    .select({
+      id: activity.id,
+      body: activity.body,
+      link: activity.link,
+      created_at: activity.created_at,
+    })
+    .from(activity)
+    .where(after === null ? undefined : gt(activity.created_at, after))
+    .orderBy(desc(activity.created_at), desc(activity.id))
+    .limit(FEED_LIMIT)
+
+  const recent = await recentThreads(db, FEED_LIMIT, threadEntityTypes)
+
+  const cards = await readThreads(
+    db,
+    recent.map((one) => one.id),
+    { after },
+  )
+
+  const byId = new Map(recent.map((one) => [one.id, one.last_at]))
+
+  const said: FeedLine[] = [
+    ...lines.map((line) => ({
+      id: line.id,
+      at: line.created_at,
+      kind: 'activity' as const,
+      body: line.body,
+      link: line.link,
+    })),
+    ...cards.flatMap((card) => {
+      const body = card.gone ? undefined : lineFor(card)
+      const at = byId.get(card.id)
+      if (body === undefined || at === undefined) return []
+
+      return [{ id: card.id, at, kind: card.entity_type, body, link: card.link }]
+    }),
+  ]
+
+  const kept = said
+    .sort((one, other) =>
+      one.at === other.at ? other.id.localeCompare(one.id) : other.at.localeCompare(one.at),
+    )
+    .slice(0, FEED_LIMIT)
+
+  return feedKinds.flatMap((kind) => {
+    const mine = kept.filter((one) => one.kind === kind)
     if (mine.length === 0) return []
 
     return [
       {
-        category,
-        label: notificationCategoryInfo[category].label,
+        kind,
+        label: feedKindLabel[kind],
         total: mine.length,
-        entries: mine.slice(0, MOST_PER_SECTION).map((row) => ({
-          body: row.body,
-          link: row.link === null ? undefined : absolute(origin, row.link),
+        entries: mine.slice(0, MOST_PER_SECTION).map((one) => ({
+          body: one.body,
+          link: one.link === null ? undefined : absolute(origin, one.link),
         })),
       },
     ]
   })
+}
 
 export interface DigestDeps extends MailDeps {
   origin?: string
@@ -140,7 +204,7 @@ export const sweepDigests = async (deps: DigestDeps, at: Date): Promise<number> 
   let sent = 0
 
   for (const candidate of await dueForDigest(deps.db, at)) {
-    const sections = await unseenFor(deps.db, candidate.account_id, {
+    const sections = await feedSince(deps.db, {
       after: laterOf(candidate.last_active_at, candidate.digest_sent_at),
       origin: deps.origin,
     })
@@ -173,17 +237,7 @@ export const sweepDigests = async (deps: DigestDeps, at: Date): Promise<number> 
 
 export const digestPreviewFor = async (
   db: Database,
-  accountId: string,
   { hours, origin }: { hours: number; origin: string | undefined },
   at: Date,
-): Promise<DigestSection[]> => {
-  const after = new Date(at.getTime() - hours * HOUR_MS).toISOString()
-
-  const rows = await db
-    .select({ category: notification.category, body: notification.body, link: notification.link })
-    .from(notification)
-    .where(and(eq(notification.account_id, accountId), gt(notification.created_at, after)))
-    .orderBy(desc(notification.created_at), desc(notification.id))
-
-  return sectionsOf(rows, origin)
-}
+): Promise<DigestSection[]> =>
+  await feedSince(db, { after: new Date(at.getTime() - hours * HOUR_MS).toISOString(), origin })
