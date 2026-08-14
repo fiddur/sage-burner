@@ -98,14 +98,32 @@ describe('putting a picture in a markdown field', () => {
     await waitFor(() => expect(box().value).toBe('![](/api/images/img-1)'))
   })
 
-  it('keeps the picture controls out of the paragraph they sit beside', async () => {
-    // `ErrorText` renders a `<p>` of its own and `DreamThread` mounts this inside a row
-    // wrapper, so a `<p>` here nests block elements. Preact builds the DOM directly, so
-    // nothing shows it — a browser parsing the same HTML would close the outer one early.
+  it('sits in the toolbar, beside the buttons that write syntax', () => {
     render(<Field upload={() => Promise.resolve({ id: 'img-1' })} />)
 
-    const control = screen.getByLabelText('Add a picture to Say something').closest('.row')
-    expect(control?.tagName).toBe('DIV')
+    const control = screen.getByLabelText('Add a picture to Say something')
+
+    expect(control.closest('.syntax-row')).not.toBeNull()
+  })
+
+  it('leaves what it has to report below the box', async () => {
+    render(<Field upload={() => Promise.reject(new Error('nope'))} />)
+
+    paste([aPicture()])
+
+    expect((await screen.findByRole('alert')).closest('.syntax-row')).toBeNull()
+  })
+
+  it('says a picture is on its way while the bytes are going up', async () => {
+    let finish = (_: { id: string }) => undefined as void
+    render(<Field upload={() => new Promise<{ id: string }>((resolve) => (finish = resolve))} />)
+
+    paste([aPicture()])
+
+    expect(await screen.findByText(/Sending a picture/)).toBeTruthy()
+
+    finish({ id: 'img-8' })
+    await waitFor(() => expect(screen.queryByText(/Sending a picture/)).toBeNull())
   })
 
   it('stands something in the text while the bytes are going up', async () => {

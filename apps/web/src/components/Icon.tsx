@@ -16,6 +16,7 @@ export type IconName =
   | 'menu'
   | 'organise'
   | 'pause'
+  | 'picture'
   | 'play'
   | 'repeats'
   | 'resize'
@@ -24,7 +25,7 @@ export type IconName =
   | 'volunteer'
   | 'waiting'
 
-const ICONS: Record<IconName, readonly string[]> = {
+export const ICONS: Record<IconName, readonly string[]> = {
   appoint: [
     'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2',
     'M5 7a4 4 0 1 0 8 0a4 4 0 1 0 -8 0',
@@ -90,6 +91,11 @@ const ICONS: Record<IconName, readonly string[]> = {
   pause: [
     'M15 3h3a1 1 0 0 1 1 1v16a1 1 0 0 1 -1 1h-3a1 1 0 0 1 -1 -1v-16a1 1 0 0 1 1 -1z',
     'M6 3h3a1 1 0 0 1 1 1v16a1 1 0 0 1 -1 1h-3a1 1 0 0 1 -1 -1v-16a1 1 0 0 1 1 -1z',
+  ],
+  picture: [
+    'M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2z',
+    'M7 9a2 2 0 1 0 4 0a2 2 0 1 0 -4 0',
+    'm21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21',
   ],
   play: ['M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z'],
   repeats: ['m17 2 4 4-4 4', 'M3 11v-1a4 4 0 0 1 4-4h14', 'm7 22-4-4 4-4', 'M21 13v1a4 4 0 0 1-4 4H3'],
