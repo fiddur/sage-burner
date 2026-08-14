@@ -156,7 +156,13 @@ describe('who is due a digest', () => {
     const accountId = await givenAccount({ lastActive: ago(3 * DAY) })
 
     expect(await dueForDigest(db(), NOW)).toEqual([
-      { account_id: accountId, email: expect.any(String), choice: 'daily', since: null },
+      {
+        account_id: accountId,
+        email: expect.any(String),
+        choice: 'daily',
+        since: null,
+        lastActive: ago(3 * DAY),
+      },
     ])
   })
 })
@@ -168,7 +174,11 @@ describe('what a digest holds', () => {
     await givenUnseen(accountId, { category: 'dream_comment', body: 'Ada commented', link: '/dreams' })
     await givenUnseen(accountId, { category: 'point_raised', body: 'Bo raised Firewood', link: '/meetings' })
 
-    const sections = await unseenFor(db(), accountId, { since: null, origin: 'https://burn.example' })
+    const sections = await unseenFor(db(), accountId, {
+      after: null,
+      since: null,
+      origin: 'https://burn.example',
+    })
 
     expect(sections.map((section) => section.category)).toEqual(['dream_comment', 'point_raised'])
     expect(sections[0]?.entries).toEqual([{ body: 'Ada commented', link: 'https://burn.example/dreams' }])
@@ -179,7 +189,7 @@ describe('what a digest holds', () => {
     const accountId = await givenAccount()
     await givenUnseen(accountId)
 
-    const sections = await unseenFor(db(), accountId, { since: null, origin: undefined })
+    const sections = await unseenFor(db(), accountId, { after: null, since: null, origin: undefined })
 
     expect(sections[0]?.entries[0]?.link).toBeUndefined()
   })
@@ -188,7 +198,7 @@ describe('what a digest holds', () => {
     build()
     const accountId = await givenAccount()
 
-    expect(await unseenFor(db(), accountId, { since: null, origin: undefined })).toEqual([])
+    expect(await unseenFor(db(), accountId, { after: null, since: null, origin: undefined })).toEqual([])
   })
 
   it('is empty where nothing has arrived since the last digest', async () => {
@@ -196,18 +206,54 @@ describe('what a digest holds', () => {
     const accountId = await givenAccount()
     await givenUnseen(accountId, { at: ago(5 * DAY) })
 
-    expect(await unseenFor(db(), accountId, { since: ago(2 * DAY), origin: undefined })).toEqual([])
+    expect(await unseenFor(db(), accountId, { after: null, since: ago(2 * DAY), origin: undefined })).toEqual(
+      [],
+    )
   })
 
-  it('carries only what has arrived since the last digest', async () => {
+  it('carries everything since somebody was last here, not only since the last digest', async () => {
     build()
     const accountId = await givenAccount()
-    await givenUnseen(accountId, { body: 'was in the last one', at: ago(5 * DAY) })
-    await givenUnseen(accountId, { body: 'new since then', at: ago(HOUR) })
+    await givenUnseen(accountId, { body: 'while they were away', at: ago(5 * DAY) })
+    await givenUnseen(accountId, { body: 'later, still away', at: ago(HOUR) })
 
-    const sections = await unseenFor(db(), accountId, { since: ago(2 * DAY), origin: undefined })
+    const sections = await unseenFor(db(), accountId, {
+      after: ago(6 * DAY),
+      since: ago(2 * DAY),
+      origin: undefined,
+    })
 
-    expect(sections[0]?.entries.map((entry) => entry.body)).toEqual(['new since then'])
+    expect(sections[0]?.entries.map((entry) => entry.body)).toEqual([
+      'later, still away',
+      'while they were away',
+    ])
+  })
+
+  it('drops what happened before they were last here, which they saw the page for', async () => {
+    build()
+    const accountId = await givenAccount()
+    await givenUnseen(accountId, { body: 'before their last visit', at: ago(9 * DAY) })
+    await givenUnseen(accountId, { body: 'after it', at: ago(HOUR) })
+
+    const sections = await unseenFor(db(), accountId, {
+      after: ago(6 * DAY),
+      since: null,
+      origin: undefined,
+    })
+
+    expect(sections[0]?.entries.map((entry) => entry.body)).toEqual(['after it'])
+  })
+
+  it('sends nothing when nothing has arrived since the last digest, however much is unseen', async () => {
+    // The cadence guard, and the only thing `since` still does: content is cut at the last
+    // visit, so without this a nightly sweep would post the same growing list for ever.
+    build()
+    const accountId = await givenAccount()
+    await givenUnseen(accountId, { body: 'while they were away', at: ago(5 * DAY) })
+
+    expect(
+      await unseenFor(db(), accountId, { after: ago(6 * DAY), since: ago(2 * DAY), origin: undefined }),
+    ).toEqual([])
   })
 
   it('carries the whole backlog to somebody who has never had one', async () => {
@@ -216,7 +262,7 @@ describe('what a digest holds', () => {
     await givenUnseen(accountId, { body: 'ancient', at: ago(60 * DAY) })
     await givenUnseen(accountId, { body: 'recent', at: ago(HOUR) })
 
-    const sections = await unseenFor(db(), accountId, { since: null, origin: undefined })
+    const sections = await unseenFor(db(), accountId, { after: null, since: null, origin: undefined })
 
     expect(sections[0]?.entries.map((entry) => entry.body)).toEqual(['recent', 'ancient'])
   })
@@ -229,7 +275,11 @@ describe('what a digest holds', () => {
     const accountId = await givenAccount()
     await givenUnseen(accountId, { body: 'an hour after they left', at: ago(6 * DAY) })
 
-    const sections = await unseenFor(db(), accountId, { since: ago(30 * DAY), origin: undefined })
+    const sections = await unseenFor(db(), accountId, {
+      after: null,
+      since: ago(30 * DAY),
+      origin: undefined,
+    })
 
     expect(sections[0]?.entries.map((entry) => entry.body)).toEqual(['an hour after they left'])
   })
@@ -239,7 +289,9 @@ describe('what a digest holds', () => {
     const accountId = await givenAccount()
     await givenUnseen(accountId, { body: 'old one', at: ago(5 * DAY) })
 
-    expect(await unseenFor(db(), accountId, { since: ago(3 * DAY), origin: undefined })).toEqual([])
+    expect(await unseenFor(db(), accountId, { after: null, since: ago(3 * DAY), origin: undefined })).toEqual(
+      [],
+    )
   })
 
   it('caps what one section carries, and says how much it left out', async () => {
@@ -249,7 +301,7 @@ describe('what a digest holds', () => {
       await givenUnseen(accountId, { body: `comment ${at}`, at: ago(at * HOUR) })
     }
 
-    const [section] = await unseenFor(db(), accountId, { since: null, origin: undefined })
+    const [section] = await unseenFor(db(), accountId, { after: null, since: null, origin: undefined })
 
     expect(section?.total).toBe(MOST_PER_SECTION + 3)
     expect(section?.entries).toHaveLength(MOST_PER_SECTION)

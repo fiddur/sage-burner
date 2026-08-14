@@ -34,6 +34,7 @@ export interface DigestCandidate {
   email: string
   choice: Repeating
   since: string | null
+  lastActive: string | null
 }
 
 export interface DigestSection {
@@ -66,14 +67,22 @@ export const dueForDigest = async (db: Database, at: Date): Promise<DigestCandid
     if (!away(row.last_active_at, new Date(at.getTime() - window).toISOString())) return []
     if (!away(row.digest_sent_at, new Date(at.getTime() - window + HOUR_MS).toISOString())) return []
 
-    return [{ account_id: row.id, email: row.email, choice, since: row.digest_sent_at }]
+    return [
+      {
+        account_id: row.id,
+        email: row.email,
+        choice,
+        since: row.digest_sent_at,
+        lastActive: row.last_active_at,
+      },
+    ]
   })
 }
 
 export const unseenFor = async (
   db: Database,
   accountId: string,
-  { since, origin }: { since: string | null; origin: string | undefined },
+  { after, since, origin }: { after: string | null; since: string | null; origin: string | undefined },
 ): Promise<DigestSection[]> => {
   const rows = await db
     .select({
@@ -86,7 +95,9 @@ export const unseenFor = async (
     .where(and(eq(notification.account_id, accountId), isNull(notification.seen_at)))
     .orderBy(desc(notification.created_at), desc(notification.id))
 
-  const within = since === null ? rows : rows.filter((row) => row.created_at > since)
+  if (since !== null && !rows.some((row) => row.created_at > since)) return []
+
+  const within = after === null ? rows : rows.filter((row) => row.created_at > after)
 
   return notificationCategories.flatMap((category) => {
     const mine = within.filter((row) => row.category === category)
@@ -119,6 +130,7 @@ export const sweepDigests = async (deps: DigestDeps, at: Date): Promise<number> 
 
   for (const candidate of await dueForDigest(deps.db, at)) {
     const sections = await unseenFor(deps.db, candidate.account_id, {
+      after: candidate.lastActive,
       since: candidate.since,
       origin: deps.origin,
     })
