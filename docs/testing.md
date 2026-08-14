@@ -243,10 +243,14 @@ phone" means 360px.
       filled button. Read it in a client with images off: nothing is missing, because there
       are none. Read it as plain text: the same words, and every link on a line of its own.
 - [ ] With SMTP configured, ⚙️ → Settings offers **Send me a digest of the last [24] hours**.
-      Press it: a digest of your own last day arrives, holding things you have already read —
-      that is the point, since an admin has read everything. Change 24 to 1 and press again:
-      less, or a note that nothing has happened in that stretch. Neither press changes when
-      your real digest next goes out.
+      Press it: a digest of the last day's feed arrives — the same headings as the chips on
+      the feed, a card as one line saying who did what, and a card somebody only commented on
+      as "+N comments" rather than the comment itself. Change 24 to 1 and press again: less,
+      or a note that nothing has happened in that stretch. Neither press changes when your
+      real digest next goes out.
+- [ ] Raise a talking point from a second account with **every** notification category
+      switched off on your own. The digest preview still carries it: it is the feed, not
+      your notifications.
 - [ ] With SMTP configured (⚙️ → Settings), the test message goes to the
       admin's own address, and the Email column appears on the notification
       settings — unticked for every kind until asked. The digest below the tables
@@ -263,8 +267,8 @@ phone" means 360px.
 - [ ] With SMTP configured, Your details → Notifications carries **A summary by email when
       you have stayed away**, set to _Every day_; without SMTP the whole control is absent.
 - [ ] Set it to _Never_ and reload: it is still _Never_. The digest itself needs a clock —
-      an account with something unseen, no visit for a day, and the sweep run in the small
-      hours — so `digest.test.ts` is what covers when one goes out.
+      an approved account, something on the feed, no visit for a day, and the sweep run in
+      the small hours — so `digest.test.ts` is what covers when one goes out.
 - [ ] ⚙️ → Notifications sent lists what has gone out, newest first, with the number told,
       the number who had the category off, and the devices that took it. Cause a burn-wide
       notification: it is **one** line whose "Told" is the number attending, not one line

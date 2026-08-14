@@ -12,7 +12,7 @@ import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, INSTALLATION_ID, mailSetting, notification } from '../db/schema.ts'
+import { account, accountRole, activity, event, INSTALLATION_ID, mailSetting } from '../db/schema.ts'
 
 const SECRET = 'm'.repeat(40)
 const NOW = '2026-08-07T10:00:00.000Z'
@@ -285,15 +285,31 @@ describe('the digest preview', () => {
       payload: { hours },
     })
 
-  const givenNotification = async (accountId: string, at: string, body = 'Ada offered a dream') => {
-    await db().insert(notification).values({
+  const givenBurn = async () => {
+    const id = randomUUID()
+    await db()
+      .insert(event)
+      .values({
+        id,
+        name: 'Burning Sage Autumn',
+        slug: `burn-${id}`,
+        start_date: '2026-09-18',
+        end_date: '2026-09-20',
+        member_cap: 42,
+        created_at: '2026-07-01T10:00:00.000Z',
+      })
+
+    return id
+  }
+
+  const givenActivity = async (eventId: string, at: string, body = 'Ada offered a dream') => {
+    await db().insert(activity).values({
       id: randomUUID(),
-      account_id: accountId,
+      event_id: eventId,
       category: 'dream_offered',
       body,
       link: '/dreams',
       created_at: at,
-      seen_at: at,
     })
   }
 
@@ -303,11 +319,11 @@ describe('the digest preview', () => {
     return row?.id ?? ''
   }
 
-  it('shows what an admin has already seen, or it would be empty every time', async () => {
+  it('posts the feed over the stretch, to the admin’s own address', async () => {
     const server = await build()
     const cookie = await givenAccount(['admin'], 'admin@example.org')
     await write(server, cookie, SETTINGS)
-    await givenNotification(await idFor('admin@example.org'), '2026-08-07T02:00:00.000Z')
+    await givenActivity(await givenBurn(), '2026-08-07T02:00:00.000Z')
 
     const answer = await preview(server, cookie, 24)
 
@@ -319,9 +335,9 @@ describe('the digest preview', () => {
     const server = await build()
     const cookie = await givenAccount(['admin'], 'admin@example.org')
     await write(server, cookie, SETTINGS)
-    const me = await idFor('admin@example.org')
-    await givenNotification(me, '2026-08-05T10:00:00.000Z', 'a day and a half back')
-    await givenNotification(me, '2026-08-07T02:00:00.000Z', 'this morning')
+    const burn = await givenBurn()
+    await givenActivity(burn, '2026-08-05T10:00:00.000Z', 'a day and a half back')
+    await givenActivity(burn, '2026-08-07T02:00:00.000Z', 'this morning')
 
     await preview(server, cookie, 24)
 
@@ -346,7 +362,7 @@ describe('the digest preview', () => {
     const cookie = await givenAccount(['admin'], 'admin@example.org')
     await write(server, cookie, SETTINGS)
     const me = await idFor('admin@example.org')
-    await givenNotification(me, '2026-08-07T02:00:00.000Z')
+    await givenActivity(await givenBurn(), '2026-08-07T02:00:00.000Z')
 
     await preview(server, cookie, 24)
 

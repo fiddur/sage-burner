@@ -9,6 +9,14 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-14
 
+- **The email summary is the feed now, not your notifications.** It used to carry only the kinds
+  you had switched on, and most of what happens around a burn — a dream offered, somebody saying
+  they are coming, a talking point raised, a song going into the book — is off until you ask for
+  it. So the summary reached the people who had stopped opening the app and told them almost
+  nothing. It now carries what the feed carries, under the same headings you see there, whatever
+  your switches say. A conversation somebody has added to says how many comments are new rather
+  than quoting them. Your switches still decide what reaches the bell and your inbox as it happens.
+
 - **Joining a burn that is already full now tells you so.** You would land on the waiting list, see
   it on the Members page if you went and looked, and hear nothing — and with every place already paid
   for, nothing that happened afterwards would have told you either. The message arrives on joining

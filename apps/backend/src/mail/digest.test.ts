@@ -1,5 +1,6 @@
-import type { DigestChoice, NotificationCategory } from '@sage-burner/shared'
+import type { DigestChoice, NotificationCategory, ThreadEntryKind } from '@sage-burner/shared'
 
+import { notifiesByDefault } from '@sage-burner/shared'
 import { eq } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -8,8 +9,20 @@ import type { DbHandle } from '../db/index.ts'
 import type { Message, Posted, Send } from './mail.ts'
 
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, installation, INSTALLATION_ID, mailSetting, notification } from '../db/schema.ts'
-import { dueForDigest, isNightHour, MOST_PER_SECTION, sweepDigests, unseenFor } from './digest.ts'
+import {
+  account,
+  accountRole,
+  activity,
+  event,
+  installation,
+  INSTALLATION_ID,
+  mailSetting,
+  meetingPoint,
+  song,
+  thread,
+  threadEntry,
+} from '../db/schema.ts'
+import { dueForDigest, feedSince, isNightHour, lineFor, MOST_PER_SECTION, sweepDigests } from './digest.ts'
 
 const NOW = new Date('2026-08-14T03:00:00.000Z')
 const ago = (ms: number) => new Date(NOW.getTime() - ms).toISOString()
@@ -61,16 +74,21 @@ const givenAccount = async ({
   digest,
   lastActive,
   digestSent,
+  name = 'Ada',
+  approved = true,
 }: {
   digest?: DigestChoice
   lastActive?: string | null
   digestSent?: string | null
+  name?: string
+  approved?: boolean
 } = {}) => {
   const id = randomUUID()
   await db()
     .insert(account)
     .values({
       id,
+      name,
       email: `${id}@example.org`,
       password_hash: null,
       created_at: ago(30 * DAY),
@@ -79,26 +97,99 @@ const givenAccount = async ({
       digest_sent_at: digestSent ?? null,
     })
 
+  if (approved) await db().insert(accountRole).values({ account_id: id, role: 'member' })
+
   return id
 }
 
-const givenUnseen = async (
-  accountId: string,
+const givenBurn = async () => {
+  const id = randomUUID()
+  await db()
+    .insert(event)
+    .values({
+      id,
+      name: 'Burning Sage Autumn',
+      slug: `burn-${id}`,
+      start_date: '2026-09-18',
+      end_date: '2026-09-20',
+      member_cap: 42,
+      created_at: ago(30 * DAY),
+    })
+
+  return id
+}
+
+const givenActivity = async (
+  eventId: string,
   {
-    category = 'dream_comment',
-    body = 'Ada commented on Sauna at dawn',
-    link = '/dreams',
+    category = 'lead_role_filled',
+    body = 'Bo takes the lead of Kitchen',
+    link = '/roles',
     at = ago(2 * HOUR),
   }: { category?: NotificationCategory; body?: string; link?: string; at?: string } = {},
 ) => {
-  await db().insert(notification).values({
-    id: randomUUID(),
-    account_id: accountId,
-    category,
-    body,
-    link,
-    created_at: at,
-  })
+  await db()
+    .insert(activity)
+    .values({ id: randomUUID(), event_id: eventId, category, body, link, created_at: at })
+}
+
+const givenSongCard = async ({
+  title = 'Nature of Love',
+  deleted = false,
+}: { title?: string; deleted?: boolean } = {}) => {
+  const songId = randomUUID()
+  const threadId = randomUUID()
+
+  await db()
+    .insert(song)
+    .values({
+      id: songId,
+      title,
+      body: '',
+      created_at: ago(10 * DAY),
+      ...(deleted ? { deleted_at: ago(HOUR) } : {}),
+    })
+  await db()
+    .insert(thread)
+    .values({ id: threadId, event_id: null, entity_type: 'song', entity_id: songId, title })
+
+  return threadId
+}
+
+const givenPointCard = async (eventId: string, title = 'Event description') => {
+  const pointId = randomUUID()
+  const threadId = randomUUID()
+
+  await db()
+    .insert(meetingPoint)
+    .values({ id: pointId, event_id: eventId, title, created_at: ago(10 * DAY) })
+  await db()
+    .insert(thread)
+    .values({ id: threadId, event_id: eventId, entity_type: 'point', entity_id: pointId, title })
+
+  return threadId
+}
+
+const givenEntry = async (
+  threadId: string,
+  {
+    kind = 'comment',
+    body = 'said something',
+    author = null,
+    at = ago(2 * HOUR),
+  }: { kind?: ThreadEntryKind; body?: string; author?: string | null; at?: string } = {},
+) => {
+  await db()
+    .insert(threadEntry)
+    .values({
+      id: randomUUID(),
+      thread_id: threadId,
+      kind,
+      seq: Date.parse(at),
+      author_account_id: author,
+      body,
+      created_at: at,
+    })
 }
 
 describe('who is due a digest', () => {
@@ -112,6 +203,29 @@ describe('who is due a digest', () => {
   it('takes somebody who has never been here at all', async () => {
     build()
     const accountId = await givenAccount({ lastActive: null })
+
+    expect((await dueForDigest(db(), NOW)).map((one) => one.account_id)).toEqual([accountId])
+  })
+
+  it('leaves an account nobody has approved, whose feed this is not', async () => {
+    build()
+    await givenAccount({ lastActive: ago(3 * DAY), approved: false })
+
+    expect(await dueForDigest(db(), NOW)).toEqual([])
+  })
+
+  it('takes an admin who is not a member, since the roles are independent', async () => {
+    build()
+    const accountId = await givenAccount({ lastActive: ago(3 * DAY), approved: false })
+    await db().insert(accountRole).values({ account_id: accountId, role: 'admin' })
+
+    expect((await dueForDigest(db(), NOW)).map((one) => one.account_id)).toEqual([accountId])
+  })
+
+  it('takes somebody holding both roles exactly once', async () => {
+    build()
+    const accountId = await givenAccount({ lastActive: ago(3 * DAY) })
+    await db().insert(accountRole).values({ account_id: accountId, role: 'admin' })
 
     expect((await dueForDigest(db(), NOW)).map((one) => one.account_id)).toEqual([accountId])
   })
@@ -132,7 +246,7 @@ describe('who is due a digest', () => {
 
   it('holds a weekly one to a week, where a daily one would already be due', async () => {
     build()
-    await givenAccount({ digest: 'weekly', lastActive: ago(2 * DAY) })
+    await givenAccount({ digest: 'weekly', lastActive: ago(3 * DAY) })
 
     expect(await dueForDigest(db(), NOW)).toEqual([])
   })
@@ -146,157 +260,219 @@ describe('who is due a digest', () => {
 
   it('leaves somebody who has had one inside the window, however long they have been away', async () => {
     build()
-    await givenAccount({ lastActive: ago(30 * DAY), digestSent: ago(3 * HOUR) })
+    await givenAccount({ lastActive: ago(30 * DAY), digestSent: ago(2 * HOUR) })
 
     expect(await dueForDigest(db(), NOW)).toEqual([])
   })
 
   it('says nothing about digests when nobody has said anything', async () => {
     build()
-    const accountId = await givenAccount({ lastActive: ago(3 * DAY) })
 
-    expect(await dueForDigest(db(), NOW)).toEqual([
-      {
-        account_id: accountId,
-        email: expect.any(String),
-        choice: 'daily',
-        digest_sent_at: null,
-        last_active_at: ago(3 * DAY),
-      },
-    ])
+    expect(await dueForDigest(db(), NOW)).toEqual([])
+  })
+})
+
+describe('a card in one line', () => {
+  const entry = (kind: ThreadEntryKind, body: string, name: string | null) => ({
+    id: randomUUID(),
+    kind,
+    body,
+    author: name === null ? null : { account_id: randomUUID(), name },
+    created_at: ago(HOUR),
+    edited_at: null,
+  })
+
+  it('says the title and what was done', () => {
+    expect(
+      lineFor({ title: 'Leads – which are needed?', entries: [entry('raised', 'raised this', 'Fredrik')] }),
+    ).toBe('Leads – which are needed? — Fredrik raised this')
+  })
+
+  it('names one actor once, however many things they did', () => {
+    expect(
+      lineFor({
+        title: 'Nature of Love',
+        entries: [
+          entry('added', 'put it in the book', 'Fredrik'),
+          entry('edited', 'said whose song it is', 'Fredrik'),
+        ],
+      }),
+    ).toBe('Nature of Love — Fredrik put it in the book, said whose song it is')
+  })
+
+  it('names the next actor again', () => {
+    expect(
+      lineFor({
+        title: 'Nature of Love',
+        entries: [entry('added', 'put it in the book', 'Fredrik'), entry('renamed', 'renamed it', 'Bo')],
+      }),
+    ).toBe('Nature of Love — Fredrik put it in the book; Bo renamed it')
+  })
+
+  it('says Somebody where the account is gone', () => {
+    expect(
+      lineFor({ title: 'Planning call', entries: [entry('scheduled', 'put it in the diary', null)] }),
+    ).toBe('Planning call — Somebody put it in the diary')
+  })
+
+  it('counts comments rather than quoting them', () => {
+    expect(
+      lineFor({
+        title: 'Event description',
+        entries: [entry('comment', 'a whole paragraph nobody wants in an email', 'Fredrik')],
+      }),
+    ).toBe('Event description — +1 comment')
+  })
+
+  it('pluralises the count', () => {
+    expect(
+      lineFor({
+        title: 'Event description',
+        entries: [entry('comment', 'one', 'Ada'), entry('comment', 'two', 'Bo')],
+      }),
+    ).toBe('Event description — +2 comments')
+  })
+
+  it('puts the count after the verbs where there are both', () => {
+    expect(
+      lineFor({
+        title: 'Event description',
+        entries: [entry('raised', 'raised this', 'Fredrik'), entry('comment', 'a paragraph', 'Fredrik')],
+      }),
+    ).toBe('Event description — Fredrik raised this (+1 comment)')
+  })
+
+  it('is nothing at all where nothing happened past the cut', () => {
+    expect(lineFor({ title: 'Event description', entries: [] })).toBeUndefined()
   })
 })
 
 describe('what a digest holds', () => {
-  it('groups what is unseen by category, and makes each link absolute', async () => {
+  it('gathers the burn lines and the cards under the feed’s own headings, in its own order', async () => {
     build()
-    const accountId = await givenAccount()
-    await givenUnseen(accountId, { category: 'dream_comment', body: 'Ada commented', link: '/dreams' })
-    await givenUnseen(accountId, { category: 'point_raised', body: 'Bo raised Firewood', link: '/meetings' })
+    const burn = await givenBurn()
+    await givenActivity(burn)
+    const card = await givenPointCard(burn)
+    await givenEntry(card, { kind: 'raised', body: 'raised this' })
 
-    const sections = await unseenFor(db(), accountId, { after: null, origin: 'https://burn.example' })
+    const sections = await feedSince(db(), { after: null, origin: 'https://burn.example' })
 
-    expect(sections.map((section) => section.category)).toEqual(['dream_comment', 'point_raised'])
-    expect(sections[0]?.entries).toEqual([{ body: 'Ada commented', link: 'https://burn.example/dreams' }])
+    expect(sections.map((section) => section.label)).toEqual(['Burns', 'Points'])
+    expect(sections[0]?.entries).toEqual([
+      { body: 'Bo takes the lead of Kitchen', link: 'https://burn.example/roles' },
+    ])
+  })
+
+  it('carries a card nothing but a comment has touched', async () => {
+    build()
+    const burn = await givenBurn()
+    const who = await givenAccount()
+    const card = await givenPointCard(burn)
+    await givenEntry(card, { kind: 'raised', body: 'raised this', at: ago(9 * DAY) })
+    await givenEntry(card, { kind: 'comment', body: 'a paragraph', author: who, at: ago(HOUR) })
+
+    const sections = await feedSince(db(), { after: ago(2 * DAY), origin: undefined })
+
+    expect(sections[0]?.entries.map((one) => one.body)).toEqual(['Event description — +1 comment'])
+  })
+
+  it('counts only the comments past the cut, not the whole conversation', async () => {
+    build()
+    const burn = await givenBurn()
+    const who = await givenAccount()
+    const card = await givenPointCard(burn)
+    for (const at of [9 * DAY, 8 * DAY, HOUR, 2 * HOUR]) {
+      await givenEntry(card, { kind: 'comment', body: 'a paragraph', author: who, at: ago(at) })
+    }
+
+    const sections = await feedSince(db(), { after: ago(2 * DAY), origin: undefined })
+
+    expect(sections[0]?.entries.map((one) => one.body)).toEqual(['Event description — +2 comments'])
+  })
+
+  it('drops a card nothing has touched since the cut', async () => {
+    build()
+    const card = await givenPointCard(await givenBurn())
+    await givenEntry(card, { kind: 'raised', body: 'raised this', at: ago(9 * DAY) })
+
+    expect(await feedSince(db(), { after: ago(2 * DAY), origin: undefined })).toEqual([])
+  })
+
+  it('drops a card whose thing has been taken back', async () => {
+    build()
+    const card = await givenSongCard({ deleted: true })
+    await givenEntry(card, { kind: 'added', body: 'put it in the book' })
+
+    expect(await feedSince(db(), { after: null, origin: undefined })).toEqual([])
+  })
+
+  it('keeps the song that is still there', async () => {
+    build()
+    const card = await givenSongCard()
+    await givenEntry(card, { kind: 'added', body: 'put it in the book' })
+
+    const sections = await feedSince(db(), { after: null, origin: undefined })
+
+    expect(sections.map((section) => section.label)).toEqual(['Songs'])
   })
 
   it('leaves the link out where the installation does not know its own address', async () => {
     build()
-    const accountId = await givenAccount()
-    await givenUnseen(accountId)
+    const burn = await givenBurn()
+    await givenActivity(burn)
 
-    const sections = await unseenFor(db(), accountId, { after: null, origin: undefined })
+    const sections = await feedSince(db(), { after: null, origin: undefined })
 
     expect(sections[0]?.entries[0]?.link).toBeUndefined()
   })
 
-  it('is empty where nothing is unseen', async () => {
+  it('is empty where nothing has happened at all', async () => {
     build()
-    const accountId = await givenAccount()
 
-    expect(await unseenFor(db(), accountId, { after: null, origin: undefined })).toEqual([])
+    expect(await feedSince(db(), { after: null, origin: undefined })).toEqual([])
   })
 
-  it('is empty where everything unseen is older than the cut', async () => {
+  it('is empty where everything is older than the cut', async () => {
     build()
-    const accountId = await givenAccount()
-    await givenUnseen(accountId, { at: ago(5 * DAY) })
+    const burn = await givenBurn()
+    await givenActivity(burn, { at: ago(5 * DAY) })
 
-    expect(await unseenFor(db(), accountId, { after: ago(2 * DAY), origin: undefined })).toEqual([])
+    expect(await feedSince(db(), { after: ago(2 * DAY), origin: undefined })).toEqual([])
   })
 
-  it('carries everything after the moment it is given', async () => {
+  it('carries the whole backlog where nothing has been mailed yet', async () => {
     build()
-    const accountId = await givenAccount()
-    await givenUnseen(accountId, { body: 'while they were away', at: ago(5 * DAY) })
-    await givenUnseen(accountId, { body: 'later, still away', at: ago(HOUR) })
+    const burn = await givenBurn()
+    await givenActivity(burn, { body: 'ancient', at: ago(60 * DAY) })
+    await givenActivity(burn, { body: 'recent', at: ago(HOUR) })
 
-    const sections = await unseenFor(db(), accountId, { after: ago(6 * DAY), origin: undefined })
+    const sections = await feedSince(db(), { after: null, origin: undefined })
 
-    expect(sections[0]?.entries.map((entry) => entry.body)).toEqual([
-      'later, still away',
-      'while they were away',
-    ])
-  })
-
-  it('drops what happened before they were last here, which they saw the page for', async () => {
-    build()
-    const accountId = await givenAccount()
-    await givenUnseen(accountId, { body: 'before their last visit', at: ago(9 * DAY) })
-    await givenUnseen(accountId, { body: 'after it', at: ago(HOUR) })
-
-    const sections = await unseenFor(db(), accountId, { after: ago(6 * DAY), origin: undefined })
-
-    expect(sections[0]?.entries.map((entry) => entry.body)).toEqual(['after it'])
-  })
-
-  it('carries the whole backlog to somebody who has never had one', async () => {
-    build()
-    const accountId = await givenAccount()
-    await givenUnseen(accountId, { body: 'ancient', at: ago(60 * DAY) })
-    await givenUnseen(accountId, { body: 'recent', at: ago(HOUR) })
-
-    const sections = await unseenFor(db(), accountId, { after: null, origin: undefined })
-
-    expect(sections[0]?.entries.map((entry) => entry.body)).toEqual(['recent', 'ancient'])
-  })
-
-  it('carries a stretch longer than any window rather than dropping what nothing has mailed', async () => {
-    build()
-    const accountId = await givenAccount()
-    await givenUnseen(accountId, { body: 'an hour after they left', at: ago(6 * DAY) })
-
-    const sections = await unseenFor(db(), accountId, { after: null, origin: undefined })
-
-    expect(sections[0]?.entries.map((entry) => entry.body)).toEqual(['an hour after they left'])
-  })
-
-  it('is empty where the one unseen thing is older than the cut', async () => {
-    build()
-    const accountId = await givenAccount()
-    await givenUnseen(accountId, { body: 'old one', at: ago(5 * DAY) })
-
-    expect(await unseenFor(db(), accountId, { after: ago(3 * DAY), origin: undefined })).toEqual([])
+    expect(sections[0]?.entries.map((one) => one.body)).toEqual(['recent', 'ancient'])
   })
 
   it('caps what one section carries, and says how much it left out', async () => {
     build()
-    const accountId = await givenAccount()
+    const burn = await givenBurn()
     for (let at = 0; at < MOST_PER_SECTION + 3; at += 1) {
-      await givenUnseen(accountId, { body: `comment ${at}`, at: ago(at * HOUR) })
+      await givenActivity(burn, { body: `line ${at}`, at: ago(at * HOUR) })
     }
 
-    const [section] = await unseenFor(db(), accountId, { after: null, origin: undefined })
+    const [section] = await feedSince(db(), { after: null, origin: undefined })
 
     expect(section?.total).toBe(MOST_PER_SECTION + 3)
     expect(section?.entries).toHaveLength(MOST_PER_SECTION)
   })
 
-  it('counts what is waiting rather than what it printed, in the subject', async () => {
+  it('carries what no notification would have been written for, nobody having asked', async () => {
     build()
-    await givenMailServer()
-    const accountId = await givenAccount({ lastActive: ago(3 * DAY) })
-    for (let at = 0; at < MOST_PER_SECTION + 3; at += 1) {
-      await givenUnseen(accountId, { body: `comment ${at}`, at: ago(at * HOUR) })
-    }
-    const sent: Message[] = []
+    const card = await givenPointCard(await givenBurn())
+    await givenEntry(card, { kind: 'raised', body: 'raised this' })
 
-    await sweepDigests(
-      {
-        db: db(),
-        send: (_transport, message) => {
-          sent.push(message)
+    const sections = await feedSince(db(), { after: null, origin: undefined })
 
-          return Promise.resolve()
-        },
-        origin: 'https://burn.example',
-        log: () => undefined,
-      },
-      NOW,
-    )
-
-    expect(sent[0]?.subject).toBe(`The Burning Sage: ${MOST_PER_SECTION + 3} things you have not seen`)
-    expect(sent[0]?.text).toContain('and 3 more')
+    expect(notifiesByDefault('point_raised')).toBe(false)
+    expect(sections.map((section) => section.label)).toEqual(['Points'])
   })
 })
 
@@ -327,11 +503,17 @@ describe('the nightly sweep', () => {
     log: vi.fn<(posted: Posted, accountId: string) => void>(),
   })
 
+  const collecting = (sent: Message[]) => (_transport: unknown, message: Message) => {
+    sent.push(message)
+
+    return Promise.resolve()
+  }
+
   it('posts one, and records that it went', async () => {
     build()
     await givenMailServer()
-    const accountId = await givenAccount({ lastActive: ago(3 * DAY) })
-    await givenUnseen(accountId)
+    await givenAccount({ lastActive: ago(3 * DAY) })
+    await givenActivity(await givenBurn())
     const send = vi.fn(() => Promise.resolve())
 
     expect(await sweepDigests(deps(send), NOW)).toBe(1)
@@ -344,24 +526,13 @@ describe('the nightly sweep', () => {
   it('cuts at the last digest where that is later than the last visit', async () => {
     build()
     await givenMailServer()
-    const accountId = await givenAccount({ lastActive: ago(10 * DAY), digestSent: ago(2 * DAY) })
-    await givenUnseen(accountId, { body: 'already sent to them', at: ago(5 * DAY) })
-    await givenUnseen(accountId, { body: 'since that digest', at: ago(HOUR) })
+    await givenAccount({ lastActive: ago(10 * DAY), digestSent: ago(2 * DAY) })
+    const burn = await givenBurn()
+    await givenActivity(burn, { body: 'already sent to them', at: ago(5 * DAY) })
+    await givenActivity(burn, { body: 'since that digest', at: ago(HOUR) })
     const sent: Message[] = []
 
-    await sweepDigests(
-      {
-        db: db(),
-        send: (_transport, message) => {
-          sent.push(message)
-
-          return Promise.resolve()
-        },
-        origin: 'https://burn.example',
-        log: () => undefined,
-      },
-      NOW,
-    )
+    await sweepDigests(deps(collecting(sent)), NOW)
 
     expect(sent[0]?.text).toContain('since that digest')
     expect(sent[0]?.text).not.toContain('already sent to them')
@@ -370,24 +541,13 @@ describe('the nightly sweep', () => {
   it('cuts at the last visit where that is later than the last digest', async () => {
     build()
     await givenMailServer()
-    const accountId = await givenAccount({ lastActive: ago(5 * DAY), digestSent: ago(10 * DAY) })
-    await givenUnseen(accountId, { body: 'before they came back', at: ago(7 * DAY) })
-    await givenUnseen(accountId, { body: 'after they left again', at: ago(HOUR) })
+    await givenAccount({ lastActive: ago(5 * DAY), digestSent: ago(10 * DAY) })
+    const burn = await givenBurn()
+    await givenActivity(burn, { body: 'before they came back', at: ago(7 * DAY) })
+    await givenActivity(burn, { body: 'after they left again', at: ago(HOUR) })
     const sent: Message[] = []
 
-    await sweepDigests(
-      {
-        db: db(),
-        send: (_transport, message) => {
-          sent.push(message)
-
-          return Promise.resolve()
-        },
-        origin: 'https://burn.example',
-        log: () => undefined,
-      },
-      NOW,
-    )
+    await sweepDigests(deps(collecting(sent)), NOW)
 
     expect(sent[0]?.text).toContain('after they left again')
     expect(sent[0]?.text).not.toContain('before they came back')
@@ -396,38 +556,26 @@ describe('the nightly sweep', () => {
   it('cuts at the last visit where nobody has had a digest yet', async () => {
     build()
     await givenMailServer()
-    const accountId = await givenAccount({ lastActive: ago(10 * DAY) })
-    await givenUnseen(accountId, { body: 'while they were gone', at: ago(5 * DAY) })
+    await givenAccount({ lastActive: ago(10 * DAY) })
+    await givenActivity(await givenBurn(), { body: 'while they were gone', at: ago(5 * DAY) })
     const sent: Message[] = []
 
-    await sweepDigests(
-      {
-        db: db(),
-        send: (_transport, message) => {
-          sent.push(message)
-
-          return Promise.resolve()
-        },
-        origin: 'https://burn.example',
-        log: () => undefined,
-      },
-      NOW,
-    )
+    await sweepDigests(deps(collecting(sent)), NOW)
 
     expect(sent[0]?.text).toContain('while they were gone')
   })
 
   it('sends nothing where no mail server has been set up', async () => {
     build()
-    const accountId = await givenAccount({ lastActive: ago(3 * DAY) })
-    await givenUnseen(accountId)
+    await givenAccount({ lastActive: ago(3 * DAY) })
+    await givenActivity(await givenBurn())
     const send = vi.fn(() => Promise.resolve())
 
     expect(await sweepDigests(deps(send), NOW)).toBe(0)
     expect(send).not.toHaveBeenCalled()
   })
 
-  it('sends nothing to somebody with nothing unseen', async () => {
+  it('sends nothing where nothing has happened', async () => {
     build()
     await givenMailServer()
     await givenAccount({ lastActive: ago(3 * DAY) })
@@ -441,7 +589,7 @@ describe('the nightly sweep', () => {
     build()
     await givenMailServer()
     const accountId = await givenAccount({ lastActive: ago(3 * DAY) })
-    await givenUnseen(accountId)
+    await givenActivity(await givenBurn())
     const failing = deps(() => Promise.reject(new Error('550 nope')))
 
     expect(await sweepDigests(failing, NOW)).toBe(0)
@@ -451,25 +599,46 @@ describe('the nightly sweep', () => {
     expect(failing.log).toHaveBeenCalledWith({ sent: false, reason: '550 nope' }, accountId)
   })
 
-  it('says how many things are waiting, in the subject', async () => {
+  it('says how many things happened, in the subject', async () => {
     build()
     await givenMailServer()
-    const accountId = await givenAccount({ lastActive: ago(3 * DAY) })
-    await givenUnseen(accountId, { body: 'one' })
-    await givenUnseen(accountId, { body: 'two' })
+    await givenAccount({ lastActive: ago(3 * DAY) })
+    const burn = await givenBurn()
+    await givenActivity(burn, { body: 'one' })
+    await givenActivity(burn, { body: 'two', at: ago(3 * HOUR) })
     const sent: Message[] = []
 
-    await sweepDigests(
-      deps((_transport, message) => {
-        sent.push(message)
+    await sweepDigests(deps(collecting(sent)), NOW)
 
-        return Promise.resolve()
-      }),
-      NOW,
-    )
+    expect(sent[0]?.subject).toBe('The Burning Sage: 2 things while you were away')
+    expect(sent[0]?.text).toContain('https://burn.example/roles')
+  })
 
-    expect(sent[0]?.subject).toBe('The Burning Sage: 2 things you have not seen')
-    expect(sent[0]?.text).toContain('https://burn.example/dreams')
+  it('counts what is waiting rather than what it printed, in the subject', async () => {
+    build()
+    await givenMailServer()
+    await givenAccount({ lastActive: ago(3 * DAY) })
+    const burn = await givenBurn()
+    for (let at = 0; at < MOST_PER_SECTION + 3; at += 1) {
+      await givenActivity(burn, { body: `line ${at}`, at: ago(at * HOUR) })
+    }
+    const sent: Message[] = []
+
+    await sweepDigests(deps(collecting(sent)), NOW)
+
+    expect(sent[0]?.subject).toBe(`The Burning Sage: ${MOST_PER_SECTION + 3} things while you were away`)
+    expect(sent[0]?.text).toContain('and 3 more')
+  })
+
+  it('sends nothing to somebody nobody has approved', async () => {
+    build()
+    await givenMailServer()
+    await givenAccount({ lastActive: ago(3 * DAY), approved: false })
+    await givenActivity(await givenBurn())
+    const send = vi.fn(() => Promise.resolve())
+
+    expect(await sweepDigests(deps(send), NOW)).toBe(0)
+    expect(send).not.toHaveBeenCalled()
   })
 })
 
