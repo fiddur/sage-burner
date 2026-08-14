@@ -625,7 +625,8 @@ a:hover {
   display: flex;
 }
 
-/* The strip only reads as one inside the bordered box; over a comment box it is four buttons. */
+/* The strip only reads as one inside the bordered box; over a comment box it is a bare row of
+   controls. */
 .md-field > .syntax-row {
   border-bottom: 1px solid var(--line);
   background: color-mix(in srgb, var(--ink) 4%, transparent);
@@ -698,10 +699,16 @@ a:hover {
 }
 
 /* Only a `<label>` opens a file picker, so the one control in this row that is not a button
-   is this — and a disabled input inside a label greys nothing on its own (#622). */
+   is this — and a disabled input inside a label greys nothing on its own (#622). The ring is
+   on the label because the thing that takes focus is the input, which is hidden. */
 .add-picture:has(:disabled) {
   opacity: 0.5;
   cursor: default;
+}
+
+.add-picture:focus-within {
+  outline: 2px solid var(--ember);
+  outline-offset: -2px;
 }
 
 /* Was a class hook with no rules, so "Apply to join" and "Log in" touched. */
@@ -801,12 +808,6 @@ a:hover {
   height: 1.1em;
   flex: none;
   vertical-align: -0.2em;
-}
-
-/* Given rather than merely offered: filled, and in the app's own colour. */
-.icon.is-given {
-  fill: currentColor;
-  color: var(--ember);
 }
 
 /* A control, not a link — it performs an action rather than navigating —

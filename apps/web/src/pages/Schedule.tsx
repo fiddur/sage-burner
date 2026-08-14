@@ -487,7 +487,7 @@ const Support = ({
       onSupport(dream.id, !dream.supported_by_me)
     }}
   >
-    <Icon name="heart" class={dream.supported_by_me ? 'is-given' : undefined} />
+    <span aria-hidden="true">{dream.supported_by_me ? '❤️‍🔥' : '♡'}</span>
     {dream.support_count > 0 && <span class="dream-heart-count">{dream.support_count}</span>}
   </button>
 )

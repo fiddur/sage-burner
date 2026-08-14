@@ -316,16 +316,14 @@ Three rules the pages follow, all of them things a phone found first:
 emoji — 🎵 Songbook, 🛻 Rideshares, 🍽️ Meals — and so do the marks on the feed's activity
 lines and the before/during/after phases on Leads. Those say _what this is_, and a grey
 outline pan is worse than 🍳. Every control went the other way: a pencil, a trashcan, a
-bell, a heart, a hand, one weight and one colour. A row may hold both — a page's own mark
-beside the arrow saying it opens elsewhere — but two _controls_ in one row are never one of
-each.
+bell, a hand, one weight and one colour. A row may hold both — a page's own mark beside the
+arrow saying it opens elsewhere — but two _controls_ in one row are never one of each.
 
-Nothing ships that nothing draws, and `Icon.test.tsx` says so rather than a number here
-saying it — a count in prose goes stale the first time somebody adds a glyph, which it did
-within a day. They are
-[Lucide](https://lucide.dev)'s, pasted as path data into `Icon.tsx` exactly as #492 pasted
-Simple Icons' brand marks into `MusicIcon.tsx`, with the ISC notice in
-[THIRD-PARTY.md](../THIRD-PARTY.md). No dependency: a package would bring six hundred
+The drawings are [Lucide](https://lucide.dev)'s, pasted as path data into `Icon.tsx` exactly
+as #492 pasted Simple Icons' brand marks into `MusicIcon.tsx`, with the ISC notice in
+[THIRD-PARTY.md](../THIRD-PARTY.md). **Nothing ships that nothing draws, and `Icon.test.tsx`
+is what says so** — that is an invariant, so it is a test rather than a count in this
+paragraph. No dependency: a package would bring six hundred
 icons and a tree-shaking argument to have with Rollup, and the reason `packages/shared`
 sets `sideEffects: false` is that this app has already lost that argument once.
 
@@ -340,6 +338,13 @@ unseen notifications turn it `--ember` instead.
 the emoji and is why six assertions in eighteen hundred had to change — a control is found by
 what it does. Where a test does need to know which face is showing, the homepage's pencil
 wearing an hourglass while a re-read is in flight, the `<svg>` carries `data-icon`.
+
+**The heart is the exception, and it is the rule underneath speaking** (#626). ♡ and ❤️‍🔥
+went grey with everything else and came back, because a heart is the one control that is also
+a feeling: every other one in the sweep is a verb somebody performs, and ❤️‍🔥 is what somebody
+left behind. Colour names what a thing is, so a control that records a feeling keeps the
+feeling's colour. `heart` is out of `ICONS` rather than kept against a future use — the sweep
+above would fail, which is the sweep doing its job.
 
 **♭** and **♯** stayed as they were. They transpose a song; they are text, not icons, and
 nothing in a line-icon set says what a flat says.

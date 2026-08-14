@@ -34,7 +34,10 @@ const namesDrawnIn = (source: string): Set<string> => {
   }
 
   for (const tag of source.match(/<Icon\b[^>]*>/gsu) ?? []) {
-    for (const quoted of tag.matchAll(/['"]([a-z][a-z-]*)['"]/gu)) add(quoted[1])
+    for (const named of tag.matchAll(/\bname\s*=\s*\{?[^'"{}]*['"]([a-z][a-z-]*)['"]/gu)) add(named[1])
+    for (const ternary of tag.matchAll(/\bname\s*=\s*\{([^}]*)\}/gu)) {
+      for (const quoted of (ternary[1] ?? '').matchAll(/['"]([a-z][a-z-]*)['"]/gu)) add(quoted[1])
+    }
   }
   for (const named of source.matchAll(/\b(?:busyIcon|icon)\s*[=:]\s*['"]([a-z][a-z-]*)['"]/gu)) {
     add(named[1])
@@ -58,15 +61,15 @@ describe('an icon', () => {
   })
 
   it('takes its colour from whatever it sits in', () => {
-    const { container } = render(<Icon name="heart" />)
+    const { container } = render(<Icon name="link" />)
 
     expect(drawn(container)?.getAttribute('stroke')).toBe('currentColor')
   })
 
   it('keeps its own class when given another', () => {
-    const { container } = render(<Icon name="heart" class="is-given" />)
+    const { container } = render(<Icon name="link" class="is-away" />)
 
-    expect(drawn(container)?.getAttribute('class')).toBe('icon is-given')
+    expect(drawn(container)?.getAttribute('class')).toBe('icon is-away')
   })
 })
 
@@ -90,5 +93,6 @@ describe('the set', () => {
     expect([...namesDrawnIn(thread)]).toContain('edit')
     expect([...namesDrawnIn('<Icon name="edit" />')]).toEqual(['edit'])
     expect([...namesDrawnIn('nothing here')]).toEqual([])
+    expect([...namesDrawnIn('<Icon name="link" class="close" />')]).toEqual(['link'])
   })
 })
