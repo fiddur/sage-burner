@@ -134,11 +134,11 @@ a:hover {
 }
 
 /* `margin-inline-start: auto` rather than `space-between` on the bar: the bar's
-   children come and go — ☰ only for a member, the selector only for a second burn —
+   children come and go — the menu button only for a member, the selector only for a second
    and `space-between` moves every one of them when another appears. Pinning the nav
    to the end is the only arrangement that holds for all four combinations.
 
-   By class, not `.site-header nav`: ☰'s drawer is a `nav` and lands inside the header
+   By class, not `.site-header nav`: the menu's drawer is a `nav` and lands inside the header
    too, where a descendant selector would beat `.menu-drawer` on specificity and lay a
    row of column entries out centred, wrapped and gapped. */
 .top-nav {
@@ -151,7 +151,7 @@ a:hover {
   font-size: 0.95rem;
 }
 
-/* 🔔, ⚙️ and the face, as one thing. The nav's words wrap when they must; these
+/* The bell, the gear and the face, as one thing. The nav's words wrap when they must; these
    three are the session rather than a page, they are where a hand goes without
    looking, and one of them arriving on a row of its own is what this stops. */
 .nav-session {
@@ -173,7 +173,7 @@ a:hover {
 /*
   The phone's bar, on one row.
 
-  Here the pages are in the bottom bar, so the bar is ☰, the logo, the burn selector
+  Here the pages are in the bottom bar, so the bar is the menu button, the logo, the selector
   and the corner — and wrapping had nothing to drop but the corner, which went under
   the logo with the whole right half of the row left empty. Nothing may wrap, and the
   installation's name gives way instead: it is the one thing in the row that is a
@@ -319,7 +319,7 @@ a:hover {
   max-width: var(--measure);
 }
 
-/* ☰ and what it slides out. Over the page rather than pushing it aside —
+/* The menu button and what it slides out. Over the page rather than pushing it aside —
    `docs/the-app.md` says why that is not a taste question. */
 .menu-wrap {
   display: inline-flex;
@@ -787,6 +787,23 @@ a:hover {
   padding: 0.75rem;
   border: 1px solid color-mix(in srgb, var(--sage) 30%, transparent);
   border-radius: var(--radius);
+}
+
+/* Sized in `em`, so wherever one lands its own font-size decides how big it is, and
+   `currentColor` so a control's colour and its `:hover` reach the drawing with no
+   second rule. The dip is what puts it on the text's optical centre rather than its
+   baseline. */
+.icon {
+  width: 1.1em;
+  height: 1.1em;
+  flex: none;
+  vertical-align: -0.2em;
+}
+
+/* Given rather than merely offered: filled, and in the app's own colour. */
+.icon.is-given {
+  fill: currentColor;
+  color: var(--ember);
 }
 
 /* A control, not a link — it performs an action rather than navigating —
@@ -1292,7 +1309,7 @@ a.person-badge:focus-visible span:last-child {
   opacity: 0.75;
 }
 
-/* The ↻: this one stays in the pool when it is placed, and a copy goes in the grid. */
+/* The repeat mark: this one stays in the pool when it is placed, and a copy goes in the grid. */
 .dream-repeats {
   margin-inline-start: 0.3rem;
   opacity: 0.7;
@@ -1355,7 +1372,7 @@ a.person-badge:focus-visible span:last-child {
 /*
   Over the timetable rather than beside it — the grid is as wide as the screen — and
   above the bottom bar, which is the whole of why this is 40 (#344). The scale:
-  bar 20, popdown 30, ☰'s backdrop 34 and its drawer 35, modal 40. `docs/the-app.md`
+  bar 20, popdown 30, the menu's backdrop 34 and its drawer 35, modal 40. `docs/the-app.md`
   says what happened when two of them shared a number.
 */
 .dream-modal {
@@ -1678,6 +1695,9 @@ a.person-badge:focus-visible span:last-child {
    it sits under a sentence rather than in a row of controls. Dashed until it is on, so
    the row itself says what is being filtered. */
 .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
   border: 1px dashed var(--line);
   border-radius: 1rem;
   background: none;
@@ -2461,7 +2481,7 @@ img.avatar {
   }
 }
 
-/* The faces of whoever gave something a ❤️‍🔥. Overlapped, like every stack of avatars. */
+/* The faces of whoever gave something a heart. Overlapped, like every stack of avatars. */
 .faces {
   display: inline-flex;
   flex-wrap: wrap;
@@ -2500,25 +2520,24 @@ img.avatar {
 }
 
 /* A link to `/notifications` rather than a button (#336), so it wears none of a
-   link's clothes: an underline under an emoji reads as a mistake. */
+   link's clothes: an underline under an icon reads as a mistake. */
 .bell {
   position: relative;
   display: inline-flex;
   padding: 0.2rem 0.3rem;
   border: 0;
   background: none;
-  color: inherit;
+  color: var(--muted);
   font-size: 1.1rem;
   line-height: 1;
   text-decoration: none;
   cursor: pointer;
-  /* Grey until something has happened, which is the whole signal. */
-  filter: grayscale(1);
-  opacity: 0.55;
+  /* Quiet until something has happened, which is the whole signal. */
+  opacity: 0.7;
 }
 
 .bell.has-unseen {
-  filter: none;
+  color: var(--ember);
   opacity: 1;
 }
 

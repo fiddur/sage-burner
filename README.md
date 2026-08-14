@@ -13,7 +13,8 @@ to.
 Self-hosted, single container, single SQLite file. No external services
 required.
 
-**License:** AGPL-3.0-or-later.
+**License:** AGPL-3.0-or-later. The icon artwork pasted into the source carries its
+own notices — see [THIRD-PARTY.md](./THIRD-PARTY.md).
 
 ## Status
 

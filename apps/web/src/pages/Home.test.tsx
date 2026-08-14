@@ -385,7 +385,7 @@ describe('Home', () => {
       fireEvent.click(await screen.findByRole('button', { name: 'Edit this text' }))
 
       const opening = await screen.findByRole('button', { name: 'Edit this text' })
-      await waitFor(() => expect(opening.textContent).toBe('⌛'))
+      await waitFor(() => expect(opening.querySelector('[data-icon="waiting"]')).not.toBeNull())
       expect(opening.hasAttribute('disabled')).toBe(true)
 
       release({ event: summer })

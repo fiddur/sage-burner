@@ -177,7 +177,7 @@ export const Songs = ({ api }: { api: SongsApi }) => {
               <li key={one.id} class="song-row is-gone">
                 <a href={songPage(one.id)}>{one.title}</a>
                 <IconButton
-                  icon="↩️"
+                  icon="restore"
                   label={`Put ${one.title} back in the book`}
                   disabled={busy}
                   onClick={() => run(() => api.restoreSong(one.id), 'Could not put that back.')}

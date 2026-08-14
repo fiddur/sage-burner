@@ -321,13 +321,13 @@ const Row = ({
 
       <p class="bring-actions">
         <IconButton
-          icon="💬"
+          icon="comment"
           label={`${opened ? 'Hide' : 'Show'} what has been said about ${item.title}`}
           disabled={busy}
           onClick={onOpen}
         />
         {mine && (
-          <IconButton icon="✏️" label={`Edit ${item.title}`} disabled={busy} onClick={() => onEdit(true)} />
+          <IconButton icon="edit" label={`Edit ${item.title}`} disabled={busy} onClick={() => onEdit(true)} />
         )}
         {(mine || admin) && <Destroy what={item.title} verb="Take off" busy={busy} onDestroy={onWithdraw} />}
       </p>

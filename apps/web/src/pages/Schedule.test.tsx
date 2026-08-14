@@ -433,7 +433,9 @@ describe('Schedule', () => {
     )
 
     const pool = await screen.findByRole('complementary')
-    const marked = [...pool.querySelectorAll('.dream-chip')].filter((chip) => chip.textContent?.includes('↻'))
+    const marked = [...pool.querySelectorAll('.dream-chip')].filter(
+      (chip) => chip.querySelector('[data-icon="repeats"]') !== null,
+    )
 
     expect(marked).toHaveLength(1)
     expect(marked[0]?.textContent).toContain('Check in')

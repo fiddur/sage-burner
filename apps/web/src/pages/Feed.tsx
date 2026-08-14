@@ -27,6 +27,7 @@ import { DreamThread } from '../components/DreamThread.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
 import { GuardedPage } from '../components/GuardedPage.tsx'
 import { Heart } from '../components/Heart.tsx'
+import { Icon } from '../components/Icon.tsx'
 import { MarkdownField } from '../components/MarkdownField.tsx'
 import { Refreshing } from '../components/Refreshing.tsx'
 import { localDay } from '../datetime.ts'
@@ -591,6 +592,6 @@ const Chip = ({
     onClick={onToggle}
   >
     {notificationCategoryInfo[category].label}
-    {on && ' 🔔'}
+    {on && <Icon name="bell" />}
   </button>
 )

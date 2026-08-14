@@ -12,6 +12,7 @@ import { useLoad } from '../load.ts'
 import { isAdmin, isApproved, useViewer } from '../viewer.tsx'
 import { useHidingBar, usePhone } from '../viewport.ts'
 import { Avatar } from './Avatar.tsx'
+import { Icon } from './Icon.tsx'
 import { Menu } from './Menu.tsx'
 import { NotificationBell } from './NotificationBell.tsx'
 
@@ -125,7 +126,7 @@ const TopNav = ({ api, pages }: { api: BellApi; pages: readonly NavPage[] }) => 
 
           {isAdmin(viewer) && (
             <a class="nav-icon" href="/admin" aria-label="Organise" title="Organise">
-              ⚙️
+              <Icon name="organise" />
             </a>
           )}
 

@@ -1,3 +1,5 @@
+import { Icon } from './Icon.tsx'
+
 export const Heart = ({
   what,
   hearted,
@@ -22,7 +24,7 @@ export const Heart = ({
       onHeart(!hearted)
     }}
   >
-    <span aria-hidden="true">{hearted ? '❤️‍🔥' : '♡'}</span>
+    <Icon name="heart" class={hearted ? 'is-given' : undefined} />
     {count > 0 && <span class="dream-heart-count">{count}</span>}
   </button>
 )

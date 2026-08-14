@@ -7,6 +7,7 @@ import { isAdmin, useViewer } from '../viewer.tsx'
 import { CopyButton } from './CopyButton.tsx'
 import { ErrorText } from './ErrorText.tsx'
 import { FormError } from './FormError.tsx'
+import { Icon } from './Icon.tsx'
 
 export type CalendarFeedApi = Pick<ApiClient, 'getCalendarToken' | 'rotateCalendarToken'>
 
@@ -31,7 +32,7 @@ export const CalendarFeed = ({ api, eventId }: { api: CalendarFeedApi; eventId: 
           href={subscribe}
           title="Opens in your calendar app and subscribes — it keeps itself up to date. Anyone holding the link can read the schedule, so keep it inside the gathering."
         >
-          📅 Add to calendar
+          <Icon name="calendar" /> Add to calendar
         </a>{' '}
         <CopyButton value={url} label="Copy link" />
         {isAdmin(viewer) && (

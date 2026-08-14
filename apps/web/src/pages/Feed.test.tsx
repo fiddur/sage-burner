@@ -453,9 +453,9 @@ describe('the heart on a card', () => {
   it('says no number where nobody has given one', async () => {
     renderPage(stub({}, [], [aCard({ id: 'c-1', title: 'Sauna at dawn' })]))
 
-    expect((await screen.findByRole('button', { name: 'Give a heart to Sauna at dawn' })).textContent).toBe(
-      '♡',
-    )
+    const heart = await screen.findByRole('button', { name: 'Give a heart to Sauna at dawn' })
+
+    expect(heart.textContent).toBe('')
   })
 })
 
@@ -901,7 +901,9 @@ describe('what everyone has been doing', () => {
       BOSS,
     )
 
-    expect((await screen.findByRole('button', { name: 'Take back Sunday' })).textContent).toBe('🗑️')
+    const back = await screen.findByRole('button', { name: 'Take back Sunday' })
+
+    expect(back.querySelector('[data-icon="destroy"]')).not.toBeNull()
     expect(screen.queryByRole('button', { name: 'Reword it' })).toBeNull()
   })
 

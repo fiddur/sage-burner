@@ -61,8 +61,8 @@ export const MapField = ({ api }: { api: MapApi }) => {
       </label>
 
       <p class="form-note">
-        A link to whatever map of the site you already keep — everybody signed in gets it in the ☰ menu, and
-        it opens where it lives. Leave it empty and the entry is not there at all.
+        A link to whatever map of the site you already keep — everybody signed in gets it in the menu, and it
+        opens where it lives. Leave it empty and the entry is not there at all.
       </p>
 
       {!linkable && (

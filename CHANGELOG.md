@@ -7,6 +7,16 @@ There are no version numbers: every merge to `develop` builds an image and the s
 picks it up within a few minutes, so a date can hold several deploys. Add your line
 under today's heading, and make a new heading when there is none.
 
+# 2026-08-14
+
+- **The buttons are drawings now, not emoji.** The pencil, the trashcan, the bell, the heart, the
+  raised hand, the menu — every control the app offers is one set of grey line icons, drawn the same
+  weight and the same size wherever it appears, instead of whatever your phone or laptop happened to
+  make of an emoji. The pages keep their emoji: the bar at the bottom, the drawer, the marks on the
+  feed. Colour is what a thing is; grey is what you can press.
+- **The bell says more.** It used to grey out with nothing unseen; now it goes the app's own orange
+  when something is waiting for you.
+
 # 2026-08-13
 
 - **A meeting put in the diary before meetings had cards has one now.** Anything scheduled on the

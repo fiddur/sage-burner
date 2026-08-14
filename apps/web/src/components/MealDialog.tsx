@@ -5,6 +5,7 @@ import { useState } from 'preact/hooks'
 
 import { DreamPanel } from './DreamPanel.tsx'
 import { HelperStrip } from './HelperStrip.tsx'
+import { Icon } from './Icon.tsx'
 
 type Person = EventAttendeesResponse['attendees'][number]
 
@@ -75,7 +76,7 @@ export const MealDialog = ({
             aria-label={`Rename ${meal.label}`}
             onClick={() => setRenaming(true)}
           >
-            ✏️ Rename
+            <Icon name="edit" /> Rename
           </button>
           <span class="form-note">Drag it in the grid to move it.</span>
         </p>

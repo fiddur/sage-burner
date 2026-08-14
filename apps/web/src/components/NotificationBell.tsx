@@ -8,6 +8,7 @@ import type { ApiClient } from '../api/client.ts'
 import { markFavicon } from '../favicon.ts'
 import { useShown } from '../shown.tsx'
 import { usePhone } from '../viewport.ts'
+import { Icon } from './Icon.tsx'
 import { NotificationList } from './NotificationList.tsx'
 
 export type BellApi = Pick<ApiClient, 'getMyNotifications' | 'markNotificationsSeen'>
@@ -118,7 +119,7 @@ export const NotificationBell = ({ api }: { api: BellApi }) => {
         aria-label={unseen === 0 ? 'Notifications' : `Notifications, ${unseen} new`}
         onClick={follow}
       >
-        <span aria-hidden="true">🔔</span>
+        <Icon name="bell" />
         {unseen > 0 && (
           <span class="bell-count" aria-hidden="true">
             {unseen}

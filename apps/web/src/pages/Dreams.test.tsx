@@ -389,8 +389,8 @@ describe('Dreams', () => {
       ]),
     )
 
-    const marked = [...(await screen.findAllByRole('listitem'))].filter((row) =>
-      row.textContent?.includes('↻'),
+    const marked = [...(await screen.findAllByRole('listitem'))].filter(
+      (row) => row.querySelector('[data-icon="repeats"]') !== null,
     )
 
     expect(marked).toHaveLength(1)

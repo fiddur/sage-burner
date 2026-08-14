@@ -13,6 +13,7 @@ import { useSelectedBurn } from '../burn.tsx'
 import { Avatar } from '../components/Avatar.tsx'
 import { CalendarFeed } from '../components/CalendarFeed.tsx'
 import { ErrorText } from '../components/ErrorText.tsx'
+import { Icon } from '../components/Icon.tsx'
 import { MealDialog } from '../components/MealDialog.tsx'
 import { NoBurn } from '../components/NoBurn.tsx'
 import { NotForYou } from '../components/NotForYou.tsx'
@@ -417,7 +418,7 @@ const Chip = ({
         {dream.title}
         {dream.repeatable && (
           <span class="dream-repeats">
-            <span aria-hidden="true">↻</span>
+            <Icon name="repeats" />
             <span class="visually-hidden">Can be planned more than once</span>
           </span>
         )}
@@ -459,7 +460,7 @@ const Chip = ({
             onResize(dream, by)
           }}
         >
-          <span aria-hidden="true">⇕</span>
+          <Icon name="resize" />
         </button>
       )}
     </span>
@@ -486,7 +487,7 @@ const Support = ({
       onSupport(dream.id, !dream.supported_by_me)
     }}
   >
-    <span aria-hidden="true">{dream.supported_by_me ? '❤️‍🔥' : '♡'}</span>
+    <Icon name="heart" class={dream.supported_by_me ? 'is-given' : undefined} />
     {dream.support_count > 0 && <span class="dream-heart-count">{dream.support_count}</span>}
   </button>
 )
@@ -562,8 +563,8 @@ const Pool = ({
     ))}
 
     <p class="form-note">
-      Drag one into the grid to place it, or click an empty hour to offer something there. A ↻ dream stays
-      here when you place it, so the same one can go into several mornings. The whole list is on{' '}
+      Drag one into the grid to place it, or click an empty hour to offer something there. A repeatable dream
+      stays here when you place it, so the same one can go into several mornings. The whole list is on{' '}
       <a href="/dreams">Dreams</a>.
     </p>
   </aside>

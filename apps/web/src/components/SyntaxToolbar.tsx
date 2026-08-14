@@ -3,8 +3,10 @@ import type { Ref } from 'preact'
 import { useEffect, useRef, useState } from 'preact/hooks'
 
 import type { Span, SyntaxKind } from '../syntax.ts'
+import type { IconName } from './Icon.tsx'
 
 import { written } from '../syntax.ts'
+import { Icon } from './Icon.tsx'
 
 export interface Syntax {
   ref: Ref<HTMLTextAreaElement>
@@ -63,11 +65,13 @@ export const useSyntax = ({
   }
 }
 
-const BUTTONS: readonly { kind: SyntaxKind; label: string; face: string; class: string }[] = [
-  { kind: 'bold', label: 'Bold', face: 'B', class: 'syntax-button is-bold' },
-  { kind: 'italic', label: 'Italic', face: 'I', class: 'syntax-button is-italic' },
-  { kind: 'link', label: 'Link', face: '🔗', class: 'syntax-button' },
-  { kind: 'list', label: 'List', face: '☰', class: 'syntax-button' },
+type Face = { letter: string } | { icon: IconName }
+
+const BUTTONS: readonly { kind: SyntaxKind; label: string; face: Face; class: string }[] = [
+  { kind: 'bold', label: 'Bold', face: { letter: 'B' }, class: 'syntax-button is-bold' },
+  { kind: 'italic', label: 'Italic', face: { letter: 'I' }, class: 'syntax-button is-italic' },
+  { kind: 'link', label: 'Link', face: { icon: 'link' }, class: 'syntax-button' },
+  { kind: 'list', label: 'List', face: { icon: 'bullets' }, class: 'syntax-button' },
 ]
 
 export const SyntaxToolbar = ({ syntax, subject }: { syntax: Syntax; subject: string }) => (
@@ -81,7 +85,7 @@ export const SyntaxToolbar = ({ syntax, subject }: { syntax: Syntax; subject: st
         title={button.label}
         onClick={() => syntax.apply(button.kind)}
       >
-        {button.face}
+        {'letter' in button.face ? button.face.letter : <Icon name={button.face.icon} />}
       </button>
     ))}
   </div>

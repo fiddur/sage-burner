@@ -1,5 +1,9 @@
 import type { JSX } from 'preact'
 
+import type { IconName } from './Icon.tsx'
+
+import { Icon } from './Icon.tsx'
+
 export const IconButton = ({
   icon,
   busyIcon,
@@ -8,8 +12,8 @@ export const IconButton = ({
   disabled,
   ...rest
 }: {
-  icon: string
-  busyIcon?: string
+  icon: IconName
+  busyIcon?: IconName
   busy?: boolean
   label: string
 } & Omit<JSX.IntrinsicElements['button'], 'children'>) => (
@@ -21,6 +25,6 @@ export const IconButton = ({
     disabled={busy || disabled === true}
     {...rest}
   >
-    {busy ? (busyIcon ?? icon) : icon}
+    <Icon name={busy ? (busyIcon ?? icon) : icon} />
   </button>
 )

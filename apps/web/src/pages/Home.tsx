@@ -106,8 +106,8 @@ export const Home = ({ api }: { api: HomeApi }) => {
               {isApproved(viewer) && (
                 <IconButton
                   busy={opening}
-                  icon="✏️"
-                  busyIcon="⌛"
+                  icon="edit"
+                  busyIcon="waiting"
                   label="Edit this text"
                   onClick={() => void openEditor(openEvent.welcome_markdown)}
                 />

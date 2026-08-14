@@ -184,7 +184,7 @@ export const DreamThread = ({
                   <p class="thread-mine">
                     {entry.author?.account_id === viewerId && (
                       <IconButton
-                        icon="✏️"
+                        icon="edit"
                         label="Rewrite what you said"
                         disabled={busy}
                         onClick={() => setEditing({ id: entry.id, body: entry.body })}
