@@ -304,8 +304,6 @@ describe('the digest preview', () => {
   }
 
   it('shows what an admin has already seen, or it would be empty every time', async () => {
-    // An admin who uses the app has read everything, so honouring `seen_at` here would make
-    // the button answer "nothing to show" on almost every press.
     const server = await build()
     const cookie = await givenAccount(['admin'], 'admin@example.org')
     await write(server, cookie, SETTINGS)
@@ -344,7 +342,6 @@ describe('the digest preview', () => {
   })
 
   it('does not spend the real digest', async () => {
-    // A preview that writes `digest_sent_at` costs somebody the thing being checked.
     const server = await build()
     const cookie = await givenAccount(['admin'], 'admin@example.org')
     await write(server, cookie, SETTINGS)

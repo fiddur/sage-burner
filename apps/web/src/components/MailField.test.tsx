@@ -196,7 +196,6 @@ describe('the digest preview', () => {
   })
 
   it('is not offered where no mail server has been set up', async () => {
-    // The rule the whole column follows: a control that cannot do anything reads as a promise.
     render(<MailField api={stub()} />)
 
     await screen.findByRole('button', { name: 'Save' })

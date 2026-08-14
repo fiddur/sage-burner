@@ -33,8 +33,8 @@ export interface DigestCandidate {
   account_id: string
   email: string
   choice: Repeating
-  since: string | null
-  lastActive: string | null
+  digest_sent_at: string | null
+  last_active_at: string | null
 }
 
 export interface DigestSection {
@@ -79,8 +79,8 @@ export const dueForDigest = async (db: Database, at: Date): Promise<DigestCandid
         account_id: row.id,
         email: row.email,
         choice,
-        since: row.digest_sent_at,
-        lastActive: row.last_active_at,
+        digest_sent_at: row.digest_sent_at,
+        last_active_at: row.last_active_at,
       },
     ]
   })
@@ -89,7 +89,7 @@ export const dueForDigest = async (db: Database, at: Date): Promise<DigestCandid
 export const unseenFor = async (
   db: Database,
   accountId: string,
-  { after, since, origin }: { after: string | null; since: string | null; origin: string | undefined },
+  { after, origin }: { after: string | null; origin: string | undefined },
 ): Promise<DigestSection[]> => {
   const rows = await db
     .select({
@@ -101,8 +101,6 @@ export const unseenFor = async (
     .from(notification)
     .where(and(eq(notification.account_id, accountId), isNull(notification.seen_at)))
     .orderBy(desc(notification.created_at), desc(notification.id))
-
-  if (since !== null && !rows.some((row) => row.created_at > since)) return []
 
   const within = after === null ? rows : rows.filter((row) => row.created_at > after)
 
@@ -143,8 +141,7 @@ export const sweepDigests = async (deps: DigestDeps, at: Date): Promise<number> 
 
   for (const candidate of await dueForDigest(deps.db, at)) {
     const sections = await unseenFor(deps.db, candidate.account_id, {
-      after: laterOf(candidate.lastActive, candidate.since),
-      since: candidate.since,
+      after: laterOf(candidate.last_active_at, candidate.digest_sent_at),
       origin: deps.origin,
     })
     if (sections.length === 0) continue
@@ -174,10 +171,6 @@ export const sweepDigests = async (deps: DigestDeps, at: Date): Promise<number> 
   return sent
 }
 
-/**
- * The preview an admin presses, which has to ignore `seen_at`: an admin who uses the app has
- * read everything, and a preview that is almost always empty is a button nobody presses twice.
- */
 export const digestPreviewFor = async (
   db: Database,
   accountId: string,
