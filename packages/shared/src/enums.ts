@@ -72,6 +72,22 @@ export const paymentStatuses = ['unpaid', 'paid'] as const
 export type PaymentStatus = (typeof paymentStatuses)[number]
 export const isPaymentStatus = (value: unknown): value is PaymentStatus => isOneOf(paymentStatuses, value)
 
+export const digestChoices = ['daily', 'weekly', 'off'] as const
+export type DigestChoice = (typeof digestChoices)[number]
+export const isDigestChoice = (value: unknown): value is DigestChoice => isOneOf(digestChoices, value)
+
+/**
+ * What an account that has never said gets. A stored row is an explicit choice, so absence is
+ * "has not said" and the default lives here — the rule `notificationCategoryInfo` already follows.
+ */
+export const DEFAULT_DIGEST: DigestChoice = 'daily'
+
+export const digestChoiceInfo = {
+  daily: { label: 'Every day' },
+  weekly: { label: 'Every week' },
+  off: { label: 'Never' },
+} as const satisfies Record<DigestChoice, { label: string }>
+
 export const notificationCategories = [
   'meal_role',
   'dream_role',

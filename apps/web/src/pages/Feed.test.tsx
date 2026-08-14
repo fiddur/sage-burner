@@ -83,8 +83,8 @@ const DEFAULTS = [
 
 const stub = (over: Partial<FeedApi> = {}, activity: Activity[] = TWO, threads: Thread[] = []): FeedApi => ({
   getFeed: () => Promise.resolve({ activity, threads }),
-  getMyNotificationSettings: () => Promise.resolve({ on: [...DEFAULTS], email: [] }),
-  updateMyNotificationSettings: () => Promise.resolve({ on: [...DEFAULTS], email: [] }),
+  getMyNotificationSettings: () => Promise.resolve({ on: [...DEFAULTS], email: [], digest: 'daily' }),
+  updateMyNotificationSettings: () => Promise.resolve({ on: [...DEFAULTS], email: [], digest: 'daily' }),
   getThread: () => Promise.reject(new Error('getThread is not stubbed here')),
   setThreadFollow: () => Promise.reject(new Error('setThreadFollow is not stubbed here')),
   supportThread: () => Promise.reject(new Error('supportThread is not stubbed here')),
@@ -342,7 +342,10 @@ describe('switching a kind on from a card', () => {
   it('offers nothing when a kind is switched off, there being nothing to hear', async () => {
     withProbe(
       stub(
-        { getMyNotificationSettings: () => Promise.resolve({ on: ['dream_offered'], email: [] }) },
+        {
+          getMyNotificationSettings: () =>
+            Promise.resolve({ on: ['dream_offered'], email: [], digest: 'daily' }),
+        },
         [],
         [aCard({ id: 'c-1', title: 'Sauna at dawn' })],
       ),
@@ -1170,7 +1173,7 @@ describe('what everyone has been doing', () => {
     // Half the point of the page: this is where somebody finds the setting, in the
     // moment they have just found the thing interesting (#303).
     const update = vi.fn<FeedApi['updateMyNotificationSettings']>(() =>
-      Promise.resolve({ on: [...DEFAULTS, 'dream_offered'], email: [] }),
+      Promise.resolve({ on: [...DEFAULTS, 'dream_offered'], email: [], digest: 'daily' }),
     )
     renderPage(stub({ updateMyNotificationSettings: update }, [aLine({ id: 'x-1', body: 'A dream.' })]))
 
@@ -1180,7 +1183,7 @@ describe('what everyone has been doing', () => {
     fireEvent.click(chip)
 
     await waitFor(() => {
-      expect(update).toHaveBeenCalledWith({ on: [...DEFAULTS, 'dream_offered'], email: [] })
+      expect(update).toHaveBeenCalledWith({ on: [...DEFAULTS, 'dream_offered'], email: [], digest: 'daily' })
     })
   })
 
@@ -1188,12 +1191,13 @@ describe('what everyone has been doing', () => {
     // The passing sibling, and the reason the whole set goes on the wire: what is sent
     // is what was held plus or minus one.
     const update = vi.fn<FeedApi['updateMyNotificationSettings']>(() =>
-      Promise.resolve({ on: [], email: ['meal_role'] }),
+      Promise.resolve({ on: [], email: ['meal_role'], digest: 'daily' }),
     )
     renderPage(
       stub(
         {
-          getMyNotificationSettings: () => Promise.resolve({ on: ['dream_offered'], email: ['meal_role'] }),
+          getMyNotificationSettings: () =>
+            Promise.resolve({ on: ['dream_offered'], email: ['meal_role'], digest: 'daily' }),
           updateMyNotificationSettings: update,
         },
         [aLine({ id: 'x-1', body: 'A dream.' })],
@@ -1205,7 +1209,9 @@ describe('what everyone has been doing', () => {
 
     fireEvent.click(chip)
 
-    await waitFor(() => expect(update).toHaveBeenCalledWith({ on: [], email: ['meal_role'] }))
+    await waitFor(() =>
+      expect(update).toHaveBeenCalledWith({ on: [], email: ['meal_role'], digest: 'daily' }),
+    )
   })
 
   it('says the songbook where a card belongs to no burn', async () => {

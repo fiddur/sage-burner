@@ -90,6 +90,45 @@ export const notificationMessage = ({
   text: [body, ...(link === undefined ? [] : ['', link]), '', '--', OFF_SWITCH].join('\n'),
 })
 
+const DIGEST_SWITCH = 'You can change how often this arrives, or stop it, under Your details → Notifications.'
+
+const countOf = (sections: readonly { entries: readonly unknown[] }[]): number =>
+  sections.reduce((total, section) => total + section.entries.length, 0)
+
+export const digestMessage = ({
+  installation,
+  to,
+  sections,
+  settings,
+}: {
+  installation: string
+  to: string
+  sections: readonly { label: string; entries: readonly { body: string; link: string | undefined }[] }[]
+  settings: string | undefined
+}): Message => {
+  const total = countOf(sections)
+
+  return {
+    to,
+    subject: `${installation}: ${total === 1 ? '1 thing' : `${total} things`} you have not seen`,
+    text: [
+      'While you have been away:',
+      '',
+      ...sections.flatMap((section) => [
+        section.entries.length === 1 ? section.label : `${section.label} (${section.entries.length})`,
+        ...section.entries.flatMap((entry) => [
+          `- ${entry.body}`,
+          ...(entry.link === undefined ? [] : [`  ${entry.link}`]),
+        ]),
+        '',
+      ]),
+      '--',
+      DIGEST_SWITCH,
+      ...(settings === undefined ? [] : [settings]),
+    ].join('\n'),
+  }
+}
+
 export const testMessage = ({ installation, to }: { installation: string; to: string }): Message => ({
   to,
   subject: `${installation}: mail is working`,

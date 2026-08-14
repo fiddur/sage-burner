@@ -266,7 +266,7 @@ describe('deciding a point', () => {
       method: 'PUT',
       url: '/api/me/notification-settings',
       headers: { cookie: bo.cookie },
-      payload: { on: ['point_decided'], email: [] },
+      payload: { on: ['point_decided'], email: [], digest: 'daily' },
     })
 
     await decide(server, ada.cookie, id, { decision: 'By the barn' })

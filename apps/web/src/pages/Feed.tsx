@@ -97,6 +97,7 @@ export const Feed = ({ api }: { api: FeedApi }) => {
     const wanted = {
       on: on ? settings.on.filter((one) => one !== category) : [...settings.on, category],
       email: [...settings.email],
+      digest: settings.digest,
     }
 
     if (!on) askAbout()

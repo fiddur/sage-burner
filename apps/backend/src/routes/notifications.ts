@@ -16,7 +16,7 @@ import { eq } from 'drizzle-orm'
 import type { GuardDeps } from '../auth/guards.ts'
 
 import { viewerFor } from '../auth/viewer.ts'
-import { notificationSetting } from '../db/schema.ts'
+import { account, notificationSetting } from '../db/schema.ts'
 import { bodyOf, noStore, sendError } from '../http.ts'
 import { markSeen, markShownSeen, notificationBatches, notificationsFor, switchedOn } from '../push/notify.ts'
 
@@ -102,11 +102,13 @@ export const registerNotificationRoutes = (app: FastifyInstance, { db, sessions,
           })
           .run()
       }
+      tx.update(account).set({ digest: body.digest }).where(eq(account.id, accountId)).run()
     })
 
     return {
       on: notificationCategories.filter((category) => on.has(category)),
       email: notificationCategories.filter((category) => email.has(category)),
+      digest: body.digest,
     } satisfies NotificationSettings
   })
 }

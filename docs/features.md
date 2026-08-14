@@ -167,6 +167,10 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
   say not to ask there, which answers for all of them at once.
 - Email as a channel of its own, per category, off until asked for — the column
   appears only once an admin has configured SMTP.
+- A digest of what you have not seen, by email, **on by default** — daily, weekly or
+  never. It goes only to people who have stayed away, and only when something new is
+  waiting, so it reaches whoever has stopped opening the app without adding a message
+  for anybody who has not.
 - Categories default by kind: what happens _to you_ is on unless refused, what
   happens _around you_ is off unless asked for — except a meeting being scheduled,
   which is on, because it is the only one with a time you have to be at. Attendance

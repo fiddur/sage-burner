@@ -9,6 +9,13 @@ under today's heading, and make a new heading when there is none.
 
 # 2026-08-14
 
+- **A summary by email when you have been away.** If something happens and you have not been on the
+  site for a day, you get one message listing what you have not seen, grouped and linked. It arrives
+  only when there is something new and only when you have actually been away, so a day you have read
+  everything is a day it stays quiet. It is on unless you say otherwise — Your details →
+  Notifications has _Every day_, _Every week_ and _Never_ — and it needs a mail server, so an
+  installation without one is unchanged.
+
 - **The buttons are drawings now, not emoji.** The pencil, the trashcan, the bell, the raised
   hand, the menu — every control the app offers is one set of grey line icons, drawn the same
   weight and the same size wherever it appears, instead of whatever your phone or laptop happened to

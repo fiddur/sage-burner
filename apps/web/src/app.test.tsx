@@ -153,7 +153,7 @@ const clientWith = (
   addMeeting: () => Promise.reject(new Error('addMeeting is not stubbed here')),
   updateMeeting: () => Promise.reject(new Error('updateMeeting is not stubbed here')),
   deleteMeeting: () => Promise.reject(new Error('deleteMeeting is not stubbed here')),
-  getMyNotificationSettings: () => Promise.resolve({ on: [], email: [] }),
+  getMyNotificationSettings: () => Promise.resolve({ on: [], email: [], digest: 'daily' }),
   updateMyNotificationSettings: () =>
     Promise.reject(new Error('updateMyNotificationSettings is not stubbed here')),
   markNotificationsSeen: () => Promise.reject(new Error('markNotificationsSeen is not stubbed in this file')),

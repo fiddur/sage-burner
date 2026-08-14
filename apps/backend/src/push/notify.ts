@@ -1,6 +1,7 @@
-import type { Notification, NotificationCategory } from '@sage-burner/shared'
+import type { DigestChoice, Notification, NotificationCategory } from '@sage-burner/shared'
 
 import {
+  DEFAULT_DIGEST,
   mentionedAccounts,
   mentionsEverybody,
   notificationCategories,
@@ -181,7 +182,7 @@ export const recordAndPush =
 export const switchedOn = async (
   db: Database,
   accountId: string,
-): Promise<{ on: NotificationCategory[]; email: NotificationCategory[] }> => {
+): Promise<{ on: NotificationCategory[]; email: NotificationCategory[]; digest: DigestChoice }> => {
   const rows = await db
     .select({
       category: notificationSetting.category,
@@ -193,11 +194,18 @@ export const switchedOn = async (
 
   const said = new Map(rows.map((row) => [row.category, row]))
 
+  const [who] = await db
+    .select({ digest: account.digest })
+    .from(account)
+    .where(eq(account.id, accountId))
+    .limit(1)
+
   return {
     on: notificationCategories.filter(
       (category) => said.get(category)?.enabled ?? notifiesByDefault(category),
     ),
     email: notificationCategories.filter((category) => said.get(category)?.email ?? false),
+    digest: who?.digest ?? DEFAULT_DIGEST,
   }
 }
 

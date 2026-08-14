@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { notificationCategories } from '../enums.ts'
+import { digestChoices, notificationCategories } from '../enums.ts'
 import { dateTimeSchema, idSchema } from './common.ts'
 
 export const notificationSchema = z.object({
@@ -48,6 +48,7 @@ export const notificationSettingsSchema = z
   .object({
     on: z.array(z.enum(notificationCategories)),
     email: z.array(z.enum(notificationCategories)),
+    digest: z.enum(digestChoices),
   })
   .strict()
 export type NotificationSettings = z.infer<typeof notificationSettingsSchema>
