@@ -1,11 +1,13 @@
 import type { MailSettings, MailSettingsUpdate } from '@sage-burner/shared'
 
 import {
+  DIGEST_PREVIEW_HOURS,
   MAX_EMAIL,
   MAX_FROM_NAME,
   MAX_SMTP_HOST,
   MAX_SMTP_PASSWORD,
   MAX_SMTP_USERNAME,
+  MOST_PREVIEW_HOURS,
 } from '@sage-burner/shared'
 import { useEffect, useState } from 'preact/hooks'
 
@@ -20,7 +22,7 @@ import { PendingButton } from './PendingButton.tsx'
 
 export type MailApi = Pick<
   ApiClient,
-  'getMailSettings' | 'removeMailSettings' | 'sendTestEmail' | 'updateMailSettings'
+  'getMailSettings' | 'removeMailSettings' | 'sendDigestPreview' | 'sendTestEmail' | 'updateMailSettings'
 >
 
 interface Draft {
@@ -71,6 +73,7 @@ export const MailField = ({ api }: { api: MailApi }) => {
   const [busy, setBusy] = useState(false)
   const [testing, setTesting] = useState(false)
   const [result, setResult] = useState<string | undefined>(undefined)
+  const [hours, setHours] = useState(String(DIGEST_PREVIEW_HOURS))
   const [error, setError] = useFormError()
 
   useEffect(() => {
@@ -146,6 +149,20 @@ export const MailField = ({ api }: { api: MailApi }) => {
       setResult(answer.sent ? `Sent to ${answer.to}. Check your inbox.` : `Not sent: ${answer.reason ?? ''}`)
     } catch (failure) {
       setError(isApiError(failure) ? failure.message : 'Could not send the test. Please try again.')
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  const preview = async () => {
+    setTesting(true)
+    setError(undefined)
+    setResult(undefined)
+    try {
+      const answer = await api.sendDigestPreview({ hours: Number(hours) })
+      setResult(answer.sent ? `Sent to ${answer.to}. Check your inbox.` : `Not sent: ${answer.reason ?? ''}`)
+    } catch (failure) {
+      setError(isApiError(failure) ? failure.message : 'Could not send that. Please try again.')
     } finally {
       setTesting(false)
     }
@@ -267,6 +284,31 @@ export const MailField = ({ api }: { api: MailApi }) => {
         {result !== undefined && (
           <p class="form-note" role="status">
             {result}
+          </p>
+        )}
+
+        {stored !== null && (
+          <p class="row digest-preview">
+            <label>
+              <span>Send me a digest of the last</span>{' '}
+              <input
+                type="number"
+                min={1}
+                max={MOST_PREVIEW_HOURS}
+                value={hours}
+                disabled={busy || testing}
+                onInput={(inputEvent) => setHours(inputEvent.currentTarget.value)}
+              />{' '}
+              <span>hours</span>
+            </label>
+            <PendingButton
+              busy={testing}
+              label="Send it"
+              busyLabel="Sending…"
+              type="button"
+              disabled={busy || Number(hours) < 1 || Number(hours) > MOST_PREVIEW_HOURS}
+              onClick={() => void preview()}
+            />
           </p>
         )}
 

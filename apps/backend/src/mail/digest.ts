@@ -6,7 +6,7 @@ import {
   notificationCategories,
   notificationCategoryInfo,
 } from '@sage-burner/shared'
-import { and, desc, eq, isNull } from 'drizzle-orm'
+import { and, desc, eq, gt, isNull } from 'drizzle-orm'
 
 import type { Database } from '../db/index.ts'
 import type { MailDeps, Posted } from './mail.ts'
@@ -99,8 +99,15 @@ export const unseenFor = async (
 
   const within = after === null ? rows : rows.filter((row) => row.created_at > after)
 
-  return notificationCategories.flatMap((category) => {
-    const mine = within.filter((row) => row.category === category)
+  return sectionsOf(within, origin)
+}
+
+const sectionsOf = (
+  rows: readonly { category: NotificationCategory; body: string; link: string | null }[],
+  origin: string | undefined,
+): DigestSection[] =>
+  notificationCategories.flatMap((category) => {
+    const mine = rows.filter((row) => row.category === category)
     if (mine.length === 0) return []
 
     return [
@@ -115,7 +122,6 @@ export const unseenFor = async (
       },
     ]
   })
-}
 
 export interface DigestDeps extends MailDeps {
   origin?: string
@@ -159,4 +165,25 @@ export const sweepDigests = async (deps: DigestDeps, at: Date): Promise<number> 
   }
 
   return sent
+}
+
+/**
+ * The preview an admin presses, which has to ignore `seen_at`: an admin who uses the app has
+ * read everything, and a preview that is almost always empty is a button nobody presses twice.
+ */
+export const digestPreviewFor = async (
+  db: Database,
+  accountId: string,
+  { hours, origin }: { hours: number; origin: string | undefined },
+  at: Date,
+): Promise<DigestSection[]> => {
+  const after = new Date(at.getTime() - hours * HOUR_MS).toISOString()
+
+  const rows = await db
+    .select({ category: notification.category, body: notification.body, link: notification.link })
+    .from(notification)
+    .where(and(eq(notification.account_id, accountId), gt(notification.created_at, after)))
+    .orderBy(desc(notification.created_at), desc(notification.id))
+
+  return sectionsOf(rows, origin)
 }

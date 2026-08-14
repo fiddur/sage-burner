@@ -298,7 +298,7 @@ export const createApp = async ({
   registerOauthAdminRoutes(app, { db, now })
   registerPwaRoutes(app, { db, sessions, now })
   registerBannerRoutes(app, { db, sessions, now })
-  registerMailRoutes(app, { db, sessions, mail, now })
+  registerMailRoutes(app, { db, sessions, mail, now, config })
   registerMealRoutes(app, { db, sessions, now, notify: tellAccount })
   registerMealAdminRoutes(app, { db, sessions, now })
 

@@ -105,6 +105,7 @@ const clientWith = (
   copyFaq: () => Promise.reject(new Error('copyFaq is not stubbed in this file')),
   updateMailSettings: () => Promise.reject(new Error('updateMailSettings is not stubbed in this file')),
   removeMailSettings: () => Promise.reject(new Error('removeMailSettings is not stubbed in this file')),
+  sendDigestPreview: () => Promise.reject(new Error('sendDigestPreview is not stubbed in this file')),
   sendTestEmail: () => Promise.reject(new Error('sendTestEmail is not stubbed in this file')),
   getQuestions: () => Promise.reject(new Error('getQuestions is not stubbed in this file')),
   submitApplication: () => Promise.reject(new Error('submitApplication is not stubbed in this file')),

@@ -38,6 +38,7 @@ const stub = (over: Partial<AdminSettingsApi> = {}): AdminSettingsApi => ({
   updateMailSettings: () => Promise.reject(new Error('updateMailSettings is not stubbed here')),
   removeMailSettings: () => Promise.reject(new Error('removeMailSettings is not stubbed here')),
   sendTestEmail: () => Promise.reject(new Error('sendTestEmail is not stubbed here')),
+  sendDigestPreview: () => Promise.resolve({ sent: true, to: 'admin@example.org', reason: null }),
   updateInstallation: () => Promise.reject(new Error('updateInstallation is not stubbed here')),
   setInstallationIcon: () => Promise.reject(new Error('setInstallationIcon is not stubbed here')),
   removeInstallationIcon: () => Promise.reject(new Error('removeInstallationIcon is not stubbed here')),

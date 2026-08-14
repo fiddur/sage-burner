@@ -17,6 +17,7 @@ import type {
   ConnectionUpdate,
   CopyFrom,
   DecisionInput,
+  DigestPreviewInput,
   EventCreateInput,
   EventOptionCreateInput,
   EventOptionOrder,
@@ -830,6 +831,11 @@ export const apiRoutes = {
     fastify: '/calendar/:token/schedule.ics',
     path: (token: string) => `/calendar/${encodeURIComponent(token)}/schedule.ics`,
   },
+  sendDigestPreview: {
+    method: 'POST',
+    fastify: '/api/admin/installation/mail/digest',
+    path: () => '/api/admin/installation/mail/digest',
+  },
   sendTestEmail: {
     method: 'POST',
     fastify: '/api/admin/installation/mail/test',
@@ -1191,6 +1197,7 @@ export interface RouteBodies {
   updateMealIntro: MealIntroUpdate
   updateMealSlot: MealSlotUpdate
   markTargetShown: TargetShownInput
+  sendDigestPreview: DigestPreviewInput
   updateMyNotificationSettings: NotificationSettings
   updateMyProfile: ProfileUpdate
   updateMyStay: AttendanceUpdate

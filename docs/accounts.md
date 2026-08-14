@@ -1207,6 +1207,19 @@ webfont is ignored anyway. Everything a member or an admin wrote is escaped, in 
 line and in the `href` alike, since a notification body is member-authored and the
 installation's name is admin-authored.
 
+**An admin can post one to themselves** (#640). ⚙️ → Settings takes a number of hours,
+defaulting to 24, and posts a digest of that stretch to the **admin's own address** — the rule
+the test button already follows, since a send-to box on an admin page is an open relay with
+extra steps. Two things make it a preview rather than a second digest: it **ignores `seen_at`**,
+because an admin who uses the app has read everything and a preview that is almost always empty
+is a button nobody presses twice; and it **never writes `digest_sent_at`**, because a preview
+that spends the real one costs somebody the thing being checked. With nothing in the stretch it
+says so rather than posting an empty message.
+
+The hours are a field rather than daily/weekly buttons for a reason worth keeping: the real
+digest has no window — its cut is the last visit — so two buttons would have sent identical
+mail. A stretch somebody types is the honest way to ask "what would this have looked like".
+
 **The sweep is in `server.ts`, not `createApp`** — exactly where `announceDeploy` is, and for
 the same reason: the suite builds an app per test, and a timer wired into that would tick in
 every one of them. It is an hourly unref'd interval that does nothing outside 02:00–05:00 by

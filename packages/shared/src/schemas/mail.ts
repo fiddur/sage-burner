@@ -32,3 +32,10 @@ export const mailTestResponseSchema = z.object({
   reason: z.string().nullable(),
 })
 export type MailTestResponse = z.infer<typeof mailTestResponseSchema>
+
+export const DIGEST_PREVIEW_HOURS = 24
+
+export const MOST_PREVIEW_HOURS = 24 * 90
+
+export const digestPreviewSchema = z.object({ hours: z.int().min(1).max(MOST_PREVIEW_HOURS) }).strict()
+export type DigestPreviewInput = z.infer<typeof digestPreviewSchema>

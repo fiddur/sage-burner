@@ -12,7 +12,7 @@ import { createSessions } from '../auth/session.ts'
 import { SESSION_COOKIE } from '../auth/viewer.ts'
 import { createConfig } from '../config.ts'
 import { createDb, runMigrations } from '../db/index.ts'
-import { account, accountRole, INSTALLATION_ID, mailSetting } from '../db/schema.ts'
+import { account, accountRole, INSTALLATION_ID, mailSetting, notification } from '../db/schema.ts'
 
 const SECRET = 'm'.repeat(40)
 const NOW = '2026-08-07T10:00:00.000Z'
@@ -273,6 +273,105 @@ describe('the test message', () => {
       to: 'admin@example.org',
       reason: '535 5.7.8 Authentication failed',
     })
+  })
+})
+
+describe('the digest preview', () => {
+  const preview = (server: FastifyInstance, cookie: string, hours: number) =>
+    server.inject({
+      method: 'POST',
+      url: '/api/admin/installation/mail/digest',
+      headers: { cookie },
+      payload: { hours },
+    })
+
+  const givenNotification = async (accountId: string, at: string, body = 'Ada offered a dream') => {
+    await db().insert(notification).values({
+      id: randomUUID(),
+      account_id: accountId,
+      category: 'dream_offered',
+      body,
+      link: '/dreams',
+      created_at: at,
+      seen_at: at,
+    })
+  }
+
+  const idFor = async (email: string) => {
+    const [row] = await db().select({ id: account.id }).from(account).where(eq(account.email, email))
+
+    return row?.id ?? ''
+  }
+
+  it('shows what an admin has already seen, or it would be empty every time', async () => {
+    // An admin who uses the app has read everything, so honouring `seen_at` here would make
+    // the button answer "nothing to show" on almost every press.
+    const server = await build()
+    const cookie = await givenAccount(['admin'], 'admin@example.org')
+    await write(server, cookie, SETTINGS)
+    await givenNotification(await idFor('admin@example.org'), '2026-08-07T02:00:00.000Z')
+
+    const answer = await preview(server, cookie, 24)
+
+    expect(answer.json()).toEqual({ sent: true, to: 'admin@example.org', reason: null })
+    expect(posted[0]?.message.text).toContain('Ada offered a dream')
+  })
+
+  it('takes the stretch it is given, and nothing older', async () => {
+    const server = await build()
+    const cookie = await givenAccount(['admin'], 'admin@example.org')
+    await write(server, cookie, SETTINGS)
+    const me = await idFor('admin@example.org')
+    await givenNotification(me, '2026-08-05T10:00:00.000Z', 'a day and a half back')
+    await givenNotification(me, '2026-08-07T02:00:00.000Z', 'this morning')
+
+    await preview(server, cookie, 24)
+
+    expect(posted[0]?.message.text).toContain('this morning')
+    expect(posted[0]?.message.text).not.toContain('a day and a half back')
+  })
+
+  it('says so rather than posting an empty one', async () => {
+    const server = await build()
+    const cookie = await givenAccount(['admin'], 'admin@example.org')
+    await write(server, cookie, SETTINGS)
+
+    const answer = await preview(server, cookie, 24)
+
+    expect(answer.json().sent).toBe(false)
+    expect(answer.json().reason).toMatch(/nothing has happened/i)
+    expect(posted).toHaveLength(0)
+  })
+
+  it('does not spend the real digest', async () => {
+    // A preview that writes `digest_sent_at` costs somebody the thing being checked.
+    const server = await build()
+    const cookie = await givenAccount(['admin'], 'admin@example.org')
+    await write(server, cookie, SETTINGS)
+    const me = await idFor('admin@example.org')
+    await givenNotification(me, '2026-08-07T02:00:00.000Z')
+
+    await preview(server, cookie, 24)
+
+    const [row] = await db().select({ sent: account.digest_sent_at }).from(account).where(eq(account.id, me))
+    expect(row?.sent).toBeNull()
+  })
+
+  it('refuses a stretch outside what the schema allows', async () => {
+    const server = await build()
+    const cookie = await givenAccount(['admin'], 'admin@example.org')
+    await write(server, cookie, SETTINGS)
+
+    expect((await preview(server, cookie, 0)).statusCode).toBe(400)
+  })
+
+  it('turns away somebody who is not an admin', async () => {
+    const server = await build()
+    const admin = await givenAccount(['admin'], 'admin@example.org')
+    await write(server, admin, SETTINGS)
+    const member = await givenAccount(['member'], 'member@example.org')
+
+    expect((await preview(server, member, 24)).statusCode).toBe(403)
   })
 })
 
