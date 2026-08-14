@@ -70,11 +70,6 @@ export const dueForDigest = async (db: Database, at: Date): Promise<DigestCandid
   })
 }
 
-/**
- * `since` is the last digest, and it does two things: nothing newer means nothing worth
- * sending, and its **absence** — nobody has ever had one — is what lets the first digest carry
- * everything rather than a day of it.
- */
 export const unseenFor = async (
   db: Database,
   accountId: string,
@@ -96,7 +91,8 @@ export const unseenFor = async (
   if (since !== null && !rows.some((row) => row.created_at > since)) return []
 
   const edge = new Date(at.getTime() - window).toISOString()
-  const within = since === null ? rows : rows.filter((row) => row.created_at > edge)
+  const after = since === null ? null : since > edge ? since : edge
+  const within = after === null ? rows : rows.filter((row) => row.created_at > after)
 
   if (within.length === 0) return []
 

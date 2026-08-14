@@ -239,9 +239,6 @@ describe('what a digest holds', () => {
   })
 
   it('carries the whole backlog to somebody who has never had one', async () => {
-    // "All not seen is fine the first time, but not every night including the same things."
-    // A first digest with a day's worth in it would be an introduction that mentions almost
-    // nothing, on the one night the whole point is what you have missed.
     build()
     const accountId = await givenAccount()
     await givenUnseen(accountId, { body: 'ancient', at: ago(60 * DAY) })
@@ -250,6 +247,24 @@ describe('what a digest holds', () => {
     const sections = await unseenFor(db(), accountId, { since: null, window: DAY, origin: undefined }, NOW)
 
     expect(sections[0]?.entries.map((entry) => entry.body)).toEqual(['recent', 'ancient'])
+  })
+
+  it('never prints again what the last digest already carried', async () => {
+    // The guard allows the next one an hour early, so `since` can sit inside the window —
+    // and the whole point of windowing is not saying the same thing twice.
+    build()
+    const accountId = await givenAccount()
+    await givenUnseen(accountId, { body: 'was in the last one', at: ago(23 * HOUR) })
+    await givenUnseen(accountId, { body: 'new since then', at: ago(HOUR) })
+
+    const sections = await unseenFor(
+      db(),
+      accountId,
+      { since: ago(22 * HOUR), window: DAY, origin: undefined },
+      NOW,
+    )
+
+    expect(sections[0]?.entries.map((entry) => entry.body)).toEqual(['new since then'])
   })
 
   it('is empty where everything unseen is older than the window', async () => {
@@ -307,6 +322,37 @@ describe('what a digest holds', () => {
     expect(sent[0]?.subject).toBe(`The Burning Sage: ${MOST_PER_SECTION + 3} things you have not seen`)
     expect(sent[0]?.text).toContain('and 3 more')
   })
+})
+
+it('gives a weekly candidate seven days through the sweep, not one', async () => {
+  // Needs a previous digest, or the first-one exception carries everything and the window
+  // this test is about decides nothing — which is how the first version of it passed
+  // against a hardcoded day.
+  build()
+  await givenMailServer()
+  const accountId = await givenAccount({
+    digest: 'weekly',
+    lastActive: ago(8 * DAY),
+    digestSent: ago(8 * DAY),
+  })
+  await givenUnseen(accountId, { body: 'four days back', at: ago(4 * DAY) })
+  const sent: Message[] = []
+
+  await sweepDigests(
+    {
+      db: db(),
+      send: (_transport, message) => {
+        sent.push(message)
+
+        return Promise.resolve()
+      },
+      origin: 'https://burn.example',
+      log: () => undefined,
+    },
+    NOW,
+  )
+
+  expect(sent[0]?.text).toContain('four days back')
 })
 
 describe('the night a restart could otherwise skip', () => {
