@@ -14,6 +14,11 @@ under today's heading, and make a new heading when there is none.
   weight and the same size wherever it appears, instead of whatever your phone or laptop happened to
   make of an emoji. The pages keep their emoji: the bar at the bottom, the drawer, the marks on the
   feed. Colour is what a thing is; grey is what you can press.
+- **Adding a picture is a button in the toolbar now.** It was the words _Add a picture_ below the
+  box, louder than anything else in the composer; it is the picture icon at the end of the row the
+  bold and italic buttons are in, where every other app puts it. Pasting and dropping still work
+  exactly as before.
+
 - **The bell says more.** It used to grey out with nothing unseen; now it goes the app's own orange
   when something is waiting for you.
 

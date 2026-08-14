@@ -1757,11 +1757,25 @@ patterns rather than a render-and-compare, because rendering plain text also cha
 is the Facebook and Discord feel — words then pictures — and it costs no data-model change, since
 storage stays a markdown token that anybody who wants one mid-text can still move.
 
+**The picture control is the fifth thing in that row** (#622). It used to be the words _Add a
+picture_ under the box and under the send button — the loudest thing in the composer while being
+the least-used control in it, which is what `.add-picture` existed to shrink. It is **not** a fifth
+`BUTTONS` entry: those apply a `SyntaxKind` to the textarea, and only a `<label>` opens a file
+picker. So `SyntaxToolbar` takes `children` rendered after the four, `AddPicture` keeps its
+label-wrapping-a-hidden-input shape with `.syntax-button` on it, and the toolbar stays ignorant of
+what an upload is. A disabled input greys nothing on its own, so `:has(:disabled)` dims the label
+while a picture is going up.
+
+**What it cannot report from inside a 2.2 rem button stays below the box**: `PictureTrouble` is the
+_Sending a picture…_ note and the `ErrorText` for no-room, SVG-refused and upload-failed. That is
+the other half of what `AddPicture` used to be, and splitting it is what removed the `<p>`-nesting
+hazard the old row wrapper was there to dodge.
+
 **Every composer gets it**: `MarkdownField` for introductions, posts, dream descriptions and
 welcome text, and the two comment boxes in `DreamThread`, which are plain textareas rather than
 a `MarkdownField`. `useSyntax` + `SyntaxToolbar` is the same hook-and-component pair as
-`useImageUpload` + `AddPicture` and `useMentioning` + `MentionMenu`, so a third composer wires it
-the way it wires those.
+`useImageUpload` + `AddPicture`/`PictureTrouble` and `useMentioning` + `MentionMenu`, so a third
+composer wires it the way it wires those.
 
 ## Markdown is escaped, not filtered
 

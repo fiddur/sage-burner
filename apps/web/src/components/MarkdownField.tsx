@@ -8,7 +8,7 @@ import { renderMarkdown } from '../markdown.ts'
 import { useMentioning } from '../mentioning.ts'
 import { hasMarkdown } from '../syntax.ts'
 import { rowsFor } from '../textarea.ts'
-import { AddPicture } from './AddPicture.tsx'
+import { AddPicture, PictureTrouble } from './AddPicture.tsx'
 import { MentionMenu } from './MentionMenu.tsx'
 import { SyntaxToolbar, useSyntax } from './SyntaxToolbar.tsx'
 
@@ -43,7 +43,9 @@ export const MarkdownField = ({
       <label for={fieldId}>{label}</label>
 
       <div class="md-field">
-        <SyntaxToolbar syntax={syntax} subject={accessibleName ?? label} />
+        <SyntaxToolbar syntax={syntax} subject={accessibleName ?? label}>
+          <AddPicture pictures={pictures} label={label} />
+        </SyntaxToolbar>
 
         <textarea
           id={fieldId}
@@ -67,7 +69,7 @@ export const MarkdownField = ({
         onChoose={mentioning.choose}
       />
 
-      <AddPicture pictures={pictures} label={label} />
+      <PictureTrouble pictures={pictures} />
 
       {hasMarkdown(value) && (
         <div class="md-field-preview">

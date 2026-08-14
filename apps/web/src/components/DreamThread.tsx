@@ -11,7 +11,7 @@ import { stillUploading, useImageUpload } from '../image-upload.ts'
 import { renderMarkdown } from '../markdown.ts'
 import { useMentioning } from '../mentioning.ts'
 import { rowsFor } from '../textarea.ts'
-import { AddPicture } from './AddPicture.tsx'
+import { AddPicture, PictureTrouble } from './AddPicture.tsx'
 import { Destroy } from './Destroy.tsx'
 import { IconButton } from './IconButton.tsx'
 import { MentionMenu } from './MentionMenu.tsx'
@@ -139,7 +139,9 @@ export const DreamThread = ({
 
               {editing?.id === entry.id ? (
                 <>
-                  <SyntaxToolbar syntax={editingSyntax} subject="what you said" />
+                  <SyntaxToolbar syntax={editingSyntax} subject="what you said">
+                    <AddPicture pictures={editingPictures} label="what you said" />
+                  </SyntaxToolbar>
                   <div class="thread-editing">
                     <textarea
                       class="thread-box"
@@ -158,7 +160,7 @@ export const DreamThread = ({
                       subject="what you said"
                       onChoose={renaming.choose}
                     />
-                    <AddPicture pictures={editingPictures} label="what you said" />
+                    <PictureTrouble pictures={editingPictures} />
                     <button
                       type="button"
                       disabled={busy || stillUploading(editing.body) || editing.body.trim() === ''}
@@ -211,7 +213,9 @@ export const DreamThread = ({
         )}
       </ol>
 
-      <SyntaxToolbar syntax={sayingSyntax} subject={`what you say about ${thread.title}`} />
+      <SyntaxToolbar syntax={sayingSyntax} subject={`what you say about ${thread.title}`}>
+        <AddPicture pictures={sayingPictures} label={`what you say about ${thread.title}`} />
+      </SyntaxToolbar>
 
       <p class="thread-say">
         <textarea
@@ -238,7 +242,7 @@ export const DreamThread = ({
         onChoose={naming.choose}
       />
 
-      <AddPicture pictures={sayingPictures} label={`what you say about ${thread.title}`} />
+      <PictureTrouble pictures={sayingPictures} />
     </div>
   )
 }

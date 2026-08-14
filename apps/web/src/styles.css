@@ -632,6 +632,9 @@ a:hover {
 }
 
 .syntax-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 2.2rem;
   padding: 0.3rem 0.6rem;
   border: 0;
@@ -694,11 +697,11 @@ a:hover {
   margin-bottom: 0;
 }
 
-/* Furniture of the field it belongs to, not a section of the page. The body font is a serif
-   at full size, which put it above the card title it sat under (#473). */
-.add-picture {
-  font-family: ui-sans-serif, system-ui, sans-serif;
-  font-size: 0.85rem;
+/* Only a `<label>` opens a file picker, so the one control in this row that is not a button
+   is this — and a disabled input inside a label greys nothing on its own (#622). */
+.add-picture:has(:disabled) {
+  opacity: 0.5;
+  cursor: default;
 }
 
 /* Was a class hook with no rules, so "Apply to join" and "Log in" touched. */

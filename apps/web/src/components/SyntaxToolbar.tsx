@@ -1,4 +1,4 @@
-import type { Ref } from 'preact'
+import type { ComponentChildren, Ref } from 'preact'
 
 import { useEffect, useRef, useState } from 'preact/hooks'
 
@@ -74,7 +74,15 @@ const BUTTONS: readonly { kind: SyntaxKind; label: string; face: Face; class: st
   { kind: 'list', label: 'List', face: { icon: 'bullets' }, class: 'syntax-button' },
 ]
 
-export const SyntaxToolbar = ({ syntax, subject }: { syntax: Syntax; subject: string }) => (
+export const SyntaxToolbar = ({
+  syntax,
+  subject,
+  children,
+}: {
+  syntax: Syntax
+  subject: string
+  children?: ComponentChildren
+}) => (
   <div class="syntax-row">
     {BUTTONS.map((button) => (
       <button
@@ -88,5 +96,6 @@ export const SyntaxToolbar = ({ syntax, subject }: { syntax: Syntax; subject: st
         {'letter' in button.face ? button.face.letter : <Icon name={button.face.icon} />}
       </button>
     ))}
+    {children}
   </div>
 )

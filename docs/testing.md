@@ -324,6 +324,16 @@ phone" means 360px.
       something fills its heart, ember too; taking the heart back empties it.
 - [ ] In dark mode every icon is still legible, and hovering a control still lightens it.
 
+## The composer
+
+- [ ] A comment box's toolbar is five wide: **B**, _I_, link, list, picture. There is no
+      _Add a picture_ under the box.
+- [ ] The picture button opens a file picker and the chosen picture lands at the end of
+      the body; pasting one and dropping one on the box still do the same.
+- [ ] While it is going up, the note below the box says a picture is on its way and the
+      picture button is dimmed. Choosing an SVG says so below the box, not in the toolbar.
+- [ ] A field the public reads — the welcome text — has four buttons and no picture one.
+
 ## On a phone
 
 - [ ] Below 45rem a member gets the six-icon bottom bar; the top bar keeps ☰,
