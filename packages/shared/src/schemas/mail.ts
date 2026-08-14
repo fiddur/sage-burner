@@ -1,6 +1,13 @@
 import { z } from 'zod'
 
-import { MAX_EMAIL, MAX_FROM_NAME, MAX_SMTP_HOST, MAX_SMTP_PASSWORD, MAX_SMTP_USERNAME } from '../limits.ts'
+import {
+  MAX_EMAIL,
+  MAX_FROM_NAME,
+  MAX_SMTP_HOST,
+  MAX_SMTP_PASSWORD,
+  MAX_SMTP_USERNAME,
+  MOST_PREVIEW_HOURS,
+} from '../limits.ts'
 import { dateTimeSchema } from './common.ts'
 
 export const mailSettingsFields = z.object({
@@ -32,3 +39,6 @@ export const mailTestResponseSchema = z.object({
   reason: z.string().nullable(),
 })
 export type MailTestResponse = z.infer<typeof mailTestResponseSchema>
+
+export const digestPreviewSchema = z.object({ hours: z.int().min(1).max(MOST_PREVIEW_HOURS) }).strict()
+export type DigestPreviewInput = z.infer<typeof digestPreviewSchema>

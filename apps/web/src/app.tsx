@@ -121,6 +121,7 @@ export type RoutesApi = Pick<
   | 'getMailSettings'
   | 'updateMailSettings'
   | 'removeMailSettings'
+  | 'sendDigestPreview'
   | 'sendTestEmail'
   | 'getEvents'
   | 'getInviteState'

@@ -562,6 +562,11 @@ export const createApiClient = (doFetch: typeof fetch = globalThis.fetch, { onRe
         method: apiRoutes.removeMailSettings.method,
       }),
 
+    sendDigestPreview: (body: BodyOf<'sendDigestPreview'>) =>
+      request<MailTestResponse>(apiRoutes.sendDigestPreview.path(), {
+        method: apiRoutes.sendDigestPreview.method,
+        body: JSON.stringify(body),
+      }),
     sendTestEmail: () =>
       request<MailTestResponse>(apiRoutes.sendTestEmail.path(), {
         method: apiRoutes.sendTestEmail.method,

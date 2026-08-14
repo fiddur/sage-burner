@@ -156,7 +156,13 @@ describe('who is due a digest', () => {
     const accountId = await givenAccount({ lastActive: ago(3 * DAY) })
 
     expect(await dueForDigest(db(), NOW)).toEqual([
-      { account_id: accountId, email: expect.any(String), choice: 'daily', since: null },
+      {
+        account_id: accountId,
+        email: expect.any(String),
+        choice: 'daily',
+        digest_sent_at: null,
+        last_active_at: ago(3 * DAY),
+      },
     ])
   })
 })
@@ -168,7 +174,7 @@ describe('what a digest holds', () => {
     await givenUnseen(accountId, { category: 'dream_comment', body: 'Ada commented', link: '/dreams' })
     await givenUnseen(accountId, { category: 'point_raised', body: 'Bo raised Firewood', link: '/meetings' })
 
-    const sections = await unseenFor(db(), accountId, { since: null, origin: 'https://burn.example' })
+    const sections = await unseenFor(db(), accountId, { after: null, origin: 'https://burn.example' })
 
     expect(sections.map((section) => section.category)).toEqual(['dream_comment', 'point_raised'])
     expect(sections[0]?.entries).toEqual([{ body: 'Ada commented', link: 'https://burn.example/dreams' }])
@@ -179,7 +185,7 @@ describe('what a digest holds', () => {
     const accountId = await givenAccount()
     await givenUnseen(accountId)
 
-    const sections = await unseenFor(db(), accountId, { since: null, origin: undefined })
+    const sections = await unseenFor(db(), accountId, { after: null, origin: undefined })
 
     expect(sections[0]?.entries[0]?.link).toBeUndefined()
   })
@@ -188,26 +194,40 @@ describe('what a digest holds', () => {
     build()
     const accountId = await givenAccount()
 
-    expect(await unseenFor(db(), accountId, { since: null, origin: undefined })).toEqual([])
+    expect(await unseenFor(db(), accountId, { after: null, origin: undefined })).toEqual([])
   })
 
-  it('is empty where nothing has arrived since the last digest', async () => {
+  it('is empty where everything unseen is older than the cut', async () => {
     build()
     const accountId = await givenAccount()
     await givenUnseen(accountId, { at: ago(5 * DAY) })
 
-    expect(await unseenFor(db(), accountId, { since: ago(2 * DAY), origin: undefined })).toEqual([])
+    expect(await unseenFor(db(), accountId, { after: ago(2 * DAY), origin: undefined })).toEqual([])
   })
 
-  it('carries only what has arrived since the last digest', async () => {
+  it('carries everything after the moment it is given', async () => {
     build()
     const accountId = await givenAccount()
-    await givenUnseen(accountId, { body: 'was in the last one', at: ago(5 * DAY) })
-    await givenUnseen(accountId, { body: 'new since then', at: ago(HOUR) })
+    await givenUnseen(accountId, { body: 'while they were away', at: ago(5 * DAY) })
+    await givenUnseen(accountId, { body: 'later, still away', at: ago(HOUR) })
 
-    const sections = await unseenFor(db(), accountId, { since: ago(2 * DAY), origin: undefined })
+    const sections = await unseenFor(db(), accountId, { after: ago(6 * DAY), origin: undefined })
 
-    expect(sections[0]?.entries.map((entry) => entry.body)).toEqual(['new since then'])
+    expect(sections[0]?.entries.map((entry) => entry.body)).toEqual([
+      'later, still away',
+      'while they were away',
+    ])
+  })
+
+  it('drops what happened before they were last here, which they saw the page for', async () => {
+    build()
+    const accountId = await givenAccount()
+    await givenUnseen(accountId, { body: 'before their last visit', at: ago(9 * DAY) })
+    await givenUnseen(accountId, { body: 'after it', at: ago(HOUR) })
+
+    const sections = await unseenFor(db(), accountId, { after: ago(6 * DAY), origin: undefined })
+
+    expect(sections[0]?.entries.map((entry) => entry.body)).toEqual(['after it'])
   })
 
   it('carries the whole backlog to somebody who has never had one', async () => {
@@ -216,30 +236,27 @@ describe('what a digest holds', () => {
     await givenUnseen(accountId, { body: 'ancient', at: ago(60 * DAY) })
     await givenUnseen(accountId, { body: 'recent', at: ago(HOUR) })
 
-    const sections = await unseenFor(db(), accountId, { since: null, origin: undefined })
+    const sections = await unseenFor(db(), accountId, { after: null, origin: undefined })
 
     expect(sections[0]?.entries.map((entry) => entry.body)).toEqual(['recent', 'ancient'])
   })
 
   it('carries a stretch longer than any window rather than dropping what nothing has mailed', async () => {
-    // The cut is the last digest and never the clock. Somebody who left an hour before
-    // something happened is first due a whole window later, so a clock-anchored cut would
-    // have moved past that notification — and they are the population this is named for.
     build()
     const accountId = await givenAccount()
     await givenUnseen(accountId, { body: 'an hour after they left', at: ago(6 * DAY) })
 
-    const sections = await unseenFor(db(), accountId, { since: ago(30 * DAY), origin: undefined })
+    const sections = await unseenFor(db(), accountId, { after: null, origin: undefined })
 
     expect(sections[0]?.entries.map((entry) => entry.body)).toEqual(['an hour after they left'])
   })
 
-  it('is empty where everything unseen predates the last digest', async () => {
+  it('is empty where the one unseen thing is older than the cut', async () => {
     build()
     const accountId = await givenAccount()
     await givenUnseen(accountId, { body: 'old one', at: ago(5 * DAY) })
 
-    expect(await unseenFor(db(), accountId, { since: ago(3 * DAY), origin: undefined })).toEqual([])
+    expect(await unseenFor(db(), accountId, { after: ago(3 * DAY), origin: undefined })).toEqual([])
   })
 
   it('caps what one section carries, and says how much it left out', async () => {
@@ -249,7 +266,7 @@ describe('what a digest holds', () => {
       await givenUnseen(accountId, { body: `comment ${at}`, at: ago(at * HOUR) })
     }
 
-    const [section] = await unseenFor(db(), accountId, { since: null, origin: undefined })
+    const [section] = await unseenFor(db(), accountId, { after: null, origin: undefined })
 
     expect(section?.total).toBe(MOST_PER_SECTION + 3)
     expect(section?.entries).toHaveLength(MOST_PER_SECTION)
@@ -322,6 +339,82 @@ describe('the nightly sweep', () => {
 
     const [row] = await db().select({ sent: account.digest_sent_at }).from(account)
     expect(row?.sent).toBe(NOW.toISOString())
+  })
+
+  it('cuts at the last digest where that is later than the last visit', async () => {
+    build()
+    await givenMailServer()
+    const accountId = await givenAccount({ lastActive: ago(10 * DAY), digestSent: ago(2 * DAY) })
+    await givenUnseen(accountId, { body: 'already sent to them', at: ago(5 * DAY) })
+    await givenUnseen(accountId, { body: 'since that digest', at: ago(HOUR) })
+    const sent: Message[] = []
+
+    await sweepDigests(
+      {
+        db: db(),
+        send: (_transport, message) => {
+          sent.push(message)
+
+          return Promise.resolve()
+        },
+        origin: 'https://burn.example',
+        log: () => undefined,
+      },
+      NOW,
+    )
+
+    expect(sent[0]?.text).toContain('since that digest')
+    expect(sent[0]?.text).not.toContain('already sent to them')
+  })
+
+  it('cuts at the last visit where that is later than the last digest', async () => {
+    build()
+    await givenMailServer()
+    const accountId = await givenAccount({ lastActive: ago(5 * DAY), digestSent: ago(10 * DAY) })
+    await givenUnseen(accountId, { body: 'before they came back', at: ago(7 * DAY) })
+    await givenUnseen(accountId, { body: 'after they left again', at: ago(HOUR) })
+    const sent: Message[] = []
+
+    await sweepDigests(
+      {
+        db: db(),
+        send: (_transport, message) => {
+          sent.push(message)
+
+          return Promise.resolve()
+        },
+        origin: 'https://burn.example',
+        log: () => undefined,
+      },
+      NOW,
+    )
+
+    expect(sent[0]?.text).toContain('after they left again')
+    expect(sent[0]?.text).not.toContain('before they came back')
+  })
+
+  it('cuts at the last visit where nobody has had a digest yet', async () => {
+    build()
+    await givenMailServer()
+    const accountId = await givenAccount({ lastActive: ago(10 * DAY) })
+    await givenUnseen(accountId, { body: 'while they were gone', at: ago(5 * DAY) })
+    const sent: Message[] = []
+
+    await sweepDigests(
+      {
+        db: db(),
+        send: (_transport, message) => {
+          sent.push(message)
+
+          return Promise.resolve()
+        },
+        origin: 'https://burn.example',
+        log: () => undefined,
+      },
+      NOW,
+    )
+
+    expect(sent[0]?.text).toContain('while they were gone')
   })
 
   it('sends nothing where no mail server has been set up', async () => {

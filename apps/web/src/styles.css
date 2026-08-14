@@ -2078,6 +2078,16 @@ a.person-badge:focus-visible span:last-child {
   margin-block-start: 1rem;
 }
 
+/* A sentence with a box in the middle of it, so the number reads as part of the question
+   rather than as a form somebody has to fill in first. */
+.digest-preview label {
+  display: inline;
+}
+
+.digest-preview input {
+  width: 5rem;
+}
+
 .digest-choice select {
   max-width: 14rem;
 }

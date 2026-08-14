@@ -6,7 +6,7 @@ import {
   notificationCategories,
   notificationCategoryInfo,
 } from '@sage-burner/shared'
-import { and, desc, eq, isNull } from 'drizzle-orm'
+import { and, desc, eq, gt, isNull } from 'drizzle-orm'
 
 import type { Database } from '../db/index.ts'
 import type { MailDeps, Posted } from './mail.ts'
@@ -33,7 +33,8 @@ export interface DigestCandidate {
   account_id: string
   email: string
   choice: Repeating
-  since: string | null
+  digest_sent_at: string | null
+  last_active_at: string | null
 }
 
 export interface DigestSection {
@@ -46,6 +47,13 @@ export interface DigestSection {
 const isRepeating = (choice: DigestChoice): choice is Repeating => choice !== 'off'
 
 const away = (stamp: string | null, edge: string): boolean => stamp === null || stamp < edge
+
+export const laterOf = (one: string | null, other: string | null): string | null => {
+  if (one === null) return other
+  if (other === null) return one
+
+  return one > other ? one : other
+}
 
 export const dueForDigest = async (db: Database, at: Date): Promise<DigestCandidate[]> => {
   const rows = await db
@@ -66,14 +74,22 @@ export const dueForDigest = async (db: Database, at: Date): Promise<DigestCandid
     if (!away(row.last_active_at, new Date(at.getTime() - window).toISOString())) return []
     if (!away(row.digest_sent_at, new Date(at.getTime() - window + HOUR_MS).toISOString())) return []
 
-    return [{ account_id: row.id, email: row.email, choice, since: row.digest_sent_at }]
+    return [
+      {
+        account_id: row.id,
+        email: row.email,
+        choice,
+        digest_sent_at: row.digest_sent_at,
+        last_active_at: row.last_active_at,
+      },
+    ]
   })
 }
 
 export const unseenFor = async (
   db: Database,
   accountId: string,
-  { since, origin }: { since: string | null; origin: string | undefined },
+  { after, origin }: { after: string | null; origin: string | undefined },
 ): Promise<DigestSection[]> => {
   const rows = await db
     .select({
@@ -86,10 +102,17 @@ export const unseenFor = async (
     .where(and(eq(notification.account_id, accountId), isNull(notification.seen_at)))
     .orderBy(desc(notification.created_at), desc(notification.id))
 
-  const within = since === null ? rows : rows.filter((row) => row.created_at > since)
+  const within = after === null ? rows : rows.filter((row) => row.created_at > after)
 
-  return notificationCategories.flatMap((category) => {
-    const mine = within.filter((row) => row.category === category)
+  return sectionsOf(within, origin)
+}
+
+const sectionsOf = (
+  rows: readonly { category: NotificationCategory; body: string; link: string | null }[],
+  origin: string | undefined,
+): DigestSection[] =>
+  notificationCategories.flatMap((category) => {
+    const mine = rows.filter((row) => row.category === category)
     if (mine.length === 0) return []
 
     return [
@@ -104,7 +127,6 @@ export const unseenFor = async (
       },
     ]
   })
-}
 
 export interface DigestDeps extends MailDeps {
   origin?: string
@@ -119,7 +141,7 @@ export const sweepDigests = async (deps: DigestDeps, at: Date): Promise<number> 
 
   for (const candidate of await dueForDigest(deps.db, at)) {
     const sections = await unseenFor(deps.db, candidate.account_id, {
-      since: candidate.since,
+      after: laterOf(candidate.last_active_at, candidate.digest_sent_at),
       origin: deps.origin,
     })
     if (sections.length === 0) continue
@@ -147,4 +169,21 @@ export const sweepDigests = async (deps: DigestDeps, at: Date): Promise<number> 
   }
 
   return sent
+}
+
+export const digestPreviewFor = async (
+  db: Database,
+  accountId: string,
+  { hours, origin }: { hours: number; origin: string | undefined },
+  at: Date,
+): Promise<DigestSection[]> => {
+  const after = new Date(at.getTime() - hours * HOUR_MS).toISOString()
+
+  const rows = await db
+    .select({ category: notification.category, body: notification.body, link: notification.link })
+    .from(notification)
+    .where(and(eq(notification.account_id, accountId), gt(notification.created_at, after)))
+    .orderBy(desc(notification.created_at), desc(notification.id))
+
+  return sectionsOf(rows, origin)
 }

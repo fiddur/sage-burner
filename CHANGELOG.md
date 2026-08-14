@@ -22,10 +22,12 @@ under today's heading, and make a new heading when there is none.
 - **A summary by email when you have been away.** If something happens and you have not been on the
   site for a day, you get one message listing what you have not seen, grouped and linked. It
   arrives only when there is something new and only when you have actually been away, so a day you
-  have read everything is a day it stays quiet. Your first one covers everything you have missed;
-  after that each one picks up where the last left off, so nothing is repeated and nothing is
-  skipped. It is on unless you say otherwise — Your details → Notifications has _Every day_, _Every
-  week_ and _Never_ — and it needs a mail server, so an installation without one is unchanged.
+  have read everything is a day it stays quiet. Your first one covers everything since you were
+  last on the site — so somebody who signed up and never came back hears about the dreams and the
+  meeting points they have missed, not just the last day of them — and each one after it covers
+  what is new since the last. It is on unless you say otherwise — Your details → Notifications has
+  _Every day_, _Every week_ and _Never_ — and it needs a mail server, so an installation without
+  one is unchanged.
 
 - **The buttons are drawings now, not emoji.** The pencil, the trashcan, the bell, the raised
   hand, the menu — every control the app offers is one set of grey line icons, drawn the same

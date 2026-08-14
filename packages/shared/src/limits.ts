@@ -77,3 +77,7 @@ export const MIN_PASSWORD = 10
 export const MAX_MEETING_LINK = 500
 
 export const MAX_DECIDED_NOTE = 200
+
+export const DIGEST_PREVIEW_HOURS = 24
+
+export const MOST_PREVIEW_HOURS = 24 * 90

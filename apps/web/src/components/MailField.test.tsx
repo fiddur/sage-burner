@@ -26,6 +26,7 @@ const stub = (over: Partial<MailApi> = {}): MailApi => ({
   updateMailSettings: () => Promise.reject(new Error('updateMailSettings is not stubbed here')),
   removeMailSettings: () => Promise.reject(new Error('removeMailSettings is not stubbed here')),
   sendTestEmail: () => Promise.reject(new Error('sendTestEmail is not stubbed here')),
+  sendDigestPreview: () => Promise.resolve({ sent: true, to: 'admin@example.org', reason: null }),
   ...over,
 })
 
@@ -171,5 +172,34 @@ describe('the mail settings form', () => {
 
     expect((await screen.findByRole('alert')).textContent).toContain('That port is not one.')
     expect(screen.getByLabelText('Server')).toHaveProperty('value', 'smtp.example.org')
+  })
+})
+
+describe('the digest preview', () => {
+  const LABEL = 'Send me a digest of the last'
+
+  it('asks for a day by default, and sends the number in the field', async () => {
+    const preview = vi.fn(() => Promise.resolve({ sent: true, to: 'admin@example.org', reason: null }))
+    render(
+      <MailField
+        api={stub({ getMailSettings: () => Promise.resolve({ mail: STORED }), sendDigestPreview: preview })}
+      />,
+    )
+
+    const hours = await screen.findByLabelText(new RegExp(LABEL))
+    expect(hours).toHaveProperty('value', '24')
+
+    fireEvent.input(hours, { target: { value: '72' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send it' }))
+
+    await waitFor(() => expect(preview).toHaveBeenCalledWith({ hours: 72 }))
+  })
+
+  it('is not offered where no mail server has been set up', async () => {
+    render(<MailField api={stub()} />)
+
+    await screen.findByRole('button', { name: 'Save' })
+
+    expect(screen.queryByRole('button', { name: 'Send it' })).toBeNull()
   })
 })

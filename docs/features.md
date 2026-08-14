@@ -184,7 +184,7 @@ a feature updates it in the same PR ([AGENTS.md](../AGENTS.md) says so).
   services required; push, email and provider sign-in are optional and
   configured from inside the app.
 - Admins name the installation, upload its icon, link the site map, and set up
-  SMTP (with a test message to their own address) and OAuth providers.
+  SMTP (with a test message, and a digest of any stretch, to their own address) and OAuth providers.
 - A shared link draws a proper card — the backend injects the installation's
   name, the burn's dates and a banner into the shell for crawlers.
 - The app installs to a home screen and works offline from its cache; signing

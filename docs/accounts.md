@@ -1128,29 +1128,28 @@ A digest goes out only when **all** of these hold: a mail server is configured; 
 is not `off`; something is unseen; something unseen is newer than the last digest; and the
 account has not been on the site inside the window — 24 hours or 7 days.
 
-**It then carries what has happened since the last one** (#644). #620 had it carry everything
-still unseen, which is right for the first digest and wrong for every one after it: somebody
-who never opens the bell has their notifications stay unseen for ever, so night after night the
-same list arrived with one new line on top, and the message meant to bring them back becomes
-the one they filter.
+**It then carries everything unseen since the later of two marks** (#654): when they were
+last on the site, and when the last digest went. Both are needed and each answers a different
+question.
 
-**The cut is the last digest and never the clock.** A window measured back from the sweep looks
-like the same rule and is not: eligibility needs `last_active_at` older than the window, so the
-earliest sweep that can write to somebody is a whole window after their last visit — and a
-clock-anchored cut would by then have moved past a notification that arrived an hour after they
-left. That is the population this exists for, and nothing else would ever carry it. It would
-also silently undo the failed-send retry, which leaves `digest_sent_at` unset precisely so the
-next sweep sends the same stretch.
+**The visit** is what makes a first digest worth having. Somebody who signed up, looked once
+and never came back gets the whole stretch since that look — the dreams offered, the points
+raised, all of it — because a digest of the last day would mention almost nothing on the one
+night that "what you have missed" is the right message.
 
-So a daily digest holds a day's worth because it goes out daily, not because a day is measured
-— and where the gap is longer, the digest is longer, which is the honest answer. `MOST_PER_SECTION`
-is what bounds it.
+**The last digest** is what stops the next one repeating it. Anchored to the visit alone, a
+nightly sweep would post the same growing list for ever.
 
-**The first one is the exception, and `since` is what makes it one.** An account that has never
-had a digest has no `digest_sent_at`, and that absence is read as "carry everything" — so a
-member's first is the whole backlog, which is the single night when _what you have missed_ is
-exactly the right message. The subject counts what is waiting rather than what was printed, so
-a large first digest is still a readable one.
+So the shape is: the first one is the history, and each one after it is what is new. Coming back
+moves the cut forward to the visit, which is right — they read the page while they were here.
+`digest_sent_at` also decides _whether_ to write at all, since a digest with nothing new in it
+is not worth a message.
+
+**The mark is the sweep's own tick, not the moment of the send.** It is taken before any account
+is read, so a notification written while the sweep is grinding through the list is either read
+into this digest or is strictly newer than the mark and lands in the next — never neither. That
+direction is the safe one, and it is why the mark must not be "tidied" to the moment the message
+actually went.
 
 **`account.last_active_at` is what "has been here" means**, and nothing recorded it before:
 a session is a signed cookie with no row behind it. An `onRequest` hook stamps it for
@@ -1215,6 +1214,19 @@ the reason to keep it small. No image and no webfont: a remote image is a read r
 webfont is ignored anyway. Everything a member or an admin wrote is escaped, in the text of a
 line and in the `href` alike, since a notification body is member-authored and the
 installation's name is admin-authored.
+
+**An admin can post one to themselves** (#640). ⚙️ → Settings takes a number of hours,
+defaulting to 24, and posts a digest of that stretch to the **admin's own address** — the rule
+the test button already follows, since a send-to box on an admin page is an open relay with
+extra steps. Two things make it a preview rather than a second digest: it **ignores `seen_at`**,
+because an admin who uses the app has read everything and a preview that is almost always empty
+is a button nobody presses twice; and it **never writes `digest_sent_at`**, because a preview
+that spends the real one costs somebody the thing being checked. With nothing in the stretch it
+says so rather than posting an empty message.
+
+The hours are a field rather than daily/weekly buttons for a reason worth keeping: the real
+digest has no window — its cut is the last visit — so two buttons would have sent identical
+mail. A stretch somebody types is the honest way to ask "what would this have looked like".
 
 **The sweep is in `server.ts`, not `createApp`** — exactly where `announceDeploy` is, and for
 the same reason: the suite builds an app per test, and a timer wired into that would tick in
