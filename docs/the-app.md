@@ -320,7 +320,9 @@ bell, a heart, a hand, one weight and one colour. A row may hold both — a page
 beside the arrow saying it opens elsewhere — but two _controls_ in one row are never one of
 each.
 
-The twenty-four the app uses are the twenty-four it ships. They are
+Nothing ships that nothing draws, and `Icon.test.tsx` says so rather than a number here
+saying it — a count in prose goes stale the first time somebody adds a glyph, which it did
+within a day. They are
 [Lucide](https://lucide.dev)'s, pasted as path data into `Icon.tsx` exactly as #492 pasted
 Simple Icons' brand marks into `MusicIcon.tsx`, with the ISC notice in
 [THIRD-PARTY.md](../THIRD-PARTY.md). No dependency: a package would bring six hundred
