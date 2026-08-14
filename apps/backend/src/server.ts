@@ -1,6 +1,8 @@
 import { createApp } from './app.ts'
 import { createConfig } from './config.ts'
 import { createDb, runMigrations } from './db/index.ts'
+import { isNightHour, sweepDigests } from './mail/digest.ts'
+import { sendWithSmtp } from './mail/smtp.ts'
 import { announceDeploy } from './push/deploy.ts'
 import { recordAndPush } from './push/notify.ts'
 import { DEFAULT_PUSH_CONTACT, deliverWithWebPush, generateVAPIDKeys } from './push/web-push.ts'
@@ -26,8 +28,37 @@ await announceDeploy(
   app.log.error({ err: failure }, 'could not announce the deploy')
 })
 
+/**
+ * Here rather than in `createApp`, exactly as `announceDeploy` is: the suite builds an app per
+ * test and a timer wired into that would tick in every one of them. Unref'd, so it never holds
+ * the process open, and hourly, since the night window is the only thing it has to land inside.
+ */
+const digests = setInterval(
+  () => {
+    const at = new Date()
+    if (!isNightHour(at.getHours())) return
+
+    sweepDigests(
+      {
+        db: handle.db,
+        send: sendWithSmtp,
+        ...(config.public_origin === undefined ? {} : { origin: config.public_origin }),
+        log: (posted, account_id) => {
+          app.log.warn({ reason: posted.reason, account_id }, 'posting a digest')
+        },
+      },
+      at,
+    ).catch((failure: unknown) => {
+      app.log.error({ err: failure }, 'sweeping for digests')
+    })
+  },
+  60 * 60 * 1000,
+)
+digests.unref()
+
 const shutdown = async (signal: string) => {
   app.log.info(`${signal} received, shutting down`)
+  clearInterval(digests)
   await app.close()
   handle.close()
   process.exit(0)

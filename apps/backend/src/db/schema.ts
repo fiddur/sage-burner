@@ -6,6 +6,7 @@ import {
   accountRoles,
   applicationStatuses,
   connectionKinds,
+  digestChoices,
   effortLevels,
   eventOptionKinds,
   formQuestionTypes,
@@ -347,10 +348,14 @@ export const account = sqliteTable(
     introduction: text('introduction'),
     invite_token_id: text('invite_token_id').references((): AnySQLiteColumn => inviteToken.id),
     created_at: text('created_at').notNull(),
+    digest: text('digest', { enum: digestChoices }),
+    last_active_at: text('last_active_at'),
+    digest_sent_at: text('digest_sent_at'),
   },
   (table) => [
     primaryKey({ columns: [table.id] }),
     check('account_email_lowercase_check', sql`${table.email} = lower(${table.email})`),
+    check('account_digest_check', sql`${table.digest} is null or ${oneOf(table.digest, digestChoices)}`),
     uniqueIndex('account_invite_token_idx')
       .on(table.invite_token_id)
       .where(sql`${table.invite_token_id} is not null`),

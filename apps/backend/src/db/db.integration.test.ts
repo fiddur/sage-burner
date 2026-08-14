@@ -658,6 +658,21 @@ describe('uniqueness', () => {
     expect(() => seedAccount(ids.otherAccount, 'someone.else@example.org')).not.toThrow()
   })
 
+  it('refuses a digest choice the app has no word for', () => {
+    // The API never writes one — Zod is ahead of it — so a write that skips the API is the
+    // only thing that exercises this, and the column is nullable on purpose: absence is
+    // "has not said", and `DEFAULT_DIGEST` decides what that means.
+    expect(() =>
+      handle.client.prepare('update account set digest = ? where id = ?').run('hourly', ids.account),
+    ).toThrow()
+    expect(() =>
+      handle.client.prepare('update account set digest = ? where id = ?').run('weekly', ids.account),
+    ).not.toThrow()
+    expect(() =>
+      handle.client.prepare('update account set digest = ? where id = ?').run(null, ids.account),
+    ).not.toThrow()
+  })
+
   it('makes an invite genuinely single-use, even by a different account', () => {
     // Enforced on `account` now that redemption creates the person rather than a
     // per-burn row. Without it a forwarded link lets a second person redeem the

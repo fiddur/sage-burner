@@ -54,7 +54,7 @@ const stub = (over: Partial<ApplyApi> = {}): ApplyApi => ({
   getPushKey: () => Promise.resolve({ public_key: null }),
   subscribeToPush: () => Promise.reject(new Error('subscribeToPush is not stubbed here')),
   unsubscribeFromPush: () => Promise.reject(new Error('unsubscribeFromPush is not stubbed here')),
-  getMyNotificationSettings: () => Promise.resolve({ on: [], email: [] }),
+  getMyNotificationSettings: () => Promise.resolve({ on: [], email: [], digest: 'daily' }),
   updateMyNotificationSettings: () =>
     Promise.reject(new Error('updateMyNotificationSettings is not stubbed here')),
   ...over,

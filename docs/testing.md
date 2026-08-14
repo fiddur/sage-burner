@@ -239,8 +239,9 @@ phone" means 360px.
 - [ ] Subscribe to push in one browser; a notification tapped lands on the
       right page in the open app rather than a new window.
 - [ ] With SMTP configured (⚙️ → Settings), the test message goes to the
-      admin's own address, and the email column appears on the notification
-      settings — off everywhere until asked.
+      admin's own address, and the Email column appears on the notification
+      settings — unticked for every kind until asked. The digest below the tables
+      is the one thing there that starts on.
 - [ ] In a browser with push off, tick a category on the details page: a strip appears at the
       bottom of the window offering to turn notifications on here.
 - [ ] Without dismissing it, go to the feed and tick "Notify me on similar" in a card's 🔔:
@@ -250,6 +251,11 @@ phone" means 360px.
       it again.
 - [ ] Take up an invite in a browser with push off: the welcome offers "Notify me here",
       and accepting it subscribes without a trip to another page.
+- [ ] With SMTP configured, Your details → Notifications carries **A summary by email when
+      you have stayed away**, set to _Every day_; without SMTP the whole control is absent.
+- [ ] Set it to _Never_ and reload: it is still _Never_. The digest itself needs a clock —
+      an account with something unseen, no visit for a day, and the sweep run in the small
+      hours — so `digest.test.ts` is what covers when one goes out.
 - [ ] ⚙️ → Notifications sent lists what has gone out, newest first, with the number told,
       the number who had the category off, and the devices that took it. Cause a burn-wide
       notification: it is **one** line whose "Told" is the number attending, not one line

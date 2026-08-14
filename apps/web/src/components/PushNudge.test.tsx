@@ -34,8 +34,9 @@ const aBrowser = (subscribed: boolean): PushBrowser => ({
 })
 
 const stub = (over: Partial<PushToggleApi> = {}): PushToggleApi => ({
-  getMyNotificationSettings: () => Promise.resolve({ on: [], email: [] }),
-  updateMyNotificationSettings: (settings) => Promise.resolve({ on: [...settings.on], email: [] }),
+  getMyNotificationSettings: () => Promise.resolve({ on: [], email: [], digest: 'daily' }),
+  updateMyNotificationSettings: (settings) =>
+    Promise.resolve({ on: [...settings.on], email: [], digest: 'daily' }),
   getPushKey: () => Promise.resolve({ public_key: 'BFakeKey_with-url-safe' }),
   subscribeToPush: () => Promise.resolve(undefined),
   unsubscribeFromPush: () => Promise.resolve(undefined),

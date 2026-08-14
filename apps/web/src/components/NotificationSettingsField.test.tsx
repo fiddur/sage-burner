@@ -1,3 +1,5 @@
+import type { NotificationSettings } from '@sage-burner/shared'
+
 import { categoriesAbout, notificationCategories } from '@sage-burner/shared'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -38,8 +40,8 @@ const asAdmin = (api: NotificationSettingsApi) => (
 )
 
 const stub = (over: Partial<NotificationSettingsApi> = {}): NotificationSettingsApi => ({
-  getMyNotificationSettings: () => Promise.resolve({ on: [...DEFAULTS], email: [] }),
-  updateMyNotificationSettings: () => Promise.resolve({ on: [...DEFAULTS], email: [] }),
+  getMyNotificationSettings: () => Promise.resolve({ on: [...DEFAULTS], email: [], digest: 'daily' }),
+  updateMyNotificationSettings: () => Promise.resolve({ on: [...DEFAULTS], email: [], digest: 'daily' }),
   ...over,
 })
 
@@ -129,7 +131,7 @@ describe('what to be told about', () => {
           getMyNotificationSettings: () => Promise.reject(apiError(500, 'internal_error', 'Nope.')),
           updateMyNotificationSettings: () => {
             saves += 1
-            return Promise.resolve({ on: [], email: [] })
+            return Promise.resolve({ on: [], email: [], digest: 'daily' })
           },
         })}
       />,
@@ -141,7 +143,7 @@ describe('what to be told about', () => {
   })
 
   it('switches one off by unticking it', async () => {
-    const update = vi.fn(() => Promise.resolve({ on: [], email: [] }))
+    const update = vi.fn(() => Promise.resolve<NotificationSettings>({ on: [], email: [], digest: 'daily' }))
     render(<NotificationSettingsField api={stub({ updateMyNotificationSettings: update })} />)
 
     fireEvent.click(await screen.findByLabelText(MEAL))
@@ -150,6 +152,7 @@ describe('what to be told about', () => {
       expect(update).toHaveBeenCalledWith({
         on: DEFAULTS.filter((category) => category !== 'meal_role'),
         email: [],
+        digest: 'daily',
       })
     })
   })
@@ -159,13 +162,13 @@ describe('what to be told about', () => {
     // category is off until somebody asks for it. The payload carries `application`
     // too, which a member is shown no row for — every save replaces the whole set, so
     // a hidden category has to ride along or the first tick switches it off (#326).
-    const update = vi.fn(() => Promise.resolve({ on: [], email: [] }))
+    const update = vi.fn(() => Promise.resolve<NotificationSettings>({ on: [], email: [], digest: 'daily' }))
     render(<NotificationSettingsField api={stub({ updateMyNotificationSettings: update })} />)
 
     fireEvent.click(await screen.findByLabelText(DREAM_OFFERED))
 
     await waitFor(() => {
-      expect(update).toHaveBeenCalledWith({ on: [...DEFAULTS, 'dream_offered'], email: [] })
+      expect(update).toHaveBeenCalledWith({ on: [...DEFAULTS, 'dream_offered'], email: [], digest: 'daily' })
     })
   })
 
@@ -189,13 +192,15 @@ describe('what to be told about', () => {
   })
 
   it('sends both lists when one channel is ticked, leaving the other alone', async () => {
-    const update = vi.fn(() => Promise.resolve({ on: [...DEFAULTS], email: ['meal_role' as const] }))
+    const update = vi.fn(() =>
+      Promise.resolve<NotificationSettings>({ on: [...DEFAULTS], email: ['meal_role'], digest: 'daily' }),
+    )
     render(<NotificationSettingsField api={stub({ updateMyNotificationSettings: update })} sendsEmail />)
 
     fireEvent.click(await screen.findByLabelText(MEAL_EMAIL))
 
     await waitFor(() => {
-      expect(update).toHaveBeenCalledWith({ on: [...DEFAULTS], email: ['meal_role'] })
+      expect(update).toHaveBeenCalledWith({ on: [...DEFAULTS], email: ['meal_role'], digest: 'daily' })
     })
   })
 
@@ -213,5 +218,53 @@ describe('what to be told about', () => {
 
     await screen.findByRole('alert')
     expect(checked(MEAL)).toBe(true)
+  })
+})
+
+describe('the digest of what you have missed', () => {
+  const DIGEST = 'A summary by email when you have stayed away'
+
+  it('is not offered where the installation has no mail server', async () => {
+    // The email column's rule: a switch that cannot do anything reads as a promise.
+    render(<NotificationSettingsField api={stub()} />)
+
+    await screen.findByLabelText(MEAL)
+
+    expect(screen.queryByLabelText(DIGEST)).toBeNull()
+  })
+
+  it('starts where the server left it', async () => {
+    const settings: NotificationSettings = { on: [...DEFAULTS], email: [], digest: 'weekly' }
+    render(
+      <NotificationSettingsField
+        api={stub({ getMyNotificationSettings: () => Promise.resolve(settings) })}
+        sendsEmail
+      />,
+    )
+
+    expect(await screen.findByLabelText(DIGEST)).toHaveProperty('value', 'weekly')
+  })
+
+  it('sends the whole set when it changes, so a choice does not clear the boxes', async () => {
+    const update = vi.fn(() =>
+      Promise.resolve<NotificationSettings>({ on: [...DEFAULTS], email: [], digest: 'off' }),
+    )
+    render(<NotificationSettingsField api={stub({ updateMyNotificationSettings: update })} sendsEmail />)
+
+    fireEvent.change(await screen.findByLabelText(DIGEST), { target: { value: 'off' } })
+
+    await waitFor(() => expect(update).toHaveBeenCalledWith({ on: [...DEFAULTS], email: [], digest: 'off' }))
+  })
+
+  it('puts back what the server had when the save is refused', async () => {
+    const update = vi.fn(() =>
+      Promise.reject(apiError(500, 'server', 'Could not save that. Please try again.')),
+    )
+    render(<NotificationSettingsField api={stub({ updateMyNotificationSettings: update })} sendsEmail />)
+
+    fireEvent.change(await screen.findByLabelText(DIGEST), { target: { value: 'off' } })
+
+    await screen.findByText(/Could not save that/)
+    expect(screen.getByLabelText(DIGEST)).toHaveProperty('value', 'daily')
   })
 })

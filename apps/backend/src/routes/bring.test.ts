@@ -115,7 +115,7 @@ const setOn = (server: FastifyInstance, cookie: string, on: string[]) =>
     method: 'PUT',
     url: '/api/me/notification-settings',
     headers: { cookie },
-    payload: { on, email: [] },
+    payload: { on, email: [], digest: 'daily' },
   })
 
 const say = (server: FastifyInstance, cookie: string, threadId: string, body: string) =>

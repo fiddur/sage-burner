@@ -137,7 +137,7 @@ const setOn = (server: FastifyInstance, cookie: string, on: string[]) =>
     method: 'PUT',
     url: '/api/me/notification-settings',
     headers: { cookie },
-    payload: { on, email: [] },
+    payload: { on, email: [], digest: 'daily' },
   })
 
 const bell = async (

@@ -1,6 +1,13 @@
-import type { NotificationCategory, NotificationSettings } from '@sage-burner/shared'
+import type { DigestChoice, NotificationCategory, NotificationSettings } from '@sage-burner/shared'
 
-import { categoriesAbout, notificationCategoryInfo, notificationSections } from '@sage-burner/shared'
+import {
+  categoriesAbout,
+  digestChoiceInfo,
+  digestChoices,
+  isDigestChoice,
+  notificationCategoryInfo,
+  notificationSections,
+} from '@sage-burner/shared'
 import { useEffect, useState } from 'preact/hooks'
 
 import type { ApiClient } from '../api/client.ts'
@@ -17,7 +24,7 @@ export type NotificationSettingsApi = Pick<
   'getMyNotificationSettings' | 'updateMyNotificationSettings'
 >
 
-type Channel = keyof NotificationSettings
+type Channel = 'on' | 'email'
 
 export const NotificationSettingsField = ({
   api,
@@ -54,20 +61,18 @@ export const NotificationSettingsField = ({
 
   if (settings === undefined) return <p class="form-note">Loading…</p>
 
-  const set = async (channel: Channel, category: NotificationCategory, notify: boolean) => {
-    const held = settings[channel]
-    const wanted = {
-      ...settings,
-      [channel]: notify ? [...held, category] : held.filter((one) => one !== category),
-    }
-
-    if (channel === 'on' && notify) askAbout()
-
+  const save = async (wanted: NotificationSettings) => {
     setBusy(true)
     setError(undefined)
     setSettings(wanted)
     try {
-      setSettings(await api.updateMyNotificationSettings({ on: [...wanted.on], email: [...wanted.email] }))
+      setSettings(
+        await api.updateMyNotificationSettings({
+          on: [...wanted.on],
+          email: [...wanted.email],
+          digest: wanted.digest,
+        }),
+      )
     } catch (failure) {
       setSettings(settings)
       setError(isApiError(failure) ? failure.message : 'Could not save that. Please try again.')
@@ -75,6 +80,19 @@ export const NotificationSettingsField = ({
       setBusy(false)
     }
   }
+
+  const set = async (channel: Channel, category: NotificationCategory, notify: boolean) => {
+    const held = settings[channel]
+
+    if (channel === 'on' && notify) askAbout()
+
+    await save({
+      ...settings,
+      [channel]: notify ? [...held, category] : held.filter((one) => one !== category),
+    })
+  }
+
+  const setDigest = async (digest: DigestChoice) => await save({ ...settings, digest })
 
   const channels: readonly { channel: Channel; heading: string }[] = [
     { channel: 'on', heading: 'Here' },
@@ -122,10 +140,37 @@ export const NotificationSettingsField = ({
         </Table>
       ))}
 
+      {sendsEmail && (
+        <>
+          <label class="field digest-choice">
+            <span>A summary by email when you have stayed away</span>
+            <select
+              disabled={busy}
+              value={settings.digest}
+              onChange={(changeEvent) => {
+                const chosen = changeEvent.currentTarget.value
+                if (isDigestChoice(chosen)) void setDigest(chosen)
+              }}
+            >
+              {digestChoices.map((choice) => (
+                <option key={choice} value={choice}>
+                  {digestChoiceInfo[choice].label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <p class="form-note">
+            Only what you have not seen, and only when you have not been here — so it never arrives on a day
+            you have already read it all.
+          </p>
+        </>
+      )}
+
       <p class="form-note">
         What else is going on means the burns you are coming to — nobody hears about a burn they have not said
         they are attending.
-        {sendsEmail && ' Email is off everywhere until you ask for it.'}
+        {sendsEmail && ' The Email column is off for every kind until you tick it.'}
       </p>
     </>
   )

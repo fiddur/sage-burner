@@ -2071,6 +2071,17 @@ a.person-badge:focus-visible span:last-child {
   table-layout: fixed;
 }
 
+/* Under the tables rather than a column in them (#620): one choice for the whole account,
+   where a column would have asked the same question once per category. Bounded, because a
+   three-way choice stretched across the page reads as a text field. */
+.digest-choice {
+  margin-block-start: 1rem;
+}
+
+.digest-choice select {
+  max-width: 14rem;
+}
+
 /*
   `min()`, and the `rem` half is only the desktop half (#341).
 

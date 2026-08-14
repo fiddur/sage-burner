@@ -258,7 +258,7 @@ describe('what somebody has switched on', () => {
       method: 'PUT',
       url: '/api/me/notification-settings',
       headers: { cookie },
-      payload: { on, email },
+      payload: { on, email, digest: 'daily' },
     })
 
   /** Everything on except the named ones — what unticking a box used to mean. */
@@ -309,6 +309,87 @@ describe('what somebody has switched on', () => {
     const back = await setOn(server, ada.cookie, ['meal_role'])
 
     expect(back.json().on).toEqual(['meal_role'])
+  })
+
+  it('records that somebody has been here, which is the whole of what a digest waits on', async () => {
+    const server = await build()
+    const ada = await givenAccount()
+
+    await server.inject({
+      method: 'GET',
+      url: '/api/me/notification-settings',
+      headers: { cookie: ada.cookie },
+    })
+
+    const [row] = await db()
+      .select({ at: account.last_active_at })
+      .from(account)
+      .where(eq(account.id, ada.id))
+
+    expect(row?.at).toBe(NOW)
+  })
+
+  it('records nothing for a request carrying no session', async () => {
+    // The passing sibling: stamping on every request would satisfy the one above while
+    // making "has been here" mean "somebody asked for the login page".
+    const server = await build()
+    const ada = await givenAccount()
+
+    await server.inject({ method: 'GET', url: '/api/me/notification-settings' })
+
+    const [row] = await db()
+      .select({ at: account.last_active_at })
+      .from(account)
+      .where(eq(account.id, ada.id))
+
+    expect(row?.at).toBeNull()
+  })
+
+  it('says a digest is daily for somebody who has never said', async () => {
+    const server = await build()
+    const ada = await givenAccount()
+
+    const settings = await server.inject({
+      method: 'GET',
+      url: '/api/me/notification-settings',
+      headers: { cookie: ada.cookie },
+    })
+
+    expect(settings.json().digest).toBe('daily')
+  })
+
+  it('remembers a digest switched off, which is what absence cannot say', async () => {
+    const server = await build()
+    const ada = await givenAccount()
+
+    await server.inject({
+      method: 'PUT',
+      url: '/api/me/notification-settings',
+      headers: { cookie: ada.cookie },
+      payload: { on: [], email: [], digest: 'off' },
+    })
+
+    const settings = await server.inject({
+      method: 'GET',
+      url: '/api/me/notification-settings',
+      headers: { cookie: ada.cookie },
+    })
+
+    expect(settings.json().digest).toBe('off')
+  })
+
+  it('refuses a digest the app has no word for', async () => {
+    const server = await build()
+    const ada = await givenAccount()
+
+    const refused = await server.inject({
+      method: 'PUT',
+      url: '/api/me/notification-settings',
+      headers: { cookie: ada.cookie },
+      payload: { on: [], email: [], digest: 'hourly' },
+    })
+
+    expect(refused.statusCode).toBe(400)
   })
 
   it('defaults to what happens to you, and the one thing around you that cannot wait', async () => {
@@ -751,7 +832,7 @@ describe('the email channel', () => {
       method: 'PUT',
       url: '/api/me/notification-settings',
       headers: { cookie },
-      payload: { on, email },
+      payload: { on, email, digest: 'daily' },
     })
 
   const ADDRESS = 'ada@example.org'

@@ -17,6 +17,7 @@ import type { EmailQueue } from './mail/queue.ts'
 import type { OAuthCalls } from './oauth/client.ts'
 import type { Delivery, VapidKeys } from './push/push.ts'
 
+import { markActive } from './auth/active.ts'
 import { createGate, SCRYPT_GATE } from './auth/gate.ts'
 import { createGuards } from './auth/guards.ts'
 import { createSessions } from './auth/session.ts'
@@ -27,6 +28,7 @@ import {
   LOGIN_BY_IP,
   REDEEM_BY_IP,
 } from './auth/throttle.ts'
+import { readSessionCookie, viewerFor } from './auth/viewer.ts'
 import { refuseEnvelopeStrippers } from './envelope.ts'
 import { clientErrorHandler, frameworkErrorHandler, registerErrorHandler } from './errors.ts'
 import { sendError } from './http.ts'
@@ -172,6 +174,23 @@ const throttles = (bounds: NonNullable<AppDeps['bounds']>, now: () => number) =>
 
 const ADMIN_PREFIX = '/api/admin'
 
+/**
+ * Only `/api/` and only with a session cookie, so nothing static or signed-out pays for it. The
+ * viewer is memoised per request, so a route that needs it anyway is not read twice.
+ */
+const registerActivityHook = (app: FastifyInstance, deps: GuardDeps & { now: () => Date }) => {
+  app.addHook('onRequest', async (request) => {
+    const pattern = request.routeOptions.url
+    if (pattern === undefined || !pattern.startsWith(`${API_PREFIX}/`)) return
+    if (readSessionCookie(request.headers.cookie) === undefined) return
+
+    const viewer = await viewerFor(request, deps)
+    if (viewer === undefined) return
+
+    await markActive(deps.db, viewer.account_id, deps.now())
+  })
+}
+
 const registerAdminPrefixGuard = (app: FastifyInstance, deps: GuardDeps) => {
   const { requireAdmin } = createGuards(deps)
 
@@ -235,6 +254,7 @@ export const createApp = async ({
   const { limits, redemptions, applicationMessages } = throttles(bounds, () => now().getTime())
 
   registerAdminPrefixGuard(app, { db, sessions })
+  registerActivityHook(app, { db, sessions, now })
 
   const push = { db, deliver, now, mintKeys }
 

@@ -107,7 +107,7 @@ const switchOn = (server: FastifyInstance, cookie: string, ...categories: string
     method: 'PUT',
     url: '/api/me/notification-settings',
     headers: { cookie },
-    payload: { on: categories, email: [] },
+    payload: { on: categories, email: [], digest: 'daily' },
   })
 
 const bodiesFor = async (server: FastifyInstance, cookie: string): Promise<string[]> => {

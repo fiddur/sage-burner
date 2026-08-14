@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm'
 
 import type { Database } from '../db/index.ts'
 
-import { INSTALLATION_ID, mailSetting } from '../db/schema.ts'
+import { installation, INSTALLATION_ID, mailSetting } from '../db/schema.ts'
 
 export interface Message {
   to: string
@@ -39,6 +39,16 @@ export const mailSettingsFor = async (db: Database) => {
   const [row] = await db.select().from(mailSetting).where(eq(mailSetting.id, INSTALLATION_ID)).limit(1)
 
   return row
+}
+
+export const installationTitle = async (db: Database): Promise<string> => {
+  const [row] = await db
+    .select({ title: installation.title })
+    .from(installation)
+    .where(eq(installation.id, INSTALLATION_ID))
+    .limit(1)
+
+  return row?.title ?? ''
 }
 
 export const fromAddress = (name: string, email: string): string => {

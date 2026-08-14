@@ -1110,6 +1110,44 @@ for every category until somebody asks**, so it needs no defaults at all — abs
 `DEFAULT 0` and the migration adding it decided nothing for the rows already there. An
 upgrade must never be what starts posting to somebody's inbox.
 
+**The digest is the one exception, and it is deliberately one** (#620). The rule above is
+about the per-category channel — an instant copy of each notification, which is somebody
+choosing to be reached that way. The digest is a different thing: **only what you have not
+seen, and only when you have not been here.** It is on by default, daily, because the
+people it is for are precisely the people who have stopped opening the app and will
+therefore never open the settings page to switch it on. An upgrade does start it, and what
+it can produce for somebody who never comes back is one message a day that would each have
+been a reason to come back.
+
+`account.digest` is `daily | weekly | off`, nullable, and **absence means "has not said"** —
+the same shape `notification_setting` uses, with `DEFAULT_DIGEST` in the shared package
+holding what that means. The wire carries it whole alongside the two lists, for the reason
+the lists are carried whole.
+
+A digest goes out only when **all** of these hold: a mail server is configured; the choice
+is not `off`; something is unseen; something unseen is newer than the last digest; and the
+account has not been on the site inside the window — 24 hours or 7 days. It then carries
+**everything** still unseen, not only what arrived since the last one: a digest is the whole
+of what is waiting, and the newer thing is only what makes it worth sending. Sending the new
+one alone would leave the rest unmentioned for ever.
+
+**`account.last_active_at` is what "has been here" means**, and nothing recorded it before:
+a session is a signed cookie with no row behind it. An `onRequest` hook stamps it for
+`/api/` requests carrying a session, and the staleness test is the `UPDATE`'s own `WHERE`,
+so it is one write, no read, and a no-op on all but the first request of an hour. That also
+sets the resolution: an hour is the finest question this data can answer.
+
+**`account.digest_sent_at` is set only on a send that succeeded.** A mail server that is
+down therefore costs a delay rather than a digest — the next sweep tries the same person
+again — which is the one place the "a failed send costs a message" rule is worth bending,
+since nothing else will carry that backlog.
+
+**The sweep is in `server.ts`, not `createApp`** — exactly where `announceDeploy` is, and for
+the same reason: the suite builds an app per test, and a timer wired into that would tick in
+every one of them. It is an hourly unref'd interval that does nothing outside 02:00–05:00 by
+the container's clock. Nothing depends on the hour being right; the window guard is what
+stops a second digest, whenever the sweep happens to wake.
+
 The wire carries both lists in full — `{ on: [...], email: [...] }` — for the same
 reason it carries `on` in full: two lists meaning two different things is exactly what
 the `muted` rewrite got rid of.
