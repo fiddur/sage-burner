@@ -37,6 +37,7 @@ afterEach(async () => {
   handle?.close()
   app = undefined
   handle = undefined
+  vi.restoreAllMocks()
 })
 
 const db = () => {
@@ -335,9 +336,23 @@ describe('what somebody has switched on', () => {
     expect(row?.at).toBe(NOW)
   })
 
+  it('answers the request even when recording the visit fails', async () => {
+    const server = await build()
+    const ada = await givenAccount()
+    vi.spyOn(db(), 'update').mockImplementation(() => {
+      throw new Error('the database went away')
+    })
+
+    const answered = await server.inject({
+      method: 'GET',
+      url: '/api/me/notification-settings',
+      headers: { cookie: ada.cookie },
+    })
+
+    expect(answered.statusCode).toBe(200)
+  })
+
   it('records nothing for a request carrying no session', async () => {
-    // The passing sibling: stamping on every request would satisfy the one above while
-    // making "has been here" mean "somebody asked for the login page".
     const server = await build()
     const ada = await givenAccount()
 

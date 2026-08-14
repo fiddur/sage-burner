@@ -256,9 +256,6 @@ describe('what a digest holds', () => {
 
 describe('the night a restart could otherwise skip', () => {
   it('is still due when the last digest went barely under a day ago', async () => {
-    // The tick offset moves on every redeploy, so a strict 24h edge means a sweep that wakes
-    // a few minutes earlier than the night before finds nobody due and the next one is 48h
-    // away. An hour of slack costs nothing: the window is a night, not a minute.
     build()
     const accountId = await givenAccount({
       lastActive: ago(3 * DAY),
