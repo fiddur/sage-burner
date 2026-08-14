@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { absolute, inviteMessage, notificationMessage, testMessage } from './messages.ts'
+import { absolute, digestMessage, inviteMessage, notificationMessage, testMessage } from './messages.ts'
 
 describe('an absolute link', () => {
   it('is the origin and the path', () => {
@@ -98,5 +98,39 @@ describe('the test message', () => {
     expect(message.subject).toBe('The Burning Sage: mail is working')
     expect(message.to).toBe('admin@example.org')
     expect(message.text).toContain('Organise → Settings')
+  })
+})
+
+describe('the digest', () => {
+  const sections = [
+    {
+      label: 'Somebody comments on a dream',
+      total: 1,
+      entries: [{ body: 'Ada commented', link: undefined }],
+    },
+  ]
+
+  it('names where the settings are once, not once in the sentence and again in the link', () => {
+    const digest = digestMessage({
+      installation: 'The Burning Sage',
+      to: 'ada@example.org',
+      sections,
+      settings: 'https://burn.example.org/profile',
+    })
+
+    expect(digest.html.match(/Your details/gu)).toHaveLength(1)
+  })
+
+  it('still says where they are when there is no link to give', () => {
+    // The passing sibling: dropping the words from the sentence would satisfy the test above
+    // while leaving an installation without PUBLIC_ORIGIN saying nothing about the off switch.
+    const digest = digestMessage({
+      installation: 'The Burning Sage',
+      to: 'ada@example.org',
+      sections,
+      settings: undefined,
+    })
+
+    expect(digest.text.replaceAll(/\s+/gu, ' ')).toContain('Your details → Notifications')
   })
 })
