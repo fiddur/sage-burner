@@ -70,11 +70,16 @@ export const dueForDigest = async (db: Database, at: Date): Promise<DigestCandid
   })
 }
 
+/**
+ * `since` is the last digest, and it does two things: nothing newer means nothing worth
+ * sending, and its **absence** — nobody has ever had one — is what lets the first digest carry
+ * everything rather than a day of it.
+ */
 export const unseenFor = async (
   db: Database,
   accountId: string,
-  since: string | null,
-  origin: string | undefined,
+  { since, window, origin }: { since: string | null; window: number; origin: string | undefined },
+  at: Date,
 ): Promise<DigestSection[]> => {
   const rows = await db
     .select({
@@ -90,8 +95,13 @@ export const unseenFor = async (
   if (rows.length === 0) return []
   if (since !== null && !rows.some((row) => row.created_at > since)) return []
 
+  const edge = new Date(at.getTime() - window).toISOString()
+  const within = since === null ? rows : rows.filter((row) => row.created_at > edge)
+
+  if (within.length === 0) return []
+
   return notificationCategories.flatMap((category) => {
-    const mine = rows.filter((row) => row.category === category)
+    const mine = within.filter((row) => row.category === category)
     if (mine.length === 0) return []
 
     return [
@@ -120,7 +130,16 @@ export const sweepDigests = async (deps: DigestDeps, at: Date): Promise<number> 
   let sent = 0
 
   for (const candidate of await dueForDigest(deps.db, at)) {
-    const sections = await unseenFor(deps.db, candidate.account_id, candidate.since, deps.origin)
+    const sections = await unseenFor(
+      deps.db,
+      candidate.account_id,
+      {
+        since: candidate.since,
+        window: digestWindowMs(candidate.choice),
+        origin: deps.origin,
+      },
+      at,
+    )
     if (sections.length === 0) continue
 
     const posted = await post(

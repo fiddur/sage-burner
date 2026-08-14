@@ -22,7 +22,7 @@ under today's heading, and make a new heading when there is none.
 - **A summary by email when you have been away.** If something happens and you have not been on the
   site for a day, you get one message listing what you have not seen, grouped and linked. It arrives
   only when there is something new and only when you have actually been away, so a day you have read
-  everything is a day it stays quiet. It is on unless you say otherwise — Your details →
+  everything is a day it stays quiet. Your first one covers everything you have missed; after that each covers its own stretch — a day, or a week — rather than repeating what the last one said. It is on unless you say otherwise — Your details →
   Notifications has _Every day_, _Every week_ and _Never_ — and it needs a mail server, so an
   installation without one is unchanged.
 

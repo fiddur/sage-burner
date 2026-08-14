@@ -168,7 +168,12 @@ describe('what a digest holds', () => {
     await givenUnseen(accountId, { category: 'dream_comment', body: 'Ada commented', link: '/dreams' })
     await givenUnseen(accountId, { category: 'point_raised', body: 'Bo raised Firewood', link: '/meetings' })
 
-    const sections = await unseenFor(db(), accountId, null, 'https://burn.example')
+    const sections = await unseenFor(
+      db(),
+      accountId,
+      { since: null, window: DAY, origin: 'https://burn.example' },
+      NOW,
+    )
 
     expect(sections.map((section) => section.category)).toEqual(['dream_comment', 'point_raised'])
     expect(sections[0]?.entries).toEqual([{ body: 'Ada commented', link: 'https://burn.example/dreams' }])
@@ -179,7 +184,7 @@ describe('what a digest holds', () => {
     const accountId = await givenAccount()
     await givenUnseen(accountId)
 
-    const sections = await unseenFor(db(), accountId, null, undefined)
+    const sections = await unseenFor(db(), accountId, { since: null, window: DAY, origin: undefined }, NOW)
 
     expect(sections[0]?.entries[0]?.link).toBeUndefined()
   })
@@ -188,7 +193,7 @@ describe('what a digest holds', () => {
     build()
     const accountId = await givenAccount()
 
-    expect(await unseenFor(db(), accountId, null, undefined)).toEqual([])
+    expect(await unseenFor(db(), accountId, { since: null, window: DAY, origin: undefined }, NOW)).toEqual([])
   })
 
   it('is empty where nothing has arrived since the last digest', async () => {
@@ -196,21 +201,71 @@ describe('what a digest holds', () => {
     const accountId = await givenAccount()
     await givenUnseen(accountId, { at: ago(5 * DAY) })
 
-    expect(await unseenFor(db(), accountId, ago(2 * DAY), undefined)).toEqual([])
+    expect(
+      await unseenFor(db(), accountId, { since: ago(2 * DAY), window: 7 * DAY, origin: undefined }, NOW),
+    ).toEqual([])
   })
 
-  it('holds the older ones too once something new has arrived', async () => {
-    // The whole backlog is what is waiting, and the newer one is only what makes it worth
-    // sending — a digest that carried the new one alone would leave the rest unmentioned
-    // for ever.
+  it('drops what is older than the window it is named for', async () => {
     build()
     const accountId = await givenAccount()
     await givenUnseen(accountId, { body: 'old one', at: ago(5 * DAY) })
     await givenUnseen(accountId, { body: 'new one', at: ago(HOUR) })
 
-    const sections = await unseenFor(db(), accountId, ago(2 * DAY), undefined)
+    const sections = await unseenFor(
+      db(),
+      accountId,
+      { since: ago(2 * DAY), window: DAY, origin: undefined },
+      NOW,
+    )
+
+    expect(sections[0]?.entries.map((entry) => entry.body)).toEqual(['new one'])
+  })
+
+  it('keeps a week of it for somebody who asked for weekly', async () => {
+    build()
+    const accountId = await givenAccount()
+    await givenUnseen(accountId, { body: 'old one', at: ago(5 * DAY) })
+    await givenUnseen(accountId, { body: 'new one', at: ago(HOUR) })
+
+    const sections = await unseenFor(
+      db(),
+      accountId,
+      { since: ago(6 * DAY), window: 7 * DAY, origin: undefined },
+      NOW,
+    )
 
     expect(sections[0]?.entries.map((entry) => entry.body)).toEqual(['new one', 'old one'])
+  })
+
+  it('carries the whole backlog to somebody who has never had one', async () => {
+    // "All not seen is fine the first time, but not every night including the same things."
+    // A first digest with a day's worth in it would be an introduction that mentions almost
+    // nothing, on the one night the whole point is what you have missed.
+    build()
+    const accountId = await givenAccount()
+    await givenUnseen(accountId, { body: 'ancient', at: ago(60 * DAY) })
+    await givenUnseen(accountId, { body: 'recent', at: ago(HOUR) })
+
+    const sections = await unseenFor(db(), accountId, { since: null, window: DAY, origin: undefined }, NOW)
+
+    expect(sections[0]?.entries.map((entry) => entry.body)).toEqual(['recent', 'ancient'])
+  })
+
+  it('is empty where everything unseen is older than the window', async () => {
+    build()
+    const accountId = await givenAccount()
+    await givenUnseen(accountId, { body: 'old one', at: ago(5 * DAY) })
+    await givenUnseen(accountId, { body: 'newer, but still past it', at: ago(2 * DAY) })
+
+    const sections = await unseenFor(
+      db(),
+      accountId,
+      { since: ago(3 * DAY), window: DAY, origin: undefined },
+      NOW,
+    )
+
+    expect(sections).toEqual([])
   })
 
   it('caps what one section carries, and says how much it left out', async () => {
@@ -220,7 +275,7 @@ describe('what a digest holds', () => {
       await givenUnseen(accountId, { body: `comment ${at}`, at: ago(at * HOUR) })
     }
 
-    const [section] = await unseenFor(db(), accountId, null, undefined)
+    const [section] = await unseenFor(db(), accountId, { since: null, window: DAY, origin: undefined }, NOW)
 
     expect(section?.total).toBe(MOST_PER_SECTION + 3)
     expect(section?.entries).toHaveLength(MOST_PER_SECTION)
