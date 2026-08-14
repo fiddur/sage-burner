@@ -52,11 +52,7 @@ describe('createApiClient', () => {
     })
   })
 
-  it('hands every method a body the server can parse, not one wrapped in a string', async () => {
-    // `request` is what serialises, so a call site that stringifies as well posts
-    // `"{\"hours\":24}"` — valid JSON, and a string where the schema wants an object, so the
-    // route answers 400 and the payload in devtools looks almost right. Checked across every
-    // method that takes one rather than the one that got it wrong.
+  it('hands a body the server can parse, not one wrapped in a string', async () => {
     const doFetch = respondWith({ ok: true })
     const client = createApiClient(doFetch)
 

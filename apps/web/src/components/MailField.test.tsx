@@ -196,9 +196,6 @@ describe('the digest preview', () => {
   })
 
   it('leaves the other button alone while it is sending', async () => {
-    // The field is not part of the settings, so nothing about it should reach the form: it
-    // shared the test button's flag, and carried `min`/`max` inside the form, where a number
-    // outside them refused an unrelated Save.
     let finish = (_: { sent: boolean; to: string; reason: string | null }) => undefined as void
     render(
       <MailField
@@ -215,6 +212,22 @@ describe('the digest preview', () => {
     expect(screen.getByRole('button', { name: 'Send a test to me' })).toHaveProperty('disabled', false)
 
     finish({ sent: true, to: 'admin@example.org', reason: null })
+  })
+
+  it('will not send a stretch the route would refuse', async () => {
+    const preview = vi.fn(() => Promise.resolve({ sent: true, to: 'admin@example.org', reason: null }))
+    render(
+      <MailField
+        api={stub({ getMailSettings: () => Promise.resolve({ mail: STORED }), sendDigestPreview: preview })}
+      />,
+    )
+
+    fireEvent.input(await screen.findByLabelText(/Send me a digest of the last/), {
+      target: { value: '5000' },
+    })
+
+    expect(screen.getByRole('button', { name: 'Send it' })).toHaveProperty('disabled', true)
+    expect(preview).not.toHaveBeenCalled()
   })
 
   it('is not offered where no mail server has been set up', async () => {

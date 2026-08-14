@@ -7,6 +7,7 @@ import {
   MAX_SMTP_HOST,
   MAX_SMTP_PASSWORD,
   MAX_SMTP_USERNAME,
+  MOST_PREVIEW_HOURS,
 } from '@sage-burner/shared'
 import { useEffect, useState } from 'preact/hooks'
 
@@ -300,17 +301,13 @@ export const MailField = ({ api }: { api: MailApi }) => {
   )
 }
 
-/**
- * Its own component because it is not part of the settings: it shares the section and nothing
- * else, so a number typed here must not reach the form that saves them.
- */
 const DigestPreview = ({ api, disabled }: { api: Pick<MailApi, 'sendDigestPreview'>; disabled: boolean }) => {
   const [hours, setHours] = useState(String(DIGEST_PREVIEW_HOURS))
   const [sending, setSending] = useState(false)
   const [said, setSaid] = useState<string | undefined>(undefined)
 
   const wanted = Number(hours)
-  const usable = Number.isInteger(wanted) && wanted >= 1
+  const usable = Number.isInteger(wanted) && wanted >= 1 && wanted <= MOST_PREVIEW_HOURS
 
   const send = async () => {
     setSending(true)
