@@ -108,8 +108,8 @@ export const notificationMessage = ({
     ],
   })
 
-const countOf = (sections: readonly { entries: readonly unknown[] }[]): number =>
-  sections.reduce((total, section) => total + section.entries.length, 0)
+const countOf = (sections: readonly { total: number }[]): number =>
+  sections.reduce((sofar, section) => sofar + section.total, 0)
 
 export const digestMessage = ({
   installation,
@@ -119,7 +119,11 @@ export const digestMessage = ({
 }: {
   installation: string
   to: string
-  sections: readonly { label: string; entries: readonly { body: string; link: string | undefined }[] }[]
+  sections: readonly {
+    label: string
+    total: number
+    entries: readonly { body: string; link: string | undefined }[]
+  }[]
   settings: string | undefined
 }): Message => {
   const total = countOf(sections)
@@ -130,18 +134,22 @@ export const digestMessage = ({
     subject: `${installation}: ${total === 1 ? '1 thing' : `${total} things`} you have not seen`,
     blocks: [
       { paragraph: 'While you have been away:' },
-      ...sections.flatMap((section): Block[] => [
-        {
-          heading:
-            section.entries.length === 1 ? section.label : `${section.label} (${section.entries.length})`,
-        },
-        {
-          lines: section.entries.map((entry) => ({
-            text: entry.body,
-            ...(entry.link === undefined ? {} : { href: entry.link }),
-          })),
-        },
-      ]),
+      ...sections.flatMap((section): Block[] => {
+        const left = section.total - section.entries.length
+
+        return [
+          { heading: section.total === 1 ? section.label : `${section.label} (${section.total})` },
+          {
+            lines: [
+              ...section.entries.map((entry) => ({
+                text: entry.body,
+                ...(entry.link === undefined ? {} : { href: entry.link }),
+              })),
+              ...(left === 0 ? [] : [{ text: `and ${left} more` }]),
+            ],
+          },
+        ]
+      }),
       {
         note: DIGEST_SWITCH,
         ...(settings === undefined ? {} : { link: { href: settings, label: 'Your details' } }),

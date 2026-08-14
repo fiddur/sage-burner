@@ -88,12 +88,7 @@ describe('recording that somebody has been here', () => {
 
     await markActive(db(), accountId, NOW)
 
-    const [row] = await db().select({ at: account.last_active_at }).from(account).limit(1)
-    expect(row?.at).toBe(NOW.toISOString())
-    expect(
-      (await db().select({ id: account.id, at: account.last_active_at }).from(account)).find(
-        (one) => one.id === other,
-      )?.at,
-    ).toBeNull()
+    expect(await stampOn(accountId)).toBe(NOW.toISOString())
+    expect(await stampOn(other)).toBeNull()
   })
 })

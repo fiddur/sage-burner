@@ -9,7 +9,7 @@ import type { Message, Posted, Send } from './mail.ts'
 
 import { createDb, runMigrations } from '../db/index.ts'
 import { account, installation, INSTALLATION_ID, mailSetting, notification } from '../db/schema.ts'
-import { dueForDigest, isNightHour, sweepDigests, unseenFor } from './digest.ts'
+import { dueForDigest, isNightHour, MOST_PER_SECTION, sweepDigests, unseenFor } from './digest.ts'
 
 const NOW = new Date('2026-08-14T03:00:00.000Z')
 const ago = (ms: number) => new Date(NOW.getTime() - ms).toISOString()
@@ -211,6 +211,68 @@ describe('what a digest holds', () => {
     const sections = await unseenFor(db(), accountId, ago(2 * DAY), undefined)
 
     expect(sections[0]?.entries.map((entry) => entry.body)).toEqual(['new one', 'old one'])
+  })
+
+  it('caps what one section carries, and says how much it left out', async () => {
+    build()
+    const accountId = await givenAccount()
+    for (let at = 0; at < MOST_PER_SECTION + 3; at += 1) {
+      await givenUnseen(accountId, { body: `comment ${at}`, at: ago(at * HOUR) })
+    }
+
+    const [section] = await unseenFor(db(), accountId, null, undefined)
+
+    expect(section?.total).toBe(MOST_PER_SECTION + 3)
+    expect(section?.entries).toHaveLength(MOST_PER_SECTION)
+  })
+
+  it('counts what is waiting rather than what it printed, in the subject', async () => {
+    build()
+    await givenMailServer()
+    const accountId = await givenAccount({ lastActive: ago(3 * DAY) })
+    for (let at = 0; at < MOST_PER_SECTION + 3; at += 1) {
+      await givenUnseen(accountId, { body: `comment ${at}`, at: ago(at * HOUR) })
+    }
+    const sent: Message[] = []
+
+    await sweepDigests(
+      {
+        db: db(),
+        send: (_transport, message) => {
+          sent.push(message)
+
+          return Promise.resolve()
+        },
+        origin: 'https://burn.example',
+        log: () => undefined,
+      },
+      NOW,
+    )
+
+    expect(sent[0]?.subject).toBe(`The Burning Sage: ${MOST_PER_SECTION + 3} things you have not seen`)
+    expect(sent[0]?.text).toContain('and 3 more')
+  })
+})
+
+describe('the night a restart could otherwise skip', () => {
+  it('is still due when the last digest went barely under a day ago', async () => {
+    // The tick offset moves on every redeploy, so a strict 24h edge means a sweep that wakes
+    // a few minutes earlier than the night before finds nobody due and the next one is 48h
+    // away. An hour of slack costs nothing: the window is a night, not a minute.
+    build()
+    const accountId = await givenAccount({
+      lastActive: ago(3 * DAY),
+      digestSent: ago(DAY - 30 * 60 * 1000),
+    })
+
+    expect((await dueForDigest(db(), NOW)).map((one) => one.account_id)).toEqual([accountId])
+  })
+
+  it('is not due when one went a couple of hours ago, which is the same sweep waking twice', async () => {
+    build()
+    await givenAccount({ lastActive: ago(3 * DAY), digestSent: ago(2 * HOUR) })
+
+    expect(await dueForDigest(db(), NOW)).toEqual([])
   })
 })
 
